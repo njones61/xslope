@@ -714,7 +714,7 @@ FEM03_STORED = {
     "wall_grid": (os.path.join(SOLUTIONS_DIR, "wall_grid.pkl"),
                   "fem03_fem_blocks_grid.png", "fem03_fem_shear_grid.png"),
     "grid_1M": (os.path.join(os.path.expanduser("~"), "python_projects",
-                             "xslope_private", "handoffs", "fem03_long_2026-09-26",
+                             "xslope_private", "handoffs", "fem03_long_2026-10-10",
                              "grid_1M.pkl"),
                 "fem03_fem_blocks_grid_long.png", "fem03_fem_shear_grid_long.png"),
 }

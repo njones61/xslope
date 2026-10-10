@@ -552,9 +552,9 @@ and reports
 The Log's closing summary reads:
 
 > The factor of safety is 1.996, the midpoint of the bracket F = 1.9922 to
-> 2.0000. At F = 1.9922 the slope reached equilibrium in 229,503 iterations. At
+> 2.0000. At F = 1.9922 the slope reached equilibrium in 200,816 iterations. At
 > F = 2.0000 it did not: the largest displacement reached 15.0 times the elastic
-> value at iteration 210,841. The run took 1 h 9 min.
+> value at iteration 185,021. The run took 1 h 6 min.
 
 The Displacement vs F plot shows how the wall got there:
 
@@ -565,14 +565,15 @@ movement grows the whole way: 6 cm at 1.5, 13 cm at 1.75, 19 cm at 1.875 and
 30 cm at 1.9922, a twelfth of the wall's height. At 2.0 the movement runs away.
 
 The wall does fail in the end, when the geogrid reaches its capacity. At
-F = 1.9922, the last strength at which the wall came to rest, the top layer is
+F = 1.9922, the last strength at which the wall came to rest, the bottom layer is
 carrying 98.6% of its 40 kN/m capacity. The middle layer is at 72% and the
-bottom layer at 57%. By then the block column has slid 80 mm down its back
-face and 25 mm along its base. Here is the 1D details plot for the top layer:
+top layer at 57%. By then the block column has slid 80 mm down its back
+face and 25 mm along its base. Here is the 1D details plot for the bottom layer:
 
-![The top layer's 1D details at F = 1.9922: the bar's tension at its capacity along most of its length](images/fem03_1d_details_grid_long.png){width=1000}
+![The bottom layer's 1D details at F = 1.9922: the bar's tension reaching its capacity about 1.5 m from the facing](images/fem03_1d_details_grid_long.png){width=1000}
 
-The bar's tension sits on its capacity line over the middle of the sheet, and
+The bar's tension reaches its capacity line between about 1.3 and 1.9 m from
+the facing, and
 the interface beyond 2.3 m is slipping at its limit. Over the first 2.3 m,
 where the sheet grips, the shear stress zigzags from station to station
 between about 12 and 26 kPa. The stress along the sheet does not swing like
@@ -585,29 +586,33 @@ because the two faces of the interface meet at one node there and the limit is
 taken from the soil's pressure on the sheet instead. Everywhere else the two
 panels use the same stress.
 
-One step further in strength, the top layer has no capacity left and the wall
-fails. This is the failed state at 2.0, drawn to scale, with no
-exaggeration:
+One step further in strength, the bottom layer has no capacity left and the wall
+fails. To draw the failure, the run takes the strength 15% past the factor of
+safety, to F = 2.30, and lets the wall move until it has gone a fifth of the
+model's height, here 1.76 m. In the picture every movement is drawn at half its
+true size; the distances below are the true ones. The title gives the run's
+factor of safety, 1.996:
 
-![The wall at 2.0, drawn at true scale: the block column pushed out and sunk into the foundation, the fill behind it collapsed, and the geogrid layers dragged out with it](images/fem03_fem_blocks_grid_long_failure.png){width=848}
+![The failed wall, drawn at half scale: the block column pushed out and sunk into the foundation, the fill behind it dropped, and the geogrid layers slid through the fill](images/fem03_fem_blocks_grid_long_failure.png){width=848}
 
-The block column has been pushed out more than 2 m and has sunk almost a meter
-into the foundation, which has heaved up in front of the toe. The fill behind
-the facing has dropped with it, and the ground surface now sits about a meter
-and a half below the dashed line that marks where it started. The three geogrid
-sheets have gone out with the blocks, their front ends carried along by the
-facing and their back ends dragged through the fill, the bottom sheet slipping
-the farthest.
+The block column has been pushed out 1.75 m at the top and 1.3 m at the base,
+and has sunk 0.6 m into the foundation, which has heaved up 0.8 m in front of
+the toe. The fill behind the facing has dropped with it, and the ground surface
+now sits up to 1.2 m below the dashed line that marks where it started. The
+three geogrid sheets have gone out with the blocks, their front ends carried
+along by the facing and their back ends dragged through the fill. The bottom
+sheet has slid the farthest, about half a meter, and the other two about a
+quarter of a meter.
 
-![Viscoplastic shear strain at the failed state: a band from under the toe of the block column, where the foundation is punched, up through the reinforced fill to the crest; the bottom layer at its capacity on the reinforcement force scale](images/fem03_fem_shear_grid_long_failure.png){width=1000}
+![Viscoplastic shear strain at the failed state: a band from just in front of the toe of the block column, where the foundation is punched, up through the reinforced fill to the crest; the bottom layer at its capacity on the reinforcement force scale](images/fem03_fem_shear_grid_long_failure.png){width=1000}
 
 The shear strain is on a different scale from the default run's: it tops out
-near 2.6 where the default run's topped out near 0.075. The band runs from under
-the toe of the block column, where the wall is punching into the foundation, up
+near 1.9 where the default run's topped out near 0.075. The band runs from just
+in front of the toe of the block column, where the wall is punching into the foundation, up
 through the reinforced fill and out to the crest. The bars are drawn on the
 reinforcement force scale, and at this state the bottom layer is at its
-capacity along most of its length, with the middle layer close to it at the
-facing.
+capacity along most of its length, and the middle layer is at three quarters
+of its capacity.
 
 ### What the factor of safety means for this wall
 
@@ -615,7 +620,7 @@ Part 1's wall failed at one strength: the joints let go, and no amount of
 waiting brought it to rest. This wall gives way only after the soil is down to
 half its strength and the facing has moved 30 cm, a twelfth of its height. Each
 time the facing moves it stretches the geogrid, the sheets take more of the
-load, and the wall comes to rest a little further out, until the top layer
+load, and the wall comes to rest a little further out, until the bottom layer
 reaches its capacity.
 
 Long before that, the wall has moved more than any wall in service is allowed
@@ -697,7 +702,7 @@ Run it first with `Joint` blank, the sheet as a bonded bar,
 
 >>**FS = 1.566**
 
-![Deformed mesh, base geotextile as a bonded bar](images/fem03_deform_sheet_bonded.png){width=1000}
+![Deformed mesh, base geotextile as a bonded bar](images/fem03_deform_sheet_bonded.png){width=827}
 
 ![Shear strain, base geotextile as a bonded bar](images/fem03_shear_sheet_bonded.png){width=1000}
 
@@ -747,7 +752,7 @@ Run it the same two ways. First `Joint` blank, the liner as a bonded bar,
 
 >>**FS = 2.167**
 
-![Deformed mesh, the liner as a bonded bar](images/fem03_deform_liner_bonded.png){width=1000}
+![Deformed mesh, the liner as a bonded bar](images/fem03_deform_liner_bonded.png){width=833}
 
 ![Shear strain, the liner as a bonded bar: the band runs down both slope faces](images/fem03_shear_liner_bonded.png){width=1000}
 

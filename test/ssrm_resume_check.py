@@ -528,7 +528,7 @@ def run_slow():
                     failure_criterion=mb.FEM03_CRITERION,
                     max_iterations=mb.FEM03_MAX_ITERATIONS)
         s1 = time.time() - t0
-        check("FEM-3 geogrid wall at 100,000: FS ≥ 1.56, the top trial can be "
+        check("FEM-3 geogrid wall at 100,000: FS ≥ 1.51, the top trial can be "
               "continued", r1["fs_is_lower_bound"] and fem.ssrm_can_continue(r1)
               is not None, f"{r1['FS']} {r1['final_interval']} in {s1:.0f} s")
         t1 = time.time()

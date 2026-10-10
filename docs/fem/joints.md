@@ -325,7 +325,7 @@ five times the limit the run stopped at), and the search picks up where its tria
 keeping every trial it has already decided. Or open **Run → Run FEM…**, raise **Max iterations
 per trial** and the **Iteration ceiling** with it, and run again from the start; the answer is
 the same. The geogrid wall of [Tutorial FEM-3](../tutorials/fem03_block_wall_joints.md) reports
-a factor of safety of at least 1.56 at 100,000 iterations and gives way at 2.0 with the limit at
+a factor of safety of at least 1.51 at 100,000 iterations and gives way at 2.0 with the limit at
 a million; the tutorial shows both runs.
 
 ### How a trial is decided {#how-a-trial-is-decided}

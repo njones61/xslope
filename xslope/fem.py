@@ -8537,6 +8537,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     u_safe = np.zeros(n_dof) if guard_on else None
     evp_safe = ([np.zeros_like(grp['evp']) for grp in gp_groups]
                 if guard_on else None)
+    # The interface's history goes back with them: the joint sweep updates the slip,
+    # the open flags and the residual and dilation records in place, and the final
+    # joint state is read from them against the field. A field put back one
+    # iteration beside this iteration's slip reads every sliding joint one slip
+    # increment under its limit, so the stopped capture drew them as gripping.
+    joint_hist = ([a for a in (joint_slip, joint_open, joint_slipped, joint_dil)
+                   if a is not None] if (guard_on and has_joints) else [])
+    joint_safe = [np.empty_like(a) for a in joint_hist]
     # The dofs the bound is read on. A model with beam elements carries a ROTATION
     # at every pile node, in radians, in the same vector as the displacements in feet
     # or meters; a maximum taken over the lot is a maximum over two different
@@ -9039,14 +9047,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     iteration -= 1          # the last iteration actually performed
                     break
             # The finite guard's snapshot of the state this iteration starts from.
-            # It is taken HERE, before the group loop mutates grp['evp'] in place, so
-            # the pair kept is (u, evp) as of the same iteration; a displacement from
-            # one iteration beside a plastic strain from the next would report a
-            # stress field neither of them has.
+            # It is taken HERE, before the group loop mutates grp['evp'] and the joint
+            # sweep its history in place, so what is kept is (u, evp, joint history)
+            # as of the same iteration; a displacement from one iteration beside a
+            # plastic strain or a slip from the next would report a stress field
+            # neither of them has.
             if guard_on:
                 np.copyto(u_safe, u)
                 for _buf, _grp in zip(evp_safe, gp_groups):
                     np.copyto(_buf, _grp['evp'])
+                for _buf, _a in zip(joint_safe, joint_hist):
+                    np.copyto(_buf, _a)
                 guard_have_safe = True
             # The accelerated sweep scales THIS sweep's internal-variable
             # increments, so it keeps the state the sweep starts from.
@@ -9694,6 +9705,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 u = u_safe.copy()
                 for _buf, _grp in zip(evp_safe, gp_groups):
                     np.copyto(_grp['evp'], _buf)
+                for _buf, _a in zip(joint_safe, joint_hist):
+                    np.copyto(_a, _buf)
                 converged = False
                 exit_reason = 'nonfinite'
                 truncated_at = iteration
@@ -9949,6 +9962,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     u = u_safe.copy()
                     for _buf, _grp in zip(evp_safe, gp_groups):
                         np.copyto(_grp['evp'], _buf)
+                    for _buf, _a in zip(joint_safe, joint_hist):
+                        np.copyto(_a, _buf)
                     converged = False
                     # A distance stop has an exit of its own: the arithmetic did not
                     # give out, and no log or classifier may call it non-finite.

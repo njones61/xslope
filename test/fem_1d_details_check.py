@@ -1674,6 +1674,61 @@ def test_the_guard_does_not_touch_a_solve_that_behaves():
     return fails
 
 
+#: Tutorial FEM-3's jointed liner, past its factor of safety (1.285): the mass slides
+#: down the liner from the first iterations, so a fenced capture stops in mid-slide.
+_SLIDING_LINER_F = 1.6
+#: A fence short enough that the capture stops in seconds (measured: 2,639
+#: iterations, 0.45 m on this mesh), still well into the slide.
+_SLIDING_LINER_FENCE = 0.05
+
+
+def test_a_stopped_capture_keeps_its_joints_with_its_field():
+    """A capture stopped by the guard reports its joints on the field it keeps.
+
+    The stop puts the displacements and the plastic strains back to the start of
+    the iteration; the joint sweep has already moved the slip, the open flags and
+    the residual and dilation records on in place, and they must go back with them.
+    Left behind, the final joint state reads this iteration's slip against last
+    iteration's field: every joint that is sliding comes out one slip increment
+    under its limit, flagged as gripping, and the at-failure figure draws a sheet
+    that has slid half a meter as closed with no slip. Measured before the fix on
+    this liner: 54 of its 162 pairs flagged slipping, slid pairs down to 0.7% of
+    their limit; after it, 112 flagged and every slid pair on its limit.
+    """
+    from xslope.fem import build_fem_data, solve_fem
+    import tools.make_block_wall_figures as mb
+    from xslope.fileio import load_slope_data
+    model = load_slope_data(mb.FEM03_LINER_JOINTED)
+    fem_data = build_fem_data(model, mb._mesh(model, mb.FEM03_SHEET_TARGET_SIZE))
+    with contextlib.redirect_stdout(io.StringIO()):
+        sol = solve_fem(fem_data, F=_SLIDING_LINER_F, debug_level=0,
+                        max_iterations=200000, max_iterations_ceiling=200000,
+                        max_disp_factor=None, early_exit=False, early_failure=False,
+                        fast_kernel=False, _corrector=False, _finite_guard=True,
+                        _capture_distance_frac=_SLIDING_LINER_FENCE)
+    if sol.get("exit_reason") != "capture_distance":
+        return [f"the sliding liner's capture ended {sol.get('exit_reason')!r}, not "
+                f"on the distance fence; the check is not reading a stopped capture"]
+    slip = np.abs(np.asarray(sol["joint_slip"], float))
+    ts = np.abs(np.asarray(sol["joint_ts"], float))
+    tlim = np.asarray(sol["joint_tlim"], float)
+    slid = (slip > 0.01) & (tlim > 0.0) & ~np.asarray(sol["joint_open"], bool)
+    ratio = ts[slid] / tlim[slid]
+    print("    STOPPED-CAPTURE joints: %d of %d pairs slipping, %d slid and closed, "
+          "|ts|/limit %.4f to %.4f"
+          % (int(np.sum(sol["joint_slipping"])), slip.size, int(slid.sum()),
+             ratio.min() if ratio.size else float("nan"),
+             ratio.max() if ratio.size else float("nan")))
+    if not slid.any():
+        return ["no joint pair on the sliding liner had slid a centimeter; the "
+                "check is not reading a slide"]
+    if ratio.min() < 1.0 - 1e-6:
+        return [f"a stopped capture reports slid, closed joint pairs under their "
+                f"limit (down to {ratio.min():.3f} of it): the joint history was not "
+                f"put back with the field"]
+    return []
+
+
 def test_no_label_prints_nan():
     """No panel prints the word nan, on any field it can be handed.
 
@@ -2160,6 +2215,8 @@ CHECKS = [
      test_the_non_finite_backstop_holds_on_its_own),
     ("the guard leaves a well-behaved solve alone",
      test_the_guard_does_not_touch_a_solve_that_behaves),
+    ("a stopped capture keeps its joints with its field",
+     test_a_stopped_capture_keeps_its_joints_with_its_field),
     ("no label prints nan", test_no_label_prints_nan),
     ("the reaction panel says where its limit is",
      test_the_reaction_panel_says_where_its_limit_is),

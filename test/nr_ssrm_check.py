@@ -2874,21 +2874,34 @@ FACTOR_PROBE = 1.45
 
 
 # The Newton corrector (SPIKE.md, "THE CORRECTOR"). Every number below was
-# measured on this checkout on 2026-09-03, on the same coarse tri6 fixture the rest
+# measured on this checkout on 2026-10-10, on the same coarse tri6 fixture the rest
 # of the file uses (387 elements), and each one is a property of the mechanism
 # rather than of the benchmark:
 #
-#   * at F = 1.39 the viscoplastic loop cannot decide the trial inside ANY budget it
-#     is given here — 200 iterations or 4,000, it comes back 'inconclusive' with the
-#     residual still falling — and the corrector certifies the same trial from a
-#     300-pass seed in 31 Newton iterations;
-#   * at F = 1.4125 no corrector certifies anything, and the trial must come back
-#     from the 'auto' path bit for bit as the viscoplastic loop left it;
+#   * at F = 1.39 the viscoplastic loop cannot decide the trial inside either budget
+#     it is given here — 80 iterations or 4,000, it comes back 'inconclusive' with
+#     the residual still falling — and the corrector certifies the same trial from
+#     the 80-pass state at the rule exit in 25 Newton iterations, and from the
+#     300-pass ladder seed in 31;
+#   * the corrector is reached three ways: the ladder rungs, the loop's rule exits,
+#     and the trend reading (see `creep_trend`), which asks it wherever a still-
+#     moving trial's movement is dying away. The trend reading needs `_CREEP_BLOCKS`
+#     blocks of at least 2 x `_HYBRID_SAMPLE_EVERY` passes before it reads anything,
+#     100 passes here, so the small budget sits below that window as well as below
+#     the first rung, and the rule exit is the only route it leaves. At 200, the
+#     budget this used before the trend reading existed, the reading at pass 100
+#     finds the movement dying away and the corrector certifies the trial there,
+#     while the loop alone ends it 'not_slowing' at 200. The trend route is held in
+#     test/creep_trend_check.py;
+#   * at F = 1.4125 no corrector certifies anything — it is asked at all three
+#     rungs, by the trend reading at pass 2,000 and at the 'not_slowing' exit at
+#     4,000 — and the trial must come back from the 'auto' path bit for bit as the
+#     viscoplastic loop left it;
 #   * at F = 1.30 the loop settles on its own in 180 passes — before the first
 #     checkpoint at 300 — so no attempt is made at all and the iteration count is
 #     the shipped one.
 CORR_F = 1.39
-CORR_SMALL_BUDGET = 200    # too small for the ladder: only the rule exit can fire
+CORR_SMALL_BUDGET = 80     # below the ladder and the trend window: only the rule exit
 CORR_BUDGET = 4000
 CORR_REFUSED_F = 1.4125    # ... a strength no corrector certifies
 CORR_SETTLES_F = 1.30      # ... and one the loop settles at before any checkpoint
@@ -2904,8 +2917,10 @@ def check_corrector(fem_data):
     holds all four:
 
       * a trial the loop ends on a RULE — here the iteration ceiling, with the
-        residual still coming down — is handed to the corrector, and a corrector
-        that reaches equilibrium ends it as standing;
+        residual still coming down, set below both the first ladder rung and the
+        trend reading's window so that the rule is the only route to the
+        corrector — is handed to the corrector, and a corrector that reaches
+        equilibrium ends it as standing;
       * the checkpoint LADDER fires too, so a trial that would have spent its whole
         budget is finished from a 300-pass seed instead;
       * a certified trial carries its evidence, and the three gates are re-read here
@@ -2913,9 +2928,11 @@ def check_corrector(fem_data):
         the Dawson tolerance at full gravity, a yield violation at or below
         `_CORRECTOR_YIELD_TOL` of the local strength, and a displacement inside the
         bound;
-      * a corrector REFUSAL is not a verdict. Where no attempt is certified the
-        trial comes back exactly as the viscoplastic loop left it, down to the
-        displacement field, and `fem_solver='viscoplastic'` makes no attempt at all;
+      * a corrector REFUSAL is not a verdict, by whichever route it was asked —
+        a ladder rung, the trend reading or a rule exit. Where no attempt is
+        certified the trial comes back exactly as the viscoplastic loop left it,
+        down to the displacement field, and `fem_solver='viscoplastic'` makes no
+        attempt at all;
       * the LADDER IS TRIMMED. `_CORRECTOR_RULE_EXITS` names the loop exits worth an
         attempt, an exit outside it gets none and reports exactly what the shipped
         loop reports, and the rule route still works when an exit is put back;
@@ -2977,15 +2994,17 @@ def check_corrector(fem_data):
                        f"charged to the trial that used it")
         return out
 
-    # --- the rule exit: a ceiling too small for the ladder to reach ------------
+    # --- the rule exit: a ceiling below the ladder and the trend window --------
     vp_small = _solve(CORR_F, 'viscoplastic', CORR_SMALL_BUDGET)
     if vp_small['converged'] or vp_small['exit_reason'] != 'inconclusive':
         fails.append(
-            f"the fixture has moved: at F = {CORR_F} on a {CORR_SMALL_BUDGET}-"
-            f"iteration ceiling the viscoplastic loop is meant to come back "
-            f"undecided, and it came back {vp_small['exit_reason']!r} "
+            f"the fixture has moved: at F = {CORR_F} with the ceiling at "
+            f"{CORR_SMALL_BUDGET} iterations the viscoplastic loop is meant to come "
+            f"back undecided, and it came back {vp_small['exit_reason']!r} "
             f"(converged={vp_small['converged']})")
-    # `_CORRECTOR_RULE_EXITS` is the whole switch, and it is locked in both
+    # `_CORRECTOR_RULE_EXITS` is the whole switch for the rule route (the ladder
+    # and the trend reading are not governed by it, which is why the ceiling sits
+    # below both), and it is locked in both
     # directions. With the ceiling exit taken OUT the corrector must not be asked
     # there and the trial must come back exactly as the shipped loop leaves it; the
     # measurement behind keeping every exit is in SPIKE.md, "THE LADDER AND THE
@@ -3024,9 +3043,12 @@ def check_corrector(fem_data):
         at = (auto_small.get('corrector') or {}).get('checkpoint')
         if at != 'rule:inconclusive':
             fails.append(
-                f"at F = {CORR_F} with a {CORR_SMALL_BUDGET}-iteration ceiling the "
-                f"corrector is meant to be reached by the RULE exit, and the "
-                f"evidence says {at!r}")
+                f"at F = {CORR_F} with the ceiling at {CORR_SMALL_BUDGET} iterations "
+                f"the corrector is meant to be reached by the RULE exit, and the "
+                f"evidence says {at!r}. The ceiling is meant to sit below the first "
+                f"ladder rung ({_fem._CORRECTOR_CHECKPOINTS[0]}) and below the trend "
+                f"reading's window, so that no other route can reach the corrector "
+                f"first")
 
     # --- the checkpoint ladder ------------------------------------------------
     vp_full = _solve(CORR_F, 'viscoplastic', CORR_BUDGET)
@@ -3063,6 +3085,20 @@ def check_corrector(fem_data):
             f"the fixture has moved: at F = {CORR_REFUSED_F} the corrector is meant "
             f"to be ASKED and to refuse, and it was never asked — the identity "
             f"below would then be measuring nothing")
+    else:
+        # The three routes, by the label each one gives its attempt.
+        _routes = {'a ladder rung': 'vp', 'the trend reading': 'trend:',
+                   'a rule exit': 'rule:'}
+        _asked = [str(a.get('at', '')) for a in auto_ref['corrector_attempts']]
+        _missed = [name for name, tag in _routes.items()
+                   if not any(at.startswith(tag) for at in _asked)]
+        if _missed:
+            fails.append(
+                f"the fixture has moved: at F = {CORR_REFUSED_F} the corrector is "
+                f"meant to be asked, and to refuse, by every route that can reach "
+                f"it, and it was not asked by {' or '.join(_missed)} (attempts at "
+                f"{', '.join(_asked)}) — the identity below would then say nothing "
+                f"about a refusal from that route")
     if any(a.get('certified') for a in (auto_ref.get('corrector_attempts') or ())):
         fails.append(
             f"the fixture has moved: at F = {CORR_REFUSED_F} an attempt was "

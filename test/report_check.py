@@ -1103,22 +1103,34 @@ def _water_load_mechanism_checks():
     return fails
 
 
+#: The circle :func:`_load_bearing_model` runs its limit equilibrium trial on: the
+#: starting circle the loaded finite element sample carried until its builder
+#: (benchmarks/build_fem_samples.py) dropped the slip surface, which no finite
+#: element run reads.
+LOAD_BEARING_CIRCLE = {"Xo": 120.0, "Yo": 80.0, "Depth": 0.0, "R": 80.0}
+
+
 def _load_bearing_model():
     """A loaded model solved by BOTH engines, or ``(None, None)``.
 
     The finite element sample carries distributed loads and a shipped strength
-    reduction solution; one limit equilibrium trial on its own starting circle
-    puts the other engine beside it, which is the only shape in which the
-    citation exists to be checked.
+    reduction solution, and no slip surface. One limit equilibrium trial on
+    :data:`LOAD_BEARING_CIRCLE` puts the other engine beside it, which is the
+    only shape in which the citation exists to be checked. The circle goes into
+    the model the way the loader puts a circle there (``circles`` and
+    ``circular``), so the limit equilibrium section describes the surface its
+    trial was run on.
     """
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
 
     slope_data, fem = _fem_bundle()
-    if not slope_data.get("dloads") or not slope_data.get("circles"):
+    if not slope_data.get("dloads"):
         return None, None
+    circle = dict(LOAD_BEARING_CIRCLE)
+    slope_data = dict(slope_data, circles=[circle], circular=True)
     with contextlib.redirect_stdout(io.StringIO()):
-        ok, out = generate_slices(slope_data, circle=slope_data["circles"][0])
+        ok, out = generate_slices(slope_data, circle=circle)
         if not ok:
             return None, None
         df, surface = out
@@ -15141,8 +15153,8 @@ NONCIRC_FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
 #: A shipped strength reduction run whose bracket was walked down by a trial the
 #: hybrid criterion counted as failed WITHOUT its displacement growing — the case
 #: a criterion sentence demanding both signals describes wrongly.
-HYBRID_COUNTEREXAMPLE_XLSX = os.path.join(_REPO, "docs", "fem", "files",
-                                          "xslope_griffiths6_dry.xlsx")
+HYBRID_COUNTEREXAMPLE_XLSX = os.path.join(_REPO, "docs", "verification", "files",
+                                          "rocscience", "rs2_30_split.xlsx")
 
 
 def _hybrid_thresholds():
@@ -15404,12 +15416,15 @@ def test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped():
     longer growing. One signal without the other is AMBIGUOUS, and AMBIGUOUS
     counts as FAILED. So "a trial counts as failed only when ... the
     displacements are both large and still growing" describes a stricter test
-    than the one that decided the answer, and griffiths6_dry is the
-    counterexample on disk: its trial at F = 2.4125 was counted as failed with
-    displacement at 1.85 times elastic scale and a growth of 0.0155, and that
-    trial sits one bisection step from the bracket its factor of safety is the
-    midpoint of — it is the trial that walked the bracket down to where it
-    closed.
+    than the one that decided the answer, and the RS2-30 run with the vendor's
+    exclusion areas held elastic (rs2_30_split) is the counterexample on disk:
+    its trial at F = 0.984375 was
+    counted as failed with displacement at 1.32 times elastic scale and a growth
+    of 0.0001, and that trial is the upper end of the bracket its factor of
+    safety is the midpoint of, one bisection step (0.015625) above the lower end —
+    it is the trial that walked the bracket down to where it closed. The trial
+    below it, at F = 0.96875, stood at 1.16 times elastic scale and a growth of
+    0.0023: the same run shows both shapes the sentence distinguishes.
 
     Checked three ways: the fixture really poses the question, the sentence the
     report prints does not claim the strict conjunction, and the rule the

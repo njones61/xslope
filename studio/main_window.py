@@ -1742,6 +1742,7 @@ class MainWindow(QMainWindow):
         add("Distributed loads", len(d.get("dloads") or []), category="dloads")
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []),
             category="reinforce")
+        add("Joints", len(d.get("joint_lines") or []), category="joints")
         add("Line loads", len(d.get("line_loads") or []), category="line_loads")
         add("Piles", len(d.get("pile_lines") or []), category="piles")
         add("Seep BC", len(sbc.get("specified_heads", [])), category="seep_bc")
@@ -1839,15 +1840,16 @@ class MainWindow(QMainWindow):
         "global": "Global Parameters", "materials": "Materials", "circles": "Circles",
         "non_circ": "Non-Circular Surface", "piezo": "Piezometric Lines",
         "dloads": "Distributed Loads", "seep_bc": "Seepage BC", "piles": "Piles",
-        "reinforce": "Reinforcement", "line_loads": "Line Loads",
+        "reinforce": "Reinforcement", "joints": "Joints", "line_loads": "Line Loads",
         "profile": "Profile Lines", "polygons": "Polygons",
         "transient": "Transient Seepage",
     }
 
-    # Source inputs whose change makes the mesh stale (the domain geometry plus
-    # the reinforcement/pile lines baked in as mesh constraint lines).
+    # Source inputs whose change makes the mesh stale (the domain geometry, the
+    # reinforcement/pile/joint lines baked in as mesh constraint lines, and the
+    # refinement and joint-network regions).
     MESH_KEYS = ("profile_lines", "polygons", "max_depth", "reinforcement_lines",
-                 "pile_lines")
+                 "pile_lines", "joint_lines", "refine_zones", "joint_zones")
 
     @staticmethod
     def mesh_signature(sd):
@@ -1869,11 +1871,12 @@ class MainWindow(QMainWindow):
                 return [clean(x) for x in o]
             return o
         def geometry_only(key, rows):
-            # A reinforcement or pile row enters the mesh as a constraint line
-            # and nothing more: only its endpoints (and how many rows there are)
-            # can change the mesh. Editing S, D, Tmax, Appl or any other property
-            # on a row must not throw the mesh away.
-            if key not in ("reinforcement_lines", "pile_lines") or not rows:
+            # A reinforcement, pile or joint row enters the mesh as a constraint
+            # line and nothing more: only its endpoints (and how many rows there
+            # are) can change the mesh. Editing S, D, Tmax, Appl, a joint's
+            # strength or any other property on a row must not throw the mesh away.
+            if key not in ("reinforcement_lines", "pile_lines",
+                           "joint_lines") or not rows:
                 return clean(rows)
             try:
                 return [[clean(r.get("x1")), clean(r.get("y1")),
@@ -1919,6 +1922,10 @@ class MainWindow(QMainWindow):
                 canvas.deleteLater()
         for a in single:
             setattr(self, a, None)
+        # The FEM results toolbar's buttons went with its canvas; a later Run
+        # menu update must not reach the deleted widgets.
+        self.fem_details_btn = None
+        self.fem_continue_btn = None
         self.seep_data_canvas = {}
         self.seep_solution_canvas = {}
         self.transient_seep_view = None
@@ -3525,6 +3532,10 @@ class MainWindow(QMainWindow):
                 canvas.deleteLater()
         for a in single:
             setattr(self, a, None)
+        # The FEM results toolbar's buttons went with its canvas; a later Run
+        # menu update must not reach the deleted widgets.
+        self.fem_details_btn = None
+        self.fem_continue_btn = None
         self.seep_data_canvas = {}
         self.seep_solution_canvas = {}
         self.transient_seep_view = None

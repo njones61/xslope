@@ -1258,6 +1258,10 @@ LEM12_PILE_FIELDS = ("Vcap (per element, lb)", "Mcap (per element, lb·ft)")
 #: not only a seepage one, which is what the page's Studio path says.
 SEEP01_INPUT_CATEGORIES = ("Seep BC",)
 
+#: The Inputs tree row FEM-3 and FEM-5 open the joints editor from (and its
+#: Build network… button). The tree lists the same rows in every mode.
+FEM_JOINTS_INPUT_ROW = ("Joints", "joints")
+
 #: The two Run-menu actions SEEP-1 names, in the same source-string convention as
 #: ``LEM02_RUN_ACTIONS`` (Qt's ``&`` removed, the ellipsis kept). The Run action's
 #: text follows the Mode switch, so the seepage label is read with the window put
@@ -2717,6 +2721,15 @@ def test_tutorial_labels():
             if name not in rows:
                 fails.append(f"the Inputs tree has no {name!r} row; Tutorial SEEP-1 "
                              f"tells the reader to click it. It reads {rows}")
+        from studio.main_window import CATEGORY_ROLE
+        name, category = FEM_JOINTS_INPUT_ROW
+        opens = [tree.topLevelItem(i).data(0, CATEGORY_ROLE)
+                 for i in range(tree.topLevelItemCount())
+                 if tree.topLevelItem(i).text(0) == name]
+        if opens != [category]:
+            fails.append(f"the Inputs tree has no {name!r} row opening the joints "
+                         f"editor; Tutorials FEM-3 and FEM-5 tell the reader to "
+                         f"click it. It reads {rows}")
 
         for attr, label in LEM02_RUN_ACTIONS.items():
             action = getattr(mw, attr, None)

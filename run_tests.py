@@ -3057,11 +3057,21 @@ def run_gsat_pair_test(test):
 
 
 def _check_bottom_elevation_roundtrip(source, template):
-    """Check missing profile bottoms and the explicit/polygon save controls."""
+    """Check missing profile bottoms and the explicit/polygon save controls.
+
+    A profile-line model with no bottom elevation is saved with B2 blank and
+    reopens with no zones (the loader checks structure only); preflight's
+    geometry.bottom_elevation_missing refuses a run until one is entered."""
     import tempfile
     from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
                                write_cells_to_xlsx)
+    from xslope.preflight import preflight
     from shapely.geometry import Polygon
+
+    def _flags_bottom(sd):
+        rep = preflight(sd, 'lem', ids=['geometry.bottom_elevation_missing'])
+        return any(f.rule_id == 'geometry.bottom_elevation_missing'
+                   for f in rep.errors)
 
     model = dict(source, profile_lines=[
         {'coords': [(0.0, 10.0), (10.0, 20.0), (20.0, 20.0)], 'mat_id': 0}],
@@ -3074,22 +3084,23 @@ def _check_bottom_elevation_roundtrip(source, template):
                                    template=template)
             if load_slope_data(str(target))['max_depth'] != value:
                 problems.append(f'explicit bottom {value} did not round-trip')
-        original = target.read_bytes()
         for label, value in (('omitted', None), ('None', None),
                              ('NaN', float('nan'))):
-            broken = dict(model, max_depth=value)
+            blank = dict(model, max_depth=value)
             if label == 'omitted':
-                broken.pop('max_depth')
-            for dest in (target, Path(td) / 'absent.xlsx'):
-                try:
-                    save_slope_data_to_xlsx(broken, str(dest), template=template)
-                except ValueError as exc:
-                    if 'bottom elevation' not in str(exc) or 'B2' not in str(exc):
-                        problems.append(f'{label}: wrong writer message: {exc}')
-                else:
-                    problems.append(f'{label}: writer accepted a missing bottom')
-            if target.read_bytes() != original or (Path(td) / 'absent.xlsx').exists():
-                problems.append(f'{label}: refused save changed a destination')
+                blank.pop('max_depth')
+            try:
+                save_slope_data_to_xlsx(blank, str(target), template=template)
+            except Exception as exc:
+                problems.append(f'{label}: writer refused a missing bottom: {exc}')
+                continue
+            from openpyxl import load_workbook
+            wb = load_workbook(target, read_only=True, data_only=True)
+            try:
+                if wb['profile']['B2'].value is not None:
+                    problems.append(f'{label}: B2 is not blank')
+            finally:
+                wb.close()
         for n_lines in (1, 2):
             lines = list(model['profile_lines'])
             if n_lines == 2:
@@ -3098,14 +3109,20 @@ def _check_bottom_elevation_roundtrip(source, template):
                                    template=template)
             write_cells_to_xlsx(str(target), {'profile': {'B2': None}})
             try:
-                load_slope_data(str(target))
-            except ValueError as exc:
-                if str(exc) != 'The profile sheet has no bottom elevation (cell B2).':
-                    problems.append(f'{n_lines} lines: wrong loader message: {exc}')
+                back = load_slope_data(str(target))
             except Exception as exc:
-                problems.append(f'{n_lines} lines: geometry failed before loader guard: {exc}')
-            else:
-                problems.append(f'{n_lines} lines: loader accepted blank B2')
+                problems.append(f'{n_lines} lines: blank B2 did not open: {exc}')
+                continue
+            if back.get('max_depth') is not None:
+                problems.append(f'{n_lines} lines: blank B2 loaded as '
+                                f'{back.get("max_depth")!r}, not None')
+            if len(back.get('profile_lines') or []) != n_lines:
+                problems.append(f'{n_lines} lines: profile lines not kept')
+            if back.get('polygons'):
+                problems.append(f'{n_lines} lines: zones built with no bottom')
+            if not _flags_bottom(back):
+                problems.append(f'{n_lines} lines: preflight did not flag the '
+                                f'missing bottom')
         polygon = dict(model, profile_lines=[], polygons=[{
             'polygon': Polygon([(0, 0), (20, 0), (20, 20), (0, 10)]), 'mat_id': 0}])
         for label in ('omitted', 'None', 'NaN'):

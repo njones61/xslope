@@ -163,9 +163,10 @@ Three rules govern the non-circular failure surface table:
   Y is not set to the ground elevation** — it reaches the
   slicer as a `TypeError`, and an empty cell that loads as a blank number gets as
   far as *"Failed to generate surface:Expected at least 2 intersection points,
-  but got 1."* A Y typed off the ground gives no error at all: the clipping
+  but got 1."* A Y typed above the ground gives no error at all: the clipping
   moves that end to where the polyline crosses the ground, and the run returns a
-  result for a surface with a different end.
+  result for a surface with a different end. A Y typed below the ground gets the
+  same *"Expected at least 2 intersection points"* error.
 - **Movement applies to the search, not to a single-surface solve.** The column
   sets how the search may move each point and has no effect on the surface being
   solved, and a blank cell does not mean unrestricted — it means `Fixed`.
@@ -311,7 +312,7 @@ Click **Materials**, and in **Table view** press **Add row** four times and
 enter (or copy-paste) the four soils in the order the table above lists them —
 the row order fixes the Mat IDs. Check the seam's row: `Soft Clay` is the only one with cohesion, and the only one whose `u` is `none`:
 
-![The materials editor on this problem's four soils](images/lem05_studio_materials.png){width=1000}
+![The materials editor on this problem's four soils](images/lem05_studio_materials.png){width=1166}
 
 Then **Profile lines**: set **Max depth (bottom boundary elevation):** to `-10`,
 and press **Add line** four times, each line taking its **Material:** and its
@@ -466,8 +467,9 @@ the black line against the intended shape before using the number on it.
 
 ### Which methods support non-circular surfaces {#which-methods-support-non-circular-surfaces}
 
-If we ask for the same search with the Ordinary Method of Slices, the run is
-refused before it starts:
+In the **Method** list of **Run LEM…**, the Ordinary Method of Slices and
+Bishop's Simplified are dimmed on a non-circular surface and cannot be chosen.
+Hold the pointer over the OMS entry to read why:
 
 > A non-circular search cannot be run with the Ordinary Method of Slices: it takes
 > moments about a circle center, which a non-circular surface does not have, so
@@ -528,8 +530,8 @@ and one pulled in further to x = 32.11, an 82.4° exit:
 | Janbu | 1.789 | 2.014 | no solution |
 | Corps of Engineers | 2.650 | 3.713 | no solution |
 | Lowe & Karafiath | 2.442 | no solution | no solution |
-| Spencer | 2.022 | 2.597 | 5.431 |
-| Morgenstern-Price | 1.977 | 2.356 | 3.487 |
+| Spencer | 2.022 | 2.597 | 5.425 |
+| Morgenstern-Price | 1.977 | 2.356 | 3.485 |
 
 Steepening the ramp raises every factor of safety that can still be computed —
 Spencer's nearly triples across the row — and leaves the three force-equilibrium
@@ -556,10 +558,10 @@ depth alone changes.
 
 | Track elevation | −4.2 | −4.5 | −5.0 | −5.5 | **−5.8** | −6.0 |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Factor of safety (Spencer) | 2.237 | 2.180 | 2.105 | 2.048 | **2.022** | 2.007 |
+| Factor of safety (Spencer) | 2.237 | 2.180 | 2.105 | 2.048 | **2.022** | 2.006 |
 
 The lower in the seam the track runs, the lower the factor of safety, across
-the full 2 ft: 2.237 a couple of inches under the top contact, 2.007 at the base,
+the full 2 ft: 2.237 a couple of inches under the top contact, 2.006 at the base,
 11% apart. The difference is not between clay and sand — every one of these
 tracks is in the clay, at the same S<sub>u</sub> = 200 psf. What changes is
 everything *around* the base: a deeper track has more soil above it and shortens

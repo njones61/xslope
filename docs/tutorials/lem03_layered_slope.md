@@ -207,9 +207,9 @@ Click **Materials**. The editor opens on **Table view**, which mirrors the `mat`
 worksheet one material per row — the right shape here, because the two soils are
 read against each other and the row order fixes the Mat IDs.
 
-Press **Add row** twice and enter (or copy-paste) the two materials from the
-table above — the block starts at the first `name` cell, and its columns are the
-editor's own:
+Set the **Show parameters for:** toggles to **LEM** alone. Press **Add row**
+twice and enter (or copy-paste) the two materials from the table above — the block
+starts at the first `name` cell, and its columns are the editor's own:
 
 ![The materials editor on this problem's two materials](images/lem03_studio_materials.png)
 
@@ -264,7 +264,9 @@ Continue below.
 
 ## Running the analysis
 
-However you built it, the model is now the same:
+However you built it, the geometry and materials are now the same. The Studio
+path has one more starting circle than the file, the toe circle, and the search
+gives the same answer from either set. The figure shows the file's two circles:
 
 ![The finished model](images/lem03_inputs.png){width=1000}
 
@@ -290,9 +292,12 @@ Each starting circle is a complete failure surface in its own right, so we solve
 the three of them — the two the file carries, plus the generator's toe circle —
 for the fastest read on which mechanism this section has. **The table below
 collects three separate runs; the program does not print it.** Each row is a run
-you can repeat: solve that circle alone with **Run LEM…** and **Analysis** =
-`Single surface`; the factor of safety is the number on that run's solution
-plot, and the weight is ΣW summed over the run's slices:
+you can repeat with **Run LEM…** and **Analysis** = `Single surface`, which solves
+the first circle in the **Circles** list. To solve another circle, select the rows
+above it in the **Circles** editor, press **Remove selected**, run, and then undo
+the removal. The toe circle is in the model only if you generated the circles in
+Studio. The factor of safety is the number on that run's solution plot, and the
+weight is ΣW summed over the run's slices:
 
 | Circle | Depth | Factor of safety | Weight of the sliding mass (lb/ft) |
 | --- | :---: | :---: | :---: |

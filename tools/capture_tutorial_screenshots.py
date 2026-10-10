@@ -148,13 +148,43 @@ def _mat_table(dlg, through="u"):
     hh = tbl.horizontalHeader()
     col = [f.key for f in MaterialsEditor.FIELDS].index(through)
     rows = sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
-    # Twice: the first resize takes the slack out of the layout's stretches, and
-    # the chrome measured against a roomy dialog is larger than the chrome of the
-    # tight one it produces. The second pass measures the tight one.
-    for _ in range(2):
+    # Until the size stops changing: the first resize takes the slack out of the
+    # layout's stretches, and the chrome measured against a roomy dialog is larger
+    # than the chrome of the tight one it produces. The later passes measure the
+    # tight one (the first editor a run opens can need a third).
+    for _ in range(4):
         w = (hh.sectionPosition(col) + hh.sectionSize(col)
              + (dlg.width() - tbl.viewport().width()))
-        dlg.resize(w, rows + (dlg.height() - tbl.viewport().height()))
+        size = (w, rows + (dlg.height() - tbl.viewport().height()))
+        if (dlg.width(), dlg.height()) == size:
+            break
+        dlg.resize(*size)
+        _settle()
+    return dlg
+
+
+def _fit_material_form(dlg, width, height):
+    """Size a materials editor in its LIST view so the whole form shows.
+
+    ``height`` is the floor: the plots beside the form need room of their own. The
+    form itself is measured, not guessed: which groups it carries follows the
+    usage toggles and the material's options, and a fixed height that is too
+    short cuts the form off mid-field at the scroll.
+    """
+    from PySide6.QtWidgets import QGroupBox, QScrollArea
+
+    dlg.resize(width, height)
+    dlg.show()
+    _settle()
+    scroll = next(sa for sa in dlg._list_view.findChildren(QScrollArea)
+                  if sa.widget() is not None
+                  and any(g.title() == "Identity"
+                          for g in sa.widget().findChildren(QGroupBox)))
+    for _ in range(4):
+        need = scroll.widget().sizeHint().height() - scroll.viewport().height()
+        if need <= 0:
+            break
+        dlg.resize(width, dlg.height() + need)
         _settle()
     return dlg
 
@@ -275,8 +305,7 @@ def lem01_materials():
 
     dlg = _lem_only(MaterialsEditor().build(_load(LEM01), None))
     dlg._set_mode("list")
-    dlg.resize(1180, 720)
-    return _grab(dlg, "lem01_studio_materials.png")
+    return _grab(_fit_material_form(dlg, 1180, 720), "lem01_studio_materials.png")
 
 
 def lem01_profile():
@@ -773,9 +802,10 @@ def _lem_only(dlg):
     """Untick every non-LEM usage toggle so the capture shows the LEM problem.
 
     The owner's rule for the LEM tutorials: an LEM page's editor capture carries
-    no FEM or seepage columns. The toggles are real checkboxes, so unticking
-    them is the same action a reader takes, and the toggle bar in the capture
-    shows the state that produced it.
+    no FEM or seepage columns, and the page tells the reader to set the toggles
+    to LEM alone. The toggles are real checkboxes, so unticking them is the same
+    action a reader takes, and the toggle bar in the capture shows the state that
+    produced it.
     """
     toggles = getattr(dlg, "_toggles", None) or {}
     for tag, cb in toggles.items():
@@ -1288,8 +1318,7 @@ def _lem07_material(model, name, row=0, edit=None, width=1180, height=760):
     dlg = _lem_only(MaterialsEditor().build(d, None))
     dlg.set_view_mode("list")
     dlg._list_view.list.setCurrentRow(row)
-    dlg.resize(width, height)
-    return _grab(dlg, name)
+    return _grab(_fit_material_form(dlg, width, height), name)
 
 
 def lem07_materials_pow():
@@ -1399,8 +1428,7 @@ def _lem11_materials(name, sigma_c=None):
     dlg = _lem_and_rel(MaterialsEditor().build(d, None))
     dlg.set_view_mode("list")
     dlg._list_view.list.setCurrentRow(0)
-    dlg.resize(1180, 620)
-    return _grab(dlg, name)
+    return _grab(_fit_material_form(dlg, 1180, 620), name)
 
 
 def lem11_materials():
@@ -2415,15 +2443,17 @@ def fem02_reinforce_blank():
     """The reinforcement table as the STARTER delivers it: six lines with their
     geometry, tensile capacity and pullout lengths, and Tres, E and Area empty.
 
-    Only the FEM toggle is ticked: the LEM inputs are complete, so the table
-    shows just the geometry and the three columns the reader is about to fill.
+    Only the FEM toggle is ticked: the table then hides the LEM-only Type, Dir
+    and Appl, keeps the columns both engines read, and adds the FEM-only columns
+    at the right. The frame runs to the last of them, Jred, so every column the
+    toggle shows is in the shot.
     """
     from studio.editors import ReinforcementEditor
 
     dlg = ReinforcementEditor().build(_load(FEM02_START), None)
     for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(tag == "fem")
-    return _grab(_line_table(dlg, through="area"),
+    return _grab(_line_table(dlg, through="jred"),
                  "fem02_studio_reinforce_blank.png")
 
 
@@ -2435,7 +2465,7 @@ def fem02_reinforce_filled():
     dlg = ReinforcementEditor().build(_load(FEM02_DONE), None)
     for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(tag == "fem")
-    return _grab(_line_table(dlg, through="area"),
+    return _grab(_line_table(dlg, through="jred"),
                  "fem02_studio_reinforce_filled.png")
 
 
@@ -3558,8 +3588,7 @@ def _lem13_material(model, name, edit=None, width=1180, height=780):
     dlg = _lem_only(MaterialsEditor().build(d, None))
     dlg.set_view_mode("list")
     dlg._list_view.list.setCurrentRow(0)
-    dlg.resize(width, height)
-    return _grab(dlg, name)
+    return _grab(_fit_material_form(dlg, width, height), name)
 
 
 def lem13_materials():

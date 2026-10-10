@@ -203,7 +203,8 @@ tables above, one block per zone:
 
 Leave **Type** at `material` in both blocks. It sets what kind of region a
 polygon is: the other settings on its list make a region an SSR analysis
-overlay or a mesh refinement zone, neither of which is geometry. **Size** is
+overlay, a mesh refinement zone or a joint-network region, none of which is
+geometry. **Size** is
 optional and blank here — it sets a local mesh element size inside the zone, which
 matters to a finite element run and not to this one.
 
@@ -227,11 +228,12 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 ### 1. Materials
 
 Click **Materials** in the **Inputs** tree. The editor opens on **Table view**;
-press **Add row** twice and enter (or copy-paste) the two materials from the
-table above — the block starts at the first `name` cell. The row order fixes the
+set the **Show parameters for:** toggles to **LEM** alone, press **Add row**
+twice and enter (or copy-paste) the two materials from the table above — the
+block starts at the first `name` cell. The row order fixes the
 Mat IDs the polygons reference next:
 
-![The materials editor on this problem's two soils](images/lem06_studio_materials.png){width=1000}
+![The materials editor on this problem's two soils](images/lem06_studio_materials.png){width=945}
 
 ### 2. Polygons
 
@@ -304,7 +306,7 @@ circle in red:
 
 ![The circular search](images/lem06_search.png){width=1000}
 
-**FS = 1.244**, on a circle centered at (18.5, 43.75) with a radius of 43.75.
+**FS = 1.244**, on a circle centered at (18.28, 43.84) with a radius of 43.84.
 Notice how the gray family thins out and stops as it approaches the hatched
 line: a circle that would cut below the domain is not a surface this model
 has, so the dipping base bounds what the search can try.
@@ -317,11 +319,11 @@ Its lowest point is at elevation 0.000 — tangent to the contact between the tw
 soils, running along the top of the foundation without entering it. All 40 slice
 bases carry c = 400 psf, the fill's strength (the green bars are the effective
 normal stress on each base; the dashed red curve is the line of thrust), and
-the sliding mass weighs 61,393 lb/ft. The dipping base is nowhere near it:
-beneath the circle's lowest point the bedrock is at −10.97, so this answer
+the sliding mass weighs 60,960 lb/ft. The dipping base is nowhere near it:
+beneath the circle's lowest point the bedrock is at −10.98, so this answer
 would be the same under a level base at any elevation below −11. Solved on its
 own, the deeper of the two starting circles — the deepest that fits — comes to
-1.655, carrying 167,130 lb/ft against the critical circle's 61,393 and still a
+1.655, carrying 167,130 lb/ft against the critical circle's 60,960 and still a
 third safer, because everything it adds is foundation at twice the fill's
 cohesion.
 
@@ -395,7 +397,7 @@ bottoms out at elevation −10.85, grazing the bedrock, with 153,546 lb/ft of so
 above it and most of its base in the foundation. This is the mechanism the deep
 starting circle was placed for, and the search reached it from that seed.
 
-We run this one with composite surfaces on: it returns 0.782 — two tenths of a
+We run this one with composite surfaces on: it returns 0.781 — two tenths of a
 percent. A 3.4° dip is gentle enough that an ordinary circle can follow it
 closely for most of its length, so there is little left for truncation to add.
 The difference is larger on a

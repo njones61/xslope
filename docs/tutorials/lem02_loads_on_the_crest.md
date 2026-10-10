@@ -58,8 +58,8 @@ carries nothing. **A distributed load stops where its points stop** — the
 intensity is not spread over the rest of the crest, and it is not tapered at the
 ends unless you enter a point saying so.
 
-The table above is laid out exactly as the `dloads` worksheet and Studio's
-loads editor — **X**, **Y**, **N**, one point per row. Select the two rows
+The table above is laid out exactly as the `dloads` worksheet (**X**, **Y**,
+**N**) and Studio's loads editor (**X**, **Y**, **Normal**), one point per row. Select the two rows
 of values, copy, and paste them straight into the sheet or editor rather than
 retyping them.
 
@@ -258,8 +258,8 @@ magnitude and must be positive; the direction lives entirely in the angle.
 concentrated form is the more severe of the two, and the reason is the same one
 as before: the critical surface stops where the load stops. It exits the crest at
 x = 30.0 — the load point — where the spread version had to run out to x = 35 to
-collect the last of the strip. That is 3.7 ft less arc, and with φ = 0 the
-resistance is c times the arc length: 19,552 lb/ft against 21,418. The two loads
+collect the last of the strip. That is 3.8 ft less arc, and with φ = 0 the
+resistance is c times the arc length: 19,523 lb/ft against 21,411. The two loads
 have the same resultant, and the concentrated one lets the slope fail on a
 shorter surface.
 
@@ -318,7 +318,7 @@ With the crest surcharge back in place:
 
 **k is unconditionally driving.** It is applied in the direction that reduces the
 factor of safety, and it acts on the whole sliding mass rather than on the loaded
-strip: at k = 0.15 that is 0.15 × 40,925 = 6,139 lb/ft of horizontal force,
+strip: at k = 0.15 that is 0.15 × 41,883 = 6,282 lb/ft of horizontal force,
 against the 7,500 lb/ft the surcharge itself weighs. Pushed sideways rather than
 pressed down, the same order of force costs less — 0.144 off the factor of
 safety, where the surcharge took 0.358.

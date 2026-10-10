@@ -96,8 +96,8 @@ gets its own search.
 
 Download
 [xslope_earth_dam_fs_time_start.xlsx](files/xslope_earth_dam_fs_time_start.xlsx)
-and open it with **File → Open…**, leaving the mode strip (LEM | Seepage | FEM) on
-**LEM**.
+and open it with **File → Open…**. Studio opens it with the mode strip
+(LEM | Seepage | FEM) on **Seepage**.
 
 Three companion files hold the seepage results and accompany the workbook:
 `xslope_earth_dam_fs_time_start_mesh.json` holds the mesh,
@@ -114,7 +114,7 @@ companions; open that one to skip the typing below.
 
 Every pore pressure the runs below read comes from the seepage engine, and the
 file arrives with those fields solved, so the first thing to do with it is look
-at what it contains. Switch the mode strip to **Seepage** (`Ctrl+2`) and click the
+at what it contains. With the mode strip on **Seepage**, click the
 **Seep · Transient** tab. The play bar steps through **nineteen** instants —
 t = 0, 2, 5, 10, 15, 20, 25, 30, 35, 40, 47, 55, 65, 80, 100, 130, 180, 240 and
 300 — and every run below reads one of them.
@@ -142,8 +142,8 @@ cohesion c′ and the friction angle φ′ sit at 0 with the pore-pressure optio
 on `none`. The seepage analysis never needed any of them. We enter the five
 values for each zone now.
 
-Switch back to **LEM** (`Ctrl+1`) and click **Materials** in the Inputs tree. Set
-the **Show parameters for:** toggles to **LEM** alone, which hides the
+Switch the mode strip to **LEM** (`Ctrl+1`) and click **Materials** in the Inputs
+tree. Set the **Show parameters for:** toggles to **LEM** alone, which hides the
 conductivity and finite element columns.
 
 ![The materials table as the starter file ships: unit weight, saturated unit weight, cohesion and friction angle blank, and u still at none](images/combo03_studio_materials_blank.png)
@@ -270,21 +270,22 @@ dependency:
 > Pore pressures come from the transient seepage solution, at t = 0 day. That
 > frame is read into the model when the run starts, in place of any stored field.
 
-Click **Run**. The Log reports the limit it read off the file, then the
-refinement:
+Click **Run**. The Log reports the frame it read and the limit it read off the
+file, then the refinement:
 
 ```text
+Analysis uses transient seepage frame t = 0 — as requested.
 Applying the file's search window: min_slip_depth.
 Searching for the critical circular surface with SPENCER…
-[🔁 iteration 1] center=(103.00, 59.00), FS=1.5372, grid=8.8500
-[🔁 iteration 4] center=(103.00, 56.79), FS=1.5311, grid=2.2125
-[🔁 iteration 7] center=(103.00, 56.79), FS=1.5311, grid=0.2766
-[✅ converged] Iter=7, FS=1.5311 (ΔFS<0.0005) at (x=103.00, y=56.79, depth=0.00)
+[↻ iteration 1] center=(103.00, 59.00), FS=1.5372, grid=8.8500
+[↻ iteration 4] center=(103.00, 56.79), FS=1.5311, grid=2.2125
+[↻ iteration 7] center=(103.00, 56.79), FS=1.5311, grid=0.2766
+[✓ converged] Iter=7, FS=1.5311 (ΔFS<0.0005) at (x=103.00, y=56.79, depth=0.00), elapsed time=2.27 seconds
 Critical FS = 1.531
 Sliding mass = 5,580.9 kN/m over 57.93 m of failure surface
 ```
 
-The first line names the one limit the file sets. The search screens both
+The second line names the one limit the file sets. The search screens both
 starting circles, takes the downstream one, and steps its center down in halving
 increments until the factor of safety stops moving by more than 0.0005.
 
@@ -306,11 +307,12 @@ has just started down. Reopen **Run → Run LEM…**, set **Saved frame** to
 `t = 5 day` and click **Run**:
 
 ```text
+Analysis uses transient seepage frame t = 5 — as requested.
 Applying the file's search window: min_slip_depth.
 Searching for the critical circular surface with SPENCER…
-[🔁 iteration 9] center=(5.20, 65.90), FS=1.5134, grid=0.2996
-[🔁 iteration 10] center=(5.20, 65.90), FS=1.5134, grid=0.1498
-[✅ converged] Iter=10, FS=1.5134 (ΔFS<0.0005) at (x=5.20, y=65.90, depth=0.02)
+[↻ iteration 9] center=(5.20, 65.90), FS=1.5134, grid=0.2996
+[↻ iteration 10] center=(5.20, 65.90), FS=1.5134, grid=0.1498
+[✓ converged] Iter=10, FS=1.5134 (ΔFS<0.0005) at (x=5.20, y=65.90, depth=0.02)
 Critical FS = 1.513
 Sliding mass = 6,237.1 kN/m over 60.20 m of failure surface
 ```
@@ -523,14 +525,15 @@ the seepage boundary sets, the pool schedule and the stage times on it.
 ### Opening the model
 
 Download [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx) and
-open it with **File → Open…**, leaving the mode strip on **LEM**. Its three
+open it with **File → Open…**. Studio opens it with the mode strip on **FEM**;
+click **LEM** (`Ctrl+1`). Its three
 companions — `xslope_johnson_fs_time_mesh.json`, `xslope_johnson_fs_time_tseep.csv`
 and `xslope_johnson_fs_time_tseep_meta.json` — sit in the same folder as the workbook and Studio
 reads them on open, so the mesh and the seepage solution are already loaded. In
 **LEM** the inputs
 view draws that mesh behind the zones.
 
-![The Johnson Reservoir dam as the shipped file opens, the mesh behind it](images/combo03_rapid_inputs.png){width=1000}
+![The Johnson Reservoir dam in LEM mode, the mesh behind it](images/combo03_rapid_inputs.png){width=1000}
 
 ### What the file contains {#what-the-file-carries}
 
@@ -540,14 +543,14 @@ what came with it. Five things in the file determine what the sweep can do.
 **The undrained envelope.** Click **Materials** and set the **Show parameters
 for:** toggles to **LEM** alone. Only the core has a $K_c = 1$ envelope —
 $d = 250$ psf and $\psi = 14°$, under its drained $c' = 400$ psf and
-$\phi' = 18°$ — and blanks on the shell and the foundation declare them
+$\phi' = 18°$ — and the zeros on the shell and the foundation declare them
 free-draining through the drawdown.
 
 | mat | name | γ (pcf) | c′ (psf) | φ′ (deg) | d (psf) | ψ (deg) | u |
 | :---: | --- | :---: | :---: | :---: | :---: | :---: | --- |
-| 1 | `shell` | 130 | 100 | 35 | — | — | `seep` |
+| 1 | `shell` | 130 | 100 | 35 | 0 | 0 | `seep` |
 | 2 | `core` | 125 | 400 | 18 | 250 | 14 | `seep` |
-| 3 | `foundation` | 127 | 100 | 27 | — | — | `seep` |
+| 3 | `foundation` | 127 | 100 | 27 | 0 | 0 | `seep` |
 
 We cover the procedure itself
 [in COMBO-2](combo02_rapid_drawdown.md#the-three-stage-procedure) — what each

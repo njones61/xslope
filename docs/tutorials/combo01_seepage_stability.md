@@ -235,9 +235,9 @@ The Log pane follows the search. Its last two refinement steps and its closing
 lines read:
 
 ```text
-[🔁 iteration 11] center=(508.96, 262.80), FS=1.2572, grid=1.4927
-[🔁 iteration 12] center=(508.96, 262.80), FS=1.2572, grid=0.7463
-[✅ converged] Iter=12, FS=1.2572 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28)
+[↻ iteration 11] center=(508.96, 262.80), FS=1.2572, grid=1.4927
+[↻ iteration 12] center=(508.96, 262.80), FS=1.2572, grid=0.7463
+[✓ converged] Iter=12, FS=1.2572 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28), elapsed time=5.18 seconds
 Critical FS = 1.257
 Sliding mass = 1,284,328.7 lb/ft over 290.62 ft of failure surface
 ```

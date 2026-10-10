@@ -92,8 +92,9 @@ the depth of water above each point.
 
 Open **Materials** and switch to **List view**. Above the form, the row of
 checkboxes labeled **Show parameters for:** sets which inputs the editor
-shows; **Reliability** is the one that is off by default, and ticking it puts a
-**± σ** box beside every parameter that can have a standard deviation:
+shows. Set the toggles to **LEM** and **Reliability**. **Reliability** is the one
+that is off by default, and ticking it puts a **± σ** box beside every parameter
+that can have a standard deviation:
 
 ![The clay with its standard deviations](images/lem11_studio_materials.png)
 
@@ -513,7 +514,8 @@ the question: the same **Plot type** list offers
 `Monte Carlo rank correlation (σ)`,
 which runs a Monte Carlo campaign and ranks the parameters by how strongly
 each sampled input tracks the factor of safety across all the realizations.
-Run it and the same ranking comes back:
+Set **MC samples** to `10000`, the count the Monte Carlo runs above used, and
+run it. The same ranking comes back:
 
 ![The Monte Carlo rank-correlation bars](images/lem11_rank.png){width=800}
 

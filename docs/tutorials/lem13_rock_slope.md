@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-13 — A Rock Slope (Hoek-Brown)"
-description: "A 10 m rock cut whose strength comes from four field observations instead of a cohesion and a friction angle: solved by Spencer's method and then by finite element strength reduction on the same file, read once more with its intact strength typed in the megapascals the literature quotes, and then swept — the Geological Strength Index across its whole range and the blast-disturbance factor across its own — to find which of the four field inputs the factor of safety actually depends on."
+description: "A 10 m rock cut whose strength comes from four field observations instead of a cohesion and a friction angle: solved by Spencer's method and then by finite element strength reduction on the same file, and then swept — the Geological Strength Index across its whole range and the blast-disturbance factor across its own — to find which of the four field inputs the factor of safety actually depends on."
 ---
 
 # Tutorial LEM-13 — A Rock Slope (Hoek-Brown)
@@ -8,12 +8,10 @@ description: "A 10 m rock cut whose strength comes from four field observations 
 One rock slope, with no cohesion and no friction angle to enter. Part A is a 10 m
 cut at 45° in a mass so heavily jointed that its strength is a small fraction of
 the intact rock's, taken through Spencer's method and then through finite element
-strength reduction on the same file — and read once more with its intact strength
-typed in the megapascals the literature quotes rather than the kilopascals the
-model works in. In Part B we sweep the two inputs that are judgments rather than
-measurements, to see which of the four the answer depends on. A rock mass gets
-its strength from a curve, and the four numbers that define the curve are field
-observations rather than laboratory constants.
+strength reduction on the same file. In Part B we sweep the two inputs that are
+judgments rather than measurements, to see which of the four the answer depends
+on. A rock mass gets its strength from a curve, and the four numbers that define
+the curve are field observations rather than laboratory constants.
 
 ![A 10 m rock slope at 45 degrees on a 5 m foundation](images/lem13_problem_sketch.png){width=1000}
 
@@ -105,8 +103,9 @@ hatched maximum depth at elevation 0, and the starting circle in the file.
 
 ![The loaded model](images/lem13_inputs.png){width=1000}
 
-Open **Materials** and switch to **List view**, which puts the strength
-parameters beside a plot of the envelope they define:
+Open **Materials**, set the **Show parameters for:** toggles to **LEM** alone,
+and switch to **List view**, which puts the strength parameters beside a plot of
+the envelope they define:
 
 ![The Hoek-Brown material](images/lem13_studio_materials.png)
 

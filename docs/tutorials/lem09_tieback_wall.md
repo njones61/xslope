@@ -308,10 +308,11 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 We build them as we did in
 [LEM-3](lem03_layered_slope.md#c-building-it-in-studio). In
-**Materials**, two rows take the table above, both unit-weight columns filled at
-the same value because there is no water in this model:
+**Materials**, set the **Show parameters for:** toggles to **LEM** alone. Two rows
+take the table above, both unit-weight columns filled at the same value because
+there is no water in this model:
 
-![The materials editor on the wall's two soils](images/lem09_studio_materials.png){width=1000}
+![The materials editor on the wall's two soils](images/lem09_studio_materials.png){width=945}
 
 In **Profile lines**, paste each layer's block from the table above as its own
 line. The lower layer's block includes the wall face — the vertical run at
@@ -331,9 +332,10 @@ preview draws the wedge running back and up from the wall toe:
 
 ### 3. Reinforcement lines
 
-Open **Reinforcement lines** in the **Inputs** tree and press **Table view** —
-the columns are the worksheet's, in the same order, so the two blocks from the
-table above paste straight in. Paste the endpoint block (`Label` through `y2`)
+Open **Reinforcement lines** in the **Inputs** tree, set its **Show parameters
+for:** toggles to **LEM** alone, and press **Table view** — the columns are the
+worksheet's, in the same order, so the two blocks from the table above paste
+straight in. Paste the endpoint block (`Label` through `y2`)
 into the first cell — the rows come with it — then set each row's **Type** to
 `anchor`, which fills **Dir** with `axial` and **Appl** with `active` on its
 own, and paste the capacity block into the first `Tmax` cell:
@@ -345,7 +347,7 @@ five groups — **Identity**, **Geometry**, **Capacity**, **Anchorage**, **Type*
 — with the list on the left labeling each line by its support type and the
 x-range it spans:
 
-![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
+![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1400}
 
 In the **Type** group, **Dir** reads `axial` and **Appl** `active` beside the
 `anchor` Type; typing over either afterwards keeps
@@ -358,8 +360,9 @@ between them loses nothing. Click **OK**.
 
 ### 4. The soldier pile
 
-Open **Piles** in the same tree, press **Table view**, and paste the row from the
-table above into the first cell:
+Open **Piles** in the same tree, set its **Show parameters for:** toggles to
+**LEM** alone, press **Table view**, and paste the row from the table above into
+the first cell:
 
 ![The piles editor's table view on the soldier pile](images/lem09_studio_piles_table.png)
 
@@ -368,7 +371,7 @@ Press **List view** to read the row as a form — **Identity**, **Geometry**,
 this problem fills beyond the endpoints — beside the preview drawing the pile
 on the section:
 
-![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1000}
+![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1400}
 
 Click **OK**.
 
@@ -457,15 +460,15 @@ non-circular surface represents its mechanism better.
 
 The three points we entered are a specified surface from the manual this problem
 comes from, and we evaluate it with a **single-surface run — no search, the
-surface exactly as typed**. Set **Analysis** to `Single surface` and raise the
-slice count to 60:
+surface exactly as typed**. Set **Analysis** to `Single surface` and **Surface**
+to `Non-circular`, and raise the slice count to 60:
 
 ![Janbu on the manual's wedge](images/lem09_solution_wedge.png){width=1000}
 
 **FS = 1.469** with Janbu's correction factor f₀ = 1.024 applied, 1.434 without
-it, and 1.439 with Spencer's method — the values
-[verification problem VP49](../verification/rocscience.md#vp49) records against
-the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 33%
+it, and 1.439 with Spencer's method.
+[Verification problem VP49](../verification/rocscience.md#vp49) records the 1.469
+and the 1.439 against the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 33%
 more soil than the searched surface, and takes the same 35,570 lb/ft from the
 anchors, since it too crosses both outside their development lengths. Its
 lower leg leaves the toe at 42° against the search's 49°. A specified surface is a
@@ -475,7 +478,9 @@ first.
 ### Effect of the tiebacks {#what-the-tiebacks-are-worth}
 
 Now we take both anchors out and search the same wall again — same soils, same
-pile, same starting points, a separate search with its own critical surface:
+pile, same starting points, a separate search with its own critical surface. In
+**Run LEM…**, set **Analysis** back to `Auto search`, **Surface** to
+`Non-circular` and the slice count back to 40:
 
 ![Janbu on the wall with no tiebacks](images/lem09_solution_bare.png){width=1000}
 
@@ -505,7 +510,7 @@ divided by the factor of safety. The
 [VP85 verification problem](../verification/rocscience.md#vp85) is the same slope
 published both ways — a 20 ft cut in saturated clay, γ = 98 pcf, c = 350 psf,
 φ = 0, with one horizontal tieback carrying 9,000 lb/ft — and each case is
-evaluated on the circle its source prints for it:
+evaluated on the circle its source prints for it, at 60 slices:
 
 | Model | Appl | XSLOPE FS |
 | --- | --- | :---: |

@@ -138,7 +138,7 @@ run checks reject an incomplete pair; leaving both blank treats the material as 
 **A second water state** — Piezometric Line 2, a second seepage solution, or a
 transient frame; the pore pressures stages 2 and 3 read.
 
-**Water loads** = `auto` (`main!D23`) — the reservoir load on the face at stage
+**Water loads** = `auto` (`main!D24`) — the reservoir load on the face at stage
 1, and whatever is left of it at stage 2.
 
 The second and third are the same statement seen twice, which is why leaving
@@ -315,10 +315,11 @@ Click **Run**. The Log pane follows the search:
 
 ```text
 Searching for the critical circular surface with SPENCER (rapid drawdown)…
-[🔁 iteration 1] center=(251.00, 235.00), FS=1.1869, grid=22.7578
-[🔁 iteration 8] center=(248.16, 239.27), FS=1.1818, grid=1.4224
-[🔁 iteration 17] center=(247.09, 241.58), FS=1.1805, grid=0.1778
-[✅ converged] Iter=17, FS=1.1805 (ΔFS<0.0005) at (x=247.09, y=241.58, depth=82.33)
+[↻ iteration 1] center=(251.00, 235.00), FS=1.1869, grid=22.7578
+[↻ iteration 8] center=(248.16, 239.27), FS=1.1818, grid=1.4224
+[↻ iteration 17] center=(247.09, 241.58), FS=1.1805, grid=0.1778
+[✓ converged] Iter=17, FS=1.1805 (ΔFS<0.0005) at (x=247.09, y=241.58, depth=82.33), elapsed time=24.93 seconds
+[! unsolved trials] Spencer could not solve 5 of 855 trial surfaces
 Critical FS = 1.181
 Rapid drawdown stages on the critical surface: Stage 1 FS = 1.4835, Stage 2 FS = 1.1805, Stage 3 FS = not required
 Sliding mass = 1,101,634.4 lb/ft over 256.56 ft of failure surface

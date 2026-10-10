@@ -60,8 +60,9 @@ file.
 
 ![The loaded model](images/lem07_baker_inputs.png){width=1000}
 
-Open **Materials** and switch to **List view**, which puts the strength
-parameters beside a plot of the envelope they define. The clay's
+Open **Materials**, set the **Show parameters for:** toggles to **LEM** alone,
+and switch to **List view**, which puts the strength parameters beside a plot of
+the envelope they define. The clay's
 **Model (option)** is `pow`, and the four coefficients under it are the power
 curve's. The option's full form is
 
@@ -94,8 +95,8 @@ the slope face:
 elevation −1.04, 9.18 m of failure surface carrying 98.6 kN/m of soil. Those
 two totals print with the factor of safety when the run completes —
 `Sliding mass = 98.6 kN/m over 9.18 m of failure surface` in Studio's Log
-pane, or on the console for a scripted run — and the slice table a
-**Reports…** export builds itemizes them slice by slice. We read the mass
+pane, or on the console for a scripted run — and the slice table in a report
+from **File → Generate Report…** itemizes them slice by slice. We read the mass
 figures quoted through the rest of this page the same way. Slide
 reports 0.960 on this case and Baker's own solution is 0.97. The surface is
 shallow, and the effective normal stress along its slice bases averages

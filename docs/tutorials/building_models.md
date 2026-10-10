@@ -45,8 +45,9 @@ spreadsheet built by hand can be handed to the assistant to extend.
 ## The Excel template
 
 The template is the blank master input file. It carries one worksheet per aspect of
-the problem — geometry, materials, water, loads, reinforcement, failure surfaces,
-seepage boundaries — and a `main` sheet of global options that apply to all of them:
+the problem — geometry, materials, water, loads, reinforcement, slip joints,
+failure surfaces, seepage boundaries — and a `main` sheet of global options that
+apply to all of them:
 
 ![The template's main worksheet, and the worksheets the workbook carries](images/t0_template_main.png)
 

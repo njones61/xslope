@@ -278,7 +278,7 @@ Enter (or copy-paste) the two surcharge points from the table above:
 
 ![The finished dloads worksheet](images/lem08_sheet_dloads.png)
 
-`dloads!B5` **Direction** stays blank, which applies the load normal to the
+`dloads!D5` **Direction** stays blank, which applies the load normal to the
 ground surface.
 
 ### 4. The `reinforce` worksheet
@@ -312,11 +312,12 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ### 1. Materials
 
-Click **Materials** in the **Inputs** tree, press **Add row** twice, and enter
+Click **Materials** in the **Inputs** tree, set the **Show parameters for:**
+toggles to **LEM** alone, press **Add row** twice, and enter
 (or copy-paste) the two materials from the table above — both at γ = 130 and
 φ = 37, told apart by c = 300 and 0:
 
-![The materials editor on this problem's two soils](images/lem08_studio_materials.png){width=1000}
+![The materials editor on this problem's two soils](images/lem08_studio_materials.png){width=945}
 
 ### 2. Profile lines
 
@@ -339,9 +340,10 @@ from the crest break to the right-hand edge:
 
 ### 4. Reinforcement lines
 
-Open **Reinforcement lines** in the **Inputs** tree and press **Table view** —
-the columns are the worksheet's, in the same order, so the two blocks from the
-tables above paste straight in. Paste the endpoint block (`Label` through `y2`)
+Open **Reinforcement lines** in the **Inputs** tree, set its **Show parameters
+for:** toggles to **LEM** alone, and press **Table view** — the columns are the
+worksheet's, in the same order, so the two blocks from the tables above paste
+straight in. Paste the endpoint block (`Label` through `y2`)
 into the first cell — the rows come with it — then set each row's **Type** to
 `geosynthetic`, which fills **Dir** and **Appl** on its own, and paste the
 capacity block into the first `Tmax` cell:
@@ -352,7 +354,7 @@ Press **List view** to read what was entered one line at a time, as a form in
 five groups — Identity, Geometry, Capacity, Anchorage, Type — beside a preview
 that draws the lines on the section:
 
-![The reinforcement editor's list view on the first layer](images/lem08_studio_reinforcement.png){width=1000}
+![The reinforcement editor's list view on the first layer](images/lem08_studio_reinforcement.png){width=1400}
 
 The capacity fields show their units — `Tmax (per unit width, lb/ft)` — so a
 per-element capacity entered without a spacing is visible as the wrong
@@ -366,8 +368,8 @@ six lines match the tables above.
 Click **Circles** and enter the two circles from the table above, or paste the
 block into the first cell — its four columns are the editor's first four, and
 the rows come with it. **Depth is an elevation**: 0 is the toe, -10 the bottom
-of the model. The `R` column fills in automatically, and the preview draws both arcs
-on the section:
+of the model. The preview draws both arcs on the section as you type, and the `R`
+column is filled in when you click **OK**:
 
 ![The circles editor on the two starting circles](images/lem08_studio_circles.png)
 

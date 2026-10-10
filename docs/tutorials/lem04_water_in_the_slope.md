@@ -265,7 +265,7 @@ enter (or copy-paste) the three soils in the order the table above lists them �
 the row order fixes the Mat IDs. Both unit-weight columns are filled here and
 every row's **u** is `piezo`:
 
-![The materials editor on this problem's three soils](images/lem04_studio_materials.png){width=1000}
+![The materials editor on this problem's three soils](images/lem04_studio_materials.png){width=1162}
 
 Then **Profile lines**: set **Max depth (bottom boundary elevation):** to `0`,
 and press **Add line** three times, each line taking its **Material:** and its
@@ -423,7 +423,7 @@ A held surface also cannot show that the water changes *which* mechanism is
 critical, not just how strong it is. Set the three `u` cells to `none` and run
 **Auto search** rather than the single surface, and the dry slope's own
 critical circle is a shorter, shallower one that never reaches as far into the
-foundation — 1.651, on a mass of 241,357 lb/ft. Isolating a variable and
+foundation — 1.650, on a mass of 241,357 lb/ft. Isolating a variable and
 finding the critical surface are two different runs, and they answer two
 different questions.
 

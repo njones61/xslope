@@ -108,8 +108,8 @@ Build a model for a simple slope on a rigid foundation. The slope is 20 ft high 
 </div>
 
 The assistant builds into the open project, not into a file: its work appears on the
-canvas immediately and lands on the undo stack as one labeled step. Nothing is saved
-until you use **Save As**.
+canvas immediately, and each change it makes goes on the undo stack as its own
+labeled step. Nothing is saved until you use **Save As**.
 
 ### Check its work
 
@@ -250,8 +250,9 @@ Click **OK**.
 Here we name each material in the model and enter its properties — unit weight
 and strength parameters. Everything else will reference the material by its ID,
 which is why it comes first. This problem has one material. Click **Materials**.
-The editor opens on **Table view**, a material per row; press **List view** for
-the per-material form, then **Add**:
+The editor opens on **Table view**, a material per row. Set the **Show parameters
+for:** toggles to **LEM** alone, press **List view** for the per-material form,
+then **Add**:
 
 1. **Name** = `soil`.
 2. **γ** = `125`.
@@ -362,8 +363,8 @@ Spencer's answer on that circle:
 
 ![Spencer's critical surface](images/lem01_solution_search.png){width=1000}
 
-**FS = 1.276**. The solution also has an amber strip across the top listing
-*admissibility warnings*: interslice tension, a line of thrust outside the
+**FS = 1.276**. In Studio, the solution view also has an amber strip across the top
+listing *admissibility warnings*: interslice tension, a line of thrust outside the
 slices on about half the boundaries, and tension on the base of 3 slices near
 the crest. These warnings mean the solution requires the soil near the crest to
 carry tension, which soil cannot do.

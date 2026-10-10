@@ -268,7 +268,7 @@ failures** with a **Min slip depth**, or an **SSR exclusion** over the face
 band, which holds that zone at full strength while the rest of the model is
 reduced. Leave the rest of the dialog alone and click **Build**.
 
-The mesh comes out at **4,364 nodes and 2,101 triangles**, with the six lines
+The mesh comes out at **4,388 nodes and 2,113 triangles**, with the six lines
 discretized into **60 bar elements**, 10 per line:
 
 ![The mesh, with the reinforcement lines carried onto element edges](images/fem02_mesh.png){width=1000}
@@ -328,17 +328,19 @@ value above zero. Click **OK**.
 
 The reinforcement's two columns are next. Open **Reinforcement** in the Inputs
 dock, and set the **Show parameters for:** toggles to **FEM** alone, as on the
-materials table — the limit equilibrium inputs are complete and can stay out of
-view. The three columns at the right end, in blue, are the ones only the finite
-element engine reads.
+materials table. The columns with blue headers, at the right end, are the ones
+only the finite element engine reads.
 
 ![The reinforcement table on the starter: Tres, E and Area empty](images/fem02_studio_reinforce_blank.png)
 
-The toggle has taken the capacity columns out of view — `Tmax`, the two pullout
-lengths and the two end anchorages — and the six lines are complete on every one
-of them: 800 lb/ft of capacity, a 4 ft pullout length at each end and no end
-anchorage. `Spacing` is still on screen and reads 1, because geogrid properties
-are already per unit width. The three blue columns are empty.
+The toggle hides `Type`, `Dir` and `Appl`, which only the limit equilibrium run
+reads. The capacity columns stay in view, because the finite element run reads
+them too, and the six lines are complete on every one of them: 800 lb/ft in
+`Tmax`, a 4 ft pullout length in `Lp1` and `Lp2`, and 0 in `Tend1` and `Tend2`,
+which is no end anchorage. `Spacing` reads 1, because geogrid properties are
+already per unit width. Of the seven blue columns, `Tres`, `E (psf)` and `Area`
+are empty. The other four, `Joint`, `kn`, `ks` and `Jred`, are for a line the
+soil can slide along, and they stay blank on this model.
 
 Fill `E (psf)` and `Area` on all six rows, and leave `Tres` empty:
 
@@ -361,10 +363,11 @@ under a name of your own.
 ## The iteration budget
 
 **Max iterations per trial** and **Iteration ceiling** open at 12,000 and
-50,000. Leave them as they are. They only set how long a slow trial may run
-before the program gives up on it; they do not decide the answer, and this
-model returns the same factors of safety with a budget of 3,000. Each run takes
-a few minutes on an ordinary laptop.
+50,000. Leave them as they are. Every run on this page is made at those values.
+They set how long a slow trial may run before the program decides whether the
+slope is standing or sliding. On this model a smaller budget can move the answer
+by one bisection step: at 3,000 the elastic-perfectly-plastic run below returns
+1.574 instead of 1.566. Each run takes a few minutes on an ordinary laptop.
 
 ---
 
@@ -427,16 +430,15 @@ to **Last converged** — here the trial at *F* = 1.5625 — because that is the
 last state that reached equilibrium, and there the layers differ.
 
 Each row of the list names a line, gives its utilization, and says what state
-the line is in. At that state four of the six — lines 2, 3, 4 and 5, the middle of
-the stack — read **yielded**: somewhere away from the ends an element is at the
-full 800 lb/ft and holding it, which is the whole tensile strength of the geogrid
-mobilized. The other two read **pullout**. Line 1, the bottom layer at the toe,
-is the clearest of them: its hardest-worked element sits 1 ft in from the face,
-carrying the 200 lb/ft its embedment develops there and slipping rather than
-carrying more. That point is working against its bond limit, not its rupture
-limit.
+the line is in. At that state five of the six — lines 2 to 6 — read
+**yielded**: somewhere away from the ends an element is at the full 800 lb/ft and
+holding it, which is the whole tensile strength of the geogrid mobilized. The
+sixth, line 1, the bottom layer at the toe, reads **pullout**. Its hardest-worked
+element sits 1 ft in from the face, carrying the 200 lb/ft its embedment develops
+there and slipping rather than carrying more. That point is working against its
+bond limit, not its rupture limit.
 
-Line 5 is one of the four that yield, and it reaches both limits at once, so we
+Line 5 is one of the five that yield, and it reaches both limits at once, so we
 open that one:
 
 ![Line 5 at the last converged trial, elastic-perfectly-plastic](images/fem02_bar_profile_epp.png){width=1000}
@@ -447,7 +449,7 @@ first 4 ft, sits at 800 lb/ft along the middle of the line, and ramps back to
 zero over the last 4 ft. The blue line is the force actually mobilized, with a
 point at the center of each of the ten 2 ft bar elements the mesh laid along the
 layer — that is where the solver reports each element's force. It climbs from almost nothing at the face, reaches the envelope at s = 9 and holds
-it at 11 — those two elements at the full 800 lb/ft are what the panel
+it at 11 and 13 — those three elements at the full 800 lb/ft are what the panel
 titles **yielded** — then falls away down the buried ramp and rides the ramp
 itself at s = 17 and 19, where 3 ft and 1 ft of embedment allow only 600 and
 200 lb/ft. The rings there are the solver's record that those elements reached
@@ -487,7 +489,7 @@ Spencer's 1.587 and the elastic-perfectly-plastic 1.566.
 
 The two solutions show where the difference comes from. Without a residual, a
 layer that reaches its 800 lb/ft keeps carrying it, and at the
-elastic-perfectly-plastic answer lines 2, 3, 4 and 5 are doing exactly that. With a
+elastic-perfectly-plastic answer lines 2 to 6 are doing exactly that. With a
 residual, a layer that reaches 800 lb/ft drops to 600 and its lost load has to
 be picked up by the soil and the other layers; the solver redistributes it and
 checks whether the slope still stands. At the peak-residual answer no layer has
@@ -518,7 +520,7 @@ when its embedment could only ever develop 200.
 
 Nothing on this line has dropped to it, and nothing should have. A layer drops
 only when a converged trial requires more than 800 lb/ft of an element, and
-this trial did not: line 5's interior peak is 763 lb/ft, its tip at s = 19 is
+this trial did not: line 5's interior peak is 764 lb/ft, its tip at s = 19 is
 on the 200 lb/ft bond limit — which is why the panel calls the line pullout
 rather than yielded — and there is no purple Softened square, the panel's mark
 for an element that has shed. The drops happened in the trials above this one,
@@ -530,9 +532,9 @@ residual lowers the answer by making the trial above this one fail.
 
 That shows in the other five lines. All six now read **pullout**: each has an
 element at its bond limit, slipping there rather than carrying more, and none of
-the six reaches the 800 lb/ft that four of them held in the run before. In the
-elastic-perfectly-plastic field four lines were at their rupture limit and two
-at their bond limit; here the whole stack is at its bond limit. **Pullout** and
+the six reaches the 800 lb/ft that five of them held in the run before. In the
+elastic-perfectly-plastic field five lines were at their rupture limit and one
+at its bond limit; here the whole stack is at its bond limit. **Pullout** and
 **yielded** are both "the line has reached a limit", and only the word says which
 limit, which is why the panel prints it. The same panel, left on its default **At failure** state,
 shows what the converged state cannot:
@@ -802,9 +804,9 @@ This tutorial covered:
   soil around them.
 - The three finite element reinforcement inputs, the axial stiffness *EA* two of
   them amount to, and the model checks that block a run without them.
-- The per-trial iteration budget, the ceiling it extends to, and why neither
-  decides the answer on this model — only how far the captured failure state
-  develops.
+- The per-trial iteration budget and the ceiling it extends to, left at their
+  defaults for every run, and the one bisection step a smaller budget moves the
+  answer on this model.
 - Reading a reinforced result: the mechanism out of shear strain, and each
   layer's force profile, bond transfer and how it is working, out of the 1D details panel at
   the last converged trial.

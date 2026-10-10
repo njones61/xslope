@@ -193,10 +193,12 @@ Treating the ends as no-flow is a judgment call: the section is drawn far
 enough either side of the wall that the flow has become horizontal by the
 time it reaches them, so nothing crosses.
 
-These tables contain the entire model, and each is laid out exactly as its
-destination is — the template's worksheets and Studio's editors, same
-columns in the same order. Select a table's block of values, copy, and
-paste it straight into the sheet or editor rather than retyping it.
+These tables contain the entire model. The vertex and boundary tables are laid
+out exactly as their destinations are — the template's worksheets and Studio's
+editors, same columns in the same order. Select one of those blocks of values,
+copy, and paste it straight into the sheet or editor rather than retyping it. Type
+the material row instead: on the `mat` sheet its `name` and seepage columns are
+far apart, and Studio's editor has no `mat` column.
 
 ---
 
@@ -245,8 +247,8 @@ Build a seepage model of flow under a sheetpile wall. The foundation is a single
 </div>
 
 The assistant builds into the open project, not into a file: its work appears on
-the canvas immediately and lands on the undo stack as one labeled step. Nothing is
-saved until you use **Save As**.
+the canvas immediately, and each change it makes goes on the undo stack as its own
+labeled step. Nothing is saved until you use **Save As**.
 
 ### Check its work
 

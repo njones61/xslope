@@ -585,7 +585,7 @@ below:
 `|<` and `>|` jump to the first and last frame, `<` and `>` step one at a time,
 **Play** animates through them at the **Speed** multiplier, and the **t =** box
 takes a typed time and jumps to the nearest saved frame. The title shows the
-frame's time, and the subtitle shows **Inflow 0 / Outflow 1.658 m³/day per m**
+frame's time, and the subtitle shows **Inflow 0 / Outflow 1.659 m³/day per m**
 — two numbers where a steady solution reports one, because under storage exchange
 the water entering and the water leaving are no longer the same.
 

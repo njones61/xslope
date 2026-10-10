@@ -795,8 +795,8 @@ defended from measurements is the one to use.
 The 4.6% gap comes from the floor. The linear front holds *k<sub>r</sub>* at its
 floor of 0.01 through the deep unsaturated zone, far above the conductivity the
 other two models leave there — and rerunning it with *kr<sub>0</sub>* lowered to
-10<sup>−4</sup>, which the other two are already below by five feet of suction,
-brings its discharge to 1.8707, against van Genuchten's 1.8641 and Gardner's
+10<sup>−4</sup>, which van Genuchten's curve is already below at five feet of
+suction, brings its discharge to 1.8707, against van Genuchten's 1.8641 and Gardner's
 1.8654: 93% of the gap closes on that one parameter. The curve's shape barely matters by
 comparison — sweeping *h<sub>0</sub>* twentyfold moves the discharge by the same
 4.6% — because on a dam whose unsaturated zone stands tens of feet above the

@@ -77,7 +77,7 @@ returns **FS = 1.257**, COMBO-1's own answer on this model.
 With three engines' results in the session, the report has something to document.
 Click **File → Generate Report…**.
 
-![The Generate Report dialog on the solved model, with Bishop and Spencer ticked and the title page filled in](images/w03_report_dialog.png){width=1000}
+![The Generate Report dialog on the solved model, with Bishop and Spencer ticked and the title page filled in](images/w03_report_dialog.png){width=1057}
 
 Three groups sit on the left — Output, Limit equilibrium analysis, and Title
 page — and a contents tree on the right. Every field opens on a default that
@@ -157,11 +157,13 @@ in it.
 
 Spencer's method solves for a pair — a factor of safety and an interslice
 inclination θ — at which both the force sum and the moment sum vanish, so it
-prints both sums rather than a single quotient. On the page after this one they
-close at F = 1.257 and θ = −16.28°, with residuals of −1.000e-11 and 5.355e-09
-against terms coming to 371418 and 84337150. Every number is printed at a
-precision the factor of safety can be rebuilt from: Bishop divides its own two
-sums, 485408 and 394283, and prints the 1.231 they give.
+prints both sums rather than a single quotient. On the page after this one in
+the linked report, they close at F = 1.257 and θ = −16.28°, with residuals of
+−1.000e-11 and 5.355e-09 against terms coming to 371418 and 84337150. Every number
+is printed at a precision the factor of safety can be rebuilt from: Bishop divides
+its own two sums, 485408 and 394283, and prints the 1.231 they give. A report you
+generate yourself closes at the same F and θ, with slightly different residuals
+and sums.
 
 ### Check its work
 
@@ -229,8 +231,10 @@ Under **Output**, click **Browse…** on the **Template** row and choose
 path. Change **Save as** to `w03_report_example_template.docx` so the first report
 survives. Under **Limit equilibrium analysis**, untick **Bishop's Simplified
 Method**, leaving
-Spencer's finished search as the only stability run, and under **Title page** set
-**Organization** to `ACME Geotechnical`. Click **Generate**.
+Spencer's finished search as the only stability run. Under **Title page**, enter
+the **Project title** and **Project number** again, because the dialog does not
+keep them between openings, and set **Organization** to `ACME Geotechnical`. Click
+**Generate**.
 
 ![The first body page of the report built on the example template: the firm's name in the head, the firm's line in the foot](images/w03_page_template.png){width=620}
 

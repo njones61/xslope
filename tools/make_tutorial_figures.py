@@ -155,6 +155,29 @@ def render(name, src, sheet, rows=None, cols=None, tab_strip=False,
     return out
 
 
+def _filled_template(name, cells):
+    """A scratch copy of the blank template with ``cells`` filled in.
+
+    ``cells`` maps ``"sheet!A1"`` to a value: the entries a tutorial's Excel path
+    tells the reader to make. The copy is written outside the repository, and
+    only to be rendered — the figure is the sheet the reader ends up with, on the
+    template the page links, whatever version the completed model was saved
+    from. Loaded with its rich text so the label runs render as they do in the
+    template.
+    """
+    import tempfile
+
+    import openpyxl
+
+    wb = openpyxl.load_workbook(TEMPLATE, rich_text=True)
+    for ref, value in cells.items():
+        sheet, cell = ref.split("!")
+        wb[sheet][cell] = value
+    out = os.path.join(tempfile.mkdtemp(prefix="xslope_tutorial_sheet_"), name)
+    wb.save(out)
+    return out
+
+
 def placeholder(name, title, lines, width=1200):
     """A visible TODO card standing in for a capture only a person can take.
 
@@ -215,7 +238,15 @@ def lem01_sheets():
     rather than a quiet crop — the same constraint the input-template manifest
     documents for its three ``mat`` views.
     """
-    render("lem01_sheet_main.png", LEM01, "main", rows=(1, 25), cols="A:D")
+    # main is rendered from the blank template with the page's own entries, not
+    # from the completed model: the reader starts from today's template, and the
+    # cells the page leaves alone (version, Time, Tension SRF, Side BC, Water
+    # loads) must read as the reader's copy does.
+    render("lem01_sheet_main.png",
+           _filled_template("lem01_main.xlsx", {
+               "main!D8": "Imperial", "main!D10": 62.4, "main!D11": 0,
+               "main!D12": 0, "main!D13": 0}),
+           "main", rows=(1, 25), cols="A:D")
     render("lem01_sheet_mat.png", LEM01, "mat", rows=(9, 13), cols="A:Z")
     # profile spans two neighbouring tables so the capture reads like the real
     # sheet — Profile Line #2 sits empty beside the filled #1, as the reader
@@ -2180,7 +2211,13 @@ def seep01_sheets():
     reason LEM-1's profile window does: the empty neighbor is what the sheet looks
     like, and cropping it makes the capture read as a table rather than a worksheet.
     """
-    render("seep01_sheet_main.png", SEEP01, "main", rows=(1, 25), cols="A:D")
+    # main from the blank template with the page's three edits, for the reason
+    # lem01_sheets gives: the cells the page leaves alone must read as the
+    # reader's copy of today's template does.
+    render("seep01_sheet_main.png",
+           _filled_template("seep01_main.xlsx", {
+               "main!D8": "SI", "main!D9": "yr", "main!D10": 9.81}),
+           "main", rows=(1, 25), cols="A:D")
     render("seep01_sheet_mat.png", SEEP01, "mat", rows=(10, 12), cols="AG:AQ",
            identity_cols="A:B")
     render("seep01_sheet_profile.png", SEEP01, "profile", rows=(1, 15), cols="A:H")

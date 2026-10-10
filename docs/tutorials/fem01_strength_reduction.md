@@ -306,11 +306,12 @@ exists, not on how far the slope had to move to reach it. A rough E is therefore
 A real one starts to matter the moment a displacement is read as a prediction of
 ground movement.
 
-ν is not in the same category. Setting it to 0 — the value a blank cell loads
-as — moved the reference model's factor of safety by a third, which is why the
-model checks raise it as an error rather than a warning. 0.3 is the paper's nominal
-value too, but unlike E it affects the factor of safety, so a real problem needs a
-real one.
+ν is checked more strictly. A blank cell loads as 0, and a Poisson's ratio of 0
+describes a material that does not push outward when it is loaded from above,
+which no soil does. The model checks therefore raise it as an error rather than a
+warning. On this embankment ν = 0 returns the same 1.3711 from the same bracket.
+0.3 is the paper's nominal value too, and a real problem needs a value chosen for
+its own soil.
 
 ---
 
@@ -363,8 +364,8 @@ The Log reports each trial:
 | Trial | *F* | Result | Iterations | Bracket after it |
 | --- | :---: | --- | :---: | :---: |
 | lower bound | 1.0000 | converged | 56 | — |
-| upper bound | 2.0000 | failed | 181 | [1.0000, 2.0000] |
-| 1 | 1.5000 | failed | 1,161 | [1.0000, 1.5000] |
+| upper bound | 2.0000 | failed | 341 | [1.0000, 2.0000] |
+| 1 | 1.5000 | failed | 2,231 | [1.0000, 1.5000] |
 | 2 | 1.2500 | converged | 124 | [1.2500, 1.5000] |
 | 3 | 1.3750 | failed | 12,000 | [1.2500, 1.3750] |
 | 4 | 1.3125 | converged | 304 | [1.3125, 1.3750] |
@@ -423,23 +424,23 @@ moves the answer 0.002.
 ### Max iterations per trial {#max-iterations-per-trial-decides-how-long-a-near-critical-trial-may-work}
 
 **Max iterations per trial** is the viscoplastic iteration budget for each trial
-*F*, and it opens at **12,000**. It is a budget rather than a ceiling. A trial
-that spends it and is still making progress — its leftover force still falling, or its displacement field standing still — is given another
-budget's worth, and another, up to the
-**Iteration ceiling** on the same dialog, which opens at 50,000. Only a trial
-whose displacements are growing stops at its budget and is recorded as failed.
+*F*, and it opens at **12,000**. It is a budget rather than a ceiling. When a
+trial spends it with the slope still moving, the program compares how far the
+slope moved in successive blocks of iterations. If the movement is dying away, the
+trial is given another budget's worth, and another, up to the
+**Iteration ceiling** on the same dialog, which opens at 50,000. If the movement
+is not slowing, the trial stops at its budget and is recorded as failed.
 
 The third bisection step above shows this. The trial at
-*F* = 1.3750 spent a full **12,000** iterations with its displacements still
-growing, and that is the one the search recorded as failed; every trial that
+*F* = 1.3750 spent a full **12,000** iterations, and over the last 6,000 of them
+each block of 1,200 moved the slope as far as the one before, as the Log's
+closing summary reports. The search recorded it as failed. Every trial that
 settles at all settles inside four hundred.
 
-Because the budget extends itself, it does not decide the answer. Run the same
-model with it set to 3,000 and the search returns **the same 1.3711** from the
-same bracket: the trial at 1.3750 is extended three times instead of running
-inside one budget, and it stops at the same 12,000 iterations either way.
-The budget sets the size of each grant of iterations; it does not decide whether
-a slow trial is allowed to finish.
+On this model the budget does not decide the answer. Run the same model with it
+set to 3,000 and the search returns **the same 1.3711** from the same bracket. The
+trial at 1.3750 stops at 3,000 iterations instead of 12,000, because its movement
+is not slowing there either, and it is recorded as failed either way.
 
 The one result the ceiling can leave open is **inconclusive**: a trial that
 reaches 50,000 with its leftover force still falling has neither settled nor run
@@ -489,9 +490,11 @@ none of them, is the better check there.
 ## Reading the failed state
 
 The run leaves its results on the **FEM · Results** tab. Its **Plot type**
-selector offers three panels, one at a time, and the **Field state** switch
-beside it applies to all three at once, so a figure never mixes states. It opens
-on **At failure**.
+selector offers four plots, one at a time. The first three draw the slope, and the
+**Field state** switch beside the selector applies to all three at once, so a
+figure never mixes states. It opens on **At failure**. The fourth,
+**Displacement vs F**, plots each trial of the search against the largest
+displacement it reached.
 
 ### Viscoplastic shear strain
 
@@ -564,14 +567,14 @@ the same band without running away on it.
 | *F* | 1.3672 | 1.5768 |
 | Equilibrium reached | yes | no |
 | Viscoplastic iterations | 393 | 12,000 — the budget |
-| Elements that have yielded, of 1,087 | 449 | 522 |
+| Elements that have yielded, of 1,087 | 463 | 522 |
 | Largest displacement (ft) | 0.999 | 8.090 |
 | Relative to the elastic response | 17.6× | 142.6× |
 
-An element counts as yielded once it has accumulated permanent strain — shearing
-that stays in the soil rather than springing back when the stress is relieved.
+An element counts as yielded when its stress has reached the weakened strength
+envelope, so it is carrying all the shear it can.
 
-At *F* = 1.3672 the slope is not intact — 449 elements have yielded and the
+At *F* = 1.3672 the slope is not intact — 463 elements have yielded and the
 crest has moved 0.999 ft, about 18 times its own elastic response — but it
 **stops**. The stresses redistribute onto soil that has strength left, the
 iteration settles, and there is an equilibrium state to report. At *F* = 1.58
@@ -617,8 +620,8 @@ This tutorial covered:
 - The bracket the search validates and bisects, and the iteration count climbing
   from 56 to 393 as the trials approach the critical factor.
 - Two controls that are easy to confuse: the tolerance that sets the
-  bracket's stopping width, and the per-trial iteration budget, which sets where
-  the automatic extension starts rather than stopping a slow trial.
+  bracket's stopping width, and the per-trial iteration budget, after which a
+  trial that is still moving goes on only if its movement is dying away.
 - Reading the mechanism out of shear strain, a deformed mesh and displacement
   vectors, and the converged state against the failed one on a single color
   scale.

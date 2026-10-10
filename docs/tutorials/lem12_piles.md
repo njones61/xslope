@@ -109,7 +109,7 @@ groups —
 **Identity**, **Geometry**, **Capacity / design**, **Behavior** — with the
 preview drawing the selected pile bold on the section:
 
-![The piles editor on the lower row](images/lem12_studio_piles.png){width=1000}
+![The piles editor on the lower row](images/lem12_studio_piles.png){width=1400}
 
 The **Capacity / design** group puts the empty **H** directly above the **D** and
 **S** it will be computed from, and the two capacity fields show their own
@@ -334,7 +334,7 @@ capacities and reaches the slices:
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 3 | 1.5 | 41.709 | 17.181 | 188,549 / 336,891 | 8,386.6 | 2.354 |
 | 4 | 2.0 | 15.184 | 7.526 | 76,378 / 138,639 | 6,405.7 | 2.072 |
-| 5 | 2.5 | 9.792 | 5.564 | 53,580 / 98,345 | 5,192.2 | 1.929 |
+| 5 | 2.5 | 9.792 | 5.564 | 53,579 / 98,345 | 5,192.2 | 1.929 |
 | 6 | 3.0 | 7.569 | 4.755 | 44,178 / 81,729 | 4,367.6 | 1.842 |
 | 8 | 4.0 | 5.621 | 4.046 | 35,938 / 67,165 | 3,316.3 | 1.741 |
 | 10 | 5.0 | 4.741 | 3.725 | 32,217 / 60,588 | 2,673.4 | 1.684 |

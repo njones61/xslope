@@ -111,9 +111,11 @@ strength of the surface between the two faces.
 
 ![The joints editor with the two rows of this model entered](images/fem05_studio_joints_editor.png){width=1102}
 
-Only the endpoints and `phi` have to be filled in. `c` blank is a cohesionless
-joint, and the rest of the row — the residual strengths, the dilation angle, the
-tension cutoff and the two stiffnesses — is left blank here and covered on the
+Only the endpoints and `phi` have to be filled in. `c` at 0 is a cohesionless
+joint. The rest of the row — the residual strengths, the dilation angle, the
+tension cutoff, the two stiffnesses and `Jred`, which says whether the joint is
+weakened along with the rest of the model — keeps the value a new row opens with.
+Those columns are covered on the
 [Joints and Interface Elements](../fem/joints.md) page.
 
 The endpoints are not free choices — they follow from the shape of the slope.
@@ -137,8 +139,9 @@ Enter the two rows below, or paste them straight into the worksheet.
 | bedding | 12.000 | 6.252 | 20.928 | 0.000 | 0 | 40 |
 | release | 12.000 | 6.252 | 12.000 | 12.000 | 0 | 40 |
 
-A new row opens with `c`, `phi` and `t_cut` at 0 and every other column blank;
-leave `t_cut` at 0 and the rest blank. With the two rows in, the Inputs plot draws
+A new row opens with its endpoints, `c`, `phi` and `t_cut` at 0 and every other
+column blank. Type the endpoints and `phi` over the zeros, and leave the rest as
+it opens. With the two rows in, the Inputs plot draws
 the joint lines in their own style, distinct from profile lines and reinforcement:
 
 ![The two joint lines on the Inputs plot, drawn in the joint line style](images/fem05_inputs_joints.png){width=900}
@@ -210,13 +213,13 @@ nearer three on an install that does not include the
 
 >>**FS = 1.199**
 
-The results view shows one panel at a time, picked from **Plot type** in the
-display panel: **Shear strain**, **Deformed mesh** or **Displacement vectors**,
-the same three every finite element tutorial reads. On this model they come down
-to two pictures. The rock is elastic, so no part of it can strain plastically
-and there is no strain field to draw; everything that happened, happened on the
-two lines, and **Shear strain** draws as **Joint slip** instead: the section a
-flat gray, and the only colorbar the slip on the joints, in meters.
+The results view shows one plot at a time, picked from **Plot type** in the
+display panel: **Viscoplastic shear strain**, **Deformed mesh**, **Displacement
+vectors** or **Displacement vs F**. The rock is elastic, so no part of it can
+strain plastically and there is no strain field to draw; everything that
+happened, happened on the two lines, and **Viscoplastic shear strain** draws as
+**Joint slip** instead: the section a flat gray, and the only colorbar the slip
+on the joints, in meters.
 
 ![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint drawn as two parted lines where it has opened](images/fem05_joint_slip.png){width=900}
 
@@ -235,10 +238,10 @@ which is what a release joint is for — and only its top, under the crest, is
 still closed and sliding, the one green length on it.
 
 **Deformed mesh** is the second picture. On a jointed model it is the deformed
-section drawn as the **blocks** the joints cut it into, with the slab under a
-tint of its own, the joint faces colored by how far they have slid, and the
-undeformed outline dashed behind it. On a jointed model, **Displacement
-vectors** shows this same picture.
+section drawn as the **blocks** the joints cut it into, with the joint faces
+colored by how far they have slid and the undeformed outline dashed behind it.
+Each material is drawn in one tint. Tick **Color by block** on the display panel
+to give each block a tint of its own.
 
 ![The deformed blocks at the critical factor: the slab has moved down the bedding plane and away from the release joint](images/fem05_fem_blocks.png){width=900}
 
@@ -292,7 +295,7 @@ on its bedding plane, Part 2 puts a **base plane** a little deeper, at 30°, and
 fills the wedge of rock above it — the block that Part 1 slid as one piece —
 with a generated set of joints, so that it becomes a stack of columns instead.
 
-![The Part 2 problem: the same 12 m face at 60°, a base plane dipping 30° from 9 m behind the crest to the toe, and above it a joint region filled by a set of columns dipping 110° at 1.5 m spacing](images/fem05_problem_sketch_topple.png){width=800}
+![The Part 2 problem: the same 12 m face at 60°, a base plane dipping 30° from 5 m behind the crest to the toe, and above it a joint region filled by a set of columns dipping 110° at 1.5 m spacing](images/fem05_problem_sketch_topple.png){width=800}
 
 Two inputs make a set. The first is *where* in the section the set exists,
 which can be given three ways:
@@ -338,9 +341,9 @@ rows. It is also how the set is found again: the rows of one network can be
 selected and removed together by their name.
 
 **Kind** selects the generator. `Parallel set` is one set of parallel traces at a
-stated dip; the other two are `Cross-jointed`, which crosses two sets, and
-`Voronoi`, which fills the region with a tessellated block mass at no preferred
-orientation. This set is a parallel one.
+stated dip; the other two are `Cross-jointed (two sets)`, which crosses two sets,
+and `Voronoi (blocky mass)`, which fills the region with a tessellated block mass
+at no preferred orientation. This set is a parallel one.
 
 **Dip** is the orientation, measured anticlockwise from horizontal, so a dip
 between 0 and 90 leans out of the face and a dip between 90 and 180 leans back
@@ -357,9 +360,14 @@ leave a whole column at each end of the region rather than a sliver. Changing
 the offset moves the set; it does not change the spacing.
 
 **Within** is where the set exists, the choice from the list above: the whole
-section, a material, or a joint region. Pick `Toppling zone`. **Elevation band**
-cuts whatever is chosen there to a range of elevations — "the sandstone above
-elevation 40" — and is left open at both ends here.
+section, a material, or a joint region. Pick `Joint region: Toppling zone`.
+**Elevation band** cuts whatever is chosen there to a range of elevations — "the
+sandstone above elevation 40" — and is left open at both ends here.
+
+**Joint properties (every trace in the set)** sets the strength of every row the
+dialog writes. Enter `0` under **c** and `35` under **phi**, the same
+strength as the base plane below, and leave the rest blank. A trace with no
+`phi` has no friction, and the model checks refuse a run on it.
 
 The dialog previews the traces on the canvas as the fields change, and **OK**
 writes exactly what the preview showed to the joints worksheet — the same
@@ -372,7 +380,7 @@ stored, so a set is changed by deleting its rows and building another.
 The base of the stack is typed by hand, because it is one surface rather than a
 set: a **base plane** dipping 30° out of the face, from its upper tip down to
 the toe, cohesionless at φ = 35°. Enter the row below in the joints editor, or
-paste it in; the generated traces take the same strength.
+paste it in.
 
 | Label | x1 | y1 | x2 | y2 | c | phi |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -394,7 +402,7 @@ elements, and 41 joint elements on 6 jointed lines** — six lines from one type
 row and five generated ones. Then **Run → Run FEM…** with the same settings as
 Part 1: SSRM, the bracket from 1.0 to 2.0, tolerance 0.01, **Max iterations per
 trial** at 100,000, and the failure criterion on Hybrid. Press **Run**. It takes
-about two minutes — nearer three without the compiled kernel — and reports
+about two minutes and reports
 
 <!-- test: file=files/xslope_rock_toppling.xlsx, type=fem_ssrm, expected_fs=1.105, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-topple-ssrm -->
 
@@ -448,14 +456,14 @@ section. The interface count grows, and the interfaces set the solution
 time: a joint reaches equilibrium by growing slip a little at a time, so the
 iterations a trial needs go up with them. On the shipped model at 1.5 m the
 trials that stand settle in a few hundred iterations, while the two that fail
-nearest the answer run 19,081 and 33,401 before their movement runs away — and
+nearest the answer run 16,671 and 29,951 before their movement runs away — and
 there are twice as many interfaces to carry at 0.75 m.
 
 So start coarse. Describe the set at a spacing two or three times what the rock
 really has, get the mechanism and the factor of safety, and only then refine —
 and check that the answer has stopped moving before trusting the fine one.
 
-The `Voronoi` generator produces still more interfaces. It fills a region with
+The `Voronoi (blocky mass)` generator produces still more interfaces. It fills a region with
 a tessellated block mass at no preferred orientation, which represents a blocky
 rock mass with no dominant joint set. Over this slope's toppling
 zone, at a block size of 2 m (and a seed of 7 — a tessellation is random, and the
@@ -474,18 +482,20 @@ it takes about **five minutes** on the reference solver. The search reports
 
 >>**FS = 1.090**
 
-and every trial beside it is decided: the mass comes to rest at 1.0625, 1.0781
-and 1.0859, each in about 310 iterations, and at 1.0938 its movement does not
-slow, so the run counts it as sliding. The factor is a little under the column
-set's 1.105, and the figures show why the two are close in number and differ in
-kind:
+The mass comes to rest at 1.0625, 1.0781 and 1.0859, each in about 310
+iterations. At 1.0938 it is still moving, though slowing, when the 100,000
+iterations run out, and the run counts that trial as failed. The Log's closing
+summary notes that the factor of safety depends on the iteration limit here and
+may change if **Max iterations per trial** is raised. The factor is a little under
+the column set's 1.105, and the figures show why the two are close in number and
+differ in kind:
 
-![Joint slip on the Voronoi mass: the base plane slipping end to end, a chain of block walls slipping from its upper tip up to the crest, and the walls nearest the face opened](images/fem05_joint_slip_voronoi.png){width=900}
+![Joint slip on the Voronoi mass: the base plane slipping along all but its upper end, a chain of block walls slipping from its upper tip up to the crest, and the walls nearest the face opened](images/fem05_joint_slip_voronoi.png){width=900}
 
 ![The deformed Voronoi blocks: the mass slides out along the base plane as a broken slab rather than toppling](images/fem05_fem_blocks_voronoi.png){width=900}
 
-The base plane takes the sliding again, slipping along its whole length and
-most at the toe, but the mass above it does not topple. With no set of columns
+The base plane takes the sliding again, slipping along all but its upper 2.7 m
+and most at the toe, but the mass above it does not topple. With no set of columns
 to rotate, the blocks slide out along the base plane as one broken slab: a chain
 of walls from the plane's upper tip up to the crest slips as the mass shears off
 the rock behind it, the walls nearest the face open as the front blocks pull

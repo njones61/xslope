@@ -126,8 +126,8 @@ Back in **Run LEM…**, tick the box and set the depth to `5`:
 
 ![The Run LEM dialog with the surficial filter on](images/lem10_studio_run_lem_filtered.png)
 
-From the embankment seed, the search now returns **1.455**, on a 33 ft circle
-that stays inside the fill — deeper than the sliver it rejected, still clear
+From the embankment seed, the search now returns **1.455**, on a circle of
+radius 39.5 ft that stays inside the fill — deeper than the sliver it rejected, still clear
 of the foundation:
 
 ![Spencer on the filtered fill circle](images/lem10_solution_filter5.png){width=1000}

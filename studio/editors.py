@@ -1678,6 +1678,13 @@ def _draw_piles_preview(ax, rows, selected, slope_data, style):
     _finish_preview_axes(ax)
 
 
+def _lload_angle(ll):
+    """A line load's direction in degrees; a blank one is straight down (-90), as
+    the loader and :meth:`LineLoadsEditor.apply` read it."""
+    a = ll.get("angle")
+    return -90.0 if a is None else float(a)
+
+
 def _draw_line_loads_preview(ax, rows, selected, slope_data, style):
     """Preview for the line-loads editor: each pending load as an arrow pointing IN
     the force direction, its head on the point of application (mirrors plot_line_loads
@@ -1701,7 +1708,7 @@ def _draw_line_loads_preview(ax, rows, selected, slope_data, style):
         if pt is None:
             continue
         try:
-            ang = np.radians(float(ll.get("angle", -90.0) or 0))
+            ang = np.radians(_lload_angle(ll))
             P = float(ll.get("P", 0) or 0)
         except (TypeError, ValueError):
             continue
@@ -1975,7 +1982,7 @@ def _pick_line_loads(rows, x, y, tol, slope_data):
         if p is None:
             continue
         try:
-            ang = np.radians(float(ll.get("angle", -90.0) or 0))
+            ang = np.radians(_lload_angle(ll))
         except (TypeError, ValueError):
             continue
         px, py = p
@@ -3276,10 +3283,10 @@ class GlobalParamsDialog(QDialog):
         self._tension_srf.setToolTip(TENSION_SRF_HELP)
         form.addRow("Tension SRF (FEM)", self._tension_srf)
 
-        # Water loads (main!D23) -- auto derives the ponded-water load from
-        # the model's own water definition; manual leaves it on the dloads
-        # sheets. The loader always resolves the mode to one of the two, so
-        # the combo carries no blank entry.
+        # Water loads (main!D24; D23 before v25) -- auto derives the ponded-water
+        # load from the model's own water definition; manual leaves it on the
+        # dloads sheets. The loader always resolves the mode to one of the two,
+        # so the combo carries no blank entry.
         self._water_loads = QComboBox()
         self._water_loads.addItems(["auto", "manual"])
         _cur_wl = str(values.get("water_loads") or "auto").strip().lower()
@@ -6905,10 +6912,11 @@ class MatGeometryDialog(QDialog):
         # Every field the record carries is edited here, so nothing has to survive as
         # a pass-through — but the copy is still explicit, because a rebuild-from-
         # fields apply() is exactly what silently deletes a key nobody listed.
-        # 'label' and 'stray_mat_id' are pass-through keys a joint-network region
-        # carries: its name, which lives in the polygon sheet's block header, and the
-        # Mat ID preflight reports on a polygon that has no material. Neither is
-        # edited here, and neither may be lost by the rebuild result_lines() does.
+        # 'label' and 'stray_mat_id' are keys a joint-network region carries: its
+        # name, which lives in the polygon sheet's block header and is edited in the
+        # Name field (shown for that Type only), and the Mat ID preflight reports on
+        # a polygon that has no material, which is a pass-through. Neither may be
+        # lost by the rebuild result_lines() does.
         self._lines = [{"mat_id": it.get("mat_id"), "size": it.get("size"),
                         "kind": it.get("kind") or "material",
                         "label": it.get("label"),
@@ -7012,6 +7020,25 @@ class MatGeometryDialog(QDialog):
         self.size_edit.textChanged.connect(self._on_size_changed)
         matrow.addWidget(self.size_edit)
         right.addLayout(matrow)
+
+        # A joint-network region's name (polygon sheet only, and only for that Type):
+        # the network builder's Within list offers the region by it, and the file
+        # keeps it as the block header. No other Type has a name to give.
+        self.name_edit = None
+        self._name_row = None
+        if self._poly_types:
+            self._name_row = QWidget()
+            namerow = QHBoxLayout(self._name_row)
+            namerow.setContentsMargins(0, 0, 0, 0)
+            namerow.addWidget(QLabel("Name:"))
+            self.name_edit = QLineEdit()
+            self.name_edit.setPlaceholderText("unnamed (listed by its number)")
+            _name_help = (self._field_help or {}).get("name", "")
+            if _name_help:
+                self.name_edit.setToolTip(_name_help)
+            self.name_edit.textChanged.connect(self._on_name_changed)
+            namerow.addWidget(self.name_edit, 1)
+            right.addWidget(self._name_row)
         self._holder = QVBoxLayout()
         right.addLayout(self._holder, 1)
 
@@ -7064,6 +7091,8 @@ class MatGeometryDialog(QDialog):
             return "type"
         if widget is self.size_edit:
             return "size"
+        if self.name_edit is not None and widget is self.name_edit:
+            return "name"
         if self._max_depth_edit is not None and widget is self._max_depth_edit:
             return "max_depth"
         if self.table is not None:
@@ -7147,8 +7176,10 @@ class MatGeometryDialog(QDialog):
         # size, always reads as something).
         tail = f", size {size:g}" if isinstance(size, (int, float)) else ""
         if kind != "material":
+            name = (str(ln.get("label") or "").strip() if kind == "joints" else "")
             return (f"{self._item_label} {i + 1}  "
-                    f"({POLYGON_KIND_LABELS.get(kind, kind)}{tail})")
+                    f"({POLYGON_KIND_LABELS.get(kind, kind)}"
+                    f"{': ' + name if name else ''}{tail})")
         mid = ln["mat_id"]
         if mid is not None and 0 <= mid < len(self._materials):
             return (f"{self._item_label} {i + 1}  (mat {mid + 1}: "
@@ -7172,6 +7203,8 @@ class MatGeometryDialog(QDialog):
             ok, size = _parse_opt_size(self.size_edit.text())
             if ok:
                 self._lines[self._cur]["size"] = size
+            if self.name_edit is not None and self._kind_at() == "joints":
+                self._lines[self._cur]["label"] = self.name_edit.text().strip() or None
 
     def _load(self, idx):
         if self.table is not None:
@@ -7196,6 +7229,10 @@ class MatGeometryDialog(QDialog):
         _sz = ln.get("size")
         self.size_edit.setText("" if _sz is None else f"{float(_sz):g}")
         self.size_edit.blockSignals(False)
+        if self.name_edit is not None:
+            self.name_edit.blockSignals(True)
+            self.name_edit.setText(str(ln.get("label") or ""))
+            self.name_edit.blockSignals(False)
         self._sync_type_enabled()
 
     def _sync_type_enabled(self):
@@ -7205,6 +7242,9 @@ class MatGeometryDialog(QDialog):
         is_mat = self._kind_at() == "material"
         self.mat_combo.setEnabled(is_mat)
         self._mat_label.setEnabled(is_mat)
+        if self._name_row is not None:
+            self._name_row.setVisible(self._kind_at() == "joints"
+                                      and 0 <= self._cur < len(self._lines))
 
     def _on_select(self, new_idx):
         self._commit_current()
@@ -7238,6 +7278,13 @@ class MatGeometryDialog(QDialog):
             if item:
                 item.setText(self._label(self._cur))
 
+    def _on_name_changed(self, text):
+        if 0 <= self._cur < len(self._lines) and self._kind_at() == "joints":
+            self._lines[self._cur]["label"] = text.strip() or None
+            item = self.list.item(self._cur)
+            if item:
+                item.setText(self._label(self._cur))
+
     def _add_line(self):
         self._commit_current()
         self._lines.append({"mat_id": 0, "coords": [], "kind": "material",
@@ -7257,6 +7304,7 @@ class MatGeometryDialog(QDialog):
             self.list.setCurrentRow(min(idx, len(self._lines) - 1))
         else:
             self._load(-1)
+            self._sync_type_enabled()      # no item left: no name to edit either
         self._schedule_preview()
 
     def result_lines(self):
@@ -7377,6 +7425,7 @@ POLYGON_HELP = {
     "mat_id": ("Material assigned to this closed zone. Grayed out for any Type other than 'material': an overlay is not a soil zone, so it has no material — the same rule the polygon sheet applies when it blanks the material-name echo."),
     "type": ("What kind of region this polygon is. 'material' (the default) is a soil zone. The three SSR types are FEM analysis OVERLAYS — never meshed, never sliced: 'ssr reduce' reduces only inside, 'ssr hold' holds full strength inside, 'ssr elastic' cannot yield inside. 'refine' is a pure meshing region and needs a Size. 'joints' marks where a joint network is built."),
     "size": ("Optional target finite-element size inside this polygon, used only when a mesh is generated. Blank = the global target size. Independent of Type: a material zone or an SSR overlay may carry one, and a 'refine' polygon is nothing but one. A Size only ever refines — a value at or above the global size cannot coarsen the mesh."),
+    "name": ("Name of this joint-network region (Type 'joints' only). The joints editor's Build network dialog offers the region under Within by this name, and the polygon sheet stores it as the block's header. Blank leaves the region named by its number."),
 }
 
 
@@ -7418,10 +7467,10 @@ class PolygonEditor(CategoryEditor):
             items.append({"mat_id": None, "kind": "refine", "size": r.get("size"),
                           "coords": [tuple(c) for c in (r.get("polygon") or [])]})
         for r in (slope_data.get("joint_zones") or []):
-            # label and mat_id ride through the editor untouched: the name is the
-            # polygon sheet's block header, which the editor does not offer as a
-            # field, and the stray Mat ID is what preflight reports. Dropping either
-            # here would silently rewrite the file on the next OK.
+            # The name is the polygon sheet's block header, edited in the dialog's
+            # Name field; the stray Mat ID rides through untouched, because it is
+            # what preflight reports. Dropping either here would silently rewrite
+            # the file on the next OK.
             items.append({"mat_id": None, "kind": "joints", "size": r.get("size"),
                           "label": r.get("label"), "stray_mat_id": r.get("mat_id"),
                           "coords": [tuple(c) for c in (r.get("polygon") or [])]})
@@ -7483,8 +7532,11 @@ class PolygonEditor(CategoryEditor):
 def _new_reinf():
     # A generic tensile line (blank type -> tangent/active via the loader presets,
     # spacing 1 -> no per-width division); mirrors the pre-v12 default row.
+    # Tres blank, not zero: a blank Tres is a line that holds its capacity once it
+    # yields, and a zero one ruptures brittly — the loader reads a blank cell the
+    # same way.
     return {"label": "", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0,
-            "t_max": 0.0, "t_res": 0.0,
+            "t_max": 0.0, "t_res": float("nan"),
             "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0,
             "type": "", "dir": "tangent", "appl": "active",
             "tend1": 0.0, "tend2": 0.0, "spacing": 1.0,
@@ -7612,9 +7664,13 @@ class ReinforcementEditor(CategoryEditor):
         # applies=LF: the finite element bar reads Tmax as its capacity and the
         # development lengths and end capacities for its pullout, exactly as the
         # limit equilibrium methods do, so neither usage toggle may hide them.
-        Field("t_max", "Tmax", applies=LF, tooltip=REINFORCE_HELP["t_max"]),
-        Field("lp1", "Lp1", applies=LF, tooltip=REINFORCE_HELP["lp1"]),
-        Field("lp2", "Lp2", applies=LF, tooltip=REINFORCE_HELP["lp2"]),
+        # kind="optfloat" for every field whose blank cell means something other
+        # than zero (BLANK_AS): a cleared cell must come back blank, as an empty
+        # cell in the workbook does. A blank Lp is a missing development length,
+        # which preflight names; read as 0.0 it would be a fully anchored end.
+        Field("t_max", "Tmax", "optfloat", applies=LF, tooltip=REINFORCE_HELP["t_max"]),
+        Field("lp1", "Lp1", "optfloat", applies=LF, tooltip=REINFORCE_HELP["lp1"]),
+        Field("lp2", "Lp2", "optfloat", applies=LF, tooltip=REINFORCE_HELP["lp2"]),
         # The overburden pullout law. applies=LF, like Spacing: both engines read
         # it, so neither usage toggle may hide it. The sheet colors the whole
         # envelope block one red; the editor leaves the both-engines members of
@@ -7628,15 +7684,19 @@ class ReinforcementEditor(CategoryEditor):
               tooltip=REINFORCE_HELP["delta"]),
         Field("tend1", "Tend1", applies=LF, tooltip=REINFORCE_HELP["tend1"]),
         Field("tend2", "Tend2", applies=LF, tooltip=REINFORCE_HELP["tend2"]),
-        Field("spacing", "Spacing", applies=LF, tooltip=REINFORCE_HELP["spacing"]),
-        Field("t_res", "Tres", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
+        # A blank Spacing is a continuous sheet (1); a blank Tres is no residual,
+        # the elastic-perfectly-plastic line — read as 0.0 it would rupture brittly.
+        Field("spacing", "Spacing", "optfloat", applies=LF,
+              tooltip=REINFORCE_HELP["spacing"]),
+        Field("t_res", "Tres", "optfloat", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
         # E is a Young's modulus (stress). Area (a cross-section, length²) has no
         # xslope.units.labels() key -- the labels() contract is length/stress/
         # unit_weight/force_per_len/k/flowrate/time -- so it is deliberately left
         # unlabeled by the static header; the list view labels it dynamically as
         # per-element (L²) / per-unit-width (L²/L) instead.
-        Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
-        Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
+        Field("E", "E", "optfloat", usage="fem", unit="stress",
+              tooltip=REINFORCE_HELP["E"]),
+        Field("area", "Area", "optfloat", usage="fem", tooltip=REINFORCE_HELP["area"]),
         # v27 joint (slip) option: the mesh splits along the line (FEM only).
         Field("joint", "Joint", "choice", choices=["", "Yes", "No"], usage="fem",
               tooltip=REINFORCE_HELP["joint"]),
@@ -7645,6 +7705,14 @@ class ReinforcementEditor(CategoryEditor):
         Field("jred", "Jred", "choice", choices=["", "Yes", "No"], usage="fem",
               tooltip=REINFORCE_HELP["jred"]),
     ]
+    # What a blank (cleared) cell of each optfloat field above is stored as: the
+    # value the loader reads an empty cell of that column as, so a model edited in
+    # Studio and one read from the workbook say the same thing. Adhesion, Delta, kn
+    # and ks stay None, which every reader of them already takes as blank.
+    BLANK_AS = {"t_max": float("nan"), "lp1": float("nan"), "lp2": float("nan"),
+                "t_res": float("nan"), "E": float("nan"), "area": float("nan"),
+                "spacing": 1.0}
+
     # Which pullout law a line uses is not a stored field — the row says it. A
     # filled Adhesion/Delta pair IS the overburden law, and the development lengths
     # stop being read; anything else is the development-length law, with Adhesion
@@ -7743,6 +7811,10 @@ class ReinforcementEditor(CategoryEditor):
     def apply(self, slope_data, dlg):
         from xslope.fileio import build_reinforce_lines, attach_reinforce_pullout
         rows = dlg.result_rows()
+        for row in rows:
+            for key, blank in self.BLANK_AS.items():
+                if row.get(key) is None:
+                    row[key] = blank
         slope_data["reinforcement_lines"] = rows
         # Rebuild the LEM display/analysis format so the canvas reflects the edit.
         slope_data["reinforce_lines"] = build_reinforce_lines(rows)
@@ -7780,7 +7852,9 @@ class LineLoadsEditor(CategoryEditor):
         Field("label", "Label", "str"),
         Field("x", "x"), Field("y", "y"),
         Field("P", "P"),
-        Field("angle", "Angle", default=-90.0),
+        # optfloat: a cleared Angle is blank, which the loader reads as straight
+        # down (-90) — read as 0.0 it would turn the load horizontal.
+        Field("angle", "Angle", "optfloat", default=-90.0),
     ]
 
     def build(self, slope_data, parent):
@@ -7808,6 +7882,9 @@ class LineLoadsEditor(CategoryEditor):
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
+        for ll in rows:
+            if ll.get("angle") is None:
+                ll["angle"] = -90.0          # a blank Angle, as the loader reads one
         # Mirror the loader (fileio.py:1315-1324), which requires a line load to act
         # ON the ground surface: snap each point onto the nearest surface location so
         # Studio can never author a load the loader would refuse. (The loader also

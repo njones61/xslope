@@ -47,6 +47,7 @@ inclined tension cracks and the vertical seismic coefficient.
 
 import csv
 import datetime
+import functools
 import io
 import math
 import os
@@ -83,6 +84,39 @@ _SUPPORTED_MODELS = {"MohrCoulomb"}
 # truth. Detection tolerates the 0.003 gap either way (bands are +/- 0.15).
 _GAMMA_W_METRIC = 9.807                   # kN/m3 -- GeoStudio vendor canonical
 _GAMMA_W_IMPERIAL = GAMMA_W["imperial"]   # lb/ft3
+
+
+@functools.lru_cache(maxsize=None)
+def _main_sheet_cell(label):
+    """The 'main' sheet cell holding the value labelled ``label`` (``"Water loads"``)
+    on the current input template -- the one an import is written into -- e.g.
+    ``"D24"``; ``None`` when the template cannot be read or has no such row.
+
+    Read off the template itself rather than restated here: the main-sheet rows move
+    when the template gains one (v25 pushed Water loads from D23 to D24), and a
+    message naming the cell a reader should change has to follow it.
+    """
+    try:
+        import openpyxl
+        from .fileio import default_template_path
+        wb = openpyxl.load_workbook(default_template_path(), read_only=True)
+        try:
+            for row in wb["main"].iter_rows(min_col=3, max_col=4):
+                text = str(row[0].value or "").strip().rstrip(":").strip()
+                if text.lower() == label.lower():
+                    return f"D{row[0].row}"
+        finally:
+            wb.close()
+    except Exception:                                       # noqa: BLE001
+        return None
+    return None
+
+
+def _water_loads_cell():
+    """How a message names the Water loads cell: by its label, and by its address on
+    the current template where that can be read."""
+    cell = _main_sheet_cell("Water loads")
+    return f"Water loads cell ({cell})" if cell else "Water loads cell"
 
 
 def _detect_units(gamma_water, declared=None):
@@ -1411,7 +1445,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     # --- ponded water ------------------------------------------------------------
     # GeoStudio stores no ponded-water object at all: where the water rises above the
     # ground, SLOPE/W simply carries its weight. From template v22 xslope models the
-    # reservoir the same way — main!D23 = auto, and the engine derives the standing
+    # reservoir the same way — Water loads = auto, and the engine derives the standing
     # water from the model's own water definition at solve time. So where the file
     # states a water SURFACE, the import carries that definition and writes NO water
     # distributed load: the two programs now share one implicit model, and the import
@@ -1432,16 +1466,17 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             f"water stands above the ground surface — that is ponded water, and "
             f"GeoStudio carries its weight implicitly. So does xslope: water loads "
             f"derive automatically from the imported water definition (the main "
-            f"sheet's D23 is set to auto, and the engine measures the reservoir off "
-            f"{derived['source']} at solve time), which comes to "
+            f"sheet's {_water_loads_cell()} is set to auto, and the engine measures "
+            f"the reservoir off {derived['source']} at solve time), which comes to "
             f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
             f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
             f"written to the dloads sheet, and nothing should be added there by hand")
         for note in derived["ambiguous"]:
             caveats.append(
                 f"the derived water load is not trustworthy here: {note}. Check it "
-                f"against the GeoStudio model, and set D23 to manual with the load "
-                f"typed in if the two pools have to be told apart")
+                f"against the GeoStudio model, and set the main sheet's "
+                f"{_water_loads_cell()} to manual with the load typed in if the two "
+                f"pools have to be told apart")
     elif seep:
         ponded = seep_ponded_dload(ground_surface, seep[0], seep[1], gamma_water)
         if ponded:
@@ -1456,7 +1491,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 f"neither, so this reservoir was recovered from the field and written "
                 f"as {len(ponded)} distributed load(s), up to {deepest:.2f} deep "
                 f"({gamma_water * deepest:.1f} pressure at the deepest point), with "
-                f"the main sheet D23 set to manual. Do not re-create it by hand")
+                f"the main sheet's {_water_loads_cell()} set to manual. Do not "
+                f"re-create it by hand")
     slope_data["dloads"] = dloads
     slope_data["water_loads"] = water_mode
 
@@ -2209,14 +2245,15 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             "water twice")
     elif ponded and str(slope_data.get("water_loads") or "").lower() == "auto":
         # An automatic-water model has no water block to leave out -- its reservoir is
-        # the piezometric line plus main!D23. The line crosses, and GeoStudio derives
-        # the load from it exactly as xslope's engine does, so nothing is lost; but a
-        # reader who expects to find the load somewhere should be told where it went.
+        # the piezometric line plus Water loads = auto. The line crosses, and GeoStudio
+        # derives the load from it exactly as xslope's engine does, so nothing is lost;
+        # but a reader who expects to find the load somewhere should be told where it
+        # went.
         caveats.append(
-            "this model takes its water loads automatically (main sheet D23), so the "
-            "reservoir was never a distributed load to write: the piezometric surface "
-            "was written and GeoStudio derives the water's weight from it, the same "
-            "way xslope does. Do not add it as a surcharge")
+            "this model takes its water loads automatically (Water loads = auto on the "
+            "main sheet), so the reservoir was never a distributed load to write: the "
+            "piezometric surface was written and GeoStudio derives the water's weight "
+            "from it, the same way xslope does. Do not add it as a surcharge")
 
     # Edges. GeoStudio draws a region from its <Lines>, not from its point list, so a
     # file without them opens with nothing visible. Each region ring contributes its

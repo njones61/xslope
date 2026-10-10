@@ -33,7 +33,7 @@ def new_slope_data():
         "tcrack_surface": None, "materials": [],
         "piezo_line": [], "piezo_line2": [],
         "circular": False, "circles": [], "non_circ": [],
-        # Which surface family the model means when it defines both (main!D24).
+        # Which surface family the model means when it defines both (main!D25).
         # None is the normal state — a new project defines neither surface yet, and
         # nothing should answer a question it has not been asked.
         "surface_family": None,
@@ -43,7 +43,7 @@ def new_slope_data():
         "seepage_bc": {"specified_heads": [], "exit_face": []},
         "seepage_bc2": {"specified_heads": [], "exit_face": []},
         "has_seepage_bc2": False, "mesh": None,
-        # A new project takes its water loads automatically (main!D23), the same as
+        # A new project takes its water loads automatically (main!D24), the same as
         # the template it will be saved into. The version-dependent default is a
         # correctness requirement for FILES — a v21 file carries hand-entered water
         # loads and deriving under them would count the reservoir twice — but a new
@@ -328,7 +328,7 @@ class ProjectDocument(QObject):
 
         _resync_geometry(sd)               # ground surface / domain / t-crack
 
-        # --- water loads (main!D23) --------------------------------------------
+        # --- water loads (main sheet, Water loads) ------------------------------
         # A DXF is the only import that round-trips xslope's own data, and it reads
         # a DLOADS layer and a PIEZO layer out of the same file. Which mode the model
         # arrives in therefore depends on what the file actually carries, and the
@@ -339,23 +339,27 @@ class ProjectDocument(QObject):
         # engine measures the reservoir itself. Getting this wrong in the permissive
         # direction would count the pool twice the moment the user prices the block.
         from xslope.cad import water_like_dloads
+        # The cell is read off the current template, which the model is saved into,
+        # so the notes name the row the reader will find (D23 before template v25).
+        from xslope.geostudio import _water_loads_cell
+        cell = _water_loads_cell()
         found = water_like_dloads(sd)
         if found["indices"]:
             sd["water_loads"] = "manual"
             notes.append(
                 f"distributed load(s) {', '.join(str(i + 1) for i in found['indices'])} "
                 f"lie along the ground the piezo line covers, so this file draws its "
-                f"ponded water by hand: water loads were set to MANUAL (main sheet "
-                f"D23) and those blocks carry the reservoir once you give them their "
-                f"pressures. Switching D23 to auto without deleting them would count "
-                f"the water twice")
+                f"ponded water by hand: water loads were set to MANUAL (the main "
+                f"sheet's {cell}) and those blocks carry the reservoir once you give "
+                f"them their pressures. Switching Water loads to auto without deleting "
+                f"them would count the water twice")
         else:
             sd["water_loads"] = "auto"
             if found["derived"]["blocks"]:
                 notes.append(
                     f"the piezo line stands above the ground surface, and no load "
-                    f"block traces it — water loads are automatic (main sheet "
-                    f"D23 = auto), so the engine derives the reservoir "
+                    f"block traces it — water loads are automatic (the main sheet's "
+                    f"{cell} = auto), so the engine derives the reservoir "
                     f"({len(found['derived']['blocks'])} load(s), up to "
                     f"{found['derived']['peak']:.1f} pressure) from the piezo line "
                     f"itself. Do not draw it as a distributed load as well")

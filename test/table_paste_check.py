@@ -206,8 +206,11 @@ def test_hidden_columns_are_not_filled():
                      800, 4, 4, "", "", 0, 0, 1, 77, 77, 77]]))
     row = t.result_rows()[0]
     out = _fail(row["spacing"] == 1.0, f"the last visible column took {row['spacing']}")
-    out += _fail((row["t_res"], row["E"], row["area"]) == (0.0, 0.0, 0.0),
-                 "a hidden column was filled from the block")
+    # Still what a new row opens with (Tres blank, E and Area 0), not the 77s.
+    fresh = _new_reinf_row()
+    kept = all(row[k] == fresh[k] or (row[k] != row[k] and fresh[k] != fresh[k])
+               for k in ("t_res", "E", "area"))
+    out += _fail(kept, "a hidden column was filled from the block")
     out += _fail("3 cells skipped (3 past the last column)" in _summary(t),
                  f"the status line read {_summary(t)!r}")
     return out

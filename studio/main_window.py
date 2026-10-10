@@ -346,7 +346,14 @@ class MainWindow(QMainWindow):
         self._pending_run_ok = False
         self._run_implemented = {"lem", "seep", "fem"}   # modes whose Run is wired up
         self._last_lem_opts = {}
+        # Run LEM's search tolerances, one entry per surface family: a circular and a
+        # non-circular search have different defaults, so the last run's values are
+        # handed back only to a run of the same family.
+        self._lem_search_tols = {}
         self._last_sens_opts = {}          # keyed by engine mode (lem/fem/seep)
+        # The transient solution each mode's last FS-vs-time ticks were made on
+        # (``_transient_token``): they are handed back only to that solution.
+        self._last_sens_token = {}
         self._last_rel_opts = {}           # keyed by engine mode (lem/fem)
         self._last_mesh_opts = {}
         self._last_seep_opts = {}
@@ -1969,6 +1976,9 @@ class MainWindow(QMainWindow):
             seed("method", sd.get("lem_method"),
                  lambda v: bool(v) and v != "all")
             seed("num_slices", sd.get("num_slices"))
+            # Per surface family; the flat fs_tol/max_iter the cache carries belong to
+            # the family its "surface" names, which the dialog sorts out.
+            d["search_tols"] = {s: dict(v) for s, v in self._lem_search_tols.items()}
         elif which == "mesh":
             seed("element_type", sd.get("element_type"), bool)
             # The 1D element size is a model input the dialog writes back, so the
@@ -2377,6 +2387,21 @@ class MainWindow(QMainWindow):
         bundle = self.doc.results.get("transient_seep") or {}
         return bundle.get("transient")
 
+    def _transient_token(self):
+        """A name for the transient solution now loaded, ``None`` without one.
+
+        Kept on the result bundle, so the same solution shown again answers to the
+        same name, and anything that replaces the bundle — a new solve, a restored
+        sidecar, the assistant's run, another file — answers to a new one.
+        """
+        bundle = self.doc.results.get("transient_seep")
+        if not bundle or not bundle.get("transient"):
+            return None
+        if not bundle.get("sweep_token"):
+            import uuid
+            bundle["sweep_token"] = uuid.uuid4().hex
+        return bundle["sweep_token"]
+
     def transient_current_time(self):
         """The instant the transient results viewer is showing, or ``None`` when no
         transient results tab is open."""
@@ -2782,6 +2807,7 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_lem_opts = opts
+        self._lem_search_tols = dlg.search_tolerances()
         self._store_surface_family(opts.get("surface"))
         self._store_transient_times(opts)
         need = self._remarch_times_needed(opts)
@@ -2818,7 +2844,7 @@ class MainWindow(QMainWindow):
         non-circular surface has no way, in its geometry, to say which one it means,
         and the circles simply win. The dialog's choice is written back into the
         model's ``surface_family`` — the ``main`` sheet's **Surface family** cell
-        (D24), so it survives save and reload — and the legacy ``circular`` flag is
+        (D25), so it survives save and reload — and the legacy ``circular`` flag is
         kept in step with it, because that flag is what the runners, the plots and
         the sensitivity sweep read when nobody hands them a family.
         """
@@ -3261,7 +3287,15 @@ class MainWindow(QMainWindow):
                                 "Build a finite-element mesh first (Build Mesh…) — "
                                 "FEM and seepage sweeps run on the mesh.")
             return
-        dlg = SensitivityDialog(self, defaults=self._last_sens_opts.get(self._mode, {}),
+        defaults = dict(self._last_sens_opts.get(self._mode, {}))
+        # The saved-frame ticks belong to the solution they were made on. Another
+        # one — a new solve, another file, another list of times — opens on the
+        # dialog's own default (every frame), so a curve never silently inherits
+        # gaps left by a sweep of a different march.
+        token = self._transient_token()
+        if token is None or self._last_sens_token.get(self._mode) != token:
+            defaults.pop("times", None)
+        dlg = SensitivityDialog(self, defaults=defaults,
                                 slope_data=self.doc.slope_data, app_mode=self._mode,
                                 document=self.doc,
                                 transient=self.transient_solution())
@@ -3269,6 +3303,7 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_sens_opts[self._mode] = opts
+        self._last_sens_token[self._mode] = token
         study = opts["mode"]
         if study in ("design", "back_analysis") and not opts.get("param"):
             QMessageBox.warning(self, "Nothing to sweep",

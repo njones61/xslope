@@ -46,6 +46,26 @@ LEM_METHODS = [
 
 ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search")]
 SURFACE_TYPES = [("circular", "Circular"), ("noncircular", "Non-circular")]
+#: The Run LEM dialog's search-tolerance fields, by the search keyword each sets.
+SEARCH_TOL_KEYS = ("fs_tol", "tol", "max_iter")
+
+
+def search_tolerance_defaults(surface):
+    """The tolerances a search of ``surface``'s family runs under when the caller
+    states none — :func:`xslope.search.circular_search`'s or
+    :func:`~xslope.search.noncircular_search`'s own keyword defaults, read off
+    their signatures so the dialog and a scripted search cannot drift apart. The
+    two differ (and only the circular search has a geometric ``tol``), so a
+    non-circular run in Studio fed the circular values solves a different search
+    from the API's.
+    """
+    import inspect
+
+    from xslope.search import circular_search, noncircular_search
+    fn = noncircular_search if surface == "noncircular" else circular_search
+    params = inspect.signature(fn).parameters
+    return {k: params[k].default for k in SEARCH_TOL_KEYS if k in params}
+
 
 MESH_ELEMENT_TYPES = [
     ("tri3", "Linear triangles (tri3)"),
@@ -108,13 +128,14 @@ FEM_FAILURE_CRITERIA = [
 def stored_surface_family(slope_data):
     """The surface family this model states, for a deck that defines both.
 
-    The file stores and the dialog edits: ``main!D24`` carries the answer (blank on
-    every model that never had to choose), the dialog opens on it, and a change is
-    written back there — so a both-family model reopens on the family its last run
-    used instead of silently reverting to the circles. The legacy ``circular`` flag
-    is the fallback for a model held in memory that has not been through the cell
-    (an import, a document built in Studio), and circular is the fallback for a model
-    that says nothing at all, because that is what the slicer does with both present.
+    The file stores and the dialog edits: ``main!D25`` (D24 before template v25)
+    carries the answer (blank on every model that never had to choose), the dialog
+    opens on it, and a change is written back there — so a both-family model reopens
+    on the family its last run used instead of silently reverting to the circles.
+    The legacy ``circular`` flag is the fallback for a model held in memory that has
+    not been through the cell (an import, a document built in Studio), and circular
+    is the fallback for a model that says nothing at all, because that is what the
+    slicer does with both present.
     """
     fam = slope_data.get("surface_family")
     if fam:
@@ -1494,7 +1515,14 @@ class RunLemDialog(QDialog):
         # Search-convergence tolerances — only meaningful for auto-search and
         # reliability (both drive the search loops). ``tol`` is the circular-search
         # geometric refinement tolerance and has no noncircular counterpart, so it
-        # is greyed out for non-circular surfaces.
+        # is greyed out for non-circular surfaces. Each surface family keeps its
+        # own FS tol and Max iterations, opening on that search's own defaults:
+        # switching Surface swaps them, so a value meant for one search never
+        # reaches the other.
+        self._search_tols = self._seed_search_tols(defaults)
+        self._tol_surface = self._surface_value()
+        opening = self._search_tols[self._tol_surface]
+
         self.tol_group = QGroupBox("Search tolerances")
         tform = QFormLayout(self.tol_group)
 
@@ -1502,7 +1530,7 @@ class RunLemDialog(QDialog):
         self.fs_tol.setDecimals(6)
         self.fs_tol.setRange(1e-8, 1.0)
         self.fs_tol.setSingleStep(1e-4)
-        self.fs_tol.setValue(float(defaults.get("fs_tol", 5e-4)))
+        self.fs_tol.setValue(float(opening["fs_tol"]))
         self.fs_tol.setToolTip("Factor-of-safety convergence tolerance for the search.")
         tform.addRow("FS tol", self.fs_tol)
 
@@ -1510,13 +1538,13 @@ class RunLemDialog(QDialog):
         self.tol.setDecimals(6)
         self.tol.setRange(1e-8, 1.0)
         self.tol.setSingleStep(1e-3)
-        self.tol.setValue(float(defaults.get("tol", 1e-2)))
+        self.tol.setValue(float(self._search_tols["circular"]["tol"]))
         self.tol.setToolTip("Geometric refinement tolerance (circular search only).")
         tform.addRow("Geometric tol", self.tol)
 
         self.max_iter = QSpinBox()
         self.max_iter.setRange(1, 1000)
-        self.max_iter.setValue(int(defaults.get("max_iter", 50)))
+        self.max_iter.setValue(int(opening["max_iter"]))
         self.max_iter.setToolTip("Maximum search refinement iterations.")
         tform.addRow("Max iterations", self.max_iter)
 
@@ -1546,6 +1574,7 @@ class RunLemDialog(QDialog):
 
         self.analysis.currentIndexChanged.connect(self._sync_tols)
         if self.surface is not None:
+            self.surface.currentIndexChanged.connect(self._swap_search_tols)
             self.surface.currentIndexChanged.connect(self._sync_tols)
         self.min_slip_on.toggled.connect(self._sync_tols)
         self.method.currentIndexChanged.connect(self._recheck)
@@ -1586,6 +1615,56 @@ class RunLemDialog(QDialog):
 
     def _surface_value(self):
         return self._fixed_surface or self.surface.currentData()
+
+    def _seed_search_tols(self, defaults):
+        """Each surface family's opening tolerances, ``{surface: {key: value}}``.
+
+        The search's own defaults (:func:`search_tolerance_defaults`), under what
+        the caller supplied for that family: ``defaults['search_tols']`` keyed by
+        surface (the window keeps one entry per family it has run), then the flat
+        ``fs_tol`` / ``max_iter`` keys, which belong to the family
+        ``defaults['surface']`` names — the run they were recorded on — or, when
+        it names none, the family the dialog opens on. A ``None`` is no value
+        (a scripted run that stated none) and leaves the default standing.
+        ``tol`` is the circular search's alone, whichever run carried it.
+        """
+        tols = {s: search_tolerance_defaults(s) for s, _ in SURFACE_TYPES}
+
+        def overlay(surface, given):
+            for key, value in (given or {}).items():
+                if key not in SEARCH_TOL_KEYS or value is None:
+                    continue
+                into = "circular" if key == "tol" else surface
+                if into in tols:
+                    tols[into][key] = value
+
+        for surface, given in (defaults.get("search_tols") or {}).items():
+            overlay(surface, given)
+        overlay(defaults.get("surface") or self._surface_value(),
+                {k: defaults.get(k) for k in SEARCH_TOL_KEYS})
+        return tols
+
+    def _store_search_tols(self):
+        """Keep what the fields hold under the family they are showing."""
+        here = self._search_tols[self._tol_surface]
+        here["fs_tol"] = self.fs_tol.value()
+        here["max_iter"] = self.max_iter.value()
+        self._search_tols["circular"]["tol"] = self.tol.value()
+
+    def _swap_search_tols(self, *_):
+        """Surface changed: file the fields under the family they belonged to and
+        show the new family's own values."""
+        self._store_search_tols()
+        self._tol_surface = self._surface_value()
+        now = self._search_tols[self._tol_surface]
+        self.fs_tol.setValue(float(now["fs_tol"]))
+        self.max_iter.setValue(int(now["max_iter"]))
+
+    def search_tolerances(self):
+        """Both families' tolerances as the dialog leaves them, for the window to
+        hand back next time (``defaults['search_tols']``)."""
+        self._store_search_tols()
+        return {s: dict(v) for s, v in self._search_tols.items()}
 
     def _selection(self):
         """What preflight and capabilities() are asked about — read live."""
@@ -2247,7 +2326,10 @@ class SensitivityDialog(QDialog):
     def _sync_stage_1_frames(self, rapid_on):
         """With every instant a drawdown, the frames at or before stage 1 are the
         state the others fall from and cannot be a stage 2 themselves; they are
-        unticked and dimmed rather than left to come back as failed rows."""
+        unticked and dimmed rather than left to come back as failed rows. Off
+        again, only the frames this dimmed come back ticked: a leading frame the
+        user unticked on a single-stage curve stays unticked when the dialog
+        reopens on it."""
         stage_1 = getattr(self, "_stage_1", None)
         if stage_1 is None:
             return
@@ -2263,7 +2345,7 @@ class SensitivityDialog(QDialog):
                                 f"t = {_fmt_time(stage_1)}{unit}; this frame is "
                                 f"the state the others fall from. It is not a "
                                 f"drawdown of its own.")
-            else:
+            elif not item.flags() & Qt.ItemIsEnabled:
                 item.setFlags(item.flags() | Qt.ItemIsEnabled)
                 item.setCheckState(Qt.Checked)
                 item.setToolTip("")

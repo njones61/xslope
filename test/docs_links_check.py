@@ -136,6 +136,9 @@ LEM12_FILE = os.path.join(_REPO, "docs/lem/files/xslope_piles.xlsx")
 #: Tutorial SEEP-1's completed model — the confined sheetpile problem, whose two
 #: specified-head boundaries and absent exit face are what its pins are read on.
 SEEP01_FILE = os.path.join(_REPO, "docs/seep/files/xslope_clay_blanket.xlsx")
+#: Tutorial W-2's imported section, which its GeoStudio leg is read on: a polygon
+#: model the GeoStudio writer accepts, given a pool over its toe.
+W02_FILE = os.path.join(_REPO, "docs/tutorials/files/w02_section_imported.xlsx")
 #: The editable master template, whose ``reinforce`` sheet carries the support-type
 #: lookup block LEM-8 reproduces as a table.
 TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
@@ -2486,6 +2489,8 @@ def _lem09_editor_labels(mw):
                          f"{LEM09_ANCHOR_PRESET} — the page tells the reader to pick "
                          f"the Type and let Dir and Appl fill themselves")
 
+    fails += _lem09_search_tolerances(mw)
+
     dlg = PilesEditor().build(data, None)
     if dlg.windowTitle() != "Piles":
         fails.append(f"the piles editor is titled {dlg.windowTitle()!r}, not 'Piles'")
@@ -2502,6 +2507,132 @@ def _lem09_editor_labels(mw):
             fails.append(f"the piles editor has no {field!r} field; Tutorial LEM-9 "
                          f"tells the reader what to put in it")
     dlg.deleteLater()
+    return fails
+
+
+def _lem09_search_tolerances(mw):
+    """Run LEM's search tolerances on LEM-9's non-circular model.
+
+    The page's wedge, its five-method table and its support table (and their test
+    tags and figures) are ``noncircular_search`` at its own defaults. The dialog
+    once filled ``circular_search``'s FS tol and Max iterations for every surface,
+    so the same search in Studio stopped early on a different wedge. Read off the
+    two signatures, so a change of either default moves this pin with it.
+
+    Three ways the circular values could still reach a non-circular run are
+    driven through the window's own Run LEM path (the dialog's exec answered
+    in place, the solve itself not started): a fresh window; a circular run
+    earlier in the session; and Surface switched on a model carrying both
+    families. The last run's values for the SAME family must still come back.
+    """
+    import copy
+    import inspect
+
+    import studio.main_window as main_window
+    from xslope.search import circular_search, noncircular_search
+
+    def sig(fn):
+        p = inspect.signature(fn).parameters
+        return (float(p["fs_tol"].default), int(p["max_iter"].default))
+
+    NONCIRC, CIRC = sig(noncircular_search), sig(circular_search)
+    fails = []
+    seen = []                      # what each dialog opened on: (surface, fs_tol, max_iter)
+    edits = []                     # what the next dialog does before Run
+    real = main_window.RunLemDialog
+
+    class _Answered(real):
+        def exec(self):
+            seen.append((self._surface_value(), self.fs_tol.value(),
+                         self.max_iter.value()))
+            if edits:
+                edits.pop(0)(self)
+            return 1
+
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM09_FILE)
+    mw._start_lem = lambda opts: None           # the dialog is the question, not the solve
+    main_window.RunLemDialog = _Answered
+    try:
+        mw._last_lem_opts = {}
+        mw._lem_search_tols = {}
+        _quiet(mw.run_lem)
+        if seen[-1] != ("noncircular",) + NONCIRC:
+            fails.append(f"Run LEM opens LEM-9's non-circular search on FS tol / Max "
+                         f"iterations {seen[-1][1:]}, not noncircular_search's own "
+                         f"{NONCIRC} — the values the page's numbers are searched at")
+
+        # A circular run made earlier in the session, with its own values typed.
+        mw._last_lem_opts = {"method": "spencer", "analysis": "auto_search",
+                             "surface": "circular", "fs_tol": 0.0007, "tol": 0.02,
+                             "max_iter": 60}
+        mw._lem_search_tols = {"circular": {"fs_tol": 0.0007, "tol": 0.02,
+                                            "max_iter": 60}}
+        _quiet(mw.run_lem)
+        if seen[-1] != ("noncircular",) + NONCIRC:
+            fails.append(f"after a circular run, Run LEM opens LEM-9's non-circular "
+                         f"search on {seen[-1][1:]}: the circular run's tolerances "
+                         f"carried over to the other search")
+
+        # A run the assistant made, which records the tolerances it was handed —
+        # None when its script stated none — as the session's last LEM options.
+        mw._last_lem_opts = {"method": "janbu", "analysis": "auto_search",
+                             "surface": "noncircular", "fs_tol": None, "tol": None,
+                             "max_iter": None}
+        mw._lem_search_tols = {}
+        try:
+            _quiet(mw.run_lem)
+        except TypeError as exc:
+            fails.append(f"Run LEM cannot open after an assistant run that stated "
+                         f"no tolerances: {exc}")
+        else:
+            if seen[-1] != ("noncircular",) + NONCIRC:
+                fails.append(f"after an assistant run that stated no tolerances, Run "
+                             f"LEM opens on {seen[-1][1:]}, not {NONCIRC}")
+
+        # Both families: the circle comparison step. Run the circles once with
+        # typed values, then come back to the wedge.
+        sd = mw.doc.slope_data
+        sd["circles"] = [{"Xo": 20.0, "Yo": 90.0, "Depth": -5.0, "R": 95.0}]
+        sd["surface_family"] = "noncircular"
+        sd["circular"] = False
+        mw._last_lem_opts, mw._lem_search_tols = {}, {}
+
+        def to_circles(dlg):
+            dlg.surface.setCurrentIndex(dlg.surface.findData("circular"))
+            got = (dlg.fs_tol.value(), dlg.max_iter.value())
+            if got != CIRC:
+                fails.append(f"Surface switched to Circular shows {got}, not "
+                             f"circular_search's own {CIRC}")
+            dlg.fs_tol.setValue(0.0007)
+            dlg.max_iter.setValue(60)
+
+        def back_to_wedge(dlg):
+            got = (dlg.fs_tol.value(), dlg.max_iter.value())
+            if got != (0.0007, 60):
+                fails.append(f"Run LEM reopens the circles on {got}, not the "
+                             f"(0.0007, 60) the last circular run was made with")
+            dlg.surface.setCurrentIndex(dlg.surface.findData("noncircular"))
+            got = (dlg.fs_tol.value(), dlg.max_iter.value())
+            if got != NONCIRC:
+                fails.append(f"Surface switched back to Non-circular shows {got}: "
+                             f"the circular run's values carried into the wedge "
+                             f"search, not noncircular_search's {NONCIRC}")
+
+        edits[:] = [to_circles, back_to_wedge]
+        _quiet(mw.run_lem)
+        _quiet(mw.run_lem)
+        if (mw._last_lem_opts.get("surface"), mw._last_lem_opts.get("fs_tol"),
+                mw._last_lem_opts.get("max_iter")) != ("noncircular",) + NONCIRC:
+            fails.append(f"the wedge run after the circles was made with "
+                         f"{mw._last_lem_opts.get('fs_tol')} / "
+                         f"{mw._last_lem_opts.get('max_iter')}, not "
+                         f"noncircular_search's {NONCIRC}")
+    finally:
+        main_window.RunLemDialog = real
+        del mw._start_lem
+        edits.clear()
+        mw.doc._dirty = False
     return fails
 
 
@@ -2646,6 +2777,16 @@ def _lem02_editor_labels(mw):
             fails.append(f"the line-loads table has no {name!r} column; Tutorial "
                          f"LEM-2 dictates a value into it. Its columns read "
                          f"{headers}")
+    # A cleared Angle is what an empty cell is in the workbook: straight down. A
+    # plain number field read it as 0.0 and turned the footing load horizontal.
+    col = [f.key for f in LineLoadsEditor.FIELDS].index("angle")
+    lloads._editable._set_cell_text(0, col, "")
+    LineLoadsEditor().apply(ll_data, lloads)
+    got = ll_data["line_loads"][0]["angle"]
+    if got != -90.0:
+        fails.append(f"a cleared Angle in the line-loads table is stored as {got!r}, "
+                     f"not -90 (straight down), which is what a blank Angle cell "
+                     f"means in the workbook")
     lloads.deleteLater()
 
     sens = SensitivityDialog(defaults={"mode": "design"}, slope_data=data)
@@ -2856,6 +2997,80 @@ def test_lem12_pile_console_block():
     return fails
 
 
+def test_w02_import_notes():
+    """W-2 tells the reader to read the import notes, and the water note names the
+    main-sheet cell that holds the water-load mode. Both importers named D23 after
+    template v25 moved that cell to D24 (D23 is Side BC), so the cell is pinned to
+    the one the writer actually fills, not to a constant of ours.
+
+    The notes come from real imports of W-2's section given a pool over its toe:
+    written to a .gsz by ``export_gsz`` and read back by ``gsz_to_slope_data``, and
+    Part 1's DXF read through Studio's own ``build_from_dxf_mapping`` with its PIEZO
+    layer raised and its load layer left out.
+    """
+    import openpyxl
+
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    from xslope.geostudio import export_gsz, gsz_to_slope_data, read_gsz
+
+    fails = []
+    sd = _quiet(load_slope_data, W02_FILE)
+    sd["piezo_line"] = [(-60.0, 6.0), (60.0, 6.0), (140.0, 6.0)]   # 6 ft over the toe
+    sd["water_loads"] = "auto"
+    path = os.path.join(_tmp(), "w02_pool.gsz")
+    _quiet(export_gsz, sd, path)
+    _back, notes = _quiet(gsz_to_slope_data, _quiet(read_gsz, path))
+    note = next((n for n in notes if "derive automatically" in n), None)
+    if note is None:
+        return [f"the GeoStudio import of a pooled section gave no water note: {notes}"]
+    water_notes = {"GeoStudio": note}
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception:                                         # noqa: BLE001
+        QApplication = None
+    if QApplication is not None:
+        from xslope.cad import suggest_dxf_target
+        from studio.document import ProjectDocument
+        QApplication.instance() or QApplication([])
+        doc = ProjectDocument()
+        layers, _warn = doc.read_dxf_layers(
+            os.path.join(_REPO, "docs/tutorials/files/w02_section.dxf"))
+        layers["PIEZO"]["open"] = [[(-60.0, 6.0), (60.0, 6.0), (140.0, 6.0)]]
+        mapping = {name: {"target": suggest_dxf_target(name, lay), "material": name}
+                   for name, lay in layers.items()}
+        mapping["DLOADS"]["target"] = "ignore"
+        dxf_notes = _quiet(doc.build_from_dxf_mapping, layers, mapping)
+        dxf_note = next((n for n in dxf_notes if "water loads are automatic" in n),
+                        None)
+        if dxf_note is None:
+            fails.append(f"the DXF import of a pooled section gave no water note: "
+                         f"{dxf_notes}")
+        else:
+            water_notes["DXF"] = dxf_note
+    named = []                                  # (importer, cell) pairs
+    for which, text in water_notes.items():
+        found = re.findall(r"\b(D\d+)\b", text)
+        if not found:
+            fails.append(f"the {which} import's water note names no main-sheet "
+                         f"cell: {text!r}")
+        named += [(which, cell) for cell in found]
+
+    # Where the writer puts the mode on the current template.
+    out = os.path.join(_tmp(), "w02_manual.xlsx")
+    _quiet(save_slope_data_to_xlsx, dict(sd, water_loads="manual"), out)
+    wb = openpyxl.load_workbook(out, read_only=True)
+    try:
+        held = [(which, cell, wb["main"][cell].value) for which, cell in named]
+    finally:
+        wb.close()
+    for which, cell, value in held:
+        if str(value).strip().lower() != "manual":
+            fails.append(f"the {which} import's water note names {cell} as the "
+                         f"water-load mode, but on the current template {cell} "
+                         f"holds {value!r}, not the mode")
+    return fails
+
+
 CHECKS = [
     ("A. one verb, and it is named", test_verb_gate),
     ("B. only XSLOPE's own sites", test_allowlist),
@@ -2867,6 +3082,7 @@ CHECKS = [
     ("H. Studio reads as the tutorials say", test_tutorial_labels),
     ("I. code spans stay on one line", test_split_code_spans),
     ("J. LEM-12 quotes the pile summary the code prints", test_lem12_pile_console_block),
+    ("K. W-2's import note names the water-load cell", test_w02_import_notes),
 ]
 
 

@@ -49,6 +49,9 @@ kind of dropped instant:
     material reading ``u = seep``, the seepage engine). The drawdown box beside the
     frames is offered only where the model carries d and psi, and holds the
     Re-search toggle on while it is ticked.
+  * **the ticks** — the Saved frames a sweep left unticked come back only to the
+    same solution; another march or a new solve opens on every frame, so a
+    second curve in one session never inherits the first one's gaps.
   * **grid seeding** — the **Grid search** box on the FS-versus-time page reaches
     the engine as ``search_opts={'seed': 'grid'}``. The option decides which
     mechanism each instant reports, so a box that is ticked in the dialog and
@@ -875,6 +878,115 @@ def check_the_dialog_offers_the_mode(failures):
     dlg.close()
 
 
+#: COMBO-3 Part 2's march (the Johnson dam): twenty-one saved instants, twelve of
+#: them shared with Part 1's nineteen.
+COMBO03_PART2_TIMES = (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0,
+                       50.0, 60.0, 70.0, 80.0, 100.0, 130.0, 170.0, 220.0, 300.0,
+                       400.0, 500.0)
+
+
+def check_the_ticks_follow_the_solution(failures):
+    """The Saved frames ticks come back only to the solution they were made on.
+
+    COMBO-3 runs Part 1's curve and then, in the same session, opens Part 2's
+    file: the dialog once reopened on Part 1's ticks, so only the twelve instants
+    the two marches share were ticked and the curve lost the days its minimum
+    falls on. Driven through the window's own Parametric path (the dialog's exec
+    answered in place, the sweep not started): the ticks carry when the same
+    solution is shown again, and reseed to every frame on another list of times
+    or on a new solve of the same list.
+    """
+    if _qt() is None:
+        return
+    import sys
+    root = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from tools import studio_settings
+    import studio.main_window as main_window
+
+    seen, edits = [], []
+
+    class _Answered(main_window.SensitivityDialog):
+        def exec(self):
+            self.mode.setCurrentIndex(self.mode.findData('fs_vs_time'))
+            seen.append(self.selected_times())
+            if edits:
+                drop = edits.pop(0)
+                for i in range(self.times.count()):
+                    item = self.times.item(i)
+                    if float(item.data(Qt.UserRole)) in drop:
+                        item.setCheckState(Qt.Unchecked)
+            return 1
+
+    class _Signal:
+        def connect(self, *_):
+            pass
+
+    class _NoSweep:
+        def __init__(self, *_a, **_k):
+            self.succeeded = self.failed = self.cancelled = _Signal()
+            self.progress = self.finished = _Signal()
+
+        def start(self):
+            pass
+
+    from PySide6.QtCore import Qt
+    real = (main_window.SensitivityDialog, main_window.SensitivityRunner)
+    with studio_settings.redirected():
+        mw = main_window.MainWindow()
+        mw._add_recent = lambda path: None
+        main_window.SensitivityDialog, main_window.SensitivityRunner = \
+            _Answered, _NoSweep
+        try:
+            import contextlib
+            import io
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.open_path(str(SAMPLE))
+            mw.set_mode_index(0)
+            sd = mw.doc.slope_data
+            sd['materials'] = [dict(m, u='seep') for m in sd['materials']]
+
+            def sweep(times, drop=()):
+                """One press of Run → Parametric… on a march saving ``times``,
+                unticking ``drop`` before Run; a new bundle is a new solve."""
+                if times is not None:
+                    mw.doc.results['transient_seep'] = {
+                        'mode': 'transient', 'transient': _frames(times)}
+                edits[:] = [set(drop)]
+                mw._sens_runner = None
+                mw.run_sensitivity()
+                mw._sens_runner = None
+                return seen[-1]
+
+            part1 = list(COMBO03_TIMES)
+            got = sweep(part1, drop=(0.0, 2.0))
+            if got != part1:
+                failures.append(f"the first sweep opens with {len(got)} of "
+                                f"{len(part1)} frames ticked")
+            got = sweep(None)                 # the same solution shown again
+            if got != part1[2:]:
+                failures.append(f"the same solution shown again opens with "
+                                f"{len(got)} ticked, not the {len(part1) - 2} the "
+                                f"last sweep of it left")
+            part2 = list(COMBO03_PART2_TIMES)
+            got = sweep(part2, drop=(500.0,))
+            if got != part2:
+                failures.append(f"another march's Saved frames open with "
+                                f"{len(got)} of {len(part2)} ticked, carried over "
+                                f"from the last sweep of a different solution: "
+                                f"unticked {sorted(set(part2) - set(got))}")
+            got = sweep(part2)                # a new solve, same list of times
+            if got != part2:
+                failures.append(f"a new solve on the same times opens with "
+                                f"{len(got)} of {len(part2)} ticked, carried over "
+                                f"from the sweep of the solve it replaced")
+        finally:
+            main_window.SensitivityDialog, main_window.SensitivityRunner = real
+            mw.doc._dirty = False
+            mw.close()
+
+
 def check_the_dialog_offers_the_drawdown(failures):
     """The drawdown box sits with the frames, is offered only where the model can
     make a drawdown, holds Re-search on while it is ticked, and reaches the runner."""
@@ -1138,6 +1250,7 @@ def run():
                check_a_one_face_march_is_not_colored,
                check_a_schedule_that_never_falls_has_no_band,
                check_the_dialog_offers_the_mode,
+               check_the_ticks_follow_the_solution,
                check_the_dialog_offers_the_drawdown,
                check_the_dialog_offers_grid_seeding,
                check_the_combo03_curve):

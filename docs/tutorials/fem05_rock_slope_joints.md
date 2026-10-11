@@ -312,8 +312,8 @@ above the base plane, which is not a material of its own.
 
 The region is entered in the polygons editor, reached from the Inputs tree
 under **Polygons**, the same editor the section itself is in. Add a polygon, set
-its **Type** to `joints`, name it `Toppling zone`, and enter or paste its four
-vertices. The shape is the wedge the base plane cuts off, the counterpart of
+its **Type** to `joints`, type `Toppling zone` in the **Name** box below it, and
+enter or paste its four vertices. The shape is the wedge the base plane cuts off, the counterpart of
 Part 1's slab: from the base plane's upper tip at (9, 6.887), down the plane to
 the toe at (20.928, 0), up the face to the crest at (14, 12), and back along the
 ground surface to (9, 12) above the tip.

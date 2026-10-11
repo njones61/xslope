@@ -257,7 +257,7 @@ by ticking the box or by shrinking the whole mesh, and the model begins to find
 a second, real mechanism: shallow sloughing of the sand face, the same one a
 tiny starting circle on the face would find in the limit equilibrium search.
 The reported factor of safety then drifts down toward the sloughing answer
-(from 1.54 at this page's mesh to 1.46 with the box ticked and 1.44 at 1 ft
+(from 1.54 at this page's mesh to 1.47 with the box ticked and 1.44 at 1 ft
 elements, on the run with a residual) — a different failure, not a better
 estimate of this one. We are after
 the general mechanism through the reinforced block, the one Spencer's circle
@@ -617,7 +617,7 @@ pullout law, and enter `0` under `Adhesion` and `22` under `Delta` on all six
 rows. Once those two are filled, `Lp1` and `Lp2` are no longer read. Click
 **OK**, then **Run → Run FEM…** and **Run**.
 
-**FS = 1.535**, against 1.566 with the stated 4 ft lengths — 2.0% lower, four
+**FS = 1.527**, against 1.566 with the stated 4 ft lengths — 2.5% lower, five
 bisection cells. To see why, open **Results → 1D Details** and select line 2,
 the second from the bottom, which is the line the new law changes most:
 
@@ -635,8 +635,8 @@ same line are allowed 42 lb/ft and 800 lb/ft — a factor of nearly twenty, wher
 the stated length allows 200 at both.
 
 The run puts line 2 at capacity in one place only — the element 3 ft in from
-the face, riding the law's 378 lb/ft — while its interior peaks at 797 lb/ft
-9 ft in, just under the 800 the envelope allows there. Under the stated
+the face, riding the law's 378 lb/ft — while its interior peaks at 746 lb/ft
+9 ft in, below the 800 the envelope allows there. Under the stated
 lengths the same line held the full 800 lb/ft over five interior elements,
 from 7 to 15 ft. A stated development length does not depend on depth, so it
 under-rates a deeply buried tail and over-rates a shallow one, and reinforced
@@ -648,20 +648,21 @@ The factor of safety changes little, but the field shows a larger change:
 
 The band is where it was — from the toe up behind the buried tips to the
 crest, its center within a foot of the stated-length run's — and the
-strain in it is more concentrated, 52 elements above half the peak against 117.
+strain in it is more concentrated, 51 elements above half the peak against 119.
 The difference shows in the colors on the layers. Under the stated lengths every layer
 faded from red to white over its last 4 ft, because the ramp allowed less and
 less toward the tip, and the band cut through those weakening tails. Under the
-law the layers are red to the tip: the buried ends develop the full 800 lb/ft
-within a foot, and the band passes just outside them. At the face the reverse
+law the lower five layers are red to the tip: their buried ends develop the full
+800 lb/ft within a foot, and the band passes just outside them. The top layer,
+under 4 ft of fill, needs nearly 2 ft, and its tip still fades. At the face the reverse
 happens — the outer few feet of every layer are blue and white, because under
 little cover the law allows almost nothing there, where the stated ramp allowed
 200, 400 and 600. The factors of safety are close, but the layer colors show
 that the weak end moved from the tail to the face.
 
-Both answers move, and by comparable amounts: the finite element one by 2.0%,
-and Spencer, searched again on the same file, from 1.587 to **1.559**, 1.8%.
-Spencer's move is not a loss of capacity. On the critical circle from the
+Both answers move, and by comparable amounts: the finite element one by 2.5%,
+and the limit equilibrium one by 1.8%, to **1.559** when the search is run again
+with the law entered. Spencer's move is not a loss of capacity. On the critical circle from the
 stated-length search, every one of the five crossings sits 8.4 ft or more from
 the nearer end, out where both laws allow the full 800 lb/ft, so on that surface
 the two laws give the same forces.
@@ -672,7 +673,8 @@ solution plot are where each line's available tension first reaches the full
 800 lb/ft from either end — the ends of its development lengths. Under the
 stated lengths they sat 4 ft in from both ends of every line; under the law they
 sit where the curved envelope reaches 800, about 4.4 ft in at the face and
-within a foot of the buried tip, so the stretch a line carries its full
+within a foot of the buried tip on the lower five lines (1.9 ft on the top one),
+so the stretch a line carries its full
 capacity over runs almost to its tail. Note that σ′<sub>v</sub> is the weight
 of the soil column standing above the point and nothing else, so the 240 psf crest surcharge does not count toward pullout
 resistance — which is what FHWA directs for a live load.
@@ -737,13 +739,17 @@ layers' modulus scaled separately:
 | :---: | :---: | :---: |
 | ×0.1 | ×1 | 1.5273 |
 | ×1 (the file) | ×1 | 1.5352 |
-| ×10 | ×1 | 1.2305 |
+| ×10 | ×1 | at least 1.34 |
 | ×10 | ×10 | 1.5352 |
 
-The result does not carry over. Ten times the soil's modulus, with the geogrid
-left as it is, costs **0.305 of factor of safety — 20%**. A stiffer soil strains
-less under the same load, so the layers are stretched less and give less of
-their tension. One tenth of the modulus costs one bisection cell, next to
+The result does not carry over. With ten times the soil's modulus and the
+geogrid left as it is, the run reports a lower bound rather than a single number.
+Its closing summary in the Log opens with "No failure was found up to F = 1.3516"
+and ends with "The factor of safety is at least 1.34". At 1.3516 the run could not
+tell whether the slope would stand. The trials at 1.3594 and above failed, so the
+answer lies between 1.34 and 1.36, well below the file's 1.5352. A stiffer soil strains less
+under the same load, so the layers are stretched less and give less of their
+tension. One tenth of the modulus costs one bisection cell, next to
 nothing, because at that stiffness the layers are already carrying close to
 everything the envelope allows and there is little further to mobilize.
 
@@ -769,14 +775,14 @@ which is brittle rupture — measures how much the answer depends on that choice
 | blank | 1.5664 |
 | 800 | 1.5664 |
 | 600 | 1.5352 |
-| 400 | 1.5195 |
+| 400 | 1.5117 |
 | 0 | 1.4570 |
 
 The answer steps down once for each drop in the residual. `Tres` = 800
 reproduces the blank run exactly — the same factor of safety, the same bracket,
 the same trials — as expected, because a residual equal to the peak means nothing ever drops below what it was already carrying, so the
 post-peak branch is never entered. Below that the answer keeps falling, in uneven steps: 600 costs
-0.031, 400 another 0.016, and a brittle zero a further 0.063.
+0.031, 400 another 0.023, and a brittle zero a further 0.055.
 
 For a real design, the size of the residual matters as much as its presence:
 the step from holding capacity to shedding to three quarters of it is 2.0% of

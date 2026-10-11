@@ -210,8 +210,7 @@ layer thicknesses, the 2:1 face, embankment 130 pcf and 400 psf, foundation
 extended the ground on both sides, in front of the toe from the drawn 30 ft to
 60 ft and behind the crest from the drawn 50 ft to 90 ft, so that trial circles
 come out on the ground rather than at the model's edges, and its reply says so.
-It
-generated three starting circles, one through the toe and one at the base of
+It generated three starting circles, one through the toe and one at the base of
 each layer, and ran the search: **FS = 1.244**, on a surface bottoming at
 elevation 0 and coming out on the face at x = 4.5, just above the toe and well
 inside either extent. It reported the three admissibility warnings and placed
@@ -725,8 +724,7 @@ Sonnet 5.5's two misses are in the build, where it widened the ground in front
 of the toe to 60 ft and reported it as the drawing's 30, and in the broken file,
 where it placed the exit of the repaired file's critical circle beyond the toe,
 on the foundation; it is on the face, at x = 4.6. gpt-6-astra's one miss is the
-first documentation question: it
-explained why all the methods agree without running any of them, and they do not
+first documentation question: it explained why all the methods agree without running any of them, and they do not
 all agree. The other misses are mostly a right number with a wrong sentence
 beside it: a circle that only touches the top of the foundation described as
 tangent to the rock or as deep and wide, a foundation twice as strong as the

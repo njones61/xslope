@@ -364,11 +364,8 @@ under a name of your own.
 ## The iteration budget
 
 **Max iterations per trial** and **Iteration ceiling** open at 12,000 and
-50,000. Leave them as they are. Every run on this page is made at those values.
-They set how long a slow trial may run before the program decides whether the
-slope is standing or sliding. On this model a smaller budget can move the answer
-by one bisection cell: at 3,000 the elastic-perfectly-plastic run below returns
-1.574 instead of 1.566. Each run takes a few minutes on an ordinary laptop.
+50,000. Leave them as they are; every run on this page uses these values. Each
+run takes a few minutes on an ordinary laptop.
 
 ---
 
@@ -813,8 +810,7 @@ This tutorial covered:
 - The three finite element reinforcement inputs, the axial stiffness *EA* two of
   them amount to, and the model checks that block a run without them.
 - The per-trial iteration budget and the ceiling it extends to, left at their
-  defaults for every run, and the one bisection cell a smaller budget moves the
-  answer on this model.
+  defaults for every run.
 - Reading a reinforced result: the mechanism out of shear strain, and each
   layer's force profile, bond transfer and how it is working, out of the 1D details panel at
   the last converged trial.

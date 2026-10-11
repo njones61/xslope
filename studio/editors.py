@@ -1240,7 +1240,7 @@ def _finish_preview_axes(ax):
     y0, y1 = ax.get_ylim()
     if y1 > y0:
         pad = 0.05 * (y1 - y0)
-        ax.set_ylim(y0, y1 + pad)
+        ax.set_ybound(y0, y1 + pad)     # as plot_inputs: a bound, not a fixed limit
 
 
 # v21 polygon Type vocabulary for the polygon editor's Type combo: the template's

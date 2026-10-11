@@ -9616,6 +9616,11 @@ MODULE_CHECKS = {
         'hybrid_criterion_check.py',
         "The opt-in strength-reduction criterion that requires displacement "
         "evidence before a non-converged trial is counted as a failed slope."),
+    'plot_aspect_limits': (
+        'plot_aspect_limits_check.py',
+        "No standard plot logs Matplotlib's \"Ignoring fixed y limits\" warning: "
+        "the equal-aspect frames set their starting window as bounds, not as "
+        "fixed limits the data-lim aspect then overrides."),
     'units_check': (
         'units_check.py',
         "xslope.units, the single source of truth for the unit systems: the "
@@ -15779,6 +15784,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
+              'plot_aspect_limits': 2,
               'reinforce_mesh_geometry': 2, 'bonded_junction': 2, 'joint_mesh': 3,
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
@@ -16688,6 +16694,9 @@ def main():
         # xslope.units, the single source of truth for the unit systems.
         tests.append({'type': 'units_check', 'file': 'xslope.units',
                       'method': '-', 'source': 'units_check'})
+        # The standard plots draw without the fixed-limits aspect warning.
+        tests.append({'type': 'plot_aspect_limits', 'file': 'standard plots',
+                      'method': '-', 'source': 'plot_aspect_limits'})
         tests.append({'type': 'assistant_suite',
                       'file': 'assistant scenario suite (scored)',
                       'method': '-', 'source': 'assistant_suite'})

@@ -3646,11 +3646,14 @@ def plot_inputs(
         _frame_content(ax, _frame_data_limits(ax), pad_frac)
     else:
         ax.set_aspect('equal', adjustable='datalim')  # ✅ Equal aspect
-        # Add a bit of headroom so plotted lines/markers don't touch the top border
+        # Add a bit of headroom so plotted lines/markers don't touch the top border.
+        # set_ybound, not set_ylim: the limits are where the equal-aspect fit
+        # starts from, and set_ylim would also FIX them -- which the data-lim aspect
+        # then overrides with a "Ignoring fixed y limits" warning on every draw.
         y0, y1 = ax.get_ylim()
         if y1 > y0:
             pad = 0.05 * (y1 - y0)
-            ax.set_ylim(y0, y1 + pad)
+            ax.set_ybound(y0, y1 + pad)
     ax.grid(False)
 
     # The legend is read off the DRAWN artists and nothing else. Every layer
@@ -3859,7 +3862,11 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)
     ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
-    ax.set_ylim(ymin, ymax)
+    # The window the equal-aspect (data-lim) fit is centered on. set_ybound sets it
+    # without fixing it: fixed y limits are overridden by that fit anyway, with a
+    # "Ignoring fixed y limits" warning on every draw. The content and slices
+    # frames below replace it with fixed, box-adjusted limits of their own.
+    ax.set_ybound(ymin, ymax)
 
     if frame == "content":
         # Frame the model's extent, the way plot_inputs(frame="content") frames the
@@ -4673,8 +4680,10 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
     y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
     x_pad = (x_max - x_min) * pad_frac
     y_pad = (y_max - y_min) * pad_frac
-    ax.set_xlim(x_min - x_pad, x_max + x_pad)
-    ax.set_ylim(y_min - y_pad, y_max + y_pad)
+    # Bounds, not limits: the equal-aspect (data-lim) fit widens one of these
+    # ranges to the axes' shape, and fixed limits would draw a warning each draw.
+    ax.set_xbound(x_min - x_pad, x_max + x_pad)
+    ax.set_ybound(y_min - y_pad, y_max + y_pad)
 
     fig.tight_layout()
     # Add legend if we have materials (after tight_layout so its reserved bottom

@@ -13,52 +13,58 @@ You: Compute the factor of safety for face slopes of 2:1, 2.5:1 and 3:1, keeping
 
 Ran code:
     for i,pl in enumerate(slope_data['profile_lines']): print(i, pl['mat_id'], pl['coords'])
-    print(slope_data['circles'], slope_data['max_depth'], slope_data.get('search_window'))
+    print(slope_data['circles'], slope_data['max_depth'])
 
 Output:
     0 0 [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)]
     1 1 [(-30.0, 0.0), (90.0, 0.0)]
-    [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}] -10.0 None
+    [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}] -10.0
 
 Ran code:
     import copy
-    orig_pl = copy.deepcopy(slope_data['profile_lines'])
+    orig = copy.deepcopy(slope_data['profile_lines'][0]['coords'])
     def apply(n):
-        c = slope_data['profile_lines'][0]['coords']
-        slope_data['profile_lines'][0]['coords'] = [c[0], (0.0+20.0*n, 20.0), c[2]]
-    out = sensitivity([2.0, 2.5, 3.0], apply, param='slope H:V', method='spencer', search=True)
+        slope_data['profile_lines'][0]['coords'] = [(0.0,0.0),(20.0*n,20.0),(90.0,20.0)]
+    out = sensitivity([2.0,2.5,3.0], apply, param='H:V ratio', method='spencer', search=True)
     print(out)
-    print(slope_data['profile_lines'][0]['coords'], slope_data['profile_lines']==orig_pl)
+    print(slope_data['profile_lines'][0]['coords'], slope_data['profile_lines'][0]['coords']==orig)
 
 Output:
-      slope H:V=2.0: FS=1.244
-      slope H:V=2.5: FS=1.396
-      slope H:V=3.0: FS=1.546
+      H:V ratio=2.0: FS=1.244
+      H:V ratio=2.5: FS=1.396
+      H:V ratio=3.0: FS=1.546
     Wrote sensitivity.csv and sensitivity.png (3 points).
-       slope H:V        FS
+       H:V ratio        FS
     0        2.0  1.244108
     1        2.5  1.396239
     2        3.0  1.546016
     [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)] True
+    [saved 2 file(s) the user can open: sensitivity.csv, sensitivity.png]
 
-Assistant: I ran a Spencer search for each slope. The toe stayed at (0, 0) and the crest elevation stayed at 20 ft; only the top of the face moved back.
+[file: sensitivity.csv]
 
-| Face slope (H:V) | Top of face at | Critical FS (Spencer) |
+[file: sensitivity.png]
+
+Assistant: I ran a Spencer search at each slope, keeping the toe at (0, 0) and the crest at elevation 20. Only the crest corner moved: it sat at x = 40, 50 and 60.
+
+| Face slope (H:V) | Crest corner x (ft) | Critical FS (Spencer, searched) |
 |:--|:--|:--|
-| 2:1 (the current model) | x = 40 | 1.244 |
-| 2.5:1 | x = 50 | 1.396 |
-| 3:1 | x = 60 | 1.546 |
+| 2:1 (the model's current slope) | 40 | 1.244 |
+| 2.5:1 | 50 | 1.396 |
+| 3:1 | 60 | 1.546 |
 
-Each half-step flatter adds about 0.15 to the FS. Of the three, only 3:1 is above 1.5.
+Each half-step flatter adds about 0.15 to the factor of safety. That steady gain makes sense because both materials are φ = 0 (strength comes only from cohesion).
 
-The model is back exactly as it was: 2:1 face, with the profile line at (0,0) → (40,20) → (90,20). I checked this after the sweep. The results are saved as `sensitivity.csv` and `sensitivity.png`.
+The model is unchanged. The embankment's top boundary still reads (0, 0) → (40, 20) → (90, 20).
 
-For the 3:1 case, the level crest still runs 30 ft past the top of the face, to x = 90. I didn't print where each critical circle starts and ends, so I haven't confirmed that it starts on the crest inside the model. I can check that if you want.
+I didn't print the critical circle for each case, so I haven't checked where the circles came out on the ground. At 3:1 the crest ground beyond the slope is only 30 ft long (1.5 × the 20 ft height). If a critical circle reaches the right edge at x = 90, that FS would be limited by the model width. I can rerun with the circle details printed, or with the crest ground extended, if you want that checked.
+
+The table and a plot are saved as **sensitivity.csv** and **sensitivity.png**.
 ```
 
-Tokens: input 59,793 · cached_input 58,525 · output 1,307 · calls 3 · 26.4s
+Tokens: input 59,792 · cached_input 58,511 · output 1,315 · calls 3 · 28.2s
 
 ## Session total
 
-- Tokens: input 59,793 · cached_input 58,525 · output 1,307 · calls 3
-- Wall time: 29.4s
+- Tokens: input 59,792 · cached_input 58,511 · output 1,315 · calls 3
+- Wall time: 31.2s

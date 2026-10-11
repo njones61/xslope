@@ -29,6 +29,12 @@ learn how to check each kind of answer it gives back.
 [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx)</div>
 </div>
 
+!!! note "October 2026"
+    The conversations, scores and costs on this page show what the models could
+    do, and what they cost, as of October 2026, when the sessions were recorded.
+    Both change over time: models are updated or replaced, and providers change
+    their prices.
+
 ---
 
 ## Setting it up
@@ -112,22 +118,22 @@ The eight conversations below cost this much between them, measured as they ran:
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Time |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Building a model from a drawing | 1 | 3 | 64,053 (42,064) | 2,371 | 37 s |
-| Modifying the model | 3 | 9 | 195,138 (189,920) | 4,340 | 73 s |
+| Modifying the model | 3 | 9 | 195,368 (170,963) | 4,495 | 78 s |
 | A sweep with the helper | 1 | 2 | 39,682 (38,624) | 806 | 64 s |
-| A sweep written ad hoc | 1 | 3 | 59,793 (58,525) | 1,307 | 29 s |
-| Stiffnesses and a strength reduction run | 2 | 4 | 89,798 (77,708) | 1,986 | 434 s |
+| A sweep written ad hoc | 1 | 3 | 59,792 (58,511) | 1,315 | 31 s |
+| Stiffnesses and a strength reduction run | 2 | 4 | 83,255 (77,723) | 1,835 | 436 s |
 | Two documentation questions | 2 | 4 | 88,380 (82,373) | 4,038 | 98 s |
-| A broken file | 1 | 4 | 80,848 (79,060) | 2,042 | 34 s |
-| Generating a report | 2 | 4 | 80,911 (79,169) | 995 | 28 s |
-| **Total** | **13** | **33** | **698,603 (647,443)** | **17,885** | **797 s** |
+| A broken file | 1 | 3 | 60,884 (58,888) | 2,203 | 62 s |
+| Generating a report | 2 | 4 | 80,927 (79,156) | 935 | 26 s |
+| **Total** | **13** | **32** | **672,341 (608,302)** | **17,998** | **832 s** |
 
-That comes to **\$0.80** at Anthropic's list prices on 2026-10-10: \$4.00 per
+That comes to **\$0.92** at Anthropic's list prices on 2026-10-10: \$4.00 per
 million input tokens, \$5.00 per million for a five-minute cache write and \$8.00
 for a one-hour write, \$0.20 per million for a cache read, and \$20.00 per million
 output tokens. The input counts above include the cache writes and the cache
 reads. Price and elapsed time do not track each other: the strength reduction run
-takes more than half the total time for about a seventh of the cost, because
-399 of its 434 seconds are spent inside the finite element solver.
+takes more than half the total time for under a tenth of the cost, because
+404 of its 436 seconds are spent inside the finite element solver.
 
 Prices change; the current ones are on each provider's pricing page:
 [Anthropic](https://claude.com/pricing),
@@ -263,7 +269,7 @@ Reduce the foundation cohesion to 250 psf and rerun the search. Which circle gov
 ```
 </div>
 
-![The three-turn conversation in the dock: the profile lines read back and rewritten for the 3:1 face, then the piezometric line and the saturated unit weights, then the cohesion change, each with the edit reported and a searched factor of safety, and a plot of the solution after the second and third](images/w1_modify_3.png){width=560}
+![The three-turn conversation in the dock: the profile lines read back and rewritten for the 3:1 face, then the piezometric line and the saturated unit weights, then the cohesion change, each with the edit reported, a searched factor of safety and a plot of the solution](images/w1_modify_3.png){width=560}
 
 The first turn moved the crest break to (60, 20) on the profile lines, moved both
 starting circles to the middle of the new face, and reran: **FS = 1.546**, still
@@ -277,11 +283,11 @@ The second turn adds the piezometric line and the saturated unit weights:
 no distributed load for the pool, because **Water loads** in **Global
 parameters** is already `auto` and the load on the submerged ground comes from
 the piezometric line itself. Since pore pressure cannot change a φ = 0 strength,
-it put the rise on the driving side and named two possible sources, the water
-pressing on the face and the heavier saturated weights, without testing which.
-The water is the source: with the saturated weights taken out, the same model
-searches to 2.972, so the heavier weights take some of the rise back rather than
-adding to it.
+it put the rise down to the water — the pond pressing on the face and crest —
+and said it had not tested how much comes from the water and how much from the
+heavier saturated soil. The water is the source: with the saturated weights
+taken out, the same model searches to 2.972, so the heavier weights take some of
+the rise back rather than adding to it.
 
 The third turn drops the foundation to 250 psf: **FS = 1.418**, on a critical
 surface that bottoms at **elevation −10** and exits past the toe. At 250 psf the
@@ -387,7 +393,7 @@ Compute the factor of safety for face slopes of 2:1, 2.5:1 and 3:1, keeping the 
 ```
 </div>
 
-![The face-slope sweep in the dock: the geometry read back, the function that moves the crest break handed to the sensitivity helper, the three searched steps, the finished table, and the restored face line](images/w1_sweep_adhoc_1.png){width=560}
+![The face-slope sweep in the dock: the geometry read back, the function that moves the crest break handed to the sensitivity helper, the three searched steps and the restored face line, the saved table and its plot of factor of safety against slope, and the finished table](images/w1_sweep_adhoc_1.png){width=560}
 
 It wrote a short function that moves the crest break and handed it to the same
 sensitivity helper the last section used, which rebuilds the section and runs the
@@ -401,10 +407,15 @@ the file's two starting circles are used every time.
 | 3:1 | (60, 20) | 1.546 |
 
 It put the geometry back the way it found it, and saved the table and a plot of
-the factor of safety against the slope to its **Files…** folder. It did not
-print where the critical circles sit, and said so rather than describing them.
-It also raised a possible problem it did not test: at 3:1 only 30 ft of crest is
-left behind the crest break. The transcript is
+the factor of safety against the slope to its **Files…** folder; both appear in
+the dock. It did not print where the critical circles sit, and said so rather
+than describing them. It also raised a possible problem it did not test: at 3:1
+only 30 ft of crest is left behind the crest break.
+
+One sentence in the reply is wrong. It says the steady gain, about 0.15 per half
+step, makes sense because both soils are φ = 0. That is not the reason: with
+φ = 20° in both soils the same three faces search to 2.304, 2.647 and 2.988,
+just as evenly spaced. The transcript is
 [w1_sweep_adhoc_transcript.md](files/w1_sweep_adhoc_transcript.md).
 
 ### Check its work
@@ -444,7 +455,7 @@ Run a strength reduction analysis and compare it with the limit equilibrium resu
 ```
 </div>
 
-![Both turns in the dock: the estimator's two suggestions written onto the materials, then the searched Spencer run, the mesh report, the nine strength reduction trials, the solver's result printed and cut short in the middle, and the comparison table](images/w1_elastic_fem_2.png){width=560}
+![Both turns in the dock: the estimator's two suggestions written onto the materials, then the searched Spencer run, the mesh report, the nine strength reduction trials, the Spencer solution plot and the strength reduction plots of the deformed mesh, the shear strain and the displacement vectors, and the comparison table](images/w1_elastic_fem_2.png){width=560}
 
 A built-in estimator classifies each soil from its strength and suggests
 values — the embankment as **Soft Clay** at E = 167,100 psf with ν = 0.45, the
@@ -453,17 +464,18 @@ assistant entered both, calling them generic textbook values rather than site
 data since the model states no stiffnesses.
 
 The second turn ran the limit equilibrium search at **FS = 1.244** — Spencer,
-the method a run takes when the model names none, as the reply points out — then
-built the mesh and ran the strength reduction to **1.270**, 2.0% higher. That
-number comes out of a bisection on the factor the strengths are divided by: nine
-trials, each of them either converging or failing to converge, closing on the
-bracket [1.2656, 1.2734], and 1.270 is its midpoint. The reply notes that even
-the highest factor the slope stood at, 1.2656, is above Spencer's 1.244, so the
-gap is not an artifact of the bisection. It did not compare the two failure
-mechanisms, and said so. The same snippet printed every value the solver
-returned, down to the stress and strain in each element. A printout that long
-reaches the assistant, and the dock, as its first and last parts with a note
-between them saying how much was cut.
+the method a run takes when the model names none — then built the mesh and ran
+the strength reduction to **1.270**, 2.0% higher. That number comes out of a
+bisection on the factor the strengths are divided by: nine trials, each of them
+either converging or failing to converge, closing on the bracket
+[1.2656, 1.2734], and 1.270 is its midpoint. The reply calls a 2% gap agreement
+and notes that the failing trials were judged by movement that did not slow
+rather than by displacements growing without limit. It did not compare the two
+failure mechanisms itself; it asked the reader to check the strength reduction
+plots against the Spencer circle. One sentence there is wrong: it says both
+saved plots show the displacement pattern at failure, but the first is the
+Spencer solution. The band of shear strain in the second runs along the top of
+the foundation, where the Spencer circle bottoms.
 
 The session saved
 [w1_elastic_fem_after.xlsx](files/w1_elastic_fem_after.xlsx); the exchange is in
@@ -581,17 +593,17 @@ This model was built from the LEM-3 tutorial, but the factor of safety looks wro
 ```
 </div>
 
-![The diagnosis in the dock: the model read once, one snippet that fixes the material assignment on the profile lines, the unit weight and the maximum depth, the rerun at 1.244, and the reply with its table of what was wrong](images/w1_diagnose_1.png){width=560}
+![The diagnosis in the dock: the model read once and searched as it came in, at 0.998, one snippet that fixes the material assignment on the profile lines, the unit weight and the maximum depth, the rerun at 1.244 with its plot, and the reply with its table of what was wrong](images/w1_diagnose_1.png){width=560}
 
-It answers by reading the file once against the inputs in the request, and one
-snippet fixes all three faults: it re-points the two profile lines at the right
-materials, sets the embankment's unit weight back to 130 pcf, and sets the
-maximum depth to −10. The rerun returns **FS = 1.244** on a surface bottoming at
-elevation 0 — LEM-3's answer — and the closing summary places that surface
-correctly: *"The circle's lowest point is at y = 0.0, so it just touches the top
-of the foundation and doesn't go into it."* It also names the swap as the biggest
-of the three errors, because it put the 800-psf soil in the embankment and the
-400-psf soil in the foundation.
+It answers by reading the file once against the inputs in the request and
+searching it as it came in, at 0.998. One snippet then fixes all three faults: it
+re-points the two profile lines at the right materials, sets the embankment's
+unit weight back to 130 pcf, and sets the maximum depth to −10. The rerun returns
+**FS = 1.244** on a surface bottoming at elevation 0 — LEM-3's answer — and the
+closing summary places that surface correctly: *"the circle just touches the top
+of the foundation, so the slide runs through the embankment only."* It fixed the
+three together, and says it did not measure how much of the rise from 0.998 to
+1.244 each fix accounts for.
 
 It repaired the swap by re-pointing the profile lines' Mat IDs rather than
 reordering the material rows, so the saved
@@ -637,12 +649,16 @@ Write the analysis report.
 ```
 </div>
 
-![Both turns in the dock: the search returning 1.244 with its circle laid out in a table and its plot, then the one line of code that writes the report, and the name of the finished document](images/w1_report_2.png){width=560}
+![Both turns in the dock: the search returning 1.244 with its circle laid out in a table and its plot, then the one line of code that writes the report, the name of the finished document, and a note that its contents page has no page numbers yet](images/w1_report_2.png){width=560}
 
 The first turn returns **FS = 1.244** — [LEM-3](lem03_layered_slope.md)'s
 published answer, on its published circle — and places that circle correctly: it
-just touches the top of the foundation and stays above the rigid base at −10.
-The second turn generates the document and gives its name. The report contains
+just touches the top of the foundation and does not cut into it. The second turn
+generates the document and gives its name. The step that
+[numbers the contents page](../studio/reports.md#building-the-page-numbers) was
+switched off for this session, and the reply says the page has no numbers yet
+and how to fill them in: open the file in Word, select all and press F9. With
+that step on, as it is by default, Studio fills them in itself. The report contains
 six figures and three tables across its Traceability, Project Definition and
 Limit Equilibrium Analysis sections — a short version of the full report built
 in [W-3](w03_report.md), where the model includes all three engines and the
@@ -664,12 +680,10 @@ dialog's options are walked through. The session saved
 
 ## Other models
 
-The same eight requests were sent, word for word, to four other models.
-**Everything in the table below is a snapshot: the models as they behaved and the
-list prices as they stood in October 2026, when this tutorial was written.**
-Models are replaced and retrained and prices are restructured every few months,
-so treat the numbers as an example of how to compare models, not as a rating of
-any of them.
+The same eight requests were sent, word for word, to four other models. Like the
+rest of the page, the table below is a snapshot of October 2026 (see the note at
+the top), so treat its numbers as an example of how to compare models, not as a
+rating of any of them.
 
 Each session is scored twice. **Model and numbers** asks whether the work was
 done: the model built or edited is the one the request describes, and every
@@ -678,31 +692,36 @@ about the mechanism or the finding is right.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5.5 | 33 | 698,603 (647,443) | 17,885 | \$0.80 | 8 of 8 | 8 of 8 |
-| Claude Sonnet 5.5 | 36 | 767,084 (721,161) | 18,668 | \$0.40 | 7 of 8 | 6 of 8 |
-| OpenAI gpt-6-astra | 35 | 494,621 (477,682) | 5,205 | \$0.91 | 8 of 8 | 7 of 8 |
-| Kimi K3 (Moonshot AI) | 38 | 565,450 (512,470) | 51,564 | \$1.09 | 8 of 8 | 5 of 8 |
-| GLM-5V-Turbo (Z.ai) | 49 | 727,151 (691,968) | 20,385 | \$0.29 | 6 of 8 | 1 of 8 |
+| Claude Opus 5.5 | 32 | 672,341 (608,302) | 17,998 | \$0.92 | 8 of 8 | 7 of 8 |
+| Claude Sonnet 5.5 | 35 | 749,362 (684,380) | 18,432 | \$0.47 | 8 of 8 | 7 of 8 |
+| OpenAI gpt-6-astra | 35 | 494,321 (464,298) | 5,200 | \$1.02 | 8 of 8 | 7 of 8 |
+| Kimi K3 (Moonshot AI) | 38 | 569,327 (502,230) | 56,197 | \$1.19 | 8 of 8 | 3 of 8 |
+| GLM-5V-Turbo (Z.ai) | 47 | 696,715 (649,088) | 19,797 | \$0.29 | 5 of 8 | 2 of 8 |
 
 gpt-6-astra is the model OpenAI names as its flagship. All five build the section
 the drawing shows and get the 1.244 that LEM-3 publishes for this slope, and all
 five run the strength reduction to the same 1.270. They part ways elsewhere.
 GLM-5V-Turbo built the section with its toe at x = 30 rather than at x = 0,
 where the request put it, and then reported the toe at x = 0. In the face-slope
-sweep, Sonnet 5.5 replaced the starting circles with circles that all cut into
-the foundation, and its search stayed with deep circles: 1.748 and 1.861 for the
-flatter faces, against the 1.396 and 1.546 a search finds when one starting
-circle is tangent to the top of the foundation. GLM-5V-Turbo also missed the
+sweep it generated new starting circles for each face, and at 3:1 its search
+stayed with a deep circle: 1.861, against the 1.546 a search finds when one
+starting circle is tangent to the top of the foundation. It also missed the
 swapped materials in the broken file and reported 1.208 as the repaired answer.
-Opus 5.5, gpt-6-astra and Kimi K3 get every number right, and Opus 5.5 is the
-only one scored right in both columns in all eight sessions.
+The other four get every number right.
 
-The explanation misses are mostly a right number with a wrong sentence beside
-it: a circle that only touches the top of the foundation described as deep or
-as tangent to the rock, a tension crack said to raise the factor of safety, the
-rise under ponded water put down to heavier slices the model does not have.
-gpt-6-astra's one miss is the first documentation question: it explained why
-all the methods agree without running any of them, and they do not all agree.
+No model is scored right in both columns in all eight sessions. Opus 5.5's one
+miss is the reason it gave in the face-slope sweep: it put the steady gain down
+to φ = 0, and the gain is just as steady at φ = 20°. Sonnet 5.5's is in the
+broken file, where it placed the exit of the repaired file's critical circle
+beyond the toe, on the foundation; it is on the face, at x = 4.6.
+gpt-6-astra's is the first documentation question: it explained why all the
+methods agree without running any of them, and they do not all agree. The other
+misses are mostly a right number with a wrong sentence beside it: a circle that
+only touches the top of the foundation described as tangent to the rock, a
+foundation twice as strong as the embankment called 40% stronger, a strength
+reduction result said to come out higher because the finite element method is
+free to find a more critical surface, the rise under ponded water put down to
+heavier slices the model does not have.
 Z.ai publishes no price for GLM-5V-Turbo; its cost here is at the rate a
 reseller lists for it.
 
@@ -742,7 +761,7 @@ the checks above re-run the measurements rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about \$0.80.
+  13 turns of work for about \$0.92.
 - Building a layered model from a drawing and editing it three ways — face, water
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without leaving a

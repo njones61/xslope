@@ -10,31 +10,31 @@ provider and the harness reported as the sessions ran; the transcripts named in
 the last column are in this folder.
 
 Model:  Claude Opus 5.5 (anthropic / claude-opus-5-5) for every session
-Date:   2026-10-10
+Date:   2026-10-10 (building, the helper sweep, the documentation questions); 2026-10-11 (the other five)
 
 Session                                  Turns Calls    Tokens in (cached)    Out    Wall Transcript
 ---------------------------------------- ----- ----- --------------------- ------ ------- ----------------------------------
 Building a model from a drawing              1     3      64,053 ( 42,064)  2,371   36.9s w1_build_from_image_transcript.md
-Modifying the model                          3     9     195,138 (189,920)  4,340   73.2s w1_modify_transcript.md
+Modifying the model                          3     9     195,368 (170,963)  4,495   78.2s w1_modify_transcript.md
 A sweep with the helper                      1     2      39,682 ( 38,624)    806   63.6s w1_sweep_builtin_transcript.md
-A sweep written ad hoc                       1     3      59,793 ( 58,525)  1,307   29.4s w1_sweep_adhoc_transcript.md
-Stiffnesses and a strength reduction run     2     4      89,798 ( 77,708)  1,986  434.3s w1_elastic_fem_transcript.md
+A sweep written ad hoc                       1     3      59,792 ( 58,511)  1,315   31.2s w1_sweep_adhoc_transcript.md
+Stiffnesses and a strength reduction run     2     4      83,255 ( 77,723)  1,835  435.5s w1_elastic_fem_transcript.md
 Two documentation questions                  2     4      88,380 ( 82,373)  4,038   98.3s w1_conceptual_transcript.md
-A broken file                                1     4      80,848 ( 79,060)  2,042   33.8s w1_diagnose_transcript.md
-Generating a report                          2     4      80,911 ( 79,169)    995   27.8s w1_report_transcript.md
+A broken file                                1     3      60,884 ( 58,888)  2,203   62.4s w1_diagnose_transcript.md
+Generating a report                          2     4      80,927 ( 79,156)    935   26.2s w1_report_transcript.md
 ---------------------------------------- ----- ----- --------------------- ------ ------- ----------------------------------
-Total                                       13    33     698,603 (647,443) 17,885  797.1s
+Total                                       13    32     672,341 (608,302) 17,998  832.2s
 
 Cost at Anthropic's list prices on 2026-10-10 — $4.00 per million input tokens,
 $5.00 per million for a five-minute cache write and $8.00 for a one-hour write,
 $0.20 per million cached-read input tokens, $20.00 per million output tokens.
 The input count above includes the cache writes and the cache reads:
 
-  fresh input          92 tokens   $0.000
-  cache writes     51,068 tokens   $0.313
-  cached input    647,443 tokens   $0.129
-  output           17,885 tokens   $0.358
+  fresh input          90 tokens   $0.000
+  cache writes     63,949 tokens   $0.434
+  cached input    608,302 tokens   $0.122
+  output           17,998 tokens   $0.360
                                  ------
-  total                          $0.80
+  total                          $0.92
 Wall time is the whole session, including the analyses. The strength reduction
-session spent 399.4 s of its 434.3 s inside the finite element solver.
+session spent 404.4 s of its 435.5 s inside the finite element solver.

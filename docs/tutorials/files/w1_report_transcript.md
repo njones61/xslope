@@ -34,27 +34,29 @@ Output:
 
 [file: assistant_plot_001.png]
 
-Assistant: The Spencer search found a **critical factor of safety of 1.244**.
+Assistant: The Spencer search found a critical **FS of 1.244**.
 
 | Critical circle | Value |
 |:--|:--|
 | Center (Xo, Yo) | (18.50, 43.75) ft |
 | Radius R | 43.75 ft |
-| Lowest point (Depth) | y = 0.0 ft |
-| Upslope end, x_entry | 55.24 ft |
-| Downslope end, x_exit | 4.56 ft |
+| Lowest point (Depth) | 0.0 ft |
+| Crest-side end | x = 55.24 ft |
+| Toe-side end | x = 4.56 ft |
 
-The lowest point is at y = 0, the same elevation as the bottom of the embankment and the top of the foundation. So the circle stays in the embankment (c = 400 psf) and only touches the foundation, which is stronger (c = 800 psf). It doesn't go down to the base at −10 ft.
+The circle's lowest point is at y = 0. That's the elevation of the boundary between the two layers, so the circle just touches the top of the foundation. It runs through the embankment (c = 400 psf) and doesn't cut into the stronger foundation (c = 800 psf).
 
-**Warnings from the run.** The factor of safety is not changed by these, but the solution isn't fully physically valid:
-- **Tension between slices** on 15% of the interior boundaries (the strongest pull is −1436 against a strongest push of 7382).
-- **The thrust line falls outside the slice** on 15% of the boundaries.
-- **Tension on the base of 2 slices near the crest.** The engine suggests adding a tension crack, which often happens with clays where φ = 0 and c is high like these.
+**The solution doesn't fully pass the admissibility checks.** These checks don't change the FS, but they show the result isn't fully physically valid:
+- 15% of the boundaries between slices are in tension.
+- On 15% of those boundaries, the line of thrust falls outside the slice.
+- The bases of 2 slices near the crest are in tension.
 
-Adding a tension crack (`tcrack_depth`) and running again would show how much the warnings affect the result. That depth isn't in the model and the right value depends on your project, so tell me what to use. The plot of the solution is saved as `assistant_plot_001.png`.
+Together these suggest a tension crack at the crest, which the model doesn't have now. Adding one would make the result more realistic and would usually lower the FS a little. If you give me a crack depth, I can add it and run the search again. If you don't have a depth in mind, a common estimate for an undrained clay is z = 2c/γ, which is about 6 ft for the embankment.
+
+The plot of the solution is saved as `assistant_plot_001.png`.
 ```
 
-Tokens: input 39,564 · cached_input 38,570 · output 723 · calls 2 · 14.4s
+Tokens: input 39,564 · cached_input 38,570 · output 679 · calls 2 · 13.5s
 
 ## Turn 2 — Write the analysis report.
 
@@ -68,19 +70,22 @@ Ran code:
 Output:
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Report written to /tmp/xslope_studio_assistant/xslope_simple_mult_layers_report.docx (6 figures).
+    Its contents page has no page numbers yet: they appear when the document is opened in Word and its fields are updated (select all and press F9).
     /tmp/xslope_studio_assistant/xslope_simple_mult_layers_report.docx
     [saved 1 file(s) the user can open: xslope_simple_mult_layers_report.docx]
 
 [file: xslope_simple_mult_layers_report.docx]
 
-Assistant: I've written the analysis report: **`xslope_simple_mult_layers_report.docx`**, which you can open from the chat. It's a Word file with 6 figures and page numbers on the contents page.
+Assistant: The analysis report is written: **`xslope_simple_mult_layers_report.docx`**, with 6 figures. You can open it from the chat.
 
-It covers the model and the Spencer search from this session: a critical factor of safety of **1.244**, with the circle centred at (18.50, 43.75) and R = 43.75 ft. The run's warnings are still open: tension between slices, the thrust line outside some slices, and tension on the base near the crest. If you'd like those addressed before you share the report, tell me what tension crack depth to use. I'll add the crack, rerun Spencer and rebuild the report.
+It documents the model and the Spencer search from this session, including the critical FS of 1.244. The admissibility warnings from that run (tension between slices and at the crest) are part of that result.
+
+**The contents page doesn't have page numbers yet**, even though page numbers should normally be added when the report is built. To fill them in, open the file in Word, select all and press F9 to update the fields.
 ```
 
-Tokens: input 41,347 · cached_input 40,599 · output 272 · calls 2 · 8.0s
+Tokens: input 41,363 · cached_input 40,586 · output 256 · calls 2 · 7.4s
 
 ## Session total
 
-- Tokens: input 80,911 · cached_input 79,169 · output 995 · calls 4
-- Wall time: 27.8s
+- Tokens: input 80,927 · cached_input 79,156 · output 935 · calls 4
+- Wall time: 26.2s

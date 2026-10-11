@@ -143,8 +143,8 @@ rows below, or paste them straight into the worksheet.
 | course-04 | 8.0 | 2.4 | 9.2 | 2.4 | 0 | 35 |
 | course-05 | 8.0 | 3.0 | 9.2 | 3.0 | 0 | 35 |
 
-A new row in the editor opens with `c`, `phi` and `t_cut` at 0 and every other
-column blank. Enter the label, the endpoints and `phi`; leave `t_cut` at 0, since
+A new row in the editor opens with the four endpoints, `c`, `phi` and `t_cut` at
+0 and every other column blank. Enter the label, the endpoints and `phi`; leave `t_cut` at 0, since
 a block contact carries no tension, and leave the rest blank. When the seven
 rows are in, the editor looks like this:
 
@@ -189,8 +189,8 @@ What the columns mean, in the order they appear on the editor:
 
 ### Building the mesh
 
-Build the mesh with **Run → Build Mesh…**: element type **tri6** and a global
-target size of **0.8 m**.
+Build the mesh with **Run → Build Mesh…**: element type **tri6**, a global
+target size of **0.8 m**, and **Refine thin zones** unticked.
 
 A 0.6 m course cannot be resolved at a 0.8 m target size, so each block polygon
 carries a local **Size** of **0.3 m** in its own row of the polygons worksheet.
@@ -286,7 +286,8 @@ slip:
 | back face | 28 of 30 | 70 mm |
 | base | 5 of 9 | 13 mm |
 | course-01 | 5 of 9 | under 0.01 mm |
-| course-02 to course-05 | none | — |
+| course-02 | 1 of 9 | under 0.01 mm |
+| course-03 to course-05 | none | — |
 
 The wall failed on its back face. The block column has slid down past the
 fill along its own back, five times as far as it has slid forward on its base,
@@ -320,7 +321,7 @@ The Log says the same in words at the end of every strength reduction run:
 > 1.1406. At F = 1.1328 the slope reached equilibrium in 363 iterations. At
 > F = 1.1406 it did not: over the last
 > 50,000 iterations the movement did not slow (each block of 10,000 iterations
-> moved the slope 92% as far as the one before), so the trial was counted as
+> moved the slope 100% as far as the one before), so the trial was counted as
 > sliding.
 
 Read this summary on every run. Part 2 is a run where it reports something
@@ -415,8 +416,9 @@ sets out the rule.
 ### What the geogrid adds
 
 Same wall, same seven joints, same mesh settings, three sheets added. Rebuild
-the mesh with **Run → Build Mesh…** at the same settings as Part 1, tri6 at
-0.8 m with the 0.3 m block size still on the polygons worksheet.
+the mesh with **Run → Build Mesh…** at the same settings as Part 1: tri6 at
+0.8 m, **Refine thin zones** unticked, and the 0.3 m block size still on the
+polygons worksheet.
 
 The mesh grows to **2,139 nodes, 927 elements and 90 joint elements on 10 jointed
 lines**. Each jointed sheet adds a jointed line of its own, and it splits the
@@ -695,7 +697,7 @@ The sheet is a base geotextile laid on the clay under the whole fill, 32 m long
 with both ends free, Tmax = 100 kN/m and EA = 2000 kN/m. Its interface with the
 soil is Adhesion = 5 kPa and Delta = 20°.
 
-Run it first with `Joint` blank, the sheet as a bonded bar,
+Run it first with `Joint` at `No`, the sheet as a bonded bar,
 [xslope_base_geotextile_bonded.xlsx](files/xslope_base_geotextile_bonded.xlsx):
 
 <!-- test: file=files/xslope_base_geotextile_bonded.xlsx, type=fem_ssrm, expected_fs=1.566, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-bonded-ssrm -->
@@ -745,7 +747,7 @@ thing in the section: Adhesion = 0.5 kPa and Delta = 10°, against a fill at
 φ′ = 34° and a foundation at φ′ = 32°. If the fill can slide along the liner,
 that is where the embankment will fail.
 
-Run it the same two ways. First `Joint` blank, the liner as a bonded bar,
+Run it the same two ways. First `Joint` at `No`, the liner as a bonded bar,
 [xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx):
 
 <!-- test: file=files/xslope_liner_bonded.xlsx, type=fem_ssrm, expected_fs=2.167, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-bonded-ssrm -->
@@ -801,7 +803,7 @@ if they agree the question is settled.
 ### Model checks on the bonded liner {#what-the-model-checks-say-before-anything-is-run}
 
 The model checks catch the wrong choice before anything is run. Open the
-bonded liner file, the one with `Joint` blank, and the checks column beside the
+bonded liner file, the one with `Joint` at `No`, and the checks column beside the
 Run FEM dialog shows three warnings on the liner, each saying that this sheet
 should be a slip surface and is entered as a bonded bar:
 

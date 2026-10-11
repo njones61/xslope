@@ -86,7 +86,8 @@ does regardless of the model, and that is what this file covers:
      reached the dock as rows of pipes; everything after a reply that ended
      on a bulleted list was drawn as more bullets of it; and a reply that the
      Responses-API route split into a text choice and a tool-call choice lost
-     its tool call.
+     its tool call; and a file a snippet wrote under a name already in the
+     Files folder was never reported or shown.
   N. TRANSIENT SEEPAGE, AND THE SNIPPET THAT NEVER RETURNS — a corpus sweep met a
      transient model with no helper for it, and the assistant spent the turn
      reverse-engineering engine signatures instead of answering; another sweep sat
@@ -2449,7 +2450,8 @@ def check_report_lands_in_the_files_folder():
 
     It goes to the assistant's output folder — what the dock's Files button opens
     — and the snippet's own result names it, so the sentence the assistant writes
-    about opening it is true.
+    about opening it is true. A report left unfinished says its contents page has
+    no page numbers yet.
     """
     out = []
     mw, asst, _ = _solved_session()
@@ -2474,9 +2476,17 @@ def check_report_lands_in_the_files_folder():
     if f"REPORT {in_the_folder}" not in result:
         out.append("generate_report() returned a path other than the one in the "
                    f"output folder: {result[-400:]}")
-    if "small_slope_report.docx" not in result.split("[saved", 1)[-1]:
+    import re
+    saved = " ".join(re.findall(r"\[saved \d+ file\(s\)[^\]]*\]", result))
+    if "small_slope_report.docx" not in saved:
         out.append("the report is not among the files the snippet reports the "
                    "user can open")
+    # Left unfinished, its contents page has no page numbers, and the printout
+    # says so: the helper's own description promises them, and a model repeats
+    # that promise unless the run tells it otherwise.
+    if "no page numbers yet" not in result:
+        out.append("an unfinished report's printout does not say its contents "
+                   f"page has no page numbers: {result[-400:]!r}")
     # An explicit path still goes exactly where it was asked to go.
     asked_for = os.path.join(tmpdir, "named.docx")
     _run(asst, f"generate_report(path={asked_for!r}, finalize=False)")
@@ -2814,6 +2824,76 @@ def check_table_under_a_line_renders():
     return out
 
 
+def check_a_rewritten_file_is_reported():
+    """A file a snippet writes under a name already in the Files folder is
+    reported like a new one.
+
+    The kernel told new files from old ones by name alone, so a second sweep's
+    sensitivity.csv and sensitivity.png — and a plot saved over an earlier
+    session's assistant_plot_001.png — were written, never named in the tool
+    result, and never shown in the dock. The sweep helper also said it wrote a
+    plot when it was told not to draw one.
+    """
+    import time
+    out = []
+    mw, asst = _session()
+    write = ("import os\n"
+             "with open(os.path.join(OUTPUT_DIR, 'w1_rewrite_probe.csv'), 'w') as fh:\n"
+             "    fh.write('step,%s\\n' % STEP)\n")
+    first = _run(asst, "STEP = 'first'\n" + write)
+    if "w1_rewrite_probe.csv" not in first:
+        out.append(f"a new file was not reported: {first[:300]!r}")
+    time.sleep(0.05)
+    second = _run(asst, "STEP = 'second, longer'\n" + write)
+    if "w1_rewrite_probe.csv" not in second:
+        out.append(f"a file rewritten under its old name was not reported: "
+                   f"{second[:300]!r}")
+    third = _run(asst, "print('nothing written')")
+    if "w1_rewrite_probe.csv" in third:
+        out.append("a file the snippet did not touch was reported as its output")
+    try:
+        os.remove(os.path.join(asst._kernel.outdir, "w1_rewrite_probe.csv"))
+    except OSError:
+        pass
+    mw.deleteLater()
+
+    # The case a user meets: a second sweep writes its table and plot over the
+    # first one's. Both are reported, and a sweep run without a plot does not
+    # claim to have written one.
+    model = os.path.join(_REPO, "docs", "lem", "files",
+                         "xslope_simple_mult_layers.xlsx")
+    if not os.path.exists(model):
+        return out + [f"the sample model is missing: {model}"]
+    mw, asst = _session()
+    mw.doc.load(model)
+    sweep = ("def bump(v):\n"
+             "    slope_data['materials'][0]['c'] = v\n"
+             "sensitivity([100.0, 200.0], bump, param='c', search=False, "
+             "name='w1_rewrite_sweep'{plot})\n")
+    _run(asst, sweep.format(plot=""))
+    time.sleep(0.05)
+    again = _run(asst, sweep.format(plot=""))
+    def saved(text):        # the names the tool result says were saved
+        import re
+        return " ".join(re.findall(r"\[saved \d+ file\(s\)[^\]]*\]", text))
+    for f in ("w1_rewrite_sweep.csv", "w1_rewrite_sweep.png"):
+        if f not in saved(again):
+            out.append(f"a second sweep's {f} was not reported: {again[-400:]!r}")
+    quiet = _run(asst, sweep.format(plot=", plot=False"))
+    if "w1_rewrite_sweep.png" in quiet:
+        out.append(f"a sweep run with plot=False names a plot: {quiet[-400:]!r}")
+    if "w1_rewrite_sweep.csv" not in saved(quiet):
+        out.append(f"a sweep run with plot=False did not report its table: "
+                   f"{quiet[-400:]!r}")
+    for f in ("w1_rewrite_sweep.csv", "w1_rewrite_sweep.png"):
+        try:
+            os.remove(os.path.join(asst._kernel.outdir, f))
+        except OSError:
+            pass
+    mw.deleteLater()
+    return out
+
+
 def check_a_split_reply_keeps_its_tool_call():
     """A reply split across choices still runs its tool call.
 
@@ -2984,6 +3064,7 @@ CHECKS = [
     ("O. a table under a line of text renders", check_table_under_a_line_renders),
     ("O. a list ends with its reply", check_a_list_ends_with_its_reply),
     ("O. a split reply keeps its tool call", check_a_split_reply_keeps_its_tool_call),
+    ("O. a rewritten file is reported", check_a_rewritten_file_is_reported),
 ]
 
 

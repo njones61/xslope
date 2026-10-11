@@ -146,6 +146,31 @@ def _geometry_native(slope_data):
     return None
 
 
+def _folder_state(folder):
+    """``{name: (mtime_ns, size)}`` for the files in ``folder`` (empty if absent)."""
+    state = {}
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return state
+    for name in names:
+        try:
+            st = os.stat(os.path.join(folder, name))
+        except OSError:
+            continue
+        state[name] = (st.st_mtime_ns, st.st_size)
+    return state
+
+
+def _written_since(folder, before):
+    """Names in ``folder`` that are new since ``before`` or have been rewritten:
+    a different modification time or size than the snapshot recorded. Comparing
+    names alone missed a file written again under its old name, so a second
+    sweep's table and plot were never shown."""
+    now = _folder_state(folder)
+    return [name for name, stamp in now.items() if before.get(name) != stamp]
+
+
 def _geometry_sigs(slope_data):
     """Per-key JSON signatures of the geometry inputs (shapely objects fall back
     to their WKT via ``str``), so a snippet's geometry edits can be located."""
@@ -1465,7 +1490,8 @@ class PythonKernel:
             path.
             """
             from xslope.report import generate_report as _generate
-            from ..report_dialog import (default_output_path, document_finish,
+            from ..report_dialog import (carries_contents_field,
+                                         default_output_path, document_finish,
                                          finalization_enabled)
             sd = doc.slope_data
             solutions = _report_solutions()
@@ -1490,11 +1516,19 @@ class PythonKernel:
             ok, res = _generate(sd, solutions, opts, out_path)
             if not ok:
                 raise RuntimeError(res)
+            finished = False
             if finalize:
                 settings = getattr(window, "settings", None)
-                document_finish(out_path, finalization_enabled(settings))
+                finished, _why = document_finish(out_path,
+                                                 finalization_enabled(settings))
             print(f"Report written to {res['path']} "
                   f"({len(res.get('figures') or ())} figures).")
+            if not finished and carries_contents_field(out_path):
+                # Say so: the contents page is a field Word fills in, and a
+                # report left unfinished was otherwise described as page-numbered.
+                print("Its contents page has no page numbers yet: they appear "
+                      "when the document is opened in Word and its fields are "
+                      "updated (select all and press F9).")
             return res["path"]
 
         def _report_solutions():
@@ -1602,7 +1636,9 @@ class PythonKernel:
                 ax.set_title(f"{ylabel} vs {param}")
                 ax.grid(True, alpha=0.3)
                 fig.savefig(f"{name}.png", dpi=150, bbox_inches="tight")
-            print(f"Wrote {name}.csv and {name}.png ({len(df)} points).")
+                print(f"Wrote {name}.csv and {name}.png ({len(df)} points).")
+            else:
+                print(f"Wrote {name}.csv ({len(df)} points).")
             return df
 
         def list_params(slope_data=None, mode="lem"):
@@ -2153,7 +2189,10 @@ class PythonKernel:
                             if isinstance(sd, dict) else None)
         os.makedirs(self.outdir, exist_ok=True)     # may have been cleared by the OS
         before_figs = set(plt.get_fignums())
-        existing = set(os.listdir(self.outdir))     # to detect files the snippet writes
+        # What the folder holds before the snippet, by name AND by modification
+        # time and size: a file the snippet writes under a name already there (a
+        # second sweep's sensitivity.csv) is as much its output as a new one.
+        existing = _folder_state(self.outdir)
         prev_cwd = os.getcwd()
         buf = StringIO()
         error = None
@@ -2185,7 +2224,7 @@ class PythonKernel:
         # save a figure itself (e.g. savefig('plot.png') without closing), so a
         # saved-and-left-open plot isn't shown twice.
         wrote_figure = any(f.lower().endswith(_FIG_EXTS)
-                           for f in os.listdir(self.outdir) if f not in existing)
+                           for f in _written_since(self.outdir, existing))
         if not wrote_figure:
             for num in plt.get_fignums():
                 if num in before_figs:
@@ -2198,7 +2237,8 @@ class PythonKernel:
                     pass
         plt.close("all")
 
-        # Everything newly present in outdir is this snippet's output.
-        created = sorted(f for f in os.listdir(self.outdir) if f not in existing)
+        # Everything new in outdir, or rewritten since the snippet started, is
+        # this snippet's output.
+        created = sorted(_written_since(self.outdir, existing))
         outputs = [os.path.join(self.outdir, f) for f in created]
         return buf.getvalue(), outputs, error

@@ -253,14 +253,12 @@ Construction Engineering Department at
 principal of [Jones Geoscience LLC](https://jonesgeo.com/){target="blank"}.
 Prof. Jones earned his PhD at the University of Texas under
 [Stephen G. Wright](https://caee.utexas.edu/person/stephen-wright/){target="blank"},
-and has taught *CE 544 — Seepage and Slope Stability Analysis* at BYU since 1991.
-That course is built around XSLOPE and its curriculum is
-[publicly available](https://byu-ce544.readthedocs.io/en/latest/){target="blank"}.
+and has taught *CE 544 — Seepage and Slope Stability Analysis* at BYU for several decades.
 
-!!! note "Under active development"
-    XSLOPE is under active development, and its interfaces and input templates
-    may change between minor releases. As with any slope stability software,
-    results should be independently verified before use in engineering
-    practice. Feedback and
+!!! note "Versions"
+    XSLOPE follows semantic versioning. Workbooks from earlier versions open in
+    the current one, and the Python API keeps its names within a major version.
+    As with any slope stability software, check results independently before
+    you rely on them in practice. Feedback and
     [issue reports](https://github.com/njones61/xslope/issues){target="blank"}
     are welcome.

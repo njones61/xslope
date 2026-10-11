@@ -101,7 +101,7 @@ The line under the input box reports the tokens each turn spent and the running
 total for the conversation:
 
 ```
-this turn: 64,053 in (42,064 cached) / 2,371 out · session: 64,053 in (42,064 cached) / 2,371 out
+this turn: 63,953 in (61,064 cached) / 2,401 out · session: 63,953 in (61,064 cached) / 2,401 out
 ```
 
 The first number climbs while the assistant works. **New chat** starts the count
@@ -118,7 +118,7 @@ expensive models, and cost this much between them, measured as they ran:
 
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Time |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Building a model from a drawing | 1 | 3 | 64,053 (42,064) | 2,371 | 37 s |
+| Building a model from a drawing | 1 | 3 | 63,953 (61,064) | 2,401 | 39 s |
 | Modifying the model | 3 | 9 | 195,368 (170,963) | 4,495 | 78 s |
 | A sweep with the helper | 1 | 2 | 40,377 (19,568) | 1,193 | 70 s |
 | A sweep written ad hoc | 1 | 3 | 60,035 (58,526) | 1,464 | 34 s |
@@ -126,9 +126,9 @@ expensive models, and cost this much between them, measured as they ran:
 | Two documentation questions | 2 | 4 | 88,380 (82,373) | 4,038 | 98 s |
 | A broken file | 1 | 3 | 60,884 (58,888) | 2,203 | 62 s |
 | Generating a report | 2 | 4 | 80,927 (79,156) | 935 | 26 s |
-| **Total** | **13** | **32** | **673,279 (589,261)** | **18,534** | **841 s** |
+| **Total** | **13** | **32** | **673,179 (608,261)** | **18,564** | **844 s** |
 
-That comes to **\$1.08** at Anthropic's list prices on 2026-10-10: \$4.00 per
+That comes to **\$0.93** at Anthropic's list prices on 2026-10-10: \$4.00 per
 million input tokens, \$5.00 per million for a five-minute cache write and \$8.00
 for a one-hour write, \$0.20 per million for a cache read, and \$20.00 per million
 output tokens. The input counts above include the cache writes and the cache
@@ -136,7 +136,7 @@ reads. Price and elapsed time do not track each other: the strength reduction ru
 takes more than half the total time for under a tenth of the cost, because
 404 of its 436 seconds are spent inside the finite element solver.
 
-The same eight conversations cost between \$0.30 and \$1.17 on the four other
+The same eight conversations cost between \$0.25 and \$1.30 on the four other
 models compared under [Other models](#other-models).
 
 Prices change; the current ones are on each provider's pricing page:
@@ -204,18 +204,20 @@ The dock itself shows the whole exchange:
 ![The whole build conversation in the dock: the attached drawing, the snippet that builds the model, the three generated starting circles, the clean model checks, the searched Spencer run with its plot, and the closing summary of the model, the starting circles, the result and the warnings](images/w1_build_from_image_1.png){width=560}
 
 One snippet builds the whole model. It took everything off the drawing — the
-layer thicknesses, the 2:1 face, the 50 ft crest, embankment 130 pcf and 400 psf,
-foundation 135 pcf and 800 psf, φ = 0 on both, and the rigid rock as a maximum
-depth of −10 — and put the toe at x = 0 as asked. It made one change of its own:
-it extended the ground to the left of the toe from the drawn 30 ft to 60 ft, so
-that deep circles can come out inside the model, and its reply says so. It
+layer thicknesses, the 2:1 face, embankment 130 pcf and 400 psf, foundation
+135 pcf and 800 psf, φ = 0 on both, and the rigid rock as a maximum depth of
+−10 — and put the toe at x = 0 as asked. It made one change of its own: it
+extended the ground on both sides, in front of the toe from the drawn 30 ft to
+60 ft and behind the crest from the drawn 50 ft to 90 ft, so that trial circles
+come out on the ground rather than at the model's edges, and its reply says so.
+It
 generated three starting circles, one through the toe and one at the base of
 each layer, and ran the search: **FS = 1.244**, on a surface bottoming at
 elevation 0 and coming out on the face at x = 4.5, just above the toe and well
 inside either extent. It reported the three admissibility warnings and placed
 that surface from the Depth its own run printed — the elevation of the circle's
-lowest point: *"The circle's lowest point is at Depth = 0.0, so it just touches
-the top of the stronger foundation without cutting into it."*
+lowest point: *"The critical circle's lowest point is at y = 0, so it just
+touches the top of the stronger foundation and stays in the embankment."*
 
 The session saved
 [w1_build_from_image_after.xlsx](files/w1_build_from_image_after.xlsx); the
@@ -233,9 +235,10 @@ exchange is in
   `u = none` on both, embankment first. The row order sets the Mat IDs the
   profile lines point at, so read it with the **Profile lines** editor: line 1,
   the top of the embankment, points at material 1.
-- **Profile lines editor.** The foundation line starts at x = −60, 30 ft beyond
-  the drawing's left edge. Set it back to −30 if the model should match the
-  drawing exactly; the search returns the same 1.2441.
+- **Profile lines editor.** The foundation line runs from x = −60 to 130 and the
+  crest to x = 130: 30 ft beyond the drawing's left edge and 40 ft beyond its
+  right. Set those ends back to −30 and 90 if the model should match the drawing
+  exactly; the search returns the same 1.2441.
 
 ---
 
@@ -701,25 +704,28 @@ about the mechanism or the finding is right.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5.5 | 32 | 673,279 (589,261) | 18,534 | \$1.08 | 8 of 8 | 8 of 8 |
-| Claude Sonnet 5.5 | 36 | 769,262 (685,212) | 17,878 | \$0.54 | 8 of 8 | 7 of 8 |
-| OpenAI gpt-6-astra | 36 | 509,307 (467,583) | 5,788 | \$1.17 | 8 of 8 | 7 of 8 |
-| Kimi K3 (Moonshot AI) | 39 | 583,645 (502,486) | 51,879 | \$1.17 | 8 of 8 | 4 of 8 |
-| GLM-5V-Turbo (Z.ai) | 46 | 683,160 (622,720) | 19,898 | \$0.30 | 6 of 8 | 1 of 8 |
+| Claude Opus 5.5 | 32 | 673,179 (608,261) | 18,564 | \$0.93 | 8 of 8 | 8 of 8 |
+| Claude Sonnet 5.5 | 36 | 769,130 (685,140) | 17,744 | \$0.54 | 8 of 8 | 6 of 8 |
+| OpenAI gpt-6-astra | 36 | 509,015 (453,199) | 5,691 | \$1.30 | 8 of 8 | 7 of 8 |
+| Kimi K3 (Moonshot AI) | 39 | 583,548 (502,479) | 48,803 | \$1.13 | 8 of 8 | 5 of 8 |
+| GLM-5V-Turbo (Z.ai) | 39 | 557,212 (500,352) | 15,825 | \$0.25 | 6 of 8 | 1 of 8 |
 
-gpt-6-astra is the model OpenAI names as its flagship. All five build the section
-the drawing shows and get the 1.244 that LEM-3 publishes for this slope, all five
-run the strength reduction to the same 1.270, and in the cohesion sweep all five
-report the trial circles Spencer could not solve at the weakest steps. They
-part ways elsewhere. GLM-5V-Turbo built the section with its toe at x = 30
-rather than at x = 0, where the request put it, and then reported the toe at
-x = 0. It also missed the swapped materials in the broken file and reported 1.208
-as the repaired answer. The other four get every number right.
+gpt-6-astra is the model OpenAI names as its flagship. Four of the five build the
+section the drawing shows and get the 1.244 that LEM-3 publishes for this slope,
+all five run the strength reduction to the same 1.270, and in the cohesion sweep
+all five report the trial circles Spencer could not solve at the weakest steps.
+They part ways elsewhere. GLM-5V-Turbo drew the top of the foundation along the
+ground surface, which leaves the embankment no area and puts the whole section in
+the 800-psf foundation, and reported that model's 1.856. It also missed the
+swapped materials in the broken file and reported 1.208 as the repaired answer.
+The other four get every number right.
 
 Opus 5.5 is the only one scored right in both columns in all eight sessions.
-Sonnet 5.5's one miss is in the broken file, where it placed the exit of the
-repaired file's critical circle beyond the toe, on the foundation; it is on the
-face, at x = 4.6. gpt-6-astra's is the first documentation question: it
+Sonnet 5.5's two misses are in the build, where it widened the ground in front
+of the toe to 60 ft and reported it as the drawing's 30, and in the broken file,
+where it placed the exit of the repaired file's critical circle beyond the toe,
+on the foundation; it is on the face, at x = 4.6. gpt-6-astra's one miss is the
+first documentation question: it
 explained why all the methods agree without running any of them, and they do not
 all agree. The other misses are mostly a right number with a wrong sentence
 beside it: a circle that only touches the top of the foundation described as
@@ -768,7 +774,7 @@ the checks above re-run the measurements rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about \$1.08.
+  13 turns of work for about \$0.93.
 - Building a layered model from a drawing and editing it three ways — face, water
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without leaving a

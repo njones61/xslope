@@ -10,11 +10,11 @@ provider and the harness reported as the sessions ran; the transcripts named in
 the last column are in this folder.
 
 Model:  Claude Opus 5.5 (anthropic / claude-opus-5-5) for every session
-Date:   2026-10-10 (building, the documentation questions); 2026-10-11 (the other six)
+Date:   2026-10-10 (the documentation questions); 2026-10-11 (the other seven)
 
 Session                                  Turns Calls    Tokens in (cached)    Out    Wall Transcript
 ---------------------------------------- ----- ----- --------------------- ------ ------- ----------------------------------
-Building a model from a drawing              1     3      64,053 ( 42,064)  2,371   36.9s w1_build_from_image_transcript.md
+Building a model from a drawing              1     3      63,953 ( 61,064)  2,401   39.4s w1_build_from_image_transcript.md
 Modifying the model                          3     9     195,368 (170,963)  4,495   78.2s w1_modify_transcript.md
 A sweep with the helper                      1     2      40,377 ( 19,568)  1,193   69.8s w1_sweep_builtin_transcript.md
 A sweep written ad hoc                       1     3      60,035 ( 58,526)  1,464   33.8s w1_sweep_adhoc_transcript.md
@@ -23,7 +23,7 @@ Two documentation questions                  2     4      88,380 ( 82,373)  4,03
 A broken file                                1     3      60,884 ( 58,888)  2,203   62.4s w1_diagnose_transcript.md
 Generating a report                          2     4      80,927 ( 79,156)    935   26.2s w1_report_transcript.md
 ---------------------------------------- ----- ----- --------------------- ------ ------- ----------------------------------
-Total                                       13    32     673,279 (589,261) 18,534  841.1s
+Total                                       13    32     673,179 (608,261) 18,564  843.7s
 
 Cost at Anthropic's list prices on 2026-10-10 — $4.00 per million input tokens,
 $5.00 per million for a five-minute cache write and $8.00 for a one-hour write,
@@ -31,10 +31,10 @@ $0.20 per million cached-read input tokens, $20.00 per million output tokens.
 The input count above includes the cache writes and the cache reads:
 
   fresh input          90 tokens   $0.000
-  cache writes     83,928 tokens   $0.591
-  cached input    589,261 tokens   $0.118
-  output           18,534 tokens   $0.371
+  cache writes     64,828 tokens   $0.438
+  cached input    608,261 tokens   $0.122
+  output           18,564 tokens   $0.371
                                  ------
-  total                          $1.08
+  total                          $0.93
 Wall time is the whole session, including the analyses. The strength reduction
 session spent 404.4 s of its 435.5 s inside the finite element solver.

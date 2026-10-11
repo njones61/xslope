@@ -781,12 +781,12 @@ def _leg_pullout(failures, results):
         results.append(f"row 3  embedment {s:4.1f} m: joints {got:8.2f} kN/m, "
                        f"envelope {want:8.2f} kN/m ({100*(got-want)/want:+.2f}%)")
 
-    # The bar on a jointed line has no bond-slip cap: its only limit is rupture.
+    # The bar on a jointed line has no bond-slip cap: its peak is Tmax.
     t_allow = np.asarray(fem_data['t_allow_by_1d_elem'])
     if t_allow.size and not np.allclose(t_allow, line_row['t_max']):
         failures.append("row 3: a bar on a jointed line still carries the "
                         "pullout envelope as its cap; on a jointed line the "
-                        "grip is the joints' and the bar's only limit is Tmax")
+                        "grip is the joints' and the bar's peak cap is Tmax")
     return worst
 
 
@@ -971,6 +971,211 @@ def _leg_certified_slip(failures, results):
 
 
 # --------------------------------------------------------------------------
+# The settled state's joint history, carried into a trial; the hold test
+# --------------------------------------------------------------------------
+
+#: A block on a plane just steeper than its joint can hold without help from
+#: the ends: tan 21 / tan 20 = 1.0547. Settling the K0 field at full strength
+#: slides the pairs near the slab's ends onto their limit, so the settled state
+#: carries real slip, and one bisection step past 1.0547 the block runs.
+ROW_HIST = dict(ROW2, phi_j=21.0)
+
+
+def _settled(fem_data, prep):
+    """The K0 in-situ state at full strength, as solve_ssrm settles it."""
+    from xslope import fem as _fem
+    with contextlib.redirect_stdout(io.StringIO()):
+        eq = solve_fem(fem_data, F=1.0, k0=1.0, _prepared=prep,
+                       fast_kernel=False, max_disp_factor=None,
+                       max_iterations=20000, max_iterations_ceiling=20000,
+                       _corrector_rungs=_fem._K0_CORRECTOR_CHECKPOINTS)
+    return eq
+
+
+def _leg_history_carried(failures, results):
+    """A trial at F = 1 from the settled state does not move.
+
+    The settled state is an equilibrium at full strength, so a trial at F = 1
+    started on it has nothing to do. That holds only if the trial starts with
+    the slip the joints took while the state settled: with the slip zeroed, the
+    pairs that slid are loaded back onto their limit and the block moves. Read on
+    both drivers a trial can run on, and, as the control that makes the leg
+    falsifiable, with the history dropped.
+    """
+    from xslope import fem as _fem
+    _d, fd, g = slab_model(**ROW_HIST)
+    prep = _fem._prepare_fem_model(fd, k0=1.0)
+    eq = _settled(fd, prep)
+    st = eq['_k0_state']
+    jh = (st or {}).get('joint')
+    if not eq['converged'] or jh is None:
+        failures.append("history: the settled state was not reached, or carries "
+                        "no joint history")
+        return
+    n_slid = int(np.count_nonzero(np.abs(jh['slip_p']) > 1e-9))
+    if n_slid == 0:
+        failures.append("history: no pair slid while the state settled, so the "
+                        "leg reads nothing")
+    kw = dict(k0=1.0, _prepared=prep, fast_kernel=False, max_disp_factor=None,
+              max_iterations=20000, max_iterations_ceiling=20000)
+    moved = {}
+    for label, state in (('carried', st), ('dropped', dict(st, joint=None))):
+        for driver in ('auto', 'newton'):
+            with contextlib.redirect_stdout(io.StringIO()):
+                tr = solve_fem(fd, F=1.0, fem_solver=driver, _init_state=state,
+                               **kw)
+            moved[(label, driver)] = float(tr['max_displacement'])
+            if label != 'carried':
+                continue
+            if not tr['converged']:
+                failures.append(f"history ({driver}): the trial at F = 1 from "
+                                f"the settled state does not converge")
+            if tr['max_displacement'] >= 1e-9:
+                failures.append(
+                    f"history ({driver}): the trial at F = 1 from the settled "
+                    f"state moves {tr['max_displacement']:.3e} m (must be "
+                    f"< 1e-9)")
+            if driver == 'auto' and tr.get('corrector') is not None:
+                failures.append("history (auto): the trial at F = 1 needed the "
+                                "corrector to stand on its own settled state")
+            if driver == 'auto':
+                results.append(f"history  carried: F = 1 from the settled state "
+                               f"converges in {tr['iterations']} sweeps, moves "
+                               f"{tr['max_displacement']:.1e} m "
+                               f"({n_slid} pairs slid while settling)")
+    # The control: the same trial with the slip zeroed must move, or the leg
+    # cannot tell the fix from its absence.
+    if max(moved[('dropped', 'auto')], moved[('dropped', 'newton')]) < 1e-7:
+        failures.append("history: with the history dropped the trial does not "
+                        "move either, so the fixture does not discriminate")
+    results.append(f"history  dropped: the same trial moves "
+                   f"{moved[('dropped', 'auto')]:.1e} m (sweep) / "
+                   f"{moved[('dropped', 'newton')]:.1e} m (Newton)")
+
+
+def _leg_hold_test(failures, results):
+    """The hold test accepts a state the plain sweep stays on, and refuses one
+    it walks off.
+
+    The settled block at F = 1 is a fixed point of the sweep: continued at F = 1
+    it must hold. The same state one bisection step past the closed form
+    (F = 1.08 against 1.0547) is a block on a joint past its limit: continued
+    there it must not. A corrector-certified trial on a jointed model carries
+    the reading on its corrector record.
+    """
+    from xslope import fem as _fem
+    _d, fd, g = slab_model(**ROW_HIST)
+    prep = _fem._prepare_fem_model(fd, k0=1.0)
+    eq = _settled(fd, prep)
+    st = eq['_k0_state']
+    hk = dict(k0=1.0, _prepared=prep, fast_kernel=False, max_disp_factor=None)
+    with contextlib.redirect_stdout(io.StringIO()):
+        keep = _fem.corrector_hold_test(fd, 1.0, st, **hk)
+        drift = _fem.corrector_hold_test(fd, 1.08, st, **hk)
+    if not keep['held']:
+        failures.append(f"hold: the settled state at F = 1 is refused "
+                        f"({keep['verdict']}, {keep['sweeps']} sweeps, drift "
+                        f"{keep['drift_u_el']} u_el)")
+    if drift['held']:
+        failures.append(f"hold: the block past its limit (F = 1.08) is accepted "
+                        f"({drift['verdict']}, drift {drift['drift_u_el']} u_el)")
+    results.append(f"hold  F = 1: held in {keep['sweeps']} sweeps, drift "
+                   f"{keep['drift_u_el']:.1e} u_el; F = 1.08: refused "
+                   f"({drift['verdict']}, {drift['sweeps']} sweeps, drift "
+                   f"{drift['drift_u_el']:.2f} u_el)")
+    # On the trial path: a certified jointed trial records the hold it passed.
+    with contextlib.redirect_stdout(io.StringIO()):
+        tr = solve_fem(fd, F=1.03, _init_state=st, max_iterations=20000,
+                       max_iterations_ceiling=20000, **hk)
+    c = tr.get('corrector') or {}
+    h = c.get('hold')
+    if not c:
+        failures.append("hold: the trial at F = 1.03 was not certified, so the "
+                        "record is not read")
+    elif h is None or not h.get('held') or not h.get('sweeps'):
+        failures.append(f"hold: the certified trial's corrector record carries "
+                        f"no passed hold test ({h})")
+    else:
+        results.append(f"hold  certified trial F = 1.03: {c['checkpoint']}, "
+                       f"hold {h['sweeps']} sweeps, drift "
+                       f"{h['drift_u_el']:.1e} u_el")
+
+
+def _leg_accelerated(failures, results):
+    """The accelerated sweep ends where the plain sweep ends, in fewer sweeps.
+
+    Rows 2 and 4 near their closed forms, on the plain viscoplastic loop (no
+    corrector, so every sweep of the approach is the loop's own): with the step
+    multiplier on (``accelerate=True``) each trial must converge on the plain
+    trial's end state, to within the force tolerance in elastic displacements,
+    and in fewer sweeps. The joints change status on the way in (pairs start and
+    stop slipping as the block settles), so the safeguard must have refused
+    steps whose scaled state would have flipped a pair. The strength reduction
+    on both rows must return the plain run's factor. With the switch off the
+    result carries no ``accelerate`` record.
+    """
+    kw = dict(max_iterations=40000, max_iterations_ceiling=40000,
+              fast_kernel=False, fem_solver='viscoplastic')
+    for label, row, F in (('row 2', ROW2, 1.56), ('row 4', ROW4, 1.5)):
+        _d, fd, g = slab_model(**row)
+        with contextlib.redirect_stdout(io.StringIO()):
+            off = solve_fem(fd, F=F, accelerate=False, **kw)
+            on = solve_fem(fd, F=F, accelerate=True, **kw)
+        acc = on.get('accelerate') or {}
+        if 'accelerate' in off:
+            failures.append(f"accelerate ({label}): the plain trial carries an "
+                            f"accelerate record")
+        if not (off['converged'] and on['converged']):
+            failures.append(f"accelerate ({label}) F = {F}: plain "
+                            f"{off['verdict']}, accelerated {on['verdict']}; "
+                            f"both must converge")
+            continue
+        u_el = float(off['u_elastic_scale'])
+        du = float(np.max(np.abs(np.asarray(on['displacements'])
+                                 - np.asarray(off['displacements']))))
+        dslip = float(np.max(np.abs(np.asarray(on['joint_slip'])
+                                    - np.asarray(off['joint_slip']))))
+        if du > 1e-3 * u_el:
+            failures.append(f"accelerate ({label}) F = {F}: the end state is "
+                            f"{du / u_el:.2e} u_el from the plain one "
+                            f"(must be <= 1e-3)")
+        if on['iterations'] >= off['iterations']:
+            failures.append(f"accelerate ({label}) F = {F}: {on['iterations']} "
+                            f"sweeps against the plain {off['iterations']}")
+        if not acc.get('accepted'):
+            failures.append(f"accelerate ({label}): no step was accelerated")
+        if not acc.get('rejected_status'):
+            failures.append(f"accelerate ({label}): the safeguard refused no "
+                            f"step, so the status fixture reads nothing")
+        results.append(
+            f"accelerate  {label} F = {F}: {off['iterations']} -> "
+            f"{on['iterations']} sweeps, end state within {du / u_el:.1e} u_el "
+            f"(slip {dslip:.1e} m); {acc.get('accepted')} steps accepted, "
+            f"{acc.get('rejected_status')} refused for a pair's status, "
+            f"largest {acc.get('largest_alpha'):g}")
+    # The factor. Read at ten times the closed-form rows' own sweep budget: at
+    # their 3,000 a trial near the closed form ends undecided at the cap, and
+    # the displacement evidence it is then read on is a per-sweep distance
+    # calibrated on the plain loop, which an accelerated sweep does not cover at
+    # the same rate (measured: row 2 1.6196 plain against 1.6606 accelerated at
+    # 3,000; 1.5903 both at 30,000, every trial the same verdict).
+    for label, row in (('row 2', ROW2), ('row 4', ROW4)):
+        _d, fd, g = slab_model(**row)
+        fs = {}
+        for acc in (False, True):
+            res = _ssrm(fd, F_min=1.0, F_max=2.5, tolerance=0.02, budget=10.0,
+                        accelerate=acc)
+            fs[acc] = res.get('FS')
+        if fs[False] is None or fs[True] != fs[False]:
+            failures.append(f"accelerate ({label}): the strength reduction "
+                            f"returns {fs[True]} with the switch on against "
+                            f"{fs[False]} off")
+        else:
+            results.append(f"accelerate  {label} SSRM FS = {fs[True]:.4f} on "
+                            f"and off (tolerance 0.02, 30,000-sweep budget)")
+
+
+# --------------------------------------------------------------------------
 # The tension cutoff and the tied end
 # --------------------------------------------------------------------------
 
@@ -1122,6 +1327,96 @@ def _leg_crossing_stiffness(failures, results):
                    "derived default")
 
 
+def _leg_stiffness_cap(failures, results):
+    """The optional ceiling clips normal and shear stiffness independently.
+
+    These builds do not solve. They prove that the switch is inert when off,
+    that either component can bind without moving the other, and that the
+    element matrix is rebuilt from the clipped values.
+    """
+    import xslope.joint as _J
+
+    p = ROW3
+    rings = [[(0.0, p['H']), (p['W'], p['H']),
+              (p['W'], 0.0), (0.0, 0.0)]]
+    line = [(p['x1'], p['y_sheet']), (p['x2'], p['y_sheet'])]
+    rings = add_intersection_points_to_polygons(rings, [line])
+    mats = [_material('soil', c=1.0e5, phi=35.0, E=E_SOIL)]
+    high, low = 1.0e12, 1.0
+
+    def _build(kn, ks, cap):
+        keep = _J.JOINT_STIFFNESS_CAP
+        _J.JOINT_STIFFNESS_CAP = cap
+        try:
+            _d, _m, fd = _finish(
+                _base(), [(rings[0], 0)], Polygon(rings[0]),
+                LineString([(0.0, p['H']), (p['W'], p['H'])]),
+                0.0, mats, line, p['adhesion'], p['delta'], p['ts'], p['s1d'],
+                kn=kn, ks=ks)
+        finally:
+            _J.JOINT_STIFFNESS_CAP = keep
+        return fd['joint_data']
+
+    off_n = _build(high, low, None)
+    on_n = _build(high, low, 10.0)
+    on_s = _build(low, high, 10.0)
+
+    if 'stiffness_cap' in off_n:
+        failures.append("cap: a build with the ceiling off still carries a record")
+    if not (np.all(off_n['kn'] == high) and np.all(off_n['ks'] == low)):
+        failures.append("cap: the off build does not preserve the stated values")
+
+    for name, jd, bound_key, fixed_key, fixed_value in (
+            ('normal', on_n, 'kn', 'ks', low),
+            ('shear', on_s, 'ks', 'kn', low)):
+        rec = jd.get('stiffness_cap') or {}
+        bound = rec.get(bound_key) or {}
+        fixed = rec.get(fixed_key) or {}
+        if bound.get('n_bound') != jd['n'] or bound.get('max_reduction', 1.0) <= 1.0:
+            failures.append(f"cap: the high {name} component did not bind on all "
+                            f"{jd['n']} joint elements: {bound!r}")
+        if fixed.get('n_bound') != 0 or fixed.get('max_reduction') != 1.0:
+            failures.append(f"cap: clipping the {name} component reports a change "
+                            f"to the other component: {fixed!r}")
+        if not np.all(jd[fixed_key] == fixed_value):
+            failures.append(f"cap: clipping the {name} component changed "
+                            f"{fixed_key}")
+        want_K = _joint_element_stiffness(
+            jd['w'], jd['tx'], jd['ty'], jd['nx'], jd['ny'], jd['kn'], jd['ks'])
+        if not np.array_equal(jd['K'], want_K):
+            failures.append(f"cap: the {name}-clipped element matrix was not "
+                            "rebuilt from its recorded stiffnesses")
+
+    results.append(
+        f"cap  normal-only and shear-only builds each bind all {on_n['n']} "
+        "joint elements without moving the other component; off preserves both")
+
+    # The corpus row that motivated the ceiling must actually reach it on its
+    # committed mesh. This is a build-only reading, not a solve.
+    rj3 = os.path.join(_ROOT, 'docs', 'verification', 'files', 'rocscience',
+                       'joints', 'rj003.xlsx')
+    if not os.path.exists(rj3):
+        results.append("cap  RJ-3 is absent; no corpus binding was read")
+        return
+    keep = _J.JOINT_STIFFNESS_CAP
+    _J.JOINT_STIFFNESS_CAP = 10.0
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            sd = load_slope_data(rj3)
+            fd3 = build_fem_data(sd, sd.get('mesh'))
+    finally:
+        _J.JOINT_STIFFNESS_CAP = keep
+    jd3 = fd3.get('joint_data') or {}
+    rec3 = jd3.get('stiffness_cap') or {}
+    kn3 = rec3.get('kn') or {}
+    if not kn3.get('n_bound'):
+        failures.append("cap: the ceiling does not bind RJ-3 normal stiffness")
+    results.append(
+        f"cap  RJ-3: normal bound {kn3.get('n_bound', 0)} of "
+        f"{rec3.get('n_joint', 0)}, shear bound "
+        f"{(rec3.get('ks') or {}).get('n_bound', 0)}")
+
+
 def run():
     """Returns a list of failure strings (empty = pass)."""
     failures, results = [], []
@@ -1135,9 +1430,13 @@ def run():
     _leg_infinite(failures, results)
     _leg_opening_and_ties(failures, results)
     _leg_certified_slip(failures, results)
+    _leg_history_carried(failures, results)
+    _leg_hold_test(failures, results)
+    _leg_accelerated(failures, results)
     _leg_crossing_stiffness(failures, results)
     _leg_untouched(failures, results)
     _leg_stiffness(failures, results)
+    _leg_stiffness_cap(failures, results)
     print("Interface (joint) element check "
           f"({time.time() - t0:.0f} s):")
     for line in results:

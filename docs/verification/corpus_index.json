@@ -4,7 +4,7 @@
   "models": [
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -40,7 +40,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -212,7 +212,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -248,7 +248,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -277,7 +277,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -313,7 +313,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -342,7 +342,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -378,7 +378,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -407,7 +407,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -443,7 +443,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -472,7 +472,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -508,7 +508,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -537,7 +537,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -573,7 +573,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -736,7 +736,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -772,7 +772,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -794,7 +794,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -804,7 +804,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -840,7 +840,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -861,7 +861,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -871,7 +871,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -907,7 +907,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -929,7 +929,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -939,7 +939,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -975,7 +975,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -997,7 +997,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -1007,7 +1007,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -1043,7 +1043,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1064,7 +1064,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown Sweep",
+          "title": "Griffiths & Lane (1999) Example 5 — \"Slow\" Drawdown",
           "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths5"
         }
       ],
@@ -1074,7 +1074,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -1110,7 +1110,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1220,7 +1220,7 @@
           "mc"
         ],
         "n_materials": 4,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": true,
         "pile_fixities": [],
         "piles": 0,
@@ -1244,7 +1244,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1257,7 +1257,7 @@
       "model": "docs/fem/files/xslope_noncircular_fem.xlsx",
       "references": [
         {
-          "anchor": "3-non-circular-failure-surface-with-thin-weak-layer",
+          "anchor": "1-non-circular-failure-surface-with-thin-weak-layer",
           "checks": [
             "fem_ssrm"
           ],
@@ -1265,18 +1265,17 @@
           "page": "fem/samples/",
           "resolution": "input-link",
           "source_md": "docs/fem/samples.md",
-          "title": "3. Non-Circular Failure Surface with Thin Weak Layer",
-          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#3-non-circular-failure-surface-with-thin-weak-layer"
+          "title": "1. Non-Circular Failure Surface with Thin Weak Layer",
+          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#1-non-circular-failure-surface-with-thin-weak-layer"
         }
       ],
       "topics": [
-        "non-circular",
         "zoned-dams"
       ]
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -1316,7 +1315,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1329,7 +1328,7 @@
       "model": "docs/fem/files/xslope_simple_mult_layers_fem.xlsx",
       "references": [
         {
-          "anchor": "4-reliability-analysis-two-layer-c-slope",
+          "anchor": "2-reliability-analysis-two-layer-c-slope",
           "checks": [
             "REL-FEM"
           ],
@@ -1337,8 +1336,8 @@
           "page": "fem/samples/",
           "resolution": "input-link",
           "source_md": "docs/fem/samples.md",
-          "title": "4. Reliability Analysis: Two-Layer c–φ Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope"
+          "title": "2. Reliability Analysis: Two-Layer c–φ Slope",
+          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#2-reliability-analysis-two-layer-c-slope"
         }
       ],
       "topics": [
@@ -1414,7 +1413,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -1452,7 +1451,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1551,7 +1550,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": "tri6",
@@ -1563,7 +1562,7 @@
           "mc"
         ],
         "n_materials": 2,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [
           "free"
@@ -1589,7 +1588,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -1615,8 +1614,7 @@
         }
       ],
       "topics": [
-        "piles",
-        "non-circular"
+        "piles"
       ]
     },
     {
@@ -1991,16 +1989,16 @@
       "model": "docs/lem/files/xslope_crest_surcharge.xlsx",
       "references": [
         {
-          "anchor": "1-simple-embankment",
+          "anchor": "tutorial-lem-2-loads-on-the-crest",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "1. Simple Embankment",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
+          "level": 1,
+          "page": "tutorials/lem02_loads_on_the_crest/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem02_loads_on_the_crest.md",
+          "title": "Tutorial LEM-2 — Loads on the Crest",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem02_loads_on_the_crest/#tutorial-lem-2-loads-on-the-crest"
         }
       ],
       "topics": [
@@ -2045,7 +2043,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -2058,7 +2056,7 @@
       "model": "docs/lem/files/xslope_earth_dam_down.xlsx",
       "references": [
         {
-          "anchor": "8-earth-dam",
+          "anchor": "4-earth-dam",
           "checks": [
             "circular_search"
           ],
@@ -2066,8 +2064,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "8. Earth Dam",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#8-earth-dam"
+          "title": "4. Earth Dam",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#4-earth-dam"
         }
       ],
       "topics": [
@@ -2112,7 +2110,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -2125,7 +2123,7 @@
       "model": "docs/lem/files/xslope_earth_dam_up.xlsx",
       "references": [
         {
-          "anchor": "8-earth-dam",
+          "anchor": "4-earth-dam",
           "checks": [
             "circular_search"
           ],
@@ -2133,8 +2131,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "8. Earth Dam",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#8-earth-dam"
+          "title": "4. Earth Dam",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#4-earth-dam"
         }
       ],
       "topics": [
@@ -2192,7 +2190,7 @@
       "model": "docs/lem/files/xslope_eight_layers.xlsx",
       "references": [
         {
-          "anchor": "6-slope-with-eight-layers",
+          "anchor": "3-slope-with-eight-layers",
           "checks": [
             "circular_search"
           ],
@@ -2200,8 +2198,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "6. Slope with Eight Layers",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-slope-with-eight-layers"
+          "title": "3. Slope with Eight Layers",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#3-slope-with-eight-layers"
         }
       ],
       "topics": [
@@ -2259,7 +2257,7 @@
       "model": "docs/lem/files/xslope_gsat_nowater.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2267,8 +2265,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2326,7 +2324,7 @@
       "model": "docs/lem/files/xslope_gsat_piezo.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2334,8 +2332,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2380,7 +2378,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -2393,7 +2391,7 @@
       "model": "docs/lem/files/xslope_gsat_rapid.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2401,8 +2399,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2448,7 +2446,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -2461,7 +2459,7 @@
       "model": "docs/lem/files/xslope_gsat_seep.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2469,8 +2467,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2529,7 +2527,7 @@
       "model": "docs/lem/files/xslope_gsat_sidecar.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search"
           ],
@@ -2537,8 +2535,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": [
@@ -2596,7 +2594,7 @@
       "model": "docs/lem/files/xslope_gsat_zoned.xlsx",
       "references": [
         {
-          "anchor": "16-saturated-vs-moist-unit-weight-_sat",
+          "anchor": "6-saturated-vs-moist-unit-weight-_sat",
           "checks": [
             "circular_search",
             "gsat_pair"
@@ -2605,8 +2603,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "16. Saturated vs. Moist Unit Weight (γ_sat)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat"
+          "title": "6. Saturated vs. Moist Unit Weight (γ_sat)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat"
         }
       ],
       "topics": []
@@ -2662,7 +2660,7 @@
       "model": "docs/lem/files/xslope_hassiotis.xlsx",
       "references": [
         {
-          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "anchor": "7-pile-stabilized-slope-hassiotis-et-al-1997",
           "checks": [
             "LEM-HASSIOTIS"
           ],
@@ -2670,8 +2668,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+          "title": "7. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997"
         }
       ],
       "topics": [
@@ -2731,7 +2729,7 @@
       "model": "docs/lem/files/xslope_hassiotis_p1.xlsx",
       "references": [
         {
-          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "anchor": "7-pile-stabilized-slope-hassiotis-et-al-1997",
           "checks": [
             "LEM-HASSIOTIS"
           ],
@@ -2739,8 +2737,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+          "title": "7. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997"
         }
       ],
       "topics": [
@@ -2801,7 +2799,7 @@
       "model": "docs/lem/files/xslope_hassiotis_p2.xlsx",
       "references": [
         {
-          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "anchor": "7-pile-stabilized-slope-hassiotis-et-al-1997",
           "checks": [
             "LEM-HASSIOTIS"
           ],
@@ -2809,8 +2807,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+          "title": "7. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997"
         }
       ],
       "topics": [
@@ -2934,16 +2932,16 @@
       "model": "docs/lem/files/xslope_johnson_rapid_KEY.xlsx",
       "references": [
         {
-          "anchor": "12-rapid-drawdown-johnson-reservoir-dam",
+          "anchor": "conclusion",
           "checks": [
             "single_circle"
           ],
-          "level": 3,
-          "page": "lem/samples/",
+          "level": 2,
+          "page": "tutorials/combo02_rapid_drawdown/",
           "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "12. Rapid Drawdown (Johnson Reservoir Dam)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam"
+          "source_md": "docs/tutorials/combo02_rapid_drawdown.md",
+          "title": "Conclusion",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#conclusion"
         }
       ],
       "topics": [
@@ -3069,21 +3067,10 @@
       "model": "docs/lem/files/xslope_method_slices_problem.xlsx",
       "references": [
         {
-          "anchor": "5-slope-with-multiple-materials-and-piezometric-line",
-          "checks": [
-            "single_circle"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "5. Slope with Multiple Materials and Piezometric Line",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#5-slope-with-multiple-materials-and-piezometric-line"
-        },
-        {
           "anchor": "tutorial-lem-4-water-in-the-slope",
           "checks": [
-            "circular_search"
+            "circular_search",
+            "single_circle"
           ],
           "level": 1,
           "page": "tutorials/lem04_water_in_the_slope/",
@@ -3148,16 +3135,16 @@
       "model": "docs/lem/files/xslope_method_slices_problem2.xlsx",
       "references": [
         {
-          "anchor": "5-slope-with-multiple-materials-and-piezometric-line",
+          "anchor": "factor-of-safety-by-method",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
-          "page": "lem/samples/",
+          "level": 2,
+          "page": "tutorials/lem04_water_in_the_slope/",
           "resolution": "input-link",
-          "source_md": "docs/lem/samples.md",
-          "title": "5. Slope with Multiple Materials and Piezometric Line",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#5-slope-with-multiple-materials-and-piezometric-line"
+          "source_md": "docs/tutorials/lem04_water_in_the_slope.md",
+          "title": "Factor of safety by method",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem04_water_in_the_slope/#factor-of-safety-by-method"
         }
       ],
       "topics": [
@@ -3215,21 +3202,10 @@
       "model": "docs/lem/files/xslope_mult_min_KEY.xlsx",
       "references": [
         {
-          "anchor": "13-multiple-local-minima",
-          "checks": [
-            "single_circle"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "13. Multiple Local Minima",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#13-multiple-local-minima"
-        },
-        {
           "anchor": "opening-the-model",
           "checks": [
-            "circular_search"
+            "circular_search",
+            "single_circle"
           ],
           "level": 3,
           "page": "tutorials/lem10_global_minimum/",
@@ -3292,20 +3268,9 @@
       "model": "docs/lem/files/xslope_noncircular.xlsx",
       "references": [
         {
-          "anchor": "7-non-circular-failure-surface",
-          "checks": [
-            "noncircular_search"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "7. Non-Circular Failure Surface",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#7-non-circular-failure-surface"
-        },
-        {
           "anchor": "tutorial-lem-5-a-weak-layer-non-circular",
           "checks": [
+            "noncircular_search",
             "single_noncirc"
           ],
           "level": 1,
@@ -3374,32 +3339,21 @@
       "model": "docs/lem/files/xslope_piles.xlsx",
       "references": [
         {
-          "anchor": "lem-vs-fem-comparison",
-          "checks": [
-            "circular_search"
-          ],
-          "level": 4,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "LEM vs. FEM Comparison",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#lem-vs-fem-comparison"
-        },
-        {
           "anchor": "opening-the-model-and-reading-the-pile-rows",
           "checks": [
-            "FEM-3-piles-ssrm"
+            "FEM-4-piles-ssrm"
           ],
           "level": 3,
-          "page": "tutorials/fem03_piles/",
+          "page": "tutorials/fem04_piles/",
           "resolution": "input-link",
-          "source_md": "docs/tutorials/fem03_piles.md",
+          "source_md": "docs/tutorials/fem04_piles.md",
           "title": "Opening the model and reading the pile rows",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#opening-the-model-and-reading-the-pile-rows"
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem04_piles/#opening-the-model-and-reading-the-pile-rows"
         },
         {
           "anchor": "opening-the-model",
           "checks": [
+            "circular_search",
             "single_circle"
           ],
           "level": 3,
@@ -3469,18 +3423,18 @@
       "model": "docs/lem/files/xslope_prob_submerged_KEY.xlsx",
       "references": [
         {
-          "anchor": "15-reliability-analysis-submerged-slope",
+          "anchor": "the-deterministic-run",
           "checks": [
             "reliability",
             "reliability_mc",
             "reliability_rs"
           ],
-          "level": 3,
-          "page": "lem/samples/",
+          "level": 2,
+          "page": "tutorials/lem11_reliability/",
           "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "15. Reliability Analysis (Submerged Slope)",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope"
+          "source_md": "docs/tutorials/lem11_reliability.md",
+          "title": "The deterministic run",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem11_reliability/#the-deterministic-run"
         }
       ],
       "topics": [
@@ -3545,16 +3499,17 @@
       "model": "docs/lem/files/xslope_reinforce.xlsx",
       "references": [
         {
-          "anchor": "9-reinforced-slope",
+          "anchor": "tutorial-lem-8-a-reinforced-slope-geogrids",
           "checks": [
-            "circular_search"
+            "circular_search",
+            "single_circle"
           ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "9. Reinforced Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope"
+          "level": 1,
+          "page": "tutorials/lem08_reinforced_slope/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem08_reinforced_slope.md",
+          "title": "Tutorial LEM-8 — A Reinforced Slope (Geogrids)",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem08_reinforced_slope/#tutorial-lem-8-a-reinforced-slope-geogrids"
         }
       ],
       "topics": [
@@ -3618,18 +3573,18 @@
       "model": "docs/lem/files/xslope_reinforce_rface.xlsx",
       "references": [
         {
-          "anchor": "9-reinforced-slope",
+          "anchor": "what-dir-and-appl-change",
           "checks": [
             "circular_search",
             "mp_spencer",
             "roundtrip"
           ],
           "level": 3,
-          "page": "lem/samples/",
+          "page": "tutorials/lem08_reinforced_slope/",
           "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "9. Reinforced Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope"
+          "source_md": "docs/tutorials/lem08_reinforced_slope.md",
+          "title": "Effect of Dir and Appl",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change"
         }
       ],
       "topics": [
@@ -3759,16 +3714,16 @@
       "model": "docs/lem/files/xslope_simple_embankment.xlsx",
       "references": [
         {
-          "anchor": "1-simple-embankment",
+          "anchor": "check-its-work",
           "checks": [
             "circular_search"
           ],
           "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "1. Simple Embankment",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
+          "page": "tutorials/lem01_simple_embankment/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem01_simple_embankment.md",
+          "title": "Check its work",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem01_simple_embankment/#check-its-work"
         }
       ],
       "topics": [
@@ -3826,16 +3781,16 @@
       "model": "docs/lem/files/xslope_simple_embankment_mods.xlsx",
       "references": [
         {
-          "anchor": "1-simple-embankment",
+          "anchor": "factor-of-safety-by-method",
           "checks": [
             "circular_search"
           ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/lem/samples.md",
-          "title": "1. Simple Embankment",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment"
+          "level": 2,
+          "page": "tutorials/lem02_loads_on_the_crest/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/tutorials/lem02_loads_on_the_crest.md",
+          "title": "Factor of safety by method",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem02_loads_on_the_crest/#factor-of-safety-by-method"
         }
       ],
       "topics": [
@@ -3894,7 +3849,7 @@
       "model": "docs/lem/files/xslope_simple_foundation.xlsx",
       "references": [
         {
-          "anchor": "2-simple-slope-with-foundation",
+          "anchor": "1-simple-slope-with-foundation",
           "checks": [
             "circular_search"
           ],
@@ -3902,8 +3857,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "2. Simple Slope with Foundation",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#2-simple-slope-with-foundation"
+          "title": "1. Simple Slope with Foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-slope-with-foundation"
         }
       ],
       "topics": [
@@ -3961,20 +3916,9 @@
       "model": "docs/lem/files/xslope_simple_mult_layers.xlsx",
       "references": [
         {
-          "anchor": "3-simple-slope-with-multiple-layers",
-          "checks": [
-            "circular_search"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "3. Simple Slope with Multiple Layers",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#3-simple-slope-with-multiple-layers"
-        },
-        {
           "anchor": "tutorial-lem-3-a-layered-slope",
           "checks": [
+            "circular_search",
             "single_circle"
           ],
           "level": 1,
@@ -4050,20 +3994,9 @@
       "model": "docs/lem/files/xslope_sloping_bottom.xlsx",
       "references": [
         {
-          "anchor": "11-polygon-input-with-a-sloping-bottom",
-          "checks": [
-            "circular_search"
-          ],
-          "level": 3,
-          "page": "lem/samples/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/lem/samples.md",
-          "title": "11. Polygon Input with a Sloping Bottom",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#11-polygon-input-with-a-sloping-bottom"
-        },
-        {
           "anchor": "tutorial-lem-6-polygon-geometry",
           "checks": [
+            "circular_search",
             "single_circle"
           ],
           "level": 1,
@@ -4127,7 +4060,7 @@
       "model": "docs/lem/files/xslope_submerged.xlsx",
       "references": [
         {
-          "anchor": "4-submerged-slope",
+          "anchor": "2-submerged-slope",
           "checks": [
             "circular_search"
           ],
@@ -4135,8 +4068,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "4. Submerged Slope",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#4-submerged-slope"
+          "title": "2. Submerged Slope",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#2-submerged-slope"
         }
       ],
       "topics": [
@@ -4194,7 +4127,7 @@
       "model": "docs/lem/files/xslope_tension_KEY.xlsx",
       "references": [
         {
-          "anchor": "14-tension-crack",
+          "anchor": "5-tension-crack",
           "checks": [
             "circular_search"
           ],
@@ -4202,8 +4135,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "14. Tension Crack",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#14-tension-crack"
+          "title": "5. Tension Crack",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#5-tension-crack"
         }
       ],
       "topics": [
@@ -4259,22 +4192,10 @@
       "model": "docs/seep/files/xslope_clay_blanket.xlsx",
       "references": [
         {
-          "anchor": "1-sheetpile-with-clay-blanket",
+          "anchor": "check-its-work",
           "checks": [
             "seep",
             "seep_elements"
-          ],
-          "level": 3,
-          "page": "seep/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/seep/samples.md",
-          "title": "1. Sheetpile with Clay Blanket",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#1-sheetpile-with-clay-blanket"
-        },
-        {
-          "anchor": "check-its-work",
-          "checks": [
-            "seep"
           ],
           "level": 3,
           "page": "tutorials/seep01_sheetpile/",
@@ -4406,7 +4327,7 @@
       "model": "docs/seep/files/xslope_earth_dam1.xlsx",
       "references": [
         {
-          "anchor": "3-earth-dam-with-core",
+          "anchor": "2-earth-dam-with-core",
           "checks": [
             "seep",
             "seep_elements"
@@ -4415,8 +4336,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "3. Earth Dam with Core",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#3-earth-dam-with-core"
+          "title": "2. Earth Dam with Core",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#2-earth-dam-with-core"
         }
       ],
       "topics": []
@@ -4470,7 +4391,7 @@
       "model": "docs/seep/files/xslope_earth_dam1_vg.xlsx",
       "references": [
         {
-          "anchor": "4-earth-dam-with-core-van-genuchten-unsaturated-model",
+          "anchor": "3-earth-dam-with-core-van-genuchten-unsaturated-model",
           "checks": [
             "seep"
           ],
@@ -4478,8 +4399,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "4. Earth Dam with Core — van Genuchten Unsaturated Model",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#4-earth-dam-with-core-van-genuchten-unsaturated-model"
+          "title": "3. Earth Dam with Core — van Genuchten Unsaturated Model",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#3-earth-dam-with-core-van-genuchten-unsaturated-model"
         }
       ],
       "topics": []
@@ -4520,7 +4441,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -4533,7 +4454,7 @@
       "model": "docs/seep/files/xslope_earth_dam2.xlsx",
       "references": [
         {
-          "anchor": "6-earth-dam-with-core-and-filter",
+          "anchor": "4-earth-dam-with-core-and-filter",
           "checks": [
             "seep"
           ],
@@ -4541,8 +4462,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "6. Earth Dam with Core and Filter",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#6-earth-dam-with-core-and-filter"
+          "title": "4. Earth Dam with Core and Filter",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#4-earth-dam-with-core-and-filter"
         }
       ],
       "topics": [
@@ -4598,16 +4519,16 @@
       "model": "docs/seep/files/xslope_earth_dam_tseep.xlsx",
       "references": [
         {
-          "anchor": "8-earth-dam-reservoir-drawdown-transient",
+          "anchor": "conclusion",
           "checks": [
             "tseep_head"
           ],
-          "level": 3,
-          "page": "seep/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/seep/samples.md",
-          "title": "8. Earth Dam — Reservoir Drawdown (Transient)",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#8-earth-dam-reservoir-drawdown-transient"
+          "level": 2,
+          "page": "tutorials/seep03_reservoir_drawdown/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/tutorials/seep03_reservoir_drawdown.md",
+          "title": "Conclusion",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/seep03_reservoir_drawdown/#conclusion"
         }
       ],
       "topics": [
@@ -4665,18 +4586,6 @@
       "model": "docs/seep/files/xslope_johnson_res.xlsx",
       "references": [
         {
-          "anchor": "johnson-reservoir",
-          "checks": [
-            "SEEP-2"
-          ],
-          "level": 3,
-          "page": "seep/samples/",
-          "resolution": "input-link",
-          "source_md": "docs/seep/samples.md",
-          "title": "5. Johnson Reservoir",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#johnson-reservoir"
-        },
-        {
           "anchor": "worked-example",
           "checks": [
             "circular_search",
@@ -4688,6 +4597,18 @@
           "source_md": "docs/seep/seep_slope.md",
           "title": "Worked example",
           "url": "https://xslope.readthedocs.io/en/latest/seep/seep_slope/#worked-example"
+        },
+        {
+          "anchor": "verification-seep2d-johnson",
+          "checks": [
+            "SEEP-2"
+          ],
+          "level": 3,
+          "page": "verification/seep/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/seep.md",
+          "title": "SEEP2D cross-check — Johnson Reservoir (established code)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/seep/#verification-seep2d-johnson"
         }
       ],
       "topics": [
@@ -4746,7 +4667,7 @@
       "model": "docs/seep/files/xslope_johnson_res_tseep.xlsx",
       "references": [
         {
-          "anchor": "9-johnson-reservoir-zoned-drawdown-transient",
+          "anchor": "6-johnson-reservoir-zoned-drawdown-transient",
           "checks": [
             "tseep_head"
           ],
@@ -4754,8 +4675,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "9. Johnson Reservoir — Zoned Drawdown (Transient)",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#9-johnson-reservoir-zoned-drawdown-transient"
+          "title": "6. Johnson Reservoir — Zoned Drawdown (Transient)",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient"
         }
       ],
       "topics": [
@@ -4813,7 +4734,7 @@
       "model": "docs/seep/files/xslope_levee_poly.xlsx",
       "references": [
         {
-          "anchor": "7-levee-with-grouted-foundation",
+          "anchor": "5-levee-with-grouted-foundation",
           "checks": [
             "seep"
           ],
@@ -4821,8 +4742,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "7. Levee with Grouted Foundation",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#7-levee-with-grouted-foundation"
+          "title": "5. Levee with Grouted Foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#5-levee-with-grouted-foundation"
         }
       ],
       "topics": [
@@ -5000,7 +4921,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -5013,7 +4934,7 @@
       "model": "docs/seep/files/xslope_sea_trench.xlsx",
       "references": [
         {
-          "anchor": "2-sea-trench",
+          "anchor": "1-sea-trench",
           "checks": [
             "seep"
           ],
@@ -5021,8 +4942,8 @@
           "page": "seep/samples/",
           "resolution": "input-link",
           "source_md": "docs/seep/samples.md",
-          "title": "2. Sea Trench",
-          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#2-sea-trench"
+          "title": "1. Sea Trench",
+          "url": "https://xslope.readthedocs.io/en/latest/seep/samples/#1-sea-trench"
         }
       ],
       "topics": [
@@ -5619,6 +5540,292 @@
         }
       ],
       "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_base_geotextile_bonded.xlsx",
+      "references": [
+        {
+          "anchor": "a-base-geotextile-on-soft-clay",
+          "checks": [
+            "FEM-3-sheet-bonded-ssrm"
+          ],
+          "level": 3,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "A base geotextile on soft clay",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_base_geotextile_jointed.xlsx",
+      "references": [
+        {
+          "anchor": "a-base-geotextile-on-soft-clay",
+          "checks": [
+            "FEM-3-sheet-jointed-ssrm"
+          ],
+          "level": 3,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "A base geotextile on soft clay",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 4,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_block_wall.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-3-a-block-wall-on-slip-joints",
+          "checks": [
+            "FEM-3-blocks-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "Tutorial FEM-3 — A Block Wall on Slip Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#tutorial-fem-3-a-block-wall-on-slip-joints"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 4,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 3,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_block_wall_grid.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-3-a-block-wall-on-slip-joints",
+          "checks": [
+            "FEM-3-grid-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "Tutorial FEM-3 — A Block Wall on Slip Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#tutorial-fem-3-a-block-wall-on-slip-joints"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
     },
     {
       "features": {
@@ -6254,6 +6461,152 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_liner_bonded.xlsx",
+      "references": [
+        {
+          "anchor": "a-smooth-geomembrane-liner-on-a-firm-foundation",
+          "checks": [
+            "FEM-3-liner-bonded-ssrm"
+          ],
+          "level": 3,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "A smooth geomembrane liner on a firm foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 1,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_liner_jointed.xlsx",
+      "references": [
+        {
+          "anchor": "a-smooth-geomembrane-liner-on-a-firm-foundation",
+          "checks": [
+            "FEM-3-liner-jointed-ssrm"
+          ],
+          "level": 3,
+          "page": "tutorials/fem03_block_wall_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_block_wall_joints.md",
+          "title": "A smooth geomembrane liner on a firm foundation",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -6305,16 +6658,16 @@
       "model": "docs/tutorials/files/xslope_pile_wall.xlsx",
       "references": [
         {
-          "anchor": "tutorial-fem-3-piles-lem-vs-fem",
+          "anchor": "tutorial-fem-4-piles-lem-vs-fem",
           "checks": [
-            "FEM-3-wall-ssrm"
+            "FEM-4-wall-ssrm"
           ],
           "level": 1,
-          "page": "tutorials/fem03_piles/",
+          "page": "tutorials/fem04_piles/",
           "resolution": "input-link",
-          "source_md": "docs/tutorials/fem03_piles.md",
-          "title": "Tutorial FEM-3 — Piles: LEM vs FEM",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#tutorial-fem-3-piles-lem-vs-fem"
+          "source_md": "docs/tutorials/fem04_piles.md",
+          "title": "Tutorial FEM-4 — Piles: LEM vs FEM",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem04_piles/#tutorial-fem-4-piles-lem-vs-fem"
         }
       ],
       "topics": [
@@ -6375,15 +6728,15 @@
         {
           "anchor": "the-slope-on-its-own",
           "checks": [
-            "FEM-3-bare-ssrm",
+            "FEM-4-bare-ssrm",
             "circular_search"
           ],
           "level": 3,
-          "page": "tutorials/fem03_piles/",
+          "page": "tutorials/fem04_piles/",
           "resolution": "input-link",
-          "source_md": "docs/tutorials/fem03_piles.md",
+          "source_md": "docs/tutorials/fem04_piles.md",
           "title": "The slope on its own",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#the-slope-on-its-own"
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem04_piles/#the-slope-on-its-own"
         }
       ],
       "topics": [
@@ -6538,6 +6891,73 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_rock_joints.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-5-a-rock-slope-on-its-joints",
+          "checks": [
+            "FEM-5-slab-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem05_rock_slope_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
+          "title": "Tutorial FEM-5 — A Rock Slope on Its Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#tutorial-fem-5-a-rock-slope-on-its-joints"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -6598,6 +7018,140 @@
           "source_md": "docs/tutorials/lem13_rock_slope.md",
           "title": "Opening the model",
           "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem13_rock_slope/#opening-the-model"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_rock_toppling.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-5-a-rock-slope-on-its-joints",
+          "checks": [
+            "FEM-5-topple-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem05_rock_slope_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
+          "title": "Tutorial FEM-5 — A Rock Slope on Its Joints",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#tutorial-fem-5-a-rock-slope-on-its-joints"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_rock_voronoi.xlsx",
+      "references": [
+        {
+          "anchor": "what-a-network-costs",
+          "checks": [
+            "FEM-5-voronoi-ssrm"
+          ],
+          "level": 3,
+          "page": "tutorials/fem05_rock_slope_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem05_rock_slope_joints.md",
+          "title": "Solution time for a joint network",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem05_rock_slope_joints/#what-a-network-costs"
         }
       ],
       "topics": [
@@ -6783,7 +7337,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7159,7 +7713,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7195,7 +7749,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7230,7 +7784,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7266,7 +7820,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7300,7 +7854,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7336,7 +7890,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7369,7 +7923,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7405,7 +7959,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7440,7 +7994,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -7476,7 +8030,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -7834,7 +8388,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -8282,12 +8836,12 @@
             "HB-lem",
             "HB-ssrm"
           ],
-          "level": 2,
-          "page": "verification/rs2/",
-          "resolution": "nearest-heading",
-          "source_md": "docs/verification/rs2.md",
-          "title": "Hoek-Brown verification (Hammah et al. 2005)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#hoek-brown"
+          "level": 3,
+          "page": "verification/ssrm/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/ssrm.md",
+          "title": "Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI = 5",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#hoek-brown"
         }
       ],
       "topics": [
@@ -8308,7 +8862,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8358,7 +8912,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8376,7 +8929,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8426,7 +8979,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8444,7 +8996,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8494,7 +9046,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8512,7 +9063,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8562,7 +9113,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8580,7 +9130,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8630,13 +9180,79 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj003.xlsx",
+      "references": [
+        {
+          "anchor": "rj-3",
+          "checks": [
+            "RJ-3"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-3: Lorig & Varona forward block toppling (rj003)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-3"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -8703,7 +9319,275 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj004_chapter.xlsx",
+      "references": [
+        {
+          "anchor": "rj-4",
+          "checks": [
+            "RJ-4c"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-4: Lorig & Varona flexural toppling (rj004)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-4"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj005.xlsx",
+      "references": [
+        {
+          "anchor": "rj-5",
+          "checks": [
+            "RJ-5"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-5: Lorig & Varona backward block toppling (rj005)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-5"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj005_chapter.xlsx",
+      "references": [
+        {
+          "anchor": "rj-5",
+          "checks": [
+            "RJ-5c"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-5: Lorig & Varona backward block toppling (rj005)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-5"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj006.xlsx",
+      "references": [
+        {
+          "anchor": "rj-6",
+          "checks": [
+            "RJ-6"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-6: Plane failure with daylighting discontinuities (rj006)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-6"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -8782,7 +9666,74 @@
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj007_chapter.xlsx",
+      "references": [
+        {
+          "anchor": "rj-7",
+          "checks": [
+            "RJ-7c"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "nearest-heading",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-7: Plane failure with non-daylighting discontinuities (rj007)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-7"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8832,7 +9783,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8850,7 +9800,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8900,7 +9850,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8918,7 +9867,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -8968,7 +9917,6 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -8986,7 +9934,7 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9031,12 +9979,11 @@
           "page": "verification/rs2_joints/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2_joints.md",
-          "title": "RJ-11: Alejano et al. ploughing sliding slab failure (rj011)",
+          "title": "RJ-11: Alejano et al. plowing sliding slab failure (rj011)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-11"
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
@@ -9054,7 +10001,74 @@
           "elastic"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj012.xlsx",
+      "references": [
+        {
+          "anchor": "rj-12",
+          "checks": [
+            "RJ-12"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-12: Alejano et al. plowing toppling slab failure (rj012)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-12"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9099,18 +10113,84 @@
           "page": "verification/rs2_joints/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2_joints.md",
-          "title": "RJ-13: Alejano et al. ploughing sliding slab, example 4 (rj013)",
+          "title": "RJ-13: Alejano et al. plowing sliding slab, example 4 (rj013)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-13"
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj014.xlsx",
+      "references": [
+        {
+          "anchor": "rj-14",
+          "checks": [
+            "RJ-14"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-14: Alejano et al. plowing sliding slab, example 5 (rj014)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-14"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9177,7 +10257,72 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj016.xlsx",
+      "references": [
+        {
+          "anchor": "rj-16",
+          "checks": [
+            "RJ-16"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-16: Barla et al. tilt-table block toppling (rj016)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-16"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9256,7 +10401,7 @@
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": true,
+        "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -9306,13 +10451,214 @@
         }
       ],
       "topics": [
-        "non-circular",
         "homogeneous"
       ]
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj019.xlsx",
+      "references": [
+        {
+          "anchor": "rj-19",
+          "checks": [
+            "RJ-19"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-19: Bi-planar step-path failure (rj019)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-19"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/joints/rj020.xlsx",
+      "references": [
+        {
+          "anchor": "rj-20",
+          "checks": [
+            "RJ-20"
+          ],
+          "level": 3,
+          "page": "verification/rs2_joints/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2_joints.md",
+          "title": "RJ-20: Hammah & Yacoub Voronoi slope (rj020)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2_joints/#rj-20"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 5,
+        "non_circular": true,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-25",
+          "checks": [
+            "RS2-25-lem"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9349,7 +10695,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": true,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9380,7 +10726,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9417,7 +10763,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": true,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9448,7 +10794,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9485,7 +10831,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": true,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9516,7 +10862,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 1,
         "element_type": null,
@@ -9552,7 +10898,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9578,6 +10924,142 @@
         }
       ],
       "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "pow"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_30.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-30",
+          "checks": [
+            "RS2-30"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-30: Homogeneous slope, power-curve strength (Perry 1994)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-30"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "pow"
+        ],
+        "n_materials": 2,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_30_split.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-30",
+          "checks": [
+            "RS2-30-split"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-30: Homogeneous slope, power-curve strength (Perry 1994)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-30"
+        }
+      ],
+      "topics": [
+        "non-circular"
+      ]
     },
     {
       "features": {
@@ -9650,7 +11132,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9686,7 +11168,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9717,7 +11199,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9753,7 +11235,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9784,7 +11266,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9820,7 +11302,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9851,7 +11333,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9887,7 +11369,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9918,7 +11400,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -9954,7 +11436,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -9985,7 +11467,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10021,7 +11503,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10052,7 +11534,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10088,7 +11570,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10119,7 +11601,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10155,7 +11637,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10454,7 +11936,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10490,7 +11972,137 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_62a.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-62",
+          "checks": [
+            "RS2-62a"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-62: Three-layered slope with a soft band (Cheng et al. 2007)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-62"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_62b.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-62",
+          "checks": [
+            "RS2-62b"
+          ],
+          "level": 3,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-62: Three-layered slope with a soft band (Cheng et al. 2007)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-62"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10587,7 +12199,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10623,7 +12235,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10654,7 +12266,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10690,7 +12302,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10721,7 +12333,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10757,7 +12369,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10788,7 +12400,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10824,7 +12436,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10855,7 +12467,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10891,7 +12503,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10922,7 +12534,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -10958,7 +12570,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10990,7 +12602,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11026,7 +12638,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11058,7 +12670,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11094,7 +12706,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11126,7 +12738,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11162,7 +12774,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11197,7 +12809,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11233,7 +12845,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11263,7 +12875,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11299,7 +12911,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11329,7 +12941,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11365,7 +12977,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11395,7 +13007,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11431,7 +13043,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11461,7 +13073,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11497,7 +13109,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11527,7 +13139,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11563,7 +13175,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11594,7 +13206,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11630,7 +13242,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11662,7 +13274,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11698,7 +13310,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11730,7 +13342,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11766,7 +13378,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11798,7 +13410,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11834,7 +13446,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -11866,7 +13478,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -11902,7 +13514,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -12138,7 +13750,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -12174,7 +13786,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -13789,7 +15401,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14055,7 +15667,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 2,
         "element_type": null,
@@ -14091,7 +15703,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14409,7 +16021,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -14448,7 +16060,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14704,7 +16316,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -14925,7 +16537,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -15707,7 +17319,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": true,
@@ -15860,7 +17472,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -15898,7 +17510,7 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": true,
-        "k0": 1.0,
+        "k0": null,
         "line_loads": 0,
         "material_options": [
           "pow"
@@ -15926,9 +17538,9 @@
         "seepage_problem": false,
         "seismic_k": 0.0,
         "sigmas": [],
-        "ssr_zones": 3,
+        "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15953,18 +17565,6 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP40: Slope, homogenous, sensitivity analysis",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp40"
-        },
-        {
-          "anchor": "rs2-30",
-          "checks": [
-            "RS2-30"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-30: Homogeneous slope, power-curve strength (Perry 1993)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-30"
         }
       ],
       "topics": [
@@ -16428,7 +18028,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -16464,7 +18064,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16828,7 +18428,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16903,7 +18503,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16980,7 +18580,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17067,7 +18667,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17779,7 +19379,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17853,7 +19453,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17928,7 +19528,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -18638,7 +20238,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -18674,7 +20274,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19907,7 +21507,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -19943,7 +21543,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19974,7 +21574,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -20010,7 +21610,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20911,7 +22511,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20985,7 +22585,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21059,7 +22659,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21164,7 +22764,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -21220,7 +22820,7 @@
       "model": "docs/verification/files/rocscience/vp087_fem.xlsx",
       "references": [
         {
-          "anchor": "the-facing-and-which-published-factor-the-row-is-scored-against",
+          "anchor": "rs2-48-baseline",
           "checks": [
             "RS2-48"
           ],
@@ -21228,8 +22828,8 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "The facing, and which published factor the row is scored against",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#the-facing-and-which-published-factor-the-row-is-scored-against"
+          "title": "RS2-48: Multi-tiered geotextile wall, baseline (vp087_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48-baseline"
         }
       ],
       "topics": [
@@ -21311,6 +22911,80 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp088_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-49",
+          "checks": [
+            "RS2-49"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-49: Geotextile wall, fill quality (vp088_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-49"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -21384,7 +23058,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -21446,7 +23120,7 @@
           ],
           "level": 4,
           "page": "verification/rs2/",
-          "resolution": "nearest-heading",
+          "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
           "title": "RS2-50: Geotextile wall, 4.2 m reinforcement (vp089_fem)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-50"
@@ -21596,6 +23270,80 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp091_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-52",
+          "checks": [
+            "RS2-52"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-52: Geotextile wall, weak foundation (vp091_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-52"
         }
       ],
       "topics": [
@@ -21824,7 +23572,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -21880,7 +23628,7 @@
       "model": "docs/verification/files/rocscience/vp094_fem.xlsx",
       "references": [
         {
-          "anchor": "the-facing-and-which-published-factor-the-row-is-scored-against",
+          "anchor": "rs2-55",
           "checks": [
             "RS2-55"
           ],
@@ -21888,8 +23636,8 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "The facing, and which published factor the row is scored against",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#the-facing-and-which-published-factor-the-row-is-scored-against"
+          "title": "RS2-55: Geotextile wall, tier count (vp094_fem)",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-55"
         }
       ],
       "topics": [
@@ -23304,7 +25052,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -23344,7 +25092,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23518,7 +25266,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -23560,7 +25308,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23593,7 +25341,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -23635,7 +25383,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23919,7 +25667,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24058,7 +25806,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24154,7 +25902,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24190,7 +25938,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24223,7 +25971,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24259,7 +26007,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24292,7 +26040,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24328,7 +26076,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24361,7 +26109,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24397,7 +26145,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24430,7 +26178,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24466,7 +26214,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24498,7 +26246,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24534,7 +26282,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24567,7 +26315,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24603,7 +26351,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24636,7 +26384,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24672,7 +26420,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24704,7 +26452,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24740,7 +26488,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24773,7 +26521,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24809,7 +26557,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24842,7 +26590,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24878,7 +26626,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24911,7 +26659,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -24947,7 +26695,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24979,7 +26727,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25015,7 +26763,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25047,7 +26795,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25083,7 +26831,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25114,7 +26862,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25150,7 +26898,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25181,7 +26929,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25217,7 +26965,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25250,7 +26998,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25286,7 +27034,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25317,7 +27065,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25353,7 +27101,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25384,7 +27132,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25420,7 +27168,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25454,7 +27202,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25490,7 +27238,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25524,7 +27272,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25560,7 +27308,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25594,7 +27342,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25630,7 +27378,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25663,7 +27411,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25699,7 +27447,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25732,7 +27480,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25768,7 +27516,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25802,7 +27550,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25838,7 +27586,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25873,7 +27621,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25909,7 +27657,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25945,7 +27693,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -25981,7 +27729,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26015,7 +27763,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26051,7 +27799,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26084,7 +27832,7 @@
     },
     {
       "features": {
-        "circular": true,
+        "circular": false,
         "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
@@ -26120,7 +27868,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 23,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -26154,7 +27902,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 368,
+    "models": 395,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -26166,12 +27914,17 @@
       "tutorials/combo03_fs_vs_time/",
       "tutorials/fem01_strength_reduction/",
       "tutorials/fem02_reinforcement/",
-      "tutorials/fem03_piles/",
+      "tutorials/fem03_block_wall_joints/",
+      "tutorials/fem04_piles/",
+      "tutorials/fem05_rock_slope_joints/",
+      "tutorials/lem01_simple_embankment/",
+      "tutorials/lem02_loads_on_the_crest/",
       "tutorials/lem03_layered_slope/",
       "tutorials/lem04_water_in_the_slope/",
       "tutorials/lem05_weak_layer_noncircular/",
       "tutorials/lem06_polygon_geometry/",
       "tutorials/lem07_strength_envelopes/",
+      "tutorials/lem08_reinforced_slope/",
       "tutorials/lem09_tieback_wall/",
       "tutorials/lem10_global_minimum/",
       "tutorials/lem11_reliability/",
@@ -26193,22 +27946,22 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 634,
+    "tags": 663,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 175,
-      "non-circular": 43,
+      "homogeneous": 189,
+      "non-circular": 33,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
-      "reinforcement": 28,
+      "reinforcement": 35,
       "seepage-coupled": 74,
       "seismic": 11,
       "soil-nails": 5,
       "tension-cracks": 19,
       "transient-seepage": 25,
-      "zoned-dams": 46
+      "zoned-dams": 47
     },
     "unloadable": 0
   },
@@ -26277,7 +28030,10 @@
       "docs/tutorials/files/xslope_dam_infiltration_storm.xlsx",
       "docs/tutorials/files/xslope_pile_wall.xlsx",
       "docs/tutorials/files/xslope_pile_wall_start.xlsx",
+      "docs/tutorials/files/xslope_rock_joints.xlsx",
       "docs/tutorials/files/xslope_rock_slope.xlsx",
+      "docs/tutorials/files/xslope_rock_toppling.xlsx",
+      "docs/tutorials/files/xslope_rock_voronoi.xlsx",
       "docs/tutorials/files/xslope_ssrm_embankment.xlsx",
       "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
@@ -26293,16 +28049,27 @@
       "docs/verification/files/rocscience/joints/rj001c.xlsx",
       "docs/verification/files/rocscience/joints/rj001d.xlsx",
       "docs/verification/files/rocscience/joints/rj002.xlsx",
+      "docs/verification/files/rocscience/joints/rj003.xlsx",
       "docs/verification/files/rocscience/joints/rj004.xlsx",
+      "docs/verification/files/rocscience/joints/rj004_chapter.xlsx",
+      "docs/verification/files/rocscience/joints/rj005.xlsx",
+      "docs/verification/files/rocscience/joints/rj005_chapter.xlsx",
+      "docs/verification/files/rocscience/joints/rj006.xlsx",
       "docs/verification/files/rocscience/joints/rj007.xlsx",
+      "docs/verification/files/rocscience/joints/rj007_chapter.xlsx",
       "docs/verification/files/rocscience/joints/rj008.xlsx",
       "docs/verification/files/rocscience/joints/rj009.xlsx",
       "docs/verification/files/rocscience/joints/rj010.xlsx",
       "docs/verification/files/rocscience/joints/rj011.xlsx",
+      "docs/verification/files/rocscience/joints/rj012.xlsx",
       "docs/verification/files/rocscience/joints/rj013.xlsx",
+      "docs/verification/files/rocscience/joints/rj014.xlsx",
       "docs/verification/files/rocscience/joints/rj015.xlsx",
       "docs/verification/files/rocscience/joints/rj017.xlsx",
       "docs/verification/files/rocscience/joints/rj018.xlsx",
+      "docs/verification/files/rocscience/joints/rj019.xlsx",
+      "docs/verification/files/rocscience/joints/rj020.xlsx",
+      "docs/verification/files/rocscience/rs2_30.xlsx",
       "docs/verification/files/rocscience/rs2_56a.xlsx",
       "docs/verification/files/rocscience/rs2_56b.xlsx",
       "docs/verification/files/rocscience/rs2_57a.xlsx",
@@ -26420,24 +28187,14 @@
     ],
     "non-circular": [
       "docs/fem/files/xslope_griffiths3_r0p2.xlsx",
-      "docs/fem/files/xslope_noncircular_fem.xlsx",
       "docs/fem/files/xslope_torggler_3b_nopile.xlsx",
-      "docs/fem/files/xslope_torggler_3b_plate.xlsx",
       "docs/lem/files/xslope_acads_weak_layer.xlsx",
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
-      "docs/verification/files/rocscience/joints/rj001a.xlsx",
-      "docs/verification/files/rocscience/joints/rj001b.xlsx",
-      "docs/verification/files/rocscience/joints/rj001c.xlsx",
-      "docs/verification/files/rocscience/joints/rj001d.xlsx",
-      "docs/verification/files/rocscience/joints/rj002.xlsx",
-      "docs/verification/files/rocscience/joints/rj008.xlsx",
-      "docs/verification/files/rocscience/joints/rj009.xlsx",
-      "docs/verification/files/rocscience/joints/rj010.xlsx",
-      "docs/verification/files/rocscience/joints/rj011.xlsx",
-      "docs/verification/files/rocscience/joints/rj013.xlsx",
-      "docs/verification/files/rocscience/joints/rj018.xlsx",
+      "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
+      "docs/verification/files/rocscience/rs2_30.xlsx",
+      "docs/verification/files/rocscience/rs2_30_split.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",
@@ -26510,6 +28267,11 @@
     ],
     "reinforcement": [
       "docs/lem/files/xslope_reinforce.xlsx",
+      "docs/tutorials/files/xslope_base_geotextile_bonded.xlsx",
+      "docs/tutorials/files/xslope_base_geotextile_jointed.xlsx",
+      "docs/tutorials/files/xslope_block_wall_grid.xlsx",
+      "docs/tutorials/files/xslope_liner_bonded.xlsx",
+      "docs/tutorials/files/xslope_liner_jointed.xlsx",
       "docs/tutorials/files/xslope_reinforced_slope.xlsx",
       "docs/tutorials/files/xslope_reinforced_slope_start.xlsx",
       "docs/verification/files/geostudio/gs2_18.xlsx",
@@ -26527,10 +28289,12 @@
       "docs/verification/files/rocscience/vp087.xlsx",
       "docs/verification/files/rocscience/vp087_fem.xlsx",
       "docs/verification/files/rocscience/vp088.xlsx",
+      "docs/verification/files/rocscience/vp088_fem.xlsx",
       "docs/verification/files/rocscience/vp089.xlsx",
       "docs/verification/files/rocscience/vp089_fem.xlsx",
       "docs/verification/files/rocscience/vp090.xlsx",
       "docs/verification/files/rocscience/vp091.xlsx",
+      "docs/verification/files/rocscience/vp091_fem.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",
       "docs/verification/files/rocscience/vp093.xlsx",
       "docs/verification/files/rocscience/vp094.xlsx",
@@ -26707,6 +28471,7 @@
       "docs/tutorials/files/xslope_johnson_res_solved.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/geostudio/gs2_wall_none.xlsx",
+      "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64l_split.xlsx",
       "docs/verification/files/rocscience/rs2_65.xlsx",

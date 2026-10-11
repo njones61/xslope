@@ -1366,7 +1366,7 @@ def _completed_model(page):
     names only a starter has no answer key and is left out.
 
     A page that names SEVERAL completed models is left out too. LEM-7 works two
-    slopes and FEM-3 works a pile row and then a wall; "build this model" has no
+    slopes and FEM-4 works a pile row and then a wall; "build this model" has no
     single answer there, and scoring a build of one against the other would
     measure the pairing rather than the assistant.
     """
@@ -1414,16 +1414,16 @@ def _sketch_for(page):
 #: The answer key for a drawing on a page whose glance box names SEVERAL completed
 #: models. ``_completed_model`` cannot choose between them and the page's prose
 #: states more than one problem, but the DRAWING is of one slope; these pairings
-#: say which. Keyed by the drawing, so a page showing two of them (FEM-3 draws a
+#: say which. Keyed by the drawing, so a page showing two of them (FEM-4 draws a
 #: pile row and then a wall) contributes a build case for each.
 DRAWING_KEYS = {
     "lem07_problem_sketch.png":
         ("docs", "lem", "files", "xslope_baker_clay.xlsx"),
     "lem10_problem_sketch.png":
         ("docs", "lem", "files", "xslope_mult_min_KEY.xlsx"),
-    "fem03_piles_problem_sketch.png":
+    "fem04_piles_problem_sketch.png":
         ("docs", "lem", "files", "xslope_piles.xlsx"),
-    "fem03_wall_problem_sketch.png":
+    "fem04_wall_problem_sketch.png":
         ("docs", "tutorials", "files", "xslope_pile_wall.xlsx"),
 }
 

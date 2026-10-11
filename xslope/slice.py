@@ -1043,6 +1043,38 @@ def _corner_claim_is_this_slice(x_cross, x_l, x_r, i, n_slices, right_facing):
     return True
 
 
+def pile_force_angle(x1, y1, x2, y2, right_facing=None):
+    """The force angle θp (degrees) of a pile, from its two end points.
+
+    θp is the convention every solver reads: the inclination of the pile force
+    from horizontal, positive upward, with its horizontal component pointing
+    against the movement of the sliding mass (the solvers mirror that component
+    on a right-facing slope). The force is perpendicular to the pile. The higher
+    end is the head, whichever end was entered first, and
+
+        θp = atan(d_u / (y_head - y_tip))
+
+    where d_u is the horizontal distance the tip lies UPSLOPE of the head.
+    Upslope is -x on a right-facing slope (one that descends to the right) and
+    +x on a left-facing one, so a battered pile and its mirror image take the
+    same θp. A vertical pile gives 0, and a pile whose tip lies upslope of its
+    head (the head leaning out toward the toe) gives a positive, upward θp.
+
+    ``right_facing=None`` asks for the angle without a facing: 0 for a vertical
+    pile, whose angle does not depend on it, and None for a battered one, which
+    is resolved per failure surface once that surface's facing is known.
+    """
+    if y2 > y1:
+        x1, y1, x2, y2 = x2, y2, x1, y1        # the higher end is the head
+    dx = x2 - x1                                # tip relative to head
+    if dx == 0.0:
+        return 0.0
+    if right_facing is None:
+        return None
+    d_u = -dx if right_facing else dx
+    return degrees(atan2(d_u, y1 - y2))
+
+
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
                     composite=False, right_facing=None,
                     suction_phi_b=None, suction_cap=None, check_inputs=True,
@@ -1282,10 +1314,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     if slope_data.get("pile_lines"):
         for _pi, pile in enumerate(slope_data["pile_lines"]):
             geom = LineString([(pile["x1"], pile["y1"]), (pile["x2"], pile["y2"])])
+            # A stated force angle (a pre-v23 sheet's column, or a caller's
+            # slope_data) is used as stated; a blank one is resolved from the
+            # end points once the surface's facing is known (pile_force_angle).
+            _tp = pile.get("theta_p")
+            if _tp is not None and pd.isna(_tp):
+                _tp = None
             pile_lines_data.append({
                 "geom": geom,
+                "ends": (pile["x1"], pile["y1"], pile["x2"], pile["y2"]),
                 "H": pile["H"] if pile["H"] is not None else None,
-                "theta_p": pile["theta_p"],
+                "theta_p": _tp,
                 "D_pile": pile.get("D_pile"),
                 "S": pile.get("S"),
                 "V_cap": pile.get("V_cap"),
@@ -1381,6 +1420,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 f"Failure surface crosses elastic (impenetrable) material "
                 f"'{_elastic_name}'. An elastic zone cannot fail; keep the surface "
                 f"above it (it may run along its boundary).")
+    # The elastic materials, and how far a base may sit from an elastic zone's
+    # boundary while riding along it (twice the crossing check's tolerance), for
+    # the base-material rule in the slice loop.
+    elastic_idx = {k for k, m in enumerate(materials)
+                   if str(m.get('option', '')).strip().lower() == 'elastic'}
+    _dom = slope_data.get('domain_polygon')
+    if _dom is not None:
+        _bx0, _by0, _bx1, _by1 = _dom.bounds
+        elastic_tol = 2.0 * max(1e-6, 1e-4 * max(_bx1 - _bx0, _by1 - _by0))
+    else:
+        elastic_tol = 2e-6
 
     # Determine if the failure surface is right-facing. Byte-identical to the
     # historical `y_left > y_right` for a normal slope; the surface-asymmetry
@@ -1841,6 +1891,25 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     base_overlap_bot = overlap_bot
                     base_material_idx = mat_index
 
+        # A base running along the UNDERSIDE of an elastic (impenetrable) zone --
+        # a wall on its foundation, which the crossing check allows the surface to
+        # ride along -- finds that zone as its deepest present layer. The zone
+        # cannot fail, so the slip is in the material it sits on: bind the
+        # strength of the layer whose top is at the base.
+        if base_material_idx is not None and base_material_idx in elastic_idx:
+            best_top = -float('inf')
+            for p_idx, pe in enumerate(poly_edges):
+                mat_id = pe['mat_id']
+                mi = (mat_id if mat_id is not None and 0 <= mat_id < len(materials)
+                      else pe['poly_index'])
+                if mi in elastic_idx or not poly_inrange[p_idx][i]:
+                    continue
+                pt = poly_top_all[p_idx][i]
+                if np.isnan(pt) or abs(pt - y_cb) > elastic_tol or pt <= best_top:
+                    continue
+                best_top = pt
+                base_material_idx = mi
+
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
 
@@ -2148,7 +2217,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 h_pile += pile_H
                 if pl["appl"] == "passive":
                     h_pile_pas += pile_H
-                theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)
+                # last pile's angle if multiple (unusual)
+                theta_p_val = (pl["theta_p"] if pl["theta_p"] is not None
+                               else pile_force_angle(*pl["ends"], right_facing))
                 x_pile = intersec.x
                 y_pile = intersec.y
         # === END: "Pile lines" ===
@@ -2430,6 +2501,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 phi = degrees(atan(slope0))
                 c1 = 0; phi1 = 0; d = 0; psi = 0
                 pow_flag = True
+            elif base_material_idx in elastic_idx:
+                # Riding an elastic zone with no material beneath it: no strength
+                # to bind, so reject the trial as the crossing check would.
+                return False, (
+                    f"Failure surface runs along elastic (impenetrable) material "
+                    f"'{materials[base_material_idx]['name']}' with no material "
+                    f"beneath it.")
             elif mat_option not in ('mc', 'cp'):
                 # Was silently treated as 'cp'. A blank option is legal on seep-only
                 # material rows, but not on one a failure surface passes through.

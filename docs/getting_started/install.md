@@ -64,7 +64,7 @@ operating system warns you once before it runs:
 
 - **Windows** — SmartScreen shows a blue *Windows protected your PC* dialog.
   Click **More info**, then **Run anyway** to start the installer.
-- **macOS** — Gatekeeper refuses a double-click. Right-click (or Control-click)
+- **macOS** — Gatekeeper blocks a double-click. Right-click (or Control-click)
   **XSLOPE Studio** in Applications, choose **Open**, and confirm once. Later
   launches open normally.
 
@@ -102,9 +102,9 @@ API keys in the system keychain under the service **XSlope Studio**.
 
 ## Keeping it up to date
 
-**Help → Check for Updates…** asks whether a newer release exists, and
+**Help → Check for Updates…** checks whether a newer release exists, and
 **Help → Check for Updates at Startup** — on by default — repeats that check
-quietly at most once a day, saying nothing unless there is something to say.
+at most once a day and shows nothing unless an update is available.
 
 When an update is available, Studio offers **Download & Install**: it downloads
 the installer for your platform, verifies its SHA-256 checksum against the one

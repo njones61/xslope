@@ -46,6 +46,26 @@ LEM_METHODS = [
 
 ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search")]
 SURFACE_TYPES = [("circular", "Circular"), ("noncircular", "Non-circular")]
+#: The Run LEM dialog's search-tolerance fields, by the search keyword each sets.
+SEARCH_TOL_KEYS = ("fs_tol", "tol", "max_iter")
+
+
+def search_tolerance_defaults(surface):
+    """The tolerances a search of ``surface``'s family runs under when the caller
+    states none — :func:`xslope.search.circular_search`'s or
+    :func:`~xslope.search.noncircular_search`'s own keyword defaults, read off
+    their signatures so the dialog and a scripted search cannot drift apart. The
+    two differ (and only the circular search has a geometric ``tol``), so a
+    non-circular run in Studio fed the circular values solves a different search
+    from the API's.
+    """
+    import inspect
+
+    from xslope.search import circular_search, noncircular_search
+    fn = noncircular_search if surface == "noncircular" else circular_search
+    params = inspect.signature(fn).parameters
+    return {k: params[k].default for k in SEARCH_TOL_KEYS if k in params}
+
 
 MESH_ELEMENT_TYPES = [
     ("tri3", "Linear triangles (tri3)"),
@@ -90,6 +110,9 @@ ELEMENT_SIZE_1D_TIP = (
 
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
+#: The largest Max iterations per trial (and Iteration ceiling) the Run FEM dialog
+#: and "Continue with a higher limit…" accept.
+MAX_ITERATIONS_LIMIT = 10_000_000
 # v21 main!D22. 'rollers' first — it is the template's shipped value, what every
 # file that declares nothing means, and the historical hardwired behaviour.
 FEM_SIDE_BC = [("rollers", "Rollers (vertical movement free)"),
@@ -105,13 +128,14 @@ FEM_FAILURE_CRITERIA = [
 def stored_surface_family(slope_data):
     """The surface family this model states, for a deck that defines both.
 
-    The file stores and the dialog edits: ``main!D24`` carries the answer (blank on
-    every model that never had to choose), the dialog opens on it, and a change is
-    written back there — so a both-family model reopens on the family its last run
-    used instead of silently reverting to the circles. The legacy ``circular`` flag
-    is the fallback for a model held in memory that has not been through the cell
-    (an import, a document built in Studio), and circular is the fallback for a model
-    that says nothing at all, because that is what the slicer does with both present.
+    The file stores and the dialog edits: ``main!D25`` (D24 before template v25)
+    carries the answer (blank on every model that never had to choose), the dialog
+    opens on it, and a change is written back there — so a both-family model reopens
+    on the family its last run used instead of silently reverting to the circles.
+    The legacy ``circular`` flag is the fallback for a model held in memory that has
+    not been through the cell (an import, a document built in Studio), and circular
+    is the fallback for a model that says nothing at all, because that is what the
+    slicer does with both present.
     """
     fam = slope_data.get("surface_family")
     if fam:
@@ -560,7 +584,7 @@ class RunFemDialog(QDialog):
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
         self.tolerance.setToolTip(
             "How narrow the F bracket must get before the search stops — the "
-            "width of [F min, F max] after bisection, not a solver convergence "
+            "width of [F min, F max] after bisection. It is not a solver convergence "
             "tolerance.")
         form.addRow("Tolerance (SSRM)", self.tolerance)
 
@@ -571,31 +595,32 @@ class RunFemDialog(QDialog):
         # (solve_fem/solve_ssrm max_iterations); a Studio run was pinned at the
         # engine default with no way to reach the converged plateau.
         self.max_iterations = QSpinBox()
-        self.max_iterations.setRange(500, 100000)
+        self.max_iterations.setRange(500, MAX_ITERATIONS_LIMIT)
         self.max_iterations.setSingleStep(500)
         self.max_iterations.setValue(int(defaults.get("max_iterations") or 12000))
         self.max_iterations.setToolTip(
-            "Viscoplastic iteration budget for EACH trial F (and single-F runs). "
-            "It is a budget, not a hard stop: a trial that reaches it with the "
-            "out-of-balance force still falling is given another budget's worth, "
-            "again and again, up to the iteration ceiling below. A residual that "
-            "stops improving is reported but never ends a trial on its own; a "
-            "trial whose movement is clearly running away is declared failed "
-            "early and does not spend the rest of its budget. "
-            "Raise it if the reported FS keeps climbing when you do; it has "
-            "plateaued when raising it further changes nothing.")
+            "Viscoplastic iterations for EACH trial F (and single-F runs). A "
+            "trial that reaches this without converging is read by the trend of "
+            "its movement over its last half: movement dying away is handed to "
+            "the Newton corrector, and a balanced state it finds counts as "
+            "standing; movement that does not slow is counted as sliding; "
+            "movement still slowing that the corrector cannot finish, or with no "
+            "clear trend, is given another Max iterations' worth, up to the "
+            "iteration ceiling below. A trial whose movement is clearly running "
+            "away is declared failed early. Raise it when the closing summary "
+            "says the factor of safety depends on the iteration limit.")
         form.addRow("Max iterations per trial", self.max_iterations)
 
         # Hard stop on the automatic budget extension. A trial that reaches THIS
         # while still improving is inconclusive - it did not fail, and it did not
         # settle - so the bisection does not count it as a failure and says so.
         self.max_iterations_ceiling = QSpinBox()
-        self.max_iterations_ceiling.setRange(500, 500000)
+        self.max_iterations_ceiling.setRange(500, MAX_ITERATIONS_LIMIT)
         self.max_iterations_ceiling.setSingleStep(1000)
         self.max_iterations_ceiling.setValue(
             int(defaults.get("max_iterations_ceiling") or 50000))
         self.max_iterations_ceiling.setToolTip(
-            "Hard stop on the automatic budget extension above. A trial that "
+            "Hard stop on the extension above. A trial that "
             "reaches this ceiling with its out-of-balance force still falling is "
             "reported INCONCLUSIVE - neither settled nor failed - and is not "
             "counted as a failure. The factor of safety is still the final "
@@ -603,6 +628,22 @@ class RunFemDialog(QDialog):
             "bracket's upper edge is an undecided trial rather than a measured "
             "failure, and the Log says so.")
         form.addRow("Iteration ceiling", self.max_iterations_ceiling)
+
+        # The accelerated sweep (xslope.fem.ACCELERATE_DEFAULT): on by default for
+        # a model that carries a joint, where a trial settles over tens of
+        # thousands of sweeps and the multiplier reaches the same state in fewer.
+        self.accelerate = QCheckBox("Accelerate convergence")
+        _acc_default = defaults.get("accelerate")
+        self.accelerate.setChecked(bool(self._opening_criterion() == "hybrid")
+                                   if _acc_default is None else bool(_acc_default))
+        self.accelerate.setToolTip(
+            "Take longer steps where each iteration's movement shows the solution "
+            "is still heading the same way, so a slowly settling trial reaches "
+            "the same balanced state in fewer iterations. A step that would change "
+            "whether a joint is open or slipping is taken at the ordinary length. "
+            "Checked by default on a model with joints, where trials settle "
+            "slowly; the closing summary says when it was on.")
+        form.addRow("", self.accelerate)
 
         # Side boundary condition (v21 main!D22). Applies to both a single trial and
         # the SSRM — it is part of how the model is restrained, not part of the
@@ -618,7 +659,7 @@ class RunFemDialog(QDialog):
             "horizontal component and leaves the vertical free, so the truncated "
             "ground can still settle under its own weight.\n\n"
             "Fixed clamps both components, which is what RS2 does on its side "
-            "boundaries. It is a vendor-parity option, not a better model: fixing the "
+            "boundaries. It matches the vendor's setting. Fixing the "
             "sides adds shear restraint the real ground does not have, and stiffens a "
             "domain truncated close to the slope.")
         form.addRow("Side BC", self.side_bc)
@@ -631,7 +672,7 @@ class RunFemDialog(QDialog):
         self.k0_on.setToolTip(
             "Start from an at-rest in-situ stress state instead of switching gravity "
             "on in one step.\n\n"
-            "Off, the initial lateral stress is set by the STIFFNESS, not the soil: "
+            "Off, the initial lateral stress is set by the STIFFNESS: "
             "sigma_h = nu/(1-nu)·sigma_v, about 0.43·sigma_v at nu = 0.3. Real "
             "compacted fill and overconsolidated clay sit at K0 = 1 and above, and "
             "under-confining a thin structural column (a reinforced-soil block) "
@@ -667,8 +708,8 @@ class RunFemDialog(QDialog):
         self.failure_criterion = QComboBox()
         for key, label in FEM_FAILURE_CRITERIA:
             self.failure_criterion.addItem(label, key)
-        cidx = self.failure_criterion.findData(defaults.get("failure_criterion",
-                                                            "non_convergence"))
+        cidx = self.failure_criterion.findData(
+            defaults.get("failure_criterion") or self._opening_criterion())
         if cidx >= 0:
             self.failure_criterion.setCurrentIndex(cidx)
         form.addRow("Failure criterion", self.failure_criterion)
@@ -798,6 +839,12 @@ class RunFemDialog(QDialog):
         # re-evaluates them (joint.iteration_budget_low) rather than only the button.
         self.max_iterations.valueChanged.connect(self._recheck)
         self.max_iterations_ceiling.valueChanged.connect(self._recheck)
+        # The ceiling is the hard stop on the budget's extension, so a budget
+        # raised above it would read as a contradiction on the dialog ("100,000
+        # per trial, ceiling 50,000") even though the solver takes the larger of
+        # the two. Keep the ceiling at or above the budget as the budget moves.
+        self.max_iterations.valueChanged.connect(self._lift_ceiling)
+        self._lift_ceiling(self.max_iterations.value())
         self.preflight.changed.connect(self._sync_run)
         # The chosen instant is part of what the checks are told, so it re-evaluates
         # them rather than only the button.
@@ -819,6 +866,11 @@ class RunFemDialog(QDialog):
                 "max_iterations": self.max_iterations.value(),
                 "max_iterations_ceiling": self.max_iterations_ceiling.value()}
 
+    def _lift_ceiling(self, budget):
+        """Raise the iteration ceiling to the budget when the budget passes it."""
+        if int(budget) > self.max_iterations_ceiling.value():
+            self.max_iterations_ceiling.setValue(int(budget))
+
     def _recheck(self):
         self.preflight.refresh()
 
@@ -829,6 +881,34 @@ class RunFemDialog(QDialog):
             reason = self.seep_time.problem()
         self._ok.setEnabled(reason is None)
         self._ok.setToolTip(reason or "")
+
+    def _opening_criterion(self):
+        """The failure criterion the dialog opens on for the model it was given.
+
+        A model with a joint in it opens on Hybrid; everything else opens on
+        Non-convergence, which is what every model without one has always used.
+
+        A strength-reduction trial on a jointed model often neither settles nor
+        runs away. The joints slip a fixed amount each sweep while the
+        displacement field stops growing, which is a slope standing still behind
+        an interface that never quite balances. Non-convergence cannot tell that
+        apart from a slope that is moving, so on a block wall it counts every
+        near-critical trial as a failure, walks the lower bound down to the
+        floor, and reports no factor of safety at all. Hybrid reads the slip and
+        the field and reports one.
+
+        Whether the model carries a joint is read with
+        :func:`xslope.mesh.extract_joint_options`, so the dialog and the mesher
+        count the same lines — both sheets, and nothing that would not be split.
+        A model the reader is still building can be refused by it, and a model
+        nothing can be read from opens on Non-convergence.
+        """
+        from xslope.mesh import extract_joint_options
+        try:
+            jointed = extract_joint_options(self._sd or {})
+        except Exception:
+            jointed = None
+        return "hybrid" if jointed else "non_convergence"
 
     def _has_reducible_tensile_cap(self):
         """Whether some material declares a tensile cutoff above zero.
@@ -906,6 +986,7 @@ class RunFemDialog(QDialog):
             "tolerance": self.tolerance.value(),
             "max_iterations": self.max_iterations.value(),
             "max_iterations_ceiling": self.max_iterations_ceiling.value(),
+            "accelerate": self.accelerate.isChecked(),
             "failure_criterion": self.failure_criterion.currentData(),
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()
@@ -1091,7 +1172,7 @@ class RunSeepDialog(QDialog):
             "can need more than the default."
             if steady else
             "Sweep ceiling for the steady solve that builds the t = 0 initial "
-            "condition. It is spent once, before the march, and has no bearing on "
+            "condition. It is spent once, before the first time step, and has no bearing on "
             "the time steps; an initial condition that does not close within it "
             "leaves converged = False on the result.")
 
@@ -1434,7 +1515,14 @@ class RunLemDialog(QDialog):
         # Search-convergence tolerances — only meaningful for auto-search and
         # reliability (both drive the search loops). ``tol`` is the circular-search
         # geometric refinement tolerance and has no noncircular counterpart, so it
-        # is greyed out for non-circular surfaces.
+        # is greyed out for non-circular surfaces. Each surface family keeps its
+        # own FS tol and Max iterations, opening on that search's own defaults:
+        # switching Surface swaps them, so a value meant for one search never
+        # reaches the other.
+        self._search_tols = self._seed_search_tols(defaults)
+        self._tol_surface = self._surface_value()
+        opening = self._search_tols[self._tol_surface]
+
         self.tol_group = QGroupBox("Search tolerances")
         tform = QFormLayout(self.tol_group)
 
@@ -1442,7 +1530,7 @@ class RunLemDialog(QDialog):
         self.fs_tol.setDecimals(6)
         self.fs_tol.setRange(1e-8, 1.0)
         self.fs_tol.setSingleStep(1e-4)
-        self.fs_tol.setValue(float(defaults.get("fs_tol", 5e-4)))
+        self.fs_tol.setValue(float(opening["fs_tol"]))
         self.fs_tol.setToolTip("Factor-of-safety convergence tolerance for the search.")
         tform.addRow("FS tol", self.fs_tol)
 
@@ -1450,13 +1538,13 @@ class RunLemDialog(QDialog):
         self.tol.setDecimals(6)
         self.tol.setRange(1e-8, 1.0)
         self.tol.setSingleStep(1e-3)
-        self.tol.setValue(float(defaults.get("tol", 1e-2)))
+        self.tol.setValue(float(self._search_tols["circular"]["tol"]))
         self.tol.setToolTip("Geometric refinement tolerance (circular search only).")
         tform.addRow("Geometric tol", self.tol)
 
         self.max_iter = QSpinBox()
         self.max_iter.setRange(1, 1000)
-        self.max_iter.setValue(int(defaults.get("max_iter", 50)))
+        self.max_iter.setValue(int(opening["max_iter"]))
         self.max_iter.setToolTip("Maximum search refinement iterations.")
         tform.addRow("Max iterations", self.max_iter)
 
@@ -1486,6 +1574,7 @@ class RunLemDialog(QDialog):
 
         self.analysis.currentIndexChanged.connect(self._sync_tols)
         if self.surface is not None:
+            self.surface.currentIndexChanged.connect(self._swap_search_tols)
             self.surface.currentIndexChanged.connect(self._sync_tols)
         self.min_slip_on.toggled.connect(self._sync_tols)
         self.method.currentIndexChanged.connect(self._recheck)
@@ -1526,6 +1615,56 @@ class RunLemDialog(QDialog):
 
     def _surface_value(self):
         return self._fixed_surface or self.surface.currentData()
+
+    def _seed_search_tols(self, defaults):
+        """Each surface family's opening tolerances, ``{surface: {key: value}}``.
+
+        The search's own defaults (:func:`search_tolerance_defaults`), under what
+        the caller supplied for that family: ``defaults['search_tols']`` keyed by
+        surface (the window keeps one entry per family it has run), then the flat
+        ``fs_tol`` / ``max_iter`` keys, which belong to the family
+        ``defaults['surface']`` names — the run they were recorded on — or, when
+        it names none, the family the dialog opens on. A ``None`` is no value
+        (a scripted run that stated none) and leaves the default standing.
+        ``tol`` is the circular search's alone, whichever run carried it.
+        """
+        tols = {s: search_tolerance_defaults(s) for s, _ in SURFACE_TYPES}
+
+        def overlay(surface, given):
+            for key, value in (given or {}).items():
+                if key not in SEARCH_TOL_KEYS or value is None:
+                    continue
+                into = "circular" if key == "tol" else surface
+                if into in tols:
+                    tols[into][key] = value
+
+        for surface, given in (defaults.get("search_tols") or {}).items():
+            overlay(surface, given)
+        overlay(defaults.get("surface") or self._surface_value(),
+                {k: defaults.get(k) for k in SEARCH_TOL_KEYS})
+        return tols
+
+    def _store_search_tols(self):
+        """Keep what the fields hold under the family they are showing."""
+        here = self._search_tols[self._tol_surface]
+        here["fs_tol"] = self.fs_tol.value()
+        here["max_iter"] = self.max_iter.value()
+        self._search_tols["circular"]["tol"] = self.tol.value()
+
+    def _swap_search_tols(self, *_):
+        """Surface changed: file the fields under the family they belonged to and
+        show the new family's own values."""
+        self._store_search_tols()
+        self._tol_surface = self._surface_value()
+        now = self._search_tols[self._tol_surface]
+        self.fs_tol.setValue(float(now["fs_tol"]))
+        self.max_iter.setValue(int(now["max_iter"]))
+
+    def search_tolerances(self):
+        """Both families' tolerances as the dialog leaves them, for the window to
+        hand back next time (``defaults['search_tols']``)."""
+        self._store_search_tols()
+        return {s: dict(v) for s, v in self._search_tols.items()}
 
     def _selection(self):
         """What preflight and capabilities() are asked about — read live."""
@@ -2040,8 +2179,8 @@ class SensitivityDialog(QDialog):
         """
         if self.app_mode == "seep":
             return ("A factor-of-safety curve needs a stability engine. Switch the "
-                    "mode strip to LEM or FEM — the seepage solution is this run's "
-                    "input, not its output.")
+                    "mode strip to LEM or FEM — the seepage solution is an input "
+                    "to this run.")
         if not self._times:
             return "Run a transient seepage analysis first."
         uses_seep = any(str(m.get("u", "")).strip().lower() == "seep"
@@ -2187,7 +2326,10 @@ class SensitivityDialog(QDialog):
     def _sync_stage_1_frames(self, rapid_on):
         """With every instant a drawdown, the frames at or before stage 1 are the
         state the others fall from and cannot be a stage 2 themselves; they are
-        unticked and dimmed rather than left to come back as failed rows."""
+        unticked and dimmed rather than left to come back as failed rows. Off
+        again, only the frames this dimmed come back ticked: a leading frame the
+        user unticked on a single-stage curve stays unticked when the dialog
+        reopens on it."""
         stage_1 = getattr(self, "_stage_1", None)
         if stage_1 is None:
             return
@@ -2201,9 +2343,9 @@ class SensitivityDialog(QDialog):
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
                 item.setToolTip(f"Stage 1 of every drawdown is read at "
                                 f"t = {_fmt_time(stage_1)}{unit}; this frame is "
-                                f"the state the others fall from, not a "
+                                f"the state the others fall from. It is not a "
                                 f"drawdown of its own.")
-            else:
+            elif not item.flags() & Qt.ItemIsEnabled:
                 item.setFlags(item.flags() | Qt.ItemIsEnabled)
                 item.setCheckState(Qt.Checked)
                 item.setToolTip("")
@@ -2374,7 +2516,7 @@ class SensitivityDialog(QDialog):
             self.note.setText(
                 f"Design: sweeps the one parameter above across [From, To] and "
                 f"annotates where {q} meets the target (interpolated). If it never "
-                f"crosses, the plot says which way to widen the range.")
+                f"crosses, the plot shows which way to widen the range.")
         else:
             self._on_plot_type_changed()
 

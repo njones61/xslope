@@ -1,6 +1,6 @@
 """Regenerate the steady seepage flow-net figures for docs/seep/samples.md.
 
-These six ``docs/seep/images/<name>_solution.png`` panels had no committed
+These four ``docs/seep/images/<name>_solution.png`` panels had no committed
 generator (they were one-off manual saves), so they drifted from the page's
 locked flowrates as the solver evolved. This script is their deterministic,
 committed source: each figure is produced by the *same* mesh-and-solve code path
@@ -16,7 +16,7 @@ Solve configuration (identical to run_seep_test's defaults, which is what every
     build_seep_data(mesh, slope_data)          # default seep_bc=1
     run_seepage_analysis(seep, tol=1e-4, max_iter=400)
 
-Figure sizing (one coherent rule for all six, per the house frame spec —
+Figure sizing (one coherent rule for all four, per the house frame spec —
 equal aspect, uniform cushion, full-height colorbar, legend in reserved space,
 all supplied unchanged by plot_seep_solution): a *fixed figure width* and *dpi*
 so every panel comes out the same pixel width, with the height following each
@@ -47,7 +47,7 @@ OUT = "docs/seep/images"
 
 # Coherent sizing rule (see module docstring): a fixed figure width in inches and
 # a fixed dpi give every panel the same pixel width; the height tracks the domain
-# aspect so the flow net stays at one consistent scale across all six figures.
+# aspect so the flow net stays at one consistent scale across all four figures.
 FIG_W_IN = 11.0     # figure width (inches) -> ~FIG_W_IN*DPI px wide after tight crop
 AXES_W_FRAC = 0.80  # fraction of the width the equal-aspect axes span (rest: y-axis
                     # margin on the left, colorbar + label on the right)
@@ -68,13 +68,11 @@ DPI = 200
 #   demand hundreds of flow lines), and the single/through-flow layer otherwise.
 #   Matches the flow-net densities of the pre-existing (Norm-approved) figures.
 CASES = [
-    ("clay_blanket",  False, 1),   # saturated: sheetpile + clay blanket (1 material)
     ("sea_trench",    False, 2),   # saturated: trench; the silty clay below the
                                    # banks is the through-flow layer (the silt is
                                    # the upper bank material)
     ("earth_dam1",    True,  2),   # partially saturated: shell + core; base = core
     ("earth_dam1_vg", True,  2),   # same dam, van Genuchten model; base = core
-    ("johnson_res",   True,  3),   # shell/core/foundation; base = foundation
     ("earth_dam2",    True,  3),   # shell/filter/core; base = core
 ]
 

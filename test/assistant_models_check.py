@@ -586,6 +586,9 @@ def test_dialog():
     try:
         # --- offline, never connected: the shipped list, and it is editable ---
         dlg = AssistantSettingsDialog(config, auto_refresh=False)
+        if dlg.sizeHint().width() < 460:
+            fails.append(f"the settings dialog opens {dlg.sizeHint().width()} px "
+                         "wide, under its 460 px floor — every note wraps short")
         if not dlg.model.isEditable():
             fails.append("the model box is not editable — an unlisted model could "
                          "never be used")
@@ -647,6 +650,43 @@ def test_dialog():
         if settings.value("ai/model/anthropic") != "claude-opus-5":
             fails.append(f"the saved model carries its decoration: "
                          f"{settings.value('ai/model/anthropic')!r}")
+
+        # --- the caption names the source, and never counts ------------------
+        # The owner's ruling (2026-10-10): a count tells the user nothing. Z.ai's
+        # endpoint names two models and the box carries the V models too, so its
+        # caption says where those came from; the "only models that can read an
+        # image" sentence stays.
+        import re as _re
+        dlg.provider.blockSignals(True)
+        dlg.provider.setCurrentIndex(dlg.provider.findData("zai"))
+        dlg.provider.blockSignals(False)
+        dlg._on_models_listed({"provider": "zai",
+                               "models": ["glm-5.3-flash", "glm-5.3-flashx"],
+                               "error": "", "manifest": None})
+        note = dlg.models_note.text()
+        if not note.startswith("Listed by Z.ai (GLM), plus its vision models, "
+                               "which its list leaves out."):
+            fails.append(f"the Z.ai caption does not name its sources: {note!r}")
+        if "can read an image" not in note:
+            fails.append(f"the Z.ai caption lost the image sentence: {note!r}")
+        if _re.search(r"\d+ models?\b", note):
+            fails.append(f"the Z.ai caption counts models: {note!r}")
+        dlg.provider.blockSignals(True)
+        dlg.provider.setCurrentIndex(dlg.provider.findData("openai"))
+        dlg.provider.blockSignals(False)
+        dlg._on_models_listed({"provider": "openai",
+                               "models": ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"],
+                               "error": "", "manifest": None})
+        note = dlg.models_note.text()
+        if not note.startswith("Listed by OpenAI. "):
+            fails.append(f"the OpenAI caption does not name its source: {note!r}")
+        if _re.search(r"\d+ models?\b", note):
+            fails.append(f"the OpenAI caption counts models: {note!r}")
+        dlg.provider.blockSignals(True)
+        dlg.provider.setCurrentIndex(dlg.provider.findData("anthropic"))
+        dlg.provider.blockSignals(False)
+        dlg._on_models_listed({"provider": "anthropic", "models": live,
+                               "error": "", "manifest": None})
 
         # --- a result for another provider is ignored ------------------------
         before = [dlg.model.itemData(i) for i in range(dlg.model.count())]
@@ -747,6 +787,80 @@ def test_runner():
 
 # ------------------------------------------------------- the shipped manifest
 
+def test_current_models_are_offered_and_routed():
+    """Today's models from OpenAI and Z.ai are listed, read images, and are sent
+    the way their provider accepts them.
+
+    Two recordings found them filtered out or failing: OpenAI's gpt-6 family was
+    hidden by an image check that knew nothing past gpt-5, and every gpt-5.6 and
+    gpt-6 model refused function tools on the chat-completions endpoint (they take
+    them only through OpenAI's Responses API, which LiteLLM bridges to when the id
+    carries ``responses/``). Z.ai's GLM-5.3 Flash models read images without a
+    "v" in the name and were hidden by the filter that looked for one.
+    """
+    import re
+
+    from studio.ai.config import AssistantConfig
+    fails = []
+    shown = [("openai", "gpt-6-astra"), ("openai", "gpt-6.1-sol"),
+             ("openai", "gpt-6-luna"), ("openai", "gpt-5.6-sol"),
+             ("openai", "gpt-5.5"), ("zai", "glm-5.3-flash"),
+             ("zai", "glm-5.3-flashx"), ("zai", "glm-5v-turbo"),
+             ("zai", "glm-4.6v")]
+    hidden = [("openai", "gpt-4o-search-preview"), ("openai", "gpt-5-search-api"),
+              ("zai", "glm-5.3"), ("zai", "glm-5.2"), ("zai", "glm-4.7-flash"),
+              ("zai", "glm-4.5-flash")]
+    for provider, model in shown:
+        if not ml.is_offerable(provider, model):
+            fails.append(f"{provider}: {model!r} reads images but is not listed")
+    for provider, model in hidden:
+        if ml.is_offerable(provider, model):
+            fails.append(f"{provider}: {model!r} cannot read images but is listed")
+    route = PROVIDERS["openai"].get("responses_match") or "^$"
+    for model, wanted in (("gpt-6-astra", True), ("gpt-6.1-sol", True),
+                          ("gpt-5.6-terra", True), ("gpt-5.5", False),
+                          ("gpt-5.4-mini", False), ("o4-mini", False)):
+        if bool(re.search(route, model)) != wanted:
+            fails.append(f"openai: {model!r} is {'not ' if wanted else ''}sent "
+                         f"through the Responses API")
+    class _NoKey(AssistantConfig):          # never reads the keychain
+        def api_key(self, provider):
+            return ""
+
+    cfg = _NoKey(Settings())
+    for provider, model, want in (("openai", "gpt-6-astra", "openai/responses/gpt-6-astra"),
+                                  ("openai", "gpt-5.5", "openai/gpt-5.5"),
+                                  ("zai", "glm-5.3-flash", "openai/glm-5.3-flash")):
+        cfg.set_selection(provider, model)
+        got = cfg.completion_kwargs()["model"]
+        if got != want:
+            fails.append(f"{provider}/{model} is sent as {got!r}, not {want!r}")
+    # A listed model whose shutdown date has passed is retired: OpenAI keeps
+    # them in its list, and each one tried failed on the first message.
+    payload = {"data": [
+        {"id": "gpt-5.1-codex", "created": 3, "shutdown_date": "2026-07-23"},
+        {"id": "o4-mini", "created": 2, "shutdown_date": "2026-10-23"},
+        {"id": "gpt-6-astra", "created": 4},
+        {"id": "gpt-5-chat-latest", "created": 1, "shutdown_date": "2026-10-10"}]}
+    got = ml.parse_models("openai", payload, today="2026-10-10")
+    if got != ["gpt-6-astra", "o4-mini"]:
+        fails.append(f"retired models are not dropped by their shutdown date: {got}")
+    # The fallback list a never-connected dialog shows leads with the flagship.
+    if PROVIDERS["openai"]["models"][0] != "gpt-6-astra":
+        fails.append("the OpenAI fallback list does not lead with gpt-6-astra")
+    # Z.ai's endpoint names the GLM-5.3 Flash pair and none of its V models; the
+    # list it produces must still carry the V models, after what it named.
+    shown, source = ml.resolve_models("zai", live=["glm-5.3-flash", "glm-5.3-flashx"])
+    if source != "live" or shown[:2] != ["glm-5.3-flash", "glm-5.3-flashx"]:
+        fails.append(f"the Z.ai live list does not lead with what it named: {shown}")
+    if "glm-5v-turbo" not in shown:
+        fails.append("Z.ai's V models drop out of the list once the endpoint answers")
+    shown, _ = ml.resolve_models("openai", live=["gpt-6-astra"])
+    if shown != ["gpt-6-astra"]:
+        fails.append(f"a complete live list was padded with shipped ids: {shown}")
+    return fails
+
+
 def test_shipped_manifest():
     """The curated file in packaging/ must be one this build can read — it is
     published as a release asset, so a mistake there is a mistake on every
@@ -780,6 +894,12 @@ def test_shipped_manifest():
             choices = ml.model_choices(name, [], manifest)
             if rec and (not choices or choices[0].id != rec):
                 fails.append(f"{name}: the recommendation does not sort first")
+            # Every id it names is one Studio would list: a recommended model
+            # the image filter hides is advice nobody can take.
+            for mid in [rec] + [g.get("id", "") for g in entry.get("good_choices") or []]:
+                if mid and name in PROVIDERS and not ml.is_offerable(name, mid):
+                    fails.append(f"{name}: the manifest names {mid!r}, which "
+                                 f"Studio does not list")
     finally:
         sys.path.remove(os.path.join(_REPO, "packaging"))
     return fails
@@ -793,6 +913,7 @@ CHECKS = [("the list-models endpoint per provider", test_endpoints),
           ("the recommendations overlay", test_manifest_overlay),
           ("a malformed manifest is ignored", test_malformed_manifest),
           ("the once-a-day manifest throttle", test_throttle),
+          ("today's OpenAI and Z.ai models", test_current_models_are_offered_and_routed),
           ("the shipped packaging/assistant_models.json", test_shipped_manifest),
           ("the background runner", test_runner),
           ("the settings dialog", test_dialog)]

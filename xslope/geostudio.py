@@ -58,7 +58,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from shapely.geometry import Polygon
 
-from .fileio import build_ground_surface_from_polygons
+from .fileio import build_ground_surface_from_polygons, main_sheet_cell
 from .mesh import ensure_ccw_elements, interpolate_at_point
 from .units import GAMMA_W, require_gamma_water, units_check, normalize_unit_system
 # Water geometry lives in a neutral module. material_above_ground_dload is used here
@@ -83,6 +83,12 @@ _SUPPORTED_MODELS = {"MohrCoulomb"}
 # truth. Detection tolerates the 0.003 gap either way (bands are +/- 0.15).
 _GAMMA_W_METRIC = 9.807                   # kN/m3 -- GeoStudio vendor canonical
 _GAMMA_W_IMPERIAL = GAMMA_W["imperial"]   # lb/ft3
+
+
+def _water_loads_cell():
+    """How a message names the Water loads cell: by its label, and by its address on
+    the current template, which is the one an import is written into."""
+    return f"Water loads cell ({main_sheet_cell('water_loads')})"
 
 
 def _detect_units(gamma_water, declared=None):
@@ -1031,7 +1037,7 @@ def _import_seep(gsz, analysis, step, caveats, polygons):
         f"pore pressure came from the parent SEEP/W analysis as a finite element field "
         f"({len(mesh['nodes'])} nodes, step {chosen}) — imported onto the mesh SEEP/W "
         f"solved on, with every material set to the 'seep' option. It is SLOPE/W's own "
-        f"pore pressure, not a re-solve: xslope did not run the seepage analysis")
+        f"pore pressure. xslope did not run the seepage analysis")
     return mesh, u, chosen
 
 
@@ -1260,8 +1266,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         caveats.append(
             "GeoStudio limits the negative pore-pressure (suction) "
             + (f"to a maximum of {mx:g}" if mx else "with CapSuction on")
-            + " for shear strength. That is SLOPE/W's threshold model, not xslope's "
-            "phi_b/s_cap apparent-cohesion pair — it was NOT converted; set phi_b (and "
+            + " for shear strength. That is SLOPE/W's threshold model. It is not xslope's "
+            "phi_b/s_cap apparent-cohesion pair and was NOT converted; set phi_b (and "
             "s_cap) by hand if you want unsaturated strength credited")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
@@ -1411,7 +1417,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     # --- ponded water ------------------------------------------------------------
     # GeoStudio stores no ponded-water object at all: where the water rises above the
     # ground, SLOPE/W simply carries its weight. From template v22 xslope models the
-    # reservoir the same way — main!D23 = auto, and the engine derives the standing
+    # reservoir the same way — Water loads = auto, and the engine derives the standing
     # water from the model's own water definition at solve time. So where the file
     # states a water SURFACE, the import carries that definition and writes NO water
     # distributed load: the two programs now share one implicit model, and the import
@@ -1432,16 +1438,17 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             f"water stands above the ground surface — that is ponded water, and "
             f"GeoStudio carries its weight implicitly. So does xslope: water loads "
             f"derive automatically from the imported water definition (the main "
-            f"sheet's D23 is set to auto, and the engine measures the reservoir off "
-            f"{derived['source']} at solve time), which comes to "
+            f"sheet's {_water_loads_cell()} is set to auto, and the engine measures "
+            f"the reservoir off {derived['source']} at solve time), which comes to "
             f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
             f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
             f"written to the dloads sheet, and nothing should be added there by hand")
         for note in derived["ambiguous"]:
             caveats.append(
                 f"the derived water load is not trustworthy here: {note}. Check it "
-                f"against the GeoStudio model, and set D23 to manual with the load "
-                f"typed in if the two pools have to be told apart")
+                f"against the GeoStudio model, and set the main sheet's "
+                f"{_water_loads_cell()} to manual with the load typed in if the two "
+                f"pools have to be told apart")
     elif seep:
         ponded = seep_ponded_dload(ground_surface, seep[0], seep[1], gamma_water)
         if ponded:
@@ -1456,7 +1463,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 f"neither, so this reservoir was recovered from the field and written "
                 f"as {len(ponded)} distributed load(s), up to {deepest:.2f} deep "
                 f"({gamma_water * deepest:.1f} pressure at the deepest point), with "
-                f"the main sheet D23 set to manual. Do not re-create it by hand")
+                f"the main sheet's {_water_loads_cell()} set to manual. Do not "
+                f"re-create it by hand")
     slope_data["dloads"] = dloads
     slope_data["water_loads"] = water_mode
 
@@ -1473,7 +1481,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         tc = None
     elif tc and opt not in _TCRACK_OPTIONS:
         caveats.append(f"GeoStudio defines the tension crack by '{opt}', which xslope "
-                       f"does not recognise — the crack was NOT imported, so the factor "
+                       f"does not recognize — the crack was NOT imported, so the factor "
                        f"of safety will be too high")
         tc = None
 
@@ -1579,7 +1587,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     for tag in stab.get("elements", []):
         if tag not in _ENTRY_ELEMENTS:
             caveats.append(
-                f"this analysis has a GeoStudio '{tag}' that xslope does not recognise "
+                f"this analysis has a GeoStudio '{tag}' that xslope does not recognize "
                 f"and did NOT import — if it affects the model, the imported factor of "
                 f"safety will be wrong")
         elif _ENTRY_ELEMENTS[tag]:
@@ -1612,7 +1620,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
 def gsz_style(gsz, analysis_id=None):
     """The material colors from a .gsz, as an xslope style sidecar.
 
-    GeoStudio gives every material a colour, and it is how people recognise their own
+    GeoStudio gives every material a colour, and it is how people recognize their own
     model at a glance -- so a model that comes back in xslope's default palette looks
     like someone else's. Returns ``{'materials': {'<mat_id>': {'color': '#rrggbb'}}}``,
     keyed the way :mod:`xslope.style` expects, or ``{}`` if the file names no colours.
@@ -2106,7 +2114,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
                 f"no SEEP/W analysis in this file, so the field cannot be re-solved or "
                 f"its boundary conditions changed on the GeoStudio side; re-create the "
                 f"seepage problem in SEEP/W if you need that. GeoStudio applies a spatial "
-                f"function to every material in the analysis, not to a chosen subset")
+                f"function to every material in the analysis")
             if n_suction:
                 caveats.append(
                     f"{n_suction} of those {len(seep_pts)} points are NEGATIVE (suction "
@@ -2155,7 +2163,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         caveats.append(
             f"elastic material(s) {', '.join(repr(n) for n in elastic_names)} were "
             f"written as GeoStudio's impenetrable Bedrock — a slip surface cannot enter "
-            f"them, which is xslope's elastic behaviour")
+            f"them, which is xslope's elastic behavior")
     non_mc = sorted({(m.get("option") or "") for m in materials} - {"mc", "elastic", ""})
     if non_mc:
         caveats.append(
@@ -2174,8 +2182,8 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     if any(m.get("phi_b") is not None or m.get("s_cap") is not None for m in materials):
         caveats.append(
             "matric-suction shear strength (phi_b / s_cap) is set on one or more "
-            "materials — it was NOT written: SLOPE/W parameterises unsaturated strength "
-            "as a suction ceiling on the piezometric surface, not a per-material phi_b, "
+            "materials — it was NOT written: SLOPE/W parameterizes unsaturated strength "
+            "as a suction ceiling on the piezometric surface. It has no per-material phi_b, "
             "so re-create it in GeoStudio if you need it")
 
     for key, label in [("circles", "failure circles"), ("non_circ", "non-circular surface"),
@@ -2209,14 +2217,15 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             "water twice")
     elif ponded and str(slope_data.get("water_loads") or "").lower() == "auto":
         # An automatic-water model has no water block to leave out -- its reservoir is
-        # the piezometric line plus main!D23. The line crosses, and GeoStudio derives
-        # the load from it exactly as xslope's engine does, so nothing is lost; but a
-        # reader who expects to find the load somewhere should be told where it went.
+        # the piezometric line plus Water loads = auto. The line crosses, and GeoStudio
+        # derives the load from it exactly as xslope's engine does, so nothing is lost;
+        # but a reader who expects to find the load somewhere should be told where it
+        # went.
         caveats.append(
-            "this model takes its water loads automatically (main sheet D23), so the "
-            "reservoir was never a distributed load to write: the piezometric surface "
-            "was written and GeoStudio derives the water's weight from it, the same "
-            "way xslope does. Do not add it as a surcharge")
+            "this model takes its water loads automatically (Water loads = auto on the "
+            "main sheet), so the reservoir was never a distributed load to write: the "
+            "piezometric surface was written and GeoStudio derives the water's weight "
+            "from it, the same way xslope does. Do not add it as a surcharge")
 
     # Edges. GeoStudio draws a region from its <Lines>, not from its point list, so a
     # file without them opens with nothing visible. Each region ring contributes its

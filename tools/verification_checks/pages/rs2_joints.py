@@ -17,12 +17,34 @@ CONFIG = PageConfig(
     # are seismic COEFFICIENTS and one unit-weight scale factor -- inputs to the
     # sweep, shaped like factors of safety and not one.
     untagged_allow=[
-        ('0.1477', 'The stack stands at k'),
-        ('0.1504', 'The stack stands at k'),
-        ('0.35', 'fails at every one above'),
-        ('1.011', 'every unit weight scaled by'),
-        # problem 17's staircase runs in metres of the section, not in factors
-        ('3.66', 'where it says 3.19011'),
+        ('0.1798', 'The stack stands at k'),
+        ('0.1814', 'The stack stands at k'),
+        ('0.25', 'fails at every one above'),
+        ('1.016', 'every unit weight scaled by 1.016 and then by'),
+        # problem 2: the 0.76 is what Alejano & Alonso PRINT for their own
+        # Goodman & Bray recursion; the page recomputes it as 0.7734.
+        ('0.76', 'against the 0.76 Alejano'),
+        ('0.76', 'their Goodman & Bray 0.76,'),
+        # RJ-20's block density: blocks per square meter of the vendor's network
+        # (525 blocks over 4,400 m2), not a factor of safety.
+        ('0.119', 'blocks per square meter'),
+        # RJ-3 on the chapter's printed list (rj003_chapter, RJ-3c) stands at 1.027
+        # and its search does not close above it (the trial at 1.047 is
+        # undecided; 1.125 fails): trials in the committed run record
+        # (rj003_chapter_fem_meta), shown as a lower bound by ruling, never tagged.
+        # (Its failing trial, 1.125, is also RJ-3's tagged failing edge, so it
+        # needs no allowance.)
+        ('1.027', 'unconfirmed*, at least 1.027'),
+        ('1.027', 'the slope stands at 1.027 and fails'),
+        ('1.047', 'trial between them at 1.047'),
+        # Problems 3, 4, 5 and 7 are scored with the joints friction only
+        # (ruling 2026-10-02, Q36 a). XSLOPE on the vendor's files as given, with
+        # the joints' 100 kPa of cohesion, is shown beside each row by ruling,
+        # never tagged.
+        ('1.232', "the factor of safety is 1.232"),
+        ('1.311', "the factor of safety is 1.311"),
+        ('1.564', "the factor of safety is 1.564"),
+        ('1.857', "the factor of safety is 1.857"),
     ],
 
     abs_bounds=[
@@ -34,7 +56,6 @@ CONFIG = PageConfig(
     bounds=[
         # the vendor's token toe force on problem 1, as a share of the block's
         # own weight: one quantity against one, not two printed factors
-        ('+0.05', 'which is 0.05% of it'),
     ],
 
     # Goodman & Bray, Alejano, Lorig & Varona and UDEC are the referees this

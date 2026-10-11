@@ -21,6 +21,51 @@ from .config import AssistantConfig
 
 MAX_TOKENS = 32000
 
+#: Most characters of one snippet's printed output that go back to the model —
+#: and to the dock, which shows the model's copy. Everything a snippet prints is
+#: input to the next completion, billed like any other input, so one print of a
+#: whole result (a strength reduction's arrays: 820,000 characters, 453,000
+#: tokens, one $2.27 call on a flagship model) costs more than the rest of a
+#: session together. The size is read off what useful output actually is: over
+#: the 450 snippets of the recorded tutorial and benchmark sessions, 99% printed
+#: under 7,700 characters and the largest that was not a raw dump printed 15,120
+#: (a 202-line diagnosis); a 40-slice table with a dozen columns is about 5,400.
+#: The cap sits just above the largest, so no output a session has needed is
+#: cut, and the head and tail it keeps hold a run's progress log and its last
+#: lines.
+OUTPUT_CAP_CHARS = 16_000
+#: How the cap is split: the first characters (where a run's log and the start
+#: of a table are) and the last ones (where the final prints are).
+OUTPUT_HEAD_CHARS = 10_000
+OUTPUT_TAIL_CHARS = 6_000
+
+
+def cap_output(text, cap=OUTPUT_CAP_CHARS, head=OUTPUT_HEAD_CHARS,
+               tail=OUTPUT_TAIL_CHARS):
+    """``text`` cut to its head and tail when it is longer than ``cap``.
+
+    The cut falls on line breaks where it can, and a plain marker in its place
+    says how much was left out and how to avoid it, so the model reads that its
+    printout was shortened rather than that the output ended oddly.
+    """
+    text = text or ""
+    if len(text) <= cap:
+        return text
+    start = text[:head]
+    nl = start.rfind("\n")
+    if nl > head // 2:
+        start = start[:nl]
+    end = text[-tail:]
+    nl = end.find("\n")
+    if 0 <= nl < tail // 2:
+        end = end[nl + 1:]
+    cut = text[len(start):len(text) - len(end)]
+    marker = ("[... {:,} characters ({:,} lines) of printed output cut here. The "
+              "snippet printed {:,} characters, and only the first and last parts "
+              "are shown. Print less: the values you need, not whole results or "
+              "arrays.]").format(len(cut), cut.count("\n"), len(text))
+    return start.rstrip("\n") + "\n" + marker + "\n" + end.lstrip("\n")
+
 # OpenAI/LiteLLM function-tool format (works across providers).
 RUN_PYTHON_TOOL = {
     "type": "function",
@@ -233,7 +278,8 @@ the canvas re-renders automatically.
    'kn'/'ks' blank = derived from the adjacent soil; 'jred'='No' holds the
    interface at full strength in the SSR. Right where the surface runs ALONG the
    sheet — a base geotextile, a wall whose fill slides on its sheets — and wrong
-   where it cuts across. 'lp1'/'lp2'/'t_res' are not read there. LEM ignores it.)
+   where it cuts across. 'lp1'/'lp2' are not read there; 't_max'/'t_res' still
+   govern the bar. LEM ignores it.)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - joint_lines[i]: {'label','x1','y1','x2','y2','c','phi','c_res','phi_res','dil',
   't_cut','kn','ks','jred'}
@@ -1035,11 +1081,19 @@ def _material_line(i, m):
 
 def _extent_line(sd):
     """Ground-surface extents and the base, read off the derived geometry when it
-    is there and off the source lines when it is not (a half-built model)."""
+    is there and off the source lines when it is not (a half-built model).
+
+    The range is labeled with what it is the range OF. Printed bare after the
+    zone count it read as the zones' own extent, and a session told a user that
+    "the zones only go down to y = 0" on a model whose foundation runs to its
+    maximum depth at -10, and suggested raising the maximum depth to 0.
+    """
     xs, ys = [], []
     gs = sd.get("ground_surface")
     coords = list(getattr(gs, "coords", []) or [])
+    what = "ground surface"
     if not coords:
+        what = "input lines"
         for line in sd.get("profile_lines") or []:
             coords += list(line.get("coords") or [])
         for poly in sd.get("polygons") or []:
@@ -1053,11 +1107,20 @@ def _extent_line(sd):
             pass
     if not xs:
         return "Geometry: none yet"
-    kind = ("polygons (%d zones)" % len(sd["polygons"])) if sd.get("polygons") \
-        else ("profile lines (%d)" % len(sd.get("profile_lines") or []))
-    return (f"Geometry: {kind}; x {_num(min(xs))}..{_num(max(xs))}, "
+    # Name the source the model is built FROM. A profile-line model carries
+    # derived polygons too, and calling its geometry "polygons" invited edits
+    # to them, which the rebuild after every snippet throws away.
+    lines = sd.get("profile_lines") or []
+    zones = sd.get("polygons") or []
+    if lines:
+        kind = "profile lines (%d)" % len(lines)
+        if zones:
+            kind += ", which build %d zones" % len(zones)
+    else:
+        kind = "polygons (%d zones)" % len(zones)
+    return (f"Geometry: {kind}; {what} x {_num(min(xs))}..{_num(max(xs))}, "
             f"y {_num(min(ys))}..{_num(max(ys))}; "
-            f"max_depth={_num(sd.get('max_depth'))}")
+            f"max_depth={_num(sd.get('max_depth'))} (the base of the section)")
 
 
 def _water_line(sd):
@@ -1085,8 +1148,20 @@ def _water_line(sd):
 
 
 def _surface_line(sd):
+    """The failure surfaces, and the family a run would use — only once the model
+    defines a surface. A new project carries a family flag but no surface, and
+    naming a family there states a choice nobody made."""
     circles, non_circ = sd.get("circles") or [], sd.get("non_circ") or []
-    family = "circular" if sd.get("circular", True) else "non-circular"
+    if not circles and not non_circ:
+        return ("Failure surfaces: none yet (no circles, no non-circular "
+                "surface)")
+    if circles and non_circ:
+        # Both defined: the model's own choice, as the Run LEM dialog opens on it.
+        fam = str(sd.get("surface_family") or "").strip().lower()
+        circular = (not fam.startswith("non")) if fam else sd.get("circular", True)
+        family = "circular" if circular else "non-circular"
+    else:
+        family = "circular" if circles else "non-circular"
     bits = [f"family={family}"]
     bits.append(f"{len(circles)} circle(s)")
     if circles:
@@ -1326,6 +1401,35 @@ def usage_from_response(response):
             "output": _usage_value(usage, "completion_tokens", "output_tokens")}
 
 
+def _reply_message(resp):
+    """The completion's reply as one message: its text and every tool call.
+
+    A chat completion puts both in ``choices[0]``. LiteLLM's bridge onto
+    OpenAI's Responses API (the route the gpt-5.6 and gpt-6 models take) makes
+    one choice per output item instead, so a reply that says what it is about to
+    do and then calls the tool arrives as a text choice followed by a tool-call
+    choice; reading only the first dropped the call, and the turn ended on the
+    announcement. The text of every choice is joined, in order, and the tool
+    calls of every choice are kept.
+    """
+    import types
+
+    choices = list(getattr(resp, "choices", None) or [])
+    if len(choices) <= 1:
+        return choices[0].message
+    texts, calls = [], []
+    for choice in choices:
+        m = getattr(choice, "message", None)
+        if m is None:
+            continue
+        text = getattr(m, "content", None)
+        if isinstance(text, str) and text.strip():
+            texts.append(text)
+        calls.extend(getattr(m, "tool_calls", None) or [])
+    return types.SimpleNamespace(content="\n\n".join(texts) if texts else None,
+                                 tool_calls=calls or None)
+
+
 def _zero_usage():
     return {"input": 0, "cached_input": 0, "output": 0}
 
@@ -1436,7 +1540,7 @@ class _AgentWorker(QThread):
                 # agentic turn is a dozen of these, and the tool results between
                 # them are what the input count grows by.
                 self.usage.emit(usage_from_response(resp))
-                msg = resp.choices[0].message
+                msg = _reply_message(resp)
                 tool_calls = getattr(msg, "tool_calls", None) or []
 
                 # Fallback for models that don't make a structured tool call but
@@ -1688,13 +1792,16 @@ class Assistant(QObject):
         led = POLYGON_EDIT_WARNING in warnings
         if led:
             parts.append(POLYGON_EDIT_DISCARDED)
+        # The snippet's own printout and traceback are capped; what the harness
+        # adds after them (the discard line above, the warnings and the checks
+        # block below) is never cut, since it is what the model must act on.
         if stdout.strip():
-            parts.append(stdout.rstrip())
+            parts.append(cap_output(stdout.rstrip()))
         if outputs:
             names = ", ".join(os.path.basename(p) for p in outputs)
             parts.append(f"[saved {len(outputs)} file(s) the user can open: {names}]")
         if error:
-            parts.append("ERROR:\n" + error)
+            parts.append("ERROR:\n" + cap_output(error))
         if not parts:
             parts.append("(no output)")
         # A geometry edit made on the source the resync overwrites: the snippet
@@ -1744,6 +1851,11 @@ class Assistant(QObject):
             # trial-and-error retries can't compound (e.g. a +5 applied 5 times).
             doc.rollback_edit()
         else:
+            # Circles or a non-circular surface the snippet defined name the family
+            # the model runs as, as the Circles editor makes them do — inside this
+            # edit, so the change is part of the snippet's undo step.
+            from .kernel import keep_surface_family_in_step
+            keep_surface_family_in_step(doc.slope_data)
             after = _source_key_sigs(doc.slope_data)
             if before is None or after is None:
                 changed = None              # couldn't compare -> assume an edit

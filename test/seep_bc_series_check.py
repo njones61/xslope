@@ -153,7 +153,7 @@ def check_set2_coerces_to_zero():
     got = _type_flux(w, 1, SERIES)["specified_fluxes"][0]["flux"]
     failures = _fail(got == 0.0,
                      f"Set 2 kept a series name in a flux value ({got!r}); it must "
-                     f"coerce to 0.0, since fileio refuses to load one there")
+                     f"coerce to 0.0, since preflight refuses one there")
     # The head field's Set-2 rule is unchanged.
     wh = _widget(d["seepage_bc"], constant_only=True)
     wh.list.setCurrentRow(0)

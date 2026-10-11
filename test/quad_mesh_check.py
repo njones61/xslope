@@ -424,8 +424,10 @@ def check_element_type_default(build, failures):
 #: A section with two sheet piles — two slit tips, the feature class that used to
 #: come back at 2.6-3.3x the size the refinement asked for.
 TIP_SECTION = 'docs/seep/files/xslope_double_sheetpile.xlsx'
-#: Two reinforcement lines and a pile, well separated, so each line's band is
-#: measured on its own rather than on its neighbour's.
+#: Two tiebacks and a soldier pile. The tiebacks cross the pile just behind
+#: their heads, where the mesh joins them; the three midpoints the leg measures
+#: at are well apart, so each line's band is measured on its own rather than on
+#: its neighbour's.
 LINE_SECTION = 'docs/verification/files/rocscience/vp049.xlsx'
 #: A section whose soft band tapers to a 5.7 degree wedge at (0, 5) — the shape
 #: behind leg (g).

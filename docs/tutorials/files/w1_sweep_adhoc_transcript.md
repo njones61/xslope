@@ -3,7 +3,7 @@
 Captured by `tools/assistant_sessions.py` against the live Studio assistant, offscreen.
 
 - Project: `docs/lem/files/xslope_simple_mult_layers.xlsx`
-- Provider / model: `anthropic` / `claude-opus-5`
+- Provider / model: `anthropic` / `claude-opus-5-5`
 - Confirm-before-running: off (unattended capture)
 
 ## Turn 1 — Compute the factor of safety for face slopes of 2:1, 2.5:1 …
@@ -12,100 +12,65 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: Compute the factor of safety for face slopes of 2:1, 2.5:1 and 3:1, keeping the crest elevation and the toe where they are, Spencer with a search each time. Give me a table. Leave the model as it was.
 
 Ran code:
-    for i,p in enumerate(slope_data['polygons']):
-        print(i, p['mat_id'], list(p['polygon'].exterior.coords))
-    print('profile_lines:', len(slope_data['profile_lines']))
-    print('circles:', slope_data['circles'])
-    print('max_depth', slope_data['max_depth'], 'lem_method', slope_data.get('lem_method'))
+    for i,pl in enumerate(slope_data['profile_lines']): print(i, pl['mat_id'], pl['coords'])
+    print(slope_data['circles'], slope_data['max_depth'], slope_data.get('lem_method'))
 
 Output:
-    0 0 [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0), (90.0, 0.0), (0.0, 0.0)]
-    1 1 [(-30.0, 0.0), (0.0, 0.0), (90.0, 0.0), (90.0, -10.0), (-30.0, -10.0), (-30.0, 0.0)]
-    profile_lines: 2
-    circles: [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}]
-    max_depth -10.0 lem_method None
+    0 0 [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)]
+    1 1 [(-30.0, 0.0), (90.0, 0.0)]
+    [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}] -10.0 None
 
 Ran code:
-    for i,pl in enumerate(slope_data['profile_lines']):
-        print(i, pl)
-    print(slope_data.get('ground_surface'))
+    def apply(n):
+        slope_data['profile_lines'][0]['coords'] = [(0.0,0.0),(20.0*n,20.0),(90.0,20.0)]
+    out = sensitivity([2.0,2.5,3.0], apply, param='H:V (horizontal per 1 vertical)', method='spencer', search=True)
+    print(out)
+    print(slope_data['profile_lines'][0]['coords'])
 
 Output:
-    0 {'coords': [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)], 'mat_id': 0, 'size': None}
-    1 {'coords': [(-30.0, 0.0), (90.0, 0.0)], 'mat_id': 1, 'size': None}
-    LINESTRING (-30 0, 0 0, 40 20, 90 20)
-
-Ran code:
-    import copy
-    from xslope.search import generate_starting_circles
+      H:V (horizontal per 1 vertical)=2.0: FS=1.244
+        warnings: interslice tension on 15% of interior boundaries; line of thrust outside the slice on 15% of boundaries; Tension on the base of 2 slices near the crest
+      H:V (horizontal per 1 vertical)=2.5: FS=1.396
+        warnings: interslice tension on 13% of interior boundaries; line of thrust outside the slice on 13% of boundaries
+      H:V (horizontal per 1 vertical)=3.0: FS=1.546
+        warnings: interslice tension on 10% of interior boundaries; line of thrust outside the slice on 10% of boundaries
+    Wrote sensitivity.csv and sensitivity.png (3 points; 3 with warnings, listed above).
+       H:V (horizontal per 1 vertical)  ...                                           warnings
+    0                              2.0  ...  interslice tension on 15% of interior boundari...
+    1                              2.5  ...  interslice tension on 13% of interior boundari...
+    2                              3.0  ...  interslice tension on 10% of interior boundari...
     
-    orig = copy.deepcopy({k: slope_data[k] for k in ('profile_lines','circles')})
-    rows=[]
-    for ratio in (2.0, 2.5, 3.0):
-        cx = 0.0 + ratio*20.0          # toe (0,0) fixed, crest elev 20 fixed
-        right = cx + 50.0              # >=2H beyond crest
-        left = -50.0                   # >=2H beyond toe
-        slope_data['profile_lines'][0]['coords'] = [(0.0,0.0),(cx,20.0),(right,20.0)]
-        slope_data['profile_lines'][1]['coords'] = [(left,0.0),(right,0.0)]
-        resync_geometry()
-        slope_data['circles'] = generate_starting_circles(slope_data)
-        print(ratio, 'ncircles', len(slope_data['circles']),
-              'min Depth', min(c['Depth'] for c in slope_data['circles']))
-        res = run_lem(method='spencer', search=True, plot=False)
-        rows.append((ratio, res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'],
-                     res.get('x_entry'), res.get('x_exit'), res.get('warnings')))
-        print(rows[-1])
+    [3 rows x 3 columns]
+    [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)]
+    [saved 2 file(s) the user can open: sensitivity.csv, sensitivity.png]
 
-Output:
-    2.0 ncircles 3 min Depth -10.0
-    spencer (auto search, circular): FS = 1.244 on the circle Xo=18.27, Yo=43.84, R=43.84
-      admissibility: interslice tension (min Z = -1433.7 vs max compression 7312.7)
-      admissibility: line of thrust outside the slice on 18% of boundaries
-    (2.0, np.float64(1.2441459516843152), 18.275, 43.84375000000001, 43.84375000000001, 0.0, 55.068341788970464, 4.464101756916862, ['interslice tension (min Z = -1433.7 vs max compression 7312.7)', 'line of thrust outside the slice on 18% of boundaries'])
-    2.5 ncircles 3 min Depth -10.0
-    spencer (auto search, circular): FS = 1.396 on the circle Xo=25.86, Yo=47.73, R=47.73
-      admissibility: interslice tension (min Z = -1088.2 vs max compression 8521.3)
-      admissibility: line of thrust outside the slice on 13% of boundaries
-    (2.5, np.float64(1.3962874756322978), 25.8625, 47.72500000000001, 47.72500000000001, 0.0, 64.70834919911006, 8.33639602638472, ['interslice tension (min Z = -1088.2 vs max compression 8521.3)', 'line of thrust outside the slice on 13% of boundaries'])
-    3.0 ncircles 2 min Depth -10.0
-    spencer (auto search, circular): FS = 1.546 on the circle Xo=32.98, Yo=53.33, R=53.33
-      admissibility: line of thrust outside the slice on 10% of boundaries
-    (3.0, np.float64(1.5459930127839399), 32.981249999999996, 53.33125000000001, 53.33125000000001, 0.0, 74.61356917633223, 12.39730449443401, ['line of thrust outside the slice on 10% of boundaries'])
-    === MODEL CHECKS: clean ===
+[file: sensitivity.csv]
 
-Ran code:
-    slope_data['profile_lines'] = copy.deepcopy(orig['profile_lines'])
-    slope_data['circles'] = copy.deepcopy(orig['circles'])
-    resync_geometry()
-    print(slope_data['profile_lines'])
-    print(slope_data['circles'])
-    print(slope_data.get('ground_surface'))
+[file: sensitivity.png]
 
-Output:
-    [{'coords': [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)], 'mat_id': 0, 'size': None}, {'coords': [(-30.0, 0.0), (90.0, 0.0)], 'mat_id': 1, 'size': None}]
-    [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}]
-    LINESTRING (-30 0, 0 0, 40 20, 90 20)
-    === MODEL CHECKS: clean ===
+Assistant: The factor of safety rises steadily as the face flattens: 1.244 at 2:1, 1.396 at 2.5:1 and 1.546 at 3:1. Each case is Spencer with a search. I held the toe at (0, 0) and the crest at elevation 20, and moved the crest point out to x = 40, 50 and 60.
 
-Assistant: Each case kept the toe at (0, 0) and the crest at elevation 20, moving only the crest x (40 → 50 → 60); the flat ground was extended to 2H+ beyond toe and crest, starting circles were regenerated with `generate_starting_circles`, and Spencer was run with a full search.
+| Face slope (H:V) | Crest point | FS (Spencer, searched) |
+|:--|:--|:--|
+| 2:1 | (40, 20) | **1.244** |
+| 2.5:1 | (50, 20) | **1.396** |
+| 3:1 | (60, 20) | **1.546** |
 
-| Face slope | Crest x | Critical circle (Xo, Yo, R) | Depth (lowest pt) | x_entry / x_exit | FS (Spencer) |
-|---|---|---|---|---|---|
-| 2:1 | 40 | 18.28, 43.84, 43.84 | 0.0 | 55.07 / 4.46 | **1.244** |
-| 2.5:1 | 50 | 25.86, 47.73, 47.73 | 0.0 | 64.71 / 8.34 | **1.396** |
-| 3:1 | 60 | 32.98, 53.33, 53.33 | 0.0 | 74.61 / 12.40 | **1.546** |
+**Every run came back with a warning about whether the result is physically admissible.** This doesn't change the FS values, but the 2:1 case is the least reliable:
+- **2:1:** tension between slices on 15% of the internal slice boundaries, the line of thrust outside the slice on 15%, and tension on the base of 2 slices near the crest.
+- **2.5:1:** tension between slices and the line of thrust outside the slice, both on 13% of boundaries.
+- **3:1:** the same two warnings, on 10% of boundaries.
 
-Notes:
+These are typical of undrained (φ = 0) cohesive soil near the crest, which pulls in tension at the top of the slide. The usual way to handle it is a tension crack, which I haven't tested here.
 
-- All three critical circles bottom out at elevation 0.0 — tangent to the top of the foundation, not cutting into it. With the foundation (c = 800) twice as strong as the embankment (c = 400), the critical mechanism stays in the embankment in every case; none of the deeper circles tangent to max_depth = -10 governed.
-- Admissibility screen (report-only, does not change FS): 2:1 and 2.5:1 show interslice tension (min Z = -1434 and -1088 against max compression 7313 and 8521) and a line of thrust outside the slice on 18% / 13% of boundaries; 3:1 shows thrust-line excursion on 10% of boundaries, no tension. Converged, but worth knowing the internal force distribution isn't fully admissible on the flatter-to-steeper pair.
-- The model has been restored exactly as it was — profile lines back to (0,0)-(40,20)-(90,20) and (-30,0)-(90,0), the original two circles back in place, model checks clean.
+One other point: at 3:1 the flat ground runs only 30 ft beyond the crest, which is 1.5 times the slope height. That's shorter than the roughly 2 times the reference recommends. I didn't check whether the 3:1 critical circle comes close to the right-hand edge of the model.
+
+The model is back as it was: the face is 0,0 → 40,20 → 90,20 again, and the sweep didn't change anything else. I saved the table and a plot of FS against slope as `sensitivity.csv` and `sensitivity.png`.
 ```
 
-Tokens: input 87,126 · cached_input 79,255 · output 2,759 · calls 5 · 48.5s
+Tokens: input 60,035 · cached_input 58,526 · output 1,464 · calls 3 · 30.8s
 
 ## Session total
 
-- Tokens: input 87,126 · cached_input 79,255 · output 2,759 · calls 5
-- Wall time: 54.0s
-- Workbook written: `docs/tutorials/files/w1_sweep_adhoc_after.xlsx`
+- Tokens: input 60,035 · cached_input 58,526 · output 1,464 · calls 3
+- Wall time: 33.8s

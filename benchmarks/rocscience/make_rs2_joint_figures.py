@@ -14,9 +14,10 @@ Usage, the same as its sibling's:
     python benchmarks/rocscience/make_rs2_joint_figures.py RJ-18      # one row
     python benchmarks/rocscience/make_rs2_joint_figures.py --from-sidecar
     python benchmarks/rocscience/make_rs2_joint_figures.py --audit
+    python benchmarks/rocscience/make_rs2_joint_figures.py --capture-only RJ-18
+        # redraw the at-failure picture from the row's stored search record
 """
 
-import math
 import os
 import sys
 import time
@@ -25,67 +26,74 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import make_rs2_figures as F                                        # noqa: E402
 
+# Every row on this page is jointed: its deformed-section panel draws each block
+# under its own tint, so the bodies can be told apart.
+F.COLOR_BLOCKS = True
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PAGE = os.path.join(ROOT, 'docs', 'verification', 'rs2_joints.md')
 
-#: Rows the page reports without locking, so they carry no fem_ssrm tag and are
-#: registered here instead. Settings are the ones the page states for the row.
-_JOINT = dict(element_type='tri6', tolerance='0.02', f_min='0.5', f_max='3.0',
-              max_iter='250000', tension_srf='false', k0='1')
+#: The rows registered without a tag -- ``EXTRA_CASES`` (reported-only brackets)
+#: and ``SWEEP_CASES`` (tilt sweeps) -- live in :mod:`rs2_joint_cases`, the one
+#: table this producer and the corpus builder both read: the builder writes each
+#: row's K0 into its workbook from the same entry this producer solves it with.
+from rs2_joint_cases import EXTRA_CASES, SWEEP_CASES                 # noqa: E402
 
-EXTRA_CASES = [
-    # Rows that bracket a factor but cannot lock, because at least one trial of
-    # the bracket that defines it -- or of the refinement step that confirms it --
-    # reaches the sweep budget without a verdict. They carry no tag, so they are
-    # registered here at the settings the page states, and their figures read the
-    # mechanism the same way a locked row's does.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj003.xlsx',
-     'target_size': '12.0', 'benchmark': 'RJ-3'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj005.xlsx',
-     'target_size': '12.0', 'benchmark': 'RJ-5'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj006.xlsx',
-     'target_size': '12.0', 'benchmark': 'RJ-6'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj019.xlsx',
-     'target_size': '3.0', 'benchmark': 'RJ-19'},
-    # The termination family's rows that still report. Corpus size is the joint
-    # spacing, as everywhere else here — the bedding spacing on 9 to 14. The four
-    # problem-1 cases and problems 9, 11 and 13 have locked and carry tags of
-    # their own, so they are no longer listed: `registered` would ignore a
-    # duplicate entry anyway, and `--audit` names one that is left behind.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj012.xlsx',
-     'target_size': '1.5', 'benchmark': 'RJ-12'},
-    # Problem 20's Voronoi mass. Corpus size is the mean BLOCK width measured on
-    # the vendor's own traces, this row's stand-in for a joint spacing.
-    {**_JOINT, 'file': 'files/rocscience/joints/rj020.xlsx',
-     'target_size': '2.895', 'benchmark': 'RJ-20'},
-    {**_JOINT, 'file': 'files/rocscience/joints/rj014.xlsx',
-     'target_size': '1.5', 'benchmark': 'RJ-14'},
-]
 
-#: Rows measured by a SWEEP rather than by a bracket. Problem 16 is scored in the
-#: tilt angle at which a block grid topples, which XSLOPE reaches by pushing the
-#: model with a seismic coefficient at full strength, so there is no bracket for
-#: the ordinary producer to draw and no factor of safety to title the panels
-#: with. Each entry names the two coefficients the sweep closed on — the last one
-#: the stack stands at and the first one it goes at — and the figure draws the
-#: second with both angles in its title. See :func:`make_sweep_figure`.
-SWEEP_CASES = [
-    {'file': 'files/rocscience/joints/rj016.xlsx', 'benchmark': 'RJ-16',
-     'target_size': '0.09', 'max_iter': '250000', 'element_type': 'tri6',
-     'tension_srf': 'false', 'k0': '1',
-     'k_stand': '0.147656', 'k_fail': '0.150391'},
-]
+def parse_sweep_tags(path=PAGE):
+    """Every ``fem_tilt`` tag on the joint page, as string key->value dicts."""
+    cases = []
+    with open(path) as fh:
+        for line in fh:
+            m = F.TAG_RE.search(line)
+            if not m:
+                continue
+            kv = {}
+            for part in m.group(1).split(','):
+                if '=' in part:
+                    k, v = part.split('=', 1)
+                    kv[k.strip()] = v.strip()
+            if kv.get('type') == 'fem_tilt':
+                cases.append(kv)
+    return cases
+
+
+def sweep_cases():
+    """Every sweep row, each ONCE: the page's fem_tilt tags, then any
+    SWEEP_CASES entry whose row carries no tag yet."""
+    tagged = parse_sweep_tags()
+    have = {t.get('benchmark') for t in tagged}
+    return tagged + [t for t in SWEEP_CASES if t.get('benchmark') not in have]
+
+
+#: The iteration ceiling a jointed row's trials extend into, as a multiple of the
+#: per-trial limit. solve_fem extends a trial still slowing at its limit up to
+#: max_iterations_ceiling and takes max(ceiling, limit), so a row at 250 000 with
+#: no ceiling of its own has a ceiling EQUAL to its limit and cannot extend at
+#: all. Four times the limit lets a slow equilibrium finish; a trial holding
+#: steady still stops at its limit, since the extension is conditional on the
+#: movement dying away. A tag's own max_iter_ceiling wins.
+CEILING_FACTOR = 4
+
+
+def _with_ceiling(tag):
+    """``tag`` with its ``max_iter_ceiling`` stated: the tag's own, else
+    ``CEILING_FACTOR`` times its ``max_iter``."""
+    max_iterations = int(float(tag.get('max_iter', 250000)))
+    return {**tag, 'max_iter_ceiling': str(int(float(
+        tag.get('max_iter_ceiling', CEILING_FACTOR * max_iterations))))}
 
 
 def sweep_registered():
     """Every sweep row, by benchmark."""
-    return {t['benchmark']: t for t in SWEEP_CASES}
+    return {t['benchmark']: t for t in sweep_cases()}
 
 
 def _tilt(k):
-    """The tilt a coefficient stands for: a body force of k*gamma toward the face
-    points where gravity points on a slope tilted by atan(k)."""
-    return math.degrees(math.atan(abs(float(k))))
+    """The tilt a coefficient stands for (run_tests.tilt_of, the one rule)."""
+    sys.path.insert(0, F.ROOT)
+    import run_tests as RT
+    return RT.tilt_of(k)
 
 
 def _solve_at(sd, mesh, k, tag):
@@ -93,26 +101,14 @@ def _solve_at(sd, mesh, k, tag):
 
     F = 1 and no reduction: what the sweep asks of each coefficient is whether the
     model stands under it, which is the question the manual's tilt table asks and
-    not the one a strength reduction answers. The reference kernel is forced for
-    the same reason the bracket rows force it — a figure and a page number must
-    not depend on whether a machine has the compiled kernel built.
+    not the one a strength reduction answers. The solve itself is
+    ``run_tests.solve_fem_tilt`` — the same call the suite's ``fem_tilt`` check
+    makes — so the figure and the lock are one computation, reference kernel
+    forced in both.
     """
-    import xslope.fem as _fem
-    from xslope.fem import build_fem_data, solve_fem
-
     sys.path.insert(0, F.ROOT)
     import run_tests as RT
-
-    sd = {**sd, 'k_seismic': -abs(float(k))}
-    fem_data = build_fem_data(sd, mesh)
-    with RT._force_fast_kernel(_fem, False):
-        sol = solve_fem(fem_data, F=1.0, debug_level=0,
-                        max_iterations=int(tag.get('max_iter', 250000)),
-                        tension_srf=str(tag.get('tension_srf', '')).lower()
-                        in ('true', '1', 'yes'),
-                        k0=float(tag['k0']) if tag.get('k0') else None,
-                        fast_kernel=False)
-    return sd, fem_data, sol
+    return RT.solve_fem_tilt(sd, mesh, k, tag)
 
 
 def make_sweep_figure(tag, dpi=150):
@@ -165,7 +161,8 @@ def registered():
     """
     tagged = parse_tags()
     have = {t.get('benchmark') for t in tagged}
-    return tagged + [t for t in EXTRA_CASES if t.get('benchmark') not in have]
+    return [_with_ceiling(t) for t in
+            tagged + [t for t in EXTRA_CASES if t.get('benchmark') not in have]]
 
 
 def superseded():
@@ -178,7 +175,7 @@ def audit(out_dir=None, verbose=True):
     """Registered rows with no rendered PNG, and NO_FIGURE entries that are dead."""
     out_dir = out_dir or F.OUT
     missing, dead = [], []
-    for tag in list(registered()) + list(SWEEP_CASES):
+    for tag in list(registered()) + list(sweep_cases()):
         bench = tag.get('benchmark', '?')
         png = os.path.join(out_dir, f'{bench}.png')
         if not os.path.exists(png):
@@ -215,10 +212,15 @@ if __name__ == '__main__':
         bad = F.audit_captures(registered())
         sys.exit(1 if (missing or dead or bad) else 0)
     from_sidecar = '--from-sidecar' in args
+    capture_only = '--capture-only' in args
+    if from_sidecar and capture_only:
+        sys.exit('--from-sidecar and --capture-only are two different redraws; '
+                 'pass one.')
     only = set(a for a in args if not a.startswith('--'))
-    cases = list(registered()) + list(SWEEP_CASES)
+    sweeps = sweep_cases()
+    cases = list(registered()) + list(sweeps)
     print(f'{len(cases)} registered rows (fem_ssrm tags + EXTRA_CASES + '
-          f'{len(SWEEP_CASES)} sweep row(s))'
+          f'{len(sweeps)} sweep row(s))'
           f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}")
     for tag in cases:
         bench = tag.get('benchmark', '?')
@@ -227,13 +229,15 @@ if __name__ == '__main__':
         t0 = time.time()
         try:
             if bench in sweep_registered():
-                if from_sidecar:
+                if from_sidecar or capture_only:
                     print(f'skip {bench:10s} a sweep row is re-rendered by '
-                          f're-solving (seconds), not from sidecars', flush=True)
+                          f're-solving (seconds); it has no search record',
+                          flush=True)
                     continue
                 out, fs = make_sweep_figure(tag)
             else:
                 out, fs = (F.make_figure_from_sidecar(tag) if from_sidecar
+                           else F.make_figure_capture_only(tag) if capture_only
                            else F.make_figure(tag))
             exp = tag.get('expected_fs')
             fsx = ('inputs-only' if tag.get('figure') == 'inputs'

@@ -127,7 +127,11 @@ def capture_truncated(solution, failure_solution=None):
     :func:`xslope.fem.solve_fem`'s ``_finite_guard``). That state IS the
     mechanism the figure exists to show. What it is not is a state the slope
     settled at, so every panel drawn from it names the iteration it was stopped
-    at and why, beside the numbers rather than instead of them.
+    at and why, beside the numbers rather than instead of them. The exception is
+    a capture the distance fence stopped (kind 'distance'): that is the ordinary
+    at-failure state taken at a set distance, so the panel titles leave it as
+    they leave a capture that ran its budget, and only the notes beside quoted
+    readings name the stop.
     """
     snap = failure_snapshot(solution, failure_solution)
     return bool(snap.get("capture_truncated")) if snap else False
@@ -905,7 +909,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
         # Where it was stopped and why, so the panel can name it rather than
-        # gesturing at it: iteration, kind ('runaway' or 'non_finite'), and the
+        # gesturing at it: iteration, kind (a runaway, 'non_finite' or 'distance'), and the
         # displacement the kept state stood at.
         "capture_stop": (capture_stop(solution, failure_solution)
                          if state == "failure" else None),
@@ -1549,7 +1553,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
         # Where it was stopped and why, so the panel can name it rather than
-        # gesturing at it: iteration, kind ('runaway' or 'non_finite'), and the
+        # gesturing at it: iteration, kind (a runaway, 'non_finite' or 'distance'), and the
         # displacement the kept state stood at.
         "capture_stop": (capture_stop(solution, failure_solution)
                          if state == "failure" else None),
@@ -1726,7 +1730,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "capture_truncated": (state == "failure"
                               and capture_truncated(solution, failure_solution)),
         # Where it was stopped and why, so the panel can name it rather than
-        # gesturing at it: iteration, kind ('runaway' or 'non_finite'), and the
+        # gesturing at it: iteration, kind (a runaway, 'non_finite' or 'distance'), and the
         # displacement the kept state stood at.
         "capture_stop": (capture_stop(solution, failure_solution)
                          if state == "failure" else None),

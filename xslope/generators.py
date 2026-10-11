@@ -904,7 +904,7 @@ def _pore_pressure(slope_data, material, x, y, sigma_v):
 
 
 def _comparable_strength(slope_data, ground, material, x, y):
-    """Mobilisable shear strength of a material at a point, across every model.
+    """Mobilizable shear strength of a material at a point, across every model.
 
     This is the one quantity that makes zones rankable. Every strength option in
     the ``mat`` sheet reduces to a shear strength at the normal stress the zone
@@ -1281,7 +1281,7 @@ def _track_surface(slope_data, geom, zone, offset_frac, points):
     if abs(face.crest[0] - face.toe[0]) <= 0.1 * scale:
         return [], ("this section's slope face is vertical, so it has no horizontal "
                     "run for a track to follow beneath. A weak-zone surface is for a "
-                    "slope, not a wall")
+                    "slope")
 
     window = _usable_window(zone, face, ground, track_y, tol)
     if window is None:

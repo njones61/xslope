@@ -13,10 +13,6 @@ CONFIG = PageConfig(
     name="seep",
 
     bounds=[
-        # the match-dot legend, not a comparison
-        ('+3', 'within 3% of the vendor and/or reference figure'),
-        ('+6', '| 🟡 | 3–6% |'),
-        ('+6', 'more than 6% |'),
         # tri3-vs-tri6 agreement on the radial problem: the tri3 discharge is
         # not printed, so the tolerance is a bound, not a pair
         ('+0.01', 'tri3 linear elements agree to within'),

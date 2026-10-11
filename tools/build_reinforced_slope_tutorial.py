@@ -1,8 +1,7 @@
 """Build Tutorial FEM-2's file PAIR (the reinforced slope, LEM against FEM).
 
-The model is the six-layer geogrid slope that Tutorial LEM-8 builds and that
-[LEM Sample Problem 9](../docs/lem/samples.md#9-reinforced-slope) locks Spencer's
-answer for.  Its finite element counterpart is the committed model
+The model is the six-layer geogrid slope that Tutorial LEM-8 builds and whose
+page locks Spencer's answer for it.  Its finite element counterpart is the committed model
 ``docs/fem/files/xslope_reinforce_fem.xlsx`` (its sample section was retired in
 favor of FEM-2).  This builder DERIVES both tutorial files from those two
 committed models rather than restating a number from either:
@@ -58,6 +57,7 @@ import sys
 
 from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
                            default_template_path)
+from fill_reinforce_formula_cache import fill_reinforce_cache
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEM_BASE = os.path.join(REPO_ROOT, "docs", "lem", "files", "xslope_reinforce.xlsx")
@@ -149,6 +149,7 @@ def _model():
 def _write(sd, filename):
     out = os.path.join(TUTORIAL_FILES, filename)
     save_slope_data_to_xlsx(sd, out, template=default_template_path())
+    fill_reinforce_cache(out)    # Dir/Appl formula results, for non-Excel readers
     print(f"wrote {os.path.relpath(out, REPO_ROOT)}")
     return out
 

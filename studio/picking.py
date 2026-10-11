@@ -54,6 +54,13 @@ def pick_category(slope_data, x, y, tol, mode=None):
         cands.append((_line_dist(pt, [(p["x1"], p["y1"]), (p["x2"], p["y2"])]), "piles", i))
     for i, r in enumerate(d.get("reinforcement_lines") or []):
         cands.append((_line_dist(pt, [(r["x1"], r["y1"]), (r["x2"], r["y2"])]), "reinforce", i))
+    if mode is None or mode == "fem":
+        # Joint lines are FEM-only geometry, drawn on the Inputs plot in FEM mode
+        # alone. Appended after the reinforcement, so a reinforcement line that is
+        # also a slip joint (lying on the same trace) still opens its own editor.
+        for i, j in enumerate(d.get("joint_lines") or []):
+            cands.append((_line_dist(pt, [(j.get("x1"), j.get("y1")),
+                                          (j.get("x2"), j.get("y2"))]), "joints", i))
     # Line loads are single points on the ground surface (drawn as an arrow); a
     # point hit-test picks the one nearest the click.
     for i, ll in enumerate(d.get("line_loads") or []):

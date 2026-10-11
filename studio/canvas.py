@@ -303,6 +303,18 @@ class MplCanvas(QWidget):
 
     def render_fem_results(self, fem_data, solution, opts):
         opts = opts or {}
+        if opts.get("plot_type") == "ssrm_curve":
+            # Drawn from the run's trial record, which a single solve and a file
+            # saved before the record existed do not carry: say so in one line
+            # rather than showing an empty axes.
+            from xslope.plot_fem import ssrm_curve_unavailable
+            why = ssrm_curve_unavailable(opts.get("ssrm_record"))
+            if why:
+                self._draw(lambda fig: fig.text(0.5, 0.5, why, ha="center",
+                                                va="center", wrap=True,
+                                                color="0.35", fontsize=10),
+                           dxf=False)
+                return
         self._draw(lambda fig: plot_fem_results(
             fem_data, solution,
             plot_type=[opts.get("plot_type", "shear_strain")],
@@ -316,8 +328,11 @@ class MplCanvas(QWidget):
             field_state=opts.get("field_state", "failure"),
             show_mesh=opts.get("show_mesh", True),
             mesh_on_fields=opts.get("mesh_on_fields", False),
+            block_grid=opts.get("block_grid"),
+            joint_linewidth=opts.get("joint_linewidth"),
+            color_blocks=opts.get("color_blocks", False),
             show_reinforcement=opts.get("show_reinforcement", True),
-            show_joints=opts.get("show_joints", True),
+            show_joints=opts.get("show_joints"),
             label_elements=opts.get("label_elements", False),
             plot_boundary=opts.get("plot_boundary", True),
             plot_nodes=opts.get("plot_nodes", False),
@@ -326,6 +341,8 @@ class MplCanvas(QWidget):
             displacement_tolerance=opts.get("displacement_tolerance", 0.5),
             color_by_magnitude=opts.get("color_by_magnitude", False),
             fs=opts.get("fs"),
+            fs_is_lower_bound=opts.get("fs_is_lower_bound"),
+            ssrm_record=opts.get("ssrm_record"),
             legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig))
 
     def render_axes(self, plot_fn, dxf=False):

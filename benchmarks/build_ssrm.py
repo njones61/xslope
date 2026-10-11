@@ -59,10 +59,11 @@ def _build(dst, wet):
     prof = {'B2': 0}              # base of foundation at y = 0
     prof.update(profile_line_cells(1, 1, GROUND))
     u['profile'] = prof
-    # placeholder circle (required by the loader; FEM/SSRM ignores it) — set
-    # plausibly over the downstream face, tangent to the foundation surface
-    u['circles'] = circle_cells(1, 130, 60, option="Depth", depth=Y_FND)
     if wet:
+        # The starting circle of the full-reservoir file's Spencer search (the LE
+        # companion, ssrm.md): over the downstream face, tangent to the
+        # foundation surface. The dry file runs strength reduction only.
+        u['circles'] = circle_cells(1, 130, 60, option="Depth", depth=Y_FND)
         # The reservoir is stated ONCE, as the piezometric line, and main!D23
         # (written 'auto' by main_cells) hands the engine the job of turning it
         # into the surface load. The file used to carry both -- the line and a
@@ -95,7 +96,6 @@ def build_griffiths6_seep():
     prof = {'B2': 0}
     prof.update(profile_line_cells(1, 1, GROUND))
     u['profile'] = prof
-    u['circles'] = circle_cells(1, 130, 60, option="Depth", depth=Y_FND)
     u['seep bc'] = seep_bc_cells(
         head1=Y_RES,
         head1_pts=[(0, Y_FND), (X_TOE_US, Y_FND), (round(X_WL, 3), Y_RES)],
@@ -120,8 +120,7 @@ def build_griffiths1():
     Geometry (Fig. 1 dimensions): crest platform (0,50)-(60,50), 2:1 face to the
     toe (160,0), firm base at y = 0. The section is a single material described by
     a profile line; get_material_polygons derives the domain from it and the max
-    depth. Placeholder starting circle over the slope face (the loader requires one;
-    FEM/SSRM ignores it).
+    depth.
 
     Elastic constants are the paper's printed nominal values (Griffiths & Lane 1999,
     p.390 -- "in the absence of meaningful data for E' and nu', they can be given
@@ -151,8 +150,6 @@ def build_griffiths1():
     prof = {'B2': 0.0}              # firm base at y = 0 (D = 1, base at toe level)
     prof.update(profile_line_cells(1, 1, ground))
     u['profile'] = prof
-    # placeholder circle (loader requires one; FEM/SSRM ignores it)
-    u['circles'] = circle_cells(1, 120.0, 80.0, option="Depth", depth=0.0)
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
     print("built", dst)
     return dst
@@ -195,7 +192,7 @@ def build_griffiths2():
     prof = {'B2': -H / 2.0}          # firm base at y = -25 (H/2 foundation)
     prof.update(profile_line_cells(1, 1, ground))
     u['profile'] = prof
-    # placeholder circle (loader requires one; FEM/SSRM ignores it) — a toe
+    # Starting circle of the limit-equilibrium search on this file — a toe
     # circle over the slope face, tangent into the foundation
     u['circles'] = circle_cells(1, 150.0, 70.0, option="Depth", depth=-H / 2.0)
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
@@ -403,22 +400,19 @@ def build_griffiths3(ratio, tag, thick=1.0):
     poly.update(polygon_cells(3, 1, inner))
     u['polygon'] = poly
 
-    # Starting circle (FEM/SSRM ignores it) — the same deep base circle Example 4
-    # carries, on the same outer profile: center (180, 165), tangent at y = 20,
-    # daylighting at (50.4, 100) and (268.3, 50), both below the center. See
-    # build_griffiths4 for what the earlier (150, 90, tangent y = 0) did.
-    u['circles'] = circle_cells(1, 180.0, 165.0, option="Depth", depth=20.0)
-
-    # Limit-equilibrium companion for the weak-ratio station: the paper's own
-    # three-line wedge (Griffiths & Lane's Janbu comparison, ~0.47) as a starting
-    # surface for the non-circular search — down the band parallel to the face,
-    # along the horizontal foundation reach, and up the 45 deg outcrop. Seeded on
-    # the band CENTERLINE (_G3_C) so every slice base sits strictly inside the cu2
-    # material rather than on a polygon boundary. Only the weak-ratio station gets
-    # one: at the other ratios the critical mechanism is the base circle, which the
-    # circular search already covers. FEM/SSRM ignores non_circ, so the SSRM locks
-    # on this file are unaffected.
+    # Limit-equilibrium companion for the weak-ratio station, the only station a
+    # circular and a non-circular search run on; the others are strength
+    # reduction only and carry no surface. The starting circle is the same deep
+    # base circle Example 4 carries, on the same outer profile: center (180, 165),
+    # tangent at y = 20, daylighting at (50.4, 100) and (268.3, 50), both below the
+    # center (see build_griffiths4 for what the earlier (150, 90, tangent y = 0)
+    # did). The starting non-circular surface is the paper's own three-line wedge
+    # (Griffiths & Lane's Janbu comparison, ~0.47) — down the band parallel to the
+    # face, along the horizontal foundation reach, and up the 45 deg outcrop —
+    # seeded on the band CENTERLINE (_G3_C) so every slice base sits strictly
+    # inside the cu2 material rather than on a polygon boundary.
     if ratio <= 0.2 and thick == 1.0:
+        u['circles'] = circle_cells(1, 180.0, 165.0, option="Depth", depth=20.0)
         cl = [(c[0], c[1]) for c in _G3_C]
         u['non-circ'] = noncirc_cells([
             (cl[0][0], cl[0][1], "Free"),   # crest daylight, band centerline
@@ -506,8 +500,12 @@ def build_griffiths5(l_over_h, tag):
     u['profile'] = prof
     # horizontal free surface across the domain (u clamped to 0 above it)
     u['piezo'] = piezo_cells([(0.0, round(y_fs, 3)), (TOE_X, round(y_fs, 3))])
-    # placeholder circle (loader requires one; FEM/SSRM ignores it) — a toe circle
-    u['circles'] = circle_cells(1, 100.0, 60.0, option="Depth", depth=TOE_Y)
+    if tag == "0p5":
+        # A toe circle for the one station a limit-equilibrium solve reads: the
+        # auto_water row (run_tests.py, AUTO_WATER_CASES) solves this file's first
+        # circle under the manual and the automatic water load and requires the
+        # same FS. The other stations are strength reduction only.
+        u['circles'] = circle_cells(1, 100.0, 60.0, option="Depth", depth=TOE_Y)
 
     # The water above the slope is the free surface written above, and nothing
     # else: main!D23 = auto, so the engine measures the piezometric line against

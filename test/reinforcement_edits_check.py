@@ -20,6 +20,13 @@ each of them silent:
   back-reference. Writing a literal into the master deleted the only copy, and
   Dir rows 9-22 read back as a bare ``'='``.
 
+* Clearing a cell in Studio's reinforcement editor. Tres, Lp1/Lp2, Spacing, Tmax,
+  E and Area were plain numbers there, so a cleared cell came back 0.0 where an
+  empty workbook cell reads blank: "clear the Tres column" (Tutorial FEM-2) made
+  every layer rupture brittly instead of holding its capacity, a cleared Lp made a
+  fully anchored end out of a missing length, and a cleared Spacing was refused
+  as zero where a blank means a continuous sheet.
+
 Each leg asserts the fix AND the behavior it must not have disturbed: a blank
 still takes the documented default, a model that carries no source key at all
 still runs the legacy point-list path, and a row whose Dir/Appl are exactly what
@@ -37,6 +44,10 @@ REINF_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
                           'docs', 'lem', 'files', 'xslope_reinforce.xlsx')
 TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         'docs', 'inputs', 'input_template.xlsx')
+#: Tutorial FEM-2's completed model: six geogrid layers with E, Area, Lp1/Lp2 and
+#: Tres = 600 filled, which is what the page's "clear the Tres column" starts from.
+FEM02_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          'docs', 'tutorials', 'files', 'xslope_reinforced_slope.xlsx')
 
 #: The Dir column's shared-formula group spans H3:H22 (Appl's spans I3:I22), so
 #: rows 9-22 are the ones no reinforcement row of the test file reaches: they are
@@ -278,6 +289,73 @@ def _unset_fields_leg():
     return failures
 
 
+def _cleared_cells_leg():
+    """A cell cleared in Studio's reinforcement editor is stored blank, as an empty
+    workbook cell is read, not as 0.0 -- through the editor's apply and a save and
+    reload. Driven in the table view, the way FEM-2 clears its Tres column."""
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception:                                         # noqa: BLE001
+        return []
+    QApplication.instance() or QApplication([])
+    import contextlib
+    import io
+    import math
+    from xslope.fileio import load_slope_data
+    from studio.editors import ReinforcementEditor, _new_reinf
+
+    def blank(v):
+        return v is not None and isinstance(v, float) and math.isnan(v)
+
+    failures = []
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(FEM02_FILE)
+    rows = sd['reinforcement_lines']
+    if not all(float(r['t_res']) > 0 for r in rows):
+        return [f"cleared: FEM-2's model no longer carries a Tres on every line "
+                f"({[r['t_res'] for r in rows]})"]
+    dlg = ReinforcementEditor().build(sd, None)
+    dlg.set_view_mode('table')
+    col = {f.key: j for j, f in enumerate(ReinforcementEditor.FIELDS)}
+    for i in range(len(rows)):
+        dlg._table._set_cell_text(i, col['t_res'], '')
+    for key in ('lp1', 'spacing', 'E'):
+        dlg._table._set_cell_text(0, col[key], '')
+    ReinforcementEditor().apply(sd, dlg)
+    dlg.deleteLater()
+
+    def _read(model, tag):
+        got = model['reinforcement_lines']
+        tres = [r.get('t_res') for r in got]
+        if not all(blank(v) for v in tres):
+            failures.append(f"cleared ({tag}): the cleared Tres column reads {tres}, "
+                            f"not blank -- 0 is brittle rupture, blank holds the "
+                            f"capacity")
+        first = got[0]
+        for key, want in (('lp1', 'blank'), ('E', 'blank'), ('spacing', 1.0)):
+            v = first.get(key)
+            ok = blank(v) if want == 'blank' else (v == want)
+            if not ok:
+                failures.append(f"cleared ({tag}): a cleared {key} reads {v!r}, "
+                                f"not {want!r} as an empty cell does")
+        if not all(float(r['t_max']) > 0 for r in got):
+            failures.append(f"cleared ({tag}): Tmax was disturbed")
+
+    _read(sd, "in the model")
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            reloaded, _ = _round_trip(sd)
+    except Exception as e:                                    # noqa: BLE001
+        return failures + [f"cleared: the save/load raised "
+                           f"{e.__class__.__name__}: {e}"]
+    _read(reloaded, "saved and reopened")
+    if not blank(_new_reinf().get('t_res')):
+        failures.append(f"cleared: a new line opens with Tres = "
+                        f"{_new_reinf().get('t_res')!r}, which is brittle rupture")
+    return failures
+
+
 def run():
     warnings.simplefilter('ignore')
     if not os.path.exists(REINF_FILE):
@@ -287,6 +365,7 @@ def run():
     failures += _cleared_lines_leg()
     failures += _saved_file_leg()
     failures += _unset_fields_leg()
+    failures += _cleared_cells_leg()
     return failures
 
 

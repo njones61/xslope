@@ -169,6 +169,11 @@ Engineers).
 - Hammah, R.E., Yacoub, T.E. & Corkum, B.C. (2005b). The shear strength
   reduction method for the generalized Hoek-Brown criterion. In *Proc. 40th U.S.
   Symposium on Rock Mechanics (Alaska Rocks 2005)*, ARMA/USRMS 05-810.
+- Hammah, R.E., Yacoub, T.E. & Curran, J.H. (2009). Variation of failure
+  mechanisms of slopes in jointed rock masses with changing scale. In *Proc. 3rd
+  Canada–US Rock Mechanics Symposium*, Toronto, paper 3956. *(The source of the
+  Voronoi slope, [RJ-20](rs2_joints.md#rj-20): its Example III, at 0.2 blocks
+  per square meter and rock friction 30°.)*
 - Harr, M.E. (1962). *Groundwater and Seepage*. McGraw-Hill, New York.
   (Reprinted by Dover, 1990; cited in the groundwater corpus as "Harr 1990".)
 - Hassan, A.M. & Wolff, T.F. (1999). Search algorithm for minimum reliability
@@ -203,6 +208,9 @@ Engineers).
   slopes based on the Hoek–Brown failure criterion. *International Journal of
   Rock Mechanics & Mining Sciences* 45(5), 689–700.
   [doi:10.1016/j.ijrmms.2007.08.010](https://doi.org/10.1016/j.ijrmms.2007.08.010)
+- Lorig, L. & Varona, P. (2004). Numerical analysis. In Wyllie, D.C. & Mah,
+  C.W. (eds), *Rock Slope Engineering: Civil and Mining*, 4th ed., Spon Press,
+  London, 218–244.
 - Loukidis, D., Bandini, P. & Salgado, R. (2003). Stability of seismically
   loaded slopes using limit analysis. *Géotechnique* 53(5), 463–479.
   [doi:10.1680/geot.2003.53.5.463](https://doi.org/10.1680/geot.2003.53.5.463)
@@ -229,8 +237,8 @@ Engineers).
 - Perry, J. (1994). A technique for defining non-linear shear strength
   envelopes, and their incorporation in a slope stability method of analysis.
   *Quarterly Journal of Engineering Geology* 27(3), 231–241.
-  [doi:10.1144/GSL.QJEGH.1994.027.P3.04](https://doi.org/10.1144/GSL.QJEGH.1994.027.P3.04). *(Cited as "Perry (1993)" in the Slide2
-  and RS2 manuals.)*
+  [doi:10.1144/GSL.QJEGH.1994.027.P3.04](https://doi.org/10.1144/GSL.QJEGH.1994.027.P3.04). *(Cited as "Perry (1993)", Fig. 10, in the
+  Slide2 and RS2 manuals; the worked example is the paper's Fig. 6.)*
 - Pilot, G., Trak, B. & La Rochelle, P. (1982). Effective stress analysis of the
   stability of embankments on soft soils (Saint-Alban test embankment).
   *Canadian Geotechnical Journal* 19(4), 433–450. [doi:10.1139/t82-048](https://doi.org/10.1139/t82-048). *(Author list/pages not fully

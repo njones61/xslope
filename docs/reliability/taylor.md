@@ -27,7 +27,7 @@ that compares with the finite-element vendors' own point-estimate options.
 
 To perform reliability analysis using the **xslope** package, we simply need to provide standard deviations for the uncertain parameters in the input data. This is done in the Materials table of the input data file. The main values of the parameters in the table are treated as the most likely values. We can then call the `reliability` function to perform the analysis. The function will automatically calculate the factor of safety based on the most likely values ($F_{MLV}$) of the parameters using an automated search. It will then perturb each parameter by the standard deviation using the Taylor Series Method described above to calculate the coefficient of variation of the factor of safety ($COV_F$). Finally, it will compute the reliability of the slope based on the calculated values.
 
-The strength parameters that are perturbed depend on each material's strength model: for Mohr-Coulomb (`mc`) materials the cohesion $c$ and friction angle $\phi$ are perturbed, while for the depth-varying undrained (`cp`) model the cohesion $c$ and the rate $c_p$ are perturbed. The unit weight $\gamma$ is perturbed in both cases. If a standard deviation exceeds its mean — so that mean $-\sigma$ would be negative — the Taylor-series analysis stops with an error, since a negative strength parameter is non-physical. This is the boundary of the Taylor-series method's domain; when a parameter's COV is that large, use the Monte Carlo function instead (`reliability_mc`, described in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope)), which handles the negative draw by truncating it at zero.
+The strength parameters that are perturbed depend on each material's strength model: for Mohr-Coulomb (`mc`) materials the cohesion $c$ and friction angle $\phi$ are perturbed, while for the depth-varying undrained (`cp`) model the cohesion $c$ and the rate $c_p$ are perturbed. The unit weight $\gamma$ is perturbed in both cases. If a standard deviation exceeds its mean — so that mean $-\sigma$ would be negative — the Taylor-series analysis stops with an error, since a negative strength parameter is non-physical. The Taylor series method cannot handle this case; when a parameter's COV is that large, use the Monte Carlo function instead (`reliability_mc`, described in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope)), which handles the negative draw by truncating it at zero.
 
 The Monte Carlo campaign is called the same way through `reliability_mc`, which reads the identical MLV and standard-deviation inputs and adds only the sampling controls (`n_samples`, `distribution`, `rng_seed`). It is a limit-equilibrium path only, for the compute reason discussed in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope).
 
@@ -56,7 +56,7 @@ plot_reliability_results(slope_data, result)
 deviations on $\gamma$, $c$ and $\phi$. With `search=True` (the default) the critical
 surface is re-searched at each of the $2N=6$ perturbed states, so the red $F_{MLV}$
 surface and the six blue/green $F^+$/$F^-$ surfaces fan out slightly rather than
-coincide — visible confirmation that the search, not only the factor of safety,
+coincide, showing that the critical surface, as well as the factor of safety,
 shifts under each $\pm\sigma$ perturbation. XSLOPE Studio renders this same plot on
 the **LEM · Reliability** result tab — see
 [Reliability analysis](../studio/analysis.md#reliability-analysis).

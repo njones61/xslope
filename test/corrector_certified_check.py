@@ -11,9 +11,16 @@ including the one at the budget exit; where it reaches equilibrium inside the
 force, yield and displacement gates, `solve_ssrm` records a `corrector` block on
 that trial. That block says an INDEPENDENT driver found a static equilibrium from
 this trial's state. It answers the standing question whatever the sweep count
-preceding it, and three rows of the RS2 joint corpus turned on exactly this: their
-standing edges were certified at 250 002, 250 006 and 250 003 sweeps against a
-250 000 ceiling, and were being read as though nothing had ruled on them.
+preceding it, and rows of the corpus turn on exactly this: RS2-52's standing edge
+is certified after 258 605 sweeps and RS2-53's at 500 000 — both past the 250 000
+sweeps their tags budget — and RJ-4's after 186 859. Read on the sweep count alone
+they would be trials nothing had ruled on.
+
+The same corrector is offered the K0 IN-SITU EQUILIBRATION, which is a solve at
+full strength before any trial and on a jointed model is where a row's sweeps go.
+Its ladder is continued past the trials' three rungs (`_K0_CORRECTOR_CHECKPOINTS`),
+because the equilibration's product is a state and not a verdict: certifying it
+earlier changes what the step costs, not what a bracket reads.
 
 What this file locks:
 
@@ -33,6 +40,20 @@ What this file locks:
      certification into a committed sidecar (or the readers above cannot see it)
      and must NOT carry the machine time with it (or a sidecar changes when the
      machine does).
+
+  4. THE K0 STEP. Its ladder is the trials' ladder continued, it certifies a
+     jointed model's in-situ state and says where, and on an unjointed model it
+     is inert — the same equilibration, reached at the same sweep, with the
+     switch on and off.
+
+  5. A REFUSAL'S RESIDUAL. A failed one-shot corrector publishes the residual of
+     the state it actually returned. It must agree with `nr_diag['oob']`, not the
+     zero that `last_oob` was initialized to before the attempt.
+
+  6. A CERTIFICATION THROUGH THE SOFTENING LATCH. On a model whose bars can
+     soften, every converged Newton state passes through `_nr_soften_latch`
+     before it is judged, so a certification there is the path a refusal never
+     reaches. The corrector must certify, and no attempt may have raised.
 """
 import os
 import sys
@@ -49,6 +70,15 @@ def check(label, ok, detail=""):
     if not ok:
         FAILURES.append(label)
 
+
+#: The jointed model the K0 leg reads: a slab on a cohesionless plane at 20 degrees
+#: whose friction angle is two degrees above it. The in-situ field has a slope to
+#: redistribute against and the interface is close enough to its limit that the
+#: sweep does not settle inside the first checkpoint, so the corrector is actually
+#: asked for something — it certifies at `vp300`, where the plain sweep would have
+#: run to 311.
+K0_SLAB = dict(beta=20.0, HV=3.0, phi_j=22.0, cj=0.0, ts=3.0, s1d=3.0,
+               E_void=100.0)
 
 CERT = {"driver_of_record": "corrector", "checkpoint": "vp_exit",
         "vp_iterations": 250000, "nr_iterations": 6, "nr_force_evals": 26,
@@ -195,6 +225,234 @@ def check_record():
           "corrector" not in got3)
 
 
+def _k0_equilibration(fem_data, ladder_on=True):
+    """One SSRM's in-situ equilibration: its record, and the ladder the step was
+    handed.
+
+    `trial_factors` keeps it to a single trial after the equilibration, which is
+    the cheapest way to reach the step through the path that owns the switch.
+    """
+    import contextlib
+    import io
+    from xslope import fem
+
+    seen = {"n": 0, "rungs": "not called"}
+    orig = fem.solve_fem
+
+    def wrapped(*a, **k):
+        seen["n"] += 1
+        if seen["n"] == 1:
+            seen["rungs"] = k.get("_corrector_rungs")
+        return orig(*a, **k)
+
+    was = fem.K0_CORRECTOR_LADDER_ON
+    fem.K0_CORRECTOR_LADDER_ON = ladder_on
+    fem.solve_fem = wrapped
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            res = fem.solve_ssrm(fem_data, F_min=1.0, F_max=1.5, k0=1.0,
+                                 trial_factors=[1.0], max_iterations=6000,
+                                 max_iterations_ceiling=6000,
+                                 capture_failure_state=False, debug_level=0)
+    finally:
+        fem.K0_CORRECTOR_LADDER_ON = was
+        fem.solve_fem = orig
+    return res.get("k0_equilibration") or {}, seen["rungs"]
+
+
+def check_k0_step():
+    """The equilibration is a solve like any other, and the corrector is offered
+    it like any other — with the ladder continued, because the step's product is
+    a state rather than a verdict (see fem._K0_CORRECTOR_CHECKPOINTS)."""
+    print("\n4. The K0 in-situ equilibration")
+    import warnings
+
+    from xslope import fem
+
+    n = len(fem._CORRECTOR_CHECKPOINTS)
+    check("the K0 ladder is the trials' ladder, continued",
+          fem._K0_CORRECTOR_CHECKPOINTS[:n] == fem._CORRECTOR_CHECKPOINTS
+          and len(fem._K0_CORRECTOR_CHECKPOINTS) > n,
+          f"{fem._K0_CORRECTOR_CHECKPOINTS}")
+    check("the continued rungs are the ones a creeping equilibration reaches",
+          min(fem._K0_CORRECTOR_CHECKPOINTS[n:]) >= 10000)
+
+    # A JOINTED model: a slab on a plane at 20 degrees, where the K0 field has a
+    # slope to redistribute against and the sweep does not settle at once.
+    sys.path.insert(0, os.path.join(_ROOT, "test"))
+    from joint_element_check import slab_model
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        _d, jointed, _g = slab_model(**K0_SLAB)
+        eq, rungs = _k0_equilibration(jointed)
+    check("the jointed step is handed the continued ladder",
+          tuple(rungs or ()) == fem._K0_CORRECTOR_CHECKPOINTS, f"{rungs}")
+    check("a jointed in-situ state is established", bool(eq.get("stable")),
+          f"{eq.get('verdict')} in {eq.get('iterations')} sweep(s)")
+    check("the corrector certified it, and the record says where",
+          str(eq.get("certified_at") or "").startswith(("vp", "rule:", "gate:")),
+          f"at {eq.get('certified_at')}, {eq.get('nr_iterations')} Newton "
+          f"iteration(s)")
+    _, off_rungs = _k0_equilibration(jointed, ladder_on=False)
+    check("and with the switch off it runs the trials' three rungs",
+          off_rungs is None, f"{off_rungs}")
+
+    # An UNJOINTED model is never handed the continued ladder, so the switch
+    # cannot reach it: the same equilibration, at the same sweep, either way.
+    from xslope.fem import build_fem_data
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+
+    base = os.path.join(_ROOT, 'docs', 'fem', 'files', 'xslope_griffiths1.xlsx')
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sd = load_slope_data(base)
+        mesh = build_mesh_from_polygons(get_material_polygons(sd),
+                                        target_size=2.0, element_type='tri6')
+        plain = build_fem_data(sd, mesh)
+        on, on_rungs = _k0_equilibration(plain, ladder_on=True)
+        off, _ = _k0_equilibration(plain, ladder_on=False)
+    check("an unjointed step is never handed the continued ladder",
+          on_rungs is None, f"{on_rungs}")
+    keys = ("iterations", "converged", "verdict", "certified_at", "n_plastic",
+            "max_displacement", "unbalanced_force_ratio")
+    check("so its equilibration is the same with the switch on and off",
+          all(on.get(k) == off.get(k) for k in keys)
+          and bool(on.get("converged")),
+          f"{on.get('iterations')} sweep(s), max|u| = "
+          f"{on.get('max_displacement', float('nan')):.6g}")
+
+
+def check_refusal_residual():
+    """A refused seeded increment reports that increment's nonzero residual."""
+    print("\n5. A refused corrector's residual")
+    import contextlib
+    import io
+    import math
+
+    import run_tests as rt
+    from xslope import fem
+
+    page = os.path.join(_ROOT, "docs", "tutorials",
+                        "fem03_block_wall_joints.md")
+    tag = next(t for t in rt.parse_test_tags(page)
+               if t.get("benchmark") == "FEM-3-sheet-jointed-ssrm")
+    tag = dict(tag)
+    tag["file"] = os.path.normpath(
+        os.path.join(os.path.dirname(page), tag["file"]))
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data, kwargs, _fmin, _fmax, tol = rt.build_fem_ssrm_case(tag)
+    kwargs = dict(kwargs)
+    kwargs.update(max_iterations=300, max_iterations_ceiling=300,
+                  capture_failure_state=False)
+    with contextlib.redirect_stdout(io.StringIO()):
+        with rt._force_fast_kernel(fem, False):
+            result = fem.solve_ssrm(
+                fem_data, F_min=1.0, F_max=2.0, tolerance=tol,
+                debug_level=1, trial_factors=[1.5546875], **kwargs)
+    attempt = next(a for a in result["trials"][0]["corrector_attempts"]
+                   if not a.get("certified"))
+    public = attempt.get("oob")
+    diagnostic = (attempt.get("nr_diag") or {}).get("oob")
+    check("the fixture reaches a refused corrector",
+          attempt.get("exit_reason") == "diverging",
+          f"{attempt.get('at')}: {attempt.get('exit_reason')}")
+    check("the refusal publishes a finite, nonzero out-of-balance",
+          public is not None and math.isfinite(public) and public > 0.0,
+          f"{public}")
+    check("the public and inner diagnostic readings are the same attempt",
+          public == diagnostic, f"{public} / {diagnostic}")
+
+
+def check_soften_certified():
+    """A corrector that CERTIFIES on a model whose bars can soften.
+
+    Section 5 reaches only a refused corrector, which leaves `_solve_fem_newton`
+    before the post-peak softening latch. A certification does not: on any model
+    with a bar whose residual strength is below its capacity, the converged state
+    goes through `_nr_soften_latch` first, and whatever the caller does with what
+    the latch returns runs on every certification. An exception there is caught
+    by `_try_corrector` and recorded as a refusal, so the trial still gets a
+    verdict — from the sweep — and nothing downstream sees an error. What shows it
+    is that the corrector did not certify, and the refusal names the exception.
+
+    The fixture is tutorial FEM-2's reinforced slope, built exactly as the suite
+    builds its `fem_ssrm` row, at that row's standing edge F = 1.53125 on the
+    reference kernel: the corrector certifies it at the `vp300` checkpoint.
+    """
+    print("\n6. A certification through the softening latch")
+    import contextlib
+    import io
+
+    import numpy as np
+
+    import run_tests as rt
+    from xslope import fem
+
+    page = os.path.join(_ROOT, "docs", "tutorials", "fem02_reinforcement.md")
+    tag = next(t for t in rt.parse_test_tags(page)
+               if t.get("benchmark") == "FEM-2-ssrm")
+    tag = dict(tag)
+    tag["file"] = os.path.normpath(
+        os.path.join(os.path.dirname(page), tag["file"]))
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data, kwargs, f_min, f_max, tol = rt.build_fem_ssrm_case(tag)
+    kwargs = dict(kwargs)
+    kwargs.update(max_iterations=12000, failure_criterion="hybrid",
+                  capture_failure_state=False)
+
+    t_res = np.asarray(fem_data.get("t_res_by_1d_elem", []), dtype=float)
+    t_cap = np.asarray(fem_data.get("t_allow_by_1d_elem", []), dtype=float)
+    check("the fixture has bars that can soften",
+          t_res.size > 0 and bool(np.any(t_res < t_cap)),
+          f"{int(np.sum(t_res < t_cap))} of {t_res.size} bar elements")
+
+    # The latch's own return is the only place its use is visible: the Newton
+    # result does not publish it. Count the calls and what each returned.
+    latch = []
+    orig = fem._nr_soften_latch
+
+    def counted(*a, **k):
+        out = orig(*a, **k)
+        latch.append({"ok": bool(out[0]), "rounds": int(out[5])})
+        return out
+
+    fem._nr_soften_latch = counted
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            with rt._force_fast_kernel(fem, False):
+                result = fem.solve_ssrm(
+                    fem_data, F_min=f_min, F_max=f_max, tolerance=tol,
+                    debug_level=0, trial_factors=[1.53125], **kwargs)
+    finally:
+        fem._nr_soften_latch = orig
+
+    t = result["trials"][0]
+    cert = t.get("corrector") or {}
+    attempts = list(t.get("corrector_attempts") or [])
+    check("the trial stands", t.get("verdict") == "CONVERGED",
+          f"{t.get('verdict')} in {t.get('iterations')} sweep(s)")
+    check("the corrector certified it at vp300",
+          cert.get("checkpoint") == "vp300"
+          and cert.get("driver_of_record") == "corrector",
+          f"at {cert.get('checkpoint')}, out-of-balance {cert.get('oob')}")
+    check("its out-of-balance is inside the force tolerance",
+          cert.get("oob") is not None
+          and cert.get("oob") < cert.get("force_tol", 0.0),
+          f"{cert.get('oob')} < {cert.get('force_tol')}")
+    check("the certifying attempt went through the softening latch",
+          len(latch) >= 1 and all(c["ok"] for c in latch),
+          f"{len(latch)} call(s), rounds {[c['rounds'] for c in latch]}")
+    raised = [a for a in attempts
+              if "error" in str(a.get("refusal") or "").lower()
+              or "error" in str(a.get("exit_reason") or "").lower()]
+    check("no corrector attempt raised",
+          bool(attempts) and not raised,
+          "; ".join(f"{a.get('at')}: {a.get('refusal') or a.get('exit_reason')}"
+                    for a in raised) or f"{len(attempts)} attempt(s)")
+
+
 def main():
     print("=" * 72)
     print("Corrector certification checks")
@@ -203,6 +461,9 @@ def main():
     check_standing_verdicts()
     check_readers_agree()
     check_record()
+    check_k0_step()
+    check_refusal_residual()
+    check_soften_certified()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

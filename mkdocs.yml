@@ -1,7 +1,5 @@
 site_name: XSLOPE
 site_url: https://xslope.readthedocs.io/en/latest/
-exclude_docs: |
-  verification/rs2_joints.md
 site_description: >-
   Free, open-source slope stability and seepage analysis software: seven limit
   equilibrium methods, finite element seepage and finite element strength reduction
@@ -29,6 +27,12 @@ extra_css:
   - css/custom.css
 plugins:
   - search
+  - redirects:
+      redirect_maps:
+        lem/reinforcement.md: reinforcement/lem.md
+        fem/reinforcement.md: reinforcement/fem.md
+        lem/piles.md: piles/lem.md
+        fem/piles.md: piles/fem.md
   - mkdocstrings:
       handlers:
         python:
@@ -84,7 +88,9 @@ nav:
     - Finite Element:
       - 1. Strength Reduction Basics: tutorials/fem01_strength_reduction.md
       - "2. Reinforcement: LEM vs FEM": tutorials/fem02_reinforcement.md
-      - "3. Piles: LEM vs FEM": tutorials/fem03_piles.md
+      - 3. A Block Wall on Slip Joints: tutorials/fem03_block_wall_joints.md
+      - "4. Piles: LEM vs FEM": tutorials/fem04_piles.md
+      - 5. A Rock Slope on Its Joints: tutorials/fem05_rock_slope_joints.md
     - Combined:
       - 1. Seepage → LEM → FEM: tutorials/combo01_seepage_stability.md
       - 2. Rapid Drawdown: tutorials/combo02_rapid_drawdown.md
@@ -93,6 +99,11 @@ nav:
       - 1. The AI Assistant: tutorials/w01_ai_assistant.md
       - 2. Importing Models from CAD and Other Programs: tutorials/w02_import.md
       - 3. Generating the Analysis Report: tutorials/w03_report.md
+  - Seepage Analysis:
+    - Overview: seep/overview.md
+    - Transient Seepage: seep/transient.md
+    - Seep-Slope Integration: seep/seep_slope.md
+    - Sample Problems: seep/samples.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md
@@ -101,22 +112,25 @@ nav:
     - Force Equilibrium Methods: lem/force_eq.md
     - Spencer's Method: lem/spencer.md
     - Morgenstern–Price Method: lem/mprice.md
-    - Soil Reinforcement: lem/reinforcement.md
-    - Piles and Concrete Piers: lem/piles.md
     - Rapid Drawdown Analysis: lem/rapid.md
     - Automated Search Algorithms: lem/search.md
     - Sample Problems: lem/samples.md
-  - Seepage Analysis:
-    - Overview: seep/overview.md
-    - Transient Seepage: seep/transient.md
-    - Seep-Slope Integration: seep/seep_slope.md
-    - Sample Problems: seep/samples.md
   - Finite Element Method:
     - Overview: fem/overview.md
-    - Soil Reinforcement: fem/reinforcement.md
-    - Piles and Concrete Piers: fem/piles.md
+    - Solver: fem/solver.md
+    - Joints and Interface Elements: fem/joints.md
     - Mesh Generation: fem/mesh.md
     - Sample Problems: fem/samples.md
+  - Reinforcement:
+    - Overview: reinforcement/overview.md
+    - Reinforcement Types: reinforcement/types.md
+    - Reinforcement in LEM: reinforcement/lem.md
+    - Reinforcement in FEM: reinforcement/fem.md
+  - Piles and Walls:
+    - Overview: piles/overview.md
+    - Pile and Wall Types: piles/types.md
+    - Piles in LEM: piles/lem.md
+    - Piles in FEM: piles/fem.md
   - Reliability:
     - Overview: reliability/index.md
     - Taylor Series (TSPM): reliability/taylor.md
@@ -134,6 +148,7 @@ nav:
     - Rocscience Slide2 Corpus: verification/rocscience.md
     - Rocscience Groundwater Corpus: verification/rocscience_groundwater.md
     - Rocscience RS2 (SSRM) Corpus: verification/rs2.md
+    - Rocscience RS2 Joint Corpus: verification/rs2_joints.md
     - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
     - Published Problems: verification/published.md
     - References: verification/references.md

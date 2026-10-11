@@ -136,6 +136,21 @@ def tags(pages):
     return out
 
 
+def tilt_tags(pages):
+    """Every ``fem_tilt`` tag on ``pages``, as ``(page, kv)``. A tilt lock is two
+    full-strength solves with no bisection and no trial record, so this audit has
+    nothing to read for it: the suite's fem_tilt check rules on the budget itself
+    (an edge that runs out of sweeps fails the row), and its lock_edges row checks
+    the pair. They are counted here so they are never silently out of view."""
+    out = []
+    for page in pages:
+        for line in open(page):
+            kv = _kv(line)
+            if kv and kv.get("type") == "fem_tilt" and kv.get("file"):
+                out.append((page, kv))
+    return out
+
+
 def row_slug(kv):
     """A file-name-safe name for ONE row of a workbook that carries several.
 
@@ -279,6 +294,13 @@ def main(argv=None):
 
     rows = tags(pages)
     print(f"{len(rows)} fem_ssrm locks on {len(set(p for p, _ in rows))} page(s)")
+    tilts = tilt_tags(pages)
+    if tilts:
+        names = ", ".join(kv.get("benchmark") or os.path.basename(kv["file"])
+                          for _, kv in tilts)
+        print(f"{len(tilts)} fem_tilt lock(s) not audited here — two full-strength "
+              f"solves, no trial record; the suite's fem_tilt check rules on the "
+              f"budget itself: {names}")
     flagged, captured, missing = [], 0, []
     checked_on_edges, stale_edges = 0, []
     for page, kv in rows:

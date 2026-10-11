@@ -20,9 +20,12 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": 0.10662749108590765,
+      "u_ratio": 0.10662749108590755,
       "growth": null,
+      "max_displacement": 0.05958504010410848,
       "exit_reason": "converged",
+      "stop_reading": null,
+      "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -36,13 +39,13 @@
         "vp_iterations": 300,
         "nr_iterations": 29,
         "nr_force_evals": 141,
-        "oob": 1.443447172862663e-07,
+        "oob": 1.443450872695482e-07,
         "force_tol": 0.001,
-        "yield_violation": 2.7777865005956096e-09,
+        "yield_violation": 2.7777790919085643e-09,
         "yield_tol": 1e-06,
-        "max_disp_deep": 0.05958504010410853,
+        "max_disp_deep": 0.05958504010410848,
         "disp_limit": 7.7,
-        "disp_frac_height": 0.0007738316896637472
+        "disp_frac_height": 0.0007738316896637465
       }
     },
     {
@@ -51,14 +54,24 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 8.010040375565824,
-      "growth": 1.9055751193938357,
+      "u_ratio": 15.016829990981963,
+      "growth": 3.6365017670114645,
+      "max_displacement": 8.391629664514332,
       "exit_reason": "diverging",
-      "plateau_iteration": null,
+      "stop_reading": {
+        "rule": "diverging",
+        "signal": "runaway",
+        "iteration": 6391,
+        "u_ratio": 15.016829990981963,
+        "window": 2000,
+        "gain": 4.578771598849152
+      },
+      "creep_reading": null,
+      "plateau_iteration": 4763,
       "budget_extensions": 0,
-      "diverging_iteration": 3330,
-      "ee_suppressed": false,
-      "iterations": 3331,
+      "diverging_iteration": 6390,
+      "ee_suppressed": true,
+      "iterations": 6391,
       "nr_force_evals": 0,
       "nr_predictor_iterations": 0
     },
@@ -68,9 +81,12 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": 0.7299513555438493,
+      "u_ratio": 0.7299513575364585,
       "growth": null,
+      "max_displacement": 0.40790775877691754,
       "exit_reason": "converged",
+      "stop_reading": null,
+      "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -84,13 +100,13 @@
         "vp_iterations": 3000,
         "nr_iterations": 24,
         "nr_force_evals": 111,
-        "oob": 3.2948288451618576e-08,
+        "oob": 3.2948279502577534e-08,
         "force_tol": 0.001,
-        "yield_violation": 1.6574862979159094e-14,
+        "yield_violation": 1.3097843075184852e-09,
         "yield_tol": 1e-06,
-        "max_disp_deep": 0.4079077576634177,
+        "max_disp_deep": 0.40790775877691754,
         "disp_limit": 7.7,
-        "disp_frac_height": 0.005297503346278152
+        "disp_frac_height": 0.005297503360739189
       }
     },
     {
@@ -99,14 +115,64 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 2.0915304463395605,
-      "growth": 0.3913447113876318,
-      "exit_reason": "diverging",
-      "plateau_iteration": null,
+      "u_ratio": 12.636189553125874,
+      "growth": 3.0151932324418413,
+      "max_displacement": 7.065211766216874,
+      "exit_reason": "not_slowing",
+      "stop_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          1.204017800111115,
+          1.1985541544745444,
+          1.2357513243940825,
+          1.1751931936357152,
+          1.2355648443130443
+        ],
+        "ratios": [
+          0.9954621554298728,
+          1.0310350348214725,
+          0.9509948890501408,
+          1.0513716816981864
+        ],
+        "ratio": 1.006486974470472,
+        "moved": 6.049081316928501,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000,
+        "rule": "not_slowing"
+      },
+      "creep_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          1.204017800111115,
+          1.1985541544745444,
+          1.2357513243940825,
+          1.1751931936357152,
+          1.2355648443130443
+        ],
+        "ratios": [
+          0.9954621554298728,
+          1.0310350348214725,
+          0.9509948890501408,
+          1.0513716816981864
+        ],
+        "ratio": 1.006486974470472,
+        "moved": 6.049081316928501,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000
+      },
+      "plateau_iteration": 2662,
       "budget_extensions": 0,
-      "diverging_iteration": 2090,
-      "ee_suppressed": false,
-      "iterations": 2091,
+      "diverging_iteration": null,
+      "ee_suppressed": true,
+      "iterations": 16000,
       "nr_force_evals": 0,
       "nr_predictor_iterations": 0
     },
@@ -116,9 +182,59 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 2.9847651690242887,
-      "growth": 0.49743153094137516,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 2.9847651687602017,
+      "growth": 0.49743153096644394,
+      "max_displacement": 1.6685582075293577,
+      "exit_reason": "not_slowing",
+      "stop_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.201790843491651,
+          0.20038857257223247,
+          0.1998647129245033,
+          0.19945444545443675,
+          0.19935837843675072
+        ],
+        "ratios": [
+          0.9930508694291843,
+          0.9973857808306892,
+          0.9979472741132571,
+          0.9995183510827891
+        ],
+        "ratio": 0.9969726838420911,
+        "moved": 1.0008569528795743,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000,
+        "rule": "not_slowing"
+      },
+      "creep_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.201790843491651,
+          0.20038857257223247,
+          0.1998647129245033,
+          0.19945444545443675,
+          0.19935837843675072
+        ],
+        "ratios": [
+          0.9930508694291843,
+          0.9973857808306892,
+          0.9979472741132571,
+          0.9995183510827891
+        ],
+        "ratio": 0.9969726838420911,
+        "moved": 1.0008569528795743,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000
+      },
       "plateau_iteration": 10541,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -133,9 +249,59 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 1.7087118503373604,
-      "growth": 0.22564679792507303,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 1.708711850357475,
+      "growth": 0.22564679815919425,
+      "max_displacement": 0.9551381477599378,
+      "exit_reason": "not_slowing",
+      "stop_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.09548184054092017,
+          0.09421371195537978,
+          0.09241869731944993,
+          0.09022054465217454,
+          0.09000017654459382
+        ],
+        "ratios": [
+          0.9867186411745288,
+          0.9809474162659043,
+          0.9762152818527904,
+          0.9975574509283855
+        ],
+        "ratio": 0.9853275928625747,
+        "moved": 0.46233497101251825,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000,
+        "rule": "not_slowing"
+      },
+      "creep_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.09548184054092017,
+          0.09421371195537978,
+          0.09241869731944993,
+          0.09022054465217454,
+          0.09000017654459382
+        ],
+        "ratios": [
+          0.9867186411745288,
+          0.9809474162659043,
+          0.9762152818527904,
+          0.9975574509283855
+        ],
+        "ratio": 0.9853275928625747,
+        "moved": 0.46233497101251825,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000
+      },
       "plateau_iteration": 7574,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -149,10 +315,60 @@
       "role": "bisect",
       "converged": false,
       "stable": false,
-      "verdict": "AMBIGUOUS",
-      "u_ratio": 1.1008128331588538,
-      "growth": 0.08533743900529318,
-      "exit_reason": "iteration_cap",
+      "verdict": "FAILED",
+      "u_ratio": 1.100812832564088,
+      "growth": 0.08533743860712759,
+      "max_displacement": 0.6152371273063363,
+      "exit_reason": "not_slowing",
+      "stop_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.036300719548178935,
+          0.03691048892115754,
+          0.03126639469116583,
+          0.0400372384937147,
+          0.028507399156003484
+        ],
+        "ratios": [
+          1.0167977213831618,
+          0.8470869827260281,
+          1.2805198325289173,
+          0.7120221131254784
+        ],
+        "ratio": 0.9413705134156628,
+        "moved": 0.17302224081022047,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000,
+        "rule": "not_slowing"
+      },
+      "creep_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.036300719548178935,
+          0.03691048892115754,
+          0.03126639469116583,
+          0.0400372384937147,
+          0.028507399156003484
+        ],
+        "ratios": [
+          1.0167977213831618,
+          0.8470869827260281,
+          1.2805198325289173,
+          0.7120221131254784
+        ],
+        "ratio": 0.9413705134156628,
+        "moved": 0.17302224081022047,
+        "u_elastic_scale": 0.5588149875542139,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000
+      },
       "plateau_iteration": 9512,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -168,6 +384,6 @@
   "unit_system": "si",
   "converged": true,
   "iterations": 3024,
-  "residual": 8.668679841517397e-06,
-  "max_displacement": 0.4079077576634177
+  "residual": 8.669884387645639e-06,
+  "max_displacement": 0.40790775877691754
 }

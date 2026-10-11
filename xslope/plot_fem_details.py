@@ -228,6 +228,14 @@ BAND_LABEL = "Shear band crossing"
 CAPTURE_TRUNCATED_NOTE = "capture stopped early"
 
 
+def capture_distance_words():
+    """How far a capture the distance fence stopped had moved, in words:
+    "moved 20% of the model height"."""
+    from xslope.fem import _CAPTURE_DISTANCE_FRAC
+    frac = _CAPTURE_DISTANCE_FRAC or 0.0
+    return f"moved {100.0 * frac:.0f}% of the model height"
+
+
 def capture_stop_note(profile):
     """What a panel says about the capture it is drawing, or "".
 
@@ -241,8 +249,13 @@ def capture_stop_note(profile):
     if not stop:
         return CAPTURE_TRUNCATED_NOTE if profile.get("capture_truncated") else ""
     at, kind, _max_u = stop
-    # Every stop but one is the section running away; the exception is the
-    # arithmetic giving out, and it is the only one named differently.
+    if kind == "distance":
+        # Not a runaway: the section had moved as far as the capture is let run
+        # (see xslope.fem._CAPTURE_DISTANCE_FRAC), and this is the state it was in.
+        return (f"capture stopped at iteration {at} ({capture_distance_words()})"
+                if at is not None else f"capture {capture_distance_words()}")
+    # Every other stop is the section running away, except the arithmetic giving
+    # out, which is named as what it is.
     why = "not a number" if kind == "non_finite" else "runaway"
     if at is None:
         return CAPTURE_TRUNCATED_NOTE
@@ -318,7 +331,12 @@ def _title(profile):
     # readings follow it: the mechanism is what the panel is drawing, and its
     # forces are the forces at the state the guard stopped on — quoted, with the
     # iteration they belong to standing beside them.
-    if profile.get("capture_truncated"):
+    # A capture the distance fence stopped is the at-failure state the title
+    # already names, so the title says nothing more about it; the note is carried
+    # where the readings are quoted (the pile panel's mobilization note, the
+    # Studio status line).
+    stop = profile.get("capture_stop")
+    if profile.get("capture_truncated") and not (stop and stop[1] == "distance"):
         note = capture_stop_note(profile)
         if note:
             bits.append(note)
@@ -566,7 +584,7 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         handles, labels = [], []
         if len(bar_cap) == len(bar_s):
             cap, = ax_T.step(bar_s, bar_cap, where="mid", linestyle="--",
-                             linewidth=1.3, color=C_ENVELOPE)
+                             linewidth=1.3, color=C_ENVELOPE, zorder=3)
             handles.append(cap)
             labels.append("Bar capacity")
         mob, = ax_T.plot(bar_s, bar_T, "-o", color=C_FORCE, linewidth=1.7,
@@ -575,21 +593,24 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         labels.append("Bar tension")
         ax_T.legend(handles, labels, loc="best", fontsize=8, frameon=False)
         ax_T.set_ylabel(_axis_label("Bar tension", u.get("force")), fontsize=9)
+        ax_T.set_ylim(bottom=0.0)
         ax_T.grid(True, **GRID)
 
     # --- normal traction ---------------------------------------------------
     ax_n.axhline(0.0, color="0.6", linewidth=0.8)
     ax_n.plot(s, profile["tn"], "-", color=C_FORCE, linewidth=1.5)
-    ax_n.set_ylabel(_axis_label("Normal traction\n(compression +)",
+    ax_n.set_ylabel(_axis_label("Normal stress\n(compression +)",
                                 u.get("stress")), fontsize=9)
     ax_n.grid(True, **GRID)
 
     # --- shear traction against its limit ----------------------------------
     ts = np.abs(np.asarray(profile["ts"], dtype=float))
     tlim = np.asarray(profile["tlim"], dtype=float)
-    lim, = ax_s.plot(s, tlim, "--", color=C_ENVELOPE, linewidth=1.3)
-    mob, = ax_s.plot(s, ts, "-", color=C_FORCE, linewidth=1.6)
-    h, l = [lim, mob], ["Mohr-Coulomb limit", "Shear traction"]
+    # The limit is drawn on top of the shear stress: where the interface slips
+    # the two coincide, and the dashed limit must stay visible there.
+    mob, = ax_s.plot(s, ts, "-", color=C_FORCE, linewidth=1.6, zorder=2)
+    lim, = ax_s.plot(s, tlim, "--", color=C_ENVELOPE, linewidth=1.3, zorder=3)
+    h, l = [lim, mob], ["Mohr-Coulomb limit", "Shear stress"]
     slipping = np.asarray(profile["slipping"], dtype=bool)
     opened = np.asarray(profile["open"], dtype=bool)
     if slipping.any():
@@ -603,7 +624,10 @@ def plot_joint_detail(profile, fig=None, fit_height=True):
         h.append(m)
         l.append("Open")
     ax_s.legend(h, l, loc="best", fontsize=8, frameon=False)
-    ax_s.set_ylabel(_axis_label("Shear traction", u.get("stress")), fontsize=9)
+    ax_s.set_ylabel(_axis_label("Shear stress", u.get("stress")), fontsize=9)
+    # From zero, like the normal-stress panel above it, so the limit keeps the
+    # normal stress's proportions instead of being stretched over a narrow range.
+    ax_s.set_ylim(bottom=0.0)
     ax_s.grid(True, **GRID)
 
     # --- slip --------------------------------------------------------------

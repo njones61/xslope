@@ -20,9 +20,15 @@ six lines made joints in memory:
   c. the plots. The inputs plot draws a jointed line in its own style with its
      own legend entry and a bonded one in the ordinary one; the mesh plot draws
      the jointed lines over the mesh; the results panel draws every joint as a
-     hairline colored by slip, with the slip colorbar as its only legend and no
-     colorbar where nothing slipped, and draws nothing at all on a model with
-     no joint. The displacement panel is the scaled deformed mesh, with the
+     thin line colored by slip with no white backing, with the slip colorbar
+     and a key naming the three states placed off the section, no colorbar
+     where nothing slipped, and nothing at all on a model with no joint. With
+     Show joints on the strain panel of a jointed model draws EVERY joint,
+     a jointed reinforcement sheet as its two faces either side of the bar,
+     whether its soil can yield (over the strain field, strain title kept) or
+     not (the Joint slip panel). The deformation panel draws the joints the
+     same way except that a closed joint keeps the joint-face weight, and it
+     returns the slip colorbar too. The displacement panel is the scaled deformed mesh, with the
      joint faces over its grid, on a jointed model and the arrow field on every
      other one — asserted in both layouts a results figure is drawn in, the
      stacked multi-panel one and the single panel Studio and the report render,
@@ -43,12 +49,25 @@ six lines made joints in memory:
      — leaves the bodies the joints cut the section into. Read on two grids
      whose answer is known by inspection: a rectangle cut through is two blocks,
      and one whose joint stops inside is one, because the material wraps around
-     the tip. That is what the deformed panel tints and outlines.
+     the tip. That is what the deformed panel tints and outlines. With Color
+     by block on (``color_blocks=True``) the shipped toppling model's panel,
+     drawn from its stored solution, fills more than one tint, neighboring
+     blocks differing; off, it fills exactly one, its single material's.
   g. the saved field keeps its joints. Slip and the opened record are the
      solve's own history and cannot be recovered from the displacements, so a
      field exported without them reloads as a model whose interfaces went
      quiet. The round trip is exact, and a file that is not this model's is
      refused whole.
+  i. the Run FEM dialog. A model with a joint in it opens the dialog on the
+     Hybrid failure criterion and every other model opens it on
+     Non-convergence, because a near-critical trial on a jointed model settles
+     into slip the other criterion can only read as failure. A criterion the
+     user has already chosen this session still wins.
+  j. a bar-less joint trace is not a bar. A joints-sheet line has 1D elements
+     of its own with no member between its faces, and both readers of
+     ``elements_1d`` have to know it: the mesh plot, which drew the trace red
+     and counted it as reinforcement, and the reinforcement sidecar, which
+     wrote a per-bar force row for it with every force and every capacity zero.
 
 Run directly:  PYTHONPATH=. python3 test/joint_surfaces_check.py
 """
@@ -61,6 +80,8 @@ import sys
 import warnings
 
 import numpy as np
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -78,16 +99,15 @@ ADHESION, DELTA = 5.0, 25.0
 TARGET_SIZE = 3.0
 SIZE_1D = 2.0
 
-#: The heaviest a joint span may be drawn (points), and the heaviest its white
-#: under-stroke may be. The overlay was three-point bars over a four-and-a-half
-#: point black under-stroke, which a model with hundreds of joints turns into a
-#: solid mat over the field. It is thin lines now: a slipping span carries the
-#: reading and takes the weight, an intact one stays out of the way, and only
-#: the slipping one is backed by white so a dark green line still reads over a
-#: dark blue or red patch of field. These are the bounds that keep it that way.
+#: The heaviest a joint span may be drawn over a strain field (points). The
+#: overlay was three-point bars over a four-and-a-half point black under-stroke,
+#: which a model with hundreds of joints turns into a solid mat over the field.
+#: It is thin lines now, with no white backing: a slipping span carries the
+#: reading and takes the weight, a closed one stays out of the way. These are
+#: the bounds that keep it that way on the strain panel; the block drawing's
+#: closed joints are the joint-face weight instead (asserted below).
 _SPAN_MAX = 1.6
 _INTACT_MAX = 1.0
-_HALO_MAX = _SPAN_MAX + 1.3
 
 
 def _same_color(collection, color):
@@ -223,9 +243,15 @@ def _leg_preflight(failures, cache):
         if rid in fired:
             failures.append(f"{rid} fires on the fixture, which earns none of "
                             f"them: {fired[rid].message[:100]}")
-    if "joint.bond_inputs_ignored" not in fired:
-        failures.append("the sample's jointed lines carry Lp1/Lp2 and a Tres, "
-                        "and nothing said they are not read")
+    got = fired.get("joint.bond_inputs_ignored")
+    if got is None:
+        failures.append("the sample's jointed lines carry Lp1/Lp2, and nothing "
+                        "said they are not read")
+    elif "fills Lp1 and Lp2," not in got.message:
+        # Tres IS read on a jointed line (the bar softens to it), so the INFO
+        # names the development lengths and nothing else as unread.
+        failures.append(f"the INFO does not name exactly Lp1 and Lp2 as the "
+                        f"unread inputs: {got.message[:120]}")
 
     # The refusal: a jointed line with no interface strength, named.
     blank = _model()
@@ -353,50 +379,112 @@ def _leg_plots(failures, cache):
                         f"panels no longer agree")
     plt.close(fig)
 
-    # The results overlay: hairlines, no state legend, a colorbar only where
-    # something slipped. A network of hundreds of traces is the case this is
-    # drawn for, so weight and legend entries are both part of the contract.
+    # The results overlay: thin lines, no per-state legend entries on the
+    # axes, a colorbar only where something slipped. A network of hundreds of
+    # traces is the case this is drawn for, so weight and legend entries are
+    # both part of the contract. Read on the fixture with nothing opened, so
+    # every white collection would be a backing: white is kept for the gap
+    # down an OPENED stretch, and nothing else carries it.
     from matplotlib.collections import LineCollection
+    import matplotlib.colors as mcolors
+    _white = mcolors.to_rgba("white")
+    _gray = mcolors.to_rgba(_PF._JOINT_INTACT_COLOR)
+    no_open = dict(sol)
+    no_open["joint_open"] = np.zeros_like(np.asarray(sol["joint_open"]))
+
+    def _by_color(ax):
+        cols_ = [c for c in ax.collections if isinstance(c, LineCollection)
+                 and 6.44 < c.get_zorder() < 6.61]
+        white_ = [c for c in cols_ if len(c.get_colors())
+                  and tuple(c.get_colors()[0]) == _white]
+        gray_ = [c for c in cols_ if len(c.get_colors())
+                 and tuple(c.get_colors()[0]) == _gray]
+        return cols_, white_, gray_, [c for c in cols_
+                                      if c not in white_ and c not in gray_]
+
     fig, ax = plt.subplots()
-    specs = plot_joint_states(ax, fem_data, sol)
-    cols = [c for c in ax.collections if isinstance(c, LineCollection)]
+    specs = plot_joint_states(ax, fem_data, no_open)
+    cols, white, faint, slid = _by_color(ax)
     if not cols:
         failures.append("the results overlay draws no joint")
-    widths = [w for c in cols for w in c.get_linewidths()]
-    if widths and max(widths) > _HALO_MAX:
-        failures.append(f"a joint is drawn heavier than a thin line and its "
-                        f"under-stroke: {widths}")
-    # The slipping spans carry the reading, so they take the weight and the
-    # white backing; the intact ones stay lighter and carry none. The three
-    # collections are told apart by color: white is the under-stroke, the
-    # neutral gray is the intact hairline, whatever is left is the slip.
-    import matplotlib.colors as mcolors
-    _white = mcolors.to_rgba(_PF._JOINT_HALO_COLOR)
-    _gray = mcolors.to_rgba(_PF._JOINT_INTACT_COLOR)
-    halo = [c for c in cols if tuple(c.get_colors()[0]) == _white]
-    faint = [c for c in cols if tuple(c.get_colors()[0]) == _gray]
-    slid = [c for c in cols if c not in halo and c not in faint]
-    if not halo:
-        failures.append("the slipping spans carry no white under-stroke, so a "
-                        "dark one over a dark patch of field has nothing to "
-                        "stand off")
+    if white:
+        failures.append(f"the strain overlay draws {len(white)} white "
+                        f"collection(s) with nothing opened: a white backing "
+                        f"under the slipping spans")
+    if not slid:
+        failures.append("the fixture's slipping spans are not drawn")
     if not faint:
-        failures.append("the fixture's intact spans are not drawn in the "
+        failures.append("the fixture's closed spans are not drawn in the "
                         "neutral gray")
     for c in faint:
         if max(c.get_linewidths()) > _INTACT_MAX:
-            failures.append(f"an intact span is drawn as heavily as a slipping "
-                            f"one: {c.get_linewidths()}")
+            failures.append(f"a closed span on the strain panel is not the "
+                            f"hairline: {c.get_linewidths()}")
     for c in slid:
         if max(c.get_linewidths()) > _SPAN_MAX:
             failures.append(f"a slipping span is heavier than the contract: "
                             f"{c.get_linewidths()}")
-    for c in halo:
-        if max(c.get_linewidths()) <= _SPAN_MAX:
-            failures.append("the under-stroke is no wider than the line it is "
-                            "meant to back")
-        if slid and c.get_zorder() >= min(x.get_zorder() for x in slid):
-            failures.append("the white under-stroke is drawn over its line")
+    plt.close(fig)
+
+    # The block drawing: the same styling (no white backing under a slipping
+    # span), except that a closed joint keeps the joint-face weight, because
+    # the thick gray closed joints are what make the blocks read as blocks;
+    # and it hands back the slip colorbar's spec for its caller to place.
+    from xslope.plot_fem import JOINT_FACE_LINEWIDTH, plot_deformed_mesh as _pdm0
+    fig, ax = plt.subplots()
+    d_specs = _quiet(_pdm0, ax, fem_data, no_open, 1000.0, joint_faces=True,
+                     single_panel=True) or []
+    _cols, d_white, d_gray, d_slid = _by_color(ax)
+    if not any("Joint slip" in lab for _sm, lab in d_specs):
+        failures.append(f"the deformation panel returns no slip colorbar "
+                        f"spec: {d_specs!r}")
+    if d_white:
+        failures.append(f"the block drawing draws {len(d_white)} white "
+                        f"collection(s) with nothing opened: a white backing "
+                        f"under the slipping spans")
+    if not d_gray:
+        failures.append("the block drawing draws no closed joint in gray")
+    for c in d_gray:
+        if abs(min(c.get_linewidths()) - JOINT_FACE_LINEWIDTH) > 1e-9:
+            failures.append(f"a closed joint on the block drawing is not the "
+                            f"joint-face weight {JOINT_FACE_LINEWIDTH}: "
+                            f"{c.get_linewidths()}")
+    for c in faint:
+        if max(c.get_linewidths()) >= JOINT_FACE_LINEWIDTH:
+            failures.append(f"a closed span on the strain panel is not "
+                            f"thinner than on the block drawing: "
+                            f"{c.get_linewidths()}")
+    plt.close(fig)
+
+    # The key is placed off the section: on each panel of the results figure
+    # its box in data coordinates does not touch the ground the panel draws
+    # (the shape the placer tests; a corner clear of the ground, or below the
+    # axes when no corner is).
+    from shapely.geometry import box as _sbox
+    from xslope.plot_fem import plot_fem_results as _pfr
+    fig, axes_k = _quiet(_pfr, fem_data, no_open,
+                         plot_type=["deformation", "shear_strain"],
+                         figsize=(9, 7))
+    fig.canvas.draw()
+    rr = fig.canvas.get_renderer()
+    for ax_k in axes_k:
+        leg = ax_k.get_legend()
+        texts = [] if leg is None else [t.get_text() for t in leg.get_texts()]
+        if "closed, no slip" not in texts:
+            failures.append(f"the {ax_k.get_title()[:30]!r} panel draws no "
+                            f"joint key: {texts!r}")
+            continue
+        shape = _PF._section_shape(ax_k)
+        bb = leg.get_window_extent(rr)
+        inv = ax_k.transData.inverted()
+        (x0, y0), (x1, y1) = inv.transform([[bb.x0, bb.y0], [bb.x1, bb.y1]])
+        if shape is None or shape.intersects(
+                _sbox(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))):
+            failures.append(f"the joint key on the {ax_k.get_title()[:30]!r} "
+                            f"panel lies over the section")
+    plt.close(fig)
+    fig, ax = plt.subplots()
+    specs = plot_joint_states(ax, fem_data, sol)
 
     # The ramp shares no color with the field it is drawn over. The field is
     # coolwarm — blue through white to red — and the slip ramp is green: every
@@ -473,29 +561,168 @@ def _leg_plots(failures, cache):
                         "where the field it would scale is zero by construction")
     plt.close(fig)
 
-    # The opened tick is the one mark on that panel with no colorbar to explain
-    # it, and the results plots carry no legend, so the panel's own subtitle
-    # carries the key — on a figure that draws a tick and on no other.
+    # Every joint draws on the strain panel with Show joints on: a jointed
+    # reinforcement SHEET as its two faces either side of the bar, a bar-less
+    # joint (wall contact, rock joint) as its line, each with the slip
+    # colorbar and the key. The fixture's joints are all sheets, so a MIXED copy is made by
+    # declaring one jointed line bar-less (``barless_1d_mask`` over its 1D
+    # elements, which is what a joints-sheet line produces); the line chosen
+    # is one with slipping spans, so its slip colorbar has something to scale.
+    _states = ("closed, no slip", "slipping (color = slip)", "opened")
+    n_1d = len(fem_data["elements_1d"])
+    line_of = np.asarray(fem_data["element_materials_1d"], dtype=int)
+    spans_all = _PF._joint_spans(fem_data, sol)
+    slipping_lines = sorted({r["line"] for r in spans_all if r["slipping"]})
+    joint_lines = sorted({r["line"] for r in spans_all})
+    fd_mix = None
+    if len(joint_lines) < 2 or not slipping_lines:
+        failures.append(f"the fixture cannot make a mixed model: joint lines "
+                        f"{joint_lines}, slipping {slipping_lines}")
+    else:
+        fd_mix = dict(fem_data)
+        fd_mix["barless_1d_mask"] = line_of == int(slipping_lines[0])
+        if not any(_PF._spans_on_bars(fd_mix, spans_all)):
+            failures.append("the mixed fixture has no sheet left on a bar")
+    fd_mix_el = None if fd_mix is None else dict(
+        fd_mix, elastic_materials=list(fem_data.get("material_names") or []))
+
+    def _overlay(ax):
+        """The joint overlay's own collections: plot_joint_states draws them
+        between z 6.45 and 6.6, and the strain panel draws nothing else there
+        when its bars are left off."""
+        return [c for c in ax.collections if isinstance(c, LineCollection)
+                and 6.44 < c.get_zorder() < 6.61]
+
+    def _strain(fd, **kw):
+        fig, ax = plt.subplots()
+        _m, specs_ = plot_shear_strain_contours(ax, fd, sol, single_panel=True,
+                                                **kw)
+        leg = ax.get_legend()
+        key = [] if leg is None else [t.get_text() for t in leg.get_texts()]
+        out = {"title": ax.get_title(), "mappable": _m,
+               "key": [k for k in key if k in _states],
+               "slip_bar": [lab for _sm, lab in specs_ if "Joint slip" in lab],
+               "overlay": len(_overlay(ax)),
+               "artists": len(ax.collections) + len(ax.lines)}
+        plt.close(fig)
+        return out
+
+    # Sheets only: the bar AND the sheet faces, with the key and the slip
+    # colorbar; with Show joints off, the bar alone.
+    for fd, tag in ((fem_data, "yielding"), (fd_el, "all-elastic")):
+        with_bar = _strain(fd, show_joints=True)
+        no_bar = _strain(fd, show_joints=True, show_reinforcement=False)
+        off = _strain(fd, show_joints=False, show_reinforcement=False)
+        if not no_bar["overlay"]:
+            failures.append(f"the {tag} sheet-only strain panel draws no sheet "
+                            f"faces")
+        if off["overlay"]:
+            failures.append(f"with Show joints off the {tag} sheet-only strain "
+                            f"panel still draws the sheet faces")
+        if with_bar["artists"] <= no_bar["artists"]:
+            failures.append(f"the {tag} sheet-only strain panel does not draw "
+                            f"the sheets' bars")
+        if not with_bar["key"]:
+            failures.append(f"the {tag} sheet-only strain panel draws no joint "
+                            f"key")
+        if not with_bar["slip_bar"]:
+            failures.append(f"the {tag} sheet-only strain panel offers no slip "
+                            f"colorbar")
+    yld = _strain(fem_data, show_joints=True)
+    if SHEAR_STRAIN_LABEL not in yld["title"] or yld["mappable"] is None:
+        failures.append(f"a yielding sheet-only model lost its strain title or "
+                        f"colorbar: {yld['title']!r}")
+
+    # Both kinds: the bar-less joint and the sheet both draw, with the key and
+    # the slip colorbar. With Show joints off, none of it.
+    if fd_mix is not None:
+        from xslope.plot_fem import plot_joint_states as _pjs
+        for show in (True, False):
+            on = "on" if show else "off"
+            m = _strain(fd_mix, show_joints=show)
+            nb = _strain(fd_mix, show_joints=show, show_reinforcement=False)
+            if SHEAR_STRAIN_LABEL not in m["title"] or m["mappable"] is None:
+                failures.append(f"a yielding mixed model with Show joints {on} "
+                                f"lost the strain title or colorbar")
+            if show and not (m["key"] and m["slip_bar"] and nb["overlay"]):
+                failures.append(f"the mixed strain panel does not draw its "
+                                f"bar-less joint with the key and the slip "
+                                f"colorbar: key {m['key']!r}, "
+                                f"bars {m['slip_bar']!r}, "
+                                f"overlay {nb['overlay']}")
+            if not show and (m["key"] or m["slip_bar"] or nb["overlay"]):
+                failures.append(f"with Show joints off the mixed strain panel "
+                                f"still draws joints: {m!r}")
+        # The sheet's faces are offset pairs either side of its bar, so the
+        # strain overlay holds more segments than the bar-less line has spans:
+        # every joint is drawn, the sheet's included.
+        fig, ax = plt.subplots()
+        _pjs(ax, fd_mix, sol)
+        strain_segs = sum(len(c.get_segments()) for c in _overlay(ax))
+        plt.close(fig)
+        barless_spans = sum(1 for r, ob in zip(
+            spans_all, _PF._spans_on_bars(fd_mix, spans_all)) if not ob)
+        sheet_spans = len(spans_all) - barless_spans
+        if strain_segs < barless_spans + 2 * sheet_spans:
+            failures.append(f"the strain overlay leaves joints out: "
+                            f"{strain_segs} segments for {barless_spans} "
+                            f"bar-less spans and {sheet_spans} sheet spans "
+                            f"(two faces each)")
+
+    # The deformation panel draws the sheet's faces too.
+    from xslope.plot_fem import plot_deformed_mesh as _pdm
+    counts = []
+    for faces_on in (True, False):
+        fig, ax = plt.subplots()
+        _quiet(_pdm, ax, fem_data, sol, 1000.0, joint_faces=faces_on)
+        counts.append(len([c for c in ax.collections
+                           if isinstance(c, LineCollection)]))
+        plt.close(fig)
+    if counts[0] <= counts[1]:
+        failures.append(f"the deformation panel of a sheet-only model no longer "
+                        f"draws the sheet faces: {counts[0]} collections with "
+                        f"faces, {counts[1]} without")
+
+    # An opened stretch is the one joint state with no colorbar to explain it.
+    # It is drawn as its two faces apart, and the joint overlay's own key
+    # (closed / slipping / opened, drawn by plot_joint_states off the section)
+    # names it — on a figure that draws an opened stretch and on no other. The
+    # overlay is drawn on the strain panel for every joint of a jointed model
+    # with Show joints on, so the key is asserted on the
+    # MIXED model's all-elastic slip panel and yielding strain panel, as the
+    # results figure draws them (bars included), and on the overlay by itself.
     opened = dict(sol)
     opened["joint_open"] = np.ones_like(np.asarray(sol["joint_open"]))
     shut = dict(sol)
     shut["joint_open"] = np.zeros_like(np.asarray(sol["joint_open"]))
-    if not _PF._joint_open_note(fem_data, opened):
-        failures.append("a model with an opened joint offers no key for the tick")
-    if _PF._joint_open_note(fem_data, shut):
-        failures.append("a model with nothing opened still keys the tick")
-    fig, ax = plt.subplots()
-    plot_shear_strain_contours(ax, fem_data, opened, single_panel=True)
-    if "opened" not in ax.get_title():
-        failures.append(f"the opened tick is drawn with nothing saying what it "
-                        f"is: {ax.get_title()!r}")
-    plt.close(fig)
-    fig, ax = plt.subplots()
-    plot_shear_strain_contours(ax, fem_data, shut, single_panel=True)
-    if "opened" in ax.get_title():
-        failures.append(f"a panel with no tick on it carries the tick's key: "
-                        f"{ax.get_title()!r}")
-    plt.close(fig)
+
+    def _key(ax):
+        leg = ax.get_legend()
+        return [] if leg is None else [t.get_text() for t in leg.get_texts()]
+
+    cases_open = [("the joint overlay",
+                   lambda ax, s_: plot_joint_states(ax, fem_data, s_))]
+    if fd_mix is not None:
+        cases_open += [
+            ("the slip panel",
+             lambda ax, s_: plot_shear_strain_contours(ax, fd_mix_el, s_,
+                                                       single_panel=True)),
+            ("the strain panel",
+             lambda ax, s_: plot_shear_strain_contours(ax, fd_mix, s_,
+                                                       single_panel=True))]
+    for where, draw in cases_open:
+        fig, ax = plt.subplots()
+        draw(ax, opened)
+        if "opened" not in _key(ax):
+            failures.append(f"{where}: the opened stretch is drawn with nothing "
+                            f"saying what it is: key {_key(ax)!r}")
+        plt.close(fig)
+        fig, ax = plt.subplots()
+        draw(ax, shut)
+        if "opened" in _key(ax):
+            failures.append(f"{where}: nothing opened, yet the key names the "
+                            f"opened state: key {_key(ax)!r}")
+        plt.close(fig)
 
     # And nothing at all where there is no joint.
     from xslope.fem import build_fem_data, solve_fem
@@ -511,25 +738,28 @@ def _leg_plots(failures, cache):
     plt.close(fig)
     cache["plain"] = (plain, mesh0, fd0, sol0)
 
-    # The displacement panel. A jointed model's mechanism is blocks moving as
-    # bodies on their joints, which an arrow field sampled at nodes does not
-    # show, so that panel becomes the scaled deformed mesh with the joint faces
-    # drawn. An unjointed model keeps the arrows.
+    # The block picture. A jointed model's mechanism is blocks moving as bodies
+    # on their joints, so with Show joints on (the default) its deformation panel
+    # draws the scaled deformed mesh as blocks with the joint faces over them. The
+    # displacement-vector panel is the arrow field on every model, jointed or not.
     #
-    # The rule belongs to the PANEL, not to a figure, so it is asserted on every
+    # Each rule belongs to a PANEL, not to a figure, so it is asserted on every
     # layout a results figure is drawn in: the stacked multi-panel figure the
     # driver scripts and the docs render, AND the one-panel-at-a-time figure
     # Studio's results view and the report render. Those take different layout
     # branches through plot_fem_results (deferred stacked colorbars vs. the
     # single-panel make_axes_locatable path), so one passing does not prove the
     # other.
+    from matplotlib.collections import PolyCollection
     from matplotlib.quiver import Quiver
     from xslope.plot_fem import plot_fem_results
-    layouts = (["shear_strain", "displace_vector"],   # stacked figure
-               ["displace_vector"])                   # Studio / report: one panel
-    for fd, sol, jointed in ((fem_data, sol, True), (fd0, sol0, False)):
-        for panels in layouts:
-            where = f"{len(panels)}-panel"
+    cases = ((fem_data, sol, True, "deformation"),
+             (fem_data, sol, True, "displace_vector"),
+             (fd0, sol0, False, "displace_vector"))
+    for fd, sol, jointed, pt in cases:
+        for panels in (["shear_strain", pt],   # stacked figure
+                       [pt]):                  # Studio / report: one panel
+            where = f"{len(panels)}-panel {pt}"
             fig, axes = _quiet(plot_fem_results, fd, sol, plot_type=list(panels),
                                figsize=(9, 7))
             # One panel returns the Axes itself, not a list of them.
@@ -537,31 +767,6 @@ def _leg_plots(failures, cache):
             title = ax_d.get_title()
             arrows = [a for a in ax_d.collections if isinstance(a, Quiver)]
             faces = [c for c in ax_d.collections if isinstance(c, LineCollection)]
-            if jointed and arrows:
-                failures.append(f"a jointed model's {where} displacement panel "
-                                f"still draws an arrow field")
-            if jointed and "Deformation" not in title:
-                failures.append(f"a jointed model's {where} displacement panel "
-                                f"is not the deformed mesh: {title!r}")
-            if jointed and "Scale" not in title:
-                failures.append(f"the {where} deformed-mesh panel does not print "
-                                f"its exaggeration: {title!r}")
-            # The joint faces are the point of the substitution: a deformed grid
-            # with no faces on it says nothing the arrows didn't.
-            if jointed and len(faces) < 2:
-                failures.append(f"the {where} deformed-mesh panel drew no joint "
-                                f"faces over its grid: {len(faces)} collections")
-            if not jointed and not arrows:
-                failures.append(f"an unjointed model lost its {where} "
-                                f"displacement vectors")
-            if not jointed and "Displacement Vectors" not in title:
-                failures.append(f"an unjointed model's {where} displacement "
-                                f"panel changed: {title!r}")
-            # The blocks: a faint tint per body, and the outside of the deformed
-            # mesh as a line of its own. Without the tint two blocks that touch
-            # are one gray field; without the boundary the only thing carrying
-            # the deformed ground surface is the light element grid.
-            from matplotlib.collections import PolyCollection
             # A Quiver is itself a PolyCollection, so the arrow field is not a
             # block tint however much it looks like one to isinstance.
             tints = [c for c in ax_d.collections
@@ -569,16 +774,48 @@ def _leg_plots(failures, cache):
                      and not isinstance(c, Quiver)]
             edges = [c for c in ax_d.collections if isinstance(c, LineCollection)
                      and _same_color(c, _PF._DEFORMED_BOUNDARY_COLOR)]
-            if jointed and not tints:
-                failures.append(f"the {where} deformed panel tints no blocks, "
-                                f"so two bodies that touch read as one")
-            if jointed and not edges:
-                failures.append(f"the {where} deformed panel draws no exterior "
-                                f"boundary, so the moved ground surface is "
-                                f"carried only by the element grid")
-            if not jointed and tints:
-                failures.append(f"an unjointed model's {where} panel was "
-                                f"tinted by block")
+            if pt == "displace_vector":
+                # The arrow field on every model: a jointed model's third panel
+                # is not the block picture a second time.
+                if not arrows:
+                    failures.append(f"{'a jointed' if jointed else 'an unjointed'}"
+                                    f" model's {where} panel draws no "
+                                    f"displacement vectors")
+                if "Displacement Vectors" not in title:
+                    failures.append(f"{'a jointed' if jointed else 'an unjointed'}"
+                                    f" model's {where} panel is not the "
+                                    f"vectors panel: {title!r}")
+                if tints:
+                    failures.append(f"{'a jointed' if jointed else 'an unjointed'}"
+                                    f" model's {where} panel was tinted by "
+                                    f"block")
+            else:
+                if arrows:
+                    failures.append(f"a jointed model's {where} panel draws an "
+                                    f"arrow field")
+                if "Deformation" not in title:
+                    failures.append(f"a jointed model's {where} panel is not "
+                                    f"the deformed mesh: {title!r}")
+                if "Scale" not in title:
+                    failures.append(f"the {where} panel does not print its "
+                                    f"exaggeration: {title!r}")
+                # The joint faces are the point of the block picture: a deformed
+                # grid with no faces on it says nothing about the joints.
+                if len(faces) < 2:
+                    failures.append(f"the {where} panel drew no joint faces "
+                                    f"over its grid: {len(faces)} collections")
+                # The blocks: a faint tint per body, and the outside of the
+                # deformed mesh as a line of its own. Without the tint two blocks
+                # that touch are one gray field; without the boundary the only
+                # thing carrying the deformed ground surface is the light
+                # element grid.
+                if not tints:
+                    failures.append(f"the {where} panel tints no blocks, so two "
+                                    f"bodies that touch read as one")
+                if not edges:
+                    failures.append(f"the {where} panel draws no exterior "
+                                    f"boundary, so the moved ground surface is "
+                                    f"carried only by the element grid")
             plt.close(fig)
 
 
@@ -781,7 +1018,7 @@ def _leg_details(failures, cache):
         failures.append(f"the joint detail figure has {len(fig.axes)} panels, "
                         f"not the four the panel documents")
     ylabels = [a.get_ylabel() for a in fig.axes]
-    for want in ("Bar tension", "Normal traction", "Shear traction", "Slip"):
+    for want in ("Bar tension", "Normal stress", "Shear stress", "Slip"):
         if not any(want in y for y in ylabels):
             failures.append(f"the detail figure has no {want} panel: {ylabels}")
     plt.close(fig)
@@ -958,6 +1195,159 @@ def _leg_blocks(failures, cache):
                         f"{ {k: len(v) for k, v in blocks2.items()} }")
 
 
+    # Color by block, on the shipped toppling model's stored solution (no
+    # solve): on, a tint per block with neighbors differing, so more than one;
+    # off, one tint per material, and the model has one material.
+    import matplotlib.figure as mplfig
+    import matplotlib.colors as mcolors
+    from matplotlib.collections import PolyCollection
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, import_fem_solution
+    from xslope.mesh import import_mesh_from_json
+    from xslope.plot_fem import plot_fem_results
+    stem = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "docs", "tutorials", "files", "xslope_rock_toppling")
+    sd = _quiet(load_slope_data, stem + ".xlsx")
+    fd = _quiet(build_fem_data, sd, _quiet(import_mesh_from_json,
+                                          stem + "_mesh.json"))
+    sol = _quiet(import_fem_solution, fd, stem)
+    n_mats = len(np.unique(np.asarray(fd["element_materials"], dtype=int)))
+    if n_mats != 1:
+        failures.append(f"the toppling model carries {n_mats} materials; the "
+                        f"Color by block assertion expects one")
+    for on, want in ((True, "more than one"), (False, "exactly one")):
+        fig = mplfig.Figure(figsize=(6.0, 4.0))
+        _quiet(plot_fem_results, fd, sol, plot_type=["deformation"], fig=fig,
+               show_joints=True, color_blocks=on)
+        tints = {tuple(np.round(c[:3], 6))
+                 for ax in fig.axes for coll in ax.collections
+                 if isinstance(coll, PolyCollection) and coll.get_zorder() == 0.5
+                 for c in coll.get_facecolors()}
+        ok = len(tints) > 1 if on else len(tints) == 1
+        if not ok:
+            failures.append(f"with Color by block {'on' if on else 'off'} the "
+                            f"toppling model's deformation panel fills "
+                            f"{len(tints)} tint(s), not {want}")
+
+
+# --------------------------------------------------------------------------
+# i. the Run FEM dialog opens on the criterion the model needs
+# --------------------------------------------------------------------------
+
+def _leg_run_dialog(failures, cache):
+    """A jointed model opens the Run FEM dialog on Hybrid.
+
+    Under Non-convergence a near-critical trial on a jointed model counts as a
+    failure whatever its joints are doing, so the bisection walks its lower
+    bound to the floor and the run reports no factor of safety. The dialog
+    reads the model the way the mesher does — either sheet's lines — and opens
+    on the criterion that can rule on it.
+    """
+    from PySide6.QtWidgets import QApplication
+    from studio.dialogs import RunFemDialog
+
+    app = QApplication.instance() or QApplication([])   # noqa: F841
+    sd, _mesh, _fem_data, _sol = cache["solved"]
+
+    dlg = _quiet(RunFemDialog, defaults={}, slope_data=sd,
+                 material_names=[m.get("name") for m in sd.get("materials") or []])
+    if dlg.failure_criterion.currentData() != "hybrid":
+        failures.append(f"a jointed model opens the Run FEM dialog on "
+                        f"{dlg.failure_criterion.currentData()!r}, not 'hybrid'")
+    dlg.deleteLater()
+
+    # The same model with its Joint columns cleared is an ordinary bonded one.
+    plain = _model(jointed=())
+    dlg2 = _quiet(RunFemDialog, defaults={}, slope_data=plain,
+                  material_names=[m.get("name") for m in plain.get("materials") or []])
+    if dlg2.failure_criterion.currentData() != "non_convergence":
+        failures.append(f"a model with no joint opens the Run FEM dialog on "
+                        f"{dlg2.failure_criterion.currentData()!r}, not "
+                        f"'non_convergence'")
+    dlg2.deleteLater()
+
+    # A criterion already chosen this session is not overwritten by the model.
+    dlg3 = _quiet(RunFemDialog, defaults={"failure_criterion": "non_convergence"},
+                  slope_data=sd,
+                  material_names=[m.get("name") for m in sd.get("materials") or []])
+    if dlg3.failure_criterion.currentData() != "non_convergence":
+        failures.append("the model's own default overrode a criterion the user "
+                        "had already chosen this session")
+    dlg3.deleteLater()
+
+    # The joints sheet is the other source, and is read the same way.
+    sheet = _model(jointed=())
+    sheet["joint_lines"] = [{"label": "bedding", "x1": 0.0, "y1": 0.0,
+                             "x2": 10.0, "y2": 5.0, "phi": 35.0}]
+    dlg4 = _quiet(RunFemDialog, defaults={}, slope_data=sheet,
+                  material_names=[m.get("name") for m in sheet.get("materials") or []])
+    if dlg4.failure_criterion.currentData() != "hybrid":
+        failures.append("a model whose joints are on the joints sheet opens "
+                        "the Run FEM dialog on "
+                        f"{dlg4.failure_criterion.currentData()!r}, not 'hybrid'")
+    dlg4.deleteLater()
+
+
+# --------------------------------------------------------------------------
+# j. a joints-sheet line's 1D elements are not a member
+# --------------------------------------------------------------------------
+
+def _leg_barless(failures, cache):
+    """A joints-sheet line has 1D elements of its own and no bar between its
+    faces, so nothing that reports on members may report on it.
+
+    Both places that split ``elements_1d`` read the same ``barless_1d_mask``:
+    the mesh plot, which drew the trace red and counted it as reinforcement, and
+    the reinforcement sidecar, which wrote a per-bar force row for it with every
+    force and every capacity zero. The fixture's own lines all carry bars, so
+    the mask is flipped on a copy of its fem_data — which is exactly what a
+    joints-sheet line produces — and the two readers are asked again.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from xslope.fem import _fem_reinforcement_dataframe as _reinf_df
+    from xslope.plot_fem import plot_fem_data
+    _sd, _mesh, fem_data, sol = cache["solved"]
+
+    n_1d = len(fem_data["elements_1d"])
+    if not n_1d:
+        failures.append("the fixture carries no 1D elements to read")
+        return
+
+    # As built: every line carries a bar, so nothing is bar-less.
+    df = _quiet(_reinf_df, fem_data, sol)
+    if df is None or len(df) != n_1d:
+        failures.append(f"the bonded fixture's sidecar lost rows: "
+                        f"{0 if df is None else len(df)} of {n_1d}")
+    _quiet(plot_fem_data, fem_data)
+    title = plt.gcf().axes[0].get_title()
+    if "reinforcement" not in title:
+        failures.append(f"a bar on the mesh plot stopped being reinforcement: "
+                        f"{title!r}")
+    plt.close("all")
+
+    # The same elements declared bar-less: a joints-sheet line.
+    barless = dict(fem_data)
+    barless["barless_1d_mask"] = np.ones(n_1d, dtype=bool)
+    if _quiet(_reinf_df, barless, sol) is not None:
+        failures.append("a bar-less joint line was written into the "
+                        "reinforcement sidecar as a member with no force")
+    _quiet(plot_fem_data, barless)
+    title = plt.gcf().axes[0].get_title()
+    if "reinforcement" in title:
+        failures.append(f"the mesh plot counts a joint trace as reinforcement: "
+                        f"{title!r}")
+    if f"{n_1d} joint" not in title:
+        failures.append(f"the mesh plot does not name the joint trace: "
+                        f"{title!r}")
+    labels = [h.get_label() for h in plt.gcf().legends[0].legend_handles] \
+        if plt.gcf().legends else []
+    if labels and not any(str(t).startswith("Joint (") for t in labels):
+        failures.append(f"the mesh plot has no joint legend entry: {labels}")
+    plt.close("all")
+
+
 # --------------------------------------------------------------------------
 
 LEGS = (
@@ -969,6 +1359,8 @@ LEGS = (
     ("the detail profile and its figure", _leg_details),
     ("the report's joints table", _leg_report),
     ("the blocks a joint cuts", _leg_blocks),
+    ("the Run FEM dialog opens on Hybrid", _leg_run_dialog),
+    ("a bar-less joint trace is not a bar", _leg_barless),
 )
 
 

@@ -555,7 +555,7 @@ def rules(analysis=None, fields=None):
 #: seepage solve read onto this mesh -- so telling a user (or an assistant) to
 #: "fix" one of these invites the wrong repair: silence it by changing the
 #: pore-pressure option, which does not supply the missing physics, it removes
-#: the requirement and quietly changes what is being analysed. An interface that
+#: the requirement and quietly changes what is being analyzed. An interface that
 #: reports findings while a model is being BUILT needs to tell the two apart, so
 #: the distinction is declared here rather than inferred from wording.
 #:
@@ -820,7 +820,7 @@ class _Ctx:
 
     @property
     def effective_surface_family(self):
-        """The family that would actually be analysed, applying today's precedence.
+        """The family that would actually be analyzed, applying today's precedence.
 
         With no explicit selection the circular family wins whenever circles are
         present -- ``generate_slices`` takes the circle branch first -- which is
@@ -1820,6 +1820,118 @@ def _circular_only_message(method, search):
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
+# Family: the model itself -- geometry and materials
+#
+# A file with no geometry, no materials, or a zone pointing at a material row
+# that does not exist yet OPENS: the loader reads structure only, and a model is
+# drawn before it is complete. These are the questions a run asks of it. They
+# apply to every analysis, and they gate the Run choices, so an empty model dims
+# every analysis with the reason rather than failing inside one.
+# ---------------------------------------------------------------------------
+
+@rule("geometry.none_defined", ERROR, ("*",), capability="analysis",
+      summary="Every analysis needs the section's geometry: profile lines or "
+              "material polygons.")
+def _geometry_none(ctx):
+    if ctx.sd.get("polygons"):
+        return None
+    return ("This model has no geometry yet. Draw the cross section as profile "
+            "lines (Profile lines; profile sheet) or as material polygons "
+            "(Polygons; polygon sheet).")
+
+
+@rule("mat.none_defined", ERROR, ("*",), capability="analysis",
+      summary="Every analysis needs at least one material.")
+def _mat_none(ctx):
+    if ctx.materials:
+        return None
+    return ("This model has no materials yet. Add a material for each zone of the "
+            "cross section, then set each zone's Mat ID to its row "
+            f"{_AT_MAT}.")
+
+
+@rule("geometry.material_missing", ERROR, ("*",),
+      "Every geometry zone must name a row of the Materials table.")
+def _geometry_material_missing(ctx):
+    polys = ctx.sd.get("polygons") or []
+    if not polys or not ctx.materials:
+        return None                      # mat.none_defined / geometry.none_defined
+    n = len(ctx.materials)
+    # A profile model's zones are built one per profile line, so the Mat ID the
+    # user typed is on the line; a polygon model's is on the polygon.
+    lines = ctx.sd.get("profile_lines") or []
+    if lines:
+        where, noun = _AT_PROFILE, "Profile line"
+        items = [ln for ln in lines if isinstance(ln, dict)
+                 and len(_coords(ln.get("coords"))) >= 2]
+    else:
+        where, noun = _AT_POLYGON, "Polygon"
+        items = [p for p in polys if isinstance(p, dict)]
+    for k, poly in enumerate(items):
+        mid = poly.get("mat_id")
+        try:
+            mid = None if mid is None else int(mid)
+        except (TypeError, ValueError):
+            mid = None
+        if mid is not None and 0 <= mid < n:
+            continue
+        what = ("has no Mat ID" if mid is None else
+                f"has Mat ID {mid + 1}, and the Materials table has "
+                f"{n} row{'s' if n != 1 else ''}")
+        yield (f"{noun} {k + 1} {what}, so the zone it bounds has no material. "
+               f"Set its Mat ID to a row of the Materials table (1 to {n}) "
+               f"{where}.")
+
+
+@rule("geometry.bottom_elevation_missing", ERROR, ("*",),
+      "Profile-line models require a numeric bottom elevation.")
+def _bottom_elevation_missing(ctx):
+    if ctx.sd.get("profile_lines") and not _finite(ctx.sd.get("max_depth")):
+        return ("This profile-line model has no numeric bottom elevation. "
+                "Enter the bottom elevation (Max depth) "
+                "in Profile lines; profile sheet cell B2.")
+
+
+@rule("geometry.profile_line_too_short", ERROR, ("*",),
+      "A profile line needs at least two points to bound a zone.")
+def _profile_line_short(ctx):
+    for k, line in enumerate(ctx.sd.get("profile_lines") or []):
+        pts = _coords(line.get("coords") if isinstance(line, dict) else line)
+        if len(pts) >= 2:
+            continue
+        yield (f"Profile line {k + 1} has {len(pts)} point"
+               f"{'' if len(pts) == 1 else 's'}, so it bounds no zone and the "
+               f"section is built without it. Add at least one more point, or "
+               f"delete the line {_AT_PROFILE}.")
+
+
+@rule("geometry.zones_overlap", ERROR, ("*",),
+      "Material zones must tile the section without overlapping.")
+def _zones_overlap(ctx):
+    # Measured: a high-conductivity zone drawn over a low-conductivity barrier
+    # bridges it in the mesh and can inflate the seepage flowrate several-fold;
+    # the slicer weighs the overlap twice. Touching along shared edges is the
+    # normal case and has zero overlap area.
+    polys = [p for p in (ctx.sd.get("polygons") or []) if isinstance(p, dict)
+             and p.get("polygon") is not None]
+    tol = 1e-6
+    for i in range(len(polys)):
+        for j in range(i + 1, len(polys)):
+            try:
+                area = polys[i]["polygon"].intersection(polys[j]["polygon"]).area
+            except Exception:
+                continue
+            if area <= tol:
+                continue
+            yield (f"Polygon {i + 1} and polygon {j + 1} overlap by "
+                   f"{area:.4g} square units. Material zones must tile the section: "
+                   f"neighboring zones share an edge, and a zone inside another (a "
+                   f"lens, a dam core) is cut out of the zone around it, which is "
+                   f"then one polygon with a notch or a hole. Redraw them so they "
+                   f"meet along a shared edge {_AT_POLYGON}.")
+
+
+# ---------------------------------------------------------------------------
 # Family: water and unit weight of water
 # ---------------------------------------------------------------------------
 
@@ -2500,10 +2612,8 @@ def _surface_none(ctx):
         # from -- and refusing here would block the caller that needs the sheet
         # least.
         return None
-    return ("This model defines no failure surface: it carries neither a circle "
-            "nor a non-circular surface. A limit-equilibrium run needs at least one "
-            "starting surface (Circles, circles sheet; Non-circular surface, "
-            "non-circ sheet).")
+    return ("This model has no failure surface. Enter a circle on the circles "
+            "sheet or a surface on the non-circ sheet.")
 
 
 @rule("surface.method_requires_circle", ERROR, ("lem",), capability="lem_method",
@@ -2973,6 +3083,28 @@ def _units_signals_disagree(ctx):
             f"independent signals disagree, so one set of numbers is in the wrong "
             f"system -- xslope never converts (Global parameters, main D8; Materials "
             f"table, mat sheet).")
+
+
+#: The time units the input template offers: its Time selector's validation list,
+#: main!D54:D58. The unit is a label -- nothing converts by it -- so a word outside
+#: the list is a warning, not an error.
+TIME_UNITS = ("sec", "min", "hr", "day", "yr")
+
+
+@rule("units.time_unit_unknown", WARNING, ("*",),
+      "A declared time unit is one of the template's: sec, min, hr, day, yr.")
+def _units_time_unit_unknown(ctx):
+    unit = ctx.sd.get("time_unit")
+    if unit is None or not str(unit).strip():
+        return None            # undeclared: tseep.time_unit_missing's question
+    word = str(unit).strip()
+    if word.lower() in TIME_UNITS:
+        return None
+    return (f"Time is {word!r}, which is not one of the time units the template "
+            f"accepts: {', '.join(TIME_UNITS)}. The unit is a label -- nothing is "
+            f"converted by it -- so no number changes, but conductivities and "
+            f"transient times would be read in a unit the model does not name "
+            f"(Global parameters; main D9).")
 
 
 # The Young's-modulus MAGNITUDE signal is deliberately absent from this family.
@@ -3447,6 +3579,16 @@ def _seep_bc_short(ctx):
         out.append(f"Exit face has fewer than two points, so it binds no mesh "
                    f"nodes and the model would silently solve as fully confined "
                    f"{_AT_SEEPBC}.")
+    # Boundary set 2 (the rapid-drawdown drawn-down state) is solved the same way.
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    for n, b in enumerate(bc2.get("specified_heads") or []):
+        if len(_coords(b.get("coords"))) < 2:
+            out.append(f"Specified head #{n + 1} of boundary set 2 has fewer than "
+                       f"two points, so it binds no mesh nodes {_AT_SEEPBC2}.")
+    for n, b in enumerate(bc2.get("specified_fluxes") or []):
+        if len(_coords(b.get("coords"))) < 2:
+            out.append(f"Specified flux #{n + 1} of boundary set 2 has fewer than "
+                       f"two points, so it binds no mesh nodes {_AT_SEEPBC2}.")
     return out
 
 
@@ -3454,8 +3596,8 @@ def _seep_bc_short(ctx):
 # Family: finite element elastic properties and the tensile cap
 #
 # The asymmetry these rules exist to close: a blank E is caught at assembly with
-# a clear message, a blank nu is NOT -- it reads as 0.0, passes the [0, 0.5)
-# range check, and moves the strength-reduction factor by a third. And a blank
+# a clear message, a blank nu is NOT -- it reads as 0.0 and passes the [0, 0.5)
+# range check, describing a material with no lateral coupling at all. And a blank
 # t_cut is silent in both engines while leaving a cohesive material the tension
 # its own envelope admits, c/tan(phi), which strength reduction never reduces --
 # the transcription defect the RS2 campaign traced a 2x factor to.
@@ -3500,10 +3642,10 @@ def _mat_nu_unusable(ctx):
             what = ("is blank or not a number. The finite element engine needs a "
                     "Poisson's ratio for every material it meshes")
         elif nu == 0.0:
-            what = ("is 0 -- which is what a BLANK cell reads as. A soil with no "
-                    "lateral coupling is not a soil, and the value is not inert: on "
-                    "the reference model it moved the strength-reduction factor of "
-                    "safety by a third against nu = 0.3")
+            what = ("is 0 -- which is what a BLANK cell reads as. A Poisson's "
+                    "ratio of 0 couples no lateral strain to vertical load, so the "
+                    "gravity turn-on gives level ground no horizontal stress at all "
+                    "(K0 = nu/(1 - nu) = 0), which describes no soil or rock")
         else:
             what = (f"is {nu:g}, outside the admissible range [0, 0.5). The finite "
                     f"element engine refuses it at assembly")
@@ -3921,8 +4063,8 @@ def _thin_zone_unresolved(ctx):
 # ---------------------------------------------------------------------------
 # Family: transient seepage
 #
-# The storage rules are where the silence is worst: the loader refuses a MISSING
-# Ss or Sy and says so clearly, but an explicit ZERO passes both guards and runs.
+# The storage rules are where the silence is worst: a blank Ss or Sy and an
+# explicit ZERO both reach a transient run, and nothing but this rule refuses them.
 # With Sy = 0 the phreatic surface tracks a falling pool instantly, which is the
 # least conservative drawdown pore pressure the model can produce -- and nothing
 # says a word.
@@ -4339,7 +4481,7 @@ def _rapid_dloads2(ctx):
         return None            # in auto mode the engine derives the stage-2 load
     return ("The stage-2 distributed loads are empty, so the post-drawdown water "
             "load is zero. A rapid-drawdown run needs the stage-2 load: with the "
-            "reservoir load simply absent the slope is analysed as though the water "
+            "reservoir load simply absent the slope is analyzed as though the water "
             "vanished without ever having pressed on it. Enter zero loads "
             "deliberately if the pool drains completely (Distributed loads, Set 2; "
             "dloads (2) sheet).")
@@ -4553,11 +4695,11 @@ def _seismic_direction_fem(ctx):
         return None
     pushes = "+x" if k > 0 else "-x"
     return (f"Seismic coefficient k = {k:g} pushes in {pushes}. In the finite "
-            f"element engine the sign IS the direction: both faces are analysed at "
+            f"element engine the sign IS the direction: both faces are analyzed at "
             f"once, so choose the direction that drives the face you are checking -- "
             f"the engine will not choose for you, and a pseudo-static factor of "
             f"safety can legitimately come out above the static one for the face the "
-            f"shaking stabilises. The limit-equilibrium engine reads the same value "
+            f"shaking stabilizes. The limit-equilibrium engine reads the same value "
             f"as a magnitude and orients it itself {_at_global('D13')}.")
 
 
@@ -4602,7 +4744,7 @@ def _crack_deeper_than_slope(ctx):
 
 
 @rule("crack.exceeds_theoretical_depth", INFO, ("lem",),
-      "A crack far deeper than 2c/gamma is a geometric feature, not a Rankine estimate.",
+      "A crack far deeper than 2c/gamma is a geometric feature. It is not a Rankine estimate.",
       fields=("tcrack_depth", "c", "phi", "gamma"))
 def _crack_theoretical(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
@@ -5071,30 +5213,130 @@ def _reinf_pullout_lp_ignored(ctx):
             f"development lengths {_AT_REINF}."]
 
 
+#: Below this fraction of Tmax, the most a line's development-length envelope lets
+#: it carry anywhere along its length is negligible. A peak BELOW Tmax is not a
+#: fault: an Lp longer than the line is how a pullout-governed member is entered
+#: (vp047's nails, Lp = 7.87 on a 4.9 m nail, reach 62% of Tmax at the facing).
+#: A misplaced decimal or a length in the wrong unit lands an order of magnitude
+#: below a member like that: the same nails with Lp entered as 78.7 reach 6.2%.
+_ENVELOPE_NEGLIGIBLE = 0.10
+
+
+def _reinf_envelope_peak(r, L):
+    """``(peak, s)``: the most tension the development-length envelope lets line
+    ``r`` carry anywhere along its length ``L``, and where -- the distance from
+    end 1. The value is :func:`xslope.fileio.reinforce_available_tension`, the
+    envelope both engines apply, so this cannot drift from what runs. None when
+    the line has no usable Tmax or a blank Lp (other rules own those).
+
+    The capacity rises from end 1 and falls toward end 2, so it peaks where the
+    two ramps cross, or at an end when they never do. An Lp of 0 (or less) holds
+    Tmax from that end, which puts the peak at it.
+    """
+    from .fileio import reinforce_available_tension
+    tmax = _num(r.get("t_max"))
+    lp1, lp2 = _num(r.get("lp1")), _num(r.get("lp2"))
+    if tmax is None or tmax <= 0 or lp1 is None or lp2 is None:
+        return None
+    te1, te2 = _num(r.get("tend1")) or 0.0, _num(r.get("tend2")) or 0.0
+    if lp1 <= 0:
+        s = 0.0
+    elif lp2 <= 0:
+        s = L
+    else:
+        k1, k2 = tmax / lp1, tmax / lp2
+        s = min(L, max(0.0, (te2 + k2 * L - te1) / (k1 + k2)))
+    return reinforce_available_tension(s, L - s, tmax, lp1, lp2, te1, te2), s
+
+
+def _reinf_tres_above_tmax(r):
+    """``(Tres, Tmax)`` as entered on the sheet when Tres exceeds Tmax, else None.
+    The engines read per unit width and the sheet takes per element, so both are
+    multiplied back by the Spacing divisor."""
+    from .fileio import reinforce_spacing_divisor
+    tmax, tres = _num(r.get("t_max")), _num(r.get("t_res"))
+    if tmax is None or tres is None or tres <= tmax:
+        return None
+    div = reinforce_spacing_divisor(r.get("spacing"))
+    return tres * div, tmax * div
+
+
 @rule("reinforce.envelope_inconsistent", WARNING, ("lem", "fem"),
-      "Tres above Tmax, or a pullout length longer than the line itself.",
+      "Tres above Tmax on a finite element run, or development lengths that hold "
+      "the line under a tenth of Tmax along its whole length.",
       fields=("t_max", "t_res", "lp1", "lp2", "tend1", "tend2"))
 def _reinf_envelope(ctx):
+    from .fileio import reinforce_spacing_divisor
+    from .mesh import line_is_jointed
     out = []
     for i, r in enumerate(ctx.reinforcement):
-        tmax, tres = _num(r.get("t_max")), _num(r.get("t_res"))
-        if tmax is not None and tres is not None and tres > tmax:
-            out.append(f"{ctx.reinf_label(i)} has Tres = {tres:g}, above Tmax = "
-                       f"{tmax:g}, so the residual capacity is above the peak the "
-                       f"bar is supposed to drop from {_AT_REINF}.")
+        # Reported as entered: the engines read per unit width, the sheet takes
+        # per element.
+        div = reinforce_spacing_divisor(r.get("spacing"))
+        tmax = _num(r.get("t_max"))
+        # Tres is a finite element input. On a limit-equilibrium run the same
+        # entry is reinforce.tres_above_tmax_on_lem, an INFO (owner ruling
+        # 2026-08-14: a FEM-only input is not a defect of the LEM run).
+        bad = _reinf_tres_above_tmax(r) if "fem" in ctx.analyses else None
+        if bad is not None:
+            tres_e, tmax_e = bad
+            out.append(f"{ctx.reinf_label(i)} has Tres = {tres_e:g}, above "
+                       f"Tmax = {tmax_e:g}. Tres is what the bar keeps after it "
+                       f"ruptures, so it cannot exceed the capacity it ruptures at: "
+                       f"the finite element solve never softens this line, exactly "
+                       f"as with Tres blank {_AT_REINF}.")
+        if _num(r.get("adhesion")) is not None and _num(r.get("delta")) is not None:
+            continue          # the overburden law does not read Lp1/Lp2
+        if "lem" not in ctx.analyses and line_is_jointed(r):
+            continue          # the interface carries a jointed line, not the Lp ramps
         L = _reinf_line_length(r)
         if L is None or L <= 0:
             continue
-        for key, col in (("lp1", "Lp1"), ("lp2", "Lp2")):
-            v = _num(r.get(key))
-            if v is not None and v > L:
-                out.append(
-                    f"{ctx.reinf_label(i)} has {col} = {v:g}, longer than the line "
-                    f"itself ({L:.4g}), so the pullout envelope never reaches Tmax "
-                    f"anywhere along it. A misplaced decimal here silently "
-                    f"annihilates the reinforcement while the line stays on the "
-                    f"drawing {_AT_REINF}.")
+        got = _reinf_envelope_peak(r, L)
+        if got is None or got[0] >= _ENVELOPE_NEGLIGIBLE * tmax:
+            continue
+        peak, s = got
+        tol = 1e-9 * L
+        where = ("at end 1" if s <= tol else "at end 2" if s >= L - tol
+                 else f"{s:.3g} from end 1")
+        builds = ("starts at each end's Tend and builds up"
+                  if (_num(r.get("tend1")) or _num(r.get("tend2")))
+                  else "builds up from each end")
+        out.append(
+            f"{ctx.reinf_label(i)} can carry at most {peak * div:.3g} anywhere "
+            f"along its length, {100.0 * peak / tmax:.2g}% of its Tmax = "
+            f"{tmax * div:g}, and reaches that {where}. Its capacity {builds} "
+            f"at Tmax/Lp per unit length, and with Lp1 = "
+            f"{_num(r.get('lp1')):g} and Lp2 = {_num(r.get('lp2')):g} on a line "
+            f"{L:.4g} long it never builds further. A development length longer "
+            f"than the line is how a pullout-governed member is entered, but at "
+            f"this level the line adds almost nothing to the run: check Lp1 and "
+            f"Lp2 for a misplaced decimal or a length in the wrong unit "
+            f"{_AT_REINF}.")
     return out
+
+
+# INFO, not WARNING: Tres is a finite element input, and on an LEM run a FEM-only
+# input is not a defect of the analysis being run (owner ruling 2026-08-14, the
+# same split as reinforce.fem_incomplete / reinforce.fem_incomplete_on_lem). A
+# finite element run of the file reports it as reinforce.envelope_inconsistent.
+@rule("reinforce.tres_above_tmax_on_lem", INFO, ("lem",),
+      "Tres above Tmax: the LEM does not read Tres, and the FEM never softens the line.",
+      fields=("t_max", "t_res"))
+def _reinf_tres_above_tmax_lem(ctx):
+    bad = [(i, got) for i, r in enumerate(ctx.reinforcement)
+           for got in (_reinf_tres_above_tmax(r),) if got is not None]
+    if not bad:
+        return None
+    i, (tres_e, tmax_e) = bad[0]
+    more = (f", and {len(bad) - 1} other line(s) the same way" if len(bad) > 1
+            else "")
+    return (f"{ctx.reinf_label(i)} has Tres = {tres_e:g}, above Tmax = "
+            f"{tmax_e:g}{more}. This limit-equilibrium run does not read Tres, so "
+            f"its answer is unaffected. A finite element run of the same file "
+            f"never softens the line, exactly as with Tres blank: Tres is what the "
+            f"bar keeps after it ruptures, so it cannot exceed the capacity it "
+            f"ruptures at {_AT_REINF}.")
 
 
 @rule("reinforce.no_surface_engagement", WARNING, ("lem",),
@@ -5582,35 +5824,102 @@ def _joint_lines_meet(ctx):
 
 
 @rule("joint.crosses_constraint_line", ERROR, ("fem",),
-      "A jointed line cannot cross another reinforcement or pile line.")
+      "A bonded reinforcement or pile line cannot end on or cross a jointed line.")
 def _joint_crosses(ctx):
-    from shapely.geometry import LineString
-    jointed = _all_joint_lines(ctx)
-    if not jointed:
-        return
-    jointed_labels = set(label for label, _r, _s in jointed)
-    others = []
+    from shapely.geometry import LineString, Point
+    from .mesh import _joint_line_tol, line_is_jointed
+
+    # The jointed lines, each with the name the message gives it.
+    jointed = []
     for i, r in enumerate(ctx.reinforcement):
         seg = _joint_seg(r)
-        if seg is not None:
-            others.append((ctx.reinf_label(i), seg, "reinforcement"))
+        if seg is None or not line_is_jointed(r):
+            continue
+        name = r.get("label")
+        jointed.append((f"'{name}'" if name else None,
+                        f"reinforcement line {i + 1}", seg))
+    for i, j in enumerate(ctx.joints):
+        seg = _joint_seg(j)
+        if seg is None:
+            continue
+        name = j.get("label")
+        jointed.append((f"'{name}'" if name else None,
+                        f"line {i + 1} on the joints sheet", seg))
+    if not jointed:
+        return
+
+    # The bonded members: reinforcement left bonded, and every pile.
+    bonded = []
+    for i, r in enumerate(ctx.reinforcement):
+        seg = _joint_seg(r)
+        if seg is not None and not line_is_jointed(r):
+            bonded.append((ctx.reinf_label(i), seg, "reinforcement"))
     for i, p in enumerate(ctx.piles):
         seg = _joint_seg(p)
         if seg is not None:
-            others.append((ctx.pile_label(i), seg, "pile"))
-    for lj, _rj, sj in jointed:
-        gj = LineString(list(sj))
-        for label, so, kind in others:
-            if label in jointed_labels:
-                continue          # two joints meeting is allowed; overlap has its own rule
-            if not gj.intersects(LineString(list(so))):
+            name = p.get("label") if isinstance(p, dict) else None
+            base = f"Pile line {i + 1}"
+            bonded.append((f"{base} ('{name}')" if name else base, seg, "pile"))
+    if not bonded:
+        return
+
+    # The mesher's own tolerance over the same geometry: a member it would
+    # refuse as touching a jointed line is one this rule reports.
+    lines = [list(s) for _n, _f, s in jointed] + [list(s) for _l, s, _k in bonded]
+    polys = []
+    for p in (ctx.sd.get("polygons") or []):
+        poly = p.get("polygon") if isinstance(p, dict) else None
+        if poly is not None and not poly.is_empty:
+            polys.append([tuple(c) for c in poly.exterior.coords])
+    tol = _joint_line_tol(lines, polys)
+
+    def _names(hits):
+        # "jointed line 'back face'", "jointed lines 'a' and 'b'", or, for a
+        # line with no label, "jointed line 3 on the joints sheet".
+        if all(n is not None for n, _f in hits):
+            head = "jointed line " if len(hits) == 1 else "jointed lines "
+            return head + _join_names([n for n, _f in hits])
+        return _join_names([f"jointed line {n}" if n is not None
+                            else f"jointed {f}" for n, f in hits])
+
+    for label, seg, kind in bonded:
+        g = LineString(list(seg))
+        ends, crosses = [], []
+        for name, fallback, sj in jointed:
+            gj = LineString(list(sj))
+            if g.distance(gj) > tol:
                 continue
-            yield (f"{lj} is a joint and touches {label}. The mesh splits along "
-                   f"a jointed line and every node on it is copied once per "
-                   f"wedge of material around it, so the {kind} line's own "
-                   f"element would keep one wedge's copy and lose the material "
-                   f"on the other side of the joint. Move the lines apart, or "
-                   f"make the {kind} line a joint too.")
+            if any(gj.distance(Point(q)) <= tol for q in seg):
+                ends.append((name, fallback))
+            else:
+                crosses.append((name, fallback))
+        if not ends and not crosses:
+            continue
+        what = "bar" if kind == "reinforcement" else "pile"
+        parts = []
+        if ends:
+            parts.append(f"ends on {_names(ends)}")
+        if crosses:
+            parts.append(f"crosses {_names(crosses)}")
+        verb = " or ".join(v for v, on in (("end on", ends), ("cross", crosses))
+                           if on)
+        if kind == "reinforcement":
+            fix = ("set Joint = Yes on the reinforcement line, or end it short "
+                   "of the joint." if not crosses else
+                   "set Joint = Yes on it or move it clear.")
+        else:
+            fix = ("end it short of the joint." if not crosses else
+                   "move it clear.")
+        yield (f"{label} {' and '.join(parts)}. A {what} bonded to the soil "
+               f"cannot {verb} a surface the soil is allowed to slide along; "
+               f"{fix}")
+
+
+def _join_names(names):
+    """``'a'``, ``'a' and 'b'``, ``'a', 'b' and 'c'``."""
+    if len(names) <= 1:
+        return "".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
 
 
 @rule("joint.line_load_on_line", ERROR, ("fem",),
@@ -5658,7 +5967,7 @@ def _joint_signal_boundary(ctx):
 
 
 @rule("joint.likely_flat_sheet", WARNING, ("fem",),
-      "A long, flat sheet under the mass is a sliding plane, not a tie.")
+      "A long, flat sheet under the mass is a sliding plane.")
 def _joint_signal_flat(ctx):
     for i, _r, seg in _joint_candidate_lines(ctx):
         if _joint_inclination(seg) > _JOINT_FLAT_DEG:
@@ -5686,7 +5995,7 @@ def _joint_signal_flat(ctx):
 
 
 @rule("joint.likely_smooth_interface", WARNING, ("fem",),
-      "Delta well below the soil's phi is a liner, not a soil contact.",
+      "Delta well below the soil's phi is a liner.",
       fields=("delta",))
 def _joint_signal_smooth(ctx):
     for i, r, seg in _joint_candidate_lines(ctx):
@@ -5713,7 +6022,7 @@ def _joint_signal_smooth(ctx):
 
 
 @rule("joint.likely_wall", WARNING, ("fem",),
-      "Closely spaced sheets behind a steep face are a wall, not a slope.")
+      "Closely spaced sheets behind a steep face are a wall.")
 def _joint_signal_wall(ctx):
     cands = [(i, r, seg) for i, r, seg in _joint_candidate_lines(ctx)
              if _joint_inclination(seg) <= _JOINT_NEAR_HORIZONTAL_DEG]
@@ -5773,8 +6082,8 @@ def _joint_signal_wall(ctx):
 # ---- the info: what a jointed line stops reading ---------------------------
 
 @rule("joint.bond_inputs_ignored", INFO, ("fem",),
-      "A jointed line's pullout comes from the interface, not from Lp or Tres.",
-      fields=("lp1", "lp2", "t_res"))
+      "A jointed line's pullout comes from the interface. Lp1 and Lp2 are not read.",
+      fields=("lp1", "lp2"))
 def _joint_bond_inputs(ctx):
     rows = []
     for i, r, _seg in _joint_lines(ctx):
@@ -5783,21 +6092,19 @@ def _joint_bond_inputs(ctx):
             cols.append("Lp1")
         if _num(r.get("lp2")):
             cols.append("Lp2")
-        tres = _num(r.get("t_res"))
-        if tres is not None:
-            cols.append("Tres")
         if cols:
             rows.append((i, cols))
     for i, cols in rows:
         yield (f"{ctx.reinf_label(i)} sets Joint = Yes and fills "
-               f"{', '.join(cols)}, which the finite element engine does not "
+               f"{' and '.join(cols)}, which the finite element engine does not "
                f"read on a jointed line. The sheet's grip on the soil is the "
                f"traction the interface elements integrate along it, so the "
                f"bond-slip cap the development lengths build is not applied — "
-               f"it would count the same grip twice — and the bar's only limit "
-               f"is its own rupture strength Tmax. The limit-equilibrium engine "
-               f"ignores Joint entirely and reads them as it always did "
-               f"{_AT_REINF}.")
+               f"it would count the same grip twice. The bar keeps its own "
+               f"limits: it yields at its rupture strength Tmax and, where Tres "
+               f"is stated, softens to it. The limit-equilibrium engine ignores "
+               f"Joint entirely and reads {' and '.join(cols)} on this line as "
+               f"on any other {_AT_REINF}.")
 
 
 # ---- the joint-network regions (polygon sheet, Type 'joints') ---------------
@@ -5940,7 +6247,7 @@ def _mat_nu_band(ctx):
                    f"limit of 0.5. The plane-strain stiffness scales with "
                    f"1 / (1 - 2 nu), so the element matrices are poorly conditioned "
                    f"and the strength reduction converges slowly or not at all. Use "
-                   f"0.45 or less; an undrained clay is modelled at 0.45, not 0.49 "
+                   f"0.45 or less; an undrained clay is modeled at 0.45 "
                    f"{_AT_MAT}.")
             continue
         if nu >= 0.1:
@@ -6033,6 +6340,65 @@ def _structural_modulus_band(ctx):
     return out
 
 
+@rule("structural.members_cross", INFO, ("fem",),
+      "Two bonded members that cross share a mesh node there, so the FEM joins them.")
+def _structural_members_cross(ctx):
+    """A bonded reinforcement line or pile CROSSING another one.
+
+    The mesher gives two bonded lines that meet one node at the meeting point
+    (mesh._insert_bonded_junction_points), so in the finite element model the two
+    members are joined there. Where one only ENDS on the other — a tieback
+    finishing at the wall, a T — that is what the drawing means. Where they cross,
+    it may not be: a tieback passing between soldier piles is not fixed to them.
+    Jointed lines are not members here: one meeting a bonded line is refused by
+    joint.crosses_constraint_line.
+    """
+    from shapely.geometry import LineString, Point
+    from .mesh import _joint_line_tol, line_is_jointed
+
+    members = []
+    for i, r in enumerate(ctx.reinforcement):
+        seg = _joint_seg(r)
+        if seg is not None and not line_is_jointed(r):
+            members.append((ctx.reinf_label(i), seg, _AT_REINF))
+    for i, p in enumerate(ctx.piles):
+        seg = _joint_seg(p) if isinstance(p, dict) else None
+        if seg is not None:
+            members.append((ctx.pile_label(i), seg, _AT_PILES))
+    if len(members) < 2:
+        return
+
+    # The mesher's own tolerance over the same geometry, so a crossing this rule
+    # reports is one the mesher joins.
+    polys = []
+    for p in (ctx.sd.get("polygons") or []):
+        poly = p.get("polygon") if isinstance(p, dict) else None
+        if poly is not None and not poly.is_empty:
+            polys.append([tuple(c) for c in poly.exterior.coords])
+    tol = _joint_line_tol([list(s) for _l, s, _a in members], polys)
+
+    for a in range(len(members)):
+        la, sa, at_a = members[a]
+        ga = LineString(list(sa))
+        for b in range(a + 1, len(members)):
+            lb, sb, _at_b = members[b]
+            gb = LineString(list(sb))
+            if ga.distance(gb) > tol:
+                continue
+            # An end standing on the other line is a T or a corner, not a crossing.
+            if (any(gb.distance(Point(q)) <= tol for q in sa)
+                    or any(ga.distance(Point(q)) <= tol for q in sb)):
+                continue
+            shared = ga.intersection(gb)
+            if shared.geom_type != "Point":
+                continue
+            yield (f"{la} crosses {lb} at ({shared.x:.4g}, {shared.y:.4g}). The "
+                   f"finite element mesh gives the two lines one node there, so "
+                   f"the two members are joined at the crossing and move together "
+                   f"at that point. If they pass each other without a connection, "
+                   f"end one short of the other or move it clear {at_a}.")
+
+
 # ===========================================================================
 # Family: material field ranges
 #
@@ -6083,6 +6449,377 @@ def _mat_phi_range(ctx):
                f"Mohr-Coulomb strength is c + σ′·tan(φ), which has no finite value "
                f"at 90 degrees and changes sign above it. Enter an angle below 90 "
                f"{_AT_MAT}.")
+
+
+# ===========================================================================
+# Family: values the file carries as typed
+#
+# Each rule here was a refusal at file load until 2026-09-27. A value a run
+# cannot use is a question about the run, so the file opens with the value in
+# it -- exactly as typed, so the fix is made where it was entered -- and the
+# rule names it when an analysis that reads it is checked.
+# ===========================================================================
+
+def _stability_rows(ctx):
+    """The material rows a stability run reads: every row for a finite element
+    run (the engine builds each one), the rows a failure surface can cross for a
+    limit-equilibrium run."""
+    if "fem" in ctx.analyses:
+        return ctx.fem_materials()
+    return list(ctx.strength_materials())
+
+
+@rule("mat.gamma_sat_below_gamma", ERROR, ("lem", "fem"),
+      "The saturated unit weight cannot be less than the moist unit weight.",
+      fields=("gamma", "gamma_sat"))
+def _mat_gamma_sat_below(ctx):
+    for i, m in _stability_rows(ctx):
+        g, gs = _num(m.get("gamma")), _num(m.get("gamma_sat"))
+        if g is None or gs is None or gs >= g:
+            continue
+        yield (f"{ctx.mat_label(i)} has gsat = {gs:g}, less than g = {g:g}. Soil "
+               f"below the water table is at least as heavy as the same soil above "
+               f"it. Enter the saturated unit weight, or leave gsat blank to use g "
+               f"throughout {_AT_MAT}.")
+
+
+@rule("mat.pow_params_nonpositive", ERROR, ("lem", "fem"),
+      "The power-curve envelope needs positive pow_a and pow_b.",
+      fields=("pow_a", "pow_b"))
+def _mat_pow_params(ctx):
+    for i, m in _stability_rows(ctx):
+        if str(m.get("option") or "").strip().lower() != "pow":
+            continue
+        bad = [f"{col} = {_fmt(m.get(key))}" for key, col in
+               (("pow_a", "pow_a"), ("pow_b", "pow_b")) if not _pos(m.get(key))]
+        if not bad:
+            continue
+        yield (f"{ctx.mat_label(i)} uses the power-curve strength model (option = "
+               f"pow) with {' and '.join(bad)}. The envelope is "
+               f"τ = pow_a·(σn + pow_d)^pow_b + pow_c, so pow_a and pow_b must both "
+               f"be greater than zero. Enter them {_AT_MAT}.")
+
+
+@rule("mat.hb_params_invalid", ERROR, ("lem", "fem"),
+      "Hoek-Brown needs a positive σci and mi, a GSI from 0 to 100 and a D from 0 to 1.",
+      fields=("hb_sci", "hb_gsi", "hb_mi", "hb_d"))
+def _mat_hb_params(ctx):
+    for i, m in _stability_rows(ctx):
+        if str(m.get("option") or "").strip().lower() != "hb":
+            continue
+        lab = ctx.mat_label(i)
+        for key, col, what in (("hb_sci", "hb_sci", "the intact rock strength σci"),
+                               ("hb_mi", "hb_mi", "the intact rock constant mi")):
+            if not _pos(m.get(key)):
+                yield (f"{lab} uses the Hoek-Brown strength model with {col} = "
+                       f"{_fmt(m.get(key))}. Enter {what}; it must be greater than "
+                       f"zero {_AT_MAT}.")
+        gsi = _num(m.get("hb_gsi"))
+        if gsi is None or not (0.0 < gsi <= 100.0):
+            yield (f"{lab} uses the Hoek-Brown strength model with hb_gsi = "
+                   f"{_fmt(m.get('hb_gsi'))}. Enter the Geological Strength Index, "
+                   f"greater than 0 and at most 100 {_AT_MAT}.")
+        d = _num(m.get("hb_d"))
+        if d is None or not (0.0 <= d <= 1.0):
+            yield (f"{lab} uses the Hoek-Brown strength model with hb_d = "
+                   f"{_fmt(m.get('hb_d'))}. Enter the disturbance factor, from 0 "
+                   f"(undisturbed) to 1 (heavily blast-damaged) {_AT_MAT}.")
+
+
+@rule("piezo.line_too_short", ERROR, ("lem", "fem"),
+      "A piezometric line needs at least two points.")
+def _piezo_line_short(ctx):
+    for key, name in (("piezo_line", "Piezometric line 1"),
+                      ("piezo_line2", "Piezometric line 2")):
+        n = len(_coords(ctx.sd.get(key)))
+        if n == 1:
+            yield (f"{name} has one point. A water table is a line across the "
+                   f"section; add at least one more point, or delete the line "
+                   f"{_AT_PIEZO}.")
+
+
+@rule("dload.line_too_short", ERROR, ("lem", "fem"),
+      "A distributed load needs at least two points.")
+def _dload_line_short(ctx):
+    for stage in (1, 2):
+        for label, pts in ctx.dload_blocks(stage):
+            if len(pts) == 1:
+                yield (f"{label} has one point. A distributed load acts along a "
+                       f"stretch of the ground surface; add at least one more point, "
+                       f"or delete the load {_at_dloads(stage)}.")
+
+
+@rule("main.num_slices_too_few", ERROR, ("lem",),
+      "A limit-equilibrium run needs at least two slices.")
+def _num_slices_few(ctx):
+    n = _num(ctx.sd.get("num_slices"))
+    if n is None or n >= 2:
+        return None
+    return (f"Number of slices is {_fmt(n)}. Enter at least 2 (30 to 50 is usual), "
+            f"or leave it blank for the default (Run LEM; main D15).")
+
+
+@rule("fem.k0_nonpositive", ERROR, ("fem",),
+      "K0 initial stress must be greater than zero where it is given.")
+def _k0_nonpositive(ctx):
+    k0 = _num(ctx.sd.get("k0"))
+    if k0 is None or k0 > 0:
+        return None
+    return (f"K0 initial stress (FEM) is {k0:g}. Enter a positive at-rest "
+            f"coefficient (about 1 − sin φ′ for a normally consolidated soil, 1.0 to "
+            f"reproduce an RS2 model), or leave it blank for the gravity turn-on "
+            f"initialization {_at_global('D16')}.")
+
+
+def _main_cell(ctx, key):
+    """The main-sheet cell of run option ``key`` on this model's own template
+    (:func:`xslope.fileio.main_sheet_cell`), or the current template's where the
+    model's own has none."""
+    from .fileio import main_sheet_cell
+    try:
+        cell = main_sheet_cell(key, ctx.sd.get("template_version"))
+    except (TypeError, ValueError):
+        cell = None
+    return cell or main_sheet_cell(key)
+
+
+@rule("mesh.size_nonpositive", ERROR, ("fem", "seep"),
+      "Every element size the model states must be greater than zero.")
+def _mesh_size_nonpositive(ctx):
+    def _bad(v):
+        f = _num(v)
+        return f is not None and f <= 0
+    sd = ctx.sd
+    if _bad(sd.get("target_size")):
+        yield (f"Target element size is {_fmt(sd.get('target_size'))}. Enter a "
+               f"positive size, or leave it blank for the automatic size (Build "
+               f"mesh; main D19).")
+    if _bad(sd.get("element_size_1d")):
+        yield (f"1D element size is {_fmt(sd.get('element_size_1d'))}. Enter a "
+               f"positive size, or leave it blank to follow the target element size "
+               f"(Build mesh; main D20).")
+    if sd.get("profile_lines"):
+        for k, line in enumerate(sd.get("profile_lines") or []):
+            if isinstance(line, dict) and _bad(line.get("size")):
+                yield (f"Profile line {k + 1} has a Size of {_fmt(line.get('size'))}. "
+                       f"Enter a positive element size for its zone, or leave Size "
+                       f"blank to use the target element size {_AT_PROFILE}.")
+    else:
+        for k, poly in enumerate(sd.get("polygons") or []):
+            if isinstance(poly, dict) and _bad(poly.get("size")):
+                yield (f"Polygon {k + 1} has a Size of {_fmt(poly.get('size'))}. "
+                       f"Enter a positive element size, or leave Size blank to use "
+                       f"the target element size {_AT_POLYGON}.")
+    for kind, label in (("ssr_zones", "SSR zone"), ("refine_zones", "Refine region"),
+                        ("joint_zones", "Joint region")):
+        for k, z in enumerate(sd.get(kind) or []):
+            if isinstance(z, dict) and _bad(z.get("size")):
+                yield (f"{label} {k + 1} has a Size of {_fmt(z.get('size'))}. Enter "
+                       f"a positive element size, or leave Size blank "
+                       f"{_AT_POLYGON}.")
+
+
+@rule("mesh.refine_zone_no_size", WARNING, ("fem", "seep"),
+      "A refine polygon does nothing without a Size.")
+def _refine_zone_no_size(ctx):
+    for k, z in enumerate(ctx.sd.get("refine_zones") or []):
+        if isinstance(z, dict) and _num(z.get("size")) is None:
+            yield (f"Refine region {k + 1} has no Size. A refine polygon carries no "
+                   f"material; its only effect is the element size inside it, so "
+                   f"without one the mesh ignores it. Enter a Size, or delete the "
+                   f"polygon {_AT_POLYGON}.")
+
+
+@rule("ssrm.bracket_reversed", ERROR, ("ssrm",),
+      "The strength-reduction search range must run from a lower F min to a higher F max.")
+def _ssrm_bracket(ctx):
+    lo, hi = _num(ctx.sd.get("ssrm_f_min")), _num(ctx.sd.get("ssrm_f_max"))
+    if lo is None or hi is None or lo < hi:
+        return None
+    return (f"F min (SSRM) is {lo:g} and F max (SSRM) is {hi:g}. The search for the "
+            f"factor of safety runs from F min up to F max, so F min must be the "
+            f"smaller. Enter them in that order, or leave both blank for the "
+            f"defaults (Run FEM; main {_main_cell(ctx, 'ssrm_f_min')} and "
+            f"{_main_cell(ctx, 'ssrm_f_max')}).")
+
+
+@rule("surface.search_window_reversed", ERROR, ("lem",),
+      "Each search window range must run from its lower to its higher end.")
+def _search_window_reversed(ctx):
+    if not ctx.is_search:
+        return None                      # a single-surface run never reads it
+    sw = ctx.sd.get("search_window") or {}
+    for lo, hi, label in (("entry_x_min", "entry_x_max", "Entry x"),
+                          ("exit_x_min", "exit_x_max", "Exit x"),
+                          ("center_box_x_min", "center_box_x_max", "Center box x"),
+                          ("center_box_y_min", "center_box_y_max", "Center box y")):
+        a, b = _num(sw.get(lo)), _num(sw.get(hi))
+        if a is None or b is None or a <= b:
+            continue
+        yield (f"The search window's {label} range runs from {a:g} to {b:g}, so no "
+               f"value lies inside it and the search has nowhere to look. Enter the "
+               f"smaller value first (Circles, Search window; circles sheet J8:K17).")
+
+
+@rule("reinforce.pullout_length_missing", ERROR, ("lem", "fem"),
+      "A line on the development-length law needs Lp1 and Lp2.",
+      fields=("lp1", "lp2"))
+def _reinf_lp_missing(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        if _num(r.get("adhesion")) is not None and _num(r.get("delta")) is not None:
+            continue                     # the overburden law does not read Lp
+        blank = [col for key, col in (("lp1", "Lp1"), ("lp2", "Lp2"))
+                 if _num(r.get(key)) is None]
+        if not blank:
+            continue
+        yield (f"{ctx.reinf_label(i)} leaves {' and '.join(blank)} blank. The "
+               f"development length at each end sets how the line's capacity builds "
+               f"up from that end: enter it, or 0 for an end that is fully anchored "
+               f"{_AT_REINF}.")
+
+
+@rule("reinforce.spacing_nonpositive", ERROR, ("lem", "fem"),
+      "A reinforcement Spacing must be greater than zero where it is given.",
+      fields=("spacing",))
+def _reinf_spacing(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        s = _num(r.get("spacing"))
+        if s is None or s > 0:
+            continue
+        yield (f"{ctx.reinf_label(i)} has Spacing = {s:g}. Spacing is the distance "
+               f"between discrete supports along the slope, which converts the "
+               f"per-support capacities to per unit width. Enter it, or leave it "
+               f"blank (or 1) for a continuous sheet {_AT_REINF}.")
+
+
+@rule("reinforce.end_capacity_negative", ERROR, ("lem", "fem"),
+      "Tend1 and Tend2 are end anchorage capacities and cannot be negative.",
+      fields=("tend1", "tend2"))
+def _reinf_tend_negative(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        for key, col in (("tend1", "Tend1"), ("tend2", "Tend2")):
+            v = _num(r.get(key))
+            if v is None or v >= 0:
+                continue
+            yield (f"{ctx.reinf_label(i)} has {col} = {v:g}. {col} is the capacity "
+                   f"of the anchorage at that end (a plate, a bearing block); enter "
+                   f"it, or 0 for an end with none {_AT_REINF}.")
+
+
+@rule("joint.endpoints_incomplete", ERROR, ("fem",),
+      "A joint line needs both endpoints: x1, y1, x2 and y2.")
+def _joint_endpoints(ctx):
+    for i, j in enumerate(ctx.joints):
+        blank = [k for k in ("x1", "y1", "x2", "y2") if _num(j.get(k)) is None]
+        if not blank:
+            continue
+        yield (f"{ctx.joint_label(i)} leaves {', '.join(blank)} blank. Enter both "
+               f"endpoints of the line (Joints; joints sheet).")
+
+
+_AT_LLOADS = "(Line loads; lloads sheet)"
+
+
+def _lload_label(ll, n):
+    name = ll.get("label") if isinstance(ll, dict) else None
+    base = f"Line load {n + 1}"
+    return f"{base} ('{name}')" if name and name != f"Load {n + 1}" else base
+
+
+@rule("lload.incomplete", ERROR, ("lem", "fem"),
+      "A line load needs x, y and P.")
+def _lload_incomplete(ctx):
+    for n, ll in enumerate(ctx.sd.get("line_loads") or []):
+        blank = [col for key, col in (("x", "x"), ("y", "y"), ("P", "P"))
+                 if _num(ll.get(key)) is None]
+        if blank:
+            yield (f"{_lload_label(ll, n)} leaves {' and '.join(blank)} blank. Enter "
+                   f"the point on the ground surface where the load acts and its "
+                   f"magnitude P {_AT_LLOADS}.")
+
+
+@rule("lload.magnitude_nonpositive", ERROR, ("lem", "fem"),
+      "A line load's magnitude P must be greater than zero.", fields=())
+def _lload_magnitude(ctx):
+    for n, ll in enumerate(ctx.sd.get("line_loads") or []):
+        p = _num(ll.get("P"))
+        if p is None or p > 0:
+            continue
+        yield (f"{_lload_label(ll, n)} has P = {p:g}. Enter the magnitude as a "
+               f"positive number and give the direction with Angle (−90 is straight "
+               f"down) {_AT_LLOADS}.")
+
+
+@rule("lload.off_ground_surface", ERROR, ("lem", "fem"),
+      "A line load must act on the ground surface.")
+def _lload_off_ground(ctx):
+    from shapely.geometry import Point
+    from .fileio import line_load_ground_tolerance
+    gs = ctx.sd.get("ground_surface")
+    tol = line_load_ground_tolerance(gs)
+    if tol is None:
+        return None
+    for n, ll in enumerate(ctx.sd.get("line_loads") or []):
+        x, y = _num(ll.get("x")), _num(ll.get("y"))
+        if x is None or y is None:
+            continue                     # lload.incomplete
+        d = gs.distance(Point(x, y))
+        if d <= tol:
+            continue
+        yield (f"{_lload_label(ll, n)} at ({x:g}, {y:g}) is {d:.3g} from the ground "
+               f"surface. A line load acts on the ground surface: move the point "
+               f"onto it (within {tol:.3g}) {_AT_LLOADS}.")
+
+
+@rule("seep.set2_reservoir", ERROR, ("seep", "rapid"),
+      "Boundary set 2 is a steady state and cannot hold a reservoir boundary.")
+def _seep_set2_reservoir(ctx):
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    for n, b in enumerate(bc2.get("specified_heads") or []):
+        if str(b.get("kind", "head")).strip().lower() == "reservoir":
+            yield (f"Specified head #{n + 1} of boundary set 2 has Type reservoir. "
+                   f"Set 2 is the steady drawn-down state of a rapid drawdown, and a "
+                   f"reservoir boundary follows a pool level through time. Set its "
+                   f"Type to head with the drawn-down level, and put reservoir "
+                   f"boundaries on boundary set 1 {_AT_SEEPBC2}.")
+
+
+@rule("seep.set2_time_series", ERROR, ("seep", "rapid"),
+      "Boundary set 2 is a steady state and its values must be numbers.")
+def _seep_set2_series(ctx):
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    for kind, vk, noun in (("specified_heads", "head", "Specified head"),
+                           ("specified_fluxes", "flux", "Specified flux")):
+        for n, b in enumerate(bc2.get(kind) or []):
+            v = b.get(vk)
+            if isinstance(v, str):
+                yield (f"{noun} #{n + 1} of boundary set 2 names the time series "
+                       f"{v!r}. Set 2 is the steady drawn-down state of a rapid "
+                       f"drawdown, so its {vk} is one number: enter it. Time-varying "
+                       f"boundaries belong on boundary set 1 {_AT_SEEPBC2}.")
+
+
+@rule("seep.series_undefined", ERROR, ("seep",),
+      "A boundary value that names a time series must name one on the tseep sheet.")
+def _seep_series_undefined(ctx):
+    tseep = ctx.tseep
+    names = set((tseep or {}).get("series") or {})
+    bc = ctx.sd.get("seepage_bc") or {}
+    for kind, vk, noun in (("specified_heads", "head", "Specified head"),
+                           ("specified_fluxes", "flux", "Specified flux")):
+        for n, b in enumerate(bc.get(kind) or []):
+            v = b.get(vk)
+            if not isinstance(v, str) or v in names:
+                continue
+            if not names:
+                have = ("This model defines no time series, so the value has "
+                        "nothing to follow.")
+            else:
+                have = f"The series defined are: {', '.join(sorted(names))}."
+            yield (f"{noun} #{n + 1} names the time series {v!r}, which is not "
+                   f"defined. {have} Enter a number for a steady boundary (Seep BC; "
+                   f"seep bc sheet), or add a series with that name (Transient "
+                   f"seepage; tseep sheet).")
 
 
 # ===========================================================================

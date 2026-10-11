@@ -146,6 +146,110 @@ def _geometry_native(slope_data):
     return None
 
 
+def _folder_state(folder):
+    """``{name: (mtime_ns, size)}`` for the files in ``folder`` (empty if absent)."""
+    state = {}
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return state
+    for name in names:
+        try:
+            st = os.stat(os.path.join(folder, name))
+        except OSError:
+            continue
+        state[name] = (st.st_mtime_ns, st.st_size)
+    return state
+
+
+def _written_since(folder, before):
+    """Names in ``folder`` that are new since ``before`` or have been rewritten:
+    a different modification time or size than the snapshot recorded. Comparing
+    names alone missed a file written again under its old name, so a second
+    sweep's table and plot were never shown."""
+    now = _folder_state(folder)
+    return [name for name, stamp in now.items() if before.get(name) != stamp]
+
+
+def keep_surface_family_in_step(slope_data):
+    """With exactly one surface family defined, the stored ``circular`` flag names
+    it — what Studio's Circles editor does when circles are entered, and the rule
+    the Run LEM dialog follows (with one family present the surface is a fixed
+    label and the flag is not consulted). With both defined the flag is the
+    model's choice and is left alone; with neither there is nothing to name.
+
+    A new project starts with the flag off and no surface at all, so circles a
+    snippet adds would otherwise be run as a non-circular model that has no
+    non-circular surface. Returns True when the flag changed.
+    """
+    if not isinstance(slope_data, dict):
+        return False
+    has_c = bool(slope_data.get("circles"))
+    has_n = bool(slope_data.get("non_circ"))
+    if has_c == has_n or bool(slope_data.get("circular")) == has_c:
+        return False
+    slope_data["circular"] = has_c
+    return True
+
+
+def _brief_warning(note):
+    """A run's warning cut to its finding: the text before its first
+    parenthesis, colon or second sentence — 'interslice tension on 15% of
+    interior boundaries', 'Spencer could not solve 67 of 330 trial surfaces'."""
+    text = " ".join(str(note).split())
+    for stop in (" (", ": ", ". "):
+        i = text.find(stop)
+        if i > 0:
+            text = text[:i]
+    return text.rstrip(". ")
+
+
+def _step_warnings(notes):
+    """One sweep step's warnings as one string, each cut to its finding and said
+    once ('' when the step raised none)."""
+    seen = []
+    for note in notes or ():
+        brief = _brief_warning(note)
+        if brief and brief not in seen:
+            seen.append(brief)
+    return "; ".join(seen)
+
+
+def _print_step_warnings(brief, previous):
+    """Print a step's warnings line under its result, unless it has none. A step
+    whose warnings read exactly as the step before's says so rather than
+    repeating them."""
+    if not brief:
+        return
+    if brief == previous:
+        print("    warnings: the same as the step before")
+    else:
+        print(f"    warnings: {brief}")
+
+
+def _print_sweep_steps(res):
+    """The steps of an LEM design or back-analysis sweep, one line each, with the
+    warnings each step's solve raised on a line under it — what the muted engine
+    would otherwise have left out."""
+    df = res.get("df")
+    if df is None or not len(df) or "value" not in df.columns:
+        return
+    label = res.get("param") or "value"
+    out = res.get("output", "FS")
+    previous = ""
+    steps = df.loc[~df["is_base"].astype(bool)].sort_values("value")
+    for _i, r in steps.iterrows():
+        if bool(r.get("success")):
+            print(f"  {label}={r['value']:g}: {out}={float(r['fs']):.3f}")
+            brief = _step_warnings(str(r.get("warnings") or "").split("; "))
+            _print_step_warnings(brief, previous)
+            previous = brief
+        else:
+            print(f"  {label}={r['value']:g}: no result — "
+                  f"{r.get('msg') or 'no result'}")
+            previous = ""
+
+
 def _geometry_sigs(slope_data):
     """Per-key JSON signatures of the geometry inputs (shapely objects fall back
     to their WKT via ``str``), so a snippet's geometry edits can be located."""
@@ -700,6 +804,22 @@ class PythonKernel:
                 and now["profile_lines"] != before["profile_lines"]):
             self._warn_geometry(PROFILE_EDIT_WARNING)
 
+    def _rebase_geometry_watch(self, slope_data):
+        """After a resync, make the geometry it just built the reference.
+
+        The watch is armed with the geometry the snippet started from, and the
+        test for a discarded polygon edit is "the polygons differ from that, the
+        profile lines do not". A sweep that moves the profile lines, resyncs,
+        and puts the lines back passes that test without ever touching a
+        polygon: its polygons are the ones the LAST resync built from the moved
+        lines. Comparing against the most recent build instead keeps the warning
+        for what it is about, a polygon edit made after the last rebuild.
+        """
+        watch = self._geom_watch
+        if not watch or slope_data is not self._doc.slope_data:
+            return
+        self._geom_watch = (watch[0], _geometry_sigs(slope_data))
+
     def _warn_geometry(self, text):
         if text not in self._geom_warnings:
             self._geom_warnings.append(text)
@@ -815,6 +935,8 @@ class PythonKernel:
             sd = doc.slope_data if slope_data is None else slope_data
             self._note_geometry_source(sd)   # before the rebuild discards an edit
             _resync_geometry(sd)
+            keep_surface_family_in_step(sd)  # the family is the one defined
+            self._rebase_geometry_watch(sd)  # later checks compare to THIS build
             return sd.get("ground_surface")
 
         def run_lem(method=None, num_slices=40, rapid=False, plot=True,
@@ -868,7 +990,8 @@ class PythonKernel:
             # A converging search writes a dozen progress lines the model would
             # have to read back as tokens, and only the last of them is the answer,
             # so a SEARCH runs muted. What the search reports about ITSELF —
-            # unsolved trials, admissibility notes — is kept below, because those
+            # unsolved trials, admissibility notes (the crest-tension advice
+            # among them) — is kept below, because those
             # are findings about the model. A single solve prints little and what
             # it prints is the solver's, so it is left alone.
             muted = (contextlib.redirect_stdout(_io.StringIO()) if search
@@ -1296,19 +1419,18 @@ class PythonKernel:
                 bundle = {"fem_data": fem_data, "solution": result["last_solution"],
                           "failure_solution": result.get("failure_solution"),
                           "FS": result.get("FS"), "analysis": "ssrm",
+                          "fs_is_lower_bound": bool(result.get("fs_is_lower_bound")),
                           "meta": ssrm_run_record(result, fem_data, {})}
-                print(f"SSRM: FS = {result['FS']:.3f}")
-                if result.get("note"):
-                    # The factor of safety is the bracket midpoint however the
-                    # bracket closed, so an undecided upper edge is invisible in
-                    # the number itself.
-                    print(f"  {result['note']}")
+                from xslope.fem import ssrm_fs_text
+                print(f"SSRM: "
+                      f"{ssrm_fs_text(result['FS'], bundle['fs_is_lower_bound'])}")
             _store_result("fem_solution", bundle,
                           show=[("_show_fem_data", (fem_data,)),
                                 ("_show_fem_results", ())])
             if plot:
                 from xslope.plot_fem import plot_fem_results
                 plot_fem_results(fem_data, bundle["solution"], fs=bundle["FS"],
+                                 fs_is_lower_bound=bundle["fs_is_lower_bound"],
                                  failure_solution=bundle.get("failure_solution"),
                                  fig=plt.figure(figsize=(11, 7)))
             return bundle
@@ -1448,7 +1570,8 @@ class PythonKernel:
             path.
             """
             from xslope.report import generate_report as _generate
-            from ..report_dialog import (default_output_path, document_finish,
+            from ..report_dialog import (carries_contents_field,
+                                         default_output_path, document_finish,
                                          finalization_enabled)
             sd = doc.slope_data
             solutions = _report_solutions()
@@ -1473,11 +1596,19 @@ class PythonKernel:
             ok, res = _generate(sd, solutions, opts, out_path)
             if not ok:
                 raise RuntimeError(res)
+            finished = False
             if finalize:
                 settings = getattr(window, "settings", None)
-                document_finish(out_path, finalization_enabled(settings))
+                finished, _why = document_finish(out_path,
+                                                 finalization_enabled(settings))
             print(f"Report written to {res['path']} "
                   f"({len(res.get('figures') or ())} figures).")
+            if not finished and carries_contents_field(out_path):
+                # Say so: the contents page is a field Word fills in, and a
+                # report left unfinished was otherwise described as page-numbered.
+                print("Its contents page has no page numbers yet: they appear "
+                      "when the document is opened in Word and its fields are "
+                      "updated (select all and press F9).")
             return res["path"]
 
         def _report_solutions():
@@ -1510,6 +1641,10 @@ class PythonKernel:
 
             For each v in `values`: call apply(v) to edit slope_data, recompute the
             factor of safety, and record (v, FS) — with NO per-step solution plot.
+            Each step is the run `run_lem` makes, and what it says about itself —
+            unsolved trials, admissibility notes, crest tension — is printed under
+            the step and kept in the table's `warnings` column, each note cut to
+            its finding.
             Writes `<name>.csv` and one `<name>.png` (FS vs param) to the output
             folder, restores the project to its original state (a sweep is analysis,
             not an edit), and returns the DataFrame.
@@ -1529,53 +1664,58 @@ class PythonKernel:
             import copy
             import contextlib
             import io as _io
-            import numpy as np
             import pandas as pd
             import matplotlib.pyplot as plt
-            from xslope.slice import generate_slices
-            from xslope.solve import solve_selected
-            from xslope.search import circular_search, noncircular_search
+            from xslope.search import AnalysisError, run_lem_analysis
 
             sd = doc.slope_data
             snapshot = copy.deepcopy(sd)
             rows = []
+            previous = ""
             try:
                 for v in values:
                     apply(v)
                     resync_geometry(sd)
-                    non_circ = sd.get("non_circ") or None
+                    # Each step is the run Studio's Run LEM makes — the same entry
+                    # point `run_lem` drives, the model's own search window
+                    # included — and it keeps what that run says about itself:
+                    # unsolved trials, admissibility, crest tension. Muted, so
+                    # the search's progress lines stay out of the printout.
+                    family = ("circular" if (sd.get("circular", True)
+                                             and sd.get("circles"))
+                              else "noncircular")
                     fs = float("nan")
-                    with contextlib.redirect_stdout(_io.StringIO()):  # quiet the engine
-                        if search:
-                            if non_circ:
-                                fs_cache, *_ = noncircular_search(
-                                    sd, method, rapid=rapid, num_slices=num_slices,
-                                    diagnostic=False)
-                            else:
-                                fs_cache, *_ = circular_search(
-                                    sd, method, rapid=rapid, num_slices=num_slices,
-                                    diagnostic=False)
-                            if fs_cache:
-                                sr = fs_cache[0].get("solver_result")
-                                fs = sr["FS"] if isinstance(sr, dict) and "FS" in sr \
-                                    else fs_cache[0].get("fs", float("nan"))
+                    notes = []
+                    try:
+                        with contextlib.redirect_stdout(_io.StringIO()):
+                            bundle = run_lem_analysis(
+                                sd, method,
+                                analysis="auto_search" if search
+                                else "single_surface",
+                                surface=family, num_slices=num_slices,
+                                rapid=rapid, announce=False)
+                        res = bundle.get("results")
+                        unsolved = (bundle.get("search") or {}).get("unsolved") or {}
+                        if unsolved.get("sentence"):
+                            notes.append(unsolved["sentence"])
+                        if isinstance(res, dict):
+                            fs = float(res["FS"])
+                            notes.extend(res.get("warnings") or [])
                         else:
-                            circle = (sd["circles"][0] if sd.get("circular")
-                                      and sd.get("circles") else None)
-                            ok, res = generate_slices(sd, circle=circle,
-                                                      non_circ=non_circ,
-                                                      num_slices=num_slices)
-                            if ok:
-                                r = solve_selected(method, res[0], rapid=rapid)
-                                if isinstance(r, dict):
-                                    fs = r["FS"]
-                    rows.append((v, fs))
+                            notes.append("no solution: %s"
+                                         % (bundle.get("failure") or "no solution"))
+                    except AnalysisError as exc:
+                        notes.append(str(exc))
+                    brief = _step_warnings(notes)
+                    rows.append((v, fs, brief))
                     print(f"  {param}={v}: FS={fs:.3f}")
+                    _print_step_warnings(brief, previous)
+                    previous = brief
             finally:
                 sd.clear()
                 sd.update(snapshot)     # leave the project exactly as it was
 
-            df = pd.DataFrame(rows, columns=[param, ylabel])
+            df = pd.DataFrame(rows, columns=[param, ylabel, "warnings"])
             df.to_csv(f"{name}.csv", index=False)
             if plot:
                 fig, ax = plt.subplots(figsize=(8, 5))
@@ -1585,7 +1725,10 @@ class PythonKernel:
                 ax.set_title(f"{ylabel} vs {param}")
                 ax.grid(True, alpha=0.3)
                 fig.savefig(f"{name}.png", dpi=150, bbox_inches="tight")
-            print(f"Wrote {name}.csv and {name}.png ({len(df)} points).")
+            flagged = int((df["warnings"] != "").sum())
+            tail = (f"; {flagged} with warnings, listed above" if flagged else "")
+            wrote = f"{name}.csv and {name}.png" if plot else f"{name}.csv"
+            print(f"Wrote {wrote} ({len(df)} points{tail}).")
             return df
 
         def list_params(slope_data=None, mode="lem"):
@@ -1690,13 +1833,21 @@ class PythonKernel:
                     f"{'SSRM' if mode == 'fem' else 'seepage'} solver, which needs a "
                     "mesh in slope_data['mesh'] — build a mesh first (Studio: the "
                     "Mesh toolbar/menu, or xslope.mesh.build_mesh_from_polygons).")
-            ok, res = _design(sd, param=param, low=low, high=high, steps=steps,
-                              target_fs=target_fs, mode=mode, method=method,
-                              search=search, num_slices=num_slices, fem_opts=fem_opts,
-                              seep_opts=seep_opts, modify=modify, label=label)
+            # An LEM sweep's searches each print a dozen progress lines; muted, and
+            # each step is printed once below with the warnings its solve raised.
+            quiet = (contextlib.redirect_stdout(StringIO()) if mode == "lem"
+                     else contextlib.nullcontext())
+            with quiet:
+                ok, res = _design(sd, param=param, low=low, high=high, steps=steps,
+                                  target_fs=target_fs, mode=mode, method=method,
+                                  search=search, num_slices=num_slices,
+                                  fem_opts=fem_opts, seep_opts=seep_opts,
+                                  modify=modify, label=label)
             if not ok:
                 raise RuntimeError(res)
             out = res.get("output", "FS")
+            if mode == "lem":
+                _print_sweep_steps(res)
             print(res["message"])
             if not res["bracketed"]:
                 lo, hi = res["fs_range"]
@@ -1732,12 +1883,18 @@ class PythonKernel:
             sd = doc.slope_data if slope_data is None else slope_data
             if mode in ("fem", "seep") and sd.get("mesh") is None:
                 raise RuntimeError(f"mode='{mode}' needs a mesh in slope_data['mesh'].")
-            ok, res = _back(sd, param=param, low=low, high=high, steps=steps,
-                            target_fs=target_fs, mode=mode, method=method,
-                            search=search, num_slices=num_slices, fem_opts=fem_opts,
-                            seep_opts=seep_opts, modify=modify, label=label)
+            quiet = (contextlib.redirect_stdout(StringIO()) if mode == "lem"
+                     else contextlib.nullcontext())
+            with quiet:
+                ok, res = _back(sd, param=param, low=low, high=high, steps=steps,
+                                target_fs=target_fs, mode=mode, method=method,
+                                search=search, num_slices=num_slices,
+                                fem_opts=fem_opts, seep_opts=seep_opts,
+                                modify=modify, label=label)
             if not ok:
                 raise RuntimeError(res)
+            if mode == "lem":
+                _print_sweep_steps(res)
             print(res["message"])
             if not res["bracketed"]:
                 out = res.get("output", "FS")
@@ -2136,7 +2293,10 @@ class PythonKernel:
                             if isinstance(sd, dict) else None)
         os.makedirs(self.outdir, exist_ok=True)     # may have been cleared by the OS
         before_figs = set(plt.get_fignums())
-        existing = set(os.listdir(self.outdir))     # to detect files the snippet writes
+        # What the folder holds before the snippet, by name AND by modification
+        # time and size: a file the snippet writes under a name already there (a
+        # second sweep's sensitivity.csv) is as much its output as a new one.
+        existing = _folder_state(self.outdir)
         prev_cwd = os.getcwd()
         buf = StringIO()
         error = None
@@ -2168,7 +2328,7 @@ class PythonKernel:
         # save a figure itself (e.g. savefig('plot.png') without closing), so a
         # saved-and-left-open plot isn't shown twice.
         wrote_figure = any(f.lower().endswith(_FIG_EXTS)
-                           for f in os.listdir(self.outdir) if f not in existing)
+                           for f in _written_since(self.outdir, existing))
         if not wrote_figure:
             for num in plt.get_fignums():
                 if num in before_figs:
@@ -2181,7 +2341,8 @@ class PythonKernel:
                     pass
         plt.close("all")
 
-        # Everything newly present in outdir is this snippet's output.
-        created = sorted(f for f in os.listdir(self.outdir) if f not in existing)
+        # Everything new in outdir, or rewritten since the snippet started, is
+        # this snippet's output.
+        created = sorted(_written_since(self.outdir, existing))
         outputs = [os.path.join(self.outdir, f) for f in created]
         return buf.getvalue(), outputs, error

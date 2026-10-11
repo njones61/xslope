@@ -6,7 +6,7 @@ description: "The three limit-equilibrium importers walked end to end in XSLOPE 
 # Tutorial W-2 — Importing Models from CAD and Other Programs
 
 A section that already exists somewhere else does not have to be redrawn. Studio's
-File menu carries four importers, and this tutorial walks the three that bring in
+File menu has four importers, and this tutorial walks the three that bring in
 a limit-equilibrium model: a **DXF** drawing from any CAD program, a **GeoStudio
 SLOPE/W** project (`.gsz`), and a **Rocscience Slide2** model (`.sli`, `.slim` or
 `.slmd`) — the fourth, **Import RS2 (.fez)…**, reads a finite element model — not
@@ -53,11 +53,11 @@ re-entering the geometry point by point, so we start there.
 
 [w02_section.dxf](files/w02_section.dxf) holds a highway embankment in feet: 30 ft
 of fill on a 2:1 face over 15 ft of silty clay on dense sand, a water table a few
-feet down, and a 600 psf crest surcharge. A DXF file says where the lines are and
-which layer each sits on, and nothing about unit weights, strengths or load
+feet down, and a 600 psf crest surcharge. A DXF file records where the lines are
+and which layer each sits on, and nothing about unit weights, strengths or load
 pressures.
 
-Six layers carry the section:
+The section is drawn on six layers:
 
 | Layer | What it holds |
 | --- | --- |
@@ -79,7 +79,7 @@ With the drawing downloaded, we start the import from the File menu. Click
 
 ![The DXF import wizard on w02_section.dxf: six layers, each with its contents, its suggested target and its material name](images/w02_dxf_wizard.png){width=688}
 
-**Layer** and **Contents** come from the file; **Import as** carries the choice,
+**Layer** and **Contents** come from the file; **Import as** holds the choice,
 and **Material** applies to the two targets that use it:
 
 | Import as | What the layer becomes |
@@ -93,7 +93,7 @@ and **Material** applies to the two targets that use it:
 | Failure circles | starting circles for the search |
 
 Piles and line loads have no target here: their rows are mostly structural
-properties a drawing does not carry, so they are entered in their editors after
+properties a drawing does not hold, so they are entered in their editors after
 the import. Two layers sharing a material name merge. Every row here is already right, so the
 only edit is cosmetic: the **Material** column defaults to the layer name, and
 these are uppercase because that is how `export_dxf` writes them. Type
@@ -117,7 +117,7 @@ blank:
 | `dense sand` | 132 |  | `mc` | 0 | 36 |  |  |  |  |  |  |  | `piezo` |
 
 Then we open the distributed loads editor and set the surcharge to 600 psf at both
-of its points. That model ships as
+of its points. That model is available as
 [w02_section_imported.xlsx](files/w02_section_imported.xlsx).
 
 With the properties in, the model is complete. Click **Run LEM**, choose
@@ -143,9 +143,8 @@ dense sand — through the foundation clay rather than the fill.
 SLOPE/W, part of Seequent's GeoStudio suite, is one of the most widely used
 slope stability programs, and years of work live in its `.gsz` files — models
 that a review, a re-analysis or a migration may need to open. A `.gsz` needs
-no mapping wizard: its regions already know which material they
-are, and a file saved after solving carries SLOPE/W's own answer on every trial
-surface. Only one question is left — which analysis to import, since a GeoStudio
+no mapping wizard: its regions already have their materials assigned, and a file
+saved after solving contains SLOPE/W's own answer on every trial surface. Only one question is left — which analysis to import, since a GeoStudio
 file routinely holds several over one geometry.
 
 **Where to get the file.** Part 2 runs on problem §2.25 of Seequent's
@@ -191,7 +190,7 @@ than this one.
 - **The materials match the manual's table.** Clay core c′ = 20 kPa, φ′ = 20°,
   γ = 20 kN/m³; granular fill c′ = 0, φ′ = 40°, γ = 21.5; hard base c′ = 200,
   φ′ = 45°, γ = 24.
-- **The reservoir is carried once** — the loads sheet is empty, water loads
+- **The reservoir is applied once** — the loads sheet is empty, water loads
   automatic.
 - **The imported circle is SLOPE/W's, not a search result.** A free search finds a
   lower minimum of its own.
@@ -204,7 +203,7 @@ SEEP/W analysis in the same file, that solved field comes along as the model's
 seepage solution (the SEEP/W model itself does not convert). What stays behind:
 SLOPE/W's search definition — a file saved without a solved surface arrives
 with no failure surface — reinforcement sets, an inclined tension crack, and
-the vertical seismic coefficient. Anything XSLOPE does not carry comes in as
+the vertical seismic coefficient. Anything XSLOPE does not support comes in as
 the nearest fit and is named in the notes, which also say when that would
 change the answer.
 
@@ -213,8 +212,8 @@ change the answer.
 ## Part 3 — A Slide2 model
 
 Rocscience's Slide2 is the other slope stability program a geotechnical office
-is most likely to have files from. A Slide2 model behaves like a `.gsz`: it already knows what its geometry means, so
-it prompts only for the scenario to take. A `.slmd` bundles several — a base case
+is most likely to have files from. A Slide2 model behaves like a `.gsz`: its
+geometry is already defined, so the import prompts only for the scenario to take. A `.slmd` bundles several — a base case
 plus variants — the way a GeoStudio file bundles analyses.
 
 **Where to get the file.** Rocscience publishes its
@@ -265,7 +264,7 @@ circle and reaches lower than a circular search can.
 - **The starting circle is yours, not Slide2's.** A run without one has no surface
   to solve.
 - **There is no Max Depth line.** The flat bottom of the section is the lower edge
-  of the three zones, not a rigid base the import carried across.
+  of the three zones, not a rigid base the import brought across.
 
 ---
 
@@ -279,11 +278,11 @@ This tutorial covered:
   surface: 1.939 against 1.934.
 - A Slide2 scenario arriving with no failure surface, because Slide2 stores a
   search: 1.372 against 1.360 once a circle is added.
-- The notes every import reports, which name what the import could not carry and
+- The notes every import reports, which name what the import could not bring across and
   what to set before solving.
 
 **Where to go next:** [DXF Import/Export](../usage/dxf.md) and
-[GeoStudio Import/Export](../usage/geostudio.md) carry the full mapping tables and
+[GeoStudio Import/Export](../usage/geostudio.md) give the full mapping tables and
 the script route; the [GeoStudio](../verification/geostudio.md) and
 [Slide2](../verification/rocscience.md) verification pages hold the corpora these
 two models come from.

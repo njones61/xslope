@@ -41,9 +41,14 @@ Run from the repo root:
     python benchmarks/make_griffiths_figures.py griffiths1
     python benchmarks/make_griffiths_figures.py --sweeps        # the summary plots
     python benchmarks/make_griffiths_figures.py --audit         # coverage only
+    python benchmarks/make_griffiths_figures.py --capture-only griffiths1
+        # redraw the results figure's at-failure picture from the case's stored
+        # search record: the standing trial and the picture are solved, the
+        # search is not, and only the picture's files and the figure are written
 """
 
 import io
+import json
 import os
 import re
 import sys
@@ -61,7 +66,8 @@ import matplotlib.pyplot as plt
 import run_tests as RT
 from xslope.fileio import load_slope_data
 from xslope.fem import (build_fem_data, solve_ssrm, export_fem_solution,
-                        ssrm_run_record)
+                        ssrm_run_record, capture_failure_from_record,
+                        export_fem_failure_solution, capture_report)
 import xslope.fem as _fem
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints,
@@ -128,10 +134,8 @@ def stem(tag):
     return os.path.splitext(os.path.basename(tag['file']))[0]
 
 
-def render(tag):
-    """Solve one case at its tag settings and write its figures + sidecars."""
-    name = stem(tag)
-    t0 = time.time()
+def _model(tag):
+    """The case's mesh and model, built exactly as its lock builds them."""
     sd = load_slope_data(tag['file'])
     lines, _n_reinf, _n_pile = extract_constraint_line_geometry(sd)
     polys = get_material_polygons(sd, reinf_lines=lines)
@@ -143,6 +147,75 @@ def render(tag):
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd), **RT._refine_kwargs(tag))
         fem_data = build_fem_data(sd, mesh)
+    return mesh, fem_data
+
+
+def _options(tag):
+    """The search options and the iteration limit the case is solved with."""
+    kwargs = {'max_iterations': int(tag['max_iter'])} if 'max_iter' in tag else {}
+    # The search options, in one dict, so the run record persists the same numbers
+    # the solve was driven with rather than a second transcription of the tag.
+    options = {'F_min': tag.get('f_min', 0.5), 'F_max': tag.get('f_max', 3.0),
+               'tolerance': tag.get('tolerance', 0.05)}
+    return options, kwargs
+
+
+def _save_results(fem_data, field, fs, failure, name):
+    """Draw the three results panels and write ``<prefix>_results.png``."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_fem_results(fem_data, field, fs=fs, failure_solution=failure)
+    prefix = name.replace('xslope_', '')
+    path = os.path.join(OUT, f'{prefix}_results.png')
+    plt.gcf().savefig(path, dpi=DPI, bbox_inches='tight')
+    plt.close('all')
+    return path
+
+
+def render_capture_only(tag):
+    """Redraw one case's results figure from its stored search record.
+
+    The model is built as ``render`` builds it and solved with the same options,
+    but only where the picture needs it (xslope.fem.capture_failure_from_record):
+    the standing trial and the at-failure solve, not the search. The figure and
+    the at-failure files are written; the search record, the standing field's
+    files and the mesh are left as they are. A case with no stored record is
+    refused."""
+    name = stem(tag)
+    if name in NO_FIGURE:
+        print(f'  {name}: no results figure ({NO_FIGURE[name]})', flush=True)
+        return None
+    t0 = time.time()
+    base = os.path.splitext(tag['file'])[0]
+    record_path = f'{base}_fem_meta.json'
+    if not os.path.exists(record_path):
+        raise RuntimeError(f'{name}: no stored search record at '
+                           f'{os.path.relpath(record_path, ROOT)}; run the full '
+                           'search for this case first')
+    with open(record_path) as fh:
+        record = json.load(fh)
+    mesh, fem_data = _model(tag)
+    options, kwargs = _options(tag)
+    with contextlib.redirect_stdout(io.StringIO()):
+        with RT._force_fast_kernel(_fem, False):
+            result = capture_failure_from_record(
+                fem_data, record, debug_level=0, capture_failure_state=True,
+                **options, **kwargs)
+    field = result['last_solution']
+    failure = result.get('failure_solution')
+    path = _save_results(fem_data, field, result['FS'], failure, name)
+    if failure is not None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            export_fem_failure_solution(fem_data, failure, base)
+    print(f'  {name}: {capture_report(result)}; wrote '
+          f'{os.path.relpath(path, ROOT)} ({time.time() - t0:.0f}s)', flush=True)
+    return result['FS']
+
+
+def render(tag):
+    """Solve one case at its tag settings and write its figures + sidecars."""
+    name = stem(tag)
+    t0 = time.time()
+    mesh, fem_data = _model(tag)
 
     # The mesh panel needs no solution, so it is written before the solve.
     if name in MESH_FIGURE:
@@ -158,11 +231,7 @@ def render(tag):
         print(f'  {name}: no results figure ({NO_FIGURE[name]})', flush=True)
         return None
 
-    kwargs = {'max_iterations': int(tag['max_iter'])} if 'max_iter' in tag else {}
-    # The search options, in one dict, so the run record persists the same numbers
-    # the solve was driven with rather than a second transcription of the tag.
-    options = {'F_min': tag.get('f_min', 0.5), 'F_max': tag.get('f_max', 3.0),
-               'tolerance': tag.get('tolerance', 0.05)}
+    options, kwargs = _options(tag)
     with contextlib.redirect_stdout(io.StringIO()):
         with RT._force_fast_kernel(_fem, False):
             result = solve_ssrm(fem_data, debug_level=0,
@@ -180,12 +249,7 @@ def render(tag):
         print(f'  {name}: SSRM returned no last_solution — no figure written', flush=True)
         return None
     failure = result.get('failure_solution')
-    with contextlib.redirect_stdout(io.StringIO()):
-        plot_fem_results(fem_data, field, fs=fs, failure_solution=failure)
-    prefix = name.replace('xslope_', '')
-    path = os.path.join(OUT, f'{prefix}_results.png')
-    plt.gcf().savefig(path, dpi=DPI, bbox_inches='tight')
-    plt.close('all')
+    path = _save_results(fem_data, field, fs, failure, name)
 
     with contextlib.redirect_stdout(io.StringIO()):
         base = os.path.splitext(tag['file'])[0]
@@ -492,6 +556,16 @@ def main(argv):
         return 0
     if wanted:
         tags = [t for t in tags if any(w in stem(t) for w in wanted)]
+    if '--capture-only' in argv:
+        print(f'{len(tags)} case(s), at-failure picture from the stored search record')
+        failed = 0
+        for t in tags:
+            try:
+                render_capture_only(t)
+            except Exception as exc:          # one refused case does not stop the rest
+                failed += 1
+                print(f'  {stem(t)}: {exc}', flush=True)
+        return 1 if failed else 0
     print(f'{len(tags)} case(s)')
     for t in tags:
         print(stem(t), flush=True)

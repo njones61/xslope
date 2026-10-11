@@ -7,16 +7,16 @@ description: "Build a slope whose bedrock dips across the section in XSLOPE — 
 
 A 20 ft embankment on a foundation whose bedrock is not level: the base of the
 section falls from elevation −5 at the right-hand edge to −15 at the left. A
-profile-line model cannot say that. Its bottom boundary is one number, a single
-horizontal elevation — so **the geometry is entered as closed polygons instead**,
-one per material zone, and the base of the model is whatever the polygons draw.
+profile-line model cannot represent that. Its bottom boundary is one number, a
+single horizontal elevation — so the geometry is entered as closed polygons
+instead, one per material zone, and the base of the model is whatever the polygons draw.
 
 ![A slope on a dipping base, entered as two material zones](images/lem06_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
@@ -25,7 +25,7 @@ polygons beat profile lines, how a dipping base constrains the circular search,
 and how to let circles truncate against the base instead of being refused by it.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">polygons</span><span class="tg-pill">dipping base</span><span class="tg-pill">composite surfaces</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx) — the same file used by [LEM Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx)</div>
 </div>
 
 ---
@@ -46,7 +46,7 @@ from CAD already drawn as closed regions. The two are alternatives, never mixed:
 a model uses one sheet or the other.
 
 Two zones here. Each is one small `x` / `y` table, one vertex per row, in the
-paired columns its worksheet block carries:
+paired columns its worksheet block has:
 
 **Polygon 1 — material 1 (`embankment`):**
 
@@ -80,20 +80,20 @@ drops to −5 at the right-hand edge, and closes along the base back to −15 at
 left. That last edge is the dipping bedrock: 10 ft of fall over 170 ft, a slope
 of 3.4°.
 
-**Nothing here states a ground surface, and nothing states a maximum depth.**
-Both come out of the zones. The section's outline is the union of the two
+The model has no separate ground surface and no maximum depth; both come from
+the zones. The section's outline is the union of the two
 polygons — the *domain* — and the ground surface is its upper edge, the
 foundation from x = −50 to the toe and then the embankment's face and crest. The
 lower edge of that same union is the base of the model, drawn hatched on every
-plot. No material exists below it, so no failure surface may pass through it: the
-role a maximum depth plays in a profile-line model is played here by a boundary
-the zones drew themselves, and it does not have to be flat.
+plot. No material exists below it, so no failure surface may pass through it:
+the base of the zones takes the place of the maximum depth of a profile-line
+model, and it does not have to be flat.
 
 **Materials** — two Mohr-Coulomb (`mc`) soils, both undrained, the fill weaker
 than the ground it stands on:
 
 Unit weights are pcf and cohesions psf; the row order is the Mat ID the polygon
-rings reference, and neither soil carries pore pressures — `u` stays `none` —
+rings reference, and neither soil has pore pressures — `u` stays `none` —
 so the table ends at φ:
 
 | name | γ | γsat | option | c | φ |
@@ -109,9 +109,9 @@ twice the slope height:
 | 20 | 40 | Depth | -10.7887 |
 | 20 | 40 | Depth | 0 |
 
-The first is as deep as a circle from that center can be and still fit inside the
-domain: its lowest point sits at elevation −10.7887, and the bedrock beneath the
-center is at −10.88. The second is tangent to the contact between the two soils.
+The first is very nearly as deep as a circle from that center can be and still
+fit inside the domain: its lowest point sits at elevation −10.7887, and the
+bedrock beneath the center is at −10.88. The second is tangent to the contact between the two soils.
 **Depth is an elevation**, and on a dipping base a circle tangent to that base
 touches it at a single point rather than running along it — which is what the
 [last section](#circles-that-will-not-fit) of this page is about.
@@ -142,7 +142,7 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The drawing at the top of this page carries the shape and both strengths. Paste
+The drawing at the top of this page shows the shape and both strengths. Paste
 it into the chat box and type `Build this model`, or describe it:
 
 <div class="prompt-block" markdown>
@@ -172,7 +172,7 @@ Build a model for a 20 ft embankment with a 2:1 face on a foundation whose bedro
   an undrained strength; it never says so. If a friction angle appeared, say:
   *"Both strengths are undrained. Set phi to 0 in both materials and leave the
   pore pressure option at none."*
-- **No maximum depth was invented.** Polygon input has none, and a value entered
+- **No maximum depth was added.** Polygon input has none, and a value entered
   anyway is an input the loader has no use for.
 
 Continue at [Running the analysis](#running-the-analysis).
@@ -201,15 +201,16 @@ tables above, one block per zone:
 
 ![The finished polygon worksheet](images/lem06_sheet_polygon.png)
 
-Leave **Type** at `material` in both blocks. It is the cell that says what a
-polygon *is*: the other settings on its list make a region an SSR analysis
-overlay or a mesh refinement zone, neither of which is geometry. **Size** is
+Leave **Type** at `material` in both blocks. It sets what kind of region a
+polygon is: the other settings on its list make a region an SSR analysis
+overlay, a mesh refinement zone or a joint-network region, none of which is
+geometry. **Size** is
 optional and blank here — it sets a local mesh element size inside the zone, which
 matters to a finite element run and not to this one.
 
 There is no Max Depth cell on this sheet, and the one on the `profile` sheet is
 not read for a polygon model. The base of the section is the bottom of Polygon 2,
-which is why that ring's last two vertices carry the two bedrock elevations.
+which is why that ring's last two vertices have the two bedrock elevations.
 
 ### 3. The `circles` worksheet
 
@@ -227,11 +228,12 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 ### 1. Materials
 
 Click **Materials** in the **Inputs** tree. The editor opens on **Table view**;
-press **Add row** twice and enter (or copy-paste) the two materials from the
-table above — the block starts at the first `name` cell. The row order fixes the
+set the **Show parameters for:** toggles to **LEM** alone, press **Add row**
+twice and enter (or copy-paste) the two materials from the table above — the
+block starts at the first `name` cell. The row order fixes the
 Mat IDs the polygons reference next:
 
-![The materials editor on this problem's two soils](images/lem06_studio_materials.png){width=1000}
+![The materials editor on this problem's two soils](images/lem06_studio_materials.png){width=945}
 
 ### 2. Polygons
 
@@ -248,14 +250,14 @@ The help line above the rows states the rule the table depends on: *"Each
 polygon is a closed region (the ring closes automatically, so list each vertex
 once)."*
 
-Two things the profile-lines editor has are missing here, and both are the
-point. There is no **Max depth** field, because a polygon model's bottom
+The editor differs from the profile-lines editor in two ways, both because of
+the polygon geometry. There is no **Max depth** field, because a polygon model's bottom
 boundary is drawn rather than typed. And the preview beside the table draws
 filled zones instead of lines — the selected zone outlined and hatched, the
 other dimmed — with the hatched base beneath them following the dip. Click a
 zone or a vertex in that preview to select it. Click **OK**.
 
-Geometry drawn in CAD takes the same road in: **File → Import DXF…** builds a
+Geometry drawn in CAD can be brought in as polygons: **File → Import DXF…** builds a
 polygon project from a drawing's closed regions —
 [DXF Import/Export](../usage/dxf.md#importing-polygons-from-a-dxf).
 
@@ -299,12 +301,12 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 ### What the search finds
 
 When the search completes, the search-results plot shows every circle it
-tried in gray, the path its refinement walked in green, and the critical
+tried in gray, the path its refinement followed in green, and the critical
 circle in red:
 
 ![The circular search](images/lem06_search.png){width=1000}
 
-**FS = 1.244**, on a circle centered at (18.5, 43.75) with a radius of 43.75.
+**FS = 1.244**, on a circle centered at (18.28, 43.84) with a radius of 43.84.
 Notice how the gray family thins out and stops as it approaches the hatched
 line: a circle that would cut below the domain is not a surface this model
 has, so the dipping base bounds what the search can try.
@@ -317,21 +319,21 @@ Its lowest point is at elevation 0.000 — tangent to the contact between the tw
 soils, running along the top of the foundation without entering it. All 40 slice
 bases carry c = 400 psf, the fill's strength (the green bars are the effective
 normal stress on each base; the dashed red curve is the line of thrust), and
-the sliding mass weighs 61,393 lb/ft. The dipping base is nowhere near it:
-beneath the circle's lowest point the bedrock is at −10.97, so this answer
+the sliding mass weighs 60,960 lb/ft. The dipping base is nowhere near it:
+beneath the circle's lowest point the bedrock is at −10.98, so this answer
 would be the same under a level base at any elevation below −11. Solved on its
 own, the deeper of the two starting circles — the deepest that fits — comes to
-1.655, carrying 167,130 lb/ft against the critical circle's 61,393 and still a
+1.655, carrying 167,130 lb/ft against the critical circle's 60,960 and still a
 third safer, because everything it adds is foundation at twice the fill's
 cohesion.
 
 <!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.655, tolerance=0.005 -->
 
-The solution carries the interslice-tension and line-of-thrust warnings a φ = 0
-crest produces, which [LEM-1](lem01_simple_embankment.md) diagnoses and fixes
-with a tension crack.
+The solution has the interslice-tension and line-of-thrust warnings a φ = 0
+crest produces, which are diagnosed and fixed with a tension crack in
+[Tutorial LEM-1](lem01_simple_embankment.md).
 
-### What the other methods say
+### Factor of safety by method {#what-the-other-methods-say}
 
 Each method gets its own search and its own critical circle:
 
@@ -339,9 +341,11 @@ Each method gets its own search and its own critical circle:
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
 
+<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
+
 The four that satisfy moment equilibrium — OMS, Bishop, Spencer and
 Morgenstern-Price — land on the same circle and the same 1.244; with φ = 0 they
-cannot disagree about one. The three force-equilibrium procedures each settle on
+give the same factor of safety on any circle. The three force-equilibrium procedures each settle on
 a flatter, larger-radius circle of their own and come out 3–7% higher. Spencer
 satisfies both force and moment equilibrium and is the one to report.
 
@@ -354,8 +358,8 @@ answer:
 
 > **LEM run failed** — Failure surface extends outside the domain polygon
 
-That is the domain rule enforced. The arc would leave the model between roughly
-x = 12 and x = 34, and there is no soil down there to shear.
+The run is refused because the arc would leave the model between roughly
+x = 12 and x = 34, where there is no soil to shear.
 
 The alternative to refusing such a circle is to cut it off at the boundary, and
 the Run LEM dialog has a checkbox for exactly that: **Composite surfaces
@@ -370,18 +374,17 @@ inclined at the base's own 3.4° rather than at the circle's tangent. A surface
 built this way is a **composite surface**; the mechanics are in
 [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces).
 
-The box is off by default, and the reason is what the bottom of a model means.
-Here it is real bedrock, so a mechanism riding along it is a mechanism the slope
-genuinely has. In a profile-line model the floor is the maximum depth — a bound
-on how deep you chose to look — and truncating circles against an arbitrary
-search bound would answer nothing.
+The box is off by default because of what the bottom of a model represents.
+Here it is real bedrock, so a mechanism running along it is physically possible.
+In a profile-line model the bottom is the maximum depth — a limit on how deep
+the search looks — and truncating circles against a limit chosen for the search
+has no physical meaning.
 
 Running the search itself with the box ticked returns **1.244**, on the same
 circle as before. Nothing changed, because the critical mechanism here never
-approaches the base. The option matters where the base is what the failure
-follows.
+approaches the base. The option matters where the failure follows the base.
 
-### When the base decides
+### A weak foundation {#when-the-base-decides}
 
 Which layer is weak is a property of the soils, not of the geometry. Now we give
 the foundation c = 300 psf — below the fill's 400 — with everything else
@@ -391,12 +394,13 @@ unchanged, and search again:
 
 **FS = 0.783**, and the mechanism is a different one: the critical circle now
 bottoms out at elevation −10.85, grazing the bedrock, with 153,546 lb/ft of soil
-above it and most of its base in the foundation. This is the surface the second
-starting circle was there to describe, and the search reached it from that seed.
+above it and most of its base in the foundation. This is the mechanism the deep
+starting circle was placed for, and the search reached it from that seed.
 
-We run this one with composite surfaces on: it returns 0.782 — two tenths of a
-percent. A 3.4° dip is gentle enough that an ordinary circle can hug it for most
-of its length, so there is little left for truncation to add. The gap opens on a
+We run this one with composite surfaces on: it returns 0.781 — two tenths of a
+percent. A 3.4° dip is gentle enough that an ordinary circle can follow it
+closely for most of its length, so there is little left for truncation to add.
+The difference is larger on a
 base that is steep or irregular, or on a soft seam lying directly on rock, where
 the mechanism runs flat along the boundary for tens of feet and no circle can
 follow it at all.
@@ -411,17 +415,15 @@ This tutorial covered:
   dips, a lens will not stack into layers, or the section comes from CAD.
 - The ground surface and maximum depth read off the zones rather than entered.
 - The domain as a hard constraint on the search: a circle deeper than the base
-  is refused, and **Composite surfaces** is what truncates it against the
+  is refused, and the **Composite surfaces** option truncates it against the
   bedrock instead.
-- Softening the foundation to put the mechanism on the base, where truncation
-  starts doing real work.
+- Softening the foundation, which moves the critical mechanism down to the
+  base.
 
 **Where to go next:**
-[LEM-8 — A Reinforced Slope](lem08_reinforced_slope.md) builds a slope that only
-stands because of what is buried in it. The [tutorials index](index.md) lists the
-series, and the sample problems carry each page further.
-[Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)
-catalogs this model, [DXF Import/Export](../usage/dxf.md) is the route from a
+[LEM-8 — A Reinforced Slope](lem08_reinforced_slope.md) builds a slope that
+stands only because of its reinforcement. The [tutorials index](index.md) lists the
+series. [DXF Import/Export](../usage/dxf.md) is the route from a
 CAD drawing to the `polygon` sheet we filled by hand here, and
 [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces)
 derives what the truncated surface does to the moment methods that assumed a

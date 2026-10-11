@@ -111,6 +111,19 @@ import numpy as np
 #: element length (PLAXIS's idiom): k_n = E_adj / d_v, k_s = G_adj / d_v.
 JOINT_VIRTUAL_THICKNESS_FRAC = 0.1
 
+#: Optional ceiling on each joint stiffness component, as a multiple of the
+#: adjacent zones' own normal stiffness. ``None`` preserves the authored model.
+#:
+#: The ceiling follows the UDEC conditioning rule
+#:
+#:     k <= multiple x max[ (K + 4G/3) / dz ]
+#:
+#: over the zones adjacent to each joint element, with ``dz`` the zone extent
+#: along that joint element's normal. Normal and shear stiffness are clipped
+#: independently: this is a numerical upper bound on each component, not a rule
+#: for preserving the authored ``k_n / k_s`` ratio.
+JOINT_STIFFNESS_CAP = None
+
 #: The iteration budget a jointed model needs before a strength-reduction trial
 #: can be trusted to have decided.
 #:
@@ -169,6 +182,31 @@ JOINT_RS2_SLIP_STIFFNESS_FACTOR = 0.01
 #: leaving the iteration's contraction at the same one percent.
 JOINT_TANGENT_FACTOR = JOINT_RS2_SLIP_STIFFNESS_FACTOR
 
+#: The one-sided stick/slip band: a pair that was SLIPPING on the last sweep is
+#: read as slipping until its trial shear falls below this fraction of its limit,
+#: where the plain test re-sticks it the moment the trial shear dips under the
+#: limit by any amount.
+#:
+#: After a slipping sweep a pair sits exactly on its limit, and the next solve
+#: moves the field by a ripple of about a nanometre. On RJ-3's undecided trial
+#: that ripple puts 123 pairs over and under their limits by a few parts in 1e8
+#: (1st/50th/99th percentile of (|trial shear| - limit)/limit on the flipping
+#: pairs: -2.6e-5 / -1.4e-8 / +1.4e-6), so they read slipping on one sweep and
+#: sticking on the next, in an exact 7-sweep cycle, while their slip moves by
+#: 8e-9 m over 358 sweeps (r41_joint_cycle_proposal.md §2). The flip carries no
+#: physics, but everything that reads the pair's STATE sees it: the accelerated
+#: sweep resets on every one, and the interface relief restores and re-relieves.
+#:
+#: The band is ONE-SIDED so the arithmetic stays exactly what it was. Slip grows
+#: only where the trial shear EXCEEDS the limit, and every such pair is classed
+#: slipping with or without the band; a pair held slipping inside the band has a
+#: non-positive excess, takes no slip increment, keeps its residual latch (it was
+#: slipping on the sweep before, so it is latched already), and carries the
+#: traction it carries. So the body load, the slip, the displacement field and
+#: every quantity the stopping rules read from them are unchanged; what changes is
+#: only the pair's slipping / sticking CODE.
+JOINT_RESTICK_FRAC = 0.999
+
 #: Newton-Cotes (Lobatto) weights on [0, 1] in the node order the mesh writes,
 #: (start, end, midside): Simpson's rule for the three-pair element and the
 #: trapezoidal rule for the two-pair one.
@@ -212,6 +250,73 @@ def _node_element_map(elements, element_types, n_nodes):
         for k in range(int(element_types[ei])):
             out[int(elements[ei, k])].append(ei)
     return out
+
+
+def _element_corners(nodes, elements, element_types):
+    """Corner coordinates per 2D element, padded to four, with a live mask.
+
+    A tri6 is its three corner nodes and a quad8 its four: mid-side nodes lie on
+    the element edges and do not widen its extent.
+    """
+    n_elem = len(elements)
+    xy = np.zeros((n_elem, 4, 2))
+    live = np.zeros((n_elem, 4), dtype=bool)
+    et = np.asarray(element_types, dtype=int)
+    n_corner = np.where((et == 3) | (et == 6), 3, 4)
+    for k in range(4):
+        take = n_corner > k
+        if not np.any(take):
+            continue
+        idx = np.asarray(elements)[take, k].astype(int)
+        xy[take, k] = nodes[idx, :2]
+        live[take, k] = True
+    return xy, live
+
+
+def _joint_stiffness_cap(nodes, elements, element_types, element_materials,
+                         E_by_mat, nu_by_mat, node_elems, conn, nx, ny,
+                         multiple):
+    """Return the UDEC-style stiffness ceiling for every joint element.
+
+    The adjacent set contains the 2D elements standing on either face of the
+    split interface. ``dz`` is each adjacent element's extent along this joint
+    element's normal. A joint element with no adjacent 2D element gets ``inf``;
+    :func:`build_joint_data` separately refuses that malformed mesh.
+    """
+    E = np.asarray(E_by_mat, dtype=float)
+    nu = np.asarray(nu_by_mat, dtype=float)
+    K_b = E / (3.0 * (1.0 - 2.0 * nu))
+    G = E / (2.0 * (1.0 + nu))
+    modulus = (K_b + 4.0 * G / 3.0)[np.asarray(element_materials, dtype=int) - 1]
+
+    xy, live = _element_corners(nodes, elements, element_types)
+
+    pair_i, pair_e = [], []
+    for i in range(len(conn)):
+        touch = set()
+        for c in range(6):
+            nd = int(conn[i, c])
+            if nd >= 0:
+                touch.update(node_elems[nd])
+        pair_i.extend([i] * len(touch))
+        pair_e.extend(sorted(touch))
+    if not pair_i:
+        return np.full(len(conn), np.inf)
+    pair_i = np.asarray(pair_i, dtype=int)
+    pair_e = np.asarray(pair_e, dtype=int)
+
+    proj = (xy[pair_e, :, 0] * nx[pair_i][:, None]
+            + xy[pair_e, :, 1] * ny[pair_i][:, None])
+    lv = live[pair_e]
+    hi = np.max(np.where(lv, proj, -np.inf), axis=1)
+    lo = np.min(np.where(lv, proj, np.inf), axis=1)
+    dz = hi - lo
+    with np.errstate(divide="ignore", invalid="ignore"):
+        val = np.where(dz > 0.0, modulus[pair_e] / dz, 0.0)
+
+    worst = np.zeros(len(conn))
+    np.maximum.at(worst, pair_i, val)
+    return np.where(worst > 0.0, float(multiple) * worst, np.inf)
 
 
 def _dof_pair(node, dof_offset):
@@ -453,6 +558,37 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
             ks[sel] = float(_ks)
         jred[sel] = str(line.get("jred", "yes") or "yes").strip().lower() != "no"
 
+    # Optional conditioning ceiling. It is applied after all line properties so
+    # stated and derived stiffnesses are treated alike. Each component is clipped
+    # against the same adjacent-zone ceiling; clipping one never changes the other.
+    cap_record = None
+    if JOINT_STIFFNESS_CAP is not None:
+        ceiling = _joint_stiffness_cap(
+            nodes, elements, element_types, element_materials,
+            E_by_mat, nu_by_mat, node_elems, conn, nx, ny,
+            JOINT_STIFFNESS_CAP)
+
+        def _clip_component(values):
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ratio = np.where(np.isfinite(ceiling), values / ceiling, 0.0)
+            bound = ratio > 1.0
+            record = {
+                "n_bound": int(np.count_nonzero(bound)),
+                "max_reduction": (float(np.max(ratio[bound]))
+                                  if np.any(bound) else 1.0),
+            }
+            return np.minimum(values, ceiling), record
+
+        kn, kn_record = _clip_component(kn)
+        ks, ks_record = _clip_component(ks)
+        cap_record = {
+            "multiple": float(JOINT_STIFFNESS_CAP),
+            "dz": "normal extent of the adjacent element",
+            "n_joint": int(n),
+            "kn": kn_record,
+            "ks": ks_record,
+        }
+
     K = _joint_element_stiffness(w, tx, ty, nx, ny, kn, ks)
 
     jd = {
@@ -470,6 +606,8 @@ def build_joint_data(slope_data, mesh, nodes, E_by_mat, nu_by_mat,
         "jred": jred, "tip": tip, "K": K,
         "jointed_lines": sorted(set(int(v) for v in line_id)),
     }
+    if cap_record is not None:
+        jd["stiffness_cap"] = cap_record
     ties = _build_tie_data(mesh, lines, nodes, dof_offset)
     if ties is not None:
         jd["ties"] = ties
@@ -701,7 +839,7 @@ def _limit_normal(jd, tn):
 
 
 def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
-                slipped=None, res_r=None, dil_p=None):
+                slipped=None, res_r=None, dil_p=None, slip_prev=None):
     """The joint tractions at displacement ``u``.
 
     ``slip_p`` is the accumulated plastic tangential offset (the viscoplastic
@@ -715,6 +853,11 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
     closing is measured against. All three are ``None`` on a model that states
     neither residual strength nor dilation, and the arithmetic below is then
     exactly what it was before either existed.
+
+    ``slip_prev`` is the (n, 3) record of which pairs were SLIPPING on the last
+    sweep; passed, a pair in it stays slipping until its trial shear falls below
+    :data:`JOINT_RESTICK_FRAC` of its limit (the one-sided band). ``None`` is the
+    plain test.
 
     Returns a dict with ``dt``, ``dn``, ``tn``, ``ts``, ``tlim``, ``open`` and
     ``slipping``, each (n, 3).
@@ -745,11 +888,20 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
         cj_eff = np.where(slipped, res_r[0][:, None], cj_r[:, None])
         tanphi_eff = np.where(slipped, res_r[1][:, None], tanphi_r[:, None])
     tlim = cj_eff + np.maximum(tn_lim, 0.0) * tanphi_eff
-    slipping = (~opened) & (np.abs(ts_el) > tlim)
+    over = np.abs(ts_el) > tlim
+    if slip_prev is None:
+        slipping = (~opened) & over
+    else:
+        # The one-sided band (see JOINT_RESTICK_FRAC): a pair slipping on the
+        # last sweep re-sticks only once its trial shear is clearly below the
+        # limit. The traction below is still clipped only where the trial shear
+        # is OVER the limit, so a pair held inside the band carries its own.
+        slipping = (~opened) & (over | (slip_prev & (
+            np.abs(ts_el) >= JOINT_RESTICK_FRAC * tlim)))
 
     tn_true = np.where(opened, 0.0, tn)
     ts_true = np.where(opened, 0.0,
-                       np.where(slipping, np.sign(ts_el) * tlim, ts_el))
+                       np.where(over, np.sign(ts_el) * tlim, ts_el))
     return {"dt": dt, "dn": dn, "tn": tn_true, "ts": ts_true, "tlim": tlim,
             "open": opened, "slipping": slipping, "ts_trial": ts_el}
 
@@ -757,7 +909,7 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
 def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
                    dt_vp=JOINT_VP_DT, slipped=None, res_r=None, dil_p=None,
                    ks_slip_factor=None, ks_asm=None, kn_asm=None,
-                   loads_relief=None):
+                   loads_relief=None, slip_state=None):
     """One viscoplastic sweep over the joints: update the slip, load the residual.
 
     The global stiffness carries every joint's FULL elastic block, so ``K u``
@@ -802,12 +954,20 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     (max|u| = 3.8e+50 in 41 sweeps on one corpus row). The measured behavior over
     milder factors is in r15_joint_convergence.md §3.
 
+    ``slip_state`` is the (n, 3) record of which pairs were slipping on the last
+    sweep, read for the one-sided stick/slip band (see
+    :data:`JOINT_RESTICK_FRAC`) and updated in place, like ``open_state``. It
+    moves the slipping / sticking code only; ``None`` is the plain test.
+
     Mutates ``slip_p`` and ``open_state`` in place, adds into ``loads``, and
     returns the number of pairs that are slipping or open.
     """
     st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_state,
-                     slipped=slipped, res_r=res_r, dil_p=dil_p)
+                     slipped=slipped, res_r=res_r, dil_p=dil_p,
+                     slip_prev=slip_state)
     np.copyto(open_state, st["open"])
+    if slip_state is not None:
+        np.copyto(slip_state, st["slipping"])
 
     ks = jd["ks"][:, None]
     excess = np.abs(st["ts_trial"]) - st["tlim"]
@@ -1057,7 +1217,7 @@ def joint_yield_violation(st, cj_r, tanphi_r, floor=0.0):
 # ---------------------------------------------------------------------------
 # What a BONDED run says about the joint it did not have
 #
-# The selection rule (docs/fem/reinforcement.md, "Bonded bar or joint?") is
+# The selection rule (docs/reinforcement/fem.md, "Bonded bar or joint?") is
 # about the mechanism, and a bonded run has already found the mechanism. Two of
 # its readings say the surface wanted to run ALONG a sheet rather than across
 # it, and both are one pass over a solution the engine already holds.

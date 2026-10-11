@@ -21,7 +21,7 @@ from PySide6.QtCore import Qt, QObject, QSettings, QStandardPaths, QThread, Sign
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
-    QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
+    QInputDialog, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
     QPushButton, QStackedWidget, QTabWidget, QToolBar, QToolButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
@@ -34,6 +34,7 @@ from . import links, urlscheme
 from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
+    MAX_ITERATIONS_LIMIT as _MAX_ITERATIONS_LIMIT,
     RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
     UnpackPackageDialog,
 )
@@ -139,7 +140,10 @@ class SolutionView(QWidget):
     The solvers return ``results['warnings']`` — Duncan & Wright admissibility
     notes on an already-accepted solution (base tension on cohesionless slices,
     interslice tension, thrust line outside the slices; see
-    ``solve._admissibility_warnings``). They reach the Log pane via the stdout tee,
+    ``solve._admissibility_warnings``) — and ``search.run_lem_analysis`` adds the
+    crest-tension note (``search.crest_tension_note``), which can suggest a
+    tension crack. A single-surface run prints them to the Log pane via the
+    stdout tee (a search prints only the crest-tension note),
     but a Studio user reading only the plot would take an inadmissible FS as a
     clean success. This strip surfaces them beside the solution: hidden when the
     list is empty, otherwise one amber line per note. It refreshes from the fresh
@@ -317,6 +321,9 @@ class MainWindow(QMainWindow):
         self.fem_data_canvas = None
         self.fem_results_canvas = None
         self.fem_details_btn = None       # "1D Details…" on the FEM results toolbar
+        # "Continue with a higher limit…" on the same toolbar, shown only while the
+        # displayed strength reduction run can be continued (see continue_fem).
+        self.fem_continue_btn = None
         self.fem_details_dlg = None       # the open (non-modal) details dialog
         self.view_tabs = QTabWidget()
         self.view_tabs.addTab(self.canvas, "Inputs")
@@ -339,7 +346,14 @@ class MainWindow(QMainWindow):
         self._pending_run_ok = False
         self._run_implemented = {"lem", "seep", "fem"}   # modes whose Run is wired up
         self._last_lem_opts = {}
+        # Run LEM's search tolerances, one entry per surface family: a circular and a
+        # non-circular search have different defaults, so the last run's values are
+        # handed back only to a run of the same family.
+        self._lem_search_tols = {}
         self._last_sens_opts = {}          # keyed by engine mode (lem/fem/seep)
+        # The transient solution each mode's last FS-vs-time ticks were made on
+        # (``_transient_token``): they are handed back only to that solution.
+        self._last_sens_token = {}
         self._last_rel_opts = {}           # keyed by engine mode (lem/fem)
         self._last_mesh_opts = {}
         self._last_seep_opts = {}
@@ -1581,6 +1595,7 @@ class MainWindow(QMainWindow):
         analysis = meta.get("analysis") or meta.get("analysis_type") or "loaded"
         self.doc.results["fem_solution"] = {
             "fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
+            "fs_is_lower_bound": bool(meta.get("fs_is_lower_bound")),
             "analysis": analysis,
             "failure_solution": failure_solution,
             # The whole record the run kept of itself, carried the way a live run
@@ -1591,7 +1606,9 @@ class MainWindow(QMainWindow):
         self._show_fem_data(fem_data)
         self._show_fem_results()
         fs = meta.get("FS")
-        fs_note = f" (SSRM FS = {fs:.3f})" if isinstance(fs, (int, float)) else ""
+        from xslope.fem import ssrm_fs_text
+        fs_note = (f" (SSRM {ssrm_fs_text(fs, bool(meta.get('fs_is_lower_bound')))})"
+                   if isinstance(fs, (int, float)) else "")
         print(f"Restored saved FEM solution from {os.path.basename(stem)}_fem_*.csv{fs_note}.")
 
     def _render(self):
@@ -1674,6 +1691,7 @@ class MainWindow(QMainWindow):
         self.act_report.setEnabled(open_ and solved and not busy)
         self.act_report.setToolTip(
             "" if solved else "Run an analysis first — a report documents results.")
+        self._update_fem_continue_action()
 
     def run_current(self):
         """Dispatch the Run action by the current mode."""
@@ -1731,6 +1749,7 @@ class MainWindow(QMainWindow):
         add("Distributed loads", len(d.get("dloads") or []), category="dloads")
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []),
             category="reinforce")
+        add("Joints", len(d.get("joint_lines") or []), category="joints")
         add("Line loads", len(d.get("line_loads") or []), category="line_loads")
         add("Piles", len(d.get("pile_lines") or []), category="piles")
         add("Seep BC", len(sbc.get("specified_heads", [])), category="seep_bc")
@@ -1828,15 +1847,16 @@ class MainWindow(QMainWindow):
         "global": "Global Parameters", "materials": "Materials", "circles": "Circles",
         "non_circ": "Non-Circular Surface", "piezo": "Piezometric Lines",
         "dloads": "Distributed Loads", "seep_bc": "Seepage BC", "piles": "Piles",
-        "reinforce": "Reinforcement", "line_loads": "Line Loads",
+        "reinforce": "Reinforcement", "joints": "Joints", "line_loads": "Line Loads",
         "profile": "Profile Lines", "polygons": "Polygons",
         "transient": "Transient Seepage",
     }
 
-    # Source inputs whose change makes the mesh stale (the domain geometry plus
-    # the reinforcement/pile lines baked in as mesh constraint lines).
+    # Source inputs whose change makes the mesh stale (the domain geometry, the
+    # reinforcement/pile/joint lines baked in as mesh constraint lines, and the
+    # refinement and joint-network regions).
     MESH_KEYS = ("profile_lines", "polygons", "max_depth", "reinforcement_lines",
-                 "pile_lines")
+                 "pile_lines", "joint_lines", "refine_zones", "joint_zones")
 
     @staticmethod
     def mesh_signature(sd):
@@ -1858,11 +1878,12 @@ class MainWindow(QMainWindow):
                 return [clean(x) for x in o]
             return o
         def geometry_only(key, rows):
-            # A reinforcement or pile row enters the mesh as a constraint line
-            # and nothing more: only its endpoints (and how many rows there are)
-            # can change the mesh. Editing S, D, Tmax, Appl or any other property
-            # on a row must not throw the mesh away.
-            if key not in ("reinforcement_lines", "pile_lines") or not rows:
+            # A reinforcement, pile or joint row enters the mesh as a constraint
+            # line and nothing more: only its endpoints (and how many rows there
+            # are) can change the mesh. Editing S, D, Tmax, Appl, a joint's
+            # strength or any other property on a row must not throw the mesh away.
+            if key not in ("reinforcement_lines", "pile_lines",
+                           "joint_lines") or not rows:
                 return clean(rows)
             try:
                 return [[clean(r.get("x1")), clean(r.get("y1")),
@@ -1908,6 +1929,10 @@ class MainWindow(QMainWindow):
                 canvas.deleteLater()
         for a in single:
             setattr(self, a, None)
+        # The FEM results toolbar's buttons went with its canvas; a later Run
+        # menu update must not reach the deleted widgets.
+        self.fem_details_btn = None
+        self.fem_continue_btn = None
         self.seep_data_canvas = {}
         self.seep_solution_canvas = {}
         self.transient_seep_view = None
@@ -1951,6 +1976,9 @@ class MainWindow(QMainWindow):
             seed("method", sd.get("lem_method"),
                  lambda v: bool(v) and v != "all")
             seed("num_slices", sd.get("num_slices"))
+            # Per surface family; the flat fs_tol/max_iter the cache carries belong to
+            # the family its "surface" names, which the dialog sorts out.
+            d["search_tols"] = {s: dict(v) for s, v in self._lem_search_tols.items()}
         elif which == "mesh":
             seed("element_type", sd.get("element_type"), bool)
             # The 1D element size is a model input the dialog writes back, so the
@@ -2359,6 +2387,21 @@ class MainWindow(QMainWindow):
         bundle = self.doc.results.get("transient_seep") or {}
         return bundle.get("transient")
 
+    def _transient_token(self):
+        """A name for the transient solution now loaded, ``None`` without one.
+
+        Kept on the result bundle, so the same solution shown again answers to the
+        same name, and anything that replaces the bundle — a new solve, a restored
+        sidecar, the assistant's run, another file — answers to a new one.
+        """
+        bundle = self.doc.results.get("transient_seep")
+        if not bundle or not bundle.get("transient"):
+            return None
+        if not bundle.get("sweep_token"):
+            import uuid
+            bundle["sweep_token"] = uuid.uuid4().hex
+        return bundle["sweep_token"]
+
     def transient_current_time(self):
         """The instant the transient results viewer is showing, or ``None`` when no
         transient results tab is open."""
@@ -2486,8 +2529,11 @@ class MainWindow(QMainWindow):
         # SSRM supports cooperative cancel (a single-trial solve is quick).
         supports_cancel = opts["analysis"] == "ssrm"
         seep_time = opts.get("seep_time") or {}
-        if not self._apply_transient_analysis_frame(rapid=False,
-                                                    time=seep_time.get("time")):
+        # A continued run solves on the model its trials were made on, so the
+        # seepage frame that model was built with is already in it.
+        if (opts.get("continue_from") is None
+                and not self._apply_transient_analysis_frame(
+                    rapid=False, time=seep_time.get("time"))):
             return
         self.statusBar().showMessage("Running FEM …")
         self.progress_bar.setRange(0, 0)
@@ -2546,7 +2592,10 @@ class MainWindow(QMainWindow):
         if self.fem_results_canvas is not None:
             self.view_tabs.setCurrentWidget(self.fem_results_canvas)
         if bundle.get("FS") is not None:
-            self.statusBar().showMessage(f"FEM done — SSRM FS = {bundle['FS']:.3f}")
+            from xslope.fem import ssrm_fs_text
+            self.statusBar().showMessage(
+                f"FEM done — SSRM "
+                f"{ssrm_fs_text(bundle['FS'], bool(bundle.get('fs_is_lower_bound')))}")
         else:
             conv = bundle["solution"].get("converged")
             self.statusBar().showMessage(f"FEM single solve done (converged={conv}).")
@@ -2599,27 +2648,50 @@ class MainWindow(QMainWindow):
                 "1D Details…",
                 "Per-line profiles for reinforcement and piles.",
                 self.open_fem_details)
+            self.fem_continue_btn = self.fem_results_canvas.add_tool_button(
+                "Continue with a higher limit…",
+                "Continue this strength reduction run from where its trials "
+                "stopped, with a higher Max iterations per trial.",
+                self.continue_fem)
+            self.fem_continue_btn.setVisible(False)
         self._rerender_fem_results()
 
     def _rerender_fem_results(self):
         bundle = self.doc.results.get("fem_solution")
         panel = self._display_panels.get(self.fem_results_canvas)
         if bundle and panel and self.fem_results_canvas is not None:
+            # A new result sets the deformation plot's element-edges default
+            # from the plotter's jointed-line rule; the same result re-rendered
+            # keeps whatever the user set.
+            if getattr(panel, "_grid_default_for", None) is not id(bundle):
+                from xslope.plot_fem import block_grid_default
+                panel.set_block_grid_default(block_grid_default(bundle["fem_data"]))
+                panel.set_jointed(bool(
+                    (bundle["fem_data"].get("joint_data") or {}).get("n")))
+                panel._grid_default_for = id(bundle)
             try:
                 self.fem_results_canvas.render_fem_results(
                     bundle["fem_data"], bundle["solution"],
                     {**panel.options(), "fs": bundle.get("FS"),
-                     "failure_solution": bundle.get("failure_solution")})
+                     "fs_is_lower_bound": bool(bundle.get("fs_is_lower_bound")),
+                     "failure_solution": bundle.get("failure_solution"),
+                     # The run's own record — its trials, bracket and factor of
+                     # safety — which the displacement-vs-F curve is drawn from.
+                     # A live run and a reopened one carry it the same way.
+                     "ssrm_record": {**(bundle.get("meta") or {}),
+                                     "FS": bundle.get("FS")}})
             except Exception:
                 traceback.print_exc()
         self._update_fem_details_action()
 
     def _update_fem_details_action(self):
-        """Gate the FEM results view's "1D Details…" button.
+        """Gate the FEM results view's "1D Details…" button (and show or hide
+        "Continue with a higher limit…" beside it).
 
         The button stays on the toolbar and dims with its reason when there is
         nothing to detail — a model with no reinforcement lines and no piles has
         no 1D elements, and the dialog would open empty."""
+        self._update_fem_continue_action()
         if self.fem_details_btn is None:
             return
         from xslope.fem_details import has_1d_details
@@ -2631,6 +2703,71 @@ class MainWindow(QMainWindow):
             "Per-line profiles for reinforcement and piles."
             if ok else
             "This model has no reinforcement lines or piles to detail.")
+
+    def _fem_continuable(self):
+        """The displayed strength reduction run's result where it can be
+        continued with a higher limit, else None."""
+        bundle = self.doc.results.get("fem_solution") or {}
+        result = bundle.get("ssrm_result")
+        if result is None:
+            return None
+        from xslope.fem import ssrm_can_continue
+        return result if ssrm_can_continue(result) is not None else None
+
+    def _update_fem_continue_action(self):
+        """Show "Continue with a higher limit…" beside the results while the
+        displayed run can be continued: its top trial ended undecided, or was
+        counted failed while still slowing, and its trials' end states are held
+        in this session. Disabled while any run is going."""
+        btn = self.fem_continue_btn
+        if btn is None:
+            return
+        busy = (self._runner is not None or self._seep_runner is not None
+                or self._fem_runner is not None or self._sens_runner is not None
+                or self._rel_runner is not None
+                or self._report_runner is not None or self._mesh_busy)
+        btn.setVisible(self._fem_continuable() is not None)
+        btn.setEnabled(not busy)
+
+    def continue_fem(self):
+        """Continue the displayed strength reduction run with a higher Max
+        iterations per trial.
+
+        Asks for the new value (prefilled at five times the limit the run
+        stopped at), then runs the continuation in the worker exactly as an
+        ordinary run: the same Cancel, the same progress bar, the Log carrying
+        on, and the results replaced when it ends. The Run FEM dialog takes the
+        new value too, so a later fresh run uses it."""
+        if self._fem_runner is not None:
+            return
+        result = self._fem_continuable()
+        if result is None:
+            from xslope.fem import ssrm_continue_refusal
+            bundle = self.doc.results.get("fem_solution") or {}
+            QMessageBox.information(
+                self, "Continue with a higher limit",
+                ssrm_continue_refusal(bundle.get("ssrm_result"))
+                or "This run cannot be continued.")
+            return
+        limit = int((result.get("resumable") or {}).get("limit") or 0)
+        top = float(result["final_interval"][1])
+        value, ok = QInputDialog.getInt(
+            self, "Continue with a higher limit",
+            f"The run stopped at F = {top:.4f} with Max iterations per trial "
+            f"{limit:,}.\nContinue it from where its trials stopped with Max "
+            f"iterations per trial:",
+            max(limit + 1, 5 * limit), limit + 1, _MAX_ITERATIONS_LIMIT,
+            max(1000, limit // 10))
+        if not ok:
+            return
+        opts = dict(self._last_fem_opts or {})
+        opts["analysis"] = "ssrm"
+        opts["max_iterations"] = int(value)
+        opts["max_iterations_ceiling"] = max(
+            int(value), int(opts.get("max_iterations_ceiling") or 0))
+        # The Run FEM dialog opens on the new value, so a later fresh run uses it.
+        self._last_fem_opts = dict(opts)
+        self._start_fem({**opts, "continue_from": result})
 
     def open_fem_details(self):
         """Open the non-modal reinforcement/pile details dialog.
@@ -2670,6 +2807,7 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_lem_opts = opts
+        self._lem_search_tols = dlg.search_tolerances()
         self._store_surface_family(opts.get("surface"))
         self._store_transient_times(opts)
         need = self._remarch_times_needed(opts)
@@ -2706,7 +2844,7 @@ class MainWindow(QMainWindow):
         non-circular surface has no way, in its geometry, to say which one it means,
         and the circles simply win. The dialog's choice is written back into the
         model's ``surface_family`` — the ``main`` sheet's **Surface family** cell
-        (D24), so it survives save and reload — and the legacy ``circular`` flag is
+        (D25), so it survives save and reload — and the legacy ``circular`` flag is
         kept in step with it, because that flag is what the runners, the plots and
         the sensitivity sweep read when nobody hands them a family.
         """
@@ -3149,7 +3287,15 @@ class MainWindow(QMainWindow):
                                 "Build a finite-element mesh first (Build Mesh…) — "
                                 "FEM and seepage sweeps run on the mesh.")
             return
-        dlg = SensitivityDialog(self, defaults=self._last_sens_opts.get(self._mode, {}),
+        defaults = dict(self._last_sens_opts.get(self._mode, {}))
+        # The saved-frame ticks belong to the solution they were made on. Another
+        # one — a new solve, another file, another list of times — opens on the
+        # dialog's own default (every frame), so a curve never silently inherits
+        # gaps left by a sweep of a different march.
+        token = self._transient_token()
+        if token is None or self._last_sens_token.get(self._mode) != token:
+            defaults.pop("times", None)
+        dlg = SensitivityDialog(self, defaults=defaults,
                                 slope_data=self.doc.slope_data, app_mode=self._mode,
                                 document=self.doc,
                                 transient=self.transient_solution())
@@ -3157,6 +3303,7 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_sens_opts[self._mode] = opts
+        self._last_sens_token[self._mode] = token
         study = opts["mode"]
         if study in ("design", "back_analysis") and not opts.get("param"):
             QMessageBox.warning(self, "Nothing to sweep",
@@ -3420,6 +3567,10 @@ class MainWindow(QMainWindow):
                 canvas.deleteLater()
         for a in single:
             setattr(self, a, None)
+        # The FEM results toolbar's buttons went with its canvas; a later Run
+        # menu update must not reach the deleted widgets.
+        self.fem_details_btn = None
+        self.fem_continue_btn = None
         self.seep_data_canvas = {}
         self.seep_solution_canvas = {}
         self.transient_seep_view = None

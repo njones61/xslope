@@ -1510,7 +1510,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       and the smaller system solves faster.
                       None is accepted and resolves to the default, so a model whose
                       main!D18 is blank meshes with tri6.
-        lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements
+        lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements.
+                      Every 1D element lies along an edge of the 2D mesh and stands on
+                      its nodes; a mesh in which one does not is refused with a
+                      MeshInputError naming the line. Lines that meet — a bar crossing
+                      a pile, a bar ending partway along another line, two bars
+                      crossing — share a node at the meeting point.
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
         element_size_1d : Optional element size along the constraint (reinforcement /
@@ -1649,8 +1654,22 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # so both curves are split there and gmsh gives the junction one node.
     _joint_opts = _normalize_joint_lines(joint_lines, len(lines) if lines else 0)
     if _joint_opts:
+        # Jointed lines ending a few centimeters apart on the outer boundary end
+        # at one point there, so no sliver of rock is left between them and the
+        # boundary. See _merge_boundary_joint_ends.
+        _merge_boundary_joint_ends(lines, _joint_opts, polygon_coords,
+                                   target_size, debug=debug)
         _validate_joint_lines(lines, _joint_opts, point_constraints, polygon_coords)
         _insert_joint_junction_points(lines, _joint_opts, debug=debug)
+
+    # Bonded lines that meet — a bar ending on or crossing a pile, two bars
+    # crossing — get the meeting point as a vertex of both, so the two members
+    # share a node there. A line that meets no other is left untouched. See
+    # _insert_bonded_junction_points.
+    _bonded_junctions = set()
+    if lines:
+        _bonded_junctions = _insert_bonded_junction_points(
+            lines, _joint_opts, polygon_coords, debug=debug)
 
     # Point constraints (e.g. line-load application points): insert each point as
     # a vertex into every polygon edge that contains it, so gmsh places a node
@@ -1853,11 +1872,37 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             poly_pts_arr = np.array(poly_pts_list)
             for line_idx in range(len(lines)):
                 snapped = list(lines[line_idx])
+                if len(snapped) >= 2:
+                    _x0, _y0 = snapped[0]
+                    _x1, _y1 = snapped[-1]
+                    _chord = float(np.hypot(_x1 - _x0, _y1 - _y0))
+                    # A line no longer than the snap tolerance cannot be meshed as a
+                    # line: snapping either end would fold it onto the other, and
+                    # gmsh is then handed a curve of no length. Say so rather than
+                    # fail on the arithmetic downstream.
+                    if _chord <= snap_tol:
+                        raise ValueError(
+                            f"Line {line_idx + 1} is {_chord:.4g} long, no longer than "
+                            f"the mesher's snap tolerance ({snap_tol:.4g}, a twentieth "
+                            f"of the element size {target_size:g}); a line that short "
+                            f"cannot be meshed. Remove it, lengthen it, or refine the "
+                            f"mesh until it spans more than a twentieth of an element.")
                 for i in [0, len(snapped) - 1]:  # snap endpoints only
                     px, py = snapped[i]
+                    # An end standing on another bonded line's interior is the
+                    # junction of the two members and stays there: moving it to a
+                    # nearby zone corner would take it off the other line.
+                    if (float(px), float(py)) in _bonded_junctions:
+                        continue
                     dists = np.sqrt((poly_pts_arr[:, 0] - px)**2 + (poly_pts_arr[:, 1] - py)**2)
                     j = np.argmin(dists)
-                    if dists[j] < snap_tol and dists[j] > 1e-12:
+                    # Any distance above zero snaps, however small. An end a
+                    # rounding error off a zone vertex (-1.1069999999999993
+                    # against -1.107) is otherwise handed to gmsh as a second
+                    # point beside the vertex, and gmsh either cannot recover
+                    # the edge between them (the last bar element then cuts
+                    # across the soil) or leaves a second node beside the vertex.
+                    if 0.0 < dists[j] < snap_tol:
                         if debug:
                             print(f"Snapped line {line_idx} endpoint ({px:.4f},{py:.4f}) "
                                   f"-> ({poly_pts_list[j][0]:.4f},{poly_pts_list[j][1]:.4f}) "
@@ -2614,6 +2659,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # conversion above, or the OCC-fragment fallback.
     attach_1d_midside_nodes(mesh, debug=debug)
 
+    # Every 1D element must lie along an edge of the 2D mesh; one that cuts across
+    # the soil elements is refused, naming the line. Before the joint split, which
+    # gives a jointed line's bar nodes of its own.
+    if lines is not None:
+        _check_1d_elements_on_soil_edges(mesh)
+
     # Jointed lines are split last, on the finished mesh: the bar elements must
     # already carry the midside node of their 2D edge before that edge is torn
     # into three.
@@ -3173,6 +3224,156 @@ def _snap_joint_line_ends(lines, opts, tol, debug=False):
     return n_moved
 
 
+#: How far apart, as a fraction of the target element size, two jointed-line ends
+#: on the section's outer boundary may stand and still be read as one corner. The
+#: same fraction as the mesher's existing end snap (a line end within a twentieth
+#: of an element of a polygon point is moved onto it).
+_BOUNDARY_END_MERGE_FRAC = 0.05
+
+
+def _merge_boundary_joint_ends(lines, opts, polygon_coords, target_size,
+                               debug=False):
+    """Make two jointed lines that end close together on the outer boundary end
+    at ONE point there.
+
+    Two joints that reach the section's outer boundary a few centimeters apart
+    leave a sliver of boundary between their ends, and where they also cross
+    just inside it, a sliver triangle of rock between the two lines and the
+    boundary. No element of the target size fits in either. The mesher fills
+    them with needle elements — an aspect ratio of 91 and an area of 0.017 m² on
+    RJ-3's left boundary — and with rock that can yield those elements flow in
+    place and hold a strength-reduction trial out of balance for as long as it
+    runs. The geometry is the measurement's tolerance, not the rock's: at the
+    element size the model is meshed at, the two joints daylight at the same
+    place.
+
+    So jointed-line ends on the outer boundary that stand within
+    ``_BOUNDARY_END_MERGE_FRAC`` x ``target_size`` of one another (the distance
+    within which the mesher already moves a line end onto a polygon point)
+    become one point: the end of the lowest-numbered line among them, so which
+    of them moves does not depend on the order they are visited in. Ends a
+    chain of such gaps connects are one group. The line that moves turns about
+    its other end by the angle the gap subtends from there; on RJ-3 that is
+    0.32 m on a 574 m line, 0.03 degrees.
+
+    Only ends on the OUTER boundary are merged. Ends on an interior material
+    boundary, or anywhere inside, are left as stated; ends a millionth of the
+    section apart are already one point and :func:`_snap_joint_line_ends` keeps
+    them so.
+
+    A moved end leaves behind the boundary vertex the polygons were given for it
+    (``get_material_polygons`` inserts every line end that lies on a polygon
+    edge). That vertex is taken out again where it lies on the straight boundary
+    between its neighbours and no other line ends or turns there, so the outline
+    keeps its shape and loses the sliver. A vertex at a real corner of the
+    outline is kept.
+
+    In place, on ``lines`` and ``polygon_coords``. Returns the number of ends moved.
+    """
+    idx = sorted(opts)
+    if len(idx) < 2 or not polygon_coords or not (target_size and target_size > 0):
+        return 0
+    from shapely.geometry import Polygon as _Poly, Point as _Pt
+    from shapely.ops import unary_union as _union
+
+    merge = _BOUNDARY_END_MERGE_FRAC * float(target_size)
+    tol = _joint_line_tol(lines, polygon_coords)
+    rings = []
+    for coords in polygon_coords:
+        pts = remove_duplicate_endpoint(list(coords))
+        if len(pts) >= 3:
+            rings.append(_Poly(pts).buffer(0))
+    if not rings:
+        return 0
+    dom = _union(rings)
+    outer = _union([g.exterior for g in getattr(dom, 'geoms', [dom])])
+
+    ends = []
+    for li in idx:
+        line = lines[li]
+        if not line or len(line) < 2:
+            continue
+        for e in (0, len(line) - 1):
+            p = (float(line[e][0]), float(line[e][1]))
+            if outer.distance(_Pt(p)) <= tol:
+                ends.append((li, e, p))
+    if len(ends) < 2:
+        return 0
+
+    home = list(range(len(ends)))
+
+    def _find(k):
+        while home[k] != k:
+            home[k] = home[home[k]]
+            k = home[k]
+        return k
+
+    for a in range(len(ends)):
+        for b in range(a + 1, len(ends)):
+            if ends[a][0] == ends[b][0]:
+                continue                     # a line's own two ends
+            pa, pb = ends[a][2], ends[b][2]
+            if math.hypot(pa[0] - pb[0], pa[1] - pb[1]) < merge:
+                ra, rb = _find(a), _find(b)
+                if ra != rb:
+                    home[max(ra, rb)] = min(ra, rb)
+
+    groups = defaultdict(list)
+    for k in range(len(ends)):
+        groups[_find(k)].append(k)
+
+    moved_from = []
+    n_moved = 0
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        # the end of the lowest-numbered line (then its first end) is the corner
+        keep = min(members, key=lambda k: (ends[k][0], ends[k][1]))
+        q = ends[keep][2]
+        for k in members:
+            li, e, p = ends[k]
+            if math.hypot(q[0] - p[0], q[1] - p[1]) <= tol:
+                continue                     # already the same point
+            pts = [tuple(map(float, v[:2])) for v in lines[li]]
+            pts[e] = q
+            lines[li] = pts
+            moved_from.append(p)
+            n_moved += 1
+            if debug:
+                print(f"  Joint line {li + 1} end ({p[0]:g}, {p[1]:g}) on the outer "
+                      f"boundary moved {math.hypot(q[0] - p[0], q[1] - p[1]):.3g} onto "
+                      f"line {ends[keep][0] + 1}'s end ({q[0]:g}, {q[1]:g})")
+    if not n_moved:
+        return 0
+
+    # The boundary vertices the moved ends leave behind.
+    vtol = max(tol, 2.0 * _XPT_VERTEX_TOL)
+    still_used = [tuple(map(float, v[:2])) for line in lines if line for v in line]
+    for p in moved_from:
+        if any(math.hypot(p[0] - v[0], p[1] - v[1]) <= vtol for v in still_used):
+            continue
+        for i, coords in enumerate(polygon_coords):
+            ring = list(coords)
+            closed = len(ring) > 1 and tuple(ring[0]) == tuple(ring[-1])
+            body = ring[:-1] if closed else ring
+            n = len(body)
+            out = []
+            for k, v in enumerate(body):
+                if n > 3 and math.hypot(v[0] - p[0], v[1] - p[1]) <= vtol:
+                    a, c = body[k - 1], body[(k + 1) % n]
+                    ux, uy = c[0] - a[0], c[1] - a[1]
+                    L = math.hypot(ux, uy)
+                    off = abs(ux * (v[1] - a[1]) - uy * (v[0] - a[0])) / L if L else 0.0
+                    if off <= vtol:
+                        continue             # on the straight boundary: drop it
+                out.append(v)
+            if len(out) != n:
+                if closed:
+                    out.append(out[0])
+                polygon_coords[i] = out
+    return n_moved
+
+
 def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
     """Give every meeting point of two jointed lines a vertex on BOTH lines.
 
@@ -3273,6 +3474,238 @@ def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
                       f"constraint line {li + 1}")
         lines[li] = line
     return n_inserted
+
+
+def _insert_bonded_junction_points(lines, opts=None, polygon_coords=None,
+                                   debug=False):
+    """Give every meeting point of two BONDED constraint lines a vertex on both.
+
+    A bonded line — a reinforcement line not flagged as a joint, or a pile —
+    stands on the soil's nodes, and where two of them meet they must stand on
+    one node there too: a bar ending partway down a pile, a bar crossing a
+    pile, two grids crossing, a T. gmsh puts a node where the geometry carries
+    a point, and the mesher keys its points by coordinate, so the meeting point
+    has to be a vertex of BOTH lines, with the same coordinates in each. Where
+    it is not, the two curves pass through a point neither carries, gmsh can
+    honor only one of them there, and the other comes back with an element
+    that cuts across the soil elements or skips the soil node at the bar's
+    end — joined to the other member nowhere.
+
+    Three steps, the bonded counterpart of :func:`_snap_joint_line_ends` and
+    :func:`_insert_joint_junction_points`:
+
+    * **ends that stand together.** A line end within ``tol`` of another line's
+      end takes the coordinates of the end on the lower-numbered line.
+    * **an end on another line's interior.** An end within ``tol`` of another
+      line, but not on it, moves to the foot of the perpendicular on that line.
+      The through line keeps its geometry; the end moves by at most ``tol``.
+    * **the meeting points.** Every crossing, and every end standing on another
+      line, becomes a vertex of both lines, in order along each. A meeting
+      point within ``tol`` of a vertex a line or zone already carries takes
+      that vertex's coordinates, so one place is one point.
+
+    ``tol`` is one part in a million of the model's span
+    (:func:`_joint_line_tol`). Lines named in ``opts`` are jointed and are left
+    alone: :func:`_validate_joint_lines` refuses a bonded line that meets one,
+    and :func:`_insert_joint_junction_points` handles two that meet. Two bonded
+    lines lying on one another over a stretch are left as they are.
+
+    In place, on ``lines``; a line that meets no other bonded line is not
+    touched. Returns the meeting points that lie in the INTERIOR of at least
+    one line, as ``(x, y)`` tuples: an end standing there must not be moved
+    off it later (see the end snap in :func:`build_mesh_from_polygons`).
+    """
+    if not lines:
+        return set()
+    from shapely.geometry import LineString as _LS, Point as _Pt
+
+    def _d(p, q):
+        return math.hypot(p[0] - q[0], p[1] - q[1])
+
+    opts = opts or {}
+    pts = {}
+    for li, line in enumerate(lines):
+        if li in opts or line is None or len(line) < 2:
+            continue
+        pl = [(float(q[0]), float(q[1])) for q in line]
+        if _d(pl[0], pl[-1]) > 0.0:
+            pts[li] = pl
+    idx = sorted(pts)
+    if len(idx) < 2:
+        return set()
+    tol = _joint_line_tol(lines, polygon_coords)
+
+    def _pairs():
+        g = {li: _LS(pts[li]) for li in idx}
+        out = [(a, b) for k, a in enumerate(idx) for b in idx[k + 1:]
+               if g[a].distance(g[b]) <= tol]
+        return g, out
+
+    geoms, pairs = _pairs()
+    if not pairs:
+        return set()
+    changed = set()
+
+    # 1. the corners: an end within tol of a lower-numbered line's end is that end
+    for k, li in enumerate(idx):
+        for end in (0, -1):
+            p = pts[li][end]
+            for lj in idx[:k]:
+                hit = next((q for q in (pts[lj][0], pts[lj][-1])
+                            if q != p and _d(p, q) <= tol), None)
+                if hit is not None:
+                    pts[li][end] = hit
+                    changed.add(li)
+                    if debug:
+                        print(f"  Bonded line {li + 1} end ({p[0]:g}, {p[1]:g}) "
+                              f"moved {_d(p, hit):.3g} onto the end of line {lj + 1}")
+                    break
+
+    # 2. the terminations: an end just off another line's interior moves onto it.
+    #    An end already ON a line, or at one of its vertices, stays where it is.
+    geoms, pairs = _pairs()
+    for li in idx:
+        for end in (0, -1):
+            p = pts[li][end]
+            P = _Pt(p)
+            best = None
+            for lj in idx:
+                if lj == li:
+                    continue
+                d = geoms[lj].distance(P)
+                if d > tol:
+                    continue
+                if d == 0.0 or any(_d(p, v) <= tol for v in pts[lj]):
+                    best = None
+                    break
+                foot = geoms[lj].interpolate(geoms[lj].project(P))
+                if best is None or d < best[0]:
+                    best = (d, (float(foot.x), float(foot.y)), lj)
+            if best is not None:
+                pts[li][end] = best[1]
+                changed.add(li)
+                if debug:
+                    print(f"  Bonded line {li + 1} end ({p[0]:g}, {p[1]:g}) moved "
+                          f"{best[0]:.3g} onto line {best[2] + 1}")
+
+    # 3. the meeting points, each one coordinate pair shared by both lines.
+    geoms, pairs = _pairs()
+    anchors = [v for li in idx for v in pts[li]]
+    zone_pts = [(float(x), float(y)) for coords in (polygon_coords or [])
+                for (x, y) in coords]
+
+    def _canon(p):
+        for q in anchors:
+            if _d(p, q) <= tol:
+                return q
+        for q in zone_pts:
+            if _d(p, q) <= tol:
+                anchors.append(q)
+                return q
+        anchors.append(p)
+        return p
+
+    adds = defaultdict(list)
+    for a, b in pairs:
+        ga, gb = geoms[a], geoms[b]
+        shared = ga.intersection(gb)
+        if shared.length > tol:
+            continue                       # lying on one another: not a junction
+        cands = [(float(g.x), float(g.y))
+                 for g in getattr(shared, "geoms", [shared])
+                 if g.geom_type == "Point" and not g.is_empty]
+        for lk, ll in ((a, b), (b, a)):
+            for p in (pts[lk][0], pts[lk][-1]):
+                if geoms[ll].distance(_Pt(p)) <= tol:
+                    cands.append(p)
+        for p in cands:
+            p = _canon(p)
+            adds[a].append(p)
+            adds[b].append(p)
+
+    n_inserted = 0
+    for li in idx:
+        line = pts[li]
+        for p in adds.get(li, ()):
+            if any(_d(p, q) <= tol for q in line):
+                continue                   # already a vertex of this line
+            k = min(range(len(line) - 1),
+                    key=lambda s: _LS([line[s], line[s + 1]]).distance(_Pt(p)))
+            line.insert(k + 1, p)
+            n_inserted += 1
+            changed.add(li)
+            if debug:
+                print(f"  Bonded junction ({p[0]:g}, {p[1]:g}) inserted into "
+                      f"constraint line {li + 1}")
+    for li in changed:
+        lines[li] = pts[li]
+
+    interior = set()
+    for li in idx:
+        for p in pts[li][1:-1]:
+            if any(p in adds.get(lj, ()) for lj in idx):
+                interior.add(p)
+    return interior
+
+
+def _check_1d_elements_on_soil_edges(mesh):
+    """Refuse a mesh in which a 1D element is not an edge of the 2D mesh.
+
+    Every bar and beam element is laid along an edge of the soil elements
+    around it and stands on that edge's nodes, which is how the member and the
+    soil are joined along their whole length. An element that is not an edge —
+    a chord gmsh drew across the soil elements where it could not fit the
+    soil mesh to the line — is joined to the soil at its two end nodes only,
+    gets no midside node on a quadratic mesh, and carries load across soil it
+    does not touch. Nothing downstream can tell such a mesh from a sound one,
+    so it is refused here, naming the line and the place.
+
+    Read-only. Run before the joint split, which gives a jointed line's bar a
+    node set of its own that no 2D element shares.
+    """
+    e1d = mesh.get("elements_1d")
+    if e1d is None or len(e1d) == 0:
+        return
+    elements = np.asarray(mesh.get("elements"), dtype=np.int64)
+    types = np.asarray(mesh.get("element_types"), dtype=int)
+    n_nodes = len(mesh["nodes"])
+    keys = []
+    for et in np.unique(types):
+        n = _CORNERS_BY_TYPE.get(int(et))
+        if not n:
+            continue
+        corners = elements[types == et][:, :n]
+        for k in range(n):
+            a, b = corners[:, k], corners[:, (k + 1) % n]
+            keys.append(np.minimum(a, b) * n_nodes + np.maximum(a, b))
+    if not keys:
+        return
+    edge_keys = np.unique(np.concatenate(keys))
+    e1d = np.asarray(e1d, dtype=np.int64)
+    a, b = e1d[:, 0], e1d[:, 1]
+    off = ~np.isin(np.minimum(a, b) * n_nodes + np.maximum(a, b), edge_keys)
+    if not off.any():
+        return
+    mats = mesh.get("element_materials_1d")
+    mats = (np.asarray(mats, dtype=int) if mats is not None
+            else np.ones(len(e1d), dtype=int))
+    nodes = np.asarray(mesh["nodes"])
+    parts = []
+    for line_id in sorted(set(int(m) for m in mats[off])):
+        on_line = mats == line_id
+        bad = np.flatnonzero(off & on_line)
+        p, q = nodes[a[bad[0]]], nodes[b[bad[0]]]
+        parts.append(f"line {line_id}, {len(bad)} of its {int(on_line.sum())} "
+                     f"elements, the first from ({p[0]:.6g}, {p[1]:.6g}) to "
+                     f"({q[0]:.6g}, {q[1]:.6g})")
+    raise MeshInputError(
+        "The soil mesh does not follow every constraint line (numbered "
+        "reinforcement lines first, then piles, then joints-sheet lines): "
+        + "; ".join(parts) + ". Each of those elements cuts across the soil "
+        "elements instead of lying along their edges, so the member would be "
+        "joined to the soil only at the element's two ends. gmsh could not fit "
+        "the soil mesh to the line at that place; look there for a line end on, "
+        "or very near, a zone corner or another line.")
 
 
 def _element_corner_edges(elements, element_types, ei):
@@ -3912,7 +4345,11 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
     import copy
 
     # Extract profile lines and max depth from slope_data
-    profile_lines = slope_data.get('profile_lines', [])
+    # A line with fewer than two points bounds no zone. It can sit in a model that
+    # is still being drawn (it reopens as entered), and preflight's
+    # geometry.profile_line_too_short names it; here it is simply not a boundary.
+    profile_lines = [p for p in (slope_data.get('profile_lines') or [])
+                     if len(p.get('coords') or []) >= 2]
     max_depth = slope_data.get('max_depth', None)
 
     if not profile_lines:
@@ -5870,11 +6307,25 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
             # Check intersection with each polygon
             for poly_idx, poly in enumerate(updated_polygons):
                 poly_coords = poly.get("coords", []) if isinstance(poly, dict) else poly
+                # The points this segment has put into this polygon so far. An edge
+                # that starts or ends at one of them was CREATED by that insertion,
+                # and the segment meets it only at that point. Intersected again it
+                # comes back a rounding away -- the inserted point is the crossing
+                # rounded to six decimals, so it sits a little off the line, and at a
+                # shallow crossing the re-intersection slides along the edge by
+                # several times that -- and the polygon gains a second vertex
+                # microns from the first. The sliver between the two meshes as a
+                # collapsed element, which leaves a jointed line's edge carried by
+                # one element or by four.
+                fresh = set()
                 # Check each edge of this polygon
                 for j in range(len(poly_coords)):
                     poly_edge_start = poly_coords[j]
                     poly_edge_end = poly_coords[(j + 1) % len(poly_coords)]
-                    
+                    if fresh and (tuple(poly_edge_start) in fresh
+                                  or tuple(poly_edge_end) in fresh):
+                        continue
+
                     # Find intersection point if it exists
                     intersection = line_segment_intersection(
                         line_seg_start, line_seg_end,
@@ -5884,7 +6335,42 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                     if intersection:
                         if debug:
                             print(f"Found intersection {intersection} between line {line_idx} segment {i} and polygon {poly_idx} edge {j}")
-                        
+
+                        # A segment that ENDS on this edge crosses it at that end.
+                        # The computed crossing can land well away from the end:
+                        # the edge's own vertices are earlier crossings rounded to
+                        # six decimals, up to 7e-7 off the boundary they lie on,
+                        # and a line meeting the edge at a few degrees slides that
+                        # along the edge by 1/sin of the angle -- 9e-6 m for a
+                        # Voronoi wall meeting RJ-20's face at 3.6 degrees. The
+                        # line's own end is then inserted too (see
+                        # _insert_constraint_line_points), two vertices microns
+                        # apart with the line passing through both, and a piece of
+                        # the line lies on the boundary. Where the end lies on
+                        # this edge -- within the two vertices' rounding -- the end
+                        # IS the crossing, and it is what goes in, rounded the same
+                        # way. A crossing within the vertex tolerance of the end is
+                        # left exactly as computed.
+                        ex0, ey0 = poly_edge_start
+                        ex1, ey1 = poly_edge_end
+                        edx, edy = ex1 - ex0, ey1 - ey0
+                        eL2 = edx * edx + edy * edy
+                        for end in (line_seg_start, line_seg_end):
+                            if eL2 <= 0.0:
+                                break
+                            if (abs(end[0] - intersection[0]) < _XPT_VERTEX_TOL
+                                    and abs(end[1] - intersection[1]) < _XPT_VERTEX_TOL):
+                                break
+                            te = ((end[0] - ex0) * edx + (end[1] - ey0) * edy) / eL2
+                            if not (0.0 < te < 1.0):
+                                continue
+                            off = math.hypot(end[0] - (ex0 + te * edx),
+                                             end[1] - (ey0 + te * edy))
+                            if off <= 2.0 * _XPT_VERTEX_TOL:
+                                intersection = (round(float(end[0]), 6),
+                                                round(float(end[1]), 6))
+                                break
+
                         # Check if intersection point is already a vertex of this
                         # polygon. The tolerance is the ROUNDING the intersection
                         # itself carries: line_segment_intersection returns its
@@ -5910,7 +6396,8 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                                 updated_polygons[poly_idx]["coords"].insert(insert_idx, intersection)
                             else:
                                 updated_polygons[poly_idx].insert(insert_idx, intersection)
-                            
+                            fresh.add(tuple(intersection))
+
                             if debug:
                                 print(f"Added intersection point {intersection} to polygon {poly_idx} at position {insert_idx}")
     

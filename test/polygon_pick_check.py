@@ -33,9 +33,12 @@ What is guarded here:
      fails if the polygon editor's merged list (material zones, then SSR overlays,
      then refine regions) ever stops putting the material zones first, which is the
      offset the resolved row assumes.
+  G. JOINT LINES — a click on a joint line in FEM mode opens the joints editor on
+     its row, inside a zone or not; in LEM and seepage mode, where the Inputs plot
+     does not draw joint lines, the same click falls through to the zone.
 
-Legs A-D are file-less and Qt-free; E and F open real Studio widgets offscreen and
-skip cleanly (exit 0) when PySide6 is not installed.
+Legs A-D and G are file-less and Qt-free; E and F open real Studio widgets
+offscreen and skip cleanly (exit 0) when PySide6 is not installed.
 """
 import contextlib
 import io
@@ -125,6 +128,39 @@ def test_precedence():
     if hit is None or hit[0] != "polygons":
         fails.append(f"click within tolerance of a shared polygon edge, outside the "
                      f"domain, resolved to {hit!r}, want a ('polygons', row) edge hit")
+    return fails
+
+
+# --------------------------------------------------------------- G. joint lines
+def test_joint_lines():
+    """A joint line is picked where the Inputs plot draws it: in FEM mode."""
+    fails = []
+    from studio.picking import pick_category
+
+    d = _poly_data(joint_lines=[
+        {"label": "bedding", "x1": 0.0, "y1": 10.0, "x2": 100.0, "y2": 70.0},
+        {"label": "release", "x1": 60.0, "y1": 20.0, "x2": 60.0, "y2": 80.0}])
+    for mode in ("fem", None):
+        hit = pick_category(d, 60.3, 60.0, TOL, mode=mode)
+        if hit != ("joints", 1):
+            fails.append(f"click on a joint line (mode {mode!r}) resolved to {hit!r}, "
+                         f"want ('joints', 1) -- the joints editor on its row")
+    hit = pick_category(d, 50.0, 40.2, TOL, mode="fem")      # on the bedding trace
+    if hit != ("joints", 0):
+        fails.append(f"click on the first joint line resolved to {hit!r}, "
+                     f"want ('joints', 0)")
+    for mode in ("lem", "seep"):
+        hit = pick_category(d, 60.3, 60.0, TOL, mode=mode)
+        if hit != ("polygons", 1):
+            fails.append(f"in {mode} mode, where no joint line is drawn, a click on "
+                         f"one resolved to {hit!r}, want the zone ('polygons', 1)")
+    # A reinforcement line that is also a slip joint lies on the same trace as a
+    # joint row would: the reinforcement editor keeps it.
+    d["reinforcement_lines"] = [{"x1": 60.0, "y1": 20.0, "x2": 60.0, "y2": 80.0}]
+    hit = pick_category(d, 60.3, 60.0, TOL, mode="fem")
+    if hit != ("reinforce", 0):
+        fails.append(f"a reinforcement line on a joint trace resolved to {hit!r}, "
+                     f"want ('reinforce', 0)")
     return fails
 
 
@@ -322,7 +358,8 @@ def run():
     legs = [("interior click -> polygons editor", test_interior),
             ("features win over the interior", test_precedence),
             ("overlapping zones: smallest wins", test_overlap),
-            ("profile files and empty space unchanged", test_profile_and_empty)]
+            ("profile files and empty space unchanged", test_profile_and_empty),
+            ("joint lines open the joints editor", test_joint_lines)]
     try:
         import PySide6                                   # noqa: F401
         legs += [("canvas pick -> edit_category", test_wire),

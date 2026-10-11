@@ -50,6 +50,9 @@ Run from the repo root:
     python benchmarks/rocscience/make_rs2_figures.py            # all
     python benchmarks/rocscience/make_rs2_figures.py RS2-30 RS2-31a
     python benchmarks/rocscience/make_rs2_figures.py --audit    # coverage only
+    python benchmarks/rocscience/make_rs2_figures.py --capture-only RS2-53
+        # redraw the at-failure picture from the row's stored search record:
+        # the standing trial and the picture are solved, the search is not
 """
 
 import glob
@@ -74,7 +77,8 @@ import matplotlib.pyplot as plt
 
 from xslope.fileio import load_slope_data
 from xslope.fem import (build_fem_data, solve_ssrm, export_fem_solution,
-                       ssrm_run_record)
+                       ssrm_run_record, capture_failure_from_record,
+                       export_fem_failure_solution, capture_report)
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_joint_options,
                          extract_point_constraints,
@@ -108,6 +112,12 @@ OUT = os.path.join(ROOT, 'docs', 'verification', 'images')
 
 TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 
+#: Whether a jointed row's deformed-section panel fills each block with its own
+#: tint (``plot_deformed_mesh(color_blocks=True)``) rather than one tint per
+#: material. Off here, so this page's figures draw as they always have; the joint
+#: corpus producer (make_rs2_joint_figures.py) turns it on for its rows.
+COLOR_BLOCKS = False
+
 
 # Rows the page documents but does NOT regression-lock, so they carry no fem_ssrm
 # test tag for parse_tags to find. Registered here — in the same tag shape — so a
@@ -135,7 +145,7 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 #
 _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
              f_min='0.5', f_max='3.0', max_iter='250000',
-             max_iter_ceiling='500000',
+             max_iter_ceiling='1000000',
              tension_srf='false', k0='1', ssr_exclude='Blocks')
 
 EXTRA_CASES = [
@@ -173,54 +183,7 @@ EXTRA_CASES = [
 # This is a claim about the page, not a way to empty the audit, so it is enforced
 # both ways: an entry naming a row that is not registered, or a row that HAS a PNG,
 # is reported as a DEAD exemption and fails the audit exactly like a missing figure.
-EXPECTED_NO_FIGURE = {
-    # RS2-40's FE-seepage case under the depth filter: the filtered run reads one cell
-    # of its own bracket above the unconstrained one and selects the same mechanism,
-    # which RS2-40-seep.png already draws (values per the page tags).
-    'RS2-40-seep-d30': 'same mechanism as the unconstrained run in RS2-40-seep.png; the depth filter has no skin to remove',
-
-    # RS2-64 — C3 and C5 are the second and third short-term Original slopes. All
-    # three lock unconstrained on a simple convex profile and fail by the same deep
-    # rotation; C1 is figured.
-    'RS2-64c': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
-    'RS2-64e': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
-
-    # RS2-66 filter-off — the face skin is surface-parallel and does not depend on
-    # the soft-band thickness (the values are the page's tags, not repeated here).
-    # Both ends of the family are figured.
-    'RS2-66b': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
-    'RS2-66c': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
-    'RS2-66d': 'depth-independent face skin (values per the page tags); figured at both ends (RS2-66a.png, RS2-66e.png)',
-
-    # RS2-66 filtered — one deep basal squeeze through the soft band, figured at the
-    # thinnest band where it separates furthest from the skin.
-    'RS2-66b-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
-    'RS2-66c-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
-    'RS2-66d-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
-    'RS2-66e-deep': 'at h1 = 10 m the filtered run selects the same mechanism as the unfiltered one (values per the page tags) — RS2-66e.png IS this run',
-
-    # RS2-67 — six drawdown stages of one dam, two mechanisms between them: the
-    # unconstrained downstream face, and the upstream face when RS2's Search Area
-    # confines reduction to it. One of each is figured.
-    'RS2-67a': 'same downstream-face mechanism as RS2-67b.png, with no pore-pressure field',
-    'RS2-67c': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the 90 h field',
-    'RS2-67e': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the drained limit',
-    'RS2-67f': 'same Search-Area-confined upstream mechanism as RS2-67d.png, at the drained limit',
-
-    # RS2-24 — each case is locked at two meshes. The coarser one selects the same
-    # deep-seated mechanism through the soft clay (values per the page tags); the
-    # finer mesh is what the figure draws.
-    'RS2-24a-m2.0': 'same mechanism as RS2-24a.png, one mesh step coarser',
-    'RS2-24b-m2.0': 'same mechanism as RS2-24b.png, one mesh step coarser',
-
-    # RS2 Part IV VP102 — the drawdown mechanism is one downstream-face wedge at every
-    # frame of a monotone sequence. One frame of each case is figured: the mid-sequence
-    # phi_b = 0 baseline frame, and the phi_b = 37 frame that sets the dot.
-    'RS2-P4-VP102-t-60-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at an earlier frame',
-    'RS2-P4-VP102-t-1500-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at a later frame',
-    'RS2-P4-VP102-t-60-c3': 'same downstream-face wedge as RS2-P4-VP102-t-1500-c3.png, at an earlier frame',
-    'RS2-P4-VP102-t-300-c3': 'same downstream-face wedge as RS2-P4-VP102-t-1500-c3.png, at an earlier frame',
-}
+EXPECTED_NO_FIGURE = {}
 
 
 # Sidecar stem overrides. ``make_figure`` writes the exported field next to the case
@@ -239,6 +202,10 @@ SIDECAR_STEM = {
     # solves the seepage again on its own tri6 mesh, so its sidecars — the mesh json
     # included — go under a stem of their own rather than over the committed ones.
     'RS2-40-seep': 'vp077a_ssrm',
+    # The d30 variant is a second SSRM run on the same workbook and the same tri6
+    # mesh; under the workbook's own stem its mesh json overwrote the tri3 seepage
+    # mesh that vp077a_seep.csv is indexed on.
+    'RS2-40-seep-d30': 'vp077a_ssrm_d30',
     'RS2-66a-deep': 'rs2_66a_deep',
     'RS2-P4-VP68-zone': 'vp068_zone',
     'RS2-P4-VP102-t-300-c2': 'vp102t_300_c2',
@@ -296,6 +263,29 @@ def _shared_stems():
             os.path.join(ROOT, 'docs', 'verification', tag['file'])))
         counts[stem] = counts.get(stem, 0) + 1
     return {stem: n for stem, n in counts.items() if n > 1}
+
+
+def _refuse_seep_mesh_overwrite(stem, mesh):
+    """Refuse to replace a ``{stem}_mesh.json`` that a shipped seepage field is
+    indexed on with a different mesh.
+
+    ``{stem}_seep.csv`` / ``_seep2.csv`` are read node-for-node against the mesh
+    beside them, so writing this run's mesh there silently breaks every ``u='seep'``
+    reader of the workbook. A row whose FEM mesh is not the seepage mesh needs its
+    own stem in ``SIDECAR_STEM``."""
+    path = f'{stem}_mesh.json'
+    seep = [f'{stem}{s}' for s in ('_seep.csv', '_seep2.csv')
+            if os.path.exists(f'{stem}{s}')]
+    if not seep or not os.path.exists(path):
+        return
+    with open(path) as fh:
+        old = np.asarray(json.load(fh).get('nodes', []), dtype=float)
+    new = np.asarray(mesh['nodes'], dtype=float)
+    if old.shape != new.shape or not np.allclose(old, new):
+        raise RuntimeError(
+            f'{os.path.basename(path)} is the mesh {os.path.basename(seep[0])} is '
+            f'indexed on ({len(old)} nodes); this run solved on a different one '
+            f'({len(new)} nodes). Give the row its own stem in SIDECAR_STEM.')
 
 
 def _write_row_meta(tag, stem, meta):
@@ -546,7 +536,40 @@ def build_and_solve(tag):
     its trials decided or ran out of budget.
     """
     sd, fem_data, path, mesh = _build(tag)
+    options, ssr_zone, ssr_exclude = _solve_options(tag)
+    with contextlib.redirect_stdout(io.StringIO()), _reference_kernel():
+        sol = solve_ssrm(fem_data, **options)
+    if not sol.get('converged'):
+        raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
 
+    # Record the tag-carried zone for DRAWING only — after the solve, so the kwarg
+    # stays the solver's single source of truth (see _record_ssr_zone).
+    sd = _record_ssr_zone(sd, ssr_zone, fem_data)
+
+    field = sol.get('last_solution')
+    if field is None:
+        raise RuntimeError('SSRM returned no last_solution to plot')
+    # The at-failure (unconverged) mechanism for the strain/vector panels; None if
+    # the capture was skipped/failed (the panels then fall back to ``field``).
+    failure = sol.get('failure_solution')
+    # What the bracket CHOSE and what its trials found. A row locked at a value no
+    # trial decided — every trial at its iteration ceiling, the final bracket's
+    # edges among them — is a statement about the budget rather than about the
+    # slope, and without the per-trial record in the sidecar nothing downstream can
+    # tell the two apart (tools/ssrm_trial_audit.py is what reads it).
+    run = ssrm_run_record(sol, fem_data=fem_data, options={
+        'tolerance': float(tag.get('tolerance', 0.02)),
+        'F_min': float(tag.get('f_min', 0.5)),
+        'F_max': float(tag.get('f_max', 3.0)),
+        'ssr_exclude': ssr_exclude,
+    })
+    return sd, fem_data, field, failure, sol['FS'], path, mesh, run
+
+
+def _solve_options(tag):
+    """The solve_ssrm options a row's tag names, as ``(options, ssr_zone,
+    ssr_exclude)``: one place, so the full search and the redraw from the stored
+    record (``--capture-only``) solve the same model the same way."""
     # SSR-exclusion material names (semicolon-separated within the tag value,
     # since tag key=value pairs are comma-split) — held at full strength.
     ssr_exclude = None
@@ -600,55 +623,30 @@ def build_and_solve(tag):
     if 'max_iter_ceiling' in tag:
         extra['max_iterations_ceiling'] = int(tag['max_iter_ceiling'])
 
-    with contextlib.redirect_stdout(io.StringIO()), _reference_kernel():
-        sol = solve_ssrm(fem_data,
-                         F_min=float(tag.get('f_min', 0.5)),
-                         F_max=float(tag.get('f_max', 3.0)),
-                         tolerance=float(tag.get('tolerance', 0.02)),
-                         max_iterations=int(tag.get('max_iter', 4000)),
-                         ssr_exclude=ssr_exclude,
-                         ssr_zone=ssr_zone,
-                         elastic_materials=elastic_materials,
-                         **extra,
-                         # tension_srf mirrors run_tests: divide each tension cap by
-                         # the trial F (RS2's tensilestrength_SRF=1). Without this the
-                         # figure re-solve would disagree with the tag's lock on any
-                         # benchmark that uses it (RS2-62c: 0.744 static vs 0.769 SRF).
-                         # Absent tag -> the solver's own default (on); an explicit
-                         # tension_srf=false in a tag is honored, so the figure and the
-                         # lock always solve the same envelope.
-                         tension_srf=(str(tag['tension_srf']).lower() in ('true','1','yes')
-                                      if 'tension_srf' in tag else True),
-                         # capture_failure_state is default-on; keep it explicit so
-                         # the at-failure mechanism (the right-panel field) is always
-                         # captured and exported.
-                         capture_failure_state=True,
-                         debug_level=0)
-    if not sol.get('converged'):
-        raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
-
-    # Record the tag-carried zone for DRAWING only — after the solve, so the kwarg
-    # stays the solver's single source of truth (see _record_ssr_zone).
-    sd = _record_ssr_zone(sd, ssr_zone, fem_data)
-
-    field = sol.get('last_solution')
-    if field is None:
-        raise RuntimeError('SSRM returned no last_solution to plot')
-    # The at-failure (unconverged) mechanism for the strain/vector panels; None if
-    # the capture was skipped/failed (the panels then fall back to ``field``).
-    failure = sol.get('failure_solution')
-    # What the bracket CHOSE and what its trials found. A row locked at a value no
-    # trial decided — every trial at its iteration ceiling, the final bracket's
-    # edges among them — is a statement about the budget rather than about the
-    # slope, and without the per-trial record in the sidecar nothing downstream can
-    # tell the two apart (tools/ssrm_trial_audit.py is what reads it).
-    run = ssrm_run_record(sol, fem_data=fem_data, options={
-        'tolerance': float(tag.get('tolerance', 0.02)),
-        'F_min': float(tag.get('f_min', 0.5)),
-        'F_max': float(tag.get('f_max', 3.0)),
-        'ssr_exclude': ssr_exclude,
-    })
-    return sd, fem_data, field, failure, sol['FS'], path, mesh, run
+    options = dict(
+        F_min=float(tag.get('f_min', 0.5)),
+        F_max=float(tag.get('f_max', 3.0)),
+        tolerance=float(tag.get('tolerance', 0.02)),
+        max_iterations=int(tag.get('max_iter', 4000)),
+        ssr_exclude=ssr_exclude,
+        ssr_zone=ssr_zone,
+        elastic_materials=elastic_materials,
+        **extra,
+        # tension_srf mirrors run_tests: divide each tension cap by
+        # the trial F (RS2's tensilestrength_SRF=1). Without this the
+        # figure re-solve would disagree with the tag's lock on any
+        # benchmark that uses it (RS2-62c: 0.744 static vs 0.769 SRF).
+        # Absent tag -> the solver's own default (on); an explicit
+        # tension_srf=false in a tag is honored, so the figure and the
+        # lock always solve the same envelope.
+        tension_srf=(str(tag['tension_srf']).lower() in ('true', '1', 'yes')
+                     if 'tension_srf' in tag else True),
+        # capture_failure_state is default-on; keep it explicit so
+        # the at-failure mechanism (the right-panel field) is always
+        # captured and exported.
+        capture_failure_state=True,
+        debug_level=0)
+    return options, ssr_zone, ssr_exclude
 
 
 # ── Composite geometry (inches). These are the figure's structural chrome —
@@ -1152,12 +1150,14 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
     # blocks moving as bodies on their joints, and arrows sampled at nodes miss
     # the parting and sliding that is the mechanism. Same rule plot_fem_results
     # applies to the standard figure; a row with no joint is unchanged.
+    deform_specs = []
     if solution_has_joint_state(fem_data, afield):
-        plot_deformed_mesh(
+        deform_specs = plot_deformed_mesh(
             ax_lr, fem_data, afield, _composite_deformation_scale(
                 fem_data, afield, domain),
             show_reinforcement=True, single_panel=True, joint_faces=True,
-            at_failure=afield.get('_at_failure', False))
+            color_blocks=COLOR_BLOCKS,
+            at_failure=afield.get('_at_failure', False)) or []
     else:
         plot_displacement_vectors(
             ax_lr, fem_data, afield, show_mesh=False, show_reinforcement=True,
@@ -1196,11 +1196,23 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
     field_specs = ([(strain_mappable, 'VP Max Shear Strain')]
                    + [(m, l) for (m, l) in reinf_specs])
     cbars = []
-    for j, (mp, lbl) in enumerate(field_specs):
-        if mp is None:
-            continue
+    # Slots are filled in order by the bars actually drawn, so on an all-elastic
+    # jointed row (the strain panel is the joints' own, with no field bar) the
+    # slip bar takes the first slot, level with the deformation panel's below.
+    for j, (mp, lbl) in enumerate([sp for sp in field_specs if sp[0] is not None]):
         cx = x_c1 + _WD_IN + _CAX_GAP + j * _CAX_PITCH
         cax = fig.add_axes(rect(cx, y_r0, _CAX_W, Hd, W, H))
+        cb = fig.colorbar(mp, cax=cax)
+        cb.set_label(lbl, rotation=270, labelpad=14)
+        cbars.append(cb)
+    # The jointed deformation panel's own slip colorbar, in the first slot to
+    # the right of the lower-right panel: its green is read against its own
+    # bar, as the strain panel's is against the one above. The right column's
+    # slot budget (Cb) is already sized to the strain panel's slot count,
+    # which counts the slip bar whenever the deformation panel draws one.
+    for j, (mp, lbl) in enumerate([sp for sp in deform_specs if sp[0] is not None]):
+        cx = x_c1 + _WD_IN + _CAX_GAP + j * _CAX_PITCH
+        cax = fig.add_axes(rect(cx, y_r1, _CAX_W, Hd, W, H))
         cb = fig.colorbar(mp, cax=cax)
         cb.set_label(lbl, rotation=270, labelpad=14)
         cbars.append(cb)
@@ -1291,8 +1303,15 @@ def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
         # Pass 1: provisional bands → measure the real legend heights.
         fig, _axes, (ax_ul, ax_ll), _fs, _cb = _build_composite(
             bench, sd, fem_data, afield, style, 1.0, 1.0, dpi, domain)
-        leg0 = _measure_legend_band(ax_ul, dpi)
-        leg1 = _measure_legend_band(ax_ll, dpi)
+        # Each row's band holds the taller of its two panels' hung legends: the
+        # left panel's legend, and on a jointed row the joint key of the right
+        # panel when no corner of that panel is clear of the section and the
+        # key drops below the axes (plot_fem._place_joint_key). A key that sits
+        # in a corner measures inside the axes and asks for nothing.
+        leg0 = max(_measure_legend_band(ax_ul, dpi),
+                   _measure_legend_band(_axes[1], dpi))
+        leg1 = max(_measure_legend_band(ax_ll, dpi),
+                   _measure_legend_band(_axes[3], dpi))
         # …and the content the panels drew, which on a jointed row includes the
         # deformed section (see _fit_domain). Measured on the same pass, so the
         # second one lays out on a domain that holds everything.
@@ -1456,8 +1475,93 @@ def make_figure(tag, dpi=150):
         # rows that ship none, rebuilds from the tag and hopes the discretization
         # comes out node-for-node the same, so everything downstream reads a
         # section that was never solved.
+        _refuse_seep_mesh_overwrite(stem, mesh)
         export_mesh_to_json(mesh, f'{stem}_mesh.json')
     _write_row_meta(tag, stem, meta)
+
+    out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi,
+                        standing_note=note)
+    return out, fs
+
+
+def _stored_record_path(tag, stem):
+    """Where the row's stored search record is: its own per-row copy where the
+    workbook is shared by several rows (see _write_row_meta), else
+    ``{stem}_fem_meta.json``."""
+    if stem in _shared_stems():
+        sys.path.insert(0, os.path.join(ROOT, 'tools'))
+        import ssrm_trial_audit as audit
+        return audit.row_meta_name(stem, tag)
+    return f'{stem}_fem_meta.json'
+
+
+def _set_refusal(meta_path, why):
+    """Record in the row's meta whether its at-failure picture was refused, and
+    nothing else: the key is written or removed only where it changes."""
+    try:
+        with open(meta_path) as fh:
+            meta = json.load(fh)
+    except OSError:
+        return
+    if meta.get('at_failure_capture_refused') == (why or None):
+        return
+    if why:
+        meta['at_failure_capture_refused'] = why
+    else:
+        meta.pop('at_failure_capture_refused', None)
+    with open(meta_path, 'w') as fh:
+        json.dump(meta, fh, indent=2)
+
+
+def make_figure_capture_only(tag, dpi=150):
+    """Redraw the row's at-failure picture from its stored search record.
+
+    The model is built exactly as the full search builds it and solved with the
+    same options, but only where the picture needs it: the trial at the bottom of
+    the record's final interval (the standing field), the at-failure solve itself,
+    and the top trial where the record or the model needs it (see
+    xslope.fem.capture_failure_from_record). The figure and the at-failure files
+    are written; the search record, the standing field's files and the mesh are
+    not. A row with no stored record is refused. Returns (out_path, fs)."""
+    bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+    if tag.get('figure') == 'inputs':
+        raise RuntimeError('an inputs-only row has no at-failure picture to redraw')
+    sd, fem_data, path, _mesh = _build(tag)
+    stem = _sidecar_stem(tag, path)
+    record_path = _stored_record_path(tag, stem)
+    if not os.path.exists(record_path):
+        raise RuntimeError(
+            f'no stored search record at {os.path.relpath(record_path, ROOT)}; '
+            'run the full search for this row first')
+    with open(record_path) as fh:
+        record = json.load(fh)
+    options, ssr_zone, _ssr_exclude = _solve_options(tag)
+    with contextlib.redirect_stdout(io.StringIO()), _reference_kernel():
+        sol = capture_failure_from_record(fem_data, record, **options)
+    sd = _record_ssr_zone(sd, ssr_zone, fem_data)
+    field = sol['last_solution']
+    failure = sol.get('failure_solution')
+    fs = sol['FS']
+    print(f'  [{bench}] {capture_report(sol)} '
+          f'(record {os.path.relpath(record_path, ROOT)})', flush=True)
+
+    # The same refusal as the full path, with the same consequences for the
+    # picture's files; the meta beside them only learns whether it was refused.
+    note = None
+    why = _refused_capture(failure, field,
+                           has_joints=solution_has_joint_state(fem_data, failure or {}))
+    if why:
+        interval = sol.get('final_interval') or []
+        f_standing = field.get('F') or (interval[0] if interval else None)
+        note = _standing_note(f_standing)
+        print(f'  [{bench}] at-failure capture REFUSED: {why}; drawing the '
+              f'{note}', flush=True)
+        failure = None
+        _drop_failure_sidecars(stem)
+    else:
+        with contextlib.redirect_stdout(io.StringIO()):
+            export_fem_failure_solution(fem_data, failure, stem)
+    _set_refusal(f'{stem}_fem_meta.json', why)
 
     out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi,
                         standing_note=note)
@@ -1635,10 +1739,17 @@ if __name__ == '__main__':
         sys.exit(1 if (ml or mr or dead or bad) else 0)
     # --from-sidecar re-renders SOLVE-FREE from the committed sidecars (no solver).
     from_sidecar = '--from-sidecar' in args
+    # --capture-only redraws the at-failure picture from each row's stored search
+    # record: the standing trial and the picture, not the search.
+    capture_only = '--capture-only' in args
+    if from_sidecar and capture_only:
+        sys.exit('--from-sidecar and --capture-only are two different redraws; '
+                 'pass one.')
     only = set(a for a in args if not a.startswith('--'))
     cases = parse_tags() + EXTRA_CASES
     print(f'{len(cases)} registered rows (fem_ssrm tags + EXTRA_CASES)'
-          f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}")
+          f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}"
+          f"{'  (at-failure picture from the stored search record)' if capture_only else ''}")
     for tag in cases:
         bench = tag.get('benchmark', '?')
         if only and bench not in only:
@@ -1646,6 +1757,7 @@ if __name__ == '__main__':
         t0 = time.time()
         try:
             out, fs = (make_figure_from_sidecar(tag) if from_sidecar
+                       else make_figure_capture_only(tag) if capture_only
                        else make_figure(tag))
             exp = tag.get('expected_fs')
             fsx = ('inputs-only' if tag.get('figure') == 'inputs'

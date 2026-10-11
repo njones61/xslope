@@ -40,12 +40,21 @@ are defined on.
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py               # every model
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py noncircular   # one
     PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --meshes-only # mesh only
+    PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --geometry-only noncircular
+        # redraw inputs and mesh from the committed companion, without a solve
+    PYTHONPATH=. python3 tools/make_fem_docs_sidecars.py --capture-only reinforce
+        # rewrite only the at-failure files, from the model's stored search
+        # record: the standing trial and the picture are solved, the search is not
+
+A model in ``RESULTS_FIGURE`` also gets its page's results figure redrawn from
+the at-failure field, by either path.
 
 A model whose materials read a shipped seepage field is solved on the mesh
 committed beside it rather than on a rebuilt one; see ``COMMITTED_MESH``.
 """
 import contextlib
 import io
+import json
 import os
 import sys
 import time
@@ -55,7 +64,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import run_tests as RT                                                  # noqa: E402
 from xslope.fileio import load_slope_data                               # noqa: E402
 from xslope.fem import (build_fem_data, export_fem_solution,            # noqa: E402
-                        solve_ssrm, ssrm_run_record)
+                        solve_ssrm, ssrm_run_record, capture_failure_from_record,
+                        export_fem_failure_solution, capture_report)
 import xslope.fem as _fem                                               # noqa: E402
 from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,  # noqa: E402
                          extract_constraint_line_geometry, extract_joint_options,
@@ -83,14 +93,14 @@ TAGGED = {
 
 #: Models whose sample section is gone from the page but whose companions are
 #: still fixtures. The reinforced slope and the two pile models were written up
-#: on ``docs/fem/samples.md`` until the tutorials FEM-2 and FEM-3 built and ran
+#: on ``docs/fem/samples.md`` until the tutorials FEM-2 and FEM-4 built and ran
 #: the same models step by step; the sections went, the workbooks stayed —
 #: ``ROUNDTRIP_FILES``, the FEM preflight bases, ``report_check``,
 #: ``fem_1d_details_check`` and ``nr_ssrm_check`` all open them by path — and so
 #: their companions still have to be rebuildable. What the retired tags specified
 #: is kept here in the same shape a parsed tag has, so ``build_tagged`` reads one
 #: or the other and solves the same run either way. These are no longer
-#: regression locks: FEM-2 and FEM-3 lock the same models at their own brackets,
+#: regression locks: FEM-2 and FEM-4 lock the same models at their own brackets,
 #: and the factors of safety below are what these brackets produced.
 RETIRED = {
     "reinforce": {"expected_fs": 1.534, "element_type": "tri6", "target_size": 2.0,
@@ -156,6 +166,75 @@ MESH_ONLY = {
 }
 
 
+#: The results figure a model's write-up shows, drawn from the at-failure field
+#: every time that field is written — by the full run and by ``--capture-only``
+#: alike — so the picture has one generating path. The panels are
+#: ``plot_fem_results`` at its defaults, titled "... at Failure  FS = X" with X the
+#: published factor of safety, the tag's ``expected_fs``: the factor the page
+#: prints, not the factor the capture was solved at (a margin above critical, so
+#: the mechanism develops) nor the run's bracket midpoint.
+RESULTS_FIGURE = {
+    "noncircular": os.path.join(REPO_ROOT, "docs", "fem", "images",
+                                "non_circ_results.png"),
+}
+
+#: The resolution docs/fem results figures are written at, as
+#: ``benchmarks/make_griffiths_figures.py`` writes its own.
+FIGURE_DPI = 200
+
+
+GEOMETRY_FIGURES = {
+    "noncircular": ("non_circ_inputs.png", "non_circ_mesh.png"),
+}
+
+
+def draw_geometry(name):
+    """Draw the model and its committed mesh; never remesh, solve or export data."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from xslope.plot import plot_inputs
+    from xslope.plot_fem import plot_fem_data
+
+    path = os.path.join(REPO_ROOT, "docs", "fem", "files", TAGGED[name])
+    slope_data = load_slope_data(path)
+    mesh = slope_data.get("mesh")
+    if mesh is None:
+        raise RuntimeError(f"{name}: no committed mesh companion to draw")
+    fem_data = _quiet(build_fem_data, slope_data, mesh)
+    out = os.path.join(REPO_ROOT, "docs", "fem", "images")
+    plots = (
+        (plot_inputs, slope_data,
+         {"mode": "fem", "show_mesh": True, "frame": "content"}),
+        (plot_fem_data, fem_data, {}),
+    )
+    for filename, (plot, data, kwargs) in zip(GEOMETRY_FIGURES[name], plots):
+        try:
+            _quiet(plot, data, fig=plt.figure(figsize=(12, 7)), **kwargs)
+            plt.gcf().savefig(os.path.join(out, filename), dpi=FIGURE_DPI,
+                             bbox_inches="tight")
+        finally:
+            plt.close("all")
+        print(f"{name}: wrote {filename} ({len(mesh['elements'])} elements)")
+
+
+def _draw_results(name, fem_data, field, failure, fs):
+    """Write ``name``'s results figure, if its write-up shows one."""
+    path = RESULTS_FIGURE.get(name)
+    if path is None:
+        return
+    if failure is None:
+        raise RuntimeError(f"{name}: no at-failure field to draw — figure not written")
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from xslope.plot_fem import plot_fem_results
+    _quiet(plot_fem_results, fem_data, field, fs=fs, failure_solution=failure)
+    plt.gcf().savefig(path, dpi=FIGURE_DPI, bbox_inches="tight")
+    plt.close("all")
+    print(f"{name}: wrote {os.path.relpath(path, REPO_ROOT)} (FS = {fs:.3f})")
+
+
 def _quiet(fn, *a, **k):
     with contextlib.redirect_stdout(io.StringIO()):
         return fn(*a, **k)
@@ -207,17 +286,74 @@ def _write(fem_data, result, stem, mesh, extra):
     export_mesh_to_json(mesh, f"{stem}_mesh.json")
 
 
-def build_tagged(name):
+def _tagged_model(name):
+    """(path, tag, mesh, fem_data, options, max_iterations) for a TAGGED model."""
     xlsx = TAGGED[name]
     path = os.path.join(REPO_ROOT, "docs", "fem", "files", xlsx)
     tag = RETIRED.get(name) or _tag(
         SAMPLES_MD, lambda t: os.path.basename(t["file"]) == xlsx)
-    t0 = time.time()
     slope_data, mesh = _mesh_for(tag, path)
     fem_data = _quiet(build_fem_data, slope_data, mesh)
     options = {"F_min": tag["f_min"], "F_max": tag["f_max"],
                "tolerance": tag["tolerance"]}
-    result = _solve(fem_data, options, int(tag["max_iter"]))
+    return path, tag, mesh, fem_data, options, int(tag["max_iter"])
+
+
+def _untagged_model(name):
+    """(path, mesh, fem_data, options, max_iterations) for an UNTAGGED model."""
+    spec = UNTAGGED[name]
+    path = spec["xlsx"]
+    slope_data = load_slope_data(path)
+    mesh = slope_data.get("mesh")
+    if mesh is None:
+        raise RuntimeError(f"{name}: no committed mesh companion to solve on")
+    fem_data = _quiet(build_fem_data, slope_data, mesh)
+    return path, mesh, fem_data, spec["options"], spec["max_iterations"]
+
+
+def capture_only(name):
+    """Rewrite one model's at-failure files from its stored search record.
+
+    The model is built as its full run builds it and solved with the same
+    options, but only where the picture needs it
+    (xslope.fem.capture_failure_from_record): the standing trial and the
+    at-failure solve, not the search. Only the at-failure files are written; the
+    record, the standing field's files and the mesh are left as they are. A model
+    with no stored record, or one whose files carry no at-failure picture, is
+    refused."""
+    t0 = time.time()
+    tag = None
+    if name in TAGGED:
+        path, tag, _mesh, fem_data, options, max_iterations = _tagged_model(name)
+    elif name in UNTAGGED:
+        path, _mesh, fem_data, options, max_iterations = _untagged_model(name)
+    else:
+        raise RuntimeError(f"{name}: its files carry no at-failure picture to redraw")
+    stem = os.path.splitext(path)[0]
+    record_path = f"{stem}_fem_meta.json"
+    if not os.path.exists(record_path):
+        raise RuntimeError(f"{name}: no stored search record at "
+                           f"{os.path.relpath(record_path, REPO_ROOT)}; run the "
+                           "full search for this model first")
+    with open(record_path) as fh:
+        record = json.load(fh)
+    with RT._force_fast_kernel(_fem, False):
+        result = _quiet(capture_failure_from_record, fem_data, record,
+                        debug_level=0, capture_failure_state=True,
+                        max_iterations=max_iterations, **options)
+    failure = result.get("failure_solution")
+    if failure is not None:
+        _quiet(export_fem_failure_solution, fem_data, failure, stem)
+    if name in RESULTS_FIGURE:
+        _draw_results(name, fem_data, result["last_solution"], failure,
+                      float(tag["expected_fs"]))
+    print(f"{name}: {capture_report(result)} ({time.time() - t0:.0f}s)")
+
+
+def build_tagged(name):
+    t0 = time.time()
+    path, tag, mesh, fem_data, options, max_iterations = _tagged_model(name)
+    result = _solve(fem_data, options, max_iterations)
     if not result.get("converged"):
         raise RuntimeError(f"{name}: SSRM did not converge")
     fs = result["FS"]
@@ -239,6 +375,10 @@ def build_tagged(name):
                  "max_iter": int(tag["max_iter"]),
                  "expected_fs": expected},
     })
+    if name in GEOMETRY_FIGURES:
+        draw_geometry(name)
+    _draw_results(name, fem_data, result["last_solution"],
+                  result.get("failure_solution"), expected)
     print(f"{name}: FS = {fs:.4f} (tag {expected:.3f}), "
           f"{len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements, "
           f"{len(result['trials'])} trials, {time.time() - t0:.0f}s")
@@ -246,13 +386,8 @@ def build_tagged(name):
 
 def build_untagged(name):
     spec = UNTAGGED[name]
-    path = spec["xlsx"]
     t0 = time.time()
-    slope_data = load_slope_data(path)
-    mesh = slope_data.get("mesh")
-    if mesh is None:
-        raise RuntimeError(f"{name}: no committed mesh companion to solve on")
-    fem_data = _quiet(build_fem_data, slope_data, mesh)
+    path, mesh, fem_data, _options, _max_iterations = _untagged_model(name)
     result = _solve(fem_data, spec["options"], spec["max_iterations"])
     if not result.get("converged"):
         raise RuntimeError(f"{name}: SSRM did not converge")
@@ -325,6 +460,23 @@ def build_mesh_only(name):
 def main(argv):
     wanted = [a for a in argv if not a.startswith("-")]
     meshes_only = "--meshes-only" in argv
+    if "--geometry-only" in argv:
+        if any(name not in GEOMETRY_FIGURES for name in wanted):
+            raise ValueError("--geometry-only accepts: " + ", ".join(GEOMETRY_FIGURES))
+        for name in wanted or GEOMETRY_FIGURES:
+            draw_geometry(name)
+        return 0
+    if "--capture-only" in argv:
+        failed = 0
+        for name in list(TAGGED) + list(UNTAGGED) + list(COMMITTED_MESH):
+            if wanted and name not in wanted:
+                continue
+            try:
+                capture_only(name)
+            except Exception as exc:      # one refused model does not stop the rest
+                failed += 1
+                print(f"{name}: {exc}" if not str(exc).startswith(name) else str(exc))
+        return 1 if failed else 0
     for name in MESH_ONLY:
         if not wanted or name in wanted:
             build_mesh_only(name)

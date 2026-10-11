@@ -8,7 +8,7 @@ model is DERIVED from the committed verification corpus rather than restated her
 
 so the section, the four Hoek-Brown inputs and the unit weight a reader reads off
 the page can never drift from the ones
-[the verification page](../docs/verification/rs2.md#hoek-brown) measures. Nothing
+[the verification page](../docs/verification/ssrm.md#hoek-brown) measures. Nothing
 here hand-edits an xlsx; the file is written through the package writer at the
 current template version.
 

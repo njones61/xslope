@@ -78,7 +78,7 @@ TUTORIAL_FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
 START_OUT = "xslope_dam_infiltration_start.xlsx"
 DONE_OUT = "xslope_dam_infiltration.xlsx"
 
-#: The corpus file's LEM placeholder circle, dropped from both tutorial files.
+#: No failure surface on either tutorial file: both are seepage only.
 _EMPTY_SURFACES = dict(circles=[], non_circ=[])
 
 #: The exposed surface of the dam, waterline to downstream toe, as the vertices the

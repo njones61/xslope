@@ -77,7 +77,7 @@ What is implemented
     water definition through :mod:`xslope.water` -- seepage boundary conditions
     where a seepage analysis is defined, otherwise the stage's piezometric line.
 ``switch_to_auto_water``
-    Hand the water load to the engine: set **Water loads** to ``auto`` (main D23)
+    Hand the water load to the engine: set **Water loads** to ``auto`` (main sheet)
     and remove the transcribed blocks the derivation reproduces, keeping every block
     that is not water. It is the better of the two water remedies wherever it applies, because
     writing blocks into a sheet records a snapshot that goes stale the moment the
@@ -109,6 +109,19 @@ from typing import Callable, Optional
 
 from . import preflight as _pf
 from .preflight import (_AT_CIRCLES, _AT_DLOADS, _AT_NONCIRC, _AT_PIEZO)
+
+
+def _water_loads_at(sd):
+    """Where a reader finds **Water loads** for this model: ``(main D24)`` on the
+    current template, ``(main D23)`` on a v22-v24 file. A model whose own template
+    has no such cell (older than v22, or none recorded) is named the current
+    template's, which is the only one that can carry the mode."""
+    from .fileio import main_sheet_cell
+    try:
+        cell = main_sheet_cell("water_loads", sd.get("template_version"))
+    except (TypeError, ValueError):
+        cell = None
+    return f"(main {cell or main_sheet_cell('water_loads')})"
 
 
 class RemedyDeclined(ValueError):
@@ -315,9 +328,9 @@ def _propose_ponded(sd):
             # a block written here would be counted a second time.
             proposals.append(RemedyProposal(
                 available=False,
-                reason=("Water loads is set to auto (main D23), so the engine "
-                        "derives this load itself -- adding it here would count the "
-                        "water twice."), **base))
+                reason=(f"Water loads is set to auto {_water_loads_at(sd)}, so the "
+                        f"engine derives this load itself -- adding it here would "
+                        f"count the water twice."), **base))
             continue
         derived = derive_water_loads(sd, stage=stage)
         if not derived["blocks"]:
@@ -437,7 +450,7 @@ def _water_change(sd):
                       "to take over: setting Water loads to auto would add the "
                       "standing water rather than replace anything, which is a "
                       "change to the analysis rather than a change of expression "
-                      "(main D23).")
+                      f"{_water_loads_at(sd)}.")
     return changes, ""
 
 
@@ -445,7 +458,7 @@ def _propose_switch_to_auto(sd):
     rules = rule_ids_for("switch_to_auto_water")
     base = dict(remedy="switch_to_auto_water", target="water_loads",
                 key="switch_to_auto_water:water_loads",
-                label="Water loads (main D23)", rule_ids=rules)
+                label=f"Water loads {_water_loads_at(sd)}", rule_ids=rules)
     if str(sd.get("water_loads") or "manual").strip().lower() == "auto":
         return []                       # already automatic: nothing to switch
     changes, reason = _water_change(sd)
@@ -471,7 +484,7 @@ def _propose_switch_to_auto(sd):
         description=("Set Water loads to auto and " + "; and ".join(parts)
                      + ". The engine then derives the water load from the model's "
                        "water definition at every solve, so it can never go stale "
-                       "when the pool moves (main D23)."),
+                       f"when the pool moves {_water_loads_at(sd)}."),
         _apply=_apply_switch_to_auto, **base)]
 
 

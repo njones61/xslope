@@ -1423,7 +1423,7 @@ def test_the_pile_is_read_at_every_node_it_stands_on():
 # returned was NaN — which the engine handed on in silence, so the figures drew
 # an empty slope and the pile panel annotated it "peak nan% of limit".
 #
-# The specimen was FEM-3's tip-fixed pile configuration. The sample below is the
+# The specimen was FEM-4's tip-fixed pile configuration. The sample below is the
 # same defect on a model the suite can afford: the shipped FEM piles file with
 # both rows' toes fixed, which turns the same runaway on and reaches a non-finite
 # field inside the capture's own default iteration budget.
@@ -1441,7 +1441,7 @@ _RUNAWAY_ITERS = 1600
 #: sample. The band is wide because the number is a property of the model and not of
 #: the rule: the classifier stops on the SHAPE of the runaway, and how far the
 #: section has moved by the time that shape is unmistakable depends on how fast this
-#: slope comes apart. Measured here at 24x, and on FEM-3's tip-fixed rows — the
+#: slope comes apart. Measured here at 24x, and on FEM-4's tip-fixed rows — the
 #: specimen this stands in for — at 44x the field at full strength.
 _RUNAWAY_U_RATIO_MAX = 60.0
 
@@ -1674,6 +1674,61 @@ def test_the_guard_does_not_touch_a_solve_that_behaves():
     return fails
 
 
+#: Tutorial FEM-3's jointed liner, past its factor of safety (1.285): the mass slides
+#: down the liner from the first iterations, so a fenced capture stops in mid-slide.
+_SLIDING_LINER_F = 1.6
+#: A fence short enough that the capture stops in seconds (measured: 2,639
+#: iterations, 0.45 m on this mesh), still well into the slide.
+_SLIDING_LINER_FENCE = 0.05
+
+
+def test_a_stopped_capture_keeps_its_joints_with_its_field():
+    """A capture stopped by the guard reports its joints on the field it keeps.
+
+    The stop puts the displacements and the plastic strains back to the start of
+    the iteration; the joint sweep has already moved the slip, the open flags and
+    the residual and dilation records on in place, and they must go back with them.
+    Left behind, the final joint state reads this iteration's slip against last
+    iteration's field: every joint that is sliding comes out one slip increment
+    under its limit, flagged as gripping, and the at-failure figure draws a sheet
+    that has slid half a meter as closed with no slip. Measured before the fix on
+    this liner: 54 of its 162 pairs flagged slipping, slid pairs down to 0.7% of
+    their limit; after it, 112 flagged and every slid pair on its limit.
+    """
+    from xslope.fem import build_fem_data, solve_fem
+    import tools.make_block_wall_figures as mb
+    from xslope.fileio import load_slope_data
+    model = load_slope_data(mb.FEM03_LINER_JOINTED)
+    fem_data = build_fem_data(model, mb._mesh(model, mb.FEM03_SHEET_TARGET_SIZE))
+    with contextlib.redirect_stdout(io.StringIO()):
+        sol = solve_fem(fem_data, F=_SLIDING_LINER_F, debug_level=0,
+                        max_iterations=200000, max_iterations_ceiling=200000,
+                        max_disp_factor=None, early_exit=False, early_failure=False,
+                        fast_kernel=False, _corrector=False, _finite_guard=True,
+                        _capture_distance_frac=_SLIDING_LINER_FENCE)
+    if sol.get("exit_reason") != "capture_distance":
+        return [f"the sliding liner's capture ended {sol.get('exit_reason')!r}, not "
+                f"on the distance fence; the check is not reading a stopped capture"]
+    slip = np.abs(np.asarray(sol["joint_slip"], float))
+    ts = np.abs(np.asarray(sol["joint_ts"], float))
+    tlim = np.asarray(sol["joint_tlim"], float)
+    slid = (slip > 0.01) & (tlim > 0.0) & ~np.asarray(sol["joint_open"], bool)
+    ratio = ts[slid] / tlim[slid]
+    print("    STOPPED-CAPTURE joints: %d of %d pairs slipping, %d slid and closed, "
+          "|ts|/limit %.4f to %.4f"
+          % (int(np.sum(sol["joint_slipping"])), slip.size, int(slid.sum()),
+             ratio.min() if ratio.size else float("nan"),
+             ratio.max() if ratio.size else float("nan")))
+    if not slid.any():
+        return ["no joint pair on the sliding liner had slid a centimeter; the "
+                "check is not reading a slide"]
+    if ratio.min() < 1.0 - 1e-6:
+        return [f"a stopped capture reports slid, closed joint pairs under their "
+                f"limit (down to {ratio.min():.3f} of it): the joint history was not "
+                f"put back with the field"]
+    return []
+
+
 def test_no_label_prints_nan():
     """No panel prints the word nan, on any field it can be handed.
 
@@ -1725,7 +1780,7 @@ def test_a_stopped_capture_is_published_and_named():
 
     The bound is a multiple of what the section moved at the last strength it
     stood at, so the state kept is a few iterations into the collapse — measured
-    on FEM-3's tip-fixed rows, a coherent toe mechanism at 11x the converged
+    on FEM-4's tip-fixed rows, a coherent toe mechanism at 11x the converged
     displacement, two iterations before the same solve blows up. So it is drawn,
     its readings are quoted, and every panel says which iteration they were read
     at (ruled 2026-09-04, revised).
@@ -1901,6 +1956,12 @@ _HEALTHY_MODEL = os.path.join(_REPO, "docs", "fem", "files",
                               "xslope_griffiths6_dry.xlsx")
 _HEALTHY_MAX_U = 5.88764437275831
 _HEALTHY_ITERS = 12000
+#: A fenced capture must still have run far past its first sweep (see
+#: tools/verification_checks/captures.py, MIN_ITERATIONS).
+_CAPTURE_MIN_DEVELOPED_FLOOR = 100
+#: The healthy model's search with the distance fence on, as the check above ran
+#: it, so the redraw-from-record check reads the same run instead of a third one.
+_HEALTHY_RUN = {}
 
 
 def test_a_healthy_capture_is_untouched():
@@ -1908,12 +1969,18 @@ def test_a_healthy_capture_is_untouched():
 
     Griffiths & Lane 6 dry, run as the corpus runs it: its capture is a developed
     mechanism that takes its whole budget to get there, growing a few percent an
-    iteration and flattening at the end. Nothing about it is a runaway, and the
-    field it returns is asserted to the last digit against the value it had before
-    the growth tests existed. The growth reading is printed beside it — that is the
-    healthy end of the distribution the thresholds were set from.
+    iteration and flattening at the end. Nothing about it is a runaway. With the
+    distance fence off (``_CAPTURE_DISTANCE_FRAC = None``) the field it returns is
+    asserted to the last digit against the value it had before the growth tests
+    existed, so neither growth test moves it. The growth reading is printed beside
+    it — that is the healthy end of the distribution the thresholds were set from.
+
+    The same run with the fence on is then held to what the fence promises: the
+    factor of safety and every trial identical, and the capture stopped by the
+    fence and nothing else, on a state short of 20% of the mesh height.
     """
     fails = []
+    import xslope.fem as _fem
     from xslope.fem import (_CAPTURE_RUNAWAY_RATIO, _CAPTURE_RUNAWAY_WINDOW,
                             build_fem_data, solve_ssrm)
     from xslope.fileio import load_slope_data
@@ -1923,21 +1990,28 @@ def test_a_healthy_capture_is_untouched():
     with contextlib.redirect_stdout(io.StringIO()):
         mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
                                         target_size=2.0, element_type="quad8")
+    fem_data = build_fem_data(slope_data, mesh)
+
+    def _run(fence):
         # A last-digit lock is a reference-path quantity: solve_ssrm has no
         # kernel switch of its own, so its trials are pinned the way the suite
         # pins them (run_tests._force_fast_kernel).
-        import xslope.fem as _fem
-        _orig_solve_fem = _fem.solve_fem
+        _orig_solve_fem, real_fence = _fem.solve_fem, _fem._CAPTURE_DISTANCE_FRAC
 
         def _reference_solve_fem(*a, **k):
             k["fast_kernel"] = False
             return _orig_solve_fem(*a, **k)
 
         _fem.solve_fem = _reference_solve_fem
+        _fem._CAPTURE_DISTANCE_FRAC = fence
         try:
-            result = solve_ssrm(build_fem_data(slope_data, mesh), F_min=2.0, F_max=2.8)
+            with contextlib.redirect_stdout(io.StringIO()):
+                return solve_ssrm(fem_data, F_min=2.0, F_max=2.8)
         finally:
             _fem.solve_fem = _orig_solve_fem
+            _fem._CAPTURE_DISTANCE_FRAC = real_fence
+
+    result = _run(None)
     capture = result.get("failure_solution")
     if capture is None:
         return ["the healthy model captured no at-failure field at all"]
@@ -1963,11 +2037,173 @@ def test_a_healthy_capture_is_untouched():
         fails.append(f"the healthy capture's longest compounding run is {run}, "
                      f"within 2 of the {_CAPTURE_RUNAWAY_WINDOW} that stops a "
                      f"capture: the threshold is too close to normal growth")
+
+    # The fence on: the same run, one capture different.
+    frac = _fem._CAPTURE_DISTANCE_FRAC
+    fenced = _run(frac)
+    # Kept for the redraw-from-record check below, which needs exactly this run.
+    _HEALTHY_RUN["fenced"] = (fem_data, fenced)
+    import json
+
+    def _trials(r):
+        # Every recorded reading of every trial, less the wall-clock times, which
+        # are the one thing two runs of the same trial never share.
+        def _strip(v):
+            if isinstance(v, dict):
+                return {k: _strip(x) for k, x in v.items() if "wall" not in k}
+            if isinstance(v, (list, tuple)):
+                return [_strip(x) for x in v]
+            return v
+        return json.dumps(_strip(r.get("trials")), sort_keys=True, default=repr)
+
+    if fenced["FS"] != result["FS"] or _trials(fenced) != _trials(result):
+        fails.append("the distance fence changed the factor of safety or a trial; "
+                     "it may change only the capture")
+    fc = fenced.get("failure_solution") or {}
+    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    fence = frac * float(nodes[:, 1].max() - nodes[:, 1].min())
+    print("    CAPTURE-FENCE healthy capture: stopped at iteration %s (%s), max|u| "
+          "%.6g against a fence of %.6g"
+          % (fc.get("capture_truncated_at"), fc.get("capture_truncated_kind"),
+             fc.get("max_displacement") or float("nan"), fence))
+    if fc.get("capture_truncated_kind") != "distance":
+        fails.append(f"the fenced capture was not stopped by the distance fence "
+                     f"(kind {fc.get('capture_truncated_kind')!r}); the unfenced "
+                     f"one reaches {_HEALTHY_MAX_U:.4g}, past the {fence:.4g} fence")
+    else:
+        if abs(float(fc.get("capture_fence") or 0.0) - fence) > 1e-9 * fence:
+            fails.append(f"the fenced capture records a fence of "
+                         f"{fc.get('capture_fence')!r}, not {fence!r}")
+        if not float(fc["max_displacement"]) < fence:
+            fails.append(f"the fenced capture kept a state at {fc['max_displacement']}"
+                         f", not short of the {fence} fence")
+        if fc.get("capture_truncated_max_u") != fc.get("max_displacement"):
+            fails.append("the fenced capture's recorded stop displacement is not the "
+                         "displacement of the state it kept")
+        if not (_CAPTURE_MIN_DEVELOPED_FLOOR < int(fc["iterations"]) < _HEALTHY_ITERS):
+            fails.append(f"the fenced capture ran {fc['iterations']} iterations")
+    return fails
+
+
+def test_the_picture_redrawn_from_the_record_is_the_search_s():
+    """Redrawing the at-failure picture from a stored search record gives the
+    picture the search itself took, and leaves the record alone.
+
+    The healthy model's search (distance fence on, as the check above runs it) is
+    written to its record the way every producer writes one, through JSON, and
+    ``capture_failure_from_record`` is run from that record. The picture it takes
+    must be the search's own: the same F, the same stop and where, the same
+    displacement to 1e-9, the same field. The standing field must be the same
+    trial's field, and the record must come back exactly as it went in. A record
+    that does not describe one search is refused before anything is solved.
+    """
+    fails = []
+    import json
+    import xslope.fem as _fem
+    from xslope.fem import (build_fem_data, capture_failure_from_record,
+                            solve_ssrm, ssrm_run_record)
+
+    _orig_solve_fem = _fem.solve_fem
+
+    def _reference_solve_fem(*a, **k):
+        k["fast_kernel"] = False
+        return _orig_solve_fem(*a, **k)
+
+    def _pinned(fn, *a, **k):
+        _fem.solve_fem = _reference_solve_fem
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                return fn(*a, **k)
+        finally:
+            _fem.solve_fem = _orig_solve_fem
+
+    if "fenced" in _HEALTHY_RUN:
+        fem_data, search = _HEALTHY_RUN["fenced"]
+    else:
+        from xslope.fileio import load_slope_data
+        from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+        slope_data = load_slope_data(_HEALTHY_MODEL)
+        with contextlib.redirect_stdout(io.StringIO()):
+            mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                            target_size=2.0, element_type="quad8")
+        fem_data = build_fem_data(slope_data, mesh)
+        search = _pinned(solve_ssrm, fem_data, F_min=2.0, F_max=2.8)
+
+    options = {"F_min": 2.0, "F_max": 2.8, "tolerance": 0.01}
+    record = ssrm_run_record(search, fem_data, options)
+    record["FS"] = search["FS"]
+    record = json.loads(json.dumps(record))          # as read back from the file
+    before = json.dumps(record, sort_keys=True)
+
+    redrawn = _pinned(capture_failure_from_record, fem_data, record,
+                      F_min=2.0, F_max=2.8)
+    if json.dumps(record, sort_keys=True) != before:
+        fails.append("redrawing from the record changed the record")
+    if json.dumps(redrawn.get("trials"), sort_keys=True) != json.dumps(
+            record["trials"], sort_keys=True):
+        fails.append("the redrawn result does not carry the record's own trials")
+    if redrawn.get("FS") != search["FS"] or tuple(redrawn.get("final_interval")) \
+            != tuple(search["final_interval"]):
+        fails.append(f"the redrawn result reads FS {redrawn.get('FS')} on "
+                     f"{redrawn.get('final_interval')}, not the search's "
+                     f"{search['FS']} on {search['final_interval']}")
+    if "_probe_solutions" in redrawn:
+        fails.append("an internal key was left on the redrawn result")
+
+    a, b = search.get("failure_solution") or {}, redrawn.get("failure_solution") or {}
+    if not a or not b:
+        return fails + ["the search or the redraw took no at-failure picture"]
+    print("    REDRAW healthy capture: search F %.6g stopped at %s (%s), max|u| %.12g; "
+          "redrawn F %.6g stopped at %s (%s), max|u| %.12g"
+          % (a.get("capture_F"), a.get("capture_truncated_at"),
+             a.get("capture_truncated_kind"), a.get("max_displacement"),
+             b.get("capture_F"), b.get("capture_truncated_at"),
+             b.get("capture_truncated_kind"), b.get("max_displacement")))
+    for key in ("capture_F", "capture_margin", "capture_truncated",
+                "capture_truncated_at", "capture_truncated_kind", "iterations",
+                "converged"):
+        if a.get(key) != b.get(key):
+            fails.append(f"the redrawn picture's {key} is {b.get(key)!r}, the "
+                         f"search's {a.get(key)!r}")
+    for key in ("max_displacement", "plastic_fraction", "capture_fence"):
+        va, vb = a.get(key), b.get(key)
+        if (va is None) != (vb is None) or (
+                va is not None and abs(float(va) - float(vb)) > 1e-9):
+            fails.append(f"the redrawn picture's {key} is {vb!r}, the search's {va!r}")
+    ua = np.asarray(a["displacements"], float)
+    ub = np.asarray(b["displacements"], float)
+    if ua.shape != ub.shape or np.max(np.abs(ua - ub)) > 1e-9:
+        fails.append("the redrawn picture's displacement field is not the search's")
+    la, lb = search["last_solution"], redrawn["last_solution"]
+    if (la["iterations"] != lb["iterations"]
+            or abs(float(la["max_displacement"]) - float(lb["max_displacement"]))
+            > 1e-9):
+        fails.append("the standing field redrawn from the record is not the "
+                     "search's standing field")
+    if not all(e.get("same_iterations") for e in redrawn.get("edges_resolved", [])):
+        fails.append(f"a re-solved trial took a different number of iterations: "
+                     f"{redrawn.get('edges_resolved')}")
+
+    # A record that does not describe one search is refused before any solve.
+    bad = dict(record, FS=record["FS"] + 0.1)
+    try:
+        capture_failure_from_record(fem_data, bad)
+        fails.append("a record whose FS is not its interval's was accepted")
+    except ValueError:
+        pass
+    try:
+        capture_failure_from_record(fem_data, {k: v for k, v in record.items()
+                                               if k != "final_interval"})
+        fails.append("a record with no final interval was accepted")
+    except ValueError:
+        pass
     return fails
 
 
 CHECKS = [
     ("a healthy capture is untouched", test_a_healthy_capture_is_untouched),
+    ("the picture redrawn from the record is the search's",
+     test_the_picture_redrawn_from_the_record_is_the_search_s),
     ("a stopped capture is published and named",
      test_a_stopped_capture_is_published_and_named),
     ("a capture that came back with nothing falls back",
@@ -1979,6 +2215,8 @@ CHECKS = [
      test_the_non_finite_backstop_holds_on_its_own),
     ("the guard leaves a well-behaved solve alone",
      test_the_guard_does_not_touch_a_solve_that_behaves),
+    ("a stopped capture keeps its joints with its field",
+     test_a_stopped_capture_keeps_its_joints_with_its_field),
     ("no label prints nan", test_no_label_prints_nan),
     ("the reaction panel says where its limit is",
      test_the_reaction_panel_says_where_its_limit_is),

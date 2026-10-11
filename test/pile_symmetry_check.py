@@ -16,17 +16,33 @@ Two separate red herrings also bit during diagnosis and are pinned here too:
   - the mirrored ground_surface must be sorted ascending in x (as load_slope_data
     produces) or the Ito & Matsui ground lookup (np.interp) returns garbage.
 
+A piles sheet carries no force angle, so the angle a solver applies is derived
+from the pile's end points: the force is perpendicular to the pile, the higher
+end is the head whichever end is entered first, and the angle is measured in
+the resisting frame — positive when the tip lies upslope of the head — so it
+depends on which way the slope faces. The legs that state no angle send the
+model through a workbook and back, so the angle is the one the loader and the
+slice builder derive, as for any file a user writes:
+  - a battered pile and its mirror image read the same, with the force tilted
+    upward when the tip lies upslope of the head and downward when it lies
+    downslope, on both facings;
+  - a pile entered tip first reads the same as one entered head first;
+  - a vertical pile's force is horizontal (angle 0) in either entry order and on
+    either facing.
+
 Run directly:  PYTHONPATH=. python3 test/pile_symmetry_check.py
 """
 
 import copy
 import os
+import tempfile
+from math import atan, degrees
 
 import numpy as np
 from shapely.affinity import scale
 from shapely.geometry import LineString
 
-from xslope.fileio import load_slope_data
+from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
 from xslope.slice import generate_slices
 from xslope.solve import oms, bishop, spencer, janbu, corps, lowe
 
@@ -156,6 +172,160 @@ def leg_a_pile_lands_on_a_boundary():
     return []
 
 
+#: The force a battered pile carries is stated: the Ito & Matsui computation is
+#: for vertical piles only and refuses a battered one.
+H_STATED = 5000.0
+#: How far the tip of a battered pile lies from below its head, horizontally.
+BATTER = 4.0
+#: Two solves of identical slices, one with its pile entered tip first: the same
+#: arithmetic in a different order.
+ORDER_TOL_REL = 1e-9
+
+
+def _through_a_workbook(d, folder, name):
+    """Write a model to a workbook and read it back. The piles sheet has no force
+    angle, so the angle the solvers apply is the one derived from the end points,
+    as it is for any file a user writes."""
+    return load_slope_data(save_slope_data_to_xlsx(d, os.path.join(folder,
+                                                                   name + ".xlsx")))
+
+
+def _with_piles(d, offset, tip_first=False):
+    """The model with every pile's tip ``offset`` UPSLOPE of its head (negative =
+    downslope), its force stated, entered head first or tip first. The sample
+    descends to the left, so upslope is +x; its mirror image carries the same
+    piles reflected, so their tips lie upslope there too."""
+    m = copy.deepcopy(d)
+    for p in m["pile_lines"]:
+        p["H"] = H_STATED
+        p["x2"] = p["x1"] + offset
+        if tip_first:
+            p["x1"], p["y1"], p["x2"], p["y2"] = p["x2"], p["y2"], p["x1"], p["y1"]
+    return m
+
+
+def _facing(sdf):
+    return bool(sdf["y_lt"].iat[0] > sdf["y_rt"].iat[-1])
+
+
+def _applied_angles(sdf):
+    """The force angle (degrees) the solvers read on each slice a pile crosses."""
+    rows = sdf[sdf["h_pile"] != 0]
+    return sorted(round(degrees(t), 9) for t in rows["theta_p"])
+
+
+def _expected_angles(d, offset):
+    """atan(d_u / (y_head - y_tip)) for each of the model's piles."""
+    return sorted(round(degrees(atan(offset / (max(p["y1"], p["y2"])
+                                               - min(p["y1"], p["y2"])))), 9)
+                  for p in d["pile_lines"])
+
+
+def leg_a_battered_pile_reads_the_same_mirrored():
+    """A battered pile, its angle derived from its end points, and its mirror
+    image: every method, at every slice count, with the force tilted upward when
+    the tip lies upslope of the head and downward when it lies downslope."""
+    failures = []
+    base = load_slope_data(PILE_MODEL)
+    with tempfile.TemporaryDirectory() as tmp:
+        for offset, word in ((BATTER, "upslope"), (-BATTER, "downslope")):
+            m = _with_piles(base, offset)
+            left = _through_a_workbook(m, tmp, "left")
+            right = _through_a_workbook(mirror_slope_data(m), tmp, "right")
+            want = _expected_angles(m, offset)
+            print(f"  battered pile, tip {BATTER:g} {word} of the head "
+                  f"(theta_p {', '.join(f'{a:+.2f}' for a in want)}):")
+            for ns in SLICE_COUNTS:
+                fl, sdf_l = _solve_all(left, ns)
+                fr, sdf_r = _solve_all(right, ns)
+                if not (not _facing(sdf_l) and _facing(sdf_r)):
+                    failures.append(f"tip {word}: expected the model left-facing and "
+                                    f"its mirror right-facing")
+                for side, sdf in (("model", sdf_l), ("mirror", sdf_r)):
+                    got = _applied_angles(sdf)
+                    if got != want:
+                        failures.append(f"tip {word}, {ns} slices, {side}: the "
+                                        f"solvers read theta_p {got}, the pile's "
+                                        f"inclination is {want}")
+                worst = (0.0, None)
+                for name, _ in METHODS:
+                    a, b = fl[name], fr[name]
+                    if a is None or b is None:
+                        failures.append(f"tip {word}, {name}: solve failed "
+                                        f"(model={a}, mirror={b})")
+                        continue
+                    asym = abs(a - b) / a * 100
+                    if asym > worst[0]:
+                        worst = (asym, name)
+                    if asym >= TOL_PCT:
+                        failures.append(f"tip {word}, {name} at {ns} slices: asym "
+                                        f"{asym:.3f}% >= {TOL_PCT}% (model={a:.5f}, "
+                                        f"mirror={b:.5f})")
+                if worst[1] is not None:
+                    print(f"    {ns:3d} slices: worst {worst[1]} {worst[0]:.4f}%")
+    return failures
+
+
+def leg_the_entry_order_does_not_matter():
+    """A pile entered tip first reads the same as the same pile entered head
+    first: vertical and battered both ways, on the model and its mirror image."""
+    failures = []
+    base = load_slope_data(PILE_MODEL)
+    ns = 40
+    with tempfile.TemporaryDirectory() as tmp:
+        for offset in (0.0, BATTER, -BATTER):
+            for side in ("model", "mirror"):
+                runs = []
+                for tip_first in (False, True):
+                    m = _with_piles(base, offset, tip_first)
+                    if side == "mirror":
+                        m = mirror_slope_data(m)
+                    runs.append(_solve_all(_through_a_workbook(m, tmp, "order"), ns)[0])
+                head, tip = runs
+                worst = 0.0
+                for name, _ in METHODS:
+                    a, b = head[name], tip[name]
+                    if a is None or b is None:
+                        failures.append(f"offset {offset:+g}, {side}, {name}: solve "
+                                        f"failed (head first={a}, tip first={b})")
+                        continue
+                    rel = abs(a - b) / a
+                    worst = max(worst, rel)
+                    if rel > ORDER_TOL_REL:
+                        failures.append(f"offset {offset:+g}, {side}, {name}: entered "
+                                        f"tip first {b:.5f}, head first {a:.5f}")
+                print(f"  tip offset {offset:+g}, {side:6s}: largest difference "
+                      f"{worst:.1e} (spencer {head['spencer']:.4f} head first, "
+                      f"{tip['spencer']:.4f} tip first)")
+    return failures
+
+
+def leg_a_vertical_pile_pushes_horizontally():
+    """A vertical pile's force angle is 0 as the file is read, in either entry
+    order, and the solvers apply 0 on both facings: its force is the horizontal
+    force it has always been."""
+    failures = []
+    base = load_slope_data(PILE_MODEL)
+    with tempfile.TemporaryDirectory() as tmp:
+        for tip_first in (False, True):
+            m = _with_piles(base, 0.0, tip_first)
+            for side, d in (("model", m), ("mirror", mirror_slope_data(m))):
+                loaded = _through_a_workbook(d, tmp, "vertical")
+                order = "tip first" if tip_first else "head first"
+                stored = [p["theta_p"] for p in loaded["pile_lines"]]
+                if stored != [0.0] * len(stored):
+                    failures.append(f"vertical, {order}, {side}: the loader stored "
+                                    f"theta_p {stored}, not 0")
+                _fs, sdf = _solve_all(loaded, 40)
+                got = _applied_angles(sdf)
+                if not got or any(a != 0.0 for a in got):
+                    failures.append(f"vertical, {order}, {side}: the solvers read "
+                                    f"theta_p {got}, not 0")
+                print(f"  vertical, {order:10s}, {side:6s}: stored {stored}, "
+                      f"applied {got}")
+    return failures
+
+
 def _mutation(label, apply, restore, leg, fails):
     apply()
     try:
@@ -182,12 +352,50 @@ def leg_mutations():
               lambda: setattr(xslice, '_corner_claim_is_this_slice', first_seen_wins),
               lambda: setattr(xslice, '_corner_claim_is_this_slice', original),
               leg_the_mirror_pair_agrees, fails)
+
+    # The pile force angle: the loader and the slice builder both take it from
+    # slice.pile_force_angle, so replacing that function replaces the rule in
+    # both places.
+    angle = xslice.pile_force_angle
+
+    def upslope_is_always_plus_x(x1, y1, x2, y2, right_facing=None):
+        """Perpendicular to the pile with the higher end as the head, but the
+        tip's offset measured along +x whichever way the slope faces."""
+        if y2 > y1:
+            x1, y1, x2, y2 = x2, y2, x1, y1
+        return degrees(np.arctan2(x2 - x1, y1 - y2))
+
+    def the_first_end_is_the_head(x1, y1, x2, y2, right_facing=None):
+        """Measured in the resisting frame, but with the first end entered taken
+        as the head, whichever end is higher."""
+        if x2 == x1:
+            return 0.0 if y1 > y2 else 180.0
+        if right_facing is None:
+            return None
+        d_u = -(x2 - x1) if right_facing else (x2 - x1)
+        return degrees(np.arctan2(d_u, y1 - y2))
+
+    for label, mutant, leg in (
+            ("the pile's offset read along +x on either facing",
+             upslope_is_always_plus_x, leg_a_battered_pile_reads_the_same_mirrored),
+            ("the first end entered taken as the head",
+             the_first_end_is_the_head, leg_the_entry_order_does_not_matter),
+            ("the first end entered taken as the head (vertical)",
+             the_first_end_is_the_head, leg_a_vertical_pile_pushes_horizontally)):
+        _mutation(label,
+                  lambda m=mutant: setattr(xslice, 'pile_force_angle', m),
+                  lambda: setattr(xslice, 'pile_force_angle', angle),
+                  leg, fails)
     return fails
 
 
 LEGS = [
     ("a pile lands on a slice boundary", leg_a_pile_lands_on_a_boundary),
     ("the mirror pair agrees", leg_the_mirror_pair_agrees),
+    ("a battered pile reads the same mirrored",
+     leg_a_battered_pile_reads_the_same_mirrored),
+    ("the entry order does not matter", leg_the_entry_order_does_not_matter),
+    ("a vertical pile pushes horizontally", leg_a_vertical_pile_pushes_horizontally),
     ("mutations", leg_mutations),
 ]
 

@@ -45,6 +45,7 @@ matplotlib.use("Agg")
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
 from xslope.search import run_lem_analysis                          # noqa: E402
+from fill_reinforce_formula_cache import fill_reinforce_cache      # noqa: E402
 
 #: LEM-3's completed model — the one the tutorial page hands the reader, and the
 #: project every other W-1 session opens.
@@ -122,6 +123,7 @@ def build():
     source = _load(SOURCE)
     broken = _break(source)
     save_slope_data_to_xlsx(broken, DEST)
+    fill_reinforce_cache(DEST)    # Dir/Appl formula results, for non-Excel readers
 
     # Everything below is measured on what was WRITTEN, not on what was held in
     # memory: the file is what the session opens.

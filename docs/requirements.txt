@@ -2,3 +2,4 @@ mkdocs
 python-markdown-math
 pymdown-extensions
 mkdocstrings[python]
+mkdocs-redirects

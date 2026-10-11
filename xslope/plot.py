@@ -1684,7 +1684,7 @@ def plot_piezo_line(ax, slope_data, style=None, only_if_used=True):
 #   set-1 reservoir  → azure  (dark cerulean boundary / light azure levels)
 #   set-2 head       → rose   (the constant-steady rapid-drawdown second set)
 # Set 2 is the constant-steady rapid-drawdown set and NEVER carries a reservoir or a
-# time-varying value (fileio rejects both at load time), so it has no reservoir hue.
+# time-varying value (preflight refuses both before a run), so it has no reservoir hue.
 _SEEP_BC_RESERVOIR = ("#0277bd", "#4fc3f7")   # set-1 reservoir  (dark azure / light azure)
 _SEEP_BC_SET2_HEAD = ("#9c2a6e", "#e39ec8")   # set-2 head       (dark / light)
 
@@ -1992,7 +1992,7 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
 
     # Plot second set of BCs if present. Set 2 is the constant-steady rapid-drawdown
     # set: it never carries a reservoir type or a time-varying (tseep series) value
-    # (fileio rejects both at load time), so it draws in its own single hue family —
+    # (preflight refuses both before a run), so it draws in its own single hue family —
     # a rose head pair (dark boundary / light level) distinct from set 1's navy head
     # and azure reservoir. It therefore needs no reservoir-color override and no tseep.
     if has_bc2:
@@ -2780,9 +2780,13 @@ def _model_span(slope_data):
     return 100.0
 
 
-#: A joint tick's half-length, as a fraction of the width of the section. Short
+#: A joint tick's half-length, as a fraction of the width of the section. Short:
+#: the ticks on a 1.2 m course joint of a block wall were as long as the block
+#: was high and the wall read as a cross-hatched smudge; a third of that length
+#: still says "two faces that can move on each other" and stays clear of the
+#: neighbouring joints.
 #: enough to read as a hatch on the line rather than as geometry of its own.
-JOINT_TICK_FRACTION = 0.009
+JOINT_TICK_FRACTION = 0.003
 
 #: A bar-less joint line's color: a saturated green, the dark end of the hue the
 #: results overlay ramps a joint's slip along, so a joint is one recognizable
@@ -2821,8 +2825,10 @@ def joint_halo_effects(linewidth=JOINT_LINEWIDTH):
 #: continuous traces you can follow, and the legend carries the count.
 JOINT_TICK_MAX_LINES = 8
 
-#: The dash pattern of a joint line drawn as a fault symbol.
-JOINT_DASHES = (0, (6, 3))
+#: A joint line's trace is solid whether or not it carries ticks: the ticks are
+#: the symbol, and a dashed trace under them added nothing but noise on a
+#: short joint.
+JOINT_DASHES = '-'
 
 
 def joint_ticks_wanted(n_lines):
@@ -2869,14 +2875,15 @@ def draw_joint_ticks(ax, xs, ys, span, color, alpha=0.8, zorder=None,
     total = float(s[-1])
     if total <= 0:
         return
-    # A tick is a mark ON the line, so it is never longer than a quarter of the
-    # line it marks. Without that bound a short joint — a course across a 0.3 m
-    # facing column — carries ticks longer than itself and reads as a smudge.
-    half = min(JOINT_TICK_FRACTION * span, 0.25 * total)
-    # One tick every four half-lengths, between four and sixteen of them, so a
-    # short sheet and a long one both read as hatched rather than as a comb or
+    # A tick is a mark ON the line, so it is never longer than an eighth of the
+    # line it marks (a quarter across, both sides together). Without that bound
+    # a short joint — a course across a 0.3 m facing column — carries ticks
+    # longer than itself and reads as a smudge.
+    half = min(JOINT_TICK_FRACTION * span, 0.12 * total)
+    # One tick every five half-lengths, between three and eight of them, so a
+    # short sheet and a long one both read as marked rather than as a comb or
     # as two lonely marks.
-    n = int(min(16, max(4, round(total / (4.0 * half)))))
+    n = int(min(8, max(3, round(total / (5.0 * half)))))
     at = np.linspace(0.0, total, n + 2)[1:-1]
     xi = np.interp(at, s, pts[:, 0])
     yi = np.interp(at, s, pts[:, 1])
@@ -2888,7 +2895,7 @@ def draw_joint_ticks(ax, xs, ys, span, color, alpha=0.8, zorder=None,
     for k in range(n):
         ax.plot([xi[k] - half * nx[k], xi[k] + half * nx[k]],
                 [yi[k] - half * ny[k], yi[k] + half * ny[k]],
-                color=color, linewidth=1.5, alpha=alpha, solid_capstyle='butt',
+                color=color, linewidth=1.0, alpha=alpha, solid_capstyle='butt',
                 zorder=zorder, label=(label if k == 0 else None))
 
 
@@ -2963,7 +2970,7 @@ def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
 
 
 def plot_joint_lines(ax, slope_data, style=None):
-    """Draw the ``joints`` sheet's lines: a thin dark dashed line, ticked on both
+    """Draw the ``joints`` sheet's lines: a thin dark solid line, ticked on both
     sides where there are few enough of them to read, and one legend entry
     naming the count.
 
@@ -3000,8 +3007,8 @@ def plot_joint_lines(ax, slope_data, style=None):
             # ticked drawing gets a ticked swatch and a plain one does not.
             ax.plot([], [], color=JOINT_COLOR, linewidth=JOINT_LINEWIDTH,
                     linestyle=dash, alpha=0.9,
-                    marker='|' if ticks else 'None', markersize=11,
-                    markeredgewidth=1.5, label=joint_legend_label(len(lines)))
+                    marker='|' if ticks else 'None', markersize=7,
+                    markeredgewidth=1.0, label=joint_legend_label(len(lines)))
             labeled = True
 
 
@@ -3639,11 +3646,14 @@ def plot_inputs(
         _frame_content(ax, _frame_data_limits(ax), pad_frac)
     else:
         ax.set_aspect('equal', adjustable='datalim')  # ✅ Equal aspect
-        # Add a bit of headroom so plotted lines/markers don't touch the top border
+        # Add a bit of headroom so plotted lines/markers don't touch the top border.
+        # set_ybound, not set_ylim: the limits are where the equal-aspect fit
+        # starts from, and set_ylim would also FIX them -- which the data-lim aspect
+        # then overrides with a "Ignoring fixed y limits" warning on every draw.
         y0, y1 = ax.get_ylim()
         if y1 > y0:
             pad = 0.05 * (y1 - y0)
-            ax.set_ylim(y0, y1 + pad)
+            ax.set_ybound(y0, y1 + pad)
     ax.grid(False)
 
     # The legend is read off the DRAWN artists and nothing else. Every layer
@@ -3852,7 +3862,11 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)
     ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
-    ax.set_ylim(ymin, ymax)
+    # The window the equal-aspect (data-lim) fit is centered on. set_ybound sets it
+    # without fixing it: fixed y limits are overridden by that fit anyway, with a
+    # "Ignoring fixed y limits" warning on every draw. The content and slices
+    # frames below replace it with fixed, box-adjusted limits of their own.
+    ax.set_ybound(ymin, ymax)
 
     if frame == "content":
         # Frame the model's extent, the way plot_inputs(frame="content") frames the
@@ -4666,8 +4680,10 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
     y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
     x_pad = (x_max - x_min) * pad_frac
     y_pad = (y_max - y_min) * pad_frac
-    ax.set_xlim(x_min - x_pad, x_max + x_pad)
-    ax.set_ylim(y_min - y_pad, y_max + y_pad)
+    # Bounds, not limits: the equal-aspect (data-lim) fit widens one of these
+    # ranges to the axes' shape, and fixed limits would draw a warning each draw.
+    ax.set_xbound(x_min - x_pad, x_max + x_pad)
+    ax.set_ybound(y_min - y_pad, y_max + y_pad)
 
     fig.tight_layout()
     # Add legend if we have materials (after tight_layout so its reserved bottom

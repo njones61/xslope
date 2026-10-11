@@ -33,7 +33,9 @@ class of defect out of the corpus.
 Detection (deterministic, no randomness): for every material-tiling input file, the
 material polygons are unioned and each x-column is intersected with a vertical line.
 The covered y-intervals are read off; a gap BETWEEN two covered intervals (not the
-open space above the ground surface, nor below the section) is a void. Contiguous
+open space above the ground surface, nor below the section) is a void when material
+encloses it. A gap open to the air at one side is the notch under an overhang, such as
+the outer corner of a leaning block in a toppling model, and is not counted. Contiguous
 columns carrying a gap are clustered into a void region with a WIDTH (x-extent) and a
 MAX_GAP (tallest vertical gap).
 
@@ -63,7 +65,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -117,6 +119,11 @@ def find_voids(polygons, ncols=400, y_eps=1e-3):
     if not polys:
         return []
     union = unary_union(polys)
+    # The section with its holes filled in. A gap whose midpoint lies outside it is
+    # open to the air at one side: the notch under an overhang, such as a leaning
+    # block's outer corner in a toppling model (RS2 joints RJ-1), not a void.
+    parts = [union] if union.geom_type == "Polygon" else list(getattr(union, "geoms", []))
+    filled = unary_union([Polygon(g.exterior) for g in parts if g.geom_type == "Polygon"])
     minx, miny, maxx, maxy = union.bounds
     span = maxx - minx
     if span <= 0:
@@ -140,7 +147,7 @@ def find_voids(polygons, ncols=400, y_eps=1e-3):
         segs.sort()
         for a, b in zip(segs[:-1], segs[1:]):
             gy0, gy1 = a[1], b[0]
-            if gy1 - gy0 > y_eps:
+            if gy1 - gy0 > y_eps and filled.contains(Point(x, 0.5 * (gy0 + gy1))):
                 col_gaps.append((i, gy0, gy1))
     if not col_gaps:
         return []

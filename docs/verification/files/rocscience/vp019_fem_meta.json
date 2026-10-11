@@ -20,9 +20,12 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": 0.052392656675889035,
+      "u_ratio": 0.052392656675889986,
       "growth": null,
+      "max_displacement": 0.052152528451416824,
       "exit_reason": "converged",
+      "stop_reading": null,
+      "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -36,13 +39,13 @@
         "vp_iterations": 300,
         "nr_iterations": 4,
         "nr_force_evals": 10,
-        "oob": 7.680302652216076e-05,
+        "oob": 7.680302730168818e-05,
         "force_tol": 0.001,
-        "yield_violation": 6.675772626570564e-16,
+        "yield_violation": 7.412367271246052e-16,
         "yield_tol": 1e-06,
-        "max_disp_deep": 0.05215252845141588,
+        "max_disp_deep": 0.052152528451416824,
         "disp_limit": 10.0,
-        "disp_frac_height": 0.0005215252845141588
+        "disp_frac_height": 0.0005215252845141682
       }
     },
     {
@@ -51,14 +54,24 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 8.044932810006467,
-      "growth": 1.904983905737532,
+      "u_ratio": 15.065636138967022,
+      "growth": 3.6551068914828613,
+      "max_displacement": 14.996586682685612,
       "exit_reason": "diverging",
+      "stop_reading": {
+        "rule": "diverging",
+        "signal": "runaway",
+        "iteration": 1031,
+        "u_ratio": 15.065636138967022,
+        "window": 2000,
+        "gain": null
+      },
+      "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
-      "diverging_iteration": 550,
+      "diverging_iteration": 1030,
       "ee_suppressed": false,
-      "iterations": 551,
+      "iterations": 1031,
       "nr_force_evals": 0,
       "nr_predictor_iterations": 0
     },
@@ -68,14 +81,47 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 2.6946552797937824,
-      "growth": 0.622924344710335,
+      "u_ratio": 15.00803546776228,
+      "growth": 3.6828178746163314,
+      "max_displacement": 14.939250009296257,
       "exit_reason": "diverging",
+      "stop_reading": {
+        "rule": "diverging",
+        "signal": "runaway",
+        "iteration": 12791,
+        "u_ratio": 15.00803546776228,
+        "window": 2000,
+        "gain": 2.3142108925552702
+      },
+      "creep_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          1.8183676054159073,
+          1.8756114999133915,
+          1.7887914014154198,
+          1.8560681195648223,
+          1.8644728968931974
+        ],
+        "ratios": [
+          1.0314809251589099,
+          0.9537110438371802,
+          1.0376101529201047,
+          1.0045282698623936
+        ],
+        "ratio": 1.0062794349084505,
+        "moved": 9.20331152320274,
+        "u_elastic_scale": 0.9954167580018201,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 11200
+      },
       "plateau_iteration": 1663,
       "budget_extensions": 0,
-      "diverging_iteration": 2060,
+      "diverging_iteration": 12790,
       "ee_suppressed": true,
-      "iterations": 2061,
+      "iterations": 12791,
       "nr_force_evals": 0,
       "nr_predictor_iterations": 0
     },
@@ -85,9 +131,12 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": 0.15768382906044084,
+      "u_ratio": 0.1576838290604183,
       "growth": null,
+      "max_displacement": 0.15696112591263478,
       "exit_reason": "converged",
+      "stop_reading": null,
+      "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -101,13 +150,13 @@
         "vp_iterations": 300,
         "nr_iterations": 3,
         "nr_force_evals": 7,
-        "oob": 6.855874343946536e-05,
+        "oob": 6.855874342321346e-05,
         "force_tol": 0.001,
-        "yield_violation": 7.682039517626101e-16,
+        "yield_violation": 7.311532942413601e-16,
         "yield_tol": 1e-06,
-        "max_disp_deep": 0.1569611259126572,
+        "max_disp_deep": 0.15696112591263478,
         "disp_limit": 10.0,
-        "disp_frac_height": 0.001569611259126572
+        "disp_frac_height": 0.0015696112591263478
       }
     },
     {
@@ -116,9 +165,12 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": 0.2282306701897141,
+      "u_ratio": 0.22823067018971532,
       "growth": null,
+      "max_displacement": 0.22718463379682907,
       "exit_reason": "converged",
+      "stop_reading": null,
+      "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -132,13 +184,13 @@
         "vp_iterations": 300,
         "nr_iterations": 4,
         "nr_force_evals": 9,
-        "oob": 4.751281823354912e-10,
+        "oob": 4.754671052929608e-10,
         "force_tol": 0.001,
-        "yield_violation": 7.633618705865087e-16,
+        "yield_violation": 7.6305507326957e-16,
         "yield_tol": 1e-06,
-        "max_disp_deep": 0.22718463379682785,
+        "max_disp_deep": 0.22718463379682907,
         "disp_limit": 10.0,
-        "disp_frac_height": 0.0022718463379682785
+        "disp_frac_height": 0.0022718463379682906
       }
     },
     {
@@ -147,9 +199,12 @@
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
-      "u_ratio": 0.2796157768587123,
+      "u_ratio": 0.2796157768587112,
       "growth": null,
+      "max_displacement": 0.27833423008685865,
       "exit_reason": "converged",
+      "stop_reading": null,
+      "creep_reading": null,
       "plateau_iteration": null,
       "budget_extensions": 0,
       "diverging_iteration": null,
@@ -163,13 +218,13 @@
         "vp_iterations": 300,
         "nr_iterations": 5,
         "nr_force_evals": 12,
-        "oob": 7.601348075514853e-10,
+        "oob": 7.593220550588612e-10,
         "force_tol": 0.001,
-        "yield_violation": 5.761206056865288e-16,
+        "yield_violation": 6.695706691856274e-16,
         "yield_tol": 1e-06,
-        "max_disp_deep": 0.27833423008685976,
+        "max_disp_deep": 0.27833423008685865,
         "disp_limit": 10.0,
-        "disp_frac_height": 0.0027833423008685977
+        "disp_frac_height": 0.0027833423008685864
       }
     },
     {
@@ -178,14 +233,64 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 1.3526774475334244,
-      "growth": 0.29366967714156667,
-      "exit_reason": "diverging",
+      "u_ratio": 8.739248562023263,
+      "growth": 1.8842040352056264,
+      "max_displacement": 8.701379527009802,
+      "exit_reason": "not_slowing",
+      "stop_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.6855514108144878,
+          0.910221251444211,
+          0.8868566410685238,
+          0.671355639465782,
+          0.7799613348663473
+        ],
+        "ratios": [
+          1.327721359894509,
+          0.9743308450131049,
+          0.7570058207568963,
+          1.161770735235033
+        ],
+        "ratio": 1.0327810513504574,
+        "moved": 3.933946277659352,
+        "u_elastic_scale": 0.9954167580018201,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000,
+        "rule": "not_slowing"
+      },
+      "creep_reading": {
+        "window": 8000,
+        "block": 1600,
+        "increments": [
+          0.6855514108144878,
+          0.910221251444211,
+          0.8868566410685238,
+          0.671355639465782,
+          0.7799613348663473
+        ],
+        "ratios": [
+          1.327721359894509,
+          0.9743308450131049,
+          0.7570058207568963,
+          1.161770735235033
+        ],
+        "ratio": 1.0327810513504574,
+        "moved": 3.933946277659352,
+        "u_elastic_scale": 0.9954167580018201,
+        "slip_frac": null,
+        "slip_ratio": null,
+        "trend": "steady",
+        "iteration": 16000
+      },
       "plateau_iteration": 1753,
       "budget_extensions": 0,
-      "diverging_iteration": 2020,
+      "diverging_iteration": null,
       "ee_suppressed": true,
-      "iterations": 2021,
+      "iterations": 16000,
       "nr_force_evals": 0,
       "nr_predictor_iterations": 0
     }
@@ -196,6 +301,6 @@
   "unit_system": "si",
   "converged": true,
   "iterations": 305,
-  "residual": 3.077802208693112e-07,
-  "max_displacement": 0.27833423008685976
+  "residual": 3.0778048417442804e-07,
+  "max_displacement": 0.27833423008685865
 }

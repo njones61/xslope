@@ -76,6 +76,32 @@ BANNED = [
     (r"\bused to (?:fall|be|sit|read|give)\b", "project-relative time"),
     (r"\bno longer (?:do|does)\b", "project-relative time"),
     (r"\bit now sits\b", "project-relative time"),
+    # -- the status vocabulary (docs/verification/index.md#status-terms) -----
+    # A row carries a match dot or one of: unconfirmed, planned, blocked, not
+    # supported, no reference value.  "Lock" is the test suite's word for the
+    # value a tag holds a row to; it stays in the tags and leaves the prose.
+    (r"\block(?:s|ed|ing)?\b", "test vocabulary: 'lock' belongs to the tags"),
+    (r"\bdeferred\b", "retired status term: use *planned*"),
+    (r"\bin progress\b", "retired status term: use *planned*"),
+    (r"\bout of scope by construction\b",
+     "retired status term: use *not supported*"),
+    (r"🟣", "retired dot: use *planned*"),
+
+    # -- solver vocabulary: the pages describe what the slope did, never which
+    # part of the solver did it (Norm 2026-09-28: "filled with techno-jargon") --
+    (r"\bcorrector\b", "solver vocabulary: say what the slope did"),
+    (r"\bcertif(?:y|ied|ies|icate|ication)\b", "solver vocabulary: say what the slope did"),
+    (r"\btrend reading\b", "solver vocabulary: say what the slope did"),
+    (r"\bcheckpoint\b", "solver vocabulary: say what the slope did"),
+    (r"\bverdict\b", "solver vocabulary: say what the slope did"),
+    (r"\bsidecars?\b", "solver vocabulary: say what the slope did"),
+    (r"\brunaway rule\b", "solver vocabulary: say what the slope did"),
+    (r"\bbudget\b", "solver vocabulary: say 'iteration limit'"),
+    (r"\bsweeps\b", "solver vocabulary: say 'iterations'"),
+    (r"\blocaliz(?:e|es|ed|ing|ation)\b", "jargon: say where the failure runs"),
+    (r"\bincipient\b", "jargon: say 'at failure'"),
+    (r"\bhold test\b", "solver vocabulary: say what the slope did"),
+
     # NOT banned: a bare "now sits"/"now reads".  Both are ordinary descriptive
     # English for a variant of the model under discussion ("the firm base now
     # sits at depth D = 1.5H", "with the cap removed the file now reads ..."),

@@ -90,7 +90,8 @@ class PageConfig:
                                  'expected_kc', 'expected_flowrate*',
                                  'expected_head*', 'points', 'expected',
                                  'expected_elements', 'expected_nodes',
-                                 'expected_depth', 'expected_force'])
+                                 'expected_depth', 'expected_force',
+                                 'expected_tilt'])
 
     #: Decimal places a section may restate a tag value to.  ``None`` demands
     #: the tag value verbatim (the rs2 convention: the page prints the lock).

@@ -718,9 +718,10 @@ def water_loads_mode(slope_data):
         return "manual"
     mode = str(mode).strip().lower()
     if mode not in WATER_LOAD_MODES:
+        from .fileio import main_sheet_cell
         raise ValueError(
             f"Water loads is {mode!r}, which is not a mode. Expected one of: "
-            f"{', '.join(WATER_LOAD_MODES)} (main D23).")
+            f"{', '.join(WATER_LOAD_MODES)} (main {main_sheet_cell('water_loads')}).")
     return mode
 
 

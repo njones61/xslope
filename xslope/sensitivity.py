@@ -483,6 +483,24 @@ def _screen_point(rows, mode):
     return rows
 
 
+def _point_warnings(result, slices, sd, unsolved=None):
+    """What one step's solve says about itself, as Studio's Run LEM reports it:
+    the search's unsolved-trials sentence, then the solver's admissibility notes
+    and the crest-tension note. A list of strings, empty when there is nothing to
+    say. The solver's own result is read, never added to."""
+    from .search import crest_tension_note
+    notes = []
+    if unsolved and unsolved.get('sentence'):
+        notes.append(unsolved['sentence'])
+    if isinstance(result, dict):
+        notes.extend(str(w) for w in (result.get('warnings') or []))
+        if slices is not None:
+            note = crest_tension_note(slices, sd)
+            if note and note not in notes:
+                notes.append(note)
+    return notes
+
+
 def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
     """Evaluate one model. Returns list of dicts (one per method).
 
@@ -512,7 +530,9 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
         for method in methods:
             try:
                 if circular:
-                    out = circular_search(sd, method, num_slices=num_slices, **kw)
+                    unsolved = {}
+                    out = circular_search(sd, method, num_slices=num_slices,
+                                          unsolved_out=unsolved, **kw)
                     best = out[0][0]
                     fs = best.get('FS')
                     R = (best['Yo'] - best['Depth']
@@ -520,14 +540,20 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
                          else np.nan)
                     rows.append({'method': method, 'fs': fs, 'success': fs is not None,
                                  'msg': '', 'Xo': best.get('Xo'), 'Yo': best.get('Yo'),
-                                 'R': R})
+                                 'R': R,
+                                 'warnings': _point_warnings(
+                                     best.get('solver_result'), best.get('slices'),
+                                     sd, unsolved)})
                 else:
                     out = noncircular_search(sd, method, num_slices=num_slices,
                                              **noncircular_search_opts(kw))
                     best = out[0][0]
                     fs = best.get('FS')
                     rows.append({'method': method, 'fs': fs, 'success': fs is not None,
-                                 'msg': '', 'Xo': np.nan, 'Yo': np.nan, 'R': np.nan})
+                                 'msg': '', 'Xo': np.nan, 'Yo': np.nan, 'R': np.nan,
+                                 'warnings': _point_warnings(
+                                     best.get('solver_result'), best.get('slices'),
+                                     sd)})
             except Exception as e:                        # noqa: BLE001
                 rows.append({'method': method, 'fs': np.nan, 'success': False,
                              'msg': f'search failed: {e}', 'Xo': np.nan,
@@ -576,7 +602,8 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
             rows.append({'method': method, 'fs': r['FS'], 'success': True, 'msg': '',
                          'Xo': (sd['circles'][0]['Xo'] if circular else np.nan),
                          'Yo': (sd['circles'][0]['Yo'] if circular else np.nan),
-                         'R': (sd['circles'][0]['R'] if circular else np.nan)})
+                         'R': (sd['circles'][0]['R'] if circular else np.nan),
+                         'warnings': _point_warnings(r, df, sd)})
     return rows
 
 
@@ -773,12 +800,14 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
         row per value x method; the unmodified model is the flagged is_base
         row), plus 'param', 'base_value', 'runtime'. A failed point is a
         success=False ROW, not an exception — a sweep that dies at value 7 of
-        9 should still report 1-6.
+        9 should still report 1-6. An LEM row's 'warnings' cell carries what
+        that step's solve said about itself — unsolved trials, admissibility,
+        crest tension — joined with '; ' ('' when it said nothing).
     """
     if analysis is not None:                           # deprecated alias for mode=
         mode = analysis
     if mode not in _OUTPUT_BY_MODE:
-        return False, (f"mode='{mode}' is not recognised "
+        return False, (f"mode='{mode}' is not recognized "
                        f"(choose 'lem', 'fem', or 'seep').")
     output, output_label = _OUTPUT_BY_MODE[mode]
     if mode in ('fem', 'seep') and slope_data.get('mesh') is None:
@@ -894,7 +923,13 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
 
     df = pd.DataFrame(rows, columns=['param', 'value', 'rel', 'is_base', 'analysis',
                                      'method', 'fs', 'success', 'msg',
-                                     'Xo', 'Yo', 'R'])
+                                     'Xo', 'Yo', 'R', 'warnings'])
+    # What each step's solve said about itself (unsolved trials, admissibility,
+    # crest tension), joined into one cell; '' where it said nothing or the step
+    # had no solve to speak of.
+    df['warnings'] = df['warnings'].apply(
+        lambda w: '; '.join(w) if isinstance(w, list) else
+        (w if isinstance(w, str) else ''))
     # output-quantity metadata travels WITH the df (plots read it) and in the
     # result dict. 'fs' stays the value column for API compatibility even when it
     # carries q; 'output'/'output_label' say what it really is.

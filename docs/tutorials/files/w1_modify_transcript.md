@@ -3,7 +3,7 @@
 Captured by `tools/assistant_sessions.py` against the live Studio assistant, offscreen.
 
 - Project: `docs/lem/files/xslope_simple_mult_layers.xlsx`
-- Provider / model: `anthropic` / `claude-opus-5`
+- Provider / model: `anthropic` / `claude-opus-5-5`
 - Confirm-before-running: off (unattended capture)
 
 ## Turn 1 — Change the face to 3:1 and rerun the search.
@@ -12,106 +12,70 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: Change the face to 3:1 and rerun the search.
 
 Ran code:
-    for i,p in enumerate(slope_data['polygons']):
-        print(i, p['mat_id'], list(p['polygon'].exterior.coords))
-    print('max_depth', slope_data['max_depth'])
-    print('circles', slope_data['circles'])
+    for p in slope_data['profile_lines']: print(p)
+    print(slope_data['circles'], slope_data['max_depth'])
 
 Output:
-    0 0 [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0), (90.0, 0.0), (0.0, 0.0)]
-    1 1 [(-30.0, 0.0), (0.0, 0.0), (90.0, 0.0), (90.0, -10.0), (-30.0, -10.0), (-30.0, 0.0)]
-    max_depth -10.0
-    circles [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}]
+    {'coords': [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)], 'mat_id': 0, 'size': None}
+    {'coords': [(-30.0, 0.0), (90.0, 0.0)], 'mat_id': 1, 'size': None}
+    [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}] -10.0
 
 Ran code:
-    from shapely.geometry import Polygon
-    import math
-    # 3:1 face: toe (0,0) -> crest (60,20); extend right edge to x=100 (2H beyond crest)
-    slope_data['polygons'][0] = {'polygon': Polygon([(0,0),(60,20),(100,20),(100,0)]), 'mat_id':0}
-    slope_data['polygons'][1] = {'polygon': Polygon([(-30,0),(100,0),(100,-10),(-30,-10)]), 'mat_id':1}
-    # restage starting circles for the new geometry
-    Xo, Yo = 30.0, 40.0
-    Rtoe = math.hypot(25-0, 40-0)
-    slope_data['circles'] = [
-        {'Xo': Xo, 'Yo': Yo, 'Depth': 0.0,   'R': 40.0},                 # tangent to embankment base
-        {'Xo': Xo, 'Yo': Yo, 'Depth': -10.0, 'R': 50.0},                 # tangent to hard base
-        {'Xo': 25.0, 'Yo': Yo, 'Depth': Yo-Rtoe, 'R': Rtoe},             # through the toe
-    ]
-    resync_geometry()
-    print(list(slope_data['polygons'][0]['polygon'].exterior.coords))
-    print(list(slope_data['polygons'][1]['polygon'].exterior.coords))
-    print(slope_data['circles'])
-
-Output:
-    [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0), (90.0, 0.0), (0.0, 0.0)]
-    [(-30.0, 0.0), (0.0, 0.0), (90.0, 0.0), (90.0, -10.0), (-30.0, -10.0), (-30.0, 0.0)]
-    [{'Xo': 30.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 30.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}, {'Xo': 25.0, 'Yo': 40.0, 'Depth': -7.169905660283021, 'R': 47.16990566028302}]
-    WARNING: polygons were edited on a profile-line model and have been rebuilt from profile_lines; edit profile_lines instead (and the ground surface if it is separate), then call resync_geometry(). The polygon edit did not take.
-    === MODEL CHECKS: clean ===
-
-Ran code:
-    for i,pl in enumerate(slope_data['profile_lines']):
-        print(i, pl)
-
-Output:
-    0 {'coords': [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)], 'mat_id': 0, 'size': None}
-    1 {'coords': [(-30.0, 0.0), (90.0, 0.0)], 'mat_id': 1, 'size': None}
-
-Ran code:
-    import math
     slope_data['profile_lines'][0]['coords'] = [(0.0,0.0),(60.0,20.0),(110.0,20.0)]
-    slope_data['profile_lines'][1]['coords'] = [(-50.0,0.0),(110.0,0.0)]
-    Xo, Yo = 30.0, 40.0
-    Rtoe = math.hypot(25.0-0.0, 40.0-0.0)
-    slope_data['circles'] = [
-        {'Xo': Xo,   'Yo': Yo, 'Depth': 0.0,        'R': 40.0},
-        {'Xo': Xo,   'Yo': Yo, 'Depth': -10.0,      'R': 50.0},
-        {'Xo': 25.0, 'Yo': Yo, 'Depth': Yo - Rtoe,  'R': Rtoe},
-    ]
+    slope_data['profile_lines'][1]['coords'] = [(-30.0,0.0),(110.0,0.0)]
+    slope_data['circles'] = [{'Xo':30.0,'Yo':40.0,'Depth':0.0,'R':40.0},
+                             {'Xo':30.0,'Yo':40.0,'Depth':-10.0,'R':50.0}]
     resync_geometry()
-    for pl in slope_data['profile_lines']: print(pl['coords'])
+    for p in slope_data['profile_lines']: print(p['coords'])
     print(slope_data['circles'])
 
 Output:
     [(0.0, 0.0), (60.0, 20.0), (110.0, 20.0)]
-    [(-50.0, 0.0), (110.0, 0.0)]
-    [{'Xo': 30.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 30.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}, {'Xo': 25.0, 'Yo': 40.0, 'Depth': -7.169905660283021, 'R': 47.16990566028302}]
+    [(-30.0, 0.0), (110.0, 0.0)]
+    [{'Xo': 30.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 30.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}]
     === MODEL CHECKS: clean ===
 
 Ran code:
     res = run_lem(search=True)
-    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res.get('x_entry'), res.get('x_exit'))
-    print(res.get('warnings'))
+    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res['x_entry'], res['x_exit'], res.get('warnings'))
 
 Output:
     spencer (auto search, circular): FS = 1.546 on the circle Xo=32.98, Yo=53.33, R=53.33
+      admissibility: interslice tension on 10% of interior boundaries (min Z = -897.3 vs max compression 9360.5)
       admissibility: line of thrust outside the slice on 10% of boundaries
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    1.5459930127839399 32.981249999999996 53.33125000000001 53.33125000000001 0.0 74.61356917633223 12.39730449443401
-    ['line of thrust outside the slice on 10% of boundaries']
+    1.5459930127839399 32.981249999999996 53.33125000000001 53.33125000000001 0.0 74.61356917633223 12.39730449443401 ['interslice tension on 10% of interior boundaries (min Z = -897.3 vs max compression 9360.5)', 'line of thrust outside the slice on 10% of boundaries']
+    [saved 1 file(s) the user can open: assistant_plot_001.png]
 
-Assistant: **Face changed to 3:1 and the search rerun.**
+[file: assistant_plot_001.png]
 
-What changed (the model is profile-line native, so I edited `profile_lines`):
+Assistant: The face is now 3:1. I re-ran the search and the critical **FS is 1.546** (Spencer, the method the model declares).
 
-| | before | after |
-|---|---|---|
-| Face | (0,0) → (40,20), 2:1 | (0,0) → (60,20), 3:1 |
-| Crest ground | to x=90 | to x=110 |
-| Foundation top | −30 … 90 | −50 … 110 |
-| max_depth | −10 | −10 (unchanged) |
+**What I changed**
+- **Face:** the toe stays at (0, 0). I moved the crest from (40, 20) to (60, 20), so the slope now rises 20 ft over 60 ft, which is 3:1.
+- **Crest and foundation:** I extended both from x = 90 to x = 110, so there is still 50 ft of flat crest behind the slope.
+- **Starting circles:** I moved their centres from Xo = 20 to Xo = 30, halfway along the new face. One circle bottoms out at the top of the foundation (y = 0) and one at the base (y = −10), as before. The model checks came back clean.
 
-I widened the flat ground on both sides (2× the 20 ft height beyond the new crest and beyond the toe) so trial circles daylight inside the model, and restaged the starting circles for the new face: one tangent to the embankment/foundation contact (Depth = 0), one tangent to the hard base (Depth = −10), and one through the toe (Xo=25, Yo=40, R=47.17, Depth=−7.17 — above the base).
+**Search result**
 
-**Result — Spencer, automated circular search: FS = 1.546**
-Critical circle Xo = 32.98, Yo = 53.33, R = 53.33, Depth = 0.00 (tangent to the top of the foundation), entering the ground at x ≈ 74.6 and exiting at x ≈ 12.4.
+| | Value |
+|:--|:--|
+| FS (Spencer, critical) | 1.546 |
+| Centre | Xo = 32.98, Yo = 53.33 |
+| Radius | 53.33 ft |
+| Lowest point of circle | y = 0.0, exactly touching the top of the foundation, not cutting into it |
+| Circle ends | top at x = 74.6 on the crest; bottom at x = 12.4 on the face, above the toe |
 
-One admissibility note to pass on: the Duncan–Wright screen reports the **line of thrust falls outside the slice on 10% of the slice boundaries**. It does not change FS, but it means that portion of the interslice force distribution is not statically admissible — worth a glance at the thrust-line plot before quoting 1.546 as final.
+**Warnings from the run:** Spencer converged, but there are two signs the result isn't fully physically acceptable. About 10% of the boundaries between slices are in tension, and on 10% of them the line of thrust falls outside the slice. Neither changes the FS, but treat 1.546 as converged rather than fully checked.
+
+**Note:** the ground only extends 30 ft (1.5 times the slope height) beyond the toe, which is a bit short of the usual 2 times. The critical circle comes out on the face well inside the model, so it didn't affect this run. I can widen that side if you plan deeper or seismic runs.
+
+The model is changed in the session but not saved to disk; use Save As if you want to keep it.
 ```
 
-Tokens: input 105,555 · cached_input 95,106 · output 3,789 · calls 6 · 57.9s
+Tokens: input 80,427 · cached_input 59,633 · output 1,952 · calls 4 · 27.2s
 
 ## Turn 2 — Add a piezometric line at elevation 30 across the whole sec…
 
@@ -119,51 +83,61 @@ Tokens: input 105,555 · cached_input 95,106 · output 3,789 · calls 6 · 57.9s
 You: Add a piezometric line at elevation 30 across the whole section so the slope is fully submerged. Use the piezo pore-pressure option on both soils and enter saturated unit weights of 135 pcf for the embankment and 140 pcf for the foundation. Rerun the search.
 
 Ran code:
-    print('water_loads =', slope_data.get('water_loads'))
-    slope_data['piezo_line'] = [(-50.0, 30.0), (110.0, 30.0)]
-    for m, gs in zip(slope_data['materials'], [135.0, 140.0]):
-        m['u'] = 'piezo'
-        m['gamma_sat'] = gs
-    slope_data['dloads'] = []
-    print(slope_data['piezo_line'])
-    for m in slope_data['materials']:
-        print(m['name'], m['gamma'], m['gamma_sat'], m['u'], m['c'], m['phi'])
+    slope_data['piezo_line'] = [(-30.0, 30.0), (110.0, 30.0)]
+    slope_data['piezo_phreatic'] = False
+    m = slope_data['materials']
+    m[0]['u'] = 'piezo'; m[0]['gamma_sat'] = 135.0
+    m[1]['u'] = 'piezo'; m[1]['gamma_sat'] = 140.0
+    print(slope_data['piezo_line'], slope_data.get('water_loads'), len(slope_data.get('dloads') or []))
+    for x in m: print(x['name'], x['gamma'], x['gamma_sat'], x['u'])
 
 Output:
-    water_loads = auto
-    [(-50.0, 30.0), (110.0, 30.0)]
-    embankment 130.0 135.0 piezo 400.0 0.0
-    foundation 135.0 140.0 piezo 800.0 0.0
+    [(-30.0, 30.0), (110.0, 30.0)] auto 0
+    embankment 130.0 135.0 piezo
+    foundation 135.0 140.0 piezo
     === MODEL CHECKS: clean ===
 
 Ran code:
     res = run_lem(search=True)
-    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res.get('x_entry'), res.get('x_exit'))
-    print(res.get('warnings'))
+    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res['x_entry'], res['x_exit'], res.get('warnings'))
 
 Output:
     spencer (auto search, circular): FS = 2.767 on the circle Xo=32.98, Yo=53.76, R=53.76
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    2.767349731685544 32.981249999999996 53.76250000000001 53.76250000000001 0.0 74.82022704294407 12.349338864653422
-    []
+    2.767349731685544 32.981249999999996 53.76250000000001 53.76250000000001 0.0 74.82022704294407 12.349338864653422 []
+    [saved 1 file(s) the user can open: assistant_plot_002.png]
 
-Assistant: Done — piezometric line added and the run is in.
+[file: assistant_plot_002.png]
 
-**Edits**
-- `piezo_line` = (−50, 30) → (110, 30), so the whole section is under 30 ft of head and the crest (el. 20) is submerged by 10 ft.
-- Both materials switched to `u = 'piezo'`.
-- `gamma_sat` = 135 pcf (embankment), 140 pcf (foundation); total unit weights left at 130 / 135 pcf, so buoyancy is not double-counted.
-- `water_loads` is **auto**, so xslope derives the hydrostatic load of the ponded water over the submerged ground itself — I added no `dloads` row.
+Assistant: The slope is now fully submerged, and the critical **FS is 2.767** (Spencer), up from 1.546 when dry.
 
-**Result — Spencer, automated circular search: FS = 2.767**
-Critical circle Xo = 32.98, Yo = 53.76, R = 53.76, Depth = 0.00 (tangent to the top of the foundation), entry x ≈ 74.8, exit x ≈ 12.3. No admissibility warnings this time — the thrust-line note from the dry run is gone.
+**What I changed**
+- **Piezometric line:** flat at y = 30 from x = −30 to x = 110, which is 10 ft above the crest. It's set as a true piezometric line, so pore pressure is the unit weight of water times the depth below the line.
+- **Embankment:** pore pressure now set to piezo, saturated unit weight 135 pcf. The moist unit weight stays at 130.
+- **Foundation:** pore pressure now set to piezo, saturated unit weight 140 pcf. The moist unit weight stays at 135.
+- **Water load on the ground:** the model's water-load setting is on automatic, so the solver calculates the weight of the standing water from the piezometric line. I didn't add a load by hand, because that would count the pond twice.
+- The model checks came back clean.
 
-FS rose from 1.546 to 2.767. Both soils are φ = 0, so the pore pressures cannot reduce their strength; the change comes from the 10 ft of water standing on the slope, whose weight acts as a stabilizing surcharge on the driving side. If you want the increase attributed rather than asserted, I can re-solve with `water_loads = 'manual'` and no load block to isolate the two effects.
+**Search result**
+
+| | Dry (before) | Submerged (now) |
+|:--|:--|:--|
+| FS (Spencer, critical) | 1.546 | 2.767 |
+| Centre (Xo, Yo) | 32.98, 53.33 | 32.98, 53.76 |
+| Radius | 53.33 ft | 53.76 ft |
+| Lowest point of circle | y = 0.0 | y = 0.0, touching the top of the foundation |
+| Circle ends | x = 74.6 → 12.4 | x = 74.8 → 12.3, ending on the face |
+
+The run came back with no warnings. The two problems flagged last time (tension between slices and the line of thrust falling outside them) no longer appear.
+
+**Why FS went up:** both soils use φ = 0 with no friction, so their strength is just c, and pore pressure doesn't weaken them. What changed is the water itself: the pond pressing on the face and crest resists sliding. Standing water lowers the net force driving the slide, which is the usual result for a submerged slope with these soils. I haven't run a separate test to show how much of the change comes from the water load versus the heavier saturated soil. I can run that comparison if you want it.
+
+The edits are in the session but not saved to disk; use Save As to keep them.
 ```
 
-Tokens: input 60,412 · cached_input 47,553 · output 1,286 · calls 3 · 26.2s
+Tokens: input 66,776 · cached_input 64,929 · output 1,297 · calls 3 · 20.5s
 
 ## Turn 3 — Reduce the foundation cohesion to 250 psf and rerun the sea…
 
@@ -172,51 +146,53 @@ You: Reduce the foundation cohesion to 250 psf and rerun the search. Which circl
 
 Ran code:
     slope_data['materials'][1]['c'] = 250.0
-    print([(m['name'], m['c'], m['phi']) for m in slope_data['materials']])
+    print(slope_data['materials'][1]['name'], slope_data['materials'][1]['c'])
 
 Output:
-    [('embankment', 400.0, 0.0), ('foundation', 250.0, 0.0)]
+    foundation 250.0
     === MODEL CHECKS: clean ===
 
 Ran code:
     res = run_lem(search=True)
-    print('FS', res['FS'])
-    print('Xo,Yo,R,Depth', res['Xo'], res['Yo'], res['R'], res['Depth'])
-    print('entry/exit', res.get('x_entry'), res.get('x_exit'))
-    print('warnings', res.get('warnings'))
+    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res['x_entry'], res['x_exit'], res.get('warnings'))
 
 Output:
     spencer (auto search, circular): FS = 1.418 on the circle Xo=30.27, Yo=48.85, R=58.85
+      admissibility: Tension on the base of 2 slices near the crest. Consider adding a tension crack.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    FS 1.4183904055323113
-    Xo,Yo,R,Depth 30.26953125 48.84765625 58.84765625 -10.0
-    entry/exit 81.56143485086083 -2.5474327320626955
-    warnings []
+    1.4183904055323109 30.26953125 48.84765625 58.84765625 -10.0 81.56143485086083 -2.547432732062692 ['Tension on the base of 2 slices near the crest. Consider adding a tension crack.']
+    [saved 1 file(s) the user can open: assistant_plot_003.png]
 
-Assistant: **Foundation c reduced to 250 psf; Spencer search rerun: FS = 1.418** (was 2.767).
+[file: assistant_plot_003.png]
 
-The governing circle moved from the shallow one to the **deep base circle**:
+Assistant: I lowered the foundation cohesion from 800 to 250 psf and re-ran the search. The critical **FS is now 1.418** (Spencer), down from 2.767, and a different circle governs: **a deep circle that bottoms out on the base of the section**.
 
-| | before (c_fdn = 800) | now (c_fdn = 250) |
-|---|---|---|
-| Xo, Yo | 32.98, 53.76 | 30.27, 48.85 |
-| R | 53.76 | 58.85 |
-| Depth | 0.00 (top of foundation) | **−10.00 (tangent to the hard base)** |
-| entry / exit | 74.8 / 12.3 | 81.6 / −2.5 |
-| FS | 2.767 | 1.418 |
+| | Foundation c = 800 psf | Foundation c = 250 psf |
+|:--|:--|:--|
+| FS (Spencer, critical) | 2.767 | 1.418 |
+| Centre (Xo, Yo) | 32.98, 53.76 | 30.27, 48.85 |
+| Radius | 53.76 ft | 58.85 ft |
+| Lowest point of circle | y = 0.0, touching the top of the foundation | **y = −10.0, touching the base** |
+| Circle ends | x = 74.8 on the crest to x = 12.3 on the face | x = 81.6 on the crest to **x = −2.5, beyond the toe** |
 
-Depth = −10.00 is exactly `max_depth`, so the critical circle is now tangent to the rigid base, and it exits at x = −2.5 — past the toe, out on the foundation surface. That is a full base failure through the foundation rather than a slope-face slide.
+**Which circle governs:** a deep circle that goes through the whole 10 ft of foundation. Its lowest point sits exactly on the base of the section at y = −10. It comes out on the flat ground about 2.5 ft past the toe instead of on the face. The search can't go any deeper, because the base is the floor.
 
-Why: both soils are φ = 0, so every circle's resisting moment is just c·L·R summed over the arc, and the choice of critical circle is a competition between how much arc runs in each material. With c_fdn = 800 the foundation was twice as strong as the embankment, so any circle that dipped into it bought resistance faster than it added driving weight, and the minimum sat right at the contact (Depth = 0, the shallowest surface that stays out of the foundation). At c_fdn = 250 the foundation is now the *weaker* material — 250 vs 400 psf — so arc length spent down there is cheap resistance, and the search drops to the deepest surface the model allows, riding the base.
+**Why:** both soils have no friction (φ = 0), so each one's strength is simply its cohesion, whatever the depth or pore pressure.
+- **Before:** the foundation (800 psf) was twice as strong as the embankment (400 psf). Cutting into it only added resistance, so the critical circle stayed in the embankment and just touched the top of the foundation.
+- **Now:** the foundation (250 psf) is the weaker soil. The longer the slip surface runs through it, the lower the resistance per foot of surface. So the critical circle drops as deep as it can and runs through the weak layer until it hits the base.
 
-Note the consequence for the answer: the critical circle is pinned against `max_depth`. FS = 1.418 is the minimum over surfaces that stop at el. −10, which is right if the base is genuinely rigid at that elevation. If the foundation clay actually continues below −10, the true critical FS is lower and the section needs to be described deeper — I did not extend it, since −10 is the base this model declares.
+This explanation comes from the two strength values plus the change in where the critical circle sits. I didn't separately calculate the FS of a circle that stays in the embankment at c = 250, so I can't tell you how much lower the deep circle comes out. I can run that comparison if you want the number.
+
+**Warning from the run:** the two slices nearest the crest are in tension at their base, and the solver suggests adding a tension crack. That doesn't change the FS shown here. If you want it covered properly, I can set a tension crack depth and re-run.
+
+The model checks came back clean. The change is in the session but not saved; use Save As to keep it.
 ```
 
-Tokens: input 64,898 · cached_input 47,553 · output 1,123 · calls 3 · 22.8s
+Tokens: input 48,165 · cached_input 46,401 · output 1,246 · calls 2 · 17.9s
 
 ## Session total
 
-- Tokens: input 230,865 · cached_input 190,212 · output 6,198 · calls 12
-- Wall time: 121.6s
+- Tokens: input 195,368 · cached_input 170,963 · output 4,495 · calls 9
+- Wall time: 78.2s

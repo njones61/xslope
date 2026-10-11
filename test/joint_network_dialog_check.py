@@ -13,8 +13,13 @@ list is what opens it. Between them they have to hold three promises:
   3. **The button appends.** The rows land after the ones already there, and
      nothing that was there — the other set, a hand-entered joint line — moves or
      changes.
+  4. **A region is named where it is drawn.** The Polygons editor names a
+     ``joints`` region (Tutorial FEM-5's "Toppling zone"), the name survives a
+     save and a reopen as the polygon block's header, and the dialog's Within
+     list offers the region by it rather than as "Joint region 1 (unnamed)".
 
-Offscreen Qt, no file and no solver work.
+Offscreen Qt and no solver work; the fourth leg saves and reopens a scratch copy
+of FEM-5's workbook.
 
 Run directly:  PYTHONPATH=. python3 test/joint_network_dialog_check.py
 """
@@ -265,6 +270,89 @@ def _leg_button(failures, results):
                    f"the hand-entered line exactly where they were")
 
 
+#: Tutorial FEM-5's part-1 model, which its part 2 draws the joint region on, and
+#: that region as the page enters it (the shipped toppling model's own vertices).
+FEM05_FILE = os.path.join(_ROOT, 'docs', 'tutorials', 'files',
+                          'xslope_rock_joints.xlsx')
+FEM05_REGION_NAME = 'Toppling zone'
+FEM05_REGION = [(9.0, 6.8867513459), (20.9282032303, 0.0), (14.0, 12.0),
+                (9.0, 12.0)]
+
+
+def _leg_region_name(failures, results):
+    """Leg 4: a joint region is named in the Polygons editor and keeps the name.
+
+    The name is what the Within list offers the region by, and the workbook keeps
+    it as the polygon block's header. The editor once had no field for it, so a
+    region drawn in Studio could only ever reach the dialog unnamed.
+    """
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+
+    from studio.editors import POLYGON_TYPE_ITEMS, PolygonEditor
+    from studio.network_dialog import BuildNetworkDialog
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+
+    def load(path):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return load_slope_data(path)
+
+    tmp = tempfile.mkdtemp(prefix='joint_region_name_')
+    try:
+        path = os.path.join(tmp, os.path.basename(FEM05_FILE))
+        shutil.copy(FEM05_FILE, path)
+        sd = load(path)
+        dlg = PolygonEditor().build(sd, None)
+        name_edit = getattr(dlg, 'name_edit', None)
+        if name_edit is None:
+            failures.append("region: the Polygons editor has no Name field for a "
+                            "joints region; FEM-5 tells the reader to name it "
+                            f"{FEM05_REGION_NAME!r}")
+            return
+        if not dlg._name_row.isHidden():
+            failures.append("region: the Name field is shown on a material polygon, "
+                            "which has no name to give")
+        dlg._add_line()
+        joints = next(i for i, (_w, k) in enumerate(POLYGON_TYPE_ITEMS)
+                      if k == 'joints')
+        dlg.type_combo.setCurrentIndex(joints)
+        if dlg._name_row.isHidden():
+            failures.append("region: the Name field stays hidden on a joints region")
+        name_edit.setText(FEM05_REGION_NAME)
+        dlg.table.replace_rows([{'x': x, 'y': y} for x, y in FEM05_REGION])
+        listed = dlg.list.item(dlg.list.currentRow()).text()
+        if FEM05_REGION_NAME not in listed:
+            failures.append(f"region: the list names the region {listed!r}")
+        PolygonEditor().apply(sd, dlg)
+        dlg.deleteLater()
+        save_slope_data_to_xlsx(sd, path)
+
+        back = load(path)
+        labels = [z.get('label') for z in back.get('joint_zones') or []]
+        if labels != [FEM05_REGION_NAME]:
+            failures.append(f"region: saved and reopened, the joint regions read "
+                            f"{labels}, not [{FEM05_REGION_NAME!r}]")
+        again = PolygonEditor().build(back, None)
+        again.list.setCurrentRow(again.list.count() - 1)
+        if again.name_edit.text() != FEM05_REGION_NAME:
+            failures.append(f"region: reopened, the Name field reads "
+                            f"{again.name_edit.text()!r}")
+        again.deleteLater()
+        net = BuildNetworkDialog(back, back.get('joint_lines') or [])
+        within = [net._region.itemText(i) for i in range(net._region.count())]
+        want = f"Joint region: {FEM05_REGION_NAME}"
+        if want not in within:
+            failures.append(f"region: Within lists {within}, not {want!r}")
+        net.deleteLater()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    results.append(f"region      a joints polygon named {FEM05_REGION_NAME!r} in the "
+                   f"Polygons editor saves, reopens with the name, and the Within "
+                   f"list offers it by name")
+
+
 def run():
     """Returns a list of failure strings (empty = pass)."""
     import time
@@ -276,6 +364,7 @@ def run():
     _leg_dialog(failures, results)
     _leg_session_memory(failures, results)
     _leg_button(failures, results)
+    _leg_region_name(failures, results)
     app.processEvents()
     print(f"Joint network dialog check ({time.time() - t0:.0f} s):")
     for line in results:

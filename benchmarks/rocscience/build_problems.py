@@ -29,6 +29,7 @@ from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 from benchmarks.tag_k0 import apply_tag_k0  # noqa: E402
+from tools.fill_reinforce_formula_cache import fill_reinforce_cache  # noqa: E402
 
 # Files these builders load purely as a GEOMETRY/FORMAT donor, then overwrite with
 # their own problem. Their elastic constants belong to THEIR problem, so they are
@@ -138,13 +139,20 @@ def save_slope_data_to_xlsx(slope_data, path):
     so every rebuild re-proves the equivalence rather than assuming it. A block over
     the pool that the derivation does NOT reproduce raises. vp068 is the recorded
     exception and sets water_loads='manual' with its reason.
+
+    The reinforce sheet's Dir/Appl cells are formulas on the row's Type; the
+    writer leaves them without a stored result, so every reader but Excel (the
+    docs sheet renders among them) would see them blank. fill_reinforce_cache
+    stores the results the formulas give (tools/fill_reinforce_formula_cache.py).
     """
     resolve_unit_system(slope_data)
     _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
     apply_tag_k0(slope_data, path)
-    return _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
+    out = _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
+    fill_reinforce_cache(path)
+    return out
 
 
 def vp002():
@@ -810,14 +818,24 @@ def vp017():
 
 
 def vp024():
-    """Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular
-    search. Slide2: Ordinary 1.439, Bishop 1.439; Low reference 1.44 both.
+    """Slide #24: Low (1989) Example 1, a 6 m cut in three undrained layers (phi=0).
+    Circular search. Slide2: Ordinary 1.439, Bishop 1.439. Low's own method gives
+    1.45 (Fig. 10, p. 220); the 1.44 the vendor manuals attribute to Low is the
+    STABR circle search (Duncan & Wong 1984) that Low printed for comparison.
 
     Geometry from the RS2 vendor .fez (`slope stability #019.fez`): three EQUAL
     4.5 m layers (crest at y=13.5, bench at y=7.5, internal boundaries at y=9
-    and y=4.5, slope break at x=33.5). Earlier this file carried unequal 5/4/5 m
-    layers with the crest at y=14; the vendor geometry makes the weak Middle
-    layer (c=20) a full 4.5 m thick rather than 4.0 m."""
+    and y=4.5, slope break at x=33.5), which is Low's own statement of the
+    example: "three horizontal clay layers each 4.5 m thick", c = 30/20/150.
+
+    The Middle layer (c = 20) carries a local element size of 0.25 m (profile
+    Size). The strength-reduction row RS2-19 runs on this file, and its
+    mechanism shears the 3 m of c = 20 clay below the base of the cut: at the
+    1.0 m global size that band is about three element rows, and the six-node
+    triangles overshoot the collapse load there (1.488 against a best circle of
+    1.435, which for a purely cohesive soil is a ceiling). At 0.25 m the band is
+    about twelve rows. The size is a mesh input only; the limit-equilibrium row
+    VP24 does not read it."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     props = [('Upper Layer', 30.0), ('Middle Layer', 20.0), ('Bottom Layer', 150.0)]
@@ -828,7 +846,8 @@ def vp024():
         sd['materials'].append(m)
     sd['profile_lines'] = [
         {'mat_id': 0, 'coords': [(0.0, 13.5), (20.0, 13.5), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)]},
-        {'mat_id': 1, 'coords': [(0.0, 9.0), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)]},
+        {'mat_id': 1, 'coords': [(0.0, 9.0), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)],
+         'size': 0.25},
         {'mat_id': 2, 'coords': [(0.0, 4.5), (60.0, 4.5)]},
     ]
     sd['max_depth'] = 0.0
@@ -1084,7 +1103,7 @@ def vp060():
     # applies the tensile/pullout envelope directly — but the FEM models each nail as
     # a bar and needs EA). E is steel (29e6 psi = 4.176e9 psf); Area is set per unit
     # width to EA/Tmax ~ 2000, the mid-range of the grouted-soil-nail convention in
-    # docs/fem/reinforcement.md (well above the ~100-200x mobilization plateau, at the
+    # docs/reinforcement/fem.md (well above the ~100-200x mobilization plateau, at the
     # stiff end wished-in-place SSRM needs). t_max is already the per-unit-width value
     # (per-nail 25918.14 lb/ft over the 5 ft spacing), so Area is per unit width too.
     E_nail = 4.176e9
@@ -1165,10 +1184,11 @@ def vp054b():
 
 
 def vp040():
-    """Slide #40 / Perry (1993) Fig. 10: homogeneous dry slope, power-curve
+    """Slide #40 / Perry (1994) Fig. 6: homogeneous dry slope, power-curve
     strength tau = A*sigma'^b (A=2, b=0.7, gamma=20), specified noncircular
-    surface (all vertices printed in Fig 40.1). The benchmark is BOTH the
-    fixed-surface FS and the published sensitivity study: A and b are swept
+    surface (all vertices printed in Fig 40.1, as rounded labels: the toe
+    (105, 3) and the vertex (80, 1) are Perry's (105, 2.8) and (80, 0.5)).
+    The benchmark is BOTH the fixed-surface FS and the published sensitivity study: A and b are swept
     +-15% (Slide's "Rel. max/min" 0.3 and 0.105 are the absolute deltas =
     15% of the means, matching Perry's Fig 40.4 axis). FS is exactly linear
     in A on a fixed dry surface; the b-sweep is strongly nonlinear. Targets:
@@ -1177,7 +1197,11 @@ def vp040():
     the fo convention for a power-curve soil). Relative sensitivities:
     xslope dFS -45%/+82% over the b range vs Slide -44%/+81%; A exactly
     +-15% in both. Locked via type=sensitivity tags (search=false: the
-    surface is specified)."""
+    surface is specified).
+
+    Limit equilibrium only. The strength-reduction row RS2-30 runs on its own
+    two files at Perry's toe (build_rs2.rs2_30 / rs2_30_split), so this file
+    carries none of the vendor's SSR exclusion areas."""
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
     m.update(name='Soil', c=0.0, phi=0.0, gamma=20.0, gamma_sat=20.0,
@@ -1200,32 +1224,6 @@ def vp040():
         {'X': 60.0, 'Y': 4.0, 'Movement': 'Free'},
         {'X': 80.0, 'Y': 1.0, 'Movement': 'Free'},
         {'X': 105.0, 'Y': 3.0, 'Movement': 'Free'},
-    ]
-    # RS2 Part IV VP40's own SSR constraint, read verbatim from the Slide2-import
-    # model `slope stability #040.fez` (SSR_polygonal_zones, three kind-1 rings =
-    # EXCLUSION areas). This file is that model -- both twins share the geometry
-    # exactly, and the strength model decides: vp040 carries Perry's power curve,
-    # which is what #040 carries, where RS2's native #030 carries a Generalized
-    # Hoek-Brown envelope fitted to the same data. The published 0.97 was produced
-    # WITH these rings, so the corpus file carries them rather than leaving the
-    # constraint on the vendor's side of the comparison.
-    #
-    # Sentinel -3 ("SSR elastic"), not -2 ("SSR hold"): the vendor does not merely
-    # hold these regions at full strength, it assigns them a linear-elastic material
-    # partition that cannot yield at all (50.65% of the domain by the vendor's own
-    # materials, 50.4% by the polygons -- the two agree, which is what identifies the
-    # partition and the polygons as one construction). On a sub-unity model a
-    # full-strength hold cannot bracket the solve; only the non-plastic hold can.
-    # Ring 3 is wholly interior, so the reducible region is a polygon with a hole --
-    # the band along Perry's specified failure surface.
-    sd['ssr_zones'] = [
-        {'kind': 'hold_elastic',
-         'polygon': [(0.0, 53.0), (0.0, -10.0), (4.0, -9.8681), (4.0, 53.0)]},
-        {'kind': 'hold_elastic',
-         'polygon': [(105.0, 2.8), (105.0, -10.0), (115.0, -10.0), (115.0, 2.8)]},
-        {'kind': 'hold_elastic',
-         'polygon': [(20.0, 16.0), (40.0, 8.0), (60.0, 4.0), (80.0, 1.0),
-                     (102.392, 4.09622), (6.53543, 51.7398)]},
     ]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp040.xlsx'))
     return 'vp040.xlsx'
@@ -1510,7 +1508,8 @@ def vp029_split():
 
     Geometrically and materially IDENTICAL to vp029 -- same submerged Bay Mud
     (c = 100 psf at el -20 growing 9.8 psf/ft, gamma = 100 pcf), same piezometric
-    line and free-water load, same circle -- except the domain is cut into the
+    line and free-water load -- except the domain carries no failure surface
+    (strength reduction only) and is cut into the
     vendor's Mohr-Coulomb band (70.755 <= x <= 350.168, 48.8% of the domain against
     the vendor's 48.9% element fraction) and the two elastic pieces outside it, which
     carry the SAME properties and are named so the runner can pass them to
@@ -1548,6 +1547,8 @@ def vp029_split():
     sd['max_depth'] = None
     gsl, domp = build_ground_surface_from_polygons(sd['polygons'])
     sd['ground_surface'], sd['domain_polygon'] = gsl, domp
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp029_split.xlsx'))
     return 'vp029_split.xlsx'
 
@@ -1796,9 +1797,7 @@ def vp032a_fem():
     it. RS2 SSR 1.15; Borges & Cardoso 1.25 / 1.19 on the two circles the
     limit-equilibrium files vp032a / vp032b carry."""
     sd = _rs2_24_slope_data(1)
-    # Inert for a strength-reduction run; vp032a's own published circle is kept so
-    # the file still opens as a complete model.
-    sd['circles'] = [{'Xo': -4.8, 'Yo': 8.0, 'Depth': 8.0 - 21.83, 'R': 21.83}]
+    sd['circles'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032a_fem.xlsx'))
     return 'vp032a_fem.xlsx'
 
@@ -1807,35 +1806,14 @@ def vp032c_fem():
     """RS2-24, Part I case 2 — the 8.75 m embankment as vendor `#024_02.fez`
     builds it. RS2 SSR 0.95; Borges & Cardoso 0.99."""
     sd = _rs2_24_slope_data(2)
-    sd['circles'] = [{'Xo': -4.8, 'Yo': 14.0, 'Depth': 14.0 - 28.8, 'R': 28.8}]
+    sd['circles'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c_fem.xlsx'))
     return 'vp032c_fem.xlsx'
 
 
-def vp033():
-    """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
-    tailings dyke (simplified probabilistic case). Cohesionless section over a
-    presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
-    surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
-    is tangent to el 270, ~19 m below the model base (~289), so it truncates at
-    the base and runs flat inside the Kca band. Slide assigns three
-    piezometric lines per-material; xslope's single line follows the lower (WT5)
-    line everywhere - bracketing both lines everywhere moves FS only 1-3%.
-
-    Geometry, material zonation and unit weights (TS gamma 20; Pf4/Pgs/Pgc/Kca
-    gamma 17) are taken from the RS2 vendor .fez (`slope stability #025.fez`):
-    the 15-vertex external boundary, the four internal material interfaces, and
-    the DIAGONAL Pgc/Kca wedge cut (233.679, 288.999)->(249.262, 295.287) - a
-    small left-hand Pgc wedge with the large Kca zone to its right. The vendor
-    file gives Clayey till (Pgc) phi = 7.5 (identical to Kca), not the earlier
-    'assumed = Pgs' phi = 34; corrected here. The same vendor model specifies the
-    elastic constants (nu = 0.4, E = 50 000 kPa on every zone), which now
-    transcribe verbatim through vendor_tcut.VENDOR_E_NU rather than being filled
-    in by soil type; see the note beside that entry for why the vendor-first pass
-    originally missed this file. Targets (composite, Bishop): Slide
-    1.305 / El-Ramly 1.31. PF deliberately not locked: published Monte Carlo
-    1.5-1.6e-3 rests on the paper's variance bookkeeping (spatial averaging),
-    which a slope-scale sigma reproduces only qualitatively."""
+def _vp033_slope_data():
+    """The vp033 model (see vp033), returned unsaved so the RS2-25 search file
+    (rs2_25_noncirc) is the same model by construction."""
     from shapely.geometry import Polygon
     from xslope.fileio import build_ground_surface_from_polygons
     sd = load_slope_data(LEVEE_POLY)   # polygon-mode base (diagonal wedge needs it)
@@ -1878,8 +1856,73 @@ def vp033():
     sd['circular'] = True
     sd['non_circ'] = []
     sd['circles'] = [{'Xo': 327.5, 'Yo': 394.0, 'Depth': 270.0, 'R': 124.0}]
+    return sd
+
+
+
+
+def vp033():
+    """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
+    tailings dyke (simplified probabilistic case). Cohesionless section over a
+    presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
+    surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
+    is tangent to el 270, ~19 m below the model base (~289), so it truncates at
+    the base and runs flat inside the Kca band. Slide assigns three
+    piezometric lines per-material; xslope's single line follows the lower (WT5)
+    line everywhere - bracketing both lines everywhere moves FS only 1-3%.
+
+    Geometry, material zonation and unit weights (TS gamma 20; Pf4/Pgs/Pgc/Kca
+    gamma 17) are taken from the RS2 vendor .fez (`slope stability #025.fez`):
+    the 15-vertex external boundary, the four internal material interfaces, and
+    the DIAGONAL Pgc/Kca wedge cut (233.679, 288.999)->(249.262, 295.287) - a
+    small left-hand Pgc wedge with the large Kca zone to its right. The vendor
+    file gives Clayey till (Pgc) phi = 7.5 (identical to Kca), not the earlier
+    'assumed = Pgs' phi = 34; corrected here. The same vendor model specifies the
+    elastic constants (nu = 0.4, E = 50 000 kPa on every zone), which now
+    transcribe verbatim through vendor_tcut.VENDOR_E_NU rather than being filled
+    in by soil type; see the note beside that entry for why the vendor-first pass
+    originally missed this file. Targets (composite, Bishop): Slide
+    1.305 / El-Ramly 1.31. PF deliberately not locked: published Monte Carlo
+    1.5-1.6e-3 rests on the paper's variance bookkeeping (spatial averaging),
+    which a slope-scale sigma reproduces only qualitatively."""
+    sd = _vp033_slope_data()
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp033.xlsx'))
     return 'vp033.xlsx'
+
+
+def rs2_25_noncirc():
+    """RS2-25 (RS2 Part I #25, the vp033 model): a non-circular Spencer search.
+
+    The strength reduction on vp033 fails on a slide no circle can follow: an
+    active scarp through the tailings sand, a flat run along the bottom of the
+    clay-shale band and a passive exit through the till past the toe. RS2-25 is
+    scored against XSLOPE's own non-circular limit equilibrium on the same
+    model, and this file carries that search's starting surface. It is a
+    separate file so that vp033 keeps Slide's circle as its one surface: the
+    VP33 limit-equilibrium row and its figure read that file.
+
+    The starting surface is nine points: a scarp from the crest slope down to
+    the band at (289.07, 289.24), the band's base to (395.44, 289.66), and an
+    exit to the ground past the toe; the two ends move along the ground
+    (Movement 'Horiz'), the interior points freely. No circle, and no
+    probabilistic spreads (VP33's sigma_phi), which a deterministic search
+    does not read."""
+    sd = _vp033_slope_data()
+    for m in sd['materials']:
+        m['sigma_phi'] = 0.0
+        # the vendor model's elastic constants, as vp033 carries them through
+        # vendor_tcut.VENDOR_E_NU (keyed by file name, so stated here)
+        m['E'], m['nu'] = 50000.0, 0.4
+    seed = [(249.346, 336.263), (269.45, 312.465), (289.07, 289.24),
+            (315.663, 289.345), (342.255, 289.45), (368.848, 289.555),
+            (395.44, 289.66), (414.53, 299.16), (434.739, 309.217)]
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [{'X': x, 'Y': y,
+                       'Movement': 'Horiz' if k in (0, len(seed) - 1) else 'Free'}
+                      for k, (x, y) in enumerate(seed)]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_25_noncirc.xlsx'))
+    return 'rs2_25_noncirc.xlsx'
 
 
 def vp034():
@@ -3007,6 +3050,8 @@ def vp087_fem():
     split along every one of them. See :func:`_lh_wall_slope_data`.
     """
     sd = _lh_wall_slope_data(joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp087_fem.xlsx'))
     return 'vp087_fem.xlsx'
 
@@ -3014,6 +3059,8 @@ def vp087_fem():
 def vp088_fem():
     """RS2-49 — fill quality (phi = 25, Ta = 22), jointed dry stack."""
     sd = _lh_wall_slope_data(fill=(0.0, 25.0), ta_of=lambda i, n: 22.0, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp088_fem.xlsx'))
     return 'vp088_fem.xlsx'
 
@@ -3021,6 +3068,8 @@ def vp088_fem():
 def vp089_fem():
     """RS2-50 — reinforcement length (L = 4.2, Ta = 11.4), jointed dry stack."""
     sd = _lh_wall_slope_data(L=4.2, ta_of=lambda i, n: 11.4, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp089_fem.xlsx'))
     return 'vp089_fem.xlsx'
 
@@ -3034,6 +3083,8 @@ def vp090_fem():
     """
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.0 if i < 7 else 7.5, joint=True,
                              ks_of=lambda i, n: 1.0e4 if i < 7 else 1.0e5)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp090_fem.xlsx'))
     return 'vp090_fem.xlsx'
 
@@ -3049,6 +3100,8 @@ def vp091_fem():
     than sharing one file.
     """
     sd = _lh_wall_slope_data(fnd=(0.0, 18.0), joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091_fem.xlsx'))
     return 'vp091_fem.xlsx'
 
@@ -3056,6 +3109,8 @@ def vp091_fem():
 def vp092_fem():
     """RS2-53 — water (piezo at y = 9 with a 3 m pond, Ta = 9.25), jointed dry stack."""
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 9.25, water=True, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp092_fem.xlsx'))
     return 'vp092_fem.xlsx'
 
@@ -3078,6 +3133,8 @@ def vp093_fem():
     VP93 model carries and what its printed Bishop 0.958 is measured on.
     """
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.6, surcharge=20.0, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093_fem.xlsx'))
     return 'vp093_fem.xlsx'
 
@@ -3086,6 +3143,8 @@ def vp094_fem():
     """RS2-55 — five 1.8 m tiers offset 0.6 m (Ta = 10.1), jointed dry stack."""
     sd = _lh_wall_slope_data(n_tiers=5, tier_h=1.8, offset=0.6,
                              ta_of=lambda i, n: 10.1, joint=True)
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp094_fem.xlsx'))
     return 'vp094_fem.xlsx'
 
@@ -3839,11 +3898,7 @@ def _vp078_variant(ground, left_x, crest_x_r, out):
     sd['max_depth'] = 0.0
     sd['gamma_water'] = 62.4
     sd['circular'] = True
-    # base-tangent seed circle (SSRM-only benchmark; the circle is not exercised
-    # by fem_ssrm, kept only so the LEM sheet is well formed)
-    crest_y = ground[-1][1]
-    R = crest_y + 30.0
-    sd['circles'] = [{'Xo': 105.0, 'Yo': R, 'Depth': 0.0, 'R': R}]
+    sd['circles'] = []
     sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, out))
     return out
@@ -4126,6 +4181,8 @@ def vp027_fem():
     sd['piezo_line'] = [(0.0, 68.0), (22.0, 67.0), (38.0, 63.0),
                         (63.027, 72.931), (83.0, 78.0), (104.0, 82.0),
                         (122.0, 85.0), (140.0, 87.0), (200.0, 93.0)]
+    sd['circles'] = []
+    sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp027_fem.xlsx'))
     return 'vp027_fem.xlsx'
 
@@ -4358,7 +4415,7 @@ def vp067c():
     """VP67 with an SSR Exclusion Area, for the constrained-SSRM head-to-head
     against RS2's published SSR 1.33.
 
-    Mechanically IDENTICAL to vp067 (same geometry, strengths, circle): the
+    Mechanically IDENTICAL to vp067 (same geometry and strengths): the
     100-ft foundation is merely split into two stacked zones at El. 81 — the
     lowest point of the USACE specified circle (Yo - R = 359 - 278 = 81) —
     'Foundation' above and 'Foundation lower' below, carrying the SAME
@@ -4369,7 +4426,6 @@ def vp067c():
     'SSR Exclusion Area' construction (Part 4 p.124, figs 67.2/67.3). E and nu
     come from the elastic classifier (same soil type -> identical in both
     zones), so they are not hand-set here. Do NOT edit vp067.xlsx."""
-    import math
     sd = load_slope_data(ACADS_1A)
     m0 = dict(sd['materials'][0]); m1 = dict(sd['materials'][0]); m2 = dict(sd['materials'][0])
     m0.update(name='Embankment', c=1780.0, phi=5.0, gamma=135.0, option='mc', u='none')
@@ -4385,8 +4441,7 @@ def vp067c():
     sd['max_depth'] = 0.0
     sd['gamma_water'] = 62.4
     sd['circular'] = True
-    R = math.hypot(101.0, 259.0)
-    sd['circles'] = [{'Xo': 101.0, 'Yo': 359.0, 'Depth': 359.0 - R, 'R': R}]
+    sd['circles'] = []
     sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp067c.xlsx'))
     return 'vp067c.xlsx'
@@ -5404,7 +5459,7 @@ BUILDERS = [
     vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018,
     vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027,
     vp027_fem, vp028a, vp028b, vp028c, vp029, vp029_split, vp030a, vp030b, vp032a,
-    vp032a_fem, vp032b, vp032c, vp032c_fem, vp033, vp034, vp035, vp036, vp037, vp039a,
+    vp032a_fem, vp032b, vp032c, vp032c_fem, vp033, rs2_25_noncirc, vp034, vp035, vp036, vp037, vp039a,
     vp039b, vp039c, vp039d, vp040, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp045a,
     vp045b, vp046, vp047, vp048, vp049, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b,
     vp055, vp056, vp057, vp058, vp059, vp060, vp061a, vp061b, vp062a, vp062b, vp063, vp064,

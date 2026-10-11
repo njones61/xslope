@@ -43,6 +43,15 @@ What is asserted, all offscreen, all against the real ``MainWindow``, the real
      own files and adds none, so a re-record never leaves an orphan behind for the
      docs build to pick up.
 
+  I. A RECORDING CANNOT READ ITS OWN ANSWERS — inside a session the kernel's
+     documentation search has the W-1 tutorial taken out (a recorded
+     documentation-questions session found W-1's account of the same questions
+     and answered from it), and outside a session the search still finds W-1.
+  J. THE LEM-1 FIGURE IS A REGISTERED SESSION — ``lem1_assistant_build`` is in
+     the registry, its name does not contain "lem01" (the screenshot producer
+     selects by substring, and a LEM-1 shot run must not start a billed
+     conversation), and a dry run of it leaves the published figure alone.
+
 Skips cleanly (exit 0) when PySide6 is not installed (engine-only install — no
 Studio layer to capture).
 """
@@ -513,6 +522,89 @@ def check_timeout(sessions, failures):
 
 
 # --------------------------------------------------------------------------- #
+# I — a recording cannot read W-1
+# --------------------------------------------------------------------------- #
+#: A query whose best hits, in the full index, are on the W-1 page itself.
+W1_QUERY = "Why do all of the limit equilibrium methods give the same factor of safety"
+
+
+def _w1_hits(search):
+    return [d["url"] for _, d in search.search(W1_QUERY, limit=20)
+            if d["url"].startswith("tutorials/w01_ai_assistant/")]
+
+
+def check_recording_cannot_read_w1(sessions, failures, tmp):
+    from studio.ai import kernel as K
+
+    name = "I. the product's search still finds W-1"
+    full = K._docs_search()
+    if full is None:
+        _ok(name, "no documentation index in this install — skipped")
+        return
+    if not _w1_hits(full):
+        _fail(failures, name, "the full index no longer returns the W-1 page "
+              "for its own question, so the exclusion below proves nothing")
+    else:
+        _ok(name)
+
+    name = "I. a session's search leaves W-1 out"
+    with sessions._docs_without() as excluded:
+        hits = _w1_hits(K._docs_search())
+    after = K._docs_search()
+    if not excluded:
+        _fail(failures, name, "nothing was excluded")
+    elif hits:
+        _fail(failures, name, "the W-1 page is still found: %s" % hits[:3])
+    elif after is not full:
+        _fail(failures, name, "the product's search was not put back afterwards")
+    else:
+        _ok(name, ", ".join(excluded))
+
+    name = "I. run_assistant_session applies it"
+    result = _run(sessions, tmp, "w1docs", ["first"])
+    if "tutorials/w01_ai_assistant/" not in (result.get("docs_excluded") or []):
+        _fail(failures, name, "the session ran with W-1 searchable: %r"
+              % result.get("docs_excluded"))
+    else:
+        _ok(name)
+
+
+# --------------------------------------------------------------------------- #
+# J — the LEM-1 figure session
+# --------------------------------------------------------------------------- #
+def check_lem1_session(sessions, failures):
+    name = "J. the LEM-1 figure is a registered session"
+    key = "lem1_assistant_build"
+    if key not in sessions.SESSIONS:
+        _fail(failures, name, "%s is not in the registry" % key)
+        return
+    if any("lem01" in k for k in sessions.SESSIONS):
+        _fail(failures, name, "a session name contains 'lem01', so a LEM-1 shot "
+              "run would start it: %s" % [k for k in sessions.SESSIONS if "lem01" in k])
+        return
+    _ok(name)
+
+    name = "J. a dry run leaves the published figure alone"
+    fig = sessions.LEM01_FIGURE
+    before = os.path.getmtime(fig) if os.path.exists(fig) else None
+    out = tempfile.mkdtemp(prefix="lem1_dry_")
+    os.environ["XSLOPE_SESSIONS_OUT"] = out
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = sessions.SESSIONS[key](dry_run=True)
+    finally:
+        os.environ.pop("XSLOPE_SESSIONS_OUT", None)
+    after = os.path.getmtime(fig) if os.path.exists(fig) else None
+    if after != before or result.get("figure"):
+        _fail(failures, name, "a dry run wrote %s" % fig)
+    elif not result.get("window_image") or not os.path.exists(result["window_image"]):
+        _fail(failures, name, "the dry run grabbed no window")
+    else:
+        _ok(name, os.path.basename(result["window_image"]))
+    shutil.rmtree(out, ignore_errors=True)
+
+
+# --------------------------------------------------------------------------- #
 def run():
     failures = []
     import tools.assistant_sessions as sessions
@@ -527,6 +619,12 @@ def run():
     check_workbook_written(sessions, failures)
     check_no_workbook_when_unchanged(sessions, failures)
     check_timeout(sessions, failures)
+    tmp = tempfile.mkdtemp(prefix="assistant_capture_ij_")
+    try:
+        check_recording_cannot_read_w1(sessions, failures, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    check_lem1_session(sessions, failures)
     return failures
 
 

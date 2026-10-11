@@ -97,7 +97,7 @@ The **distributed load** resultant force $D$ is calculated from the distributed 
 
 The **seismic force** $kW$ is calculated as a horizontal pseudo-static force acting on the slice through the center of gravity of the slice. It is assumed to act in the direction of sliding. It is equal to the seismic coefficient $k$ multiplied by the weight of the slice $W$. The seismic coefficient is a user-defined input, depending on the seismic conditions of the site.
 
-The **reinforcement force** $P$ is applied at the point $r = (x_r, y_r)$ where a reinforcement line crosses the base of the slice, in a direction resisting sliding. Its magnitude is the available tensile capacity of the line at the crossing point, interpolated from the line's capacity envelope (tensile strength, pullout development, and end anchorage — see the [reinforcement page](reinforcement.md)). Its *direction* depends on the line's **Dir** setting in the input:
+The **reinforcement force** $P$ is applied at the point $r = (x_r, y_r)$ where a reinforcement line crosses the base of the slice, in a direction resisting sliding. Its magnitude is the available tensile capacity of the line at the crossing point, interpolated from the line's capacity envelope (tensile strength, pullout development, and end anchorage — see the [reinforcement page](../reinforcement/lem.md)). Its *direction* depends on the line's **Dir** setting in the input:
 
 - **Tangent** (the default): flexible reinforcement (geosynthetics) is assumed to bend with the sliding mass so the force acts parallel to the base of the slice, i.e. $\psi = \alpha$.
 - **Axial**: rigid reinforcement (soil nails, tiebacks) carries the force along its own axis, so $\psi$ equals the inclination of the reinforcement line itself.
@@ -193,7 +193,7 @@ Note that:
 
 ### Composite Surfaces
 
-Everything above assumes that the base of every slice lies on the circle, and that assumption buys two simplifications: the moment arm of $S$ (and of $W \sin \alpha$) is the constant $R$, and the normal force $N$ points straight at the center, so it produces no moment at all and never appears. On a [composite surface](overview.md#composite-failure-surfaces) — a circle truncated at bedrock — neither is true of the slices that run along the floor. Their bases are not at radius $R$, and their normals miss the center.
+Everything above assumes that the base of every slice lies on the circle, and that assumption gives two simplifications: the moment arm of $S$ (and of $W \sin \alpha$) is the constant $R$, and the normal force $N$ points straight at the center, so it produces no moment at all and never appears. On a [composite surface](overview.md#composite-failure-surfaces) — a circle truncated at bedrock — neither is true of the slices that run along the floor. Their bases are not at radius $R$, and their normals miss the center.
 
 XSLOPE therefore uses the general moment arms, taken about the center of rotation $(X_o, Y_o)$. Writing
 
@@ -207,11 +207,11 @@ for the offsets of the slice base center from the center of rotation, the three 
 | $S$ (along the base)   | $a_S = x_r \sin \alpha - y_r \cos \alpha$     |   $R$                  |
 | $N$ (normal to the base) | $a_N = x_r \cos \alpha + y_r \sin \alpha$   |   $0$                  |
 
-The load and support moments need no generalization — they were always true moments about the center, which is precisely why the classical equation divides them by $R$. Multiplying equation (8) through by $R$ and substituting the general arms:
+The load and support moments need no generalization — they were always true moments about the center, which is why the classical equation divides them by $R$. Multiplying equation (8) through by $R$ and substituting the general arms:
 
 >$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_k + T \, a_t - \ldots}   \qquad (8a)$
 
-where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term — which is why every circular factor of safety is unchanged.
+where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term, so on a true circle equations (8) and (8a) give the same factor of safety.
 
 The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** base normal about the center. It vanishes on every slice of a true arc and it is easy to overlook, but it is not small: on the Fredlund & Krahn weak-seam benchmark ([VP22](../verification/rocscience.md#vp22)) dropping it moves Bishop's factor of safety from 1.380 to 1.189.
 
@@ -231,7 +231,7 @@ The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** b
     a **fully-submerged slope**, for example the upstream face of a dam under a full
     reservoir — $N'$ goes negative, and the shear resistance computed from it is
     meaningless. On the `earth_dam_up` sample this happens on a quarter of the slices
-    and drags the factor of safety to 0.886 against Bishop's 1.815, which is why that
+    and lowers the factor of safety to 0.886 against Bishop's 1.815, which is why that
     problem reports OMS as *n/a*. Use a method whose base normal comes from vertical
     equilibrium — Bishop, Janbu, or a complete-equilibrium method such as Spencer — for
     such cases.

@@ -51,7 +51,7 @@ import zipfile
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
-from .fileio import build_ground_surface_from_polygons
+from .fileio import build_ground_surface_from_polygons, main_sheet_cell
 from .units import GAMMA_W, units_check, normalize_unit_system
 from .water import derive_water_loads
 
@@ -593,7 +593,7 @@ def slide2_to_slope_data(d, scenario=None):
     # --- ponded water ------------------------------------------------------------
     # Slide2, like SLOPE/W, stores no ponded-water object: where the water table rises
     # above the ground surface it simply carries the water's weight. From template v22
-    # so does xslope — main!D23 = auto, and the engine derives the standing water from
+    # so does xslope — Water loads = auto, and the engine derives the standing water from
     # the model's own water definition at solve time — so the import carries the water
     # table and writes NO water distributed load. The synthesis this replaces existed
     # only to reconstruct what Slide2's solver already implied from the same line; both
@@ -761,16 +761,18 @@ def slide2_to_slope_data(d, scenario=None):
             f"the water table rises above the ground surface — that is ponded water, "
             f"and Slide2 carries its weight implicitly. So does xslope: water loads "
             f"derive automatically from the imported water definition (the main "
-            f"sheet's D23 is set to auto, and the engine measures the reservoir off "
-            f"{derived['source']} at solve time), which comes to "
+            f"sheet's Water loads cell ({main_sheet_cell('water_loads')}) is set to "
+            f"auto, and the engine measures the reservoir off {derived['source']} at "
+            f"solve time), which comes to "
             f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
             f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
             f"written to the dloads sheet, and nothing should be added there by hand")
     for note in derived["ambiguous"]:
         caveats.append(
             f"the derived water load is not trustworthy here: {note}. Check it "
-            f"against the Slide2 model, and set D23 to manual with the load typed in "
-            f"if the two pools have to be told apart")
+            f"against the Slide2 model, and set the main sheet's Water loads cell "
+            f"({main_sheet_cell('water_loads')}) to manual with the load typed in if "
+            f"the two pools have to be told apart")
 
     # Unit sanity cross-checks as caveats -- warnings, never errors (units plan phase 2).
     caveats.extend(units_check(slope_data))

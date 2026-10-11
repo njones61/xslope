@@ -56,7 +56,7 @@ XSLOPE provides two interslice force functions, selected with the `f_type` argum
 
 >>$f(x_j) = 1   \qquad (3)$
 
-  Reduces to Spencer's method; used as the regression case.
+  Reduces to Spencer's method, which makes it a check on both solvers.
 
 - **Half-sine**, `f_type='half_sine'`:
 
@@ -68,7 +68,7 @@ XSLOPE provides two interslice force functions, selected with the `f_type` argum
   crest or the toe). This is the textbook default and matches the default used by
   GeoStudio SLOPE/W, so it is the most useful choice for comparison.
 
-The computed factor of safety is famously *insensitive* to the choice of $f(x)$;
+The computed factor of safety is generally *insensitive* to the choice of $f(x)$;
 $\lambda$, on the other hand, does depend on it (see
 [Insensitivity to f(x)](#insensitivity-to-fx) below).
 
@@ -93,7 +93,7 @@ normal they return:
 The sweep starts from $Z_0 = 0$ (no force outside the first slice) and ends with a
 leftover interslice resultant $Z_n$ at the downhill end. Global **force
 equilibrium** requires that this leftover vanish, which is the first of the two
-conditions the solution closes on — the force residual $R_f$:
+conditions the solution must satisfy — the force residual $R_f$:
 
 >>$R_f = Z_n = 0   \qquad (7)$
 
@@ -180,16 +180,15 @@ $F_m(\lambda)$, the $F$ that drives the **moment** residual to zero:
 >>$R_f \left( F_f(\lambda), \lambda \right) = 0, \qquad R_m \left( F_m(\lambda), \lambda \right) = 0   \qquad (11)$
 
 The Morgenstern–Price solution is the value of $\lambda$ where the two curves meet,
-$F_f(\lambda) = F_m(\lambda)$; the common value is the factor of safety. The two
-curves cross once and nearly linearly — the system (11) on the Arai & Tagyo
-benchmark:
+$F_f(\lambda) = F_m(\lambda)$; the common value is the factor of safety. On the
+Arai & Tagyo benchmark the two curves of system (11) are nearly straight and cross
+once:
 
 ![mprice_f_vs_lambda.png](images/mprice_f_vs_lambda.png){width=700}
 
-XSLOPE uses two cooperating solvers: a bracketed crossing in the Fredlund–Krahn /
-GLE style, which is the transparent reference, and a two-dimensional Newton
-solution, which is the shipped path. Both agree to roughly $10^{-10}$ on every
-benchmark.
+XSLOPE uses two solvers: a bracketed crossing in the Fredlund–Krahn / GLE style,
+which serves as the reference, and a two-dimensional Newton solution, which XSLOPE
+runs first. Both agree to roughly $10^{-10}$ on every benchmark.
 
 ### Approach A — the bracketed crossing
 
@@ -205,16 +204,16 @@ function of $\lambda$ alone:
 
 >>$h(\lambda) = R_m \left( F_f(\lambda), \lambda \right)   \qquad (13)$
 
-whose root $h(\lambda^*) = 0$ is the solution: force and moment equilibrium both
-close there. Working through $F_f$ this way keeps the search off the moment-only
-curve $F_m(\lambda)$, which is multivalued and carries an asymptote. XSLOPE
+whose root $h(\lambda^*) = 0$ is the solution: force and moment equilibrium are
+both satisfied there. Working through $F_f$ this way keeps the search off the
+moment-only curve $F_m(\lambda)$, which is multivalued and has an asymptote. XSLOPE
 evaluates $h$ at 61 points evenly spaced over $\lambda \in [-1.5, 1.5]$, brackets
 every sign change with Brent's method to $10^{-9}$, and takes the crossing nearest
 $\lambda = 0$ — the physical one.
 
 ### Approach B — the two-dimensional Newton solution
 
-The shipped path drives both residuals to zero at once in $(F, \lambda)$. A force
+The Newton solution drives both residuals to zero at once in $(F, \lambda)$. A force
 and a moment differ in magnitude by some three orders, so each residual is first
 scaled by its own value at the starting point:
 
@@ -243,11 +242,11 @@ is built numerically instead, by forward differences,
 
 and is then carried between steps by rank-one updates with the step limited to a
 trust region — MINPACK's hybrid Powell method, reached through
-`scipy.optimize.root(method='hybr')`. This is the one structural difference from
-[Spencer's solution](spencer.md#solution-of-equilibrium-equations): Spencer's
-residuals are closed forms in $(F, \theta)$, so that solver differences nothing —
-the Jacobian it forms is the four first-order derivatives, equations (35), (36),
-(40) and (41) of that derivation, which publishes the full cascade through (63).
+`scipy.optimize.root(method='hybr')`. [Spencer's solution](spencer.md#solution-of-equilibrium-equations)
+differs here: Spencer's residuals are closed forms in $(F, \theta)$, so its Jacobian
+is formed from the four analytical first-order derivatives, equations (35), (36),
+(40) and (41) of that derivation, which gives the higher derivatives through (63)
+as well.
 
 A converged step is accepted only where both scaled residuals have vanished,
 
@@ -259,7 +258,7 @@ to Approach A's bracketed crossing. Each evaluation of (16) costs one sweep, whi
 is why the Newton path runs about three times faster than root-finding $h(\lambda)$,
 where a full $F_f$ solve is nested inside every step.
 
-**Admissibility guard.** XSLOPE rejects a solution when more than half the base
+**Base tension limit.** XSLOPE rejects a solution when more than half the base
 normals are in tension,
 
 >>$\dfrac{\# \left\{ N'_i < 0 \right\}}{n} > 0.5   \qquad (20)$
@@ -271,15 +270,15 @@ see [Interslice tension](overview.md#interslice-tension).
 
 ## Insensitivity to f(x)
 
-A hallmark of the Morgenstern–Price method is that the factor of safety is nearly
-independent of the assumed interslice force function. On a smooth circular surface
+In the Morgenstern–Price method the factor of safety is nearly independent of the
+assumed interslice force function. On a smooth circular surface
 the spread between `constant` and `half_sine` is typically a few hundredths of a
 percent. The spread is somewhat larger — up to about 2% — on **non-circular
 surfaces that run along a thin weak layer**, where the sharp kinks in the slip
-surface make the interslice force distribution matter more. This is expected
-behavior, not a defect: it reflects genuine sensitivity of the mechanism, and it
-does not shrink under refinement — on the shipped weak-layer models the spread is
-unchanged from 30 slices to 240. `constant` reproduces Spencer exactly, so the
+surface make the interslice force distribution matter more. The spread reflects a
+real sensitivity of the mechanism rather than a numerical error, and it does not
+decrease as the slices are refined: on the sample weak-layer models the spread is
+the same from 30 slices to 240. `constant` reproduces Spencer exactly, so the
 spread against Spencer is the same number. The interslice
 distribution itself (captured by $\lambda$) is more sensitive to $f(x)$ than the
 factor of safety is.
@@ -318,8 +317,8 @@ if success:
 ```
 
 The result dictionary mirrors Spencer's, with the addition of `lambda` and
-`f_type`. Because the method solves a standard slice dataframe, it inherits
-[rapid drawdown](rapid.md) and all external-load handling without any extra work.
+`f_type`. Because the method solves a standard slice dataframe, it supports
+[rapid drawdown](rapid.md) and all external loads.
 
 ## References
 

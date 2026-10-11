@@ -86,7 +86,7 @@ def _slope_data(with_pile, head_fixity='free'):
                                  (35.0, 10.0)], 'size': None},
     ]
     sd['max_depth'] = -10.0
-    sd['circles'] = [{'Xo': 17.0, 'Yo': 16.0, 'Depth': -2.0, 'R': 18.0}]
+    sd['circles'] = []
     sd['non_circ'] = []
     sd['circular'] = True
     sd['dloads'] = []

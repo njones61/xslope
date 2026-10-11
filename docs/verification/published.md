@@ -16,26 +16,17 @@ Those problems verify something the program-to-program comparisons cannot. A
 published hand calculation names its own formula, so agreement is traceable to a
 particular clause of a particular design method rather than to two codes
 happening to share an implementation. Where a manual tabulates a quantity layer
-by layer or station by station, the whole table is locked, not a single headline
+by layer or station by station, the whole table is checked, not a single headline
 number.
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
-**Match to the published value**
+Match dots and status terms follow the shared [definitions](index.md#status-terms) and
+[scoring](index.md#how-the-match-dots-are-scored).
 
-| Symbol | Meaning |
-|---|---|
-| 🟢 | within 3% of the vendor and/or reference figure |
-| 🟡 | 3–6% |
-| 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
-
-The dot scores the **match quality of what is locked**, not how much of a
-problem is built; the partial detail is in the row text. A worked example
-frequently publishes one part of a design and defers the rest, and where XSLOPE
-computes a quantity the example does not carry, that quantity is reported as
+A worked example frequently publishes one part of a design and defers the rest,
+and where XSLOPE computes a quantity the example does not carry, that quantity is reported as
 XSLOPE's own with no published counterpart and takes no dot.
 
 <div class="corpus-summary match" markdown>
@@ -86,7 +77,7 @@ with $F^{*} = 0.45$ and $\alpha = 0.8$ for these geogrids, $C = 2$ for the two
 bearing faces of a sheet, and a coverage ratio $R_c = 1.0$ for continuous
 geogrid. XSLOPE states the same resistance as a rate per unit length of line,
 $r(s) = 2(a + \sigma'_v(s)\tan\delta)$, and integrates it along the embedment
-([overburden-dependent pullout](../lem/reinforcement.md#pullout-from-the-effective-overburden)).
+([overburden-dependent pullout](../reinforcement/lem.md#pullout-from-the-effective-overburden)).
 The two are the same statement with the adhesion set to zero and
 
 >$\delta = \arctan(F^{*}\alpha) = \arctan(0.36) = 19.80°$

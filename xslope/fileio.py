@@ -143,7 +143,7 @@ POLYGON_TYPE_WORDS = {
 
 # === v12 reinforcement support-type presets (reinforce sheet, Type column) ===
 # type -> (dir, appl). The same table the sheet holds in its hidden lookup block
-# (reinforce!AB8:AD11), which its Dir and Appl formulas VLOOKUP: picking a Type
+# (reinforce!AH8:AJ11), which its Dir and Appl formulas VLOOKUP: picking a Type
 # fills both, and typing over either keeps what was typed until the Type is picked
 # again. Module level rather than local to the loader so the Studio's reinforcement
 # editor fills its Dir/Appl combos from THIS table instead of restating it -- the
@@ -176,8 +176,10 @@ def _reinf_word(value, default):
 
 
 def _opt_size_cell(df, row_idx, col_idx, where):
-    """Optional local mesh size cell. Blank -> None; a non-numeric or non-positive
-    entry is a loud error naming the block, never a silently ignored refinement."""
+    """Optional local mesh size cell. Blank -> None; a non-numeric entry is a loud
+    error naming the block. A number is read as entered: a Size of zero or less is
+    a value a mesh cannot use, and preflight's ``mesh.size_nonpositive`` names it
+    when a mesh-based analysis is checked."""
     try:
         raw = df.iloc[row_idx, col_idx]
     except IndexError:
@@ -193,10 +195,6 @@ def _opt_size_cell(df, row_idx, col_idx, where):
         raise ValueError(
             f"{where} declares a mesh Size of {raw!r}, which is not a number. "
             "Leave it blank to use the global target size.")
-    if not (val > 0):
-        raise ValueError(
-            f"{where} declares a mesh Size of {val}. It must be positive (leave it "
-            "blank to use the global target size).")
     return val
 
 
@@ -348,12 +346,8 @@ def _parse_polygon_sheet(xls, materials, template_version=20):
             if kind == 'refine':
                 # Pure meshing overlay: no material, no analysis meaning, only a
                 # local element size — so without a Size it does nothing at all.
-                if size is None:
-                    raise ValueError(
-                        f"{where} declares Type 'refine' but no Size. A refine "
-                        "polygon carries no material and no analysis meaning — its "
-                        "only effect is the local target element size, so the Size "
-                        "cell is required.")
+                # It is kept as drawn (a file saved mid-edit must reopen), the
+                # mesher skips it, and preflight's mesh.refine_zone_no_size says so.
                 refine_zones.append({'polygon': list(coords), 'size': size})
                 col += 3
                 continue
@@ -394,49 +388,17 @@ def _parse_polygon_sheet(xls, materials, template_version=20):
                 col += 3
                 continue
 
-            mat_id = raw_id - 1 if raw_id is not None else None  # 1-based -> 0-based
-            if mat_id is None or mat_id < 0 or mat_id >= len(materials):
-                _sentinels = ("" if template_version >= 21 else
-                              ", or be one of the SSR zone sentinels -1 / -2 / -3")
-                raise ValueError(
-                    f"{where} has an invalid "
-                    f"Mat ID ({mat_id_val!r}); it must reference a material in the "
-                    f"'mat' sheet (1..{len(materials)}){_sentinels}.")
+            # 1-based -> 0-based. A blank Mat ID, or one naming a row the Materials
+            # table does not have (yet), is kept as entered: a model is often drawn
+            # before its materials are typed, and preflight's
+            # geometry.material_missing names the zone when a run is checked.
+            mat_id = raw_id - 1 if raw_id is not None else None
 
             polygons.append({'polygon': poly, 'mat_id': mat_id, 'size': size})
 
         col += 3  # next block (A->D->G->...)
 
     return polygons, ssr_zones, refine_zones, joint_zones
-
-
-def _validate_polygons_no_overlap(polygons):
-    """Material zones must tile the section without overlapping — adjacent zones
-    share matching edges; a zone is never drawn on top of another. Overlapping
-    zones mesh incorrectly (a high-conductivity zone bridges over a low-
-    conductivity barrier and can inflate the seepage flowrate several-fold), so
-    reject them at load time instead of silently producing wrong results.
-
-    Touching at shared edges/vertices is fine (zero overlap area); only a positive
-    intersection area is an error.
-    """
-    tol = 1e-6
-    for i in range(len(polygons)):
-        pi = polygons[i]['polygon']
-        for j in range(i + 1, len(polygons)):
-            area = pi.intersection(polygons[j]['polygon']).area
-            if area > tol:
-                mi, mj = polygons[i].get('mat_id'), polygons[j].get('mat_id')
-                m1 = mi + 1 if mi is not None else '?'
-                m2 = mj + 1 if mj is not None else '?'
-                raise ValueError(
-                    f"Material zones overlap: polygon #{i + 1} (Mat ID {m1}) and "
-                    f"polygon #{j + 1} (Mat ID {m2}) overlap by {area:.4g} sq units. "
-                    f"Material zones must tile the section without overlapping — adjacent "
-                    f"zones share matching edges, and a zone that sits inside or cuts "
-                    f"through another (a lens, or a dam core) must be carved out of its "
-                    f"neighbor (e.g. a shell around a core is one concave polygon with a "
-                    f"notch), not drawn on top of it.")
 
 
 class PulloutProfile:
@@ -824,7 +786,7 @@ def reinforce_pullout_profile(line, slope_data, n=201):
     # The loader has already divided the entered per-element capacities by
     # Spacing; the rate is divided here for the same reason, so a discrete
     # support's envelope stays in one convention end to end.
-    spacing = float(line.get('spacing') or 1.0)
+    spacing = reinforce_spacing_divisor(line.get('spacing') or 1.0)
 
     def rate(s):
         x, y = x1 + s * dx, y1 + s * dy
@@ -932,6 +894,71 @@ SURFACE_FAMILY_OPTIONS = ('circular', 'non-circular')
 #: The cell spelling of each internal surface-family name, for the writer.
 SURFACE_FAMILY_CELL = {'circular': 'circular', 'noncircular': 'non-circular'}
 
+#: The main sheet's run-option block (column D), by the ``slope_data`` key each cell
+#: holds: the label in column C, the row on the template version that introduced the
+#: cell, and that version. Every row from D20 down moved one row lower at v25, when
+#: the 1D element size was inserted at D20 (:data:`_ELEMENT_SIZE_1D_TEMPLATE_VERSION`)
+#: -- the same one-row shift the loader and writer apply.
+MAIN_SHEET_CELLS = {
+    'lem_method': ('LEM method', 14, 19),
+    'num_slices': ('Number of slices', 15, 19),
+    'k0': ('K0 initial stress (FEM)', 16, 19),
+    'tension_srf': ('Tension SRF (FEM)', 17, 19),
+    'element_type': ('Mesh element type', 18, 19),
+    'target_size': ('Mesh target size', 19, 19),
+    'element_size_1d': ('1D element size', 20, _ELEMENT_SIZE_1D_TEMPLATE_VERSION),
+    'ssrm_f_min': ('SSRM F min', 20, 19),
+    'ssrm_f_max': ('SSRM F max', 21, 19),
+    'side_bc': ('Side BC', 22, 21),
+    'water_loads': ('Water loads', 23, _WATER_LOADS_TEMPLATE_VERSION),
+    'surface_family': ('Surface family', 24, 22),
+}
+
+
+def main_sheet_cell(key, version=None):
+    """The 'main' sheet cell that holds ``slope_data[key]`` on a template of
+    ``version`` -- the current template when ``None`` -- e.g.
+    ``main_sheet_cell('water_loads')`` is ``'D24'``, and ``'D23'`` on a v22-v24 file.
+    ``None`` when that version has no such cell.
+
+    The one place a message, a remedy or an import note looks up which cell a reader
+    should change, so none of them restates a row that the next template moves. It
+    names the cells the loader reads and the writer fills (both apply the v25 shift
+    themselves); ``test/docs_links_check.py`` holds the table to every template's own
+    labels and to the writer.
+    """
+    _label, row, since = MAIN_SHEET_CELLS[key]
+    v = SUPPORTED_TEMPLATE_VERSION if version is None else int(float(version))
+    if v < since:
+        return None
+    if key != 'element_size_1d' and row >= 20 and v >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
+        row += 1
+    return f"D{row}"
+
+
+def template_main_sheet_cell(label, template=None):
+    """The 'main' sheet cell a template itself labels ``label`` (column C, the
+    trailing colon ignored), e.g. ``'D24'`` for ``'Water loads'`` on the current
+    template; ``None`` when the workbook cannot be read or has no such row.
+
+    ``template`` is a workbook path, the bundled template by default. This reads
+    the layout off the file rather than off :data:`MAIN_SHEET_CELLS`, which is what
+    makes it the cross-check of that table.
+    """
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(template or default_template_path(), read_only=True)
+        try:
+            for row in wb['main'].iter_rows(min_col=3, max_col=3):
+                text = str(row[0].value or '').strip().rstrip(':').strip()
+                if text.lower() == label.lower():
+                    return f"D{row[0].row}"
+        finally:
+            wb.close()
+    except Exception:                                       # noqa: BLE001
+        return None
+    return None
+
 # Optional circles-sheet search window (v19, J8:K17). Each entry maps the label
 # in column J to the slope_data['search_window'] key its value in column K feeds.
 # Order IS the sheet order: the reader walks rows 8..17 positionally.
@@ -1017,13 +1044,8 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
 
         coords = _read_coords(col, col + 1)
         if is_flux:
-            block = (col - 4) // 3 + 1
-            if len(coords) < 2:
-                raise ValueError(
-                    f"Flux BC #{block} on sheet '{sheet_name}' has "
-                    f"{len(coords)} coordinate(s). A flux BC is applied over the "
-                    "edges of a polyline and needs at least 2 points."
-                )
+            # A flux polyline with fewer than two points binds no mesh edge. It is
+            # kept as entered; preflight's seep.bc_polyline_too_short names it.
             bc["specified_fluxes"].append({"flux": _bc_value(value), "coords": coords})
         elif coords:
             kind = "reservoir" if is_reservoir else "head"
@@ -1202,19 +1224,45 @@ def _parse_tseep_sheet(xls, template_version=18):
     }
 
 
-def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=True):
+def reinforce_spacing_divisor(spacing):
+    """The divisor that turns a reinforce-sheet per-element capacity into the per
+    unit width value the engines read: the Spacing where it is usable (positive),
+    1 otherwise. A zero or negative Spacing is refused by preflight's
+    ``reinforce.spacing_nonpositive``; dividing by 1 meanwhile keeps the entered
+    values intact, and the writer multiplies by the same divisor, so the file
+    round-trips exactly as typed."""
+    try:
+        s = float(spacing)
+    except (TypeError, ValueError):
+        return 1.0
+    return s if s > 0 else 1.0
+
+
+def line_load_ground_tolerance(ground_surface):
+    """How far a line load may sit from the ground surface and still be read as
+    acting on it (the loader snaps it on): 0.5% of the model height, floored at a
+    small absolute value. ``None`` when there is no ground surface. Preflight's
+    ``lload.off_ground_surface`` measures against the same number."""
+    if ground_surface is None or ground_surface.is_empty:
+        return None
+    ys = [p[1] for p in ground_surface.coords]
+    return max(1e-6, 0.005 * (max(ys) - min(ys)))
+
+
+def load_slope_data(filepath, dest=None, overwrite=False):
     """
     This function reads input data from various Excel sheets and parses it into
     structured components used throughout the slope stability analysis framework.
     It handles circular and non-circular failure surface data, reinforcement, piezometric
     lines, and distributed loads.
 
-    ``require_analysis_data=False`` loads a model that is not yet runnable — no
-    failure surfaces, no mesh, and no seepage boundary conditions (e.g. a partially
-    built model saved from an editor, or a tutorial starter file). Such a model is
-    validated on the seepage-only path (unit weights may be blank); everything else
-    is checked as usual. The default (True) keeps the analysis-entry behavior: a
-    file with none of the four is rejected.
+    The loader checks STRUCTURE only: a sheet or column the template must have, a
+    cell that cannot be read as the number or the word it has to be, a polygon that
+    cannot close. Every question about the VALUES -- no geometry yet, no materials
+    yet, a strength parameter left blank, a polyline with one point -- is a
+    preflight rule, asked when an analysis is requested
+    (:func:`xslope.preflight.preflight`), so a model saved half-built always
+    reopens.
 
     ``filepath`` is a workbook (.xlsx) or a project package (.xslz). A package is
     unpacked first and the extracted workbook loaded, because the sidecars this
@@ -1224,16 +1272,10 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     only for a package: by default it extracts to a folder named for the package,
     beside it, and raises rather than write over a folder that is already there.
 
-    Validation is enforced to ensure required geometry and material information is present:
-    - Circular failure surface: must contain at least one valid row with Xo and Yo
-    - Non-circular failure surface: required if no circular data is provided
-    - Profile lines: must contain at least one valid set, and each line must have ≥ 2 points
-    - Materials: must match the number of profile lines
-    - Piezometric line: only included if it contains ≥ 2 valid rows
-    - Distributed loads and reinforcement: each block must contain ≥ 2 valid entries
-
     Raises:
-        ValueError: if required inputs are missing or inconsistent.
+        ValueError: if the workbook cannot be read as a template: a newer template
+            version, a cell that cannot be parsed, a word outside a column's
+            vocabulary, a polygon that cannot close.
 
     Returns:
         dict: Parsed and validated global data structure for analysis
@@ -1327,13 +1369,10 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             _gamma_raw = main_df.iloc[9, 3]                     # D10
             _gamma_blank = pd.isna(_gamma_raw) or _cell_str(_gamma_raw) == ''
             if _gamma_blank:
-                if unit_system is None:
-                    raise ValueError(
-                        "The 'main' sheet declares no Units selector (D8) and no unit "
-                        "weight of water (D10). Set one or the other: with a Units "
-                        "selector the canonical gamma_w is filled automatically; "
-                        "otherwise enter it in D10.")
-                gamma_water = GAMMA_W[unit_system]              # canonical autofill
+                # No Units selector and no value: nothing to fill it from. Kept
+                # blank; preflight's water.gamma_water_missing names it at run time.
+                gamma_water = (GAMMA_W[unit_system] if unit_system is not None
+                               else None)                       # canonical autofill
             else:
                 gamma_water = float(_gamma_raw)                 # D10 always wins
                 if unit_system is None:
@@ -1404,21 +1443,15 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                     f"{_lem_raw!r} in cell D14. Expected one of: "
                     f"{', '.join(LEM_METHODS)} (or leave it blank).")
 
+        # D15-D22 are read as entered. Whether a value is usable (at least two
+        # slices, a positive K0 or mesh size, an increasing SSRM bracket) is a
+        # preflight rule for the analysis that reads it.
         num_slices_opt = _opt_num(14, 'number of slices', integer=True)   # D15
-        if num_slices_opt is not None and num_slices_opt < 2:
-            raise ValueError(
-                f"The 'main' sheet declares {num_slices_opt} slices in cell D15. "
-                "At least 2 are required (leave it blank for the default).")
 
         # -- D16 K0. At-rest lateral earth pressure coefficient for the FEM
         # initial stress state. Blank -> None -> gravity turn-on (the historical
         # initialization), so no existing model moves.
         k0 = _opt_num(15, 'K0 initial stress')
-        if k0 is not None and k0 <= 0:
-            raise ValueError(
-                f"The 'main' sheet declares K0 = {k0} in cell D16. The at-rest "
-                "coefficient must be positive (leave it blank for the gravity "
-                "turn-on initialization).")
 
         # -- D17 Tension SRF. YES/NO/blank -> True/False/None. None is NOT False:
         # it means unspecified, and the engine default (True) applies.
@@ -1444,11 +1477,6 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                     f"{_et_raw!r} in cell D18. Expected one of: "
                     f"{', '.join(MESH_ELEMENT_TYPES)} (or leave it blank).")
         target_size = _opt_num(18, 'mesh target size')                   # D19
-        if target_size is not None and target_size <= 0:
-            raise ValueError(
-                f"The 'main' sheet declares a mesh target size of {target_size} "
-                "in cell D19. It must be positive (leave it blank for the "
-                "automatic size).")
 
         # -- D20 1D element size (v25). The target edge length along the 1D
         # members -- piles and reinforcement lines. Blank means unspecified, and
@@ -1456,21 +1484,10 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         # cell at all) and a v25 file with the cell empty are the same model.
         if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
             element_size_1d = _opt_num(19, '1D element size')            # D20
-            if element_size_1d is not None and element_size_1d <= 0:
-                raise ValueError(
-                    f"The 'main' sheet declares a 1D element size of "
-                    f"{element_size_1d} in cell D20. It must be positive (leave it "
-                    "blank to subdivide the 1D members automatically).")
 
         # -- SSRM bracket (D20/D21 through v24, D21/D22 from v25).
         ssrm_f_min = _opt_num(19 + _shift, 'SSRM F min')
         ssrm_f_max = _opt_num(20 + _shift, 'SSRM F max')
-        if (ssrm_f_min is not None and ssrm_f_max is not None
-                and ssrm_f_min >= ssrm_f_max):
-            raise ValueError(
-                f"The 'main' sheet declares SSRM F min = {ssrm_f_min} "
-                f"(D{20 + _shift}) >= F max = {ssrm_f_max} (D{21 + _shift}). "
-                f"The bracket must be increasing.")
 
     # === SIDE BOUNDARY CONDITION (v21, main D22) ===
     # How the FEM restrains the left and right truncation boundaries:
@@ -1620,11 +1637,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 break
             row += 1
         
-        # Validate that we have at least 2 points
-        if len(coords) == 1:
-            raise ValueError(f"Each profile line must contain at least two points. Profile line starting at column {chr(65 + col)} has only one point.")
-        
-        if len(coords) >= 2:
+        # A line with one point is kept as entered: it bounds no zone (build_polygons
+        # skips it) and preflight's geometry.profile_line_too_short names it.
+        if coords:
             # Store as dict with coords, mat_id and the optional v21 local mesh size
             _size = (None if size_row is None else _opt_size_cell(
                 profile_df, size_row, y_col,
@@ -1637,6 +1652,13 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
 
         # Move to next profile line (skip 3 columns: A->D, D->G, etc.)
         col += 3
+
+    # A profile-line model with a blank bottom elevation (B2) still opens: the
+    # loader checks structure only. It has no zones until a bottom is entered,
+    # and preflight's geometry.bottom_elevation_missing stops a run until then.
+    _no_bottom = bool(profile_lines) and pd.isna(max_depth)
+    if _no_bottom:
+        max_depth = None
 
     # Ground surface, domain polygon, and tensile-crack line are built from the
     # unified polygon representation after materials are parsed — see below.
@@ -1701,19 +1723,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         if pd.isna(material_name) or str(material_name).strip() == '':
             break  # Stop reading when we encounter an empty material name
         
-        # For seep workflows, 'g' (unit weight) and shear strength properties are not required.
-        # A material row is considered "missing" only if EVERY property column after
-        # 'name' is empty. (Expressed position-free: a column insert can never
-        # silently narrow this check the way the old hardcoded C:X window could.)
-        props_empty = row.iloc[2:].isna().all() if mat_df.shape[1] > 2 else True
-        if props_empty:
-            # Excel row number: first data row sits just below the located header
-            excel_row = _mat_hdr + 1 + i
-            raise ValueError(
-                "CRITICAL ERROR: Material row has empty property fields. "
-                f"Material '{material_name}' (Excel row {excel_row}) has no property "
-                "values after the name column."
-            )
+        # A row carrying only a name is a material still to be filled in. It loads
+        # with every property blank; the preflight rules for unit weight, strength
+        # and conductivity name what each analysis needs from it.
 
         # Unsaturated relative-permeability model (template v11+): 'lf' (linear
         # front, kr0/h0 apply), 'vg' (van Genuchten) or 'gard' (Gardner, v14+).
@@ -1757,53 +1769,26 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         gamma_val = _num(row.get("g", 0))
         _gsat_num = pd.to_numeric(row.get('gsat'), errors='coerce')
         gamma_sat_val = float(_gsat_num) if pd.notna(_gsat_num) else None
-        if gamma_sat_val is not None and gamma_sat_val < gamma_val:
-            raise ValueError(
-                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has "
-                f"gsat = {gamma_sat_val} < g = {gamma_val}. The saturated unit weight "
-                "cannot be less than the moist unit weight; leave gsat blank to use "
-                "g throughout.")
 
+        # Strength and pore-pressure parameters are read as entered. Whether they
+        # are usable -- gsat at least g, a positive ru, the power-curve and
+        # Hoek-Brown parameters in range -- is asked by preflight when an analysis
+        # that reads them is checked (mat.gamma_sat_below_gamma, mat.ru_zero,
+        # mat.pow_params_nonpositive, mat.hb_params_invalid).
         ru_val = _num(row.get('ru', 0))
-        if u_val == 'ru' and ru_val < 0:
-            raise ValueError(
-                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
-                f"u='ru' but has a negative pore pressure ratio ru = {ru_val}.")
 
         pow_a_val = _num(row.get('powa', 0))
         pow_b_val = _num(row.get('powb', 0))
         pow_c_val = _num(row.get('powc', 0))
         pow_d_val = _num(row.get('powd', 0))
-        if option_val == 'pow' and (pow_a_val <= 0 or pow_b_val <= 0):
-            raise ValueError(
-                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
-                f"option='pow' but pow_a ({pow_a_val}) and pow_b ({pow_b_val}) must both "
-                "be positive for the envelope tau = pow_a*(sigma_n + pow_d)^pow_b + pow_c.")
 
         # Generalized Hoek-Brown (v14). mb/s/a are DERIVED from GSI/mi/D at use
         # time (xslope.hoekbrown), so only the four field-observable inputs are
-        # entered. GSI is defined on (0, 100] and D on [0, 1]; sigma_ci and mi
-        # must be positive or the envelope collapses.
+        # entered. Their ranges are preflight's mat.hb_params_invalid.
         hb_sci_val = _num(row.get('hbsci', 0))
         hb_gsi_val = _num(row.get('hbgsi', 0))
         hb_mi_val = _num(row.get('hbmi', 0))
         hb_d_val = _num(row.get('hbd', 0))
-        if option_val == 'hb':
-            if hb_sci_val <= 0 or hb_mi_val <= 0:
-                raise ValueError(
-                    f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
-                    f"option='hb' but hb_sci ({hb_sci_val}) and hb_mi ({hb_mi_val}) must "
-                    "both be positive (intact strength and the intact Hoek-Brown constant).")
-            if not (0 < hb_gsi_val <= 100):
-                raise ValueError(
-                    f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
-                    f"option='hb' but has hb_gsi = {hb_gsi_val}. The Geological Strength "
-                    "Index must lie in (0, 100].")
-            if not (0 <= hb_d_val <= 1):
-                raise ValueError(
-                    f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
-                    f"option='hb' but has hb_d = {hb_d_val}. The disturbance factor must "
-                    "lie in [0, 1] (0 = undisturbed, 1 = heavily blast-damaged).")
 
         # Tensile-strength cutoff (v16). Rankine cap on the major principal stress,
         # in stress units. BLANK -> None (no STATED cutoff: the FEM then caps each
@@ -1967,9 +1952,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     if polygons_from_sheet:
         if profile_lines:
             raise ValueError(
-                "Both the 'profile' and 'polygon' sheets contain data. Use one "
-                "geometry method, not both.")
-        _validate_polygons_no_overlap(polygons_from_sheet)
+                "Both the 'profile' and 'polygon' sheets contain data. Use only one "
+                "geometry method.")
+        # Zones that overlap are preflight's geometry.zones_overlap.
         polygons = polygons_from_sheet
         # max_depth shapes nothing here — the polygons define the domain floor, and
         # the profile sheet is not this model's geometry source. It is still a value
@@ -1982,7 +1967,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         # maximum-depth elevation nobody typed into their reports and plot extents.
         if max_depth is None or max_depth != max_depth or max_depth == 0:
             max_depth = None
-    elif profile_lines:
+    elif not _no_bottom and any(len(p['coords']) >= 2 for p in profile_lines):
         # Convert profile lines -> polygons. max_depth is used ONLY here, as the
         # bottom boundary for build_polygons (mat_id is 0-based in both).
         # build_polygons emits one zone per profile line, in line order, so the
@@ -2101,10 +2086,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             break
         row += 1
     
-    # Validate first piezometric line
-    if len(piezo_line) == 1:
-        raise ValueError("First piezometric line must contain at least two points.")
-    
+    # A line with one point is kept as entered; preflight's piezo.line_too_short
+    # names it when an analysis that reads the water is checked.
+
     # Read second piezometric line (columns D:E, starting at row 4, Excel row 4 = index 3)
     # Keep reading until we encounter an empty row
     x_col2 = 3  # Column D
@@ -2127,9 +2111,6 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             break
         row += 1
     
-    # Validate second piezometric line (only if it has data)
-    if len(piezo_line2) == 1:
-        raise ValueError("Second piezometric line must contain at least two points if provided.")
 
     # === DISTRIBUTED LOADS ===
     # Both sheets ('dloads' and the rapid-drawdown stage-2 'dloads (2)') have the
@@ -2196,14 +2177,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                     break
                 row += 1
 
-            # Validate that we have at least 2 points
-            if len(block_points) == 1:
-                raise ValueError(
-                    f"Each distributed load must contain at least two points. "
-                    f"Distributed load starting at column {chr(65 + col)} of the "
-                    f"'{sheet_name}' sheet has only one point.")
-
-            if len(block_points) >= 2:
+            # A block with one point is kept as entered; preflight's
+            # dload.line_too_short names it.
+            if block_points:
                 lines.append(block_points)
                 directions.append(_dload_direction(df, normal_col, col, sheet_name))
 
@@ -2286,7 +2262,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     circles_df = xls.parse('circles', header=1)
     raw = circles_df.dropna(subset=['Xo', 'Yo'], how='any')
     circles = []
-    for _, row in raw.iterrows():
+    for _ci, row in raw.iterrows():
         Xo = row['Xo']
         Yo = row['Yo']
         Option = row.get('Option', None)
@@ -2303,7 +2279,13 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         elif Option == 'Radius':
             Depth = Yo - R
         else:
-            raise ValueError(f"Unknown option '{Option}' for circles.")
+            _opt_txt = ('blank' if Option is None or (isinstance(Option, float)
+                                                      and pd.isna(Option))
+                        else repr(str(Option)))
+            raise ValueError(
+                f"The circle in row {_ci + 3} of the 'circles' sheet has Option "
+                f"{_opt_txt}. Option says how the circle's size is given: enter "
+                f"Depth, Intercept or Radius.")
         circle = {
             "Xo": Xo,
             "Yo": Yo,
@@ -2336,16 +2318,8 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                     f"The 'circles' sheet search window cell K{_r + 1} "
                     f"({_key}) contains {_v!r}, which is not a number. Leave it "
                     "blank if the limit does not apply.")
-        for _lo, _hi in (('entry_x_min', 'entry_x_max'),
-                         ('exit_x_min', 'exit_x_max'),
-                         ('center_box_x_min', 'center_box_x_max'),
-                         ('center_box_y_min', 'center_box_y_max')):
-            if (_lo in search_window and _hi in search_window
-                    and search_window[_lo] > search_window[_hi]):
-                raise ValueError(
-                    f"The 'circles' sheet search window has {_lo} = "
-                    f"{search_window[_lo]} > {_hi} = {search_window[_hi]}. "
-                    "Ranges must be increasing.")
+        # A range typed backwards is kept as entered; preflight's
+        # surface.search_window_reversed names it before a search.
 
     # === NON-CIRCULAR SURFACES ===
     noncirc_df = xls.parse('non-circ')
@@ -2384,12 +2358,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         if pd.isna(row.get('y1')) or pd.isna(row.get('x2')) or pd.isna(row.get('y2')):
             continue  # Skip rows with incomplete coordinate data
 
-        # If coordinates are present, check for required parameters (Tmax, Lp1, Lp2)
-        if pd.isna(row.get('tmax')) or pd.isna(row.get('lp1')) or pd.isna(row.get('lp2')):
-            raise ValueError(
-                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
-                "coordinates but missing required parameters (Tmax, Lp1, Lp2). "
-                "All three must be specified.")
+        # A blank Tmax, Lp1 or Lp2 is kept blank (NaN), never read as zero: a zero
+        # Lp is a fully anchored end. Preflight's reinforce.tmax_nonpositive and
+        # reinforce.pullout_length_missing name them at run time.
 
         # v12 support-type columns; defaults reproduce pre-v12 behavior exactly
         # (generic tensile line: tangent direction, active application).
@@ -2415,17 +2386,16 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
 
         _sp_num = pd.to_numeric(row.get('spacing'), errors='coerce')
         spacing = float(_sp_num) if pd.notna(_sp_num) else 1.0
-        if spacing <= 0:
-            raise ValueError(
-                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
-                f"Spacing = {spacing}; it must be positive (blank or 1 for geosynthetics).")
+        # The per-element capacities are divided by a USABLE spacing only. A zero
+        # or negative Spacing is kept as entered (preflight's
+        # reinforce.spacing_nonpositive refuses the run) and the capacities stay
+        # per element, so the writer, which multiplies by the same divisor, puts
+        # back exactly what was typed.
+        _div = reinforce_spacing_divisor(spacing)
 
+        # A negative Tend is preflight's reinforce.end_capacity_negative.
         tend1 = _num(row.get('tend1', 0))
         tend2 = _num(row.get('tend2', 0))
-        if tend1 < 0 or tend2 < 0:
-            raise ValueError(
-                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
-                f"a negative end anchorage capacity (Tend1 = {tend1}, Tend2 = {tend2}).")
 
         try:
             # Extract coordinates and parameters into the raw (FEM) format. All
@@ -2436,7 +2406,8 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             reinforcement_lines.append({
                 "x1": float(row['x1']), "y1": float(row['y1']),
                 "x2": float(row['x2']), "y2": float(row['y2']),
-                "t_max": float(row['tmax']) / spacing,
+                "t_max": (float(row['tmax']) / _div
+                          if pd.notna(row.get('tmax')) else float('nan')),
                 # A BLANK Tres means "no post-peak drop" — the bar is elastic-
                 # perfectly-plastic and holds its capacity once it yields. It does
                 # NOT mean zero. Zero is a legitimate, and very aggressive, entry:
@@ -2445,18 +2416,18 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 # behavior of every file that never mentions Tres. NaN carries the
                 # "unset" sense through to the FEM, which softens only where t_res
                 # is finite.
-                "t_res": (float(row['tres']) / spacing
+                "t_res": (float(row['tres']) / _div
                           if pd.notna(row.get('tres')) else float('nan')),
-                "lp1": float(row['lp1']) if not pd.isna(row['lp1']) else 0.0,
-                "lp2": float(row['lp2']) if not pd.isna(row['lp2']) else 0.0,
+                "lp1": float(row['lp1']) if pd.notna(row.get('lp1')) else float('nan'),
+                "lp2": float(row['lp2']) if pd.notna(row.get('lp2')) else float('nan'),
                 "E": float(row['e']) if pd.notna(row.get('e')) else float('nan'),
-                "area": (float(row['area']) if pd.notna(row.get('area')) else float('nan')) / spacing,
+                "area": (float(row['area']) if pd.notna(row.get('area')) else float('nan')) / _div,
                 "label": label,
                 "type": rtype,
                 "dir": direction,
                 "appl": appl,
-                "tend1": tend1 / spacing,
-                "tend2": tend2 / spacing,
+                "tend1": tend1 / _div,
+                "tend2": tend2 / _div,
                 "spacing": spacing,
                 # v27 joint (slip) option, stored as entered ('Yes' / 'No' / '')
                 # so a file round-trips blank as blank. Readers: the line is a
@@ -2506,12 +2477,8 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             label = (str(row['label']).strip()
                      if 'label' in joints_df.columns and pd.notna(row.get('label'))
                      else f"Joint {i + 1}")
-            if (pd.isna(row.get('y1')) or pd.isna(row.get('x2'))
-                    or pd.isna(row.get('y2'))):
-                raise ValueError(
-                    f"Joint line '{label}' (joints sheet, Excel row {excel_row}) has "
-                    "an x1 but not a complete pair of endpoints. All four of x1, "
-                    "y1, x2 and y2 are required.")
+            # A row with x1 but a blank y1, x2 or y2 is kept (the blank as NaN);
+            # preflight's joint.endpoints_incomplete names it.
             try:
                 joint_lines.append({
                     "label": label,
@@ -2560,9 +2527,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     if 'piles' in xls.sheet_names:
         # Header-name-driven with case-normalized headers, so the v12 column
         # regrouping (and the v11 layout) both load. The force-angle override
-        # column was dropped in v23 (never used; the direction auto-derives
-        # from the pile endpoints) — pre-v23 files may still carry it as 'qp'
-        # ('theta' in some older files) and either is honored when present.
+        # column was dropped in v23 (the angle derives from the pile end
+        # points) — pre-v23 files may still carry it as 'qp' ('theta' in some
+        # older files), and an angle entered there is kept as stated.
         piles_df = xls.parse('piles', header=1)
         piles_df.columns = [str(c).strip().lower() for c in piles_df.columns]
         _theta_col = 'qp' if 'qp' in piles_df.columns else 'theta'
@@ -2587,10 +2554,14 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 if pd.notna(row.get(_theta_col)):
                     theta_p = float(row[_theta_col])
                 else:
-                    # Auto-compute: perpendicular to pile axis (0 for vertical)
-                    dx = x2 - x1
-                    dy = y2 - y1
-                    theta_p = np.degrees(np.arctan2(dx, -dy))
+                    # Derived: the force is perpendicular to the pile, with the
+                    # higher end as the head in either entry order. A vertical
+                    # pile's angle is 0 for either slope facing; a battered
+                    # pile's depends on which way the slide moves, so it is
+                    # left None here and resolved per failure surface when the
+                    # slices are built (slice.pile_force_angle).
+                    from .slice import pile_force_angle
+                    theta_p = pile_force_angle(x1, y1, x2, y2)
                 D_pile = float(row['d']) if pd.notna(row.get('d')) else None
                 S = float(row['s']) if pd.notna(row.get('s')) else None
                 E_pile = float(row['e']) if pd.notna(row.get('e')) else None
@@ -2653,11 +2624,8 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     if 'lloads' in xls.sheet_names:
         lloads_df = xls.parse('lloads', header=1)
         lloads_df.columns = [str(c).strip().lower() for c in lloads_df.columns]
-        # Snap tolerance for "on the ground surface": 0.5% of the model height,
-        # floored to a small absolute value for degenerate geometries.
-        if not ground_surface.is_empty:
-            _gs_ys = [p[1] for p in ground_surface.coords]
-            _ll_tol = max(1e-6, 0.005 * (max(_gs_ys) - min(_gs_ys)))
+        # Snap tolerance for "on the ground surface" (line_load_ground_tolerance).
+        _ll_tol = line_load_ground_tolerance(ground_surface)
         for i, row in lloads_df.iterrows():
             excel_row = i + 3
             if pd.isna(row.get('x')):
@@ -2665,29 +2633,20 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             ll_label = (str(row['label']).strip()
                         if 'label' in lloads_df.columns and pd.notna(row.get('label'))
                         else f"Load {i + 1}")
-            if pd.isna(row.get('y')) or pd.isna(row.get('p')):
-                raise ValueError(
-                    f"Line load '{ll_label}' (lloads sheet, Excel row {excel_row}) needs "
-                    "x, y, and P; one or more are blank.")
-            ll_x, ll_y = float(row['x']), float(row['y'])
-            ll_p = float(row['p'])
-            if ll_p <= 0:
-                raise ValueError(
-                    f"Line load '{ll_label}' (lloads sheet, Excel row {excel_row}) has "
-                    f"P = {ll_p}; the magnitude must be positive (use Angle for direction).")
+            # A blank y or P is kept blank (NaN), a P of zero or less and a point
+            # off the ground surface are kept as entered: preflight's
+            # lload.incomplete, lload.magnitude_nonpositive and
+            # lload.off_ground_surface name them at run time.
+            ll_x = float(row['x'])
+            ll_y = float(row['y']) if pd.notna(row.get('y')) else float('nan')
+            ll_p = float(row['p']) if pd.notna(row.get('p')) else float('nan')
             ll_angle = float(row['angle']) if pd.notna(row.get('angle')) else -90.0
-            # The load must act on the ground surface: snap small mismatches from
-            # rounded coordinates, refuse anything farther than the tolerance.
-            if not ground_surface.is_empty:
+            # Snap small mismatches from rounded coordinates onto the ground.
+            if _ll_tol is not None and np.isfinite(ll_y):
                 _pt = Point(ll_x, ll_y)
-                _d = ground_surface.distance(_pt)
-                if _d > _ll_tol:
-                    raise ValueError(
-                        f"Line load '{ll_label}' (lloads sheet, Excel row {excel_row}) at "
-                        f"({ll_x}, {ll_y}) is {_d:.3g} away from the ground surface "
-                        f"(tolerance {_ll_tol:.3g}). Line loads must act on the ground surface.")
-                _snapped = ground_surface.interpolate(ground_surface.project(_pt))
-                ll_x, ll_y = float(_snapped.x), float(_snapped.y)
+                if ground_surface.distance(_pt) <= _ll_tol:
+                    _snapped = ground_surface.interpolate(ground_surface.project(_pt))
+                    ll_x, ll_y = float(_snapped.x), float(_snapped.y)
             line_loads.append({
                 "x": ll_x, "y": ll_y,
                 "P": ll_p,
@@ -2700,9 +2659,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     seepage_bc = _read_seep_bc_sheet(xls.parse('seep bc', header=None), 'seep bc')
     try:
         seepage_bc2 = _read_seep_bc_sheet(xls.parse('seep bc (2)', header=None), 'seep bc (2)')
-    except (ValueError, KeyError) as e:
-        if isinstance(e, ValueError) and 'Flux BC' in str(e):
-            raise
+    except (ValueError, KeyError):
         # Sheet absent (older workbook) -> no second BC set.
         seepage_bc2 = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
 
@@ -2710,55 +2667,11 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # Absent or all-blank -> None (no key, steady behavior, bit-identical to pre-v18).
     tseep = _parse_tseep_sheet(xls, template_version=_tv)
 
-    # 'seep bc (2)' is the CONSTANT-STEADY rapid-drawdown boundary set (the second of
-    # the two steady solves). There is exactly one transient timeline and it belongs
-    # to the main 'seep bc' sheet, so set 2 may carry neither a reservoir (submerged-
-    # only, inherently time-varying) boundary NOR a time-varying value (a string naming
-    # a tseep series). Reject both LOUDLY and specifically here — before the generic
-    # series-name check below — so the message names the real rule instead of a vaguer
-    # "series not defined". The alternative is a set-2 solve silently ignoring a
-    # schedule the user believed was applied.
-    for _b in seepage_bc2.get('specified_heads', []):
-        if str(_b.get('kind', 'head')).strip().lower() == 'reservoir':
-            raise ValueError(
-                "The 'seep bc (2)' sheet has a head block with type 'reservoir'. "
-                "'seep bc (2)' is the constant-steady rapid-drawdown boundary set and "
-                "cannot carry a reservoir (submerged-only, time-varying) boundary. "
-                "Reservoir boundaries — and any time-varying boundaries — belong on "
-                "the main 'seep bc' sheet.")
-    for _kind, _vk in (('specified_heads', 'head'), ('specified_fluxes', 'flux')):
-        for _b in seepage_bc2.get(_kind, []):
-            if isinstance(_b[_vk], str):
-                raise ValueError(
-                    f"The 'seep bc (2)' sheet binds a {_vk} to a time series "
-                    f"({_b[_vk]!r}). 'seep bc (2)' is the constant-steady rapid-drawdown "
-                    f"boundary set and cannot carry a time-varying (tseep series) value. "
-                    f"Enter a number here; time-varying boundaries belong on the main "
-                    f"'seep bc' sheet.")
-
-    # A seep-BC VALUE cell may name a tseep series (a time-varying head/flux). Resolve
-    # every string value now: it must match a tseep series header, else a hard error
-    # listing the available names. A string with no tseep sheet is likewise an error
-    # (there are no series to bind to) -- pre-v18 files never reach here because their
-    # value cells parse as floats.
-    _series_names = set(tseep["series"]) if tseep else set()
-    for _bcset, _label in ((seepage_bc, 'seep bc'), (seepage_bc2, 'seep bc (2)')):
-        for _kind, _vk in (('specified_heads', 'head'), ('specified_fluxes', 'flux')):
-            for _b in _bcset.get(_kind, []):
-                _v = _b[_vk]
-                if not isinstance(_v, str):
-                    continue
-                if tseep is None:
-                    raise ValueError(
-                        f"The '{_label}' sheet gives a non-numeric {_vk} value {_v!r}. "
-                        f"A time-series name is only valid when a 'tseep' sheet defines "
-                        f"series; this file has none. Enter a number, or add a tseep "
-                        f"series named {_v!r}.")
-                if _v not in _series_names:
-                    _avail = ', '.join(sorted(_series_names)) or '(none defined)'
-                    raise ValueError(
-                        f"The '{_label}' sheet binds a {_vk} to tseep series {_v!r}, "
-                        f"which is not defined. Available tseep series: {_avail}.")
+    # 'seep bc (2)' is the constant-steady rapid-drawdown boundary set, so a reservoir
+    # boundary or a time-series value on it has no meaning, and a value naming a tseep
+    # series has to name one that exists. The values are kept as entered; preflight's
+    # seep.set2_reservoir, seep.set2_time_series and seep.series_undefined name them
+    # when a seepage analysis is checked.
 
     # === VALIDATION ===
  
@@ -2772,39 +2685,14 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # define.
     if surface_family is not None and circular and len(non_circ) > 0:
         circular = surface_family == 'circular'
-    # Check if this is a seep-only analysis (has seep BCs but no slope stability surfaces)
-    has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or
-                     len(seepage_bc.get("specified_fluxes", [])) > 0 or
-                     len(seepage_bc.get("exit_face", [])) > 0)
-    # An editor load (require_analysis_data=False) of a model with no surfaces takes
-    # the same validation path: it is a seepage model in progress, so unit weights
-    # may still be blank and no failure surfaces are demanded.
-    is_seepage_only = ((has_seepage_bc or not require_analysis_data)
-                       and not circular and len(non_circ) == 0)
-    # A mesh-based run with no LEM surfaces is a seepage or FEM (SSRM) analysis;
-    # neither needs circular/non-circular failure surfaces.
-    is_mesh_analysis = mesh is not None and not circular and len(non_circ) == 0
-
-    # Only require circular/non-circular data for a pure LEM run (no seep BCs, no mesh)
-    if not is_seepage_only and not is_mesh_analysis and not circular and len(non_circ) == 0:
-        raise ValueError(
-            "Input must include circular or non-circular surface data (for a "
-            "slope-stability run), a mesh, or seepage boundary conditions (for a "
-            "seepage run).")
-    if not polygons:
-        raise ValueError("Geometry is missing: provide either the 'profile' sheet or the 'polygon' sheet.")
-    if not materials:
-        raise ValueError("Materials sheet is empty.")
-
-    # Every polygon must reference a material that exists in the 'mat' sheet. The
-    # polygon-sheet path validates this at parse time; profile-derived polygons are
-    # validated here (materials are not yet parsed when profile lines are read).
-    for poly in polygons:
-        mid = poly.get('mat_id')
-        if mid is not None and (mid < 0 or mid >= len(materials)):
-            raise ValueError(
-                f"A geometry zone references an invalid Mat ID ({mid + 1}); it must "
-                f"reference a material in the 'mat' sheet (1..{len(materials)}).")
+    # No failure surface, mesh or seepage boundary condition is demanded here. The
+    # loader answers only "is this workbook structurally readable"; whether the model
+    # carries what a given engine needs (a surface for LEM, boundary conditions for
+    # seepage) is a preflight question, asked per engine at run time. An FEM model
+    # needs none of them.
+    # No geometry, no materials, and a zone whose Mat ID names no material row are
+    # all a model still being built. They load; preflight's geometry.none_defined,
+    # mat.none_defined and geometry.material_missing name them when a run is checked.
 
     # A missing unit weight is NOT refused here. Loading answers "is this workbook
     # structurally readable" -- sheet shapes, required columns, ID references -- and
@@ -2813,31 +2701,10 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # asks it for every stability analysis (and stays silent for a seepage-only one,
     # which never reads unit weight).
 
-    # === TRANSIENT-SEEPAGE VALIDATION (only when a tseep sheet is in use) ===
+    # === TRANSIENT-SEEPAGE SCHEDULE (only when a tseep sheet is in use) ===
+    # A missing Time unit and a blank Ss or Sy are preflight's tseep.time_unit_missing
+    # and tseep.storage_nonpositive, asked when a transient run is checked.
     if tseep is not None:
-        # A transient run makes the implied TIME unit load-bearing everywhere (k is
-        # len/time, storage is 1/len, the tseep times), so it must be declared. Never
-        # guessed -- a wrong time label is worse than none.
-        if time_unit is None:
-            raise ValueError(
-                "A 'tseep' (transient seepage) sheet is in use, but no Time unit is "
-                "declared in the 'main' sheet (D8/D9 Units & Time selectors). Transient "
-                "seepage needs a declared time base; set the Time unit.")
-        # Storage parameters: Ss is required for every material; Sy is required only
-        # when the model is unconfined (an exit-face BC exists -> desaturation possible;
-        # a confined/always-saturated transient needs only Ss).
-        _unconfined = bool(seepage_bc.get('exit_face') or seepage_bc2.get('exit_face'))
-        for _m in materials:
-            if _m.get('Ss') is None:
-                raise ValueError(
-                    f"Material '{_m['name']}' has no Ss (specific storage), which is "
-                    f"required for a transient (tseep) analysis. Set Ss on every "
-                    f"material, or remove the tseep sheet for a steady run.")
-            if _unconfined and _m.get('Sy') is None:
-                raise ValueError(
-                    f"Material '{_m['name']}' has no Sy (specific yield). Sy is required "
-                    f"for an unconfined transient analysis (this model has an exit-face "
-                    f"BC, so desaturation is possible).")
         # Saved-frame schedule = union of the save_interval schedule, save_times, stage
         # times, and series breakpoints. Entries beyond the run duration are never
         # reached -- warn (not an error; the run is still valid).
@@ -2962,7 +2829,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     globals_data["time_unit"] = time_unit
     if tseep is not None:
         globals_data["tseep"] = tseep
-    if unit_system is None:
+    if unit_system is None and gamma_water is not None:
         warnings.warn(
             f"This file declares no unit system and its unit weight of water "
             f"({gamma_water:g}) matches neither the SI (~9.81) nor the Imperial "
@@ -3233,12 +3100,13 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         if _tpl_version < _WATER_LOADS_TEMPLATE_VERSION:
             raise ValueError(
                 f"Cannot save this model into a version {_tpl_version} template: it "
-                f"takes its water loads automatically (main sheet D23 = auto), and "
-                f"cell D23 does not exist before template version "
+                f"takes its water loads automatically (Water loads = auto), and the "
+                f"main sheet has no Water loads cell before template version "
                 f"{_WATER_LOADS_TEMPLATE_VERSION}. The file would load back as manual "
                 f"carrying no water load at all, losing the standing water. Save into "
-                f"the current template, or set the mode to manual and enter the water "
-                f"loads on the dloads sheet.")
+                f"the current template (Water loads is main "
+                f"{main_sheet_cell('water_loads')}), or set the mode to manual and "
+                f"enter the water loads on the dloads sheet.")
     # The workbook is built in a temporary file beside the destination and moved
     # into place only once every sheet has been written: a failure partway
     # (a None where a number was expected, a template mismatch) must not leave a
@@ -3492,7 +3360,8 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             # reader ignores it for, leaving a stale material ID in a block that has
             # no material.
             poly_u[cell_ref(_poly_matid_row, y_col)] = (
-                int(mat_id) if kind == 'material' else None)
+                int(mat_id) if kind == 'material' and mat_id is not None
+                else None)
             poly_u[cell_ref(8, y_col)] = _f(size) if size is not None else None
         else:
             if kind in ('refine', 'joints'):
@@ -3505,7 +3374,8 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                     f"{_dest_version} has no way to express. Save to a version "
                     f"{_need} (or later) template.")
             poly_u[cell_ref(_poly_matid_row, y_col)] = (
-                int(mat_id) if kind == 'material' else _sentinel_by_kind[kind])
+                (int(mat_id) if mat_id is not None else None)
+                if kind == 'material' else _sentinel_by_kind[kind])
         pts = list(coords)
         if len(pts) >= 2 and tuple(pts[0]) == tuple(pts[-1]):
             pts = pts[:-1]                                 # loader closes implicitly
@@ -3521,8 +3391,10 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
         _prof_size_row = 7 if _dest_version >= 21 else None
         _prof_coord_row = 9 if _dest_version >= 21 else 8
         prof = {}
+        # A model with no bottom elevation is saved with B2 blank, as it was
+        # loaded; preflight asks for the bottom before a run.
         md = slope_data.get('max_depth')
-        prof['B2'] = _f(md) if md is not None else 0.0
+        prof['B2'] = None if _isnan(md) else _f(md)
         for n, line in enumerate(profile_lines):              # n is 0-based
             x_col = 1 + n * 3                                  # A, D, G, ...
             y_col = x_col + 1
@@ -3551,11 +3423,14 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
         md = slope_data.get('max_depth')
         updates['profile'] = {'B2': _f(md) if md is not None else None}
         for pdict in slope_data.get('polygons') or []:
+            # A zone whose Mat ID is still blank is written with a blank Mat ID,
+            # never dropped: the loader reads it back as drawn, and preflight's
+            # geometry.material_missing asks for the material at run time.
             mat_id = pdict.get('mat_id')
-            if mat_id is None:
-                continue
             _write_poly_block(pdict['polygon'].exterior.coords, 'material',
-                              mat_id=int(mat_id) + 1, size=pdict.get('size'))
+                              mat_id=(int(mat_id) + 1 if mat_id is not None
+                                      else None),
+                              size=pdict.get('size'))
 
     # SSR zone overlays. The kind maps back to its Type word (v21) or its sentinel Mat
     # ID (v20 and earlier), so a file with zones round-trips as zones (an unknown kind
@@ -3569,14 +3444,11 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 f"{sorted(_sentinel_by_kind)}.")
         _write_poly_block(zone['polygon'], kind, size=zone.get('size'))
 
-    # v21 mesh refinement overlays. Size is required by the loader, and a zone that
-    # somehow lost it would come back as a hard load error, so refuse it here.
+    # v21 mesh refinement overlays. One with no Size yet is written with a blank
+    # Size: it reopens as drawn, the mesher skips it, and preflight's
+    # mesh.refine_zone_no_size says so.
     for zone in slope_data.get('refine_zones') or []:
-        if zone.get('size') is None:
-            raise ValueError(
-                "A mesh refinement polygon (Type 'refine') carries no Size. Its only "
-                "effect is the local target element size, so the size is required.")
-        _write_poly_block(zone['polygon'], 'refine', size=zone['size'])
+        _write_poly_block(zone['polygon'], 'refine', size=zone.get('size'))
 
     # v27 joint-network regions. The label is the block header, which is where the
     # reader takes the region's name from; a region with none gets the ordinary
@@ -3701,16 +3573,22 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 _rcol.setdefault(name, i + 1)
     for n, r in enumerate(slope_data.get('reinforcement_lines') or []):
         row = 3 + n
-        sp = float(r.get('spacing', 1.0) or 1.0)
+        # The loader divided by reinforce_spacing_divisor(Spacing); multiply back
+        # by the same number, and write Spacing itself as it was entered.
+        _sp_entered = r.get('spacing', 1.0)
+        _sp_entered = 1.0 if _isnan(_sp_entered) else float(_sp_entered)
+        sp = reinforce_spacing_divisor(_sp_entered)
         reinf[cell_ref(row, _rcol.get('#', 1))] = n + 1
         reinf[cell_ref(row, _rcol.get('label', 2))] = str(r.get('label', f"Line {n + 1}"))
         for hdr, val in (('x1', _f(r['x1'])), ('y1', _f(r['y1'])),
                          ('x2', _f(r['x2'])), ('y2', _f(r['y2'])),
-                         ('tmax', _f(r['t_max']) * sp),
-                         ('lp1', _f(r['lp1'])), ('lp2', _f(r['lp2'])),
+                         ('tmax', None if _isnan(r.get('t_max'))
+                          else _f(r['t_max']) * sp),
+                         ('lp1', None if _isnan(r.get('lp1')) else _f(r['lp1'])),
+                         ('lp2', None if _isnan(r.get('lp2')) else _f(r['lp2'])),
                          ('tend1', _f(r.get('tend1') or 0.0) * sp),
                          ('tend2', _f(r.get('tend2') or 0.0) * sp),
-                         ('spacing', sp),
+                         ('spacing', _sp_entered),
                          # unset Tres round-trips as a BLANK cell, not a literal NaN
                          ('tres', None if _isnan(r.get('t_res'))
                           else _f(r.get('t_res', 0.0)) * sp),

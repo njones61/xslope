@@ -1,9 +1,6 @@
 """Regenerate the mesh-generation figures for docs/fem/mesh.md.
 
-Four figures, each answering one question the page asks the reader to decide:
-
-  mesh_element_nodes.png   What the five element types are, and where their
-                           nodes sit — the local numbering the mesh arrays use.
+Three figures, each answering one question the page asks the reader to decide:
   mesh_tri_vs_quad.png     What the element-type choice looks like on a real
                            section: the same layered slope as tri3 and quad4.
   mesh_zone_size.png       What a per-zone Size does: a thin weak layer that the
@@ -22,6 +19,7 @@ Run from the repo root:
 import contextlib
 import io
 import os
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -171,64 +169,6 @@ def _stats(mesh):
 
 
 # --------------------------------------------------------------------------
-# 1. element types and local node numbering
-# --------------------------------------------------------------------------
-
-TRI = np.array([(0.0, 0.0), (1.0, 0.0), (0.5, 0.88)])
-QUAD = np.array([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
-
-
-def _element_schematic(kind):
-    """Corner outline plus the node coordinates in xslope's local order.
-
-    Corners come first, counterclockwise; then the midside nodes in edge order
-    (0-1, 1-2, ...); then, for quad9, the center. This is the order the mesh
-    ``elements`` array stores, so the labels are the array columns."""
-    base = TRI if kind.startswith("tri") else QUAD
-    nodes = [tuple(p) for p in base]
-    if kind in ("tri6", "quad8", "quad9"):
-        n = len(base)
-        nodes += [tuple((base[i] + base[(i + 1) % n]) / 2) for i in range(n)]
-    if kind == "quad9":
-        nodes.append(tuple(base.mean(axis=0)))
-    return base, np.array(nodes)
-
-
-def figure_element_nodes():
-    kinds = [("tri3", "3-node triangle"), ("tri6", "6-node triangle"),
-             ("quad4", "4-node quadrilateral"), ("quad8", "8-node quadrilateral"),
-             ("quad9", "9-node quadrilateral")]
-    fig_w, panel_h = 10.0, 1.95
-    fig = plt.figure(figsize=(fig_w, panel_h + 0.55), dpi=DPI)
-    for i, (kind, title) in enumerate(kinds):
-        ax = fig.add_axes((i / len(kinds) + 0.012, 0.10,
-                           1 / len(kinds) - 0.024, panel_h / (panel_h + 0.55) * 0.86))
-        outline, nodes = _element_schematic(kind)
-        ring = np.vstack([outline, outline[:1]])
-        ax.fill(ring[:, 0], ring[:, 1], color="#cfe3ee", alpha=0.85, zorder=0)
-        ax.plot(ring[:, 0], ring[:, 1], color="0.2", lw=1.4, zorder=1)
-        ax.scatter(nodes[:, 0], nodes[:, 1], s=42, color="#c0392b", zorder=3)
-        center = nodes[:len(outline)].mean(axis=0)
-        for n, (x, y) in enumerate(nodes):
-            # Push each label away from the element center so it never sits on
-            # an edge; the center node of quad9 has nowhere to go but up.
-            d = np.array([x, y]) - center
-            if np.hypot(*d) < 1e-9:
-                off = np.array([0.0, 0.16])
-            else:
-                off = 0.20 * d / np.hypot(*d)
-            ax.annotate(str(n), (x + off[0], y + off[1]), ha="center", va="center",
-                        fontsize=9.5, fontweight="bold", color="#7b241c")
-        ax.set_title(f"{kind}\n{title}", fontsize=9.5, fontweight="bold", pad=4,
-                     linespacing=1.35)
-        ax.set_aspect("equal", adjustable="box")
-        ax.set_xlim(-0.34, 1.34)
-        ax.set_ylim(-0.30, 1.38)
-        ax.axis("off")
-    _save(fig, "mesh_element_nodes.png")
-
-
-# --------------------------------------------------------------------------
 # 2. triangles vs quadrilaterals on the same section
 # --------------------------------------------------------------------------
 
@@ -323,8 +263,70 @@ def figure_refine_features():
     print(f"   target element size {target:.3f}")
 
 
+def figure_structural_coupling():
+    """FEM-2 whole mesh and two-layer detail; no solve or companion writes.
+
+    Use the program's mesh plot, retaining its default drawing, title, labels
+    and legend. Only the viewing window changes for this illustration.
+    """
+    from PIL import Image
+    from tools.make_tutorial_figures import FEM02_DONE, _fem02_mesh
+    from xslope.plot import plot_mesh
+
+    data = _quiet(load_slope_data, FEM02_DONE)
+    data.update(target_size=5.0, element_size_1d=2.5)
+    mesh = _quiet(_fem02_mesh, data)
+    edges = {tuple(sorted(int(row[i]) for i in inds))
+             for row in mesh["elements"]
+             for inds in ((0, 1, 3), (1, 2, 4), (2, 0, 5))}
+    members = np.asarray(mesh["elements_1d"], dtype=int)
+    assert all(int(t) == 3 for t in mesh["element_types_1d"])
+    assert all(tuple(sorted(row)) in edges for row in members)
+    print(f"FEM-2: {_stats(mesh)}, {len(members)} member edges; "
+          "all member nodes and edges shared with soil")
+
+    x0, x1, y0, y1 = _extent(mesh)
+    pad = PAD_FRAC * max(x1 - x0, y1 - y0)
+    windows = ((x0-pad, x1+pad, y0-pad, y1+pad), (12, 28, 6, 14))
+    panels = []
+    for window in windows:
+        height = FIG_W_IN * (window[3]-window[2]) / (window[1]-window[0]) + 1.1
+        fig = plot_mesh(mesh, materials=data["materials"],
+                        figsize=(FIG_W_IN, height))
+        ax = fig.axes[0]
+        title = ax.get_title()
+        labels = [t.get_text() for t in ax.get_legend().get_texts()]
+        ax.set_xlim(window[:2])
+        ax.set_ylim(window[2:])
+        ax.set_aspect("equal", adjustable="box")
+        assert ax.get_title() == title
+        assert [t.get_text() for t in ax.get_legend().get_texts()] == labels
+        print(title, labels, "window", window)
+        buffer = io.BytesIO()
+        fig.savefig(buffer, dpi=DPI, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+        buffer.seek(0)
+        panels.append(Image.open(buffer).convert("RGB"))
+    gap = 16
+    combined = Image.new("RGB", (max(p.width for p in panels),
+                                  sum(p.height for p in panels)+gap), "white")
+    y = 0
+    for panel in panels:
+        x = (combined.width-panel.width)//2
+        combined.paste(panel, (x, y))
+        assert combined.crop((x, y, x+panel.width, y+panel.height)).tobytes() == panel.tobytes()
+        y += panel.height + gap
+    path = os.path.join(_root(), IMAGES, "fem_structural_meshes.png")
+    combined.save(path)
+    print("wrote", path)
+
+
 def main():
-    figure_element_nodes()
+    if sys.argv[1:] == ["structural"]:
+        figure_structural_coupling()
+        return
+    if sys.argv[1:]:
+        raise SystemExit("usage: make_mesh_figures.py [structural]")
     figure_tri_vs_quad()
     figure_zone_size()
     figure_refine_features()

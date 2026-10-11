@@ -158,8 +158,8 @@ def quotes(root, needles, repo=REPO, model=None):
     that links it is walking the very model whose answer is moving, so its hit
     is almost certainly a restatement; a page that does not may be printing the
     same three digits about something else entirely.  The distinction is
-    marked, never used to drop a line — the Cai & Ugai table on FEM-3 restates a
-    verification lock on a model FEM-3 never links.
+    marked, never used to drop a line — the Cai & Ugai table on FEM-4 restates a
+    verification lock on a model FEM-4 never links.
     """
     pats = [(n, re.compile(r"(?<![\w.,\-−])" + re.escape(n) + r"(?![\d\w.])"))
             for n in needles]

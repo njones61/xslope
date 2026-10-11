@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-9 — A Tieback Wall"
-description: "Build a 30 ft soldier-pile tieback wall in XSLOPE — two grouted anchors entered as axial reinforcement with a bond length at the far end, plus the pile that carries their heads — search it for its critical wedge, solve the wedge the reference manual gives, and read what the anchors and the Appl option are worth."
+description: "Build a 30 ft soldier-pile tieback wall in XSLOPE — two grouted anchors entered as axial reinforcement with a development length at the far end, plus the pile that carries their heads — search it for its critical wedge, solve the reference manual's wedge, and measure how much the anchors and the Appl option change the factor of safety."
 ---
 
 # Tutorial LEM-9 — A Tieback Wall
@@ -12,21 +12,21 @@ centers, 15,043 and 20,527 lb per foot of wall. The soldier pile at the face car
 heads and 5,900 lb/ft of shear across any surface that cuts it. The problem comes from the Caltrans SNAILZ
 reference manual, by way of the Rocscience Slide2 verification corpus — it is
 [verification problem VP49](../verification/rocscience.md#vp49), and this page
-reproduces that row's locked values.
+reproduces the values verified there.
 
 ![A soldier-pile tieback wall: two anchor rows in two soil layers](images/lem09_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>20–25 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model a tieback wall: how to enter grouted anchors
 with the Anchor preset and per-foot-of-wall capacities, how to search for the
-critical wedge and solve a specified one, and how to read what the anchors are
-worth and the two ways their force can be applied.
+critical wedge and solve a specified one, and how to measure the anchors'
+contribution and the two ways their force can be applied.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">support types</span><span class="tg-pill">anchors</span><span class="tg-pill">piles</span><span class="tg-pill">non-circular search</span><span class="tg-pill">active vs passive</span></p>
 <div class="tgm-model" markdown>**Completed model** — [vp049.xlsx](../verification/files/rocscience/vp049.xlsx) — the same file used by [verification problem VP49](../verification/rocscience.md#vp49)</div>
@@ -58,7 +58,7 @@ it — and three things about it are different from a geogrid:
 lower one more frictional and heavier.
 
 Unit weights are pcf, cohesions psf and φ degrees; the row order is the Mat ID,
-and neither soil carries pore pressures — `u` stays `none` — so the table ends
+and neither soil has pore pressures — `u` stays `none` — so the table ends
 at φ:
 
 | name | γ | γsat | option | c | φ |
@@ -68,7 +68,7 @@ at φ:
 
 **Geometry** — a profile line is the *top* of a material layer. Layer 1 is the
 upper wedge of ground, so its line is the ground surface behind the wall; Layer 2
-runs beneath it and carries the wall face itself, a vertical run from (0, 0) to
+runs beneath it and includes the wall face itself, a vertical run from (0, 0) to
 (0, 30).
 
 **Profile Line 1 — material 1 (Layer 1):**
@@ -119,7 +119,7 @@ over two settings:
 Picking `Anchor` fills **Dir** with `Axial` — the force acts along the bar, not
 along the slip surface — and **Appl** with `Active`, meaning the capacity is an
 allowable working load applied as it stands rather than an ultimate capacity
-divided by the factor of safety. [Soil Reinforcement in LEM](../lem/reinforcement.md)
+divided by the factor of safety. [Soil Reinforcement in LEM](../reinforcement/lem.md)
 derives what each choice does to the equilibrium equations.
 
 **Dir and Appl are not entered.** Choosing a Type sets both — in the worksheet
@@ -137,23 +137,24 @@ between.
 horizontal spacing between anchors — which is why **Spacing** stays at 1: the
 division has already been done.
 
-**Lp1 = 0 is the plate.** A pullout length of zero means *fully anchored*: the
+**Lp1 = 0 represents the plate.** A pullout length of zero means *fully anchored*: the
 whole capacity is available right at that end, which is what a bearing plate on
-the wall face provides. **Lp2** is the far end's bond length — the length of grout
-it takes to develop Tmax — so the tension available tapers from full capacity down
-to zero over the last 8.87 ft of the upper anchor and the last 12.1 ft of the
-lower one. **Adhesion** and **Delta** stay blank, which is what keeps the bond lengths in
-force; they are the alternative law, where the grout's resistance would follow the
-effective overburden instead. **Tend1** and **Tend2**, the end anchorage
-capacities, are 0 because
-the plate is already expressed as Lp1 = 0.
+the wall face provides. **Lp2** is the far end's development length, the length
+of grout it takes to develop the bar's capacity at the source's bond strength of
+13,571.68 lb per foot of anchor: 120,344.9 / 13,571.68 = 8.86735 ft for the upper
+anchor and 164,217.3 / 13,571.68 = 12.1 ft for the lower. Over that length at the
+far end, the tension available tapers from full capacity down to zero.
+**Adhesion** and **Delta** stay blank, which keeps the development lengths in
+effect; they are the alternative law, where the grout's resistance would follow
+the effective overburden instead. **Tend1** and **Tend2**, the end anchorage
+capacities, are 0 because the plate is already expressed as Lp1 = 0.
 
 **Soldier pile** — a separate input, on its own sheet and its own editor, because
 a pile resists in shear and bending rather than in tension:
 
-| Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | --- | :---: | :---: |
-| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |  |  | 0.5 | 1 |
+| Label | x1 | y1 | x2 | y2 | H | Appl | D | S |
+| --- | :---: | :---: | :---: | :---: | :---: | --- | :---: | :---: |
+| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 | Active | 0.5 | 1 |
 
 A real soldier-pile wall is discrete — piles at intervals along the wall, with
 the anchors seating on them. The reference states no pile spacing; like Slide,
@@ -162,16 +163,16 @@ same way. **H** = 5900 is the reference's shear resistance, per
 foot of wall, delivered to any surface that crosses the pile axis; **S** = 1
 because the division by spacing is already in that number — a
 continuous-equivalent of the discrete row, exactly as the anchors are entered —
-and **D** = 0.5 is the pile diameter. `θp` and `Appl` stay empty, and blank
-means what this model wants: the force acts along the pile's own axis, applied
-`active` — an allowable working load, the same meaning it has on an anchor.
+and **D** = 0.5 is the pile diameter. **Appl** is `Active`, as on the anchors,
+because the 5,900 lb/ft is a stated resistance to apply as it stands, not an
+ultimate capacity to divide by the factor of safety.
 
 `H` does not have to be given. Left blank, xslope computes the limiting force
 itself by the Ito & Matsui (1975) method, which treats the soil uphill of the
 pile row as squeezing plastically through the gaps between piles and integrates
 the resulting pressure on the pile from the ground surface down to each trial
 surface. That is the route to take when the design gives a diameter and spacing
-but no resistance number, and [Piles and Concrete Piers](../lem/piles.md)
+but no resistance number, and [Piles and Concrete Piers](../piles/lem.md)
 derives it. Here the reference publishes the 5,900 lb/ft itself, so we use it
 directly.
 
@@ -185,7 +186,7 @@ manual this problem comes from, entered as three points:
 | 61 | 67.069 | Free |
 
 `Free` lets a search move a point, and the two end vertices can never leave
-the ground: the search walks an end point horizontally and re-anchors its Y to
+the ground: the search moves an end point horizontally and re-anchors its Y to
 the ground surface at the new x, so a `Free` end tracks the ground
 automatically — the behavior some programs mark with an `Auto` vertex is built
 in. In [LEM-5](lem05_weak_layer_noncircular.md) we cover the column and what the
@@ -216,13 +217,13 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The drawing at the top of this page carries the geometry, both strengths and the
+The drawing at the top of this page shows the geometry, both strengths and the
 anchor layout. Paste it into the chat box and type `Build this model`, or describe
 it:
 
 <div class="prompt-block" markdown>
 ```text
-Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), ground running 20 ft out in front at elevation 0, and a cut slope above the wall from (0, 30) through (29, 51) to (33, 53), then ground rising to (60, 66), (70, 71) and (178, 80). Layer 1 is the upper wedge above a contact from (33, 53) to (195, 26): 120 pcf, c = 600 psf, phi = 24. Layer 2 is everything below it: 130 pcf, c = 300 psf, phi = 34. Bottom of the model is elevation -20. Add two grouted tiebacks of type Anchor starting on the wall face at elevations 20 and 8, both declined 25 degrees, 35 ft and 33 ft long, with capacities of 15043.1 and 20527.2 lb per foot of wall, fully anchored at the wall end and bond lengths of 8.86735 ft and 12.1 ft at the far end. Add a vertical soldier pile at x = 0.5 from elevation 30 to elevation -7 carrying 5900 lb/ft of shear, diameter 0.5, spacing 1. Enter a non-circular failure surface through (0, 0), (37, 33.6) and (61, 67.069).
+Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), ground running 20 ft out in front at elevation 0, and a cut slope above the wall from (0, 30) through (29, 51) to (33, 53), then ground rising to (60, 66), (70, 71) and (178, 80). Layer 1 is the upper wedge above a contact from (33, 53) to (195, 26): 120 pcf, c = 600 psf, phi = 24. Layer 2 is everything below it: 130 pcf, c = 300 psf, phi = 34. Bottom of the model is elevation -20. Add two grouted tiebacks of type Anchor starting on the wall face at elevations 20 and 8, both declined 25 degrees, 35 ft and 33 ft long, with capacities of 15043.1 and 20527.2 lb per foot of wall, fully anchored at the wall end and development lengths of 8.86735 ft and 12.1 ft at the far end. Add a vertical soldier pile at x = 0.5 from elevation 30 to elevation -7 carrying 5900 lb/ft of shear, diameter 0.5, spacing 1. Enter a non-circular failure surface through (0, 0), (37, 33.6) and (61, 67.069).
 ```
 </div>
 
@@ -232,12 +233,12 @@ Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), gro
   it acts *tangent* to the slip surface — a flexible geogrid, not a grouted bar.
   If the Type column came back empty, say: *"Set the support type to Anchor on
   both reinforcement lines."*
-- **Lp1 = 0 and Lp2 is the bond length.** The plate end is fully anchored and the
-  grouted end tapers. Both pullout lengths equal, or both zero, is a different
-  anchor from this one.
+- **Lp1 = 0 and Lp2 is the development length.** The plate end is fully anchored
+  and the grouted end tapers. Both pullout lengths equal, or both zero, is a
+  different anchor from this one.
 - **The capacities are per foot of wall**, not per anchor. An anchor at 8 ft
   centers delivers an eighth of its bar capacity to each foot of wall, and the
-  numbers above already carry that division with Spacing left at 1.
+  numbers above already include that division, with Spacing left at 1.
 - **The pile is on the piles sheet, not the reinforcement sheet.** A soldier pile
   is a shear element; entering its 5,900 lb/ft as a tensile capacity would apply
   it in the wrong direction entirely.
@@ -281,8 +282,8 @@ the capacity values from `Tmax` through `Spacing`:
 ![The finished reinforce worksheet](images/lem09_sheet_reinforce.png)
 
 **Leave Dir and Appl alone.** Typing into either replaces the formula, which is
-how a preset gets overridden deliberately, and pasting blanks across them erases
-it for nothing.
+how a preset is overridden deliberately, and pasting blanks across them erases
+the formula.
 
 ### 4. The `piles` worksheet
 
@@ -307,10 +308,11 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 We build them as we did in
 [LEM-3](lem03_layered_slope.md#c-building-it-in-studio). In
-**Materials**, two rows take the table above, both unit-weight columns filled at
-the same value because there is no water in this model:
+**Materials**, set the **Show parameters for:** toggles to **LEM** alone. Two rows
+take the table above, both unit-weight columns filled at the same value because
+there is no water in this model:
 
-![The materials editor on the wall's two soils](images/lem09_studio_materials.png){width=1000}
+![The materials editor on the wall's two soils](images/lem09_studio_materials.png){width=945}
 
 In **Profile lines**, paste each layer's block from the table above as its own
 line. The lower layer's block includes the wall face — the vertical run at
@@ -330,9 +332,10 @@ preview draws the wedge running back and up from the wall toe:
 
 ### 3. Reinforcement lines
 
-Open **Reinforcement lines** in the **Inputs** tree and press **Table view** —
-the columns are the worksheet's, in the same order, so the two blocks from the
-table above paste straight in. Paste the endpoint block (`Label` through `y2`)
+Open **Reinforcement lines** in the **Inputs** tree, set its **Show parameters
+for:** toggles to **LEM** alone, and press **Table view** — the columns are the
+worksheet's, in the same order, so the two blocks from the table above paste
+straight in. Paste the endpoint block (`Label` through `y2`)
 into the first cell — the rows come with it — then set each row's **Type** to
 `anchor`, which fills **Dir** with `axial` and **Appl** with `active` on its
 own, and paste the capacity block into the first `Tmax` cell:
@@ -344,10 +347,10 @@ five groups — **Identity**, **Geometry**, **Capacity**, **Anchorage**, **Type*
 — with the list on the left labeling each line by its support type and the
 x-range it spans:
 
-![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
+![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1400}
 
-In the **Type** group the preset shows its work: **Dir** reads `axial` and
-**Appl** `active` beside the `anchor` Type; typing over either afterwards keeps
+In the **Type** group, **Dir** reads `axial` and **Appl** `active` beside the
+`anchor` Type; typing over either afterwards keeps
 what you typed, and choosing the Type again puts the preset back. The preview
 draws the anchors on the section with the selected one bold: a marker at each
 end, and one more where its capacity envelope reaches full Tmax, 8.87 ft in
@@ -357,10 +360,9 @@ between them loses nothing. Click **OK**.
 
 ### 4. The soldier pile
 
-Open **Piles** in the same tree and press **Table view**. Its columns are the
-piles worksheet's except `θp`, which Studio derives from the pile's endpoints —
-so the row from the table above pastes in as two pieces: `Label` through `H` at
-the first cell, then `D` and `S` at the `D` cell:
+Open **Piles** in the same tree, set its **Show parameters for:** toggles to
+**LEM** alone, press **Table view**, and paste the row from the table above into
+the first cell:
 
 ![The piles editor's table view on the soldier pile](images/lem09_studio_piles_table.png)
 
@@ -369,7 +371,7 @@ Press **List view** to read the row as a form — **Identity**, **Geometry**,
 this problem fills beyond the endpoints — beside the preview drawing the pile
 on the section:
 
-![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1000}
+![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1400}
 
 Click **OK**.
 
@@ -387,7 +389,7 @@ from the wall toe is the failure surface as entered.
 
 Now we search it. Click **Run LEM…** and choose **Method** =
 `Janbu (Corrected)` — the method both of this problem's references report their
-factor of safety in, so we can read our results directly against theirs — and
+factor of safety in, so the results can be compared with theirs directly — and
 **Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the wall](images/lem09_studio_run_lem.png)
@@ -399,13 +401,13 @@ factor of safety in, so we can read our results directly against theirs — and
 
 ### What the search finds
 
-The search starts from the three points the model carries and walks them, and the
+The search starts from the three points in the model and moves them, and the
 plot draws every surface it tried in gray with the one it kept in red:
 
 ![The Janbu search on the wall](images/lem09_search.png){width=1000}
 
 **FS = 1.431**, on a surface that runs from the wall toe at (0, 0) through
-(32.64, 37.52) and out at (55.05, 63.62). The kink barely bends it — the lower leg
+(32.64, 37.52) and out at (55.05, 63.62). The bend at the middle point is slight — the lower leg
 rises at 49.0° and the upper at 49.4° — so the search has straightened the manual's
 two-part wedge into what is very nearly a single plane from the toe, and pulled
 the exit point 6 ft closer to the wall.
@@ -419,10 +421,10 @@ The sliding mass weighs 119,150 lb/ft on an 84.1 ft base. The surface crosses th
 lower anchor 5.0 ft out from the face and the upper one 12.4 ft out, and both
 deliver their full capacity — 35,570 lb/ft between them, which at 25° below
 horizontal resolves into 32,238 lb/ft holding the mass back and 15,033 lb/ft
-pressing down on it. Neither crossing is anywhere near a bond zone: more than 20 ft
-of each anchor lies behind the surface, against the 8.87 ft and 12.1 ft it takes to
-develop the bar, so both are governed by the steel rather than by the grout. The
-pile adds its 5,900 lb/ft of shear where the surface passes it at the toe.
+pressing down on it. Neither crossing comes near a development length: more than
+20 ft of each anchor lies behind the surface, against the 8.87 ft and 12.1 ft it
+takes to develop the bar, so both are governed by the steel rather than by the
+grout. The pile adds its 5,900 lb/ft of shear where the surface passes it at the toe.
 
 Each method runs its own search and finds its own critical surface:
 
@@ -438,7 +440,7 @@ which a polyline does not have, so they refuse the run rather than approximate i
 Spencer and Morgenstern-Price, the two that satisfy force and moment equilibrium
 together, agree to 0.1% at 1.414 and 1.416.
 
-### Why not a circle?
+### Comparison with a circular search {#why-not-a-circle}
 
 The wedge family is a modeling choice, and we can test it. Open **Circles**
 and click **Generate starting circles…** to give the search one circular seed —
@@ -448,39 +450,43 @@ becomes a choice — and run the same Janbu auto search on `Circular`:
 ![Janbu on the best circle](images/lem09_solution_circle.png){width=1000}
 
 The best circle bottoms out deep and climbs back to the crest break, because a
-circle cannot run flat along a plane. It reads **FS = 1.473, 3% above the
+circle cannot run flat along a plane. It gives **FS = 1.473, 3% above the
 wedge's 1.431**, and the other methods agree: Spencer 1.473 against 1.414, and
 Bishop — which joins the list because a circle restores its moment arm — 1.487.
-Searched only in circles, this wall would look 3 to 4% safer than it is, and the
-non-circular family is what carries its real mechanism.
+Searched only in circles, this wall would look 3 to 4% safer than it is; the
+non-circular surface represents its mechanism better.
 
 ### The wedge the reference manual gives
 
 The three points we entered are a specified surface from the manual this problem
 comes from, and we evaluate it with a **single-surface run — no search, the
-surface exactly as typed**. Set **Analysis** to `Single surface` and raise the
-slice count to 60:
+surface exactly as typed**. Set **Analysis** to `Single surface` and **Surface**
+to `Non-circular`, and raise the slice count to 60:
 
 ![Janbu on the manual's wedge](images/lem09_solution_wedge.png){width=1000}
 
 **FS = 1.469** with Janbu's correction factor f₀ = 1.024 applied, 1.434 without
-it, and 1.439 with Spencer's method — the values
-[verification problem VP49](../verification/rocscience.md#vp49) records against
-the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 33%
-more soil than the searched surface, and takes the same 35,570 lb/ft from the
-anchors, since a crossing anywhere in the free length gives full capacity. Its
+it, and 1.439 with Spencer's method.
+[Verification problem VP49](../verification/rocscience.md#vp49) compares the 1.469
+and the 1.439 with the published solutions. The wedge carries 157,936 lb/ft on a
+90.1 ft base, 33% more soil than the searched surface, and takes the same
+35,570 lb/ft from the
+anchors, since it too crosses both outside their development lengths. Its
 lower leg leaves the toe at 42° against the search's 49°. A specified surface is a
-candidate, not an answer, which is why the search comes first.
+trial surface, not necessarily the critical one, which is why the search comes
+first.
 
-### What the tiebacks are worth
+### Effect of the tiebacks {#what-the-tiebacks-are-worth}
 
 Now we take both anchors out and search the same wall again — same soils, same
-pile, same starting points, a separate search with its own critical surface:
+pile, same starting points, a separate search with its own critical surface. In
+**Run LEM…**, set **Analysis** back to `Auto search` and the slice count back to
+40:
 
 ![Janbu on the wall with no tiebacks](images/lem09_solution_bare.png){width=1000}
 
-**FS = 0.921** against 1.431 — an unstable wall. The mechanism moves with the
-anchors, not just the number: without them the critical surface exits at
+**FS = 0.921** against 1.431 — an unstable wall. Removing the anchors changes the
+mechanism as well as the number: without them the critical surface exits at
 (41.77, 57.22) on the cut slope, 13 ft closer to the wall, and cuts 87,264 lb/ft
 of soil against 119,150.
 
@@ -499,26 +505,26 @@ The wall does not stand at all without the anchors, and the pile is worth about
 
 ### Active or passive
 
-**Appl** decides whether the capacity entered is an allowable force applied as it
+**Appl** sets whether the capacity entered is an allowable force applied as it
 stands, or an ultimate capacity that mobilizes with the soil and is therefore
 divided by the factor of safety. The
 [VP85 verification problem](../verification/rocscience.md#vp85) is the same slope
 published both ways — a 20 ft cut in saturated clay, γ = 98 pcf, c = 350 psf,
 φ = 0, with one horizontal tieback carrying 9,000 lb/ft — and each case is
-evaluated on the circle its source prints for it:
+evaluated on the circle its source prints for it, at 60 slices:
 
 | Model | Appl | XSLOPE FS |
 | --- | --- | :---: |
 | `vp085a` | Active | 1.567 |
 | `vp085b` | Passive | 1.319 |
 
-Those two answers sit on two different circles, so to isolate the setting we hold
-the surface still. On the vp085a circle — **one surface, no search, Bishop, only
-Appl changing** — active reads 1.567 and passive 1.331, against 0.914 with no
-anchor at all. Passive delivers about six-tenths of what active is worth here, and
+Those two answers are on two different circles, so to isolate the setting we fix
+the surface. On the vp085a circle — **one surface, no search, Bishop, only
+Appl changing** — active gives 1.567 and passive 1.331, against 0.914 with no
+anchor at all. Passive provides about six-tenths of the increase active provides here, and
 that fraction is not a constant, since the divisor is the factor of safety being
 solved for. Neither convention is a correction of the other, which is why the Type
-presets set it rather than leaving it to habit: `Geosynthetic`, `Tieback` and
+presets set it: `Geosynthetic`, `Tieback` and
 `Anchor` are active, `Nail` is passive.
 
 ---
@@ -529,19 +535,19 @@ This tutorial covered:
 
 - Grouted tiebacks entered with the **Anchor** preset — force along the bar's
   own axis, applied as a working load.
-- Anchorage different at the two ends: a plate at the wall face, a grout bond
-  length developing the far end.
+- Anchorage different at the two ends: a plate at the wall face, a development
+  length at the grouted far end.
 - A discrete anchor's capacity divided by its spacing into force per foot of
   wall.
 - A soldier pile as a separate shear contribution beside the tensile rows.
 - The wall searched with and without its support, and the active/passive
-  application difference measured on one held surface.
+  application difference measured on one fixed surface.
 
 **Where to go next:** in [LEM-10](lem10_global_minimum.md) we search a section
-that holds two competing mechanisms, where the surface a search returns depends
+that has two competing mechanisms, where the surface a search returns depends
 on the circle it started from. The [tutorials index](index.md) lists the series.
 [VP49](../verification/rocscience.md#vp49) catalogs this model against the
-published solutions it comes from, [Soil Reinforcement in LEM](../lem/reinforcement.md)
+published solutions it comes from, [Soil Reinforcement in LEM](../reinforcement/lem.md)
 derives the capacity envelope and the per-method equations the anchor force enters,
-and [Piles and Concrete Piers](../lem/piles.md) covers the support family the
+and [Piles and Concrete Piers](../piles/lem.md) covers the support family the
 soldier pile belongs to.

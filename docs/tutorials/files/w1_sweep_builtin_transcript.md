@@ -3,7 +3,7 @@
 Captured by `tools/assistant_sessions.py` against the live Studio assistant, offscreen.
 
 - Project: `docs/lem/files/xslope_simple_mult_layers.xlsx`
-- Provider / model: `anthropic` / `claude-opus-5`
+- Provider / model: `anthropic` / `claude-opus-5-5`
 - Confirm-before-running: off (unattended capture)
 
 ## Turn 1 — Sweep the foundation cohesion from 200 to 800 psf in steps …
@@ -12,160 +12,78 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: Sweep the foundation cohesion from 200 to 800 psf in steps of 100 psf, Spencer with a search at each step, and give me the factor of safety at each. Leave the model as it was.
 
 Ran code:
-    orig_c = slope_data['materials'][1]['c']
-    res = design_sweep({'material': 'foundation', 'property': 'c'},
-                       200, 800, steps=7, target_fs=1.5, mode='lem', method='spencer')
-    for k in res:
-        print(k, type(res[k]))
+    r = design_sweep({'material':'foundation','property':'c'}, 200, 800, steps=7, method='spencer')
+    for k,v in r.items():
+        if k not in ('fig','figure','ax'): print(k, ':', v)
+    print('foundation c after sweep:', slope_data['materials'][1]['c'])
 
 Output:
-    [🔁 iteration 1] center=(20.00, 40.00), FS=1.2471, grid=6.0000
-    [🔁 iteration 2] center=(20.00, 40.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 3] center=(20.00, 43.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 4] center=(17.00, 46.00), FS=1.2465, grid=3.0000
-    [🔁 iteration 5] center=(17.00, 46.00), FS=1.2465, grid=1.5000
-    [🔁 iteration 6] center=(18.50, 44.50), FS=1.2443, grid=1.5000
-    [🔁 iteration 7] center=(18.50, 43.00), FS=1.2441, grid=1.5000
-    [🔁 iteration 8] center=(18.50, 43.00), FS=1.2441, grid=0.7500
-    [🔁 iteration 9] center=(18.50, 43.75), FS=1.2441, grid=0.7500
-    [🔁 iteration 10] center=(18.50, 43.75), FS=1.2441, grid=0.3750
-    [✅ converged] Iter=10, FS=1.2441 (ΔFS<0.0005) at (x=18.50, y=43.75, depth=0.00), elapsed time=3.56 seconds
-    [🔁 iteration 1] center=(27.50, 47.50), FS=0.7457, grid=8.0581
-    [🔁 iteration 2] center=(19.44, 55.56), FS=0.6413, grid=8.0581
-    [🔁 iteration 3] center=(19.44, 55.56), FS=0.6413, grid=4.0291
-    [🔁 iteration 4] center=(19.44, 55.56), FS=0.6413, grid=2.0145
-    [🔁 iteration 5] center=(19.44, 55.56), FS=0.6413, grid=1.0073
-    [🔁 iteration 6] center=(19.44, 55.56), FS=0.6413, grid=0.5036
-    [🔁 iteration 7] center=(19.95, 55.05), FS=0.6404, grid=0.5036
-    [🔁 iteration 8] center=(19.95, 55.05), FS=0.6404, grid=0.2518
-    [🔁 iteration 9] center=(19.69, 54.80), FS=0.6399, grid=0.2518
-    [🔁 iteration 10] center=(19.69, 54.80), FS=0.6399, grid=0.1259
-    [🔁 iteration 11] center=(19.82, 54.68), FS=0.6397, grid=0.1259
-    [✅ converged] Iter=11, FS=0.6397 (ΔFS<0.0005) at (x=19.82, y=54.68, depth=-10.00), elapsed time=9.95 seconds
-    [⚠️ unsolved trials] Spencer could not solve 61 of 457 trial surfaces (30 admit no admissible solution, 31 solved only with an inadmissible stress state); 13 of them rank lower than the reported minimum by the moment measure.
-    [🔁 iteration 1] center=(20.00, 47.50), FS=0.8043, grid=8.6250
-    [🔁 iteration 2] center=(20.00, 38.88), FS=0.7929, grid=8.6250
-    [🔁 iteration 3] center=(20.00, 38.88), FS=0.7929, grid=4.3125
-    [🔁 iteration 4] center=(20.00, 38.88), FS=0.7929, grid=2.1562
-    [🔁 iteration 5] center=(20.00, 38.88), FS=0.7929, grid=1.0781
-    [🔁 iteration 6] center=(20.00, 37.80), FS=0.7923, grid=1.0781
-    [🔁 iteration 7] center=(20.00, 37.80), FS=0.7923, grid=0.5391
-    [🔁 iteration 8] center=(20.00, 37.80), FS=0.7923, grid=0.2695
-    [🔁 iteration 9] center=(20.00, 37.53), FS=0.7922, grid=0.2695
-    [✅ converged] Iter=9, FS=0.7922 (ΔFS<0.0005) at (x=20.00, y=37.53, depth=-10.00), elapsed time=10.26 seconds
-    [⚠️ unsolved trials] Spencer could not solve 39 of 405 trial surfaces (5 admit no admissible solution, 34 solved only with an inadmissible stress state); 4 of them rank lower than the reported minimum by the moment measure.
-    [🔁 iteration 1] center=(20.00, 32.50), FS=0.9653, grid=6.3750
-    [🔁 iteration 2] center=(20.00, 38.88), FS=0.9651, grid=6.3750
-    [🔁 iteration 3] center=(20.00, 38.88), FS=0.9651, grid=3.1875
-    [🔁 iteration 4] center=(20.00, 35.69), FS=0.9636, grid=3.1875
-    [🔁 iteration 5] center=(20.00, 35.69), FS=0.9636, grid=1.5938
-    [🔁 iteration 6] center=(20.00, 35.69), FS=0.9636, grid=0.7969
-    [🔁 iteration 7] center=(20.00, 35.69), FS=0.9636, grid=0.3984
-    [🔁 iteration 8] center=(20.00, 35.29), FS=0.9636, grid=0.3984
-    [✅ converged] Iter=8, FS=0.9636 (ΔFS<0.0005) at (x=20.00, y=35.29, depth=-10.00), elapsed time=4.56 seconds
-    [⚠️ unsolved trials] Spencer could not solve 6 of 353 trial surfaces (2 admit no admissible solution, 4 solved only with an inadmissible stress state); 0 of them rank lower than the reported minimum by the moment measure.
-    [🔁 iteration 1] center=(20.00, 32.50), FS=1.1368, grid=6.3750
-    [🔁 iteration 2] center=(20.00, 32.50), FS=1.1368, grid=3.1875
-    [🔁 iteration 3] center=(20.00, 35.69), FS=1.1352, grid=3.1875
-    [🔁 iteration 4] center=(20.00, 35.69), FS=1.1352, grid=1.5938
-    [🔁 iteration 5] center=(20.00, 35.69), FS=1.1352, grid=0.7969
-    [🔁 iteration 6] center=(20.00, 34.89), FS=1.1351, grid=0.7969
-    [🔁 iteration 7] center=(20.00, 34.89), FS=1.1351, grid=0.3984
-    [🔁 iteration 8] center=(20.00, 35.29), FS=1.1351, grid=0.3984
-    [✅ converged] Iter=8, FS=1.1351 (ΔFS<0.0005) at (x=20.00, y=35.29, depth=-10.00), elapsed time=3.71 seconds
-    [🔁 iteration 1] center=(20.00, 40.00), FS=1.2471, grid=6.0000
-    [🔁 iteration 2] center=(20.00, 40.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 3] center=(20.00, 43.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 4] center=(17.00, 46.00), FS=1.2465, grid=3.0000
-    [🔁 iteration 5] center=(17.00, 46.00), FS=1.2465, grid=1.5000
-    [🔁 iteration 6] center=(18.50, 44.50), FS=1.2443, grid=1.5000
-    [🔁 iteration 7] center=(18.50, 43.00), FS=1.2441, grid=1.5000
-    [🔁 iteration 8] center=(18.50, 43.00), FS=1.2441, grid=0.7500
-    [🔁 iteration 9] center=(18.50, 43.75), FS=1.2441, grid=0.7500
-    [🔁 iteration 10] center=(18.50, 43.75), FS=1.2441, grid=0.3750
-    [✅ converged] Iter=10, FS=1.2441 (ΔFS<0.0005) at (x=18.50, y=43.75, depth=0.00), elapsed time=3.67 seconds
-    [🔁 iteration 1] center=(20.00, 40.00), FS=1.2471, grid=6.0000
-    [🔁 iteration 2] center=(20.00, 40.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 3] center=(20.00, 43.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 4] center=(17.00, 46.00), FS=1.2465, grid=3.0000
-    [🔁 iteration 5] center=(17.00, 46.00), FS=1.2465, grid=1.5000
-    [🔁 iteration 6] center=(18.50, 44.50), FS=1.2443, grid=1.5000
-    [🔁 iteration 7] center=(18.50, 43.00), FS=1.2441, grid=1.5000
-    [🔁 iteration 8] center=(18.50, 43.00), FS=1.2441, grid=0.7500
-    [🔁 iteration 9] center=(18.50, 43.75), FS=1.2441, grid=0.7500
-    [🔁 iteration 10] center=(18.50, 43.75), FS=1.2441, grid=0.3750
-    [✅ converged] Iter=10, FS=1.2441 (ΔFS<0.0005) at (x=18.50, y=43.75, depth=0.00), elapsed time=3.59 seconds
-    [🔁 iteration 1] center=(20.00, 40.00), FS=1.2471, grid=6.0000
-    [🔁 iteration 2] center=(20.00, 40.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 3] center=(20.00, 43.00), FS=1.2471, grid=3.0000
-    [🔁 iteration 4] center=(17.00, 46.00), FS=1.2465, grid=3.0000
-    [🔁 iteration 5] center=(17.00, 46.00), FS=1.2465, grid=1.5000
-    [🔁 iteration 6] center=(18.50, 44.50), FS=1.2443, grid=1.5000
-    [🔁 iteration 7] center=(18.50, 43.00), FS=1.2441, grid=1.5000
-    [🔁 iteration 8] center=(18.50, 43.00), FS=1.2441, grid=0.7500
-    [🔁 iteration 9] center=(18.50, 43.75), FS=1.2441, grid=0.7500
-    [🔁 iteration 10] center=(18.50, 43.75), FS=1.2441, grid=0.3750
-    [✅ converged] Iter=10, FS=1.2441 (ΔFS<0.0005) at (x=18.50, y=43.75, depth=0.00), elapsed time=3.57 seconds
-    FS = 1.5 is not reached for mat:foundation:c in [200, 800] — FS spans [0.64, 1.24]. Extend the range above 800 to bracket it.
-      (not bracketed — FS spans [0.64, 1.24]; extend the range above 800 to reach FS = 1.5)
-    df <class 'pandas.core.frame.DataFrame'>
-    param <class 'str'>
-    target_fs <class 'float'>
-    crossing <class 'NoneType'>
-    crossings <class 'list'>
-    bracketed <class 'bool'>
-    fs_range <class 'tuple'>
-    direction <class 'str'>
-    extend <class 'str'>
-    message <class 'str'>
-    mode <class 'str'>
-    output <class 'str'>
-    output_label <class 'str'>
-    base_value <class 'float'>
-    runtime <class 'float'>
+      mat:foundation:c=200: FS=0.627
+        warnings: Spencer could not solve 67 of 330 trial surfaces; interslice tension on 22% of interior boundaries; line of thrust outside the slice on 40% of boundaries; Tension on the base of 2 slices near the crest
+      mat:foundation:c=300: FS=0.792
+        warnings: Spencer could not solve 11 of 347 trial surfaces; interslice tension on 15% of interior boundaries; line of thrust outside the slice on 21% of boundaries; Tension on the base of 2 slices near the crest
+      mat:foundation:c=400: FS=0.964
+        warnings: Spencer could not solve 2 of 356 trial surfaces; interslice tension on 10% of interior boundaries; line of thrust outside the slice on 12% of boundaries
+      mat:foundation:c=500: FS=1.135
+        warnings: interslice tension on 8% of interior boundaries
+      mat:foundation:c=600: FS=1.244
+        warnings: interslice tension on 15% of interior boundaries; line of thrust outside the slice on 15% of boundaries; Tension on the base of 2 slices near the crest
+      mat:foundation:c=700: FS=1.244
+        warnings: the same as the step before
+      mat:foundation:c=800: FS=1.244
+        warnings: the same as the step before
+    FS = 1.5 is not reached for mat:foundation:c in [200, 800] — FS spans [0.627, 1.24]. Extend the range above 800 to bracket it.
+      (not bracketed — FS spans [0.627, 1.24]; extend the range above 800 to reach FS = 1.5)
+    df :               param  value  ...  output      output_label
+    0  mat:foundation:c  800.0  ...      FS  Factor of Safety
+    1  mat:foundation:c  200.0  ...      FS  Factor of Safety
+    2  mat:foundation:c  300.0  ...      FS  Factor of Safety
+    3  mat:foundation:c  400.0  ...      FS  Factor of Safety
+    4  mat:foundation:c  500.0  ...      FS  Factor of Safety
+    5  mat:foundation:c  600.0  ...      FS  Factor of Safety
+    6  mat:foundation:c  700.0  ...      FS  Factor of Safety
+    7  mat:foundation:c  800.0  ...      FS  Factor of Safety
+    
+    [8 rows x 15 columns]
+    param : mat:foundation:c
+    target_fs : 1.5
+    crossing : None
+    crossings : []
+    bracketed : False
+    fs_range : (0.6269633578582114, 1.2441076756911937)
+    direction : increasing
+    extend : above 800
+    message : FS = 1.5 is not reached for mat:foundation:c in [200, 800] — FS spans [0.627, 1.24]. Extend the range above 800 to bracket it.
+    mode : lem
+    output : FS
+    output_label : Factor of Safety
+    base_value : 800.0
+    runtime : 54.4391108751297
+    foundation c after sweep: 800.0
+    [saved 1 file(s) the user can open: assistant_plot_001.png]
 
-Ran code:
-    df = res['df']
-    print(df.to_string(index=False))
-    print('foundation c now =', slope_data['materials'][1]['c'], '(was', orig_c, ')')
+[file: assistant_plot_001.png]
 
-Output:
-               param  value   rel  is_base analysis  method       fs  success msg        Xo        Yo         R output     output_label
-    mat:foundation:c  800.0 1.000     True      lem spencer 1.244108     True     18.500000 43.750000 43.750000     FS Factor of Safety
-    mat:foundation:c  200.0 0.250    False      lem spencer 0.639688     True     19.819618 54.676750 64.676750     FS Factor of Safety
-    mat:foundation:c  300.0 0.375    False      lem spencer 0.792223     True     20.000000 37.527344 47.527344     FS Factor of Safety
-    mat:foundation:c  400.0 0.500    False      lem spencer 0.963558     True     20.000000 35.289062 45.289062     FS Factor of Safety
-    mat:foundation:c  500.0 0.625    False      lem spencer 1.135100     True     20.000000 35.289062 45.289062     FS Factor of Safety
-    mat:foundation:c  600.0 0.750    False      lem spencer 1.244108     True     18.500000 43.750000 43.750000     FS Factor of Safety
-    mat:foundation:c  700.0 0.875    False      lem spencer 1.244108     True     18.500000 43.750000 43.750000     FS Factor of Safety
-    mat:foundation:c  800.0 1.000    False      lem spencer 1.244108     True     18.500000 43.750000 43.750000     FS Factor of Safety
-    foundation c now = 800.0 (was 800.0 )
+Assistant: I ran Spencer with a search at each step. The foundation cohesion is back at its original **800 psf**, so the model is unchanged.
 
-Assistant: Spencer, search at every step; foundation cohesion varied, everything else untouched.
+| Foundation c (psf) | Critical FS (Spencer) | Admissibility notes |
+|---:|---:|:--|
+| 200 | 0.627 | Spencer couldn't solve 67 of 330 trial surfaces; tension between slices on 22% of slice boundaries; line of thrust outside the slice on 40%; tension on the base of 2 slices near the crest |
+| 300 | 0.792 | 11 of 347 trial surfaces unsolved; tension between slices 15%; thrust line outside 21%; tension on the base of 2 slices near the crest |
+| 400 | 0.964 | 2 of 356 trial surfaces unsolved; tension between slices 10%; thrust line outside 12% |
+| 500 | 1.135 | Tension between slices on 8% of slice boundaries |
+| 600 | 1.244 | Tension between slices 15%; thrust line outside 15%; tension on the base of 2 slices near the crest |
+| 700 | 1.244 | Same as 600 |
+| 800 | 1.244 | Same as 600 |
 
-| foundation c (psf) | FS | critical circle (Xo, Yo, R) | Depth |
-|---:|---:|:--|---:|
-| 200 | 0.640 | (19.82, 54.68, 64.68) | -10.0 |
-| 300 | 0.792 | (20.00, 37.53, 47.53) | -10.0 |
-| 400 | 0.964 | (20.00, 35.29, 45.29) | -10.0 |
-| 500 | 1.135 | (20.00, 35.29, 45.29) | -10.0 |
-| 600 | 1.244 | (18.50, 43.75, 43.75) | 0.0 |
-| 700 | 1.244 | (18.50, 43.75, 43.75) | 0.0 |
-| 800 | 1.244 | (18.50, 43.75, 43.75) | 0.0 |
-
-Two things the numbers show:
-
-- **FS saturates at 1.244 for c ≥ 600 psf.** Below 600 the critical circle bottoms out on the rigid base at elevation -10 (deep foundation failure) and FS tracks the foundation strength almost linearly (~0.17 per 100 psf). At 600 psf and above the critical surface jumps up to Depth = 0.0 — tangent to the top of the foundation, i.e. entirely within the 400-psf embankment — so further foundation strength buys nothing. That's the measured cap, not an estimate: three different c values return the identical circle and FS.
-- **Spencer admissibility warnings on the weak-foundation steps.** At c = 200 it could not solve 61 of 457 trial surfaces (30 with no admissible solution, 31 admissible-stress failures), and 13 of those ranked below the reported minimum by the moment measure — so FS = 0.640 could be slightly optimistic. Similar but smaller counts at 300 (39 of 405, 4 ranking lower) and 400 (6 of 353, none ranking lower). The 500–800 steps were clean.
-
-FS = 1.5 is not reached anywhere in this range; it isn't reachable by foundation cohesion at all, since the embankment caps it at 1.244.
-
-Model left as it was — foundation c is back at 800 psf.
+- **Trend:** FS rises steadily from 200 to 600 psf, about 0.11 to 0.17 per 100 psf. Above 600 psf it stays flat at 1.244. I haven't checked why. A likely cause is that the critical circle moves up into the embankment once the foundation is strong enough, which would make foundation strength stop mattering. I can confirm that by printing the critical circle's depth at each step if you want.
+- **Warnings:** at every step these factors of safety are converged but not fully admissible. The run found tension between slices and, at most steps, a line of thrust outside the slice. They're worst at the low cohesions, where some trial surfaces also didn't solve. The 200–400 psf values are the least reliable.
+- **Plot:** the sweep tool also draws a reference line at FS = 1.5. You didn't ask for that target, and no step in this range reaches it. The plot of FS against cohesion is saved as `assistant_plot_001.png`.
 ```
 
-Tokens: input 58,106 · cached_input 31,702 · output 1,699 · calls 3 · 67.7s
+Tokens: input 40,377 · cached_input 19,568 · output 1,193 · calls 2 · 66.9s
 
 ## Session total
 
-- Tokens: input 58,106 · cached_input 31,702 · output 1,699 · calls 3
-- Wall time: 73.3s
+- Tokens: input 40,377 · cached_input 19,568 · output 1,193 · calls 2
+- Wall time: 69.8s

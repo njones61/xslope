@@ -157,13 +157,22 @@ def _user_agent():
 # The response
 # ---------------------------------------------------------------------------
 
-def parse_models(provider, payload):
+def parse_models(provider, payload, today=None):
     """Model ids out of one provider's list response. Never raises.
 
     Anything that is not the shape this provider documents — a list where an
     object was promised, an entry with no id — is skipped rather than failing the
     whole enumeration.
+
+    A row whose ``shutdown_date`` (OpenAI's listing carries one, as an ISO date)
+    is today or earlier is skipped too: OpenAI keeps retired models in its list,
+    and every one tried answered "does not exist" or "has been deprecated" on the
+    first message — gpt-5-codex and the gpt-5.1/5.2 codex models, the *-chat-
+    latest aliases. ``today`` (an ISO date) is for the check; it defaults to the
+    current date.
     """
+    import datetime as _dt
+    cutoff = str(today or _dt.date.today().isoformat())[:10]
     style = (LISTING.get(provider) or {}).get("style", "openai")
     if not isinstance(payload, dict):
         return []
@@ -186,6 +195,9 @@ def parse_models(provider, payload):
     for row in rows:
         value = None
         if isinstance(row, dict):
+            gone = row.get("shutdown_date")
+            if isinstance(gone, str) and gone.strip() and gone.strip()[:10] <= cutoff:
+                continue
             for key in key_order:
                 if isinstance(row.get(key), str) and row[key].strip():
                     value = row[key].strip()
@@ -453,10 +465,16 @@ def resolve_models(provider, live=None, cached=None, static=None):
     """
     if static is None:
         static = PROVIDERS.get(provider, {}).get("models") or []
+    # A provider whose list-models endpoint leaves models out (Z.ai lists its
+    # text models and the GLM-5.3 Flash pair, and none of its V models) keeps
+    # the shipped ids the endpoint did not name, after the ones it did — so the
+    # V models still appear once the endpoint answers.
+    incomplete = bool(PROVIDERS.get(provider, {}).get("listing_incomplete"))
     for models, source in ((live, "live"), (cached, "cache"), (static, "static")):
         if models:
             out, seen = [], set()
-            for m in models:
+            extra = static if incomplete and source != "static" else []
+            for m in list(models) + list(extra):
                 m = str(m).strip()
                 if m and m not in seen:
                     seen.add(m)

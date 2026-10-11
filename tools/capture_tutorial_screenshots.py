@@ -148,13 +148,43 @@ def _mat_table(dlg, through="u"):
     hh = tbl.horizontalHeader()
     col = [f.key for f in MaterialsEditor.FIELDS].index(through)
     rows = sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
-    # Twice: the first resize takes the slack out of the layout's stretches, and
-    # the chrome measured against a roomy dialog is larger than the chrome of the
-    # tight one it produces. The second pass measures the tight one.
-    for _ in range(2):
+    # Until the size stops changing: the first resize takes the slack out of the
+    # layout's stretches, and the chrome measured against a roomy dialog is larger
+    # than the chrome of the tight one it produces. The later passes measure the
+    # tight one (the first editor a run opens can need a third).
+    for _ in range(4):
         w = (hh.sectionPosition(col) + hh.sectionSize(col)
              + (dlg.width() - tbl.viewport().width()))
-        dlg.resize(w, rows + (dlg.height() - tbl.viewport().height()))
+        size = (w, rows + (dlg.height() - tbl.viewport().height()))
+        if (dlg.width(), dlg.height()) == size:
+            break
+        dlg.resize(*size)
+        _settle()
+    return dlg
+
+
+def _fit_material_form(dlg, width, height):
+    """Size a materials editor in its LIST view so the whole form shows.
+
+    ``height`` is the floor: the plots beside the form need room of their own. The
+    form itself is measured, not guessed: which groups it carries follows the
+    usage toggles and the material's options, and a fixed height that is too
+    short cuts the form off mid-field at the scroll.
+    """
+    from PySide6.QtWidgets import QGroupBox, QScrollArea
+
+    dlg.resize(width, height)
+    dlg.show()
+    _settle()
+    scroll = next(sa for sa in dlg._list_view.findChildren(QScrollArea)
+                  if sa.widget() is not None
+                  and any(g.title() == "Identity"
+                          for g in sa.widget().findChildren(QGroupBox)))
+    for _ in range(4):
+        need = scroll.widget().sizeHint().height() - scroll.viewport().height()
+        if need <= 0:
+            break
+        dlg.resize(width, dlg.height() + need)
         _settle()
     return dlg
 
@@ -194,6 +224,30 @@ def _line_table(dlg, through):
             sizes = sp.sizes()
             if len(sizes) == 2 and sp.isAncestorOf(tbl) and deficit:
                 sp.setSizes([sizes[0] + deficit, max(1, sizes[1])])
+        _settle()
+    return dlg
+
+
+def _grow_preview(dlg, extra):
+    """Give a line editor's section preview ``extra`` pixels more height.
+
+    ``_line_table`` sizes the dialog to the TABLE, and the preview under it keeps
+    whatever height is left — on a short, wide section that is a strip in which
+    the section fits by its height and draws small. The table's rows are kept;
+    the extra goes to the preview pane, and the canvas refits to it.
+    """
+    from PySide6.QtWidgets import QSplitter
+
+    tbl = dlg._table.table
+    dlg.resize(dlg.width(), dlg.height() + extra)
+    for sp in dlg.findChildren(QSplitter):
+        sizes = sp.sizes()
+        if len(sizes) == 2 and sp.isAncestorOf(tbl):
+            sp.setSizes([sizes[0], sizes[1] + extra])
+    _settle()
+    canvas = getattr(dlg, "_preview", None) or getattr(dlg, "_canvas", None)
+    if canvas is not None and hasattr(canvas, "fit"):
+        canvas.fit()
         _settle()
     return dlg
 
@@ -251,8 +305,7 @@ def lem01_materials():
 
     dlg = _lem_only(MaterialsEditor().build(_load(LEM01), None))
     dlg._set_mode("list")
-    dlg.resize(1180, 720)
-    return _grab(dlg, "lem01_studio_materials.png")
+    return _grab(_fit_material_form(dlg, 1180, 720), "lem01_studio_materials.png")
 
 
 def lem01_profile():
@@ -745,13 +798,27 @@ def _all_usages(dlg):
     return dlg
 
 
+def _lem_and_fem(dlg):
+    """Tick LEM and FEM, untick Seepage and Reliability.
+
+    For LEM-4 and LEM-5, whose material tables carry the worksheet's empty
+    ``t_cut``, ``E`` and ``nu`` columns so that one block pastes into both the
+    sheet and the editor: the editor shows those columns only with FEM ticked,
+    and the page tells the reader to set exactly these two.
+    """
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag in ("lem", "fem"))
+    return dlg
+
+
 def _lem_only(dlg):
     """Untick every non-LEM usage toggle so the capture shows the LEM problem.
 
     The owner's rule for the LEM tutorials: an LEM page's editor capture carries
-    no FEM or seepage columns. The toggles are real checkboxes, so unticking
-    them is the same action a reader takes, and the toggle bar in the capture
-    shows the state that produced it.
+    no FEM or seepage columns, and the page tells the reader to set the toggles
+    to LEM alone. The toggles are real checkboxes, so unticking them is the same
+    action a reader takes, and the toggle bar in the capture shows the state that
+    produced it.
     """
     toggles = getattr(dlg, "_toggles", None) or {}
     for tag, cb in toggles.items():
@@ -822,9 +889,9 @@ def lem09_reinforcement():
     The same editor LEM-8 photographs, on a row whose Type is ``anchor`` rather
     than blank: the shot's subject is the Type group at the bottom of the form,
     where the preset has filled Dir with ``axial`` and Appl with ``active``, and
-    the Anchorage group above it, where the two pullout lengths are 0 at the wall
-    and the bond length at the far end. The first line is selected because it is
-    the one the page reads its capacity off.
+    the Anchorage group above it, where Lp1 is 0 at the wall, Lp2 is the
+    development length at the far end, and Adhesion and Delta are blank. The
+    first line is selected because it is the one the page reads its capacity off.
     """
     from studio.editors import ReinforcementEditor
 
@@ -834,9 +901,9 @@ def lem09_reinforcement():
 
 def lem09_piles_table():
     """The piles editor's table view on the soldier pile — the view the page
-    teaches first: the worksheet's columns minus the derived θp, taking the
-    Problem-section row as two pieces. LEM columns only, per the page's
-    toggles."""
+    teaches first: the worksheet's LEM columns, Label through Mcap, in the
+    sheet's order, so the Problem-section row pastes in as one block. LEM
+    columns only, per the page's toggles."""
     from studio.editors import PilesEditor
 
     dlg = PilesEditor().build(_load(LEM09), None)
@@ -1021,7 +1088,7 @@ def lem04_materials():
     """
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(_all_usages(MaterialsEditor().build(_load(LEM04), None))),
+    return _grab(_mat_table(_lem_and_fem(MaterialsEditor().build(_load(LEM04), None))),
                  "lem04_studio_materials.png")
 
 
@@ -1054,10 +1121,19 @@ def lem04_run_lem():
 
 def lem05_materials():
     """The materials editor, table view, on LEM-5's four soils — the seam of soft
-    clay among them, told from the sand fill by its cohesion."""
+    clay among them, told from the sand fill by its cohesion.
+
+    The completed file carries stiffnesses the page's table leaves empty (E, ν
+    and a zero t_cut, which the limit equilibrium run never reads). They are
+    cleared here, so the shot shows the rows the reader pastes from the table,
+    not the saved model's extra cells.
+    """
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(_all_usages(MaterialsEditor().build(_load(LEM05), None))),
+    d = _load(LEM05)
+    d = dict(d, materials=[dict(m, E=0.0, nu=0.0, t_cut=None)
+                           for m in d["materials"]])
+    return _grab(_mat_table(_lem_and_fem(MaterialsEditor().build(d, None))),
                  "lem05_studio_materials.png")
 
 
@@ -1155,11 +1231,18 @@ def lem08_dloads():
 
 def lem08_circles():
     """The circles editor holding LEM-8's two starting circles, typed rather than
-    generated: one tangent to the toe elevation, one to the bottom of the model."""
+    generated: one tangent to the toe elevation, one to the bottom of the model.
+
+    Photographed as the step leaves it, before **OK**: the editor computes ``R``
+    only when OK applies the rows, so a typed or pasted row shows R = 0 until
+    then. The file stores the computed radii, and they are cleared here so the
+    shot shows the reader's screen rather than the saved model.
+    """
     from studio.editors import CirclesEditor
 
-    return _grab(CirclesEditor().build(_load(LEM08), None),
-                 "lem08_studio_circles.png")
+    d = _load(LEM08)
+    d = dict(d, circles=[dict(c, R=0.0) for c in d["circles"]])
+    return _grab(CirclesEditor().build(d, None), "lem08_studio_circles.png")
 
 
 def lem08_run_lem():
@@ -1264,8 +1347,7 @@ def _lem07_material(model, name, row=0, edit=None, width=1180, height=760):
     dlg = _lem_only(MaterialsEditor().build(d, None))
     dlg.set_view_mode("list")
     dlg._list_view.list.setCurrentRow(row)
-    dlg.resize(width, height)
-    return _grab(dlg, name)
+    return _grab(_fit_material_form(dlg, width, height), name)
 
 
 def lem07_materials_pow():
@@ -1375,8 +1457,7 @@ def _lem11_materials(name, sigma_c=None):
     dlg = _lem_and_rel(MaterialsEditor().build(d, None))
     dlg.set_view_mode("list")
     dlg._list_view.list.setCurrentRow(0)
-    dlg.resize(1180, 620)
-    return _grab(dlg, name)
+    return _grab(_fit_material_form(dlg, 1180, 620), name)
 
 
 def lem11_materials():
@@ -2391,15 +2472,17 @@ def fem02_reinforce_blank():
     """The reinforcement table as the STARTER delivers it: six lines with their
     geometry, tensile capacity and pullout lengths, and Tres, E and Area empty.
 
-    Only the FEM toggle is ticked: the LEM inputs are complete, so the table
-    shows just the geometry and the three columns the reader is about to fill.
+    Only the FEM toggle is ticked: the table then hides the LEM-only Type, Dir
+    and Appl, keeps the columns both engines read, and adds the FEM-only columns
+    at the right. The frame runs to the last of them, Jred, so every column the
+    toggle shows is in the shot.
     """
     from studio.editors import ReinforcementEditor
 
     dlg = ReinforcementEditor().build(_load(FEM02_START), None)
     for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(tag == "fem")
-    return _grab(_line_table(dlg, through="area"),
+    return _grab(_line_table(dlg, through="jred"),
                  "fem02_studio_reinforce_blank.png")
 
 
@@ -2411,7 +2494,7 @@ def fem02_reinforce_filled():
     dlg = ReinforcementEditor().build(_load(FEM02_DONE), None)
     for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(tag == "fem")
-    return _grab(_line_table(dlg, through="area"),
+    return _grab(_line_table(dlg, through="jred"),
                  "fem02_studio_reinforce_filled.png")
 
 
@@ -2498,32 +2581,32 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
-# FEM-3 — Piles: LEM against FEM
+# FEM-4 — Piles: LEM against FEM
 # --------------------------------------------------------------------------- #
 #: The discrete row: one model, two sample pages.  The page links the
 #: limit-equilibrium copy and enters the mesh and the bracket by hand, so every
 #: dialog below is photographed on a mesh built here at the page's own settings
 #: rather than on a committed companion.
-FEM03_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+FEM04_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
 #: The continuous wall: the completed file of the page's second half, written by
 #: ``tools/build_pile_wall_tutorial.py`` on the same slope.
-FEM03_WALL_DONE = os.path.join(REPO_ROOT,
+FEM04_WALL_DONE = os.path.join(REPO_ROOT,
                                "docs/tutorials/files/xslope_pile_wall.xlsx")
 #: The mesh the page builds for both models, and the finer 1D element size its
 #: optional refinement step enters.
-FEM03_ELEMENT_TYPE = "tri6"
-FEM03_TARGET_SIZE = 2.0
-FEM03_REFINED_1D = 0.5
+FEM04_ELEMENT_TYPE = "tri6"
+FEM04_TARGET_SIZE = 2.0
+FEM04_REFINED_1D = 0.5
 #: The strength-reduction settings the page runs every trial at.  The bracket
 #: reaches 2.0 because the socketed runs stand at 1.6 and above; everything else
 #: is the dialog as it opens.
-FEM03_BRACKET = (1.0, 2.0)
-FEM03_TOLERANCE = 0.01
-FEM03_MAX_ITERATIONS = 12000
-FEM03_CRITERION = "non_convergence"
+FEM04_BRACKET = (1.0, 2.0)
+FEM04_TOLERANCE = 0.01
+FEM04_MAX_ITERATIONS = 12000
+FEM04_CRITERION = "non_convergence"
 
 
-def _fem03_meshed(path, element_size_1d=None):
+def _fem04_meshed(path, element_size_1d=None):
     """The model with a mesh attached — the state Build Mesh leaves behind, and
     the only state Studio's Run FEM action is reachable in.
 
@@ -2540,14 +2623,14 @@ def _fem03_meshed(path, element_size_1d=None):
     with contextlib.redirect_stdout(io.StringIO()):
         data["mesh"] = build_mesh_from_polygons(
             get_material_polygons(data, reinf_lines=lines),
-            FEM03_TARGET_SIZE, FEM03_ELEMENT_TYPE, lines=lines or None,
+            FEM04_TARGET_SIZE, FEM04_ELEMENT_TYPE, lines=lines or None,
             element_size_1d=element_size_1d,
             point_constraints=extract_point_constraints(data),
             size_regions=extract_size_regions(data))
     return data
 
 
-def fem03_piles_table():
+def fem04_piles_table():
     """The two pile rows with BOTH usage bands shown — every column the two
     engines read, side by side.
 
@@ -2565,30 +2648,30 @@ def fem03_piles_table():
     """
     from studio.editors import PilesEditor
 
-    dlg = PilesEditor().build(_load(FEM03_PILES), None)
+    dlg = PilesEditor().build(_load(FEM04_PILES), None)
     for _tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(True)
     return _grab(_line_table(dlg, through="tip_fixity"),
-                 "fem03_studio_piles_table.png")
+                 "fem04_studio_piles_table.png")
 
 
-def fem03_run_fem_piles():
+def fem04_run_fem_piles():
     """Run FEM on the meshed pile model: strength reduction over the page's
     bracket, with the checks column beside it."""
     from studio.dialogs import RunFemDialog
 
-    data = _fem03_meshed(FEM03_PILES)
+    data = _fem04_meshed(FEM04_PILES)
     dlg = RunFemDialog(defaults={"analysis": "ssrm",
-                                 "F_min": FEM03_BRACKET[0],
-                                 "F_max": FEM03_BRACKET[1],
-                                 "tolerance": FEM03_TOLERANCE},
+                                 "F_min": FEM04_BRACKET[0],
+                                 "F_max": FEM04_BRACKET[1],
+                                 "tolerance": FEM04_TOLERANCE},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "fem03_studio_run_fem_piles.png")
+    return _grab(dlg, "fem04_studio_run_fem_piles.png")
 
 
-def fem03_wall_row():
+def fem04_wall_row():
     """The one row the reader adds, in the editor's table view: the wall's two
     endpoints, its axial and bending section constants entered directly, spacing
     1, a moment capacity, and D and Vcap left empty.
@@ -2600,12 +2683,12 @@ def fem03_wall_row():
     """
     from studio.editors import PilesEditor
 
-    dlg = _fem_only(PilesEditor().build(_load(FEM03_WALL_DONE), None))
+    dlg = _fem_only(PilesEditor().build(_load(FEM04_WALL_DONE), None))
     return _grab(_line_table(dlg, through="tip_fixity"),
-                 "fem03_studio_wall_row.png")
+                 "fem04_studio_wall_row.png")
 
 
-def fem03_build_mesh_1d():
+def fem04_build_mesh_1d():
     """Build Mesh with the page's optional refinement entered: tri6 at 2 ft, and
     a 1D element size of 0.5 ft.
 
@@ -2617,31 +2700,31 @@ def fem03_build_mesh_1d():
     """
     from studio.dialogs import BuildMeshDialog
 
-    dlg = BuildMeshDialog(defaults={"element_type": FEM03_ELEMENT_TYPE,
-                                    "target_size": FEM03_TARGET_SIZE,
+    dlg = BuildMeshDialog(defaults={"element_type": FEM04_ELEMENT_TYPE,
+                                    "target_size": FEM04_TARGET_SIZE,
                                     "auto_size": False,
-                                    "element_size_1d": FEM03_REFINED_1D})
+                                    "element_size_1d": FEM04_REFINED_1D})
     dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "fem03_studio_build_mesh_1d.png")
+    return _grab(dlg, "fem04_studio_build_mesh_1d.png")
 
 
-def fem03_run_fem_wall():
+def fem04_run_fem_wall():
     """Run FEM on the meshed wall model, at the bracket the page's numbers are
     measured over."""
     from studio.dialogs import RunFemDialog
 
-    data = _fem03_meshed(FEM03_WALL_DONE)
+    data = _fem04_meshed(FEM04_WALL_DONE)
     dlg = RunFemDialog(defaults={"analysis": "ssrm",
-                                 "F_min": FEM03_BRACKET[0],
-                                 "F_max": FEM03_BRACKET[1],
-                                 "tolerance": FEM03_TOLERANCE},
+                                 "F_min": FEM04_BRACKET[0],
+                                 "F_max": FEM04_BRACKET[1],
+                                 "tolerance": FEM04_TOLERANCE},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "fem03_studio_run_fem_wall.png")
+    return _grab(dlg, "fem04_studio_run_fem_wall.png")
 
 
-def fem03_wall_details():
+def fem04_wall_details():
     """The 1D Details panel on the wall with its tip fixed: lateral displacement,
     shear, bending moment and soil reaction down its length.
 
@@ -2657,29 +2740,197 @@ def fem03_wall_details():
     from studio.fem_details_dialog import FemDetailsDialog
     from xslope.fem import build_fem_data, solve_ssrm
 
-    data = _fem03_meshed(FEM03_WALL_DONE)
+    data = _fem04_meshed(FEM04_WALL_DONE)
     data["pile_lines"][0]["tip_fixity"] = "fixed"
     with contextlib.redirect_stdout(io.StringIO()):
         fem_data = build_fem_data(data, data["mesh"])
-        result = solve_ssrm(fem_data, F_min=FEM03_BRACKET[0],
-                            F_max=FEM03_BRACKET[1], tolerance=FEM03_TOLERANCE,
-                            debug_level=0, failure_criterion=FEM03_CRITERION,
-                            max_iterations=FEM03_MAX_ITERATIONS)
+        result = solve_ssrm(fem_data, F_min=FEM04_BRACKET[0],
+                            F_max=FEM04_BRACKET[1], tolerance=FEM04_TOLERANCE,
+                            debug_level=0, failure_criterion=FEM04_CRITERION,
+                            max_iterations=FEM04_MAX_ITERATIONS)
     dlg = FemDetailsDialog(fem_data, result["last_solution"], data,
-                           model_path=FEM03_WALL_DONE,
+                           model_path=FEM04_WALL_DONE,
                            failure_solution=result.get("failure_solution"))
     dlg.resize(1140, 660)
     dlg.list.setCurrentRow(dlg.list.count() - 1)
-    return _grab(dlg, "fem03_studio_wall_1d_details.png")
+    return _grab(dlg, "fem04_studio_wall_1d_details.png")
 
 
 SHOTS.update({
-    "fem03_piles_table": fem03_piles_table,
-    "fem03_run_fem_piles": fem03_run_fem_piles,
-    "fem03_wall_row": fem03_wall_row,
-    "fem03_build_mesh_1d": fem03_build_mesh_1d,
-    "fem03_run_fem_wall": fem03_run_fem_wall,
-    "fem03_wall_details": fem03_wall_details,
+    "fem04_piles_table": fem04_piles_table,
+    "fem04_run_fem_piles": fem04_run_fem_piles,
+    "fem04_wall_row": fem04_wall_row,
+    "fem04_build_mesh_1d": fem04_build_mesh_1d,
+    "fem04_run_fem_wall": fem04_run_fem_wall,
+    "fem04_wall_details": fem04_wall_details,
+})
+
+
+# --------------------------------------------------------------------------- #
+# FEM-5 — A Rock Slope on Its Joints
+#
+# Three dialogs, one for each thing the page asks the reader to do that a
+# worksheet cannot show: type two joint lines into the joints editor, run the
+# strength reduction at the settings a jointed model needs, and describe a whole
+# column set in one form instead of typing forty lines.
+# --------------------------------------------------------------------------- #
+FEM05_SLAB = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_rock_joints.xlsx")
+FEM05_TOPPLE = os.path.join(REPO_ROOT,
+                            "docs/tutorials/files/xslope_rock_toppling.xlsx")
+#: The mesh the page builds for both halves: quadratic triangles at 1.5 m.
+FEM05_ELEMENT_TYPE = "tri6"
+FEM05_TARGET_SIZE = 1.5
+#: Run FEM, as the page has the reader set it.  The failure criterion is NOT in
+#: this list, and that is the point of the shot: the dialog opens on Hybrid by
+#: itself when the model it is given carries a joint, so what is photographed is
+#: the choice the reader does not have to make.  The bracket and the tolerance are
+#: the dialog's own; the sweep budget is raised to 100,000, which is the model
+#: checks' floor for a jointed model and the box's own ceiling.
+FEM05_BRACKET = (1.0, 2.0)
+FEM05_TOLERANCE = 0.01
+FEM05_MAX_ITERATIONS = 100000
+#: The set the page's second half builds: 110 degrees is 70 degrees dipping INTO
+#: the face, at 1.5 m centers, over the joint region the polygon sheet carries.
+FEM05_SET = {"name": "col", "dip": "110", "spacing": "1.5", "offset": "1.25"}
+FEM05_REGION = "Toppling zone"
+
+
+def _fem05_meshed(path):
+    """The model with a SPLIT mesh attached — the state Build Mesh leaves behind,
+    and the only state Studio's Run FEM action is reachable in.
+
+    ``extract_joint_options`` is what makes it a jointed mesh rather than a mesh
+    with lines drawn on it: it tells the mesher which constraint lines to split
+    along.  Run FEM's own dialog reads the same function to decide which failure
+    criterion to open on, so a shot taken on a mesh built without it would
+    photograph the wrong default.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_joint_options,
+                             extract_point_constraints,
+                             extract_size_regions, get_material_polygons)
+
+    data = _load(path)
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(data)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data, reinf_lines=lines),
+            FEM05_TARGET_SIZE, FEM05_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=data.get("element_size_1d"),
+            point_constraints=extract_point_constraints(data),
+            size_regions=extract_size_regions(data),
+            joint_lines=extract_joint_options(data))
+    return data
+
+
+def fem05_joints_editor():
+    """The joints editor, table view, with the two lines of part 1 in it.
+
+    The table is taken out to Jred, its last column, rather than to the last
+    column the two rows fill.  Everything past t_cut is BLANK on both rows and the
+    page is telling the reader to leave it blank — the normal and shear
+    stiffnesses derived from the rock around the joint, the strength reduction
+    reducing the joint with it — so a shot cut off at t_cut would photograph a
+    table whose empty cells are the instruction.
+
+    No usage band is set: every field of a joint line is FEM-only, so the editor
+    shows one band and there is nothing to untick.
+    """
+    from studio.editors import JointsEditor
+
+    dlg = JointsEditor().build(_load(FEM05_SLAB), None)
+    return _grab(_grow_preview(_line_table(dlg, through="jred"), 140),
+                 "fem05_studio_joints_editor.png")
+
+
+def fem05_run_fem():
+    """Run FEM on the meshed slab model, at the page's settings.
+
+    Only the bracket, the tolerance and the sweep budget are passed.  The failure
+    criterion is left to the dialog, which opens a jointed model on Hybrid and
+    every other model on Non-convergence, so the shot shows the reader the box
+    already reading what their model needs.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem05_meshed(FEM05_SLAB)
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": FEM05_BRACKET[0],
+                                 "F_max": FEM05_BRACKET[1],
+                                 "tolerance": FEM05_TOLERANCE,
+                                 "max_iterations": FEM05_MAX_ITERATIONS},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem05_studio_run_fem.png")
+
+
+def fem05_build_network():
+    """Build network, describing the column set the page's second half generates.
+
+    The dialog is opened on the model as it stands BEFORE the set exists — the
+    base plane and nothing else — because that is the state the reader is in when
+    they press the button, and because a dialog opened on the finished file would
+    have to name the set something other than ``col`` to avoid writing over the
+    rows already there.
+
+    ``_flush`` is called rather than waited on: the preview and the count are
+    regenerated on a debounce, and reading them back flushes the timer.
+    """
+    from studio import network_dialog
+    from studio.network_dialog import BuildNetworkDialog
+
+    data = _load(FEM05_TOPPLE)
+    # The base plane is the hand-entered row the builder puts first; the rows
+    # after it are the set this dialog is being photographed describing.
+    data["joint_lines"] = [dict(data["joint_lines"][0])]
+    # The dialog reopens on whatever this session last built (see _LAST_SET), so
+    # a capture clears it: the shot has to be of the page's set, not of the last
+    # one some other producer in this process happened to describe.
+    network_dialog._LAST_SET = None
+
+    dlg = BuildNetworkDialog(data, data["joint_lines"], None)
+    dlg._name.setText(FEM05_SET["name"])
+    dlg._kind.setCurrentIndex(0)                       # Parallel set
+    edits = dlg._param_edits["parallel"]
+    for key in ("dip", "spacing", "offset"):
+        edits[key].setText(FEM05_SET[key])
+    region = "Joint region: %s" % FEM05_REGION
+    index = [dlg._region.itemText(i) for i in range(dlg._region.count())]
+    dlg._region.setCurrentIndex(index.index(region))
+    dlg._prop_edits["c"].setText("0")
+    dlg._prop_edits["phi"].setText("35")
+    dlg._flush()
+    # The dialog opens at the height its form asks for capped by the screen, and
+    # an offscreen screen is not the reader's: the property group — the c and phi
+    # the page has the reader type — falls below the scroll. The height is grown
+    # by the form's own measured deficit, the idiom ``_list_view`` uses.
+    dlg.show()
+    _settle()
+    scroll = dlg._form_scroll
+    # Twice, for the reason ``_mat_table`` gives: the chrome measured against the
+    # opening dialog is not the chrome of the taller one the first pass produces,
+    # and one pass leaves the last row of the property grid under the scroll.
+    for _ in range(3):
+        deficit = max(0, scroll.widget().sizeHint().height()
+                      - scroll.viewport().height())
+        if not deficit:
+            break
+        dlg.resize(dlg.width(), dlg.height() + deficit)
+        _settle()
+    out = _grab(dlg, "fem05_studio_build_network.png")
+    network_dialog._LAST_SET = None      # a capture leaves no session state behind
+    print("   %s -> %d trace(s): %s"
+          % (region, len(dlg.result_rows()), dlg._status.text()))
+    return out
+
+
+SHOTS.update({
+    "fem05_joints_editor": fem05_joints_editor,
+    "fem05_run_fem": fem05_run_fem,
+    "fem05_build_network": fem05_build_network,
 })
 
 
@@ -3366,8 +3617,7 @@ def _lem13_material(model, name, edit=None, width=1180, height=780):
     dlg = _lem_only(MaterialsEditor().build(d, None))
     dlg.set_view_mode("list")
     dlg._list_view.list.setCurrentRow(0)
-    dlg.resize(width, height)
-    return _grab(dlg, name)
+    return _grab(_fit_material_form(dlg, width, height), name)
 
 
 def lem13_materials():

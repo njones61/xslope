@@ -30,6 +30,10 @@ Studio's dialog captures are a separate producer, because they need Qt:
 Run:  PYTHONPATH=. python3 tools/make_tutorial_figures.py            # everything
       PYTHONPATH=. python3 tools/make_tutorial_figures.py sheets     # one group
       PYTHONPATH=. python3 tools/make_tutorial_figures.py lem01      # by name
+      PYTHONPATH=. python3 tools/make_tutorial_figures.py --capture-only fem01_plots fem02_plots
+
+Capture-only redraws FEM result panels from stored trial records, without a
+bracket or limit-equilibrium search. Cases without a record are left untouched.
 """
 
 from __future__ import annotations
@@ -85,8 +89,7 @@ def _sweep_cached(tag, model_path, compute, **kw):
         pickle.dump(res, fh)
     return res
 
-#: The tutorial's model is the sample's model — one file, two pages (the tutorial
-#: builds it, ``docs/lem/samples.md`` catalogues it). Nothing is copied.
+#: The tutorial's completed model, linked from its page. Nothing is copied.
 LEM01 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_embankment.xlsx")
 LEM01_SLICES = 40
 
@@ -152,6 +155,29 @@ def render(name, src, sheet, rows=None, cols=None, tab_strip=False,
     return out
 
 
+def _filled_template(name, cells):
+    """A scratch copy of the blank template with ``cells`` filled in.
+
+    ``cells`` maps ``"sheet!A1"`` to a value: the entries a tutorial's Excel path
+    tells the reader to make. The copy is written outside the repository, and
+    only to be rendered — the figure is the sheet the reader ends up with, on the
+    template the page links, whatever version the completed model was saved
+    from. Loaded with its rich text so the label runs render as they do in the
+    template.
+    """
+    import tempfile
+
+    import openpyxl
+
+    wb = openpyxl.load_workbook(TEMPLATE, rich_text=True)
+    for ref, value in cells.items():
+        sheet, cell = ref.split("!")
+        wb[sheet][cell] = value
+    out = os.path.join(tempfile.mkdtemp(prefix="xslope_tutorial_sheet_"), name)
+    wb.save(out)
+    return out
+
+
 def placeholder(name, title, lines, width=1200):
     """A visible TODO card standing in for a capture only a person can take.
 
@@ -212,7 +238,15 @@ def lem01_sheets():
     rather than a quiet crop — the same constraint the input-template manifest
     documents for its three ``mat`` views.
     """
-    render("lem01_sheet_main.png", LEM01, "main", rows=(1, 25), cols="A:D")
+    # main is rendered from the blank template with the page's own entries, not
+    # from the completed model: the reader starts from today's template, and the
+    # cells the page leaves alone (version, Time, Tension SRF, Side BC, Water
+    # loads) must read as the reader's copy does.
+    render("lem01_sheet_main.png",
+           _filled_template("lem01_main.xlsx", {
+               "main!D8": "Imperial", "main!D10": 62.4, "main!D11": 0,
+               "main!D12": 0, "main!D13": 0}),
+           "main", rows=(1, 25), cols="A:D")
     render("lem01_sheet_mat.png", LEM01, "mat", rows=(9, 13), cols="A:Z")
     # profile spans two neighbouring tables so the capture reads like the real
     # sheet — Profile Line #2 sits empty beside the filled #1, as the reader
@@ -272,13 +306,38 @@ def lem01_plots():
           % (crit_sp["FS"], crit_b["FS"], crit_c["FS"], LEM01_SLICES))
 
 
-def lem01_placeholders():
-    """The two LEM-1 figures no script can take.
+def lem01_crack_water():
+    """The cracked model with the 8 ft crack full of water, Spencer's search re-run.
 
-    A full main-window capture is the owner's — it carries the real window chrome
-    at the project's fixed capture size — The assistant figure (lem01_assistant.png) is a
-    live-session hand capture — the owner's, 2026-08-11, taken after the skill
-    hardening round — since a provider conversation cannot be scripted.
+    Same in-memory edit as the dry crack in ``lem01_plots``, plus the one input the
+    page's last step changes (main!D12, Water in crack = 8). Kept as its own group
+    so the water-filled run can be redrawn without re-solving the four searches
+    above.
+    """
+    sw = copy.deepcopy(load_slope_data(LEM01))
+    sw["tcrack_depth"] = 8.0
+    sw["tcrack_water"] = 8.0
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(
+            sw, "spencer", num_slices=LEM01_SLICES, diagnostic=False,
+            **file_search_window(sw))
+    crit = fs_cache[0]
+    capture("lem01_solution_crack_water.png", plot_solution, sw, crit["slices"],
+            crit["failure_surface"], crit["solver_result"], frame="content")
+    print("   water-filled crack spencer %.4f (%d slices)"
+          % (crit["FS"], LEM01_SLICES))
+
+
+def lem01_placeholders():
+    """The two LEM-1 figures this module does not draw.
+
+    Both are main-window grabs, made by the screenshot producers rather than here.
+    The Studio canvas (lem01_studio_canvas.png) is an offscreen grab in
+    ``tools/capture_tutorial_screenshots.py``. The assistant figure
+    (lem01_assistant.png) is a recorded session: ``lem1_assistant_build`` in
+    ``tools/assistant_sessions.py`` sends "Build this model" with the problem
+    drawing to a real provider and grabs the window, so it costs a provider call
+    and runs only when named.
     """
     # lem01_studio_canvas.png is now produced by capture_tutorial_screenshots.py
     # (offscreen main-window grab — the hand-capture convention is retired).
@@ -1093,17 +1152,21 @@ def lem09_sheets():
     """The five worksheets LEM-9's Excel path fills.
 
     ``reinforce`` and ``piles`` are the two this page is about, and both windows
-    run to the last input column so the reader sees the columns they are told to
-    leave alone as well as the ones they fill. ``non-circ`` runs to F for the
-    sheet's own Movement legend, as LEM-5's does. ``mat`` and ``profile`` take
-    the two-material frames LEM-3 and LEM-8 use.
+    run to the last column a limit equilibrium analysis reads, so the reader sees
+    the columns they are told to leave alone or blank as well as the ones they
+    fill. ``non-circ`` runs to F for the sheet's own Movement legend, as LEM-5's
+    does. ``mat`` and ``profile`` take the two-material frames LEM-3 and LEM-8
+    use.
     """
     render("lem09_sheet_mat.png", LEM09, "mat", rows=(10, 13), cols="A:O")
     render("lem09_sheet_profile.png", LEM09, "profile", rows=(1, 14), cols="A:H")
     render("lem09_sheet_noncirc.png", LEM09, "non-circ", rows=(1, 6), cols="A:F")
-    render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:O")
-    # LEM problem: stop before the FEM-only pile columns (E, I, Area, Head, Tip).
-    render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:M")
+    # LEM problem: run to Spacing (Q), stopping before the FEM-only reinforce
+    # columns (Tres, E, Area).
+    render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:Q")
+    # LEM problem: run to Mcap (L), stopping before the FEM-only pile columns
+    # (E, I, Area, Head, Tip).
+    render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:L")
 
 
 def lem09_plots():
@@ -2151,7 +2214,13 @@ def seep01_sheets():
     reason LEM-1's profile window does: the empty neighbor is what the sheet looks
     like, and cropping it makes the capture read as a table rather than a worksheet.
     """
-    render("seep01_sheet_main.png", SEEP01, "main", rows=(1, 25), cols="A:D")
+    # main from the blank template with the page's three edits, for the reason
+    # lem01_sheets gives: the cells the page leaves alone must read as the
+    # reader's copy of today's template does.
+    render("seep01_sheet_main.png",
+           _filled_template("seep01_main.xlsx", {
+               "main!D8": "SI", "main!D9": "yr", "main!D10": 9.81}),
+           "main", rows=(1, 25), cols="A:D")
     render("seep01_sheet_mat.png", SEEP01, "mat", rows=(10, 12), cols="AG:AQ",
            identity_cols="A:B")
     render("seep01_sheet_profile.png", SEEP01, "profile", rows=(1, 15), cols="A:H")
@@ -2459,7 +2528,7 @@ def seep01_plots():
 # --------------------------------------------------------------------------- #
 # SEEP-2 — Unconfined Seepage Through a Zoned Dam (open and explore)
 #
-# The Johnson Reservoir dam of docs/seep/samples.md #5, meshed and solved exactly
+# The Johnson Reservoir dam (the copy docs/verification/seep.md checks against SEEP2D), meshed and solved exactly
 # as run_tests.py::run_seep_test solves it — tri3 at the ground-surface width over
 # 120 — so the discharge this page quotes is the discharge that page's lock and the
 # SEEP2D cross-check were recorded from.
@@ -3219,7 +3288,7 @@ def seep02_plots():
 # SEEP-3 — Transient Seepage: Reservoir Drawdown Through a Cored Earth Dam
 #
 # The first page on which the answer is a sequence rather than a field. The model is
-# the cored earth dam of docs/seep/samples.md #8, in the tutorial's own sidecar-free
+# the cored earth dam of docs/seep/files/xslope_earth_dam_tseep.xlsx, in the tutorial's own sidecar-free
 # copy: a granular shell around a compacted clay core, a full pool at el 18 held
 # against the upstream face, a tailwater at el 2, and a reservoir drawn down to the
 # tailwater over 45 days.
@@ -4545,8 +4614,7 @@ def fem01_plots():
 # FEM-2 — Reinforcement: LEM against FEM
 # --------------------------------------------------------------------------- #
 #: FEM-2's file pair, written by ``tools/build_reinforced_slope_tutorial.py`` from
-#: the LEM reinforced-slope model (docs/lem/samples.md problem 9, the model
-#: Tutorial LEM-8 builds) and its finite element counterpart
+#: the LEM reinforced-slope model (the model Tutorial LEM-8 builds) and its finite element counterpart
 #: (docs/fem/samples.md problem 1).  The starter carries the limit-equilibrium
 #: model only — the six geogrid lines, but no elastic constants, no mesh and no
 #: FEM reinforcement data; the completed file adds the soils' E and nu, Tres, the
@@ -4566,23 +4634,22 @@ FEM02_SLICES = 40
 FEM02_CRITERION = "non_convergence"
 FEM02_F_MIN, FEM02_F_MAX = 1.0, 2.0
 FEM02_TOLERANCE = 0.01
-#: 12,000, which is also ``solve_ssrm``'s default budget.  On this model the
-#: number no longer decides the answer: a trial that spends its budget while still
-#: making progress is extended rather than failed, so both runs return the same
-#: factors of safety (1.5664 elastic-perfectly-plastic, 1.5352 peak-residual) from
-#: a 3,000 budget and from 12,000, with the same brackets and the same converged
-#: field.  What the budget still decides is how far the captured failure state has
-#: developed, which is why the producers ask for the larger one.
+#: The iteration budget per trial passed to ``solve_ssrm`` for every FEM-2 run
+#: here: 12,000, which is also its default, and the value the page shows in
+#: **Max iterations per trial**.  A trial that spends its budget while the
+#: residual is still falling is extended rather than failed, so the number sets
+#: where that extension starts; it also bounds how far the captured failure state
+#: develops.
 FEM02_MAX_ITERATIONS = 12000
-#: The line the bar-force profiles are drawn for: the most heavily loaded of the
-#: six in both runs (peak 800 lb/ft elastic-perfectly-plastic, 762.8 lb/ft
-#: peak-residual, both at the last converged trial).
+#: The reinforcement line the bar-force profiles are drawn for, in both runs
+#: (elastic-perfectly-plastic and peak-residual), from the last converged trial.
+#: The producer prints that line's largest force and its hardest-worked point, so
+#: the choice can be checked against each run.
 FEM02_PROFILE_LINE = 5
 #: The residual capacities the sweep asks for, highest first.  ``None`` is the
-#: blank cell — no post-peak drop at all.  The sweep runs down to zero because
-#: that is where the answer moves: Tres = Tmax is the same run as a blank cell,
-#: 600 and 400 each give a lower factor of safety of their own (1.5352 and
-#: 1.5195), and Tres = 0 — the bar tearing and carrying nothing — gives another.
+#: blank cell — no post-peak drop at all.  Tres = Tmax (800) is the same run as a
+#: blank cell; the sweep then steps down through 600 and 400 to 0, the bar tearing
+#: and carrying nothing, solving one strength reduction at each value.
 FEM02_TRES_SWEEP = (None, 800.0, 600.0, 400.0, 0.0)
 
 
@@ -4594,12 +4661,12 @@ def _fem02_mesh(model):
 
     The dialog's own default for that box is ticked, and on this section it is not
     inert: the shell is a 1.19 ft facing band, thinner than one element at the
-    target size, so the refinement drives the local size there to 0.33 ft and the
-    mesh from 2,101 elements to 5,096.  That mesh is a different model's worth of
-    answer (peak-residual 1.4570 against 1.5352, elastic-perfectly-plastic 1.5195
-    against 1.5664; 1.4414 is what a 1 ft element size gives), so the page has to
-    tell the reader which box to clear, and
-    this producer draws the mesh the page's own numbers come from.
+    target size, so the refinement would drive the local element size down there
+    and build a much finer mesh, which gives different factors of safety. The page
+    tells the reader to clear the box, and this producer builds the mesh without
+    that refinement: it passes only the size regions the file declares, so no
+    thin-zone sizes (Studio adds those from ``mesh.thin_zone_plan``) reach the
+    mesher. That is the mesh the page's own numbers come from.
     """
     from xslope.mesh import (build_mesh_from_polygons,
                              extract_constraint_line_geometry,
@@ -5003,62 +5070,59 @@ def fem02_tres_sweep():
 
 
 # --------------------------------------------------------------------------- #
-# FEM-3 — Piles: LEM against FEM
+# FEM-4 — Piles: LEM against FEM
 # --------------------------------------------------------------------------- #
-#: FEM-3's two models, both on the same slope.  The discrete row is the pile
-#: sample problem — one model, two sample pages: docs/lem/samples.md problem 10
-#: locks Spencer's search on it and docs/fem/samples.md problem 2 locks a
-#: strength-reduction run on it.  The sample's locked run is made over its own
-#: bracket on the mesh committed beside its finite element copy; the tutorial
-#: runs below are made at the settings the page has the reader enter, so they
-#: build their own mesh from the limit-equilibrium copy the page links.
-FEM03_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+#: FEM-4's two models, both on the same slope.  The discrete row is the pile
+#: model of Tutorial LEM-12, whose page locks Spencer's search on it.  The
+#: tutorial runs below are made at the settings the page has the reader enter,
+#: so they build their own mesh from the limit-equilibrium copy the page links.
+FEM04_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
 #: The continuous wall: the pair written by ``tools/build_pile_wall_tutorial.py``
 #: from that same slope — the starter with no structural line in it, and the same
 #: file with one PZ-27 sheet pile row.  Neither carries a mesh; the page builds
 #: one, and so does every run here.
-FEM03_WALL_START = os.path.join(REPO_ROOT,
+FEM04_WALL_START = os.path.join(REPO_ROOT,
                                 "docs/tutorials/files/xslope_pile_wall_start.xlsx")
-FEM03_WALL_DONE = os.path.join(REPO_ROOT,
+FEM04_WALL_DONE = os.path.join(REPO_ROOT,
                                "docs/tutorials/files/xslope_pile_wall.xlsx")
 #: The limit-equilibrium method and slice count the piles model's own locked
-#: search runs at (docs/lem/samples.md's circular_search tag).
-FEM03_METHOD = "spencer"
-FEM03_SLICES = 40
+#: search runs at (the circular_search tag on docs/tutorials/lem12_piles.md).
+FEM04_METHOD = "spencer"
+FEM04_SLICES = 40
 #: The mesh every figure on the page is drawn on: quadratic triangles at 2 ft,
 #: with the thin-zone refinement off, which is what the page has the reader set
 #: in Build Mesh.
-FEM03_ELEMENT_TYPE = "tri6"
-FEM03_TARGET_SIZE = 2.0
+FEM04_ELEMENT_TYPE = "tri6"
+FEM04_TARGET_SIZE = 2.0
 #: The optional refinement step of the wall half: a 0.5 ft 1D element size, which
 #: also refines the soil the beam is embedded in.
-FEM03_REFINED_1D = 0.5
+FEM04_REFINED_1D = 0.5
 #: The strength-reduction settings the page runs every trial at, which are
 #: Studio's Run FEM dialog as it opens except for the bracket: ``non_convergence``
 #: rather than the API default ``hybrid``, a 12,000-iteration budget, and a
 #: 1.0–2.0 bracket, which has to reach 2.0 because the socketed runs stand at 1.6
 #: and above.
-FEM03_CRITERION = "non_convergence"
-FEM03_F_MIN, FEM03_F_MAX = 1.0, 2.0
-FEM03_TOLERANCE = 0.01
-FEM03_MAX_ITERATIONS = 12000
+FEM04_CRITERION = "non_convergence"
+FEM04_F_MIN, FEM04_F_MAX = 1.0, 2.0
+FEM04_TOLERANCE = 0.01
+FEM04_MAX_ITERATIONS = 12000
 #: The spacings the sweep runs, spanning S/D = 1.5 to 6 on the model's 2 ft
 #: shafts.  6 ft is the file's own value and the locked case; 3 and 12 ft halve
 #: and double it, which quarters and quadruples what the finite element model
 #: sees, since spacing reaches it only as the divisor on EA and EI.
-FEM03_SPACINGS = (3.0, 6.0, 12.0)
+FEM04_SPACINGS = (3.0, 6.0, 12.0)
 
 
-def _fem03_search(model):
+def _fem04_search(model):
     """One Spencer search on the piles model at the sample's own slice count."""
     with contextlib.redirect_stdout(io.StringIO()):
         fs_cache, _conv, _path, _cache = circular_search(
-            model, FEM03_METHOD, num_slices=FEM03_SLICES, diagnostic=False,
+            model, FEM04_METHOD, num_slices=FEM04_SLICES, diagnostic=False,
             **file_search_window(model))
     return fs_cache[0]
 
 
-def _fem03_reading(crit):
+def _fem04_reading(crit):
     """The one-line reading of a search: factor of safety, circle, and the pile
     force that reached the slices."""
     piles = (crit["slices"].attrs.get("pile_report") or []
@@ -5070,8 +5134,8 @@ def _fem03_reading(crit):
                crit["Depth"], total, len(piles)))
 
 
-def _fem03_piles_model(spacing=None, head=None, tip=None, pile_E=None,
-                       caps=True, path=FEM03_PILES):
+def _fem04_piles_model(spacing=None, head=None, tip=None, pile_E=None,
+                       caps=True, path=FEM04_PILES):
     """The piles model with one thing changed on both rows.
 
     Every argument left ``None`` leaves the file's own cell alone, so a call with
@@ -5095,7 +5159,7 @@ def _fem03_piles_model(spacing=None, head=None, tip=None, pile_E=None,
     return sd
 
 
-def _fem03_mesh(model, element_size_1d=None):
+def _fem04_mesh(model, element_size_1d=None):
     """The mesh Studio's Build Mesh dialog builds for this model at the page's
     settings: quadratic triangles at 2 ft with the pile or wall lines carried in
     as constraint lines, so the beam elements lie on element edges and share
@@ -5110,13 +5174,13 @@ def _fem03_mesh(model, element_size_1d=None):
     with contextlib.redirect_stdout(io.StringIO()):
         return build_mesh_from_polygons(
             get_material_polygons(model, reinf_lines=lines),
-            FEM03_TARGET_SIZE, FEM03_ELEMENT_TYPE, lines=lines or None,
+            FEM04_TARGET_SIZE, FEM04_ELEMENT_TYPE, lines=lines or None,
             element_size_1d=element_size_1d,
             point_constraints=extract_point_constraints(model),
             size_regions=extract_size_regions(model))
 
 
-def _fem03_solve(model, mesh):
+def _fem04_solve(model, mesh):
     """One strength-reduction run at the page's settings.  Returns
     ``(fem_data, result, solution, seconds)``, where ``solution`` is the last
     converged field with the captured mechanism attached — the pair the results
@@ -5128,18 +5192,18 @@ def _fem03_solve(model, mesh):
     fem_data = build_fem_data(model, mesh)
     t0 = time.time()
     with contextlib.redirect_stdout(io.StringIO()):
-        result = solve_ssrm(fem_data, F_min=FEM03_F_MIN, F_max=FEM03_F_MAX,
-                            tolerance=FEM03_TOLERANCE, debug_level=0,
+        result = solve_ssrm(fem_data, F_min=FEM04_F_MIN, F_max=FEM04_F_MAX,
+                            tolerance=FEM04_TOLERANCE, debug_level=0,
                             capture_failure_state=True,
-                            failure_criterion=FEM03_CRITERION,
-                            max_iterations=FEM03_MAX_ITERATIONS)
+                            failure_criterion=FEM04_CRITERION,
+                            max_iterations=FEM04_MAX_ITERATIONS)
     seconds = time.time() - t0
     solution = dict(result["last_solution"])
     solution["failure_solution"] = result.get("failure_solution")
     return fem_data, result, solution, seconds
 
 
-def _fem03_mechanism(fem_data, solution):
+def _fem04_mechanism(fem_data, solution):
     """Where the shear strain concentrates at the captured mechanism: the peak,
     how many elements stand above half of it, and where they are."""
     import numpy as np
@@ -5163,7 +5227,7 @@ def _fem03_mechanism(fem_data, solution):
                float(cent[hot, 1].min()), float(cent[hot, 1].max())))
 
 
-def _fem03_beam(field, spacing, m_cap, v_cap):
+def _fem04_beam(field, spacing, m_cap, v_cap):
     """What the beam elements carry in one field: the peaks per unit width of
     section, what those are per member, and how many elements have yielded."""
     import numpy as np
@@ -5187,7 +5251,7 @@ def _fem03_beam(field, spacing, m_cap, v_cap):
                int(y_v.sum()) if y_v.size else 0))
 
 
-def _fem03_report(label, model, mesh, fem_data, result, solution, seconds,
+def _fem04_report(label, model, mesh, fem_data, result, solution, seconds,
                   beam=True):
     """Everything the page can quote from one run."""
     row = model["pile_lines"][0] if model["pile_lines"] else None
@@ -5205,19 +5269,19 @@ def _fem03_report(label, model, mesh, fem_data, result, solution, seconds,
     # field standing in its place is the last converged one, and the line has to
     # say which state it is rather than label a converged field "at failure".
     print("      converged  %s"
-          % _fem03_beam(solution, spacing, row["M_cap"], row["V_cap"]))
+          % _fem04_beam(solution, spacing, row["M_cap"], row["V_cap"]))
     if result.get("capture_failed"):
         print("      last converged state (at-failure capture not available) %s"
-              % _fem03_beam(fail, spacing, row["M_cap"], row["V_cap"]))
+              % _fem04_beam(fail, spacing, row["M_cap"], row["V_cap"]))
         print("         no capture: %s"
               % (result.get("capture_failed_reason") or "runaway"))
     else:
         print("      at failure %s"
-              % _fem03_beam(fail, spacing, row["M_cap"], row["V_cap"]))
-    print("      mechanism  %s" % _fem03_mechanism(fem_data, solution))
+              % _fem04_beam(fail, spacing, row["M_cap"], row["V_cap"]))
+    print("      mechanism  %s" % _fem04_mechanism(fem_data, solution))
 
 
-def _fem03_profiles(model, fem_data, solution, state="converged"):
+def _fem04_profiles(model, fem_data, solution, state="converged"):
     """The per-member profile Studio's 1D Details panel draws, read as numbers."""
     from xslope import fem_details
 
@@ -5243,8 +5307,8 @@ def fem_lem_figures():
     """The five limit-equilibrium figures on the FEM tutorials, redrawn without
     their strength-reduction runs: the searches take seconds, the SSRM groups
     they normally ride with take hours. Same models, same searches, same
-    captures as fem01_plots, fem02_plots, fem02_pullout_law, fem03_piles and
-    fem03_wall.
+    captures as fem01_plots, fem02_plots, fem02_pullout_law, fem04_piles and
+    fem04_wall.
     """
     from xslope.fileio import ensure_reinforce_pullout
 
@@ -5279,19 +5343,19 @@ def fem_lem_figures():
             frame="content")
     print("   FEM-2 law   FS %.4f" % crit["FS"])
 
-    sd = _fem03_piles_model()
-    crit = _fem03_search(sd)
-    capture("fem03_lem_solution_piles.png", plot_solution, sd, crit["slices"],
+    sd = _fem04_piles_model()
+    crit = _fem04_search(sd)
+    capture("fem04_lem_solution_piles.png", plot_solution, sd, crit["slices"],
             crit["failure_surface"], crit["solver_result"], frame="content")
-    print("   FEM-3 piles %s" % _fem03_reading(crit))
-    start = load_slope_data(FEM03_WALL_START)
-    crit = _fem03_search(start)
-    capture("fem03_lem_solution_bare.png", plot_solution, start, crit["slices"],
+    print("   FEM-4 piles %s" % _fem04_reading(crit))
+    start = load_slope_data(FEM04_WALL_START)
+    crit = _fem04_search(start)
+    capture("fem04_lem_solution_bare.png", plot_solution, start, crit["slices"],
             crit["failure_surface"], crit["solver_result"], frame="content")
-    print("   FEM-3 bare  %s" % _fem03_reading(crit))
+    print("   FEM-4 bare  %s" % _fem04_reading(crit))
 
 
-def fem03_piles():
+def fem04_piles():
     """The discrete row: the section both engines are given, the limit
     equilibrium answer with the two rows crossing the critical circle, the mesh
     the page builds, and the strength-reduction mechanism the finite element
@@ -5300,7 +5364,7 @@ def fem03_piles():
     """
     from xslope.plot_fem import plot_fem_data, plot_fem_results
 
-    sd = _fem03_piles_model()
+    sd = _fem04_piles_model()
     _u = declared_unit_labels(sd)
     mat = sd["materials"][0]
     print("   model       %s: γ %g %s · c %g %s · φ %g° · E %g %s · ν %g · u %s"
@@ -5314,13 +5378,13 @@ def fem03_piles():
                  pile["E"], _u["stress"], pile["V_cap"], pile["M_cap"],
                  pile["head_fixity"], pile["tip_fixity"], pile["appl"]))
 
-    capture("fem03_inputs_piles.png", plot_inputs, sd,
+    capture("fem04_inputs_piles.png", plot_inputs, sd,
             title="Slope Geometry and Inputs")
 
-    crit = _fem03_search(sd)
-    capture("fem03_lem_solution_piles.png", plot_solution, sd, crit["slices"],
+    crit = _fem04_search(sd)
+    capture("fem04_lem_solution_piles.png", plot_solution, sd, crit["slices"],
             crit["failure_surface"], crit["solver_result"], frame="content")
-    print("   LEM         %s" % _fem03_reading(crit))
+    print("   LEM         %s" % _fem04_reading(crit))
     for rec in (crit["slices"].attrs.get("pile_report") or []):
         print("      row %-9s crosses at y %.3f · Ito & Matsui %.0f per pile · "
               "%s → %.0f per pile = %.1f %s applied"
@@ -5330,18 +5394,18 @@ def fem03_piles():
     print("   LEM circle  entry (%.3f, %.3f) exit (%.3f, %.3f)"
           % (xs[0], ys[0], xs[-1], ys[-1]))
 
-    mesh = _fem03_mesh(sd)
-    fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
-    capture("fem03_mesh_piles.png", plot_fem_data, fem_data)
-    capture("fem03_fem_shear_piles.png", plot_fem_results, fem_data, solution,
+    mesh = _fem04_mesh(sd)
+    fem_data, result, solution, seconds = _fem04_solve(sd, mesh)
+    capture("fem04_mesh_piles.png", plot_fem_data, fem_data)
+    capture("fem04_fem_shear_piles.png", plot_fem_results, fem_data, solution,
             plot_type="shear_strain", fs=result["FS"],
             failure_solution=solution.get("failure_solution"),
             field_state="failure")
-    _fem03_report("FEM as shipped", sd, mesh, fem_data, result, solution, seconds)
-    _fem03_profiles(sd, fem_data, solution)
+    _fem04_report("FEM as shipped", sd, mesh, fem_data, result, solution, seconds)
+    _fem04_profiles(sd, fem_data, solution)
 
 
-def fem03_tip():
+def fem04_tip():
     """What the flat spacing line is actually measuring: the shafts' toe.
 
     Five runs on the pile model, each changing one thing from the file as it is
@@ -5355,7 +5419,7 @@ def fem03_tip():
     """
     from xslope.plot_fem import plot_fem_results
 
-    E0 = load_slope_data(FEM03_PILES)["pile_lines"][0]["E"]
+    E0 = load_slope_data(FEM04_PILES)["pile_lines"][0]["E"]
     from xslope import fem_details
     from xslope.plot_fem_details import plot_pile_detail
 
@@ -5370,18 +5434,18 @@ def fem03_tip():
     #: says so where it shows the two.
     cases = [
         ("tips pinned (as entered)", dict(tip="pinned"), None,
-         "fem03_piles_profile_pinned.png", "failure"),
+         "fem04_piles_profile_pinned.png", "failure"),
         ("pile E ×100", dict(pile_E=E0 * 100.0), None, None, "failure"),
         ("pile E ÷100", dict(pile_E=E0 / 100.0), None, None, "failure"),
         ("Vcap and Mcap cleared", dict(caps=False), None, None, "failure"),
         ("heads fixed, tips pinned", dict(head="fixed"), None, None, "failure"),
-        ("tips fixed", dict(tip="fixed"), "fem03_fem_shear_piles_fixed.png",
-         "fem03_piles_profile_fixed.png", "converged"),
+        ("tips fixed", dict(tip="fixed"), "fem04_fem_shear_piles_fixed.png",
+         "fem04_piles_profile_fixed.png", "converged"),
     ]
     for label, kwargs, figure, prof_fig, prof_state in cases:
-        sd = _fem03_piles_model(**kwargs)
-        mesh = _fem03_mesh(sd)
-        fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
+        sd = _fem04_piles_model(**kwargs)
+        mesh = _fem04_mesh(sd)
+        fem_data, result, solution, seconds = _fem04_solve(sd, mesh)
         if figure:
             capture(figure, plot_fem_results, fem_data, solution,
                     plot_type="shear_strain", fs=result["FS"],
@@ -5394,11 +5458,11 @@ def fem03_tip():
                 fem_data, solution, 1, slope_data=sd, field_state=prof_state,
                 failure_solution=solution.get("failure_solution"))
             capture(prof_fig, plot_pile_detail, prof)
-        _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
-        _fem03_profiles(sd, fem_data, solution)
+        _fem04_report(label, sd, mesh, fem_data, result, solution, seconds)
+        _fem04_profiles(sd, fem_data, solution)
 
 
-def fem03_spacing():
+def fem04_spacing():
     """The page's falsifiable test: the same two pile rows at 3, 6 and 12 ft
     spacing, put through both engines, and through the finite element engine
     twice — once with the shafts' toes free, as the file ships, and once with
@@ -5409,7 +5473,7 @@ def fem03_spacing():
     strength-reduction runs change nothing but the S cell, which reaches the
     model only as the divisor on EA and EI.
     """
-    sd = load_slope_data(FEM03_PILES)
+    sd = load_slope_data(FEM04_PILES)
     _u = declared_unit_labels(sd)
     row = sd["pile_lines"][0]
     D, E = row["D_pile"], row["E"]
@@ -5419,27 +5483,27 @@ def fem03_spacing():
              _u["stress"]))
 
     lem, free, fixed = {}, {}, {}
-    for spacing in FEM03_SPACINGS:
-        model = _fem03_piles_model(spacing=spacing)
-        crit = _fem03_search(model)
+    for spacing in FEM04_SPACINGS:
+        model = _fem04_piles_model(spacing=spacing)
+        crit = _fem04_search(model)
         lem[spacing] = crit["FS"]
-        print("   LEM  S %-5g %s" % (spacing, _fem03_reading(crit)))
+        print("   LEM  S %-5g %s" % (spacing, _fem04_reading(crit)))
 
     for tip, store in (("free", free), ("fixed", fixed)):
-        for spacing in FEM03_SPACINGS:
-            model = _fem03_piles_model(spacing=spacing, tip=tip)
-            mesh = _fem03_mesh(model)
-            fem_data, result, solution, seconds = _fem03_solve(model, mesh)
+        for spacing in FEM04_SPACINGS:
+            model = _fem04_piles_model(spacing=spacing, tip=tip)
+            mesh = _fem04_mesh(model)
+            fem_data, result, solution, seconds = _fem04_solve(model, mesh)
             store[spacing] = result["FS"]
             print("   FEM  tips %s, S %-5g EA/S %.4g · EI/S %.4g"
                   % (tip, spacing, E * area / spacing, E * inertia / spacing))
-            _fem03_report("     ", model, mesh, fem_data, result, solution,
+            _fem04_report("     ", model, mesh, fem_data, result, solution,
                           seconds)
 
-    _fem03_spacing_figure(lem, fixed, free, _u)
+    _fem04_spacing_figure(lem, fixed, free, _u)
 
 
-def _fem03_spacing_figure(lem, fixed, free, _u):
+def _fem04_spacing_figure(lem, fixed, free, _u):
     """The sweep on one axis: the limit equilibrium curve and the two
     strength-reduction lines (tips pinned by the base, tips fixed), each point
     labeled with its own answer.
@@ -5453,7 +5517,7 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
     """
     def _draw(with_fixed=True):
         fig, ax = plt.subplots(figsize=(7.0, 4.6))
-        xs = list(FEM03_SPACINGS)
+        xs = list(FEM04_SPACINGS)
         series = [
             (lem, "LEM (Spencer, Ito & Matsui)", "#1f77b4", "o-"),
             (fixed, "FEM (SSRM, pile tips fixed)", "#9467bd", "^-"),
@@ -5487,10 +5551,10 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
         ax.legend(loc="upper right", frameon=False, fontsize=9)
         fig.tight_layout()
 
-    capture("fem03_spacing_sweep.png", _draw)
+    capture("fem04_spacing_sweep.png", _draw)
 
 
-def fem03_wall():
+def fem04_wall():
     """The continuous wall: the slope the reader starts from, the mesh the wall
     line forces, the two mechanisms its toe condition produces, and the internal
     actions only the finite element engine can give.
@@ -5503,7 +5567,7 @@ def fem03_wall():
     from xslope.plot_fem import plot_fem_data, plot_fem_results
     from xslope.plot_fem_details import plot_pile_detail
 
-    start = load_slope_data(FEM03_WALL_START)
+    start = load_slope_data(FEM04_WALL_START)
     _u = declared_unit_labels(start)
     mat = start["materials"][0]
     print("   model       %s: γ %g %s · c %g %s · φ %g° · E %g %s · ν %g"
@@ -5514,7 +5578,7 @@ def fem03_wall():
           % (len(start["pile_lines"]), start["element_type"],
              start["target_size"], _u["length"], start["ssrm_f_min"],
              start["ssrm_f_max"]))
-    wall = load_slope_data(FEM03_WALL_DONE)["pile_lines"][0]
+    wall = load_slope_data(FEM04_WALL_DONE)["pile_lines"][0]
     print("   wall row    %s: (%g, %g) to (%g, %g) · E %g %s · Area %g %s²/%s · "
           "I %g %s⁴/%s · S %g · D %r · Vcap %r · Mcap %g · head %s · tip %s"
           % (wall["label"], wall["x1"], wall["y1"], wall["x2"], wall["y2"],
@@ -5525,19 +5589,19 @@ def fem03_wall():
     print("   wall EA %.4g · EI %.4g" % (wall["E"] * wall["area"],
                                          wall["E"] * wall["I"]))
 
-    capture("fem03_inputs_wall.png", plot_inputs, start,
+    capture("fem04_inputs_wall.png", plot_inputs, start,
             title="Slope Geometry and Inputs")
 
     # The bare slope, both ways — the baseline both halves of the page measure
     # against, drawn so the reader sees the two mechanisms before any member.
-    crit = _fem03_search(start)
-    capture("fem03_lem_solution_bare.png", plot_solution, start, crit["slices"],
+    crit = _fem04_search(start)
+    capture("fem04_lem_solution_bare.png", plot_solution, start, crit["slices"],
             crit["failure_surface"], crit["solver_result"], frame="content")
-    print("   LEM (bare)  %s" % _fem03_reading(crit))
-    mesh = _fem03_mesh(start)
-    fem_data, result, solution, seconds = _fem03_solve(start, mesh)
-    _fem03_report("no wall", start, mesh, fem_data, result, solution, seconds)
-    capture("fem03_fem_shear_bare.png", plot_fem_results, fem_data, solution,
+    print("   LEM (bare)  %s" % _fem04_reading(crit))
+    mesh = _fem04_mesh(start)
+    fem_data, result, solution, seconds = _fem04_solve(start, mesh)
+    _fem04_report("no wall", start, mesh, fem_data, result, solution, seconds)
+    capture("fem04_fem_shear_bare.png", plot_fem_results, fem_data, solution,
             plot_type="shear_strain", fs=result["FS"],
             failure_solution=result.get("failure_solution"),
             field_state="failure")
@@ -5545,18 +5609,18 @@ def fem03_wall():
     #: (label, tip, 1D element size, keep Mcap, mesh figure, shear-strain figure,
     #: profile figure)
     runs = [
-        ("wall, tip fixed", "fixed", None, True, "fem03_mesh_wall.png",
-         "fem03_wall_shear_fixed.png", "fem03_wall_profiles_fixed.png"),
-        ("wall, tip fixed, 1D 0.5", "fixed", FEM03_REFINED_1D, True, None, None,
-         "fem03_wall_profiles_refined.png"),
+        ("wall, tip fixed", "fixed", None, True, "fem04_mesh_wall.png",
+         "fem04_wall_shear_fixed.png", "fem04_wall_profiles_fixed.png"),
+        ("wall, tip fixed, 1D 0.5", "fixed", FEM04_REFINED_1D, True, None, None,
+         "fem04_wall_profiles_refined.png"),
     ]
     for label, tip, size_1d, keep_cap, mesh_fig, shear_fig, prof_fig in runs:
-        sd = load_slope_data(FEM03_WALL_DONE)
+        sd = load_slope_data(FEM04_WALL_DONE)
         sd["pile_lines"][0]["tip_fixity"] = tip
         if not keep_cap:
             sd["pile_lines"][0]["M_cap"] = None
-        mesh = _fem03_mesh(sd, element_size_1d=size_1d)
-        fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
+        mesh = _fem04_mesh(sd, element_size_1d=size_1d)
+        fem_data, result, solution, seconds = _fem04_solve(sd, mesh)
         if mesh_fig:
             capture(mesh_fig, plot_fem_data, fem_data)
         if shear_fig:
@@ -5564,18 +5628,407 @@ def fem03_wall():
                     plot_type="shear_strain", fs=result["FS"],
                     failure_solution=solution.get("failure_solution"),
                     field_state="failure")
-        _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
-        profs = _fem03_profiles(sd, fem_data, solution)
+        _fem04_report(label, sd, mesh, fem_data, result, solution, seconds)
+        profs = _fem04_profiles(sd, fem_data, solution)
         if prof_fig:
             capture(prof_fig, plot_pile_detail, profs[0])
-            if prof_fig == "fem03_wall_profiles_fixed.png":
+            if prof_fig == "fem04_wall_profiles_fixed.png":
                 # The same wall at the captured mechanism: the moment at the
                 # toe on its capacity, which the page reads next.
                 from xslope import fem_details
                 prof_f = fem_details.pile_profile(
                     fem_data, solution, 0, slope_data=sd, field_state="failure",
                     failure_solution=solution.get("failure_solution"))
-                capture("fem03_wall_profiles_fixed_failure.png", plot_pile_detail, prof_f)
+                capture("fem04_wall_profiles_fixed_failure.png", plot_pile_detail, prof_f)
+
+
+# --------------------------------------------------------------------------- #
+# FEM-5 — A Rock Slope on Its Joints
+#
+# The page runs one section twice. Part 1 cuts a single slab out of the face with
+# two lines — a bedding plane that daylights at the toe and a release joint behind
+# the crest — and the answer is one a reader checks with a calculator, because the
+# rock is elastic and the strength reduction has nothing but the joints to divide.
+# Part 2 replaces them with a base plane and a generated set of steep columns, and
+# the mechanism stops being a slab sliding and becomes columns tipping on it.
+#
+# Both models are built by ``tools/build_rock_joints.py``; nothing here edits one.
+# Every figure is drawn at the settings the page tells the reader to enter, and
+# the numbers printed beside them are what those settings measure.
+#
+# The inputs plots are drawn in the FEM view (``mode="fem"``), which is the view
+# Studio shows a finite element model in and the only one that draws a joint line:
+# the joints worksheet is finite element geometry, and the limit equilibrium view
+# leaves it out the way it leaves out anything the slices do not read.
+# --------------------------------------------------------------------------- #
+FEM05_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_rock_joints_start.xlsx")
+FEM05_SLAB = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_rock_joints.xlsx")
+FEM05_TOPPLE = os.path.join(REPO_ROOT,
+                            "docs/tutorials/files/xslope_rock_toppling.xlsx")
+FEM05_VORONOI = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_rock_voronoi.xlsx")
+#: Build Mesh, at the page's own settings and the files' own declaration:
+#: quadratic triangles at 1.5 m. Quadratic is a requirement rather than a
+#: preference — an interface element spans three node pairs on a tri6 edge and two
+#: on a tri3 one — and the size is what puts a node pair about every metre along a
+#: joint, which is the resolution the slip is read at.
+FEM05_ELEMENT_TYPE = "tri6"
+FEM05_TARGET_SIZE = 1.5
+#: Run FEM: bracket [1.0, 2.0], the dialog's own 0.01 bisection tolerance, and
+#: ``hybrid`` — which is the criterion the dialog opens on for a jointed model and
+#: NOT the ``non_convergence`` the bonded pages run. On a jointed model almost all
+#: of the out-of-balance force sits on the joints, and a pair of faces at its limit
+#: alternates between slipping and sticking as the rock around it breathes, so a
+#: standing trial never converges on force alone; ``hybrid`` reads the slip and the
+#: displacement field together (docs/fem/joints.md, "How a trial is decided").
+FEM05_CRITERION = "hybrid"
+FEM05_F_MIN, FEM05_F_MAX = 1.0, 2.0
+FEM05_TOLERANCE = 0.01
+#: 100,000 sweeps a trial, which is the model checks' floor for a jointed model and
+#: the Run FEM dialog's own ceiling. A joint reaches equilibrium by growing slip a
+#: little per sweep, so a jointed trial settles over tens of thousands of sweeps
+#: where a bonded one settles over hundreds; a trial that runs out of budget is
+#: recorded undecided and read as not standing, which reports the budget rather
+#: than the slope. Allowing more costs nothing on a trial that decides, because a
+#: trial that decides stops — the slab's standing trials each take about 300.
+FEM05_MAX_ITERATIONS = 100000
+#: The spacings the cost table walks, the file's own 1.5 m in the middle. Halving
+#: the spacing of a set doubles its traces, and every trace is a line the mesh is
+#: split along: the table is what that costs in nodes, in interface elements and in
+#: the wall time of one viscoplastic trial.
+FEM05_SPACINGS = (3.0, 1.5, 0.75)
+#: The blocky-mass model: ``voronoi`` over the same joint region, at a block size
+#: and a seed, as ``tools/build_rock_joints.py`` writes it to
+#: ``xslope_rock_voronoi.xlsx``. The two numbers here are for the printout; the
+#: solve reads the workbook. 2 m over the 60.5 m² zone
+#: is about fifteen blocks, which is a mass a reader can still count the cells of
+#: at the width the figure is placed at; the model's own 1.5 m spacing would put
+#: ninety traces in the same wedge.
+FEM05_VORONOI_BLOCK = 2.0
+FEM05_VORONOI_SEED = 7
+
+
+def _rock_joints_module():
+    """Import ``tools/build_rock_joints.py`` as a module (it is a script).
+
+    The column set is regenerated from the builder's OWN dip, offset, region and
+    properties in the spacing table below, so each swept set is the shipped set
+    with one number changed rather than a second description of it that could
+    drift away from the first.
+    """
+    path = os.path.join(REPO_ROOT, "tools", "build_rock_joints.py")
+    spec = importlib.util.spec_from_file_location("build_rock_joints", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _fem05_mesh(model):
+    """The mesh Studio's Build Mesh dialog builds for a jointed model.
+
+    The joint lines are carried in twice, and both are needed: as constraint
+    lines, so every trace lies on element edges, and through
+    ``extract_joint_options``, which is what tells the mesher to SPLIT the mesh
+    along them and give every node on a trace one copy per piece of material
+    around it. Without the second the traces are meshed and bonded, and the model
+    has no joints in it at all.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_joint_options,
+                             extract_point_constraints,
+                             extract_size_regions, get_material_polygons)
+
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(model)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model, reinf_lines=lines),
+            FEM05_TARGET_SIZE, FEM05_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=model.get("element_size_1d"),
+            point_constraints=extract_point_constraints(model),
+            size_regions=extract_size_regions(model),
+            joint_lines=extract_joint_options(model))
+
+
+def _fem05_solve(model, mesh):
+    """One strength reduction at the page's settings, on the reference kernel.
+
+    ``fast_kernel=False`` is pinned the way every producer of a committed number
+    pins it: the compiled Mohr-Coulomb kernel is built on some machines and not
+    others, and a figure has to carry the answer the reference path gives.
+    Returns ``(fem_data, result, seconds)``.
+    """
+    import time
+
+    import run_tests as RT
+    import xslope.fem as _fem
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    fem_data = build_fem_data(model, mesh)
+    t0 = time.time()
+    with RT._force_fast_kernel(_fem, False):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = solve_ssrm(fem_data, F_min=FEM05_F_MIN, F_max=FEM05_F_MAX,
+                                tolerance=FEM05_TOLERANCE, debug_level=0,
+                                failure_criterion=FEM05_CRITERION,
+                                max_iterations=FEM05_MAX_ITERATIONS)
+    return fem_data, result, time.time() - t0
+
+
+def _fem05_counts(label, model, mesh, fem_data):
+    """What the meshed model came to: the three counts the page prints."""
+    jd = fem_data.get("joint_data") or {}
+    print("   %-9s %d nodes · %d elements · %d joint elements on %d jointed "
+          "line(s) · %d row(s) on the joints sheet · %s at %g %s"
+          % (label, len(mesh["nodes"]), len(mesh["elements"]),
+             int(jd.get("n", 0)), len(jd.get("jointed_lines", []) or []),
+             len(model.get("joint_lines") or []), model["element_type"],
+             model["target_size"], declared_unit_labels(model)["length"]))
+
+
+def _fem05_report(label, result, seconds):
+    """The bracket walk: what each trial was asked, and what it answered."""
+    print("   %-9s FS %.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
+          "step(s) · %.0f s"
+          % (label, result["FS"], result["final_interval"][0],
+             result["final_interval"][1], result["interval_width"],
+             result["iterations_ssrm"], seconds))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s sweeps"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    last = result["last_solution"]
+    print("        last standing trial F %.4f · %s · %s sweeps (%s)"
+          % (last.get("F", float("nan")),
+             "equilibrium" if last.get("converged") else "no equilibrium",
+             last.get("iterations"), last.get("exit_reason")))
+
+
+def _fem05_joints(model, fem_data, result):
+    """What every jointed line is doing at the last standing trial.
+
+    Read station by station rather than element by element: a quadratic interface
+    element carries three node pairs and shares its end pairs with the element
+    next along it, so counting slots would count the shared pairs twice.
+    ``fem_details.joint_profile`` keys its record by the split node itself, which
+    makes exactly one record per node pair on the line.
+    """
+    import numpy as np
+
+    from xslope import fem_details
+
+    last = result["last_solution"]
+    units = declared_unit_labels(model)["length"]
+    for line_id in fem_details.joint_line_ids(fem_data, last):
+        prof = fem_details.joint_profile(fem_data, last, line_id,
+                                         slope_data=model,
+                                         field_state="converged")
+        slipping = np.asarray(prof["slipping"], dtype=bool)
+        slip = np.asarray(prof["slip"], dtype=float)
+        opened = np.asarray(prof["open"], dtype=bool)
+        print("   joint     %-11s %d of %d node pair(s) slipping · largest slip "
+              "%.6f %s · %d open · peak |ts|/limit %s · %s"
+              % (prof["label"], int(slipping.sum()), len(slip),
+                 float(slip.max()) if len(slip) else float("nan"), units,
+                 int(opened.sum()),
+                 "n/a" if prof["peak_utilization"] is None
+                 else "%.3f" % prof["peak_utilization"], prof["status"]))
+        # Station by station, bottom to top: the state each node pair is in
+        # (open, slipping or closed) and its slip, which is what the page's
+        # prose reads when it says where along a line the joint has parted.
+        order = np.lexsort((np.asarray(prof["x"], dtype=float),
+                            np.asarray(prof["y"], dtype=float)))
+        for i in order:
+            state = ("open" if opened[i] else
+                     "slipping" if slipping[i] else "closed")
+            print("             %-11s (%.3f, %.3f)  %-8s  slip %.4f mm"
+                  % ("", prof["x"][i], prof["y"][i], state,
+                     abs(float(slip[i])) * 1000.0))
+
+
+def fem05_plots():
+    """The rock arc: the section as the reader opens it, the two joint lines they
+    type into it, the split mesh, and the strength reduction that slides the slab
+    off the face — then the same four for the generated column set that tips on
+    its base plane instead, and the third generator's blocky mass solved at the
+    same settings.
+
+    Printed rather than drawn: the mesh and interface counts of the three models,
+    each bracket walk trial by trial, and every jointed line's state station by
+    station at the last standing trial.
+    """
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+
+    # ---- the section as it opens, and the joints typed into it -------------- #
+    start = load_slope_data(FEM05_START)
+    _u = declared_unit_labels(start)
+    mat = start["materials"][0]
+    print("   rock        %s: γ %g %s · %s · E %g %s · ν %g · %d joint line(s)"
+          % (mat["name"], mat["gamma"], _u["unit_weight"], mat["option"],
+             mat["E"], _u["stress"], mat["nu"], len(start["joint_lines"])))
+    capture("fem05_inputs_start.png", plot_inputs, start, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    slab = load_slope_data(FEM05_SLAB)
+    for row in slab["joint_lines"]:
+        print("   joint line  %-11s (%.4f, %.4f) to (%.4f, %.4f) · c %s %s · "
+              "φ %g° · t_cut %s · kn %s · ks %s"
+              % (row["label"], row["x1"], row["y1"], row["x2"], row["y2"],
+                 row["c"], _u["stress"], row["phi"], row["t_cut"], row["kn"],
+                 row["ks"]))
+    capture("fem05_inputs_joints.png", plot_inputs, slab, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    # ---- part 1: the slab --------------------------------------------------- #
+    mesh = _fem05_mesh(slab)
+    fem_data, result, seconds = _fem05_solve(slab, mesh)
+    _fem05_counts("slab", slab, mesh, fem_data)
+    capture("fem05_mesh.png", plot_fem_data, fem_data)
+    _fem05_report("slab", result, seconds)
+    _fem05_joints(slab, fem_data, result)
+    # ``shear_strain`` is the panel asked for; ``joint_slip`` is what comes back.
+    # The rock is elastic, so there is no viscoplastic strain anywhere for the
+    # contour to draw, and ``plot_fem_results`` renames the panel and drops the
+    # strain colorbar rather than filling the section with a flat zero. The file
+    # is named for what it shows: the joints carrying all of the movement, which
+    # is the whole reading of a slope whose rock cannot yield.
+    capture("fem05_joint_slip.png", plot_fem_results, fem_data,
+            result["last_solution"], plot_type="shear_strain", fs=result["FS"])
+    capture("fem05_fem_blocks.png", plot_fem_results, fem_data,
+            result["last_solution"], plot_type="deformation",
+            fs=result["FS"])
+
+    # ---- part 2: the generated column set ----------------------------------- #
+    topple = load_slope_data(FEM05_TOPPLE)
+    zone = (topple.get("joint_zones") or [{}])[0]
+    print("   network     %d row(s) on the joints sheet · joint region %r"
+          % (len(topple["joint_lines"]), zone.get("label")))
+    capture("fem05_inputs_network.png", plot_inputs, topple, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    mesh_t = _fem05_mesh(topple)
+    fem_t, result_t, seconds_t = _fem05_solve(topple, mesh_t)
+    _fem05_counts("toppling", topple, mesh_t, fem_t)
+    capture("fem05_mesh_network.png", plot_fem_data, fem_t)
+    _fem05_report("toppling", result_t, seconds_t)
+    _fem05_joints(topple, fem_t, result_t)
+    capture("fem05_joint_slip_topple.png", plot_fem_results, fem_t,
+            result_t["last_solution"], plot_type="shear_strain",
+            fs=result_t["FS"])
+    capture("fem05_fem_blocks_topple.png", plot_fem_results, fem_t,
+            result_t["last_solution"], plot_type="deformation",
+            fs=result_t["FS"])
+
+    # ---- the third generator: the Voronoi model ---------------------------- #
+    # ``xslope_rock_voronoi.xlsx`` is the toppling model's section and joint
+    # region with the column set replaced by the Voronoi generator's traces at a
+    # 2 m block size, seed 7, on the same base plane. It is solved at the page's
+    # own settings and drawn the way the toppling pair is.
+    vor = load_slope_data(FEM05_VORONOI)
+    print("   voronoi     block size %g %s · seed %d · region %r → %d row(s) on "
+          "the joints sheet (base plane + %d trace(s))"
+          % (FEM05_VORONOI_BLOCK, _u["length"], FEM05_VORONOI_SEED,
+             zone.get("label"), len(vor["joint_lines"]),
+             len(vor["joint_lines"]) - 1))
+    capture("fem05_inputs_voronoi.png", plot_inputs, vor, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    mesh_v = _fem05_mesh(vor)
+    fem_v, result_v, seconds_v = _fem05_solve(vor, mesh_v)
+    _fem05_counts("voronoi", vor, mesh_v, fem_v)
+    if result_v.get("converged"):
+        _fem05_report("voronoi", result_v, seconds_v)
+    else:
+        # No bracket resolved at the page's settings: say which trials stood and
+        # which did not, at the budget the page gives, rather than raise it.
+        print("   voronoi   no factor of safety · %s · %.0f s"
+              % (result_v.get("error"), seconds_v))
+        for tr in result_v.get("trials") or []:
+            print("        F %.4f  %-6s  %-13s  %s sweeps"
+                  % (tr["F"], tr.get("role"), tr.get("verdict"),
+                     tr.get("iterations")))
+    if result_v.get("last_solution") is not None and result_v.get("FS") is not None:
+        _fem05_joints(vor, fem_v, result_v)
+        capture("fem05_joint_slip_voronoi.png", plot_fem_results, fem_v,
+                result_v["last_solution"], plot_type="shear_strain",
+                fs=result_v["FS"])
+        capture("fem05_fem_blocks_voronoi.png", plot_fem_results, fem_v,
+                result_v["last_solution"], plot_type="deformation",
+                fs=result_v["FS"])
+    else:
+        print("   voronoi   no standing trial — no result panels drawn")
+
+
+def fem05_spacing():
+    """What a closer joint set costs, measured rather than asserted.
+
+    The toppling model's column set is regenerated at three spacings — the file's
+    own 1.5 m, twice it and half it — from ``tools/build_rock_joints.py``'s own
+    dip, offset, region and properties, so each row is the shipped model with one
+    number changed. Nothing is written: the rows go onto a copy of the model in
+    memory, and the workbooks on disk are untouched.
+
+    The time reported is ONE trial of ``solve_fem`` at F = 1.0 — a single
+    viscoplastic solve at full strength, not a bracket — because that is the unit
+    a strength reduction spends its budget in, and it is the same unit at every
+    spacing.
+    """
+    import copy as _copy
+    import time
+
+    import run_tests as RT
+    import xslope.fem as _fem
+    from xslope import joints as xjoints
+    from xslope.fem import build_fem_data, solve_fem
+
+    bld = _rock_joints_module()
+    base_model = load_slope_data(FEM05_TOPPLE)
+    # The base plane is the hand-entered row the builder puts first; every row
+    # after it is the generated set, which is what the sweep replaces.
+    base_plane = base_model["joint_lines"][0]
+    print("   base plane  %-11s (%.4f, %.4f) to (%.4f, %.4f) · φ %g°"
+          % (base_plane["label"], base_plane["x1"], base_plane["y1"],
+             base_plane["x2"], base_plane["y2"], base_plane["phi"]))
+    print("   set         dip %g° · offset %g m · region %r · φ %g°"
+          % (bld.COL_DIP, bld.COL_OFFSET, bld.REGION_LABEL, bld.COL_PHI))
+
+    rows = []
+    for spacing in FEM05_SPACINGS:
+        model = _copy.deepcopy(base_model)
+        traces = xjoints.parallel_set(
+            model, dip_deg=bld.COL_DIP, spacing=spacing, offset=bld.COL_OFFSET,
+            region="poly:%s" % bld.REGION_LABEL, label="col",
+            props={"c": 0.0, "phi": bld.COL_PHI})
+        model["joint_lines"] = [dict(base_plane)] + list(traces)
+        mesh = _fem05_mesh(model)
+        fem_data = build_fem_data(model, mesh)
+        jd = fem_data.get("joint_data") or {}
+        t0 = time.time()
+        with RT._force_fast_kernel(_fem, False):
+            with contextlib.redirect_stdout(io.StringIO()):
+                sol = solve_fem(fem_data, F=1.0, debug_level=0,
+                                max_iterations=FEM05_MAX_ITERATIONS)
+        seconds = time.time() - t0
+        rows.append((spacing, len(traces), len(mesh["nodes"]),
+                     len(mesh["elements"]), int(jd.get("n", 0)), seconds,
+                     sol.get("iterations")))
+        print("   spacing %-5g %d traces · %d nodes · %d elements · %d joint "
+              "elements · %.2f s for one F = 1.0 trial (%s sweeps, %s)"
+              % (spacing, len(traces), len(mesh["nodes"]), len(mesh["elements"]),
+                 int(jd.get("n", 0)), seconds, sol.get("iterations"),
+                 "equilibrium" if sol.get("converged") else "no equilibrium"))
+
+    # Seconds to two places, because at this size the answer is a fraction of one:
+    # a trial at F = 1.0 stands, and a trial that stands stops after a few hundred
+    # sweeps. What a strength reduction spends its time on is the trials that do
+    # NOT stand, which run to the budget — so this column measures how the cost of
+    # one sweep grows with the set, not how long a bracket takes.
+    print("\n   | Spacing | Traces | Nodes | Joint elements | Sweeps | One trial at F = 1 |")
+    print("   | --- | --- | --- | --- | --- | --- |")
+    for spacing, n_traces, n_nodes, _n_el, n_joint, seconds, sweeps in rows:
+        print("   | %g m | %d | %d | %d | %s | %.2f s |"
+              % (spacing, n_traces, n_nodes, n_joint, sweeps, seconds))
 
 
 # --------------------------------------------------------------------------- #
@@ -6805,10 +7258,192 @@ def combo03_rapid():
             plain_res)
 
 
+def fem05_blocks_grid_pair():
+    """The toppling stack's block drawing twice for the joints page: the
+    tutorial's own figure (element grid on, one tint per material), which this
+    group rewrites, and the other way round (grid off, Color by block on), at
+    the same at-failure state and factor."""
+    from xslope.plot_fem import plot_fem_results
+    model = load_slope_data(FEM05_TOPPLE)
+    mesh_t = _fem05_mesh(model)
+    fem_t, result_t, seconds_t = _fem05_solve(model, mesh_t)
+    _fem05_report("toppling", result_t, seconds_t)
+    capture("fem05_fem_blocks_topple.png", plot_fem_results, fem_t,
+            result_t["last_solution"], plot_type="deformation",
+            fs=result_t["FS"])
+    capture("fem05_fem_blocks_topple_colored.png", plot_fem_results, fem_t,
+            result_t["last_solution"], plot_type="deformation",
+            fs=result_t["FS"], block_grid=False, color_blocks=True)
+
+
+# Capture-only cases name the page's own tag, not the older full-run constants.
+# The tag supplies the mesh/model options; the record supplies the search's
+# verdicts, criterion and iteration budget. No record is created by this path.
+_CAPTURE_CASES = {
+    "fem01_plots": [
+        ("fem01_strength_reduction.md", "FEM-1-ssrm", [
+            ("fem01_shear_strain.png", "shear_strain", "failure"),
+            ("fem01_deformed.png", "deformation", "failure"),
+            ("fem01_displacement_vectors.png", "displace_vector", "failure"),
+            ("fem01_shear_strain_converged.png", "shear_strain", "converged"),
+        ], []),
+    ],
+    "fem02_plots": [
+        ("fem02_reinforcement.md", "FEM-2-ssrm", [
+            ("fem02_shear_strain_pr.png", "shear_strain", "failure"),
+            ("fem02_deformed_pr.png", "deformation", "failure"),
+            ("fem02_displacement_vectors_pr.png", "displace_vector", "failure"),
+        ], [("fem02_bar_profile_pr.png", "reinforcement", FEM02_PROFILE_LINE,
+             "converged")]),
+    ],
+    "fem04_piles": [
+        ("fem04_piles.md", "FEM-4-piles-ssrm", [
+            ("fem04_fem_shear_piles.png", "shear_strain", "failure"),
+        ], []),
+    ],
+    "fem04_wall": [
+        ("fem04_piles.md", "FEM-4-bare-ssrm", [
+            ("fem04_fem_shear_bare.png", "shear_strain", "failure"),
+        ], []),
+        ("fem04_piles.md", "FEM-4-wall-ssrm", [
+            ("fem04_wall_shear_fixed.png", "shear_strain", "failure"),
+        ], [("fem04_wall_profiles_fixed.png", "pile", 0, "converged"),
+            ("fem04_wall_profiles_fixed_failure.png", "pile", 0, "failure")]),
+    ],
+    "fem05_plots": [
+        ("fem05_rock_slope_joints.md", "FEM-5-slab-ssrm", [
+            ("fem05_joint_slip.png", "shear_strain", "failure"),
+            ("fem05_fem_blocks.png", "deformation", "failure"),
+        ], []),
+        ("fem05_rock_slope_joints.md", "FEM-5-topple-ssrm", [
+            ("fem05_joint_slip_topple.png", "shear_strain", "failure"),
+            ("fem05_fem_blocks_topple.png", "deformation", "failure"),
+        ], []),
+        ("fem05_rock_slope_joints.md", "FEM-5-voronoi-ssrm", [
+            ("fem05_joint_slip_voronoi.png", "shear_strain", "failure"),
+            ("fem05_fem_blocks_voronoi.png", "deformation", "failure"),
+        ], []),
+    ],
+    "fem05_blocks_grid": [
+        ("fem05_rock_slope_joints.md", "FEM-5-topple-ssrm", [
+            ("fem05_fem_blocks_topple.png", "deformation", "failure"),
+            ("fem05_fem_blocks_topple_colored.png", "blocks_colored", "failure"),
+        ], []),
+    ],
+}
+_CAPTURE_UNRECORDED = {
+    "fem02_plots": "elastic-perfectly-plastic run",
+    "fem04_piles": "head-fixed comparison",
+    "fem04_wall": "refined 0.5 ft wall comparison",
+}
+_CAPTURE_BUDGETS = {
+    "fem01_strength_reduction.md": FEM01_MAX_ITERATIONS,
+    "fem02_reinforcement.md": FEM02_MAX_ITERATIONS,
+    "fem04_piles.md": FEM04_MAX_ITERATIONS,
+    "fem05_rock_slope_joints.md": FEM05_MAX_ITERATIONS,
+}
+
+
+def _capture_recorded_case(page, benchmark, panels, profiles):
+    """Redraw one tagged case. Never search or write a model, mesh or sidecar."""
+    import json
+    import time
+
+    import run_tests as RT
+    import xslope.fem as fem
+    from xslope.plot_fem import plot_fem_results
+
+    md = os.path.join(REPO_ROOT, "docs", "tutorials", page)
+    tags = [tag for tag in RT.parse_test_tags(md)
+            if tag.get("type") == "fem_ssrm" and tag.get("benchmark") == benchmark]
+    if len(tags) != 1:
+        raise RuntimeError(f"{benchmark}: expected one page tag, found {len(tags)}")
+    tag = tags[0]
+    stem = os.path.splitext(tag["file"])[0]
+    candidates = [os.path.join(os.path.dirname(stem), "trial_records",
+                               os.path.basename(stem) + "_fem_meta_" +
+                               benchmark.lower() + ".json"),
+                  stem + "_fem_meta.json"]
+    record_path = next((path for path in candidates if os.path.isfile(path)), None)
+    if record_path is None:
+        print(f"   {benchmark}: no stored trial record; figures left untouched")
+        return False
+    with open(record_path) as fh:
+        record = json.load(fh)
+    if record.get("benchmark", benchmark).lower() != benchmark.lower():
+        raise RuntimeError(f"{benchmark}: stored record belongs to another benchmark")
+    if (record.get("file") and
+            os.path.basename(record["file"]) != os.path.basename(tag["file"])):
+        raise RuntimeError(f"{benchmark}: stored record belongs to another workbook")
+    if abs(float(record["FS"]) - float(tag["expected_fs"])) > float(tag["tolerance"]):
+        raise RuntimeError(f"{benchmark}: stored factor of safety disagrees with page tag")
+    # Check the record before building the mesh or starting any solver work.
+    for key in ("final_interval", "trials", "failure_criterion", "max_iter"):
+        if key not in record:
+            raise RuntimeError(f"{benchmark}: stored record has no {key}")
+    t0 = time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data, kwargs, f_min, f_max, tolerance = RT.build_fem_ssrm_case(tag)
+    kwargs.update(failure_criterion=record["failure_criterion"],
+                  max_iterations=int(record["max_iter"]),
+                  # Trial-record budgets describe the search, not the later
+                  # picture. Keep the full figure producer's capture budget.
+                  capture_max_iterations=record.get("capture_max_iterations",
+                                                     _CAPTURE_BUDGETS[page]),
+                  F_min=record.get("F_min", f_min),
+                  F_max=record.get("F_max", f_max),
+                  tolerance=record.get("tolerance", tolerance),
+                  debug_level=0, capture_failure_state=True)
+    with RT._force_fast_kernel(fem, False):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = fem.capture_failure_from_record(fem_data, record, **kwargs)
+    last, failure = result["last_solution"], result.get("failure_solution")
+    if failure is None or result.get("capture_failed"):
+        raise RuntimeError(f"{benchmark}: no usable at-failure capture; figures left untouched")
+    for filename, kind, state in panels:
+        extra = {}
+        if kind == "blocks_colored":
+            kind = "deformation"
+            extra = dict(block_grid=False, color_blocks=True)
+        capture(filename, plot_fem_results, fem_data, last, plot_type=kind,
+                fs=result["FS"], failure_solution=failure, field_state=state, **extra)
+    if profiles:
+        from xslope import fem_details
+        from xslope.plot_fem_details import plot_pile_detail, plot_reinforcement_detail
+        model = load_slope_data(tag["file"])
+        for filename, kind, line, state in profiles:
+            fn = (fem_details.pile_profile if kind == "pile"
+                  else fem_details.reinforcement_profile)
+            profile = fn(fem_data, last, line, slope_data=model,
+                         field_state=state, failure_solution=failure)
+            capture(filename, plot_pile_detail if kind == "pile"
+                    else plot_reinforcement_detail, profile)
+    print(f"   {benchmark}: {fem.capture_report(result)} ({time.time() - t0:.0f}s)")
+    print(f"   record      {os.path.relpath(record_path, REPO_ROOT)} (unchanged)")
+    for edge in result.get("edges_resolved", []):
+        print(f"   re-solved   {edge}")
+    return True
+
+
+def capture_only(name):
+    """Redraw only recorded FEM cases in a group; missing cases never search."""
+    cases = _CAPTURE_CASES.get(name)
+    if cases is None:
+        print(f"   {name}: no stored trial records for this group; figures left untouched")
+        return False
+    if name in _CAPTURE_UNRECORDED:
+        print(f"   {_CAPTURE_UNRECORDED[name]}: no stored trial record; figures left untouched")
+    drawn = False
+    for case in cases:
+        drawn = _capture_recorded_case(*case) or drawn
+    return drawn
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
     "lem01_plots": lem01_plots,
+    "lem01_crack_water": lem01_crack_water,
     "lem01_placeholders": lem01_placeholders,
     "lem02_sheets": lem02_sheets,
     "lem02_plots": lem02_plots,
@@ -6842,10 +7477,13 @@ GROUPS = {
     "fem02_plots": fem02_plots,
     "fem02_pullout_law": fem02_pullout_law,
     "fem02_tres_sweep": fem02_tres_sweep,
-    "fem03_piles": fem03_piles,
-    "fem03_tip": fem03_tip,
-    "fem03_spacing": fem03_spacing,
-    "fem03_wall": fem03_wall,
+    "fem04_piles": fem04_piles,
+    "fem04_tip": fem04_tip,
+    "fem04_spacing": fem04_spacing,
+    "fem04_wall": fem04_wall,
+    "fem05_plots": fem05_plots,
+    "fem05_blocks_grid": fem05_blocks_grid_pair,
+    "fem05_spacing": fem05_spacing,
     "combo01_plots": combo01_plots,
     "combo02_plots": combo02_plots,
     "combo02_seep": combo02_seep,
@@ -6856,7 +7494,24 @@ GROUPS = {
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    capturing = "--capture-only" in argv
     os.makedirs(OUT_DIR, exist_ok=True)
+    if capturing:
+        argv.remove("--capture-only")
+        names = [name for name in GROUPS if name.startswith("fem") and
+                 (not argv or any(arg in name for arg in argv))]
+        if not names:
+            print(f"no FEM figure group matching {argv}")
+            return 1
+        failed = 0
+        for name in names:
+            print(f"== {name} (capture only)")
+            try:
+                capture_only(name)
+            except Exception as exc:
+                print(f"   {name}: {exc}; no search attempted")
+                failed += 1
+        return 1 if failed else 0
     names = [n for n in GROUPS
              if not argv or any(a in n for a in argv)]
     if not names:

@@ -17,23 +17,15 @@ CONFIG = PageConfig(
     # page makes in its own voice rather than XSLOPE-against-source.
     #   (printed, distinctive substring of the line, value-for, value-against)
     whitelist=[
-        ('+0.8', '[RS2-63](#rs2-63)', '1.391', '1.38'),
-        ('+5.5', 'the other φ = 0 foundation problem', '1.488', '1.41'),
-        ('+9.0', 'is not a search that stopped early', '0.169', '0.155'),
-        ('+2.7', 'the three locks within ±2.7%', '0.339', '0.33'),
         # RS2 against itself: the section's two vendor columns, read out of the
         # table the sentence sits under.
         ('+6.1', 'vendor answers are 6.1% apart', '1.05', '0.99'),
-        ('+1.8', 'The same uncapped machinery is within 1.8%', '1.669', '1.64'),
-        ('+3.2', 'baseline is within 3.2% at every frame', '1.713', '1.77'),
         ('+1.1', 'The two vendor numbers landing within', '1.9', '1.88'),
         ('+2.5', 'the three answers agree within', '1.25', '1.219'),
-        ('+1.9', 'that rounding is worth', '0.997', '0.978'),
         ('+15.6', "above Slide2's own Spencer on an identical slope", '1.11', '0.960'),
         ('+3.0', 'one count in the last place', '0.34', '0.33'),
         ('+23.2', 'GEO FEM reads 23.2% above', '1.17', '0.95'),
         ('+11.3', 'above PLAXIS on #58 case 3', '0.59', '0.53'),
-        ('+4.2', "the paper's 2.5 × 10⁻⁵", '2.605', '2.5'),
     ],
 
     # Absolute factor-of-safety differences whose partner value the page does
@@ -41,7 +33,23 @@ CONFIG = PageConfig(
     # Published values quoted in prose beside the row's own lock: RS2's native
     # shallow rebuild of problem 43 is a different model's number.
     untagged_allow=[
+        # VP51 is an LEM row; the vendor catalog's RS2 SSRM value is quoted, not scored.
+        ('1.22', 'the RS2 SSRM value of 1.22 in the catalog'),
         ('1.19', 'The 1.19 published for this problem'),
+        # the geotextile wall rows that print the factor their search found
+        # without confirming it (RS2-49, 51, 52, 53, 54)
+        ('1.018', 'unconfirmed'),
+        ('1.037', 'unconfirmed'),
+        # Source papers' own numbers quoted in prose, each named as the paper's:
+        # El-Ramly et al.'s deterministic Bishop on measured band pressures
+        # (RS2-25, shown, not scored); Cheng et al.'s Fig. 13c value for the
+        # surface RS2-61's case-3 window does not reach; the low end of the
+        # paper's Table 4 range for Phase on RS2-62 Analysis III; and the paper's
+        # own strength-reduction value on RS2-63, recorded, not a referee.
+        ('1.30', "so the paper's 1.30 answers a different water"),
+        ('1.415', 'toe-to-top-crest surface of Fig. 13c (Cheng 1.415'),
+        ('0.74', 'inside the 0.74–0.84 the paper reports for Phase'),
+        ('1.47', "The paper's own strength-reduction result for this slope is 1.47"),
         # RS2-49's published spread needed two entries here while its section
         # printed those numbers in prose alone. The section now opens with the
         # same table a locked row has — referee and RS2 SSR, XSLOPE reading
@@ -56,25 +64,19 @@ CONFIG = PageConfig(
     # that a new worded percentage fails until someone reads it.
     worded_ok=[
         "agreeing to a quarter of a percent",
-        "costs about a percent, not several",
     ],
 
     # Statements of a BOUND or a SHARE rather than a comparison of two printed
     # factors: no pair exists to re-derive, so each is named here explicitly.
     bounds=[
-        ('+4.2', 'lighter by section area'),
-        ('+1.8', "the polygon's area is within"),
         ('+14', 'by 14% at 12.5 kPa'),
         ('+25', 'by 25% at 5 kPa'),
         ('+43', 'by 43% at 1 kPa'),
         ('+3', 'worth ~2–3% here'),
-        ('+39.2', 'larger than the Mohr-Coulomb corridor'),
-        ('+3.5', 'Every case lands within 3.5% of unity'),
         ('+1', 'stages land within 1% of'),
         ('+2.3', 'within 2.3% of RS2 at all three thicknesses'),
-        ('+0.8', 'land within 0.8%'),
         ('+2.2', 'that still lands within 2.2%'),
-        ('+2.1', 'lands within 2.1% of'),
+        ('+3.5', 'Every case lands within 3.5% of unity'),
         ('+20', 'runs about 20% low'),
         # RS2-18: a bound over both cases against the scored vendor column.
         ('+0.8', "lands within 0.8% of RS2's own model"),

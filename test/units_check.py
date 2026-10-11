@@ -407,18 +407,25 @@ def _make_v18(mutate=None, raw_cells=None):
     return tmp
 
 
-def _expect_load_error(path, needle, label):
+def _expect_preflight(path, rule_id, analysis, needle, label):
+    """The file opens (the loader reads structure only), and preflight names the
+    value when the analysis that reads it is checked."""
     import warnings as _w
     from xslope.fileio import load_slope_data
+    from xslope.preflight import preflight
     try:
         with _w.catch_warnings():
             _w.simplefilter("ignore")
-            load_slope_data(path)
+            sd = load_slope_data(path)
     except Exception as e:  # noqa: BLE001
-        if needle in str(e):
-            return []
-        return [f"{label}: raised but message lacked {needle!r}: {e!r}"]
-    return [f"{label}: expected a raise mentioning {needle!r}, none occurred"]
+        return [f"{label}: the file did not reopen: {e!r}"]
+    hits = [f for f in preflight(sd, analysis).findings if f.rule_id == rule_id]
+    if not hits:
+        return [f"{label}: reopened, but preflight({analysis!r}) did not report "
+                f"{rule_id}"]
+    if not any(needle in f.message for f in hits):
+        return [f"{label}: {rule_id} fired without {needle!r}: {hits[0].message!r}"]
+    return []
 
 
 def check_v18_selector_semantics():
@@ -553,7 +560,8 @@ def check_v18_tseep_absent_is_legacy():
 
 
 def check_v18_validation_errors():
-    """The four load-time validation rules fire with clear, specific messages."""
+    """The transient and boundary-set value rules: each file OPENS, and the
+    preflight rule for the analysis that reads the value names it."""
     import os as _os
     from xslope.fileio import write_cells_to_xlsx
     if not _v18_fixtures_present():
@@ -562,12 +570,14 @@ def check_v18_validation_errors():
 
     # tseep present but no time_unit declared.
     tmp = _make_v18(lambda sd: _transient_mutation(sd, time_unit=None))
-    fails += _expect_load_error(tmp, "Time unit", "tseep-requires-time_unit")
+    fails += _expect_preflight(tmp, "tseep.time_unit_missing", "tseep",
+                               "no time unit", "tseep-requires-time_unit")
     _os.remove(tmp)
 
     # Ss required for every material with a tseep sheet.
     tmp = _make_v18(lambda sd: _transient_mutation(sd, ss=None))
-    fails += _expect_load_error(tmp, "Ss", "Ss-required")
+    fails += _expect_preflight(tmp, "tseep.storage_nonpositive", "tseep", "Ss",
+                               "Ss-required")
     _os.remove(tmp)
 
     # Sy required when unconfined (the base file has an exit-face BC).
@@ -576,7 +586,8 @@ def check_v18_validation_errors():
                       or base["seepage_bc2"].get("exit_face"))
     if unconfined:
         tmp = _make_v18(lambda sd: _transient_mutation(sd, sy=None))
-        fails += _expect_load_error(tmp, "Sy", "Sy-required-unconfined")
+        fails += _expect_preflight(tmp, "tseep.storage_nonpositive", "tseep",
+                                   "Sy", "Sy-required-unconfined")
         _os.remove(tmp)
 
     # A BC bound to an undefined series name -> hard error.
@@ -584,7 +595,8 @@ def check_v18_validation_errors():
         _transient_mutation(sd)
         sd["seepage_bc"]["specified_heads"][0]["head"] = "does_not_exist"
     tmp = _make_v18(_bad_series)
-    fails += _expect_load_error(tmp, "not defined", "bad-series-name")
+    fails += _expect_preflight(tmp, "seep.series_undefined", "tseep",
+                               "not defined", "bad-series-name")
     _os.remove(tmp)
 
     # A non-numeric BC value with NO tseep sheet -> error (nothing to bind to).
@@ -596,7 +608,8 @@ def check_v18_validation_errors():
             m["Sy"] = None
     tmp = _make_v18(_no_tseep)
     write_cells_to_xlsx(tmp, {"seep bc": {"F3": "myseries"}})  # F3 = first block value cell
-    fails += _expect_load_error(tmp, "time-series", "string-BC-without-tseep")
+    fails += _expect_preflight(tmp, "seep.series_undefined", "seep",
+                               "defines no time series", "string-BC-without-tseep")
     _os.remove(tmp)
 
     # 'seep bc (2)' is the constant-steady rapid-drawdown set: a reservoir type there
@@ -607,7 +620,8 @@ def check_v18_validation_errors():
             {"head": 12.0, "kind": "reservoir", "coords": [(0.0, 0.0), (10.0, 5.0)]}]
         sd["has_seepage_bc2"] = True
     tmp = _make_v18(_bc2_reservoir)
-    fails += _expect_load_error(tmp, "reservoir", "bc2-reservoir-rejected")
+    fails += _expect_preflight(tmp, "seep.set2_reservoir", "seep", "reservoir",
+                               "bc2-reservoir-rejected")
     _os.remove(tmp)
 
     # A time-series value on 'seep bc (2)' is likewise rejected (even though the series
@@ -618,7 +632,8 @@ def check_v18_validation_errors():
             {"head": "res", "kind": "head", "coords": [(0.0, 0.0), (10.0, 5.0)]}]
         sd["has_seepage_bc2"] = True
     tmp = _make_v18(_bc2_series)
-    fails += _expect_load_error(tmp, "time-varying", "bc2-series-rejected")
+    fails += _expect_preflight(tmp, "seep.set2_time_series", "seep",
+                               "names the time series", "bc2-series-rejected")
     _os.remove(tmp)
 
     # A valid CONSTANT set-2 (plain head) loads clean and round-trips its value/kind.
@@ -689,6 +704,72 @@ def check_elastic_props_declared_system():
     return fails
 
 
+def check_time_unit_outside_the_list():
+    """A declared time unit outside the template's list draws a warning naming the
+    units it accepts; a listed unit (in any case), or none, draws nothing.
+
+    The list is the template's own (the Time selector's validation range), and the
+    Claude Code skill and its bundled copy name every unit on it -- the skill once
+    left out 'yr'.
+    """
+    import contextlib
+    import io
+    import re
+    import warnings as _w
+    import openpyxl
+    from xslope.fileio import load_slope_data
+    from xslope.preflight import TIME_UNITS, preflight
+    fails = []
+
+    with _w.catch_warnings():
+        _w.simplefilter("ignore")
+        ws = openpyxl.load_workbook(_V18_TEMPLATE)["main"]
+    listed = None
+    for dv in ws.data_validations.dataValidation:
+        if "D9" in str(dv.sqref) and dv.formula1:
+            first, last = dv.formula1.replace("$", "").split(":")
+            col, r0, r1 = first[0], int(first[1:]), int(last[1:])
+            listed = tuple(str(ws[f"{col}{r}"].value).strip()
+                           for r in range(r0, r1 + 1) if ws[f"{col}{r}"].value)
+    if listed != TIME_UNITS:
+        fails.append(f"the template's Time list {listed!r} is not the list the "
+                     f"check accepts {TIME_UNITS!r}")
+
+    path = os.path.join(_REPO_ROOT, "docs", "lem", "files",
+                        "xslope_simple_mult_layers.xlsx")
+    with contextlib.redirect_stdout(io.StringIO()), _w.catch_warnings():
+        _w.simplefilter("ignore")
+        sd = load_slope_data(path)
+
+    def findings(unit):
+        sd["time_unit"] = unit
+        return [f for f in preflight(sd, "lem").findings
+                if f.rule_id == "units.time_unit_unknown"]
+
+    for unit in (None, "", "  ") + TIME_UNITS + ("Day", "YR"):
+        if findings(unit):
+            fails.append(f"time unit {unit!r} is on the list, but drew a warning")
+    for unit in ("days", "s", "hours", "month"):
+        hits = findings(unit)
+        if not hits:
+            fails.append(f"time unit {unit!r} is not on the list, and passed silently")
+        elif hits[0].severity != "warning":
+            fails.append(f"time unit {unit!r} drew a {hits[0].severity}, not a warning")
+        elif ", ".join(TIME_UNITS) not in hits[0].message:
+            fails.append(f"the warning for {unit!r} does not say which units are "
+                         f"accepted: {hits[0].message!r}")
+
+    for rel in (("docs", "usage", "claude", "xslope.md"),
+                ("xslope", "resources", "xslope_skill.md")):
+        text = open(os.path.join(_REPO_ROOT, *rel), encoding="utf-8").read()
+        line = next((ln for ln in text.splitlines() if "'time_unit':" in ln), "")
+        named = set(re.findall(r"'(\w+)'", line.split("#", 1)[-1]))
+        missing = [u for u in TIME_UNITS if u not in named]
+        if missing:
+            fails.append(f"{'/'.join(rel)} leaves out the time unit(s) {missing}")
+    return fails
+
+
 def main():
     print("xslope.units unit checks:")
     checks = [
@@ -709,6 +790,7 @@ def main():
         ("v18 tseep absent = legacy", check_v18_tseep_absent_is_legacy),
         ("v18 validation errors", check_v18_validation_errors),
         ("elastic_props declared system", check_elastic_props_declared_system),
+        ("time unit outside the list", check_time_unit_outside_the_list),
     ]
     failures = []
     for name, fn in checks:

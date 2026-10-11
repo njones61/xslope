@@ -1,7 +1,7 @@
 """Builders for the RS2 JOINT-analysis verification corpus (docs/verification/rs2_joints.md).
 
 Rocscience's *RS2 Joint Verification* manual carries 23 problems on jointed rock:
-block and flexural toppling, plane failure, Alejano's sliding and ploughing slabs,
+block and flexural toppling, plane failure, Alejano's sliding and plowing slabs,
 step-path failure, a Voronoi-tessellated mass, a jointed tunnel, and two problems
 that exercise the joint's own constitutive law rather than a slope. Twenty-one of
 them report a factor of safety (or, for problem 16, a tilt angle); problems 22 and
@@ -10,7 +10,7 @@ them report a factor of safety (or, for problem 16, a tilt angle); problems 22 a
 **Naming.** One file per problem, ``rjNNN.xlsx`` with the manual's own problem
 number — ``rj018.xlsx`` is problem 18 — and a letter suffix where the manual
 carries lettered cases (``rj001a``…``rj001d``). Variants the manual does not
-letter take a descriptive suffix (``rj016_3deg``). The ``rj`` prefix separates
+letter take a descriptive suffix (``rj016_3deg``, ``rj003_chapter``). The ``rj`` prefix separates
 this corpus from the ``vpNNN`` Slide2 one and the ``rs2_NN`` RS2 slope-stability
 one, both of which are numbered by a different manual.
 
@@ -21,6 +21,18 @@ inclination), and the model is what RS2 actually solved. The manual supplies the
 referee — the closed form or the UDEC run each problem is scored against — and
 RS2's own two reported factors. The vendor files are NOT redistributed; the page
 records what was read from them.
+
+Problems 3, 4, 5 and 7, the Lorig & Varona examples, carry a second file each.
+Their source (Wyllie & Mah 2004, ch. 10) prints one property list for the
+section, with joints that have no cohesion where the vendor's files carry
+100 kPa, and a rock that can yield where the files for problems 3 and 5 hold it
+elastic. Each row (``rj003.xlsx`` …) is posed on the vendor's file with the
+joints as the chapter lists them, friction only (owner's ruling 2026-10-02,
+Q36 a): the UDEC answers the rows are scored against come from the chapter,
+whose joints carry no cohesion. The printed list in full, with the yielding
+rock, is kept beside it with the suffix ``_chapter`` (``rj003_chapter.xlsx`` …).
+Geometry, stiffnesses and restraints are the vendor's in both. Problem 6 states
+its own joint cohesion, 100 kPa, and has one file.
 
 **Units.** The vendor models are Metric MPa with unit weight in MN/m^3. These
 files are written in metric kPa / kN/m^3, which is the unit system the rest of the
@@ -44,7 +56,7 @@ from xslope.fileio import load_slope_data                           # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx    # noqa: E402
 from xslope.fileio import build_ground_surface_from_polygons        # noqa: E402
 from xslope.joints import cross_jointed, parallel_set               # noqa: E402
-from benchmarks.tag_k0 import apply_tag_k0                          # noqa: E402
+from benchmarks.tag_k0 import apply_declared_k0                     # noqa: E402
 from rj020_voronoi import EXTERNAL as RJ20_RING, TRACES as RJ20_TRACES  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -71,6 +83,9 @@ def _base():
     # and none of them has water, so the value is inert but it must not be wrong.
     sd['gamma_water'] = 9.81
     sd['profile_lines'] = []
+    # No failure surface: every file here is run by the strength reduction only,
+    # which never reads the circles or non-circ sheets, and nothing runs a
+    # limit-equilibrium surface on them.
     sd['circles'] = []
     sd['non_circ'] = []
     sd['piezo_line'] = []
@@ -124,42 +139,6 @@ def _offset_through(dip_deg, x, y):
     return float(x) * nx + float(y) * ny
 
 
-def _toe_chord(toe, crest):
-    """The seed surface for an ELASTIC section whose mechanism is not one plane.
-
-    A limit-equilibrium surface cannot be sliced on a model whose rock is
-    elastic: an elastic zone cannot fail, so the slicer refuses any surface that
-    crosses one, and the starting circle the house rule draws is refused with it.
-    What the file needs is a surface at all — the loader will not read a model
-    with no failure surface, no mesh and no seepage boundary condition — and a
-    strength reduction never reads it. So an elastic row carries the chord
-    between the two points the house rule draws its circle through, toe to
-    crest, as a non-circular surface.
-    """
-    return _surface([toe, crest])
-
-
-def _toe_circle(toe, crest):
-    """A starting circle for a section whose mechanism is not a single plane.
-
-    Centred above mid-slope at the toe elevation plus twice the slope height and
-    passing through the toe, which is the starting circle a user would draw on
-    this section. It is what makes the file a complete slope-stability model;
-    a strength reduction never reads it. A section whose rock is ELASTIC takes
-    :func:`_toe_chord` instead — a circle cannot be sliced through a zone that
-    cannot fail.
-    """
-    (tx, ty), (cx, cy) = toe, crest
-    xo = 0.5 * (tx + cx)
-    yo = ty + 2.0 * (cy - ty)
-    r = ((xo - tx) ** 2 + (yo - ty) ** 2) ** 0.5
-    # Depth is the elevation of the circle's lowest point, and the loader reads
-    # it in preference to R, so the two have to agree or the stated radius is
-    # replaced by one that reaches elevation zero.
-    return [{'Xo': float(xo), 'Yo': float(yo), 'Depth': float(yo - r),
-             'R': float(r)}]
-
-
 def _joint(label, p1, p2, c, phi, kn=KN_STD, ks=KS_STD, t_cut=0.0,
            c_res=None, phi_res=None, dil=None, jred=''):
     """One row of the joints sheet, in kPa."""
@@ -174,19 +153,6 @@ def _joint(label, p1, p2, c, phi, kn=KN_STD, ks=KS_STD, t_cut=0.0,
             't_cut': t_cut, 'kn': kn, 'ks': ks, 'jred': jred}
 
 
-def _surface(points):
-    """A non-circular failure surface through the stated points.
-
-    The two ends are Free — they are on the ground surface and the slicer finds
-    where — and every point between them is Fixed. Each carries an explicit Y,
-    which is what a Free end needs.
-    """
-    n = len(points)
-    return [{'X': float(x), 'Y': float(y),
-             'Movement': 'Free' if i in (0, n - 1) else 'Fixed'}
-            for i, (x, y) in enumerate(points)]
-
-
 def _finish(sd, rings_and_ids, materials):
     """Install the geometry and derive the surface the loader would."""
     sd['materials'] = materials
@@ -198,17 +164,19 @@ def _finish(sd, rings_and_ids, materials):
 
 
 def _write(sd, name):
-    """Write one corpus file, declaring the K0 its own test tag names.
+    """Write one corpus file, declaring the K0 its row is run under.
 
     The initial stress has to live in the FILE, not only in the tag, or the
     locked factor is reproducible from the suite and from nothing a user would
-    open. ``apply_tag_k0`` reads the page's own tag and clears K0 where no tag
-    names one, which is what stops a donor's value riding into a problem that
-    never asked for it.
+    open. ``apply_declared_k0`` reads the page's own tag; for a row reported
+    without a tag it reads the producer's registration of that row
+    (``rs2_joint_cases``), the same entry the reported factor was solved with.
+    Where neither names a K0 it clears it, which is what stops a donor's value
+    riding into a problem that never asked for it.
     """
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name)
-    apply_tag_k0(sd, path)
+    apply_declared_k0(sd, path)
     _write_xlsx(sd, path)
     return name
 
@@ -219,10 +187,32 @@ def _write(sd, name):
 LV_RING = [(0.0, 0.0), (700.0, 0.0), (700.0, 140.0), (560.0, 140.0),
            (377.785587105239, 400.0), (0.0, 400.0)]
 
-#: The joint the same four problems carry: c = 0.1 MPa, phi = 40 degrees. The
-#: manual's tables for problems 3 to 7 state the friction angle and no cohesion
-#: at all; 0.1 MPa is the models' own value and it is what is built.
+#: The joint the vendor's models for problems 3 to 7 carry: c = 0.1 MPa,
+#: phi = 40 degrees. Problem 6 is the one example in the source chapter (Wyllie
+#: & Mah 2004, ch. 10, Lorig & Varona) that states this cohesion itself, and
+#: the only one that carries it; problems 3, 4, 5 and 7 carry LV_JOINT_FRICTION.
 LV_JOINT = {'c': 100.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
+
+#: The joint the source chapter's property list gives the 260 m / 55 degree
+#: section: friction 40 degrees, dilation 0, and no cohesion, the list naming a
+#: cohesion only for the rock mass. Problem 7's text calls its planes
+#: "cohesionless". The ``_chapter`` files of problems 3, 4, 5 and 7 carry it;
+#: the stiffness pair is the vendor's, which the chapter does not state.
+LV_JOINT_BOOK = {'c': 0.0, 'phi': 40.0, 't_cut': 0.0, 'kn': KN_STD, 'ks': KS_STD}
+
+#: The joint the scored files of problems 3, 4, 5 and 7 carry: the vendor's joint
+#: (phi 40 degrees, t_cut 0, the vendor's stiffness pair) with its 100 kPa of
+#: cohesion set to zero. Owner's ruling 2026-10-02 (Q36 a): the referee for these
+#: rows is UDEC as the source chapter reports it, and the chapter's joints are
+#: friction only; RS2's own numbers in the manual were computed with the vendor's
+#: 100 kPa, so they are shown beside the rows and are not like for like. The rock
+#: stays the vendor's (elastic on problems 3 and 5).
+LV_JOINT_FRICTION = dict(LV_JOINT, c=0.0)
+
+#: The rock mass of the same list: 2660 kg/m^3 (26.1 kN/m^3), c = 675 kPa,
+#: phi = 43 degrees, no tension, bulk 6.3 GPa and shear 3.6 GPa, which is
+#: E = 9.072 GPa and nu = 0.26.
+LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C, LV_ROCK_PHI = 9.072e6, 0.26, 675.0, 43.0
 
 
 
@@ -410,9 +400,6 @@ def _gb_case(name, phi_joint, toe_force=0.0):
         sd['line_loads'] = [{'label': 'toe force',
                              'x': GB_FORCE_CORNER[0], 'y': GB_FORCE_CORNER[1],
                              'P': float(toe_force), 'angle': 0.0}]
-    # The seed surface is the basal plane the stack stands on, toe to crest.
-    sd['non_circ'] = _surface([(-0.5, 0.866025403784439),
-                               (130.56406460551, 93.856406460551)])
     return _write(sd, name)
 
 
@@ -505,15 +492,22 @@ def rj002():
     sd['joint_lines'] = [
         _joint('basal', (20.0, 10.0), (2.9393, 19.85), 0.0, 31.0),
     ] + columns
-    # The seed surface is the basal joint: the plane the toppling column stack
-    # stands on. Inert for a strength reduction, and it makes the file complete.
-    sd['non_circ'] = _surface([(20.0, 10.0), (2.9393, 19.85)])
     return _write(sd, 'rj002.xlsx')
 
 
 # ---------------------------------------------------------------------------
 # Problem 3 — Lorig & Varona forward block toppling
 # ---------------------------------------------------------------------------
+
+def _rj003(name, rock, joint):
+    """Problem 3's section and two sets, with the given rock and joint."""
+    sd = _base()
+    _finish(sd, [(LV_RING, 0)], [rock])
+    sd['joint_lines'] = cross_jointed(
+        parallel_set(sd, 70.0, 20.0, label='col', props=joint),
+        parallel_set(sd, -20.0, 30.0, label='cross', props=joint))
+    return _write(sd, name)
+
 
 def rj003():
     """RJ-3 — Lorig & Varona forward block toppling (vendor `joint #003.fez`).
@@ -524,22 +518,44 @@ def rj003():
     same pair measured the other way round the half circle.
 
     The rock is ELASTIC, so only the joints can fail. gamma = 26.0946 kN/m^3,
-    E = 9.072 GPa, nu = 0.26. Referee: UDEC 1.13. RS2 reports 1.12 without joint
-    improvement and 1.09 with it.
+    E = 9.072 GPa, nu = 0.26. The joints carry phi = 40 degrees and no cohesion
+    (LV_JOINT_FRICTION; the vendor's file gives them c = 100 kPa).
+    Referee: UDEC 1.13. RS2 reports 1.12 without joint improvement and 1.09
+    with it.
     """
-    sd = _base()
-    mats = [_rock('Rock', 26.0946, 9.072e6, 0.26, 0.0, 0.0, option='elastic')]
-    _finish(sd, [(LV_RING, 0)], mats)
-    sd['joint_lines'] = cross_jointed(
-        parallel_set(sd, 70.0, 20.0, label='col', props=LV_JOINT),
-        parallel_set(sd, -20.0, 30.0, label='cross', props=LV_JOINT))
-    sd['non_circ'] = _toe_chord((560.0, 140.0), (377.785587105239, 400.0))
-    return _write(sd, 'rj003.xlsx')
+    return _rj003('rj003.xlsx',
+                  _rock('Rock', 26.0946, LV_ROCK_E, LV_ROCK_NU, 0.0, 0.0,
+                        option='elastic'),
+                  LV_JOINT_FRICTION)
+
+
+def rj003_chapter():
+    """RJ-3c — problem 3 on the source chapter's printed property list.
+
+    Same geometry as :func:`rj003`. The rock is Mohr-Coulomb with c = 675 kPa,
+    phi = 43 degrees and no tension, E = 9.072 GPa, nu = 0.26, and the joints
+    have phi = 40 degrees and no cohesion; gamma = 26.0946 kN/m^3 is the
+    vendor's value. Shown beside the row, not scored.
+    """
+    return _rj003('rj003_chapter.xlsx',
+                  _rock('Rock', 26.0946, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C,
+                        LV_ROCK_PHI, t_cut=0.0),
+                  LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
 # Problem 4 — Lorig & Varona flexural toppling
 # ---------------------------------------------------------------------------
+
+def _rj004(name, joint):
+    """Problem 4's section, rock and single set, with the given joint."""
+    sd = _base()
+    mats = [_rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C, LV_ROCK_PHI,
+                  t_cut=0.0)]
+    _finish(sd, [(LV_RING, 0)], mats)
+    sd['joint_lines'] = parallel_set(sd, 70.0, 20.0, label='col', props=joint)
+    return _write(sd, name)
+
 
 def rj004():
     """RJ-4 — Lorig & Varona flexural toppling (vendor `joint #004.fez`).
@@ -550,20 +566,36 @@ def rj004():
 
     The rock is Mohr-Coulomb and carries a tensile cutoff of zero, which is what
     lets a column break in flexure: gamma = 26.1 kN/m^3, E = 9.072 GPa,
-    nu = 0.26, c = 675 kPa, phi = 43 degrees, T = 0. Referee: UDEC 1.3. RS2
-    reports 1.19 without joint improvement and 1.27 with it.
+    nu = 0.26, c = 675 kPa, phi = 43 degrees, T = 0. The joints carry
+    phi = 40 degrees and no cohesion (LV_JOINT_FRICTION; the vendor's file gives
+    them c = 100 kPa). Referee: UDEC 1.3. RS2 reports 1.19
+    without joint improvement and 1.27 with it.
     """
-    sd = _base()
-    mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
-    _finish(sd, [(LV_RING, 0)], mats)
-    sd['joint_lines'] = parallel_set(sd, 70.0, 20.0, label='col', props=LV_JOINT)
-    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
-    return _write(sd, 'rj004.xlsx')
+    return _rj004('rj004.xlsx', LV_JOINT_FRICTION)
+
+
+def rj004_chapter():
+    """RJ-4c — problem 4 on the source chapter's printed property list: the same
+    rock as :func:`rj004`, joints at phi = 40 degrees with no cohesion. Shown
+    beside the row, not scored."""
+    return _rj004('rj004_chapter.xlsx', LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
 # Problem 5 — Lorig & Varona backward block toppling
 # ---------------------------------------------------------------------------
+
+def _rj005(name, rock, joint):
+    """Problem 5's section and two sets, with the given rock and joint."""
+    sd = _base()
+    _finish(sd, [(LV_RING, 0)], [rock])
+    sd['joint_lines'] = cross_jointed(
+        parallel_set(sd, -55.0, 10.0, offset=_offset_through(-55.0, 560.0, 140.0),
+                     label='dip', props=joint),
+        parallel_set(sd, 0.0, 40.0, offset=_offset_through(0.0, 0.0, 400.0),
+                     label='bed', props=joint))
+    return _write(sd, name)
+
 
 def rj005():
     """RJ-5 — Lorig & Varona backward block toppling (vendor `joint #005.fez`).
@@ -572,20 +604,30 @@ def rj005():
     toe at (560, 140) — dipping out of the face, so the blocks topple backward —
     and a horizontal set at 40 m spacing through (0, 400).
 
-    The rock is ELASTIC. gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26.
-    Referee: UDEC 1.7. RS2 reports 1.65 without joint improvement and 1.86 with
-    it — the widest "joint improvement" spread in the manual.
+    The rock is ELASTIC. gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26. The
+    joints carry phi = 40 degrees and no cohesion (LV_JOINT_FRICTION; the
+    vendor's file gives them c = 100 kPa). Referee: UDEC 1.7. RS2
+    reports 1.65 without joint improvement and 1.86 with it — the widest
+    "joint improvement" spread in the manual.
     """
-    sd = _base()
-    mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 0.0, 0.0, option='elastic')]
-    _finish(sd, [(LV_RING, 0)], mats)
-    sd['joint_lines'] = cross_jointed(
-        parallel_set(sd, -55.0, 10.0, offset=_offset_through(-55.0, 560.0, 140.0),
-                     label='dip', props=LV_JOINT),
-        parallel_set(sd, 0.0, 40.0, offset=_offset_through(0.0, 0.0, 400.0),
-                     label='bed', props=LV_JOINT))
-    sd['non_circ'] = _toe_chord((560.0, 140.0), (377.785587105239, 400.0))
-    return _write(sd, 'rj005.xlsx')
+    return _rj005('rj005.xlsx',
+                  _rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, 0.0, 0.0,
+                        option='elastic'),
+                  LV_JOINT_FRICTION)
+
+
+def rj005_chapter():
+    """RJ-5c — problem 5 on the source chapter's printed property list.
+
+    Same geometry as :func:`rj005`. The rock is Mohr-Coulomb:
+    gamma = 26.1 kN/m^3, E = 9.072 GPa, nu = 0.26, c = 675 kPa, phi = 43
+    degrees, no tension; the joints have phi = 40 degrees and no cohesion.
+    Shown beside the row, not scored.
+    """
+    return _rj005('rj005_chapter.xlsx',
+                  _rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C,
+                        LV_ROCK_PHI, t_cut=0.0),
+                  LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
@@ -608,16 +650,22 @@ def rj006():
     mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
     _finish(sd, [(LV_RING, 0)], mats)
     sd['joint_lines'] = parallel_set(sd, -35.0, 10.0, label='jnt', props=LV_JOINT)
-    # The seed surface is the daylighting plane itself: the 35 degree joint
-    # through the toe of the face, back to where it reaches the crest plateau.
-    # Inert for a strength reduction, and it makes the file a complete model.
-    sd['non_circ'] = _surface([(188.6478, 400.0), (560.0, 140.0)])
     return _write(sd, 'rj006.xlsx')
 
 
 # ---------------------------------------------------------------------------
 # Problem 7 — plane failure, non-daylighting discontinuities
 # ---------------------------------------------------------------------------
+
+def _rj007(name, joint):
+    """Problem 7's section, rock and single set, with the given joint."""
+    sd = _base()
+    mats = [_rock('Rock', 26.1, LV_ROCK_E, LV_ROCK_NU, LV_ROCK_C, LV_ROCK_PHI,
+                  t_cut=0.0)]
+    _finish(sd, [(LV_RING, 0)], mats)
+    sd['joint_lines'] = parallel_set(sd, -70.0, 20.0, label='jnt', props=joint)
+    return _write(sd, name)
+
 
 def rj007():
     """RJ-7 — plane failure with non-daylighting discontinuities (`joint #007.fez`).
@@ -626,18 +674,22 @@ def rj007():
     -70 degrees at 20 m spacing through the origin. The joints now dip out of
     the face STEEPER than the 55 degree face, so none of them daylights: a slab
     cannot slide out along one without shearing rock, and the slope stands
-    higher than problem 6's.
+    higher than problem 6's. The joints carry phi = 40 degrees and no cohesion
+    (LV_JOINT_FRICTION; the vendor's file gives them c = 100 kPa).
 
     Referee: UDEC 1.5. RS2 reports 1.57 without joint improvement and 1.59 with
     it. The manual's own table prints the slope angle as 5 degrees; the figure
     and the model are the same 55 degrees problem 6 uses.
     """
-    sd = _base()
-    mats = [_rock('Rock', 26.1, 9.072e6, 0.26, 675.0, 43.0, t_cut=0.0)]
-    _finish(sd, [(LV_RING, 0)], mats)
-    sd['joint_lines'] = parallel_set(sd, -70.0, 20.0, label='jnt', props=LV_JOINT)
-    sd['circles'] = _toe_circle((560.0, 140.0), (377.785587105239, 400.0))
-    return _write(sd, 'rj007.xlsx')
+    return _rj007('rj007.xlsx', LV_JOINT_FRICTION)
+
+
+def rj007_chapter():
+    """RJ-7c — problem 7 on the source chapter's printed property list, whose
+    text calls these sliding planes "cohesionless": the same rock as
+    :func:`rj007`, joints at phi = 40 degrees with no cohesion. Shown beside the
+    row, not scored."""
+    return _rj007('rj007_chapter.xlsx', LV_JOINT_BOOK)
 
 
 # ---------------------------------------------------------------------------
@@ -669,12 +721,15 @@ def rj008():
     _finish(sd, [(ring, 0)], mats)
     kn, ks = 1.5e7, 1.0e7
     props = {'c': 0.0, 'phi': 39.0, 't_cut': 0.0, 'kn': kn, 'ks': ks}
-    # The column set exists only ABOVE the basal joint, which is how the vendor
-    # file states it: its 13 stored segments are clipped to the block bounded
-    # below by y = 6 and on the left by the face, not to the whole section. The
-    # same region generated over the whole section would put columns under the
-    # basal joint, where the model has none.
-    stack = [(15.0, 6.0), (72.407, 6.0), (72.407, 36.5), (21.48, 36.5)]
+    # The column set exists only inside the block the basal joint and the back
+    # joint bound, which is how the vendor file states it: its 12 stored column
+    # chains are clipped below by y = 6, on the left by the face and on the
+    # right by the back joint at x = 68.4, not to the whole section. Generated
+    # over the section the set would put columns under the basal joint and
+    # behind the back joint, where the model has none: the three highest would
+    # each run on past x = 68.4 into the strip the vendor leaves uncut, adding
+    # 24 m of trace the vendor has no counterpart for.
+    stack = [(15.0, 6.0), (68.4, 6.0), (68.4, 36.5), (21.48, 36.5)]
     columns = parallel_set(sd, -60.0, 5.08,
                            offset=_offset_through(-60.0, 21.48, 36.5),
                            region=stack, label='col', props=props)
@@ -683,14 +738,12 @@ def rj008():
         _joint('base-2', (68.4, 6.0), (72.407, 6.0), 0.0, 39.0, kn=kn, ks=ks),
         _joint('back', (68.4, 36.5), (68.4, 6.0), 0.0, 39.0, kn=kn, ks=ks),
     ] + columns
-    # The seed surface is the basal joint the column stack stands on.
-    sd['non_circ'] = _surface([(15.0, 6.0), (72.407, 6.0)])
     return _write(sd, 'rj008.xlsx')
 
 
 
 # ---------------------------------------------------------------------------
-# Problems 9 to 14 — Alejano et al. sliding and ploughing slabs
+# Problems 9 to 14 — Alejano et al. sliding and plowing slabs
 #
 # Each release trace runs from the crest down onto a bedding plane, and the
 # vendor states its lower tip to six decimals, so the tip lands 2e-7 to 2e-6
@@ -781,7 +834,6 @@ def _alejano(name, round6=False):
         for j in sd['joint_lines']:
             for k in ('x1', 'y1', 'x2', 'y2'):
                 j[k] = round(float(j[k]), 6)
-    sd['non_circ'] = _toe_chord((0.0, 0.0), (ring[-3][0], ring[-3][1]))
     return _write(sd, name + '.xlsx')
 
 
@@ -809,7 +861,7 @@ def rj010():
 
 
 def rj011():
-    """RJ-11 — ploughing sliding slab failure (vendor `joint #011.fez`).
+    """RJ-11 — plowing sliding slab failure (vendor `joint #011.fez`).
 
     A 25 m slope with bedding at -50 degrees at 1.5 m (phi = 30) and two release
     traces at phi = 20, one of which ends inside the rock at the toe. Referee:
@@ -819,7 +871,7 @@ def rj011():
 
 
 def rj012():
-    """RJ-12 — ploughing toppling slab failure (vendor `joint #012.fez`).
+    """RJ-12 — plowing toppling slab failure (vendor `joint #012.fez`).
 
     Bedding at -60 degrees at 1.5 m (phi = 30) with releases at phi = 40.
     Referee: UDEC 1.78. RS2 reports 1.39 without joint improvement and 1.75 with
@@ -829,7 +881,7 @@ def rj012():
 
 
 def rj013():
-    """RJ-13 — ploughing sliding slab, example 4 (vendor `joint #013.fez`).
+    """RJ-13 — plowing sliding slab, example 4 (vendor `joint #013.fez`).
 
     Bedding at -55 degrees at 1.5 m (phi = 25) with releases at phi = 20.
     Referee: UDEC 1.0. RS2 reports 1.0 without joint improvement and 1.05 with
@@ -839,7 +891,7 @@ def rj013():
 
 
 def rj014():
-    """RJ-14 — ploughing sliding slab, example 5 (vendor `joint #014.fez`).
+    """RJ-14 — plowing sliding slab, example 5 (vendor `joint #014.fez`).
 
     Example 4's section with the release joint moved and the two strengths the
     other way round: bedding at -60 degrees at 1.5 m at phi = 20, releases at
@@ -856,9 +908,11 @@ def rj014():
 def rj015():
     """RJ-15 — partially joint-controlled footwall slope (`joint #015.fez`).
 
-    A 25 m footwall at 40 degrees with bedding dipping the same way at the same
+    A 40 m footwall at 40 degrees with bedding dipping the same way at the same
     angle, 2 m apart, so the slabs are parallel to the face and the failure has
-    to break rock at the toe to get out. That is the one problem in this family
+    to break rock at the toe to get out. The manual's table prints the slope
+    height as 25 m; the vendor's own section is 40 m high, which is also the
+    height the source paper states, and the section is what is built. That is the one problem in this family
     whose rock can yield: Mohr-Coulomb, c = 200 kPa, phi = 35 degrees,
     gamma = 28 kN/m^3, E = 1 GPa, nu = 0.3.
 
@@ -877,7 +931,6 @@ def rj015():
     _finish(sd, [(ring, 0)], mats)
     props = {'c': 0.0, 'phi': 25.0, 't_cut': 0.0, 'kn': 5.0e6, 'ks': 5.0e5}
     sd['joint_lines'] = parallel_set(sd, -40.0, 2.0, label='bed', props=props)
-    sd['circles'] = _toe_circle((0.0, 0.0), (-47.6701, 40.0))
     return _write(sd, 'rj015.xlsx')
 
 # ---------------------------------------------------------------------------
@@ -961,9 +1014,6 @@ def rj016():
                        props['c'], props['phi'],
                        kn=props['kn'], ks=props['ks']))
     sd['joint_lines'] = rows
-    # The seed surface: the staircase face itself, toe to crest. A strength
-    # reduction never reads it, and an elastic section cannot be sliced.
-    sd['non_circ'] = _toe_chord((0.09, 0.09), (0.45, 0.9))
     return _write(sd, 'rj016.xlsx')
 
 
@@ -1056,7 +1106,6 @@ def _rj017(name, elastic_ring):
     # the search area, because that is the region the vendor holds.
     sd['ssr_zones'] = [{'kind': 'hold_elastic',
                         'polygon': [(float(x), float(y)) for x, y in elastic_ring]}]
-    sd['circles'] = _toe_circle((17.0, 8.2), (26.9, 20.0))
     return _write(sd, name)
 
 
@@ -1124,11 +1173,6 @@ def rj018():
         _joint('joint-2', (19.3571, 11.0095), (31.7, 20.0), 1.0, 35.0),
         _joint('joint-3', (21.7143, 13.819), (30.2, 20.0), 1.0, 35.0),
     ]
-    # The seed failure surface. A rock slope cut by through-going joints does not
-    # fail on a circle, and the surface worth shipping with the file is the one
-    # the joints draw: the lowest joint, from the toe of the face to the crest.
-    # Inert for a strength reduction, and it makes the file a complete model.
-    sd['non_circ'] = _surface([(17.0, 8.2), (33.2, 20.0)])
     return _write(sd, 'rj018.xlsx')
 
 
@@ -1161,10 +1205,6 @@ def rj019():
         _joint('basal', (39.0149, 35.0248), (63.0, 48.0), 0.0, 40.0),
         _joint('upper', (62.0, 49.0), (76.0, 70.0), 0.0, 40.0),
     ]
-    # The seed surface is the bi-planar path itself: up the basal joint, across
-    # the rock bridge, and out along the upper one.
-    sd['non_circ'] = _surface([(39.0149, 35.0248), (63.0, 48.0),
-                               (76.0, 70.0)])
     return _write(sd, 'rj019.xlsx')
 
 
@@ -1208,10 +1248,6 @@ def _rj020(name, joint_lines):
     mats = [_rock('Rock', 27.0, 2.0e7, 0.3, 1000.0, 35.0, t_cut=0.0)]
     _finish(sd, [(RJ20_RING, 0)], mats)
     sd['joint_lines'] = joint_lines(sd)
-    # The seed surface. A blocky mass has no one plane to fail on, so the file
-    # carries the starting circle a user would draw through the toe at (10, 10)
-    # and the crest at (30, 70). A strength reduction never reads it.
-    sd['circles'] = _toe_circle((10.0, 10.0), (30.0, 70.0))
     return _write(sd, name)
 
 
@@ -1243,8 +1279,9 @@ def rj020():
 #: Every builder in this module, in problem-number order. ``verify_rebuild.py``'s
 #: ``joints`` group is this list, so a builder missing here is a corpus file
 #: nothing guards.
-BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj003, rj004, rj005,
-            rj006, rj007, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
+BUILDERS = [rj001a, rj001b, rj001c, rj001d, rj002, rj015, rj016,
+            rj003, rj003_chapter, rj004, rj004_chapter, rj005, rj005_chapter,
+            rj006, rj007, rj007_chapter, rj008, rj009, rj010, rj011, rj012, rj013, rj014,
             rj017, rj017_staircase, rj018, rj019, rj020]
 
 

@@ -1,15 +1,11 @@
 """Render the illustration figures for docs/fem/overview.md.
 
-Four figures land in docs/fem/images/ with the fem_ov_ prefix:
+Three figures land in docs/fem/images/ with the fem_ov_ prefix:
 
   fem_ov_viscoplastic_loop.png  Flow diagram of the viscoplastic algorithm: one
                                 factorization, the per-Gauss-point yield check, the
                                 body-load correction, and the two convergence tests
                                 with the hybrid verdict that follows them.
-  fem_ov_tension_cutoff.png     The Mohr-Coulomb envelope in the tensile quadrant —
-                                the implicit apex at c/tan(phi), its invariance under
-                                strength reduction, and the Rankine cap t_cut that
-                                removes it.
   fem_ov_k0_initial.png         Initial lateral effective stress with depth: the
                                 gravity turn-on's nu/(1-nu) coefficient against
                                 stated K0 values.
@@ -18,8 +14,11 @@ Four figures land in docs/fem/images/ with the fem_ov_ prefix:
                                 against F, marked by whether the trial reached
                                 equilibrium, with the bisection's factor of safety.
 
-The first three are closed-form schematics. The fourth runs the solver on the
+The first two are closed-form schematics. The third runs the solver on the
 committed sample docs/fem/files/xslope_griffiths1.xlsx (about a minute).
+
+The tension-cutoff schematic is exported from the private repo's
+drawings/docs/fem/tension_cutoff/ source; this script never overwrites it.
 
 Run from the repo root:  python tools/make_fem_overview_figures.py
 """
@@ -38,6 +37,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "docs", "fem", "images")
 SAMPLE = os.path.join(HERE, "..", "docs", "fem", "files", "xslope_griffiths1.xlsx")
+FEM01_CURVE_TOLERANCE = 0.02  # Overview figure only; tutorial tolerance is unchanged.
 
 # ---- shared palette -------------------------------------------------------
 C_INK = "#1f2933"
@@ -155,72 +155,6 @@ def fig_viscoplastic_loop():
 
 
 # ===========================================================================
-# Figure 2 — the tensile quadrant: apex, reduction, Rankine cap
-# ===========================================================================
-
-def fig_tension_cutoff():
-    c, phi = 20.0, 35.0                 # kPa, degrees
-    F = 2.0
-    tanphi = np.tan(np.radians(phi))
-    apex = -c / tanphi                  # sigma' at tau = 0  (about -28.6 kPa)
-    t_cut = 5.0                         # a stated tensile strength, kPa
-
-    fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.3), sharey=True)
-
-    for ax, cap in zip(axes, (None, t_cut)):
-        s = np.linspace(-40, 60, 400)
-        env = c + s * tanphi
-        env_r = c / F + s * (tanphi / F)
-
-        ax.plot(s[env >= 0], env[env >= 0], color=C_ACCENT, linewidth=2.0)
-        ax.plot(s[env_r >= 0], env_r[env_r >= 0], color=C_ACCENT2, linewidth=2.0,
-                linestyle=(0, (6, 3)))
-        ax.axhline(0, color=C_MUTED, linewidth=0.9)
-        ax.axvline(0, color=C_MUTED, linewidth=0.9)
-
-        ax.plot([apex], [0], marker="o", markersize=7, color=C_INK, zorder=5)
-        ax.annotate("apex  $\\sigma'_t = -c/\\tan\\phi$\nunmoved by $F$",
-                    xy=(apex, 0.4), xytext=(apex + 3, 13),
-                    fontsize=9, color=C_INK, ha="left",
-                    arrowprops=dict(arrowstyle="->", color=C_INK, linewidth=1.0))
-
-        ax.text(26, 34, "$\\tau = c + \\sigma'\\tan\\phi$",
-                color=C_ACCENT, fontsize=9.5, ha="left", va="top", zorder=6)
-        ax.text(44, 19.5, "reduced by $F$",
-                color=C_ACCENT2, fontsize=9.5, ha="left", va="top", zorder=6)
-
-        if cap is None:
-            ax.fill_between([apex, 0], 0, 46, color="#f3d9d4", alpha=0.75, zorder=0)
-            ax.text((apex) / 2, 40, "tension carried\nby the criterion alone",
-                    fontsize=9, color=C_RED, ha="center", va="center")
-            ax.set_title("No cutoff — the Griffiths & Lane convention",
-                         fontsize=10.5, color=C_INK)
-        else:
-            # tension is negative on this axis, so a tensile strength T sits at -T
-            ax.axvline(-cap, color=C_GREEN, linewidth=1.8)
-            ax.axvline(-cap / F, color=C_GREEN, linewidth=1.4, linestyle=(0, (4, 3)))
-            ax.fill_between([apex, -cap], 0, 46, color="#e6e9ec", alpha=0.9, zorder=0)
-            ax.text(-cap + 1.5, 40.5, "$-T$", fontsize=9, color=C_GREEN,
-                    ha="left", va="center")
-            ax.text(-cap / F + 1.5, 35.5, "$-T/F$", fontsize=9, color=C_GREEN,
-                    ha="left", va="center")
-            ax.text((apex - cap) / 2 - 1, 40, "removed by the\nRankine cap",
-                    fontsize=9, color=C_INK, ha="center", va="center")
-            ax.set_title("With a stated tensile strength (mat!t_cut)",
-                         fontsize=10.5, color=C_INK)
-
-        ax.set_xlim(-40, 60)
-        ax.set_ylim(0, 46)
-        ax.set_xlabel("effective normal stress $\\sigma'$   (tension negative)", fontsize=9.5)
-        _tidy(ax)
-
-    axes[0].set_ylabel("shear stress $\\tau$", fontsize=9.5)
-    fig.text(0.5, -0.03,
-             "c = 20 kPa, $\\phi$ = 35°, strength reduced by F = 2",
-             ha="center", fontsize=9, color=C_MUTED)
-    fig.tight_layout()
-    _finish(fig, "fem_ov_tension_cutoff.png")
-
 
 # ===========================================================================
 # Figure 3 — initial lateral stress: gravity turn-on vs stated K0
@@ -237,45 +171,80 @@ def _label_along(ax, k, gamma, depth, text, color, fontsize=9.0):
 
 
 def fig_k0_initial():
-    gamma = 19.0          # kN/m3
+    gamma = 19.0          # kN/m3: same uniform dry column as the previous figure
     z = np.linspace(0, 12, 200)
     sv = gamma * z
 
-    fig, ax = plt.subplots(figsize=(7.6, 5.2))
+    fig = plt.figure(figsize=(4.9, 6.1))
+    gs = fig.add_gridspec(2, 2, height_ratios=(1.1, 2.0),
+                          left=0.12, right=0.98, bottom=0.19, top=0.91,
+                          wspace=0.36, hspace=0.24)
 
-    # The gravity turn-on's coefficient is nu/(1-nu): a band, not a value, because
-    # nu is chosen for reasons of its own.
-    k_lo, k_hi = 0.2 / 0.8, 0.4 / 0.6
-    ax.fill_betweenx(z, k_lo * sv, k_hi * sv, color="#f7e6dc", zorder=0)
-    ax.plot(0.3 / 0.7 * sv, z, color=C_ACCENT2, linewidth=1.8, linestyle=(0, (6, 3)))
-    for k0 in (1.0, 1.5):
-        ax.plot(k0 * sv, z, color=C_ACCENT, linewidth=2.0)
+    def element(ax, title, relation, color):
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis("off")
+        ax.set_title(title, fontsize=8.3, color=C_INK, pad=9)
+        ax.add_patch(plt.Rectangle((0.1, 0.02), 0.8, 0.88,
+                                   facecolor="#e5d2ad", alpha=0.3, edgecolor="none"))
+        ax.plot([0.1, 0.9], [0.9, 0.9], color=C_INK, linewidth=0.9)
+        ax.add_patch(plt.Rectangle((0.39, 0.34), 0.26, 0.24,
+                                   facecolor="white", edgecolor=C_INK, linewidth=0.9))
+        for tail, tip in (((0.52, 0.77), (0.52, 0.59)),
+                          ((0.52, 0.14), (0.52, 0.33))):
+            ax.annotate("", xy=tip, xytext=tail,
+                        arrowprops=dict(arrowstyle="-|>", color=C_INK, linewidth=0.9))
+        for tail, tip in (((0.17, 0.46), (0.38, 0.46)),
+                          ((0.87, 0.46), (0.66, 0.46))):
+            ax.annotate("", xy=tip, xytext=tail,
+                        arrowprops=dict(arrowstyle="-|>", color=color, linewidth=0.9))
+        ax.text(0.52, 0.81, r"$\sigma'_v$ from overburden",
+                fontsize=7.5, ha="center", color=C_INK)
+        ax.text(0.84, 0.53, r"$\sigma'_h$", fontsize=8, ha="center", color=color)
+        ax.annotate("", xy=(0.1, 0.46), xytext=(0.1, 0.9),
+                    arrowprops=dict(arrowstyle="<->", color=C_INK, linewidth=0.7))
+        ax.text(0.045, 0.66, "$z$", fontsize=8, ha="right", color=C_INK)
+        ax.text(0.52, -0.03, relation, fontsize=8.3, ha="center", color=color)
 
-    ax.set_xlim(0, 400)
-    ax.set_ylim(12, 0)
-    ax.set_xlabel("initial lateral effective stress $\\sigma'_h$   (kPa)", fontsize=9.5)
-    ax.set_ylabel("depth below level ground   (m)", fontsize=9.5)
-    _tidy(ax)
+    element(fig.add_subplot(gs[0, 0]),
+            "Gravity turn-on\nElastic, zero lateral strain",
+            r"$\sigma'_h=\frac{\nu}{1-\nu}\,\sigma'_v$", C_ACCENT2)
+    element(fig.add_subplot(gs[0, 1]),
+            "At-rest initialization\nSpecified $K_0$",
+            r"$\sigma'_h=K_0\,\sigma'_v$", C_ACCENT)
 
-    _label_along(ax, 0.3 / 0.7, gamma, 6.6,
-                 "gravity turn-on,  $\\nu$ = 0.3", C_ACCENT2)
-    _label_along(ax, k_hi, gamma, 3.4, "$\\nu$ = 0.4", C_ACCENT2, fontsize=8.5)
-    _label_along(ax, k_lo, gamma, 10.6, "$\\nu$ = 0.2", C_ACCENT2, fontsize=8.5)
-    _label_along(ax, 1.0, gamma, 7.6,
-                 "$K_0$ = 1.0   compacted fill, RS2", C_ACCENT)
-    _label_along(ax, 1.5, gamma, 6.4,
-                 "$K_0$ = 1.5   overconsolidated clay", C_ACCENT)
+    for column in (0, 1):
+        ax = fig.add_subplot(gs[1, column])
+        ax.plot(sv, z, color=C_INK, linewidth=1.5, label=r"$|\sigma'_v|$")
+        if column == 0:
+            k_lo, k_hi = 0.2 / 0.8, 0.4 / 0.6
+            ax.fill_betweenx(z, k_lo * sv, k_hi * sv, color="#f7e6dc", zorder=0,
+                             label=r"$\nu=0.2$–$0.4$")
+            ax.plot(0.3 / 0.7 * sv, z, color=C_ACCENT2, linewidth=1.4,
+                    linestyle=(0, (6, 3)), label=r"$|\sigma'_h|,\ \nu=0.3$")
+        else:
+            for k0, style in ((0.5, (0, (5, 3))), (1.5, "solid")):
+                ax.plot(k0 * sv, z, color=C_ACCENT, linewidth=1.1, linestyle=style,
+                        label=rf"$|\sigma'_h|,\ K_0={k0:.1f}$")
+        ax.set_xlim(0, 400)
+        ax.set_ylim(12, 0)
+        ax.set_xticks((0, 200, 400))
+        ax.set_yticks((0, 4, 8, 12))
+        ax.set_xlabel("Stress magnitude (kPa)", fontsize=7.5)
+        if column == 0:
+            ax.set_ylabel("Depth below level ground (m)", fontsize=7.5)
+        _tidy(ax)
+        ax.tick_params(labelsize=7.2)
+        ax.legend(loc="upper right", fontsize=6.8, framealpha=1, edgecolor=C_GRID,
+                  borderpad=0.4, handlelength=1.5, labelspacing=0.45)
 
-    ax.text(0.985, 0.965,
-            "solid: at-rest initialization — $\\sigma'_h = K_0\\sigma'_v$, stated with the soil\n"
-            "dashed band: gravity turn-on — $\\sigma'_h$ follows from Poisson's ratio",
-            transform=ax.transAxes, fontsize=9.0, color=C_INK, va="top", ha="right",
-            bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
-                      edgecolor=C_GRID))
-
-    fig.tight_layout()
+    fig.text(0.31, 0.105, r"Gravity band: $\nu=0.2$–$0.4$",
+             ha="center", fontsize=7.4, color=C_INK)
+    fig.text(0.31, 0.075, r"Shown line: $\nu=0.3$",
+             ha="center", fontsize=7.4, color=C_INK)
+    fig.text(0.55, 0.025, r"$\gamma=19$ kN/m$^3$; both vertical profiles are the same.",
+             ha="center", fontsize=7.5, color=C_INK)
     _finish(fig, "fem_ov_k0_initial.png")
-
 
 # ===========================================================================
 # Figure 4 — strength-reduction sweep on the Griffiths & Lane Example 1 sample
@@ -342,8 +311,125 @@ def fig_ssrm_sweep():
     _finish(fig, "fem_ov_ssrm_sweep.png")
 
 
+def fig_capture_comparison():
+    """Reload Tutorial W-3's saved standing and failure fields; never solve."""
+    import tempfile
+    from PIL import Image
+    from tools.make_tutorial_figures import capture
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, import_fem_solution, import_fem_meta
+    from xslope.plot_fem import plot_fem_results
+
+    stem = os.path.join(HERE, "..", "docs", "tutorials", "files",
+                        "xslope_johnson_res_solved")
+    data = load_slope_data(stem + ".xlsx")
+    fem_data = build_fem_data(data)
+    standing = import_fem_solution(fem_data, stem)
+    failure = standing.get("failure_solution")
+    if not standing.get("converged") or not failure or failure.get("converged"):
+        raise ValueError("The committed tutorial must hold both distinct field states")
+    meta = import_fem_meta(stem)
+    if not meta or meta.get("F") is None:
+        raise ValueError("The saved SSRM record must identify the converged trial factor")
+    # Match Studio's saved-result reload: CSV import restores the field, while
+    # the run record supplies its trial factor independently of the reported FS.
+    standing = {**standing, "F": meta["F"]}
+    panels = []
+    with tempfile.TemporaryDirectory(prefix="xslope_capture_panels_") as tmp:
+        for state in ("converged", "failure"):
+            # Exactly the FEM-1/FEM-2 tutorial export path: its capture helper
+            # saves the plotter-owned, aspect-sized figure at 200 dpi, tight,
+            # with the shared fonts and no per-figure style or save overrides.
+            path = capture(
+                os.path.join(tmp, state + ".png"), plot_fem_results,
+                fem_data, standing, plot_type="deformation", field_state=state,
+                failure_solution=failure, fs=meta["FS"], ssrm_record=meta,
+                deform_scale=1.0)
+            with Image.open(path) as panel:
+                panels.append(panel.convert("RGB"))
+
+    # Preserve each standard render pixel for pixel. Only add white padding
+    # and a separator; never replace titles, legends or the selected 1x scale.
+    gap = 16
+    combined = Image.new("RGB", (max(p.width for p in panels),
+                                  sum(p.height for p in panels) + gap), "white")
+    y = 0
+    for panel in panels:
+        x = (combined.width - panel.width) // 2
+        combined.paste(panel, (x, y))
+        assert combined.crop((x, y, x + panel.width, y + panel.height)).tobytes() == panel.tobytes()
+        y += panel.height + gap
+    path = os.path.abspath(os.path.join(OUT, "fem_capture_comparison.png"))
+    combined.save(path, dpi=(200, 200))
+    print("wrote", path, "from saved W-3 fields; no solve", flush=True)
+
+
+def run_fem1_curve():
+    """Figure-only FEM-1 search at the wider tolerance; launch through the gate."""
+    import json
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, solve_ssrm
+    from tools.make_tutorial_figures import (
+        FEM01_DONE, FEM01_CRITERION, FEM01_F_MIN, FEM01_F_MAX,
+        FEM01_MAX_ITERATIONS, _fem01_mesh)
+
+    tolerance = FEM01_CURVE_TOLERANCE
+    model = load_slope_data(FEM01_DONE)
+    fem_data = build_fem_data(model, _fem01_mesh(model))
+    result = solve_ssrm(
+        fem_data, F_min=FEM01_F_MIN, F_max=FEM01_F_MAX, tolerance=tolerance,
+        max_iterations=FEM01_MAX_ITERATIONS, failure_criterion=FEM01_CRITERION,
+        capture_failure_state=False, debug_level=1)
+    record = {key: result.get(key) for key in (
+        "FS", "final_interval", "interval_width", "trials", "fs_is_lower_bound", "summary")}
+    record.update(benchmark="FEM-1-overview-tol-0.02", analysis="ssrm",
+                  file="docs/tutorials/files/xslope_ssrm_embankment.xlsx",
+                  tolerance=tolerance, F_min=FEM01_F_MIN, F_max=FEM01_F_MAX,
+                  max_iter=FEM01_MAX_ITERATIONS, failure_criterion=FEM01_CRITERION,
+                  target_size=model["target_size"], element_type=model["element_type"],
+                  unit_system=model.get("unit_system"), figure_only=True)
+    path = os.path.join(OUT, "fem01_ssrm_curve_fem_meta.json")
+    with open(path, "w") as stream:
+        json.dump(record, stream, indent=2,
+                  default=lambda value: value.tolist() if isinstance(value, np.ndarray)
+                  else value.item() if isinstance(value, np.generic) else str(value))
+        stream.write("\n")
+    print("wrote figure-only record", path, flush=True)
+    fig_displacement_curves()
+
+
+def fig_displacement_curves():
+    """Replay only the figure-only FEM-1 record, without a new solve."""
+    import json
+    from xslope.fileio import load_slope_data
+    from xslope.plot_fem import plot_ssrm_curve
+
+    model = load_slope_data(os.path.join(HERE, "..", "docs", "tutorials", "files",
+                                        "xslope_ssrm_embankment.xlsx"))
+    with open(os.path.join(OUT, "fem01_ssrm_curve_fem_meta.json")) as stream:
+        record = json.load(stream)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    plot_ssrm_curve(ax, record, fem_data=model)
+    fig.tight_layout()
+    print("FEM-1", ax.get_title(), ax.get_ylabel(),
+          [t.get_text() for t in ax.get_legend().get_texts()], flush=True)
+    path = os.path.abspath(os.path.join(OUT, "fem01_ssrm_curve.png"))
+    fig.savefig(path, dpi=150, facecolor="white")
+    plt.close(fig)
+    print("wrote", path, "from saved record; no solve", flush=True)
+
+
 if __name__ == "__main__":
-    fig_viscoplastic_loop()
-    fig_tension_cutoff()
-    fig_k0_initial()
-    fig_ssrm_sweep()
+    if sys.argv[1:] == ["run-fem1-curve"]:
+        run_fem1_curve()
+    elif sys.argv[1:] == ["displacement-curves"]:
+        fig_displacement_curves()
+    elif sys.argv[1:] == ["capture-comparison"]:
+        fig_capture_comparison()
+    elif sys.argv[1:]:
+        raise SystemExit("usage: make_fem_overview_figures.py "
+                         "[run-fem1-curve|displacement-curves|capture-comparison]")
+    else:
+        fig_viscoplastic_loop()
+        fig_k0_initial()
+        fig_ssrm_sweep()

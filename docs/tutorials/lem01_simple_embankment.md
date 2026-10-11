@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-1 — Simple Embankment"
-description: "Build a single-material embankment in XSLOPE from scratch — with the AI assistant, in the Excel template, or in Studio — find its critical failure surface with Spencer's method, and learn to read what the results are telling you about the model."
+description: "Build a single-material embankment in XSLOPE from scratch — with the AI assistant, in the Excel template, or in Studio — find its critical failure surface with Spencer's method, and learn to read the warnings that come with the result."
 ---
 
 # Tutorial LEM-1 — Simple Embankment
@@ -9,7 +9,7 @@ The section below is a 20 ft embankment on a rigid foundation, one soil througho
 with a 1:1 face and a level crest. Its strength is a cohesion of 500 psf and no
 friction angle — a **total-stress undrained** strength.
 
-![Simple embankment problem](../lem/sample_images/simple_embankment.png){width=700}
+![The embankment: 20 ft high on a rigid base with a 1:1 face, one soil](images/lem01_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -23,8 +23,8 @@ enter a section as profile lines with a material, how to search for the critical
 circular surface, and how to read the result closely enough to catch what a
 first model gets wrong.
 </div>
-<p><span class="tg-pill">profile lines</span><span class="tg-pill">one material</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">tension crack</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx) — the same file used by [LEM Sample Problem 1](../lem/samples.md#1-simple-embankment)</div>
+<p><span class="tg-pill">profile lines</span><span class="tg-pill">one material</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">tension crack</span><span class="tg-pill">water in crack</span></p>
+<div class="tgm-model" markdown>**Completed model** — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx)</div>
 </div>
 
 ---
@@ -89,14 +89,22 @@ and credentials. That setup is a one-time job, described in
 
 ### Give it the problem
 
-The drawing at the top of this page carries what the assistant needs — height, face
+The drawing at the top of this page has what the assistant needs — height, face
 inclination, unit weight, strength.
 
 1. Right-click the problem figure at the top of this page and choose **Copy image**.
 2. Click in the assistant's chat box and press Ctrl/Cmd+V to attach it.
 3. Type `Build this model` and press **Enter**.
 
-![The assistant reading the drawing and building the model](images/lem01_assistant.png){width=1000}
+![The assistant reading the drawing and building the model](images/lem01_assistant.png){width=1500}
+
+The assistant works by running short pieces of Python code, each shown in the
+dock under **Ran code**, and after every one that changes the model it gets back
+the input checks Studio runs before an analysis. In the figure, the checks after
+the first snippet find one problem: that code worked out a starting circle and
+printed it but did not store it, so the model has no failure surface yet. A later
+step stores that circle and a second one through the toe — the two dashed
+circles on the canvas.
 
 A geometry this simple is faster to describe than to paste, and a sentence works with
 a model that has no vision. Use this instead if you prefer:
@@ -108,22 +116,22 @@ Build a model for a simple slope on a rigid foundation. The slope is 20 ft high 
 </div>
 
 The assistant builds into the open project, not into a file: its work appears on the
-canvas immediately and lands on the undo stack as one labeled step. Nothing is saved
-until you use **Save As**.
+canvas immediately, and each change it makes goes on the undo stack as its own
+labeled step. Nothing is saved until you use **Save As**.
 
 ### Check its work
 
 Now we read what it built against the section it was given, and correct it in the
 same conversation — plain sentences work, and each correction is undoable.
 
-- **φ = 0.** Check this first: it is the judgment the drawing leaves to you, and the
-  likeliest miss, because the drawing never states it. If the assistant supplied a
-  friction angle, say: *"c = 500 psf is an undrained strength. Set phi to 0 and leave
+- **φ = 0.** Check this first: it is the likeliest miss. The drawing states it, but
+  a soil given a cohesion is easily given a friction angle as well. If the assistant
+  supplied one, say: *"c = 500 psf is an undrained strength. Set phi to 0 and leave
   the pore pressure option at none."*
 - **One material**, γ = `125` pcf, c = `500` psf, strength option `mc`.
 - **No water.** There should be no piezometric line. If one was added, have it
-  removed — with φ = 0 it cannot change the answer, and a water table nobody asked
-  for is an input you will have to explain later.
+  removed — with φ = 0 it cannot change the answer, but it is not part of the
+  problem.
 - **The ground surface** rises 20 ft over a 20 ft run, then runs level. The origin
   does not matter, only the height and the 1:1 face.
 - **The maximum depth is at the toe elevation.** The hatched band under the toe is a
@@ -204,7 +212,7 @@ on material 1, with the rigid base closing it from below.
 
 ![The finished profile worksheet](images/lem01_sheet_profile.png)
 
-The sheet carries table blocks for many profile lines; this model uses only the
+The sheet has table blocks for many profile lines; this model uses only the
 first, and the rest stay empty.
 
 ### 4. The `circles` worksheet
@@ -238,7 +246,7 @@ The global parameters declare what every number after them means. Click
 between unit systems; the declaration states what the numbers you type already
 mean, and drives the unit labels on the plots. The unit weight of water fills
 itself with `62.4`. Leave the tension crack and seismic fields at `0`. The
-finished form carries the declaration and nothing else — **Time** and the two FEM
+finished form has the units and nothing else — **Time** and the two FEM
 fields stay empty on a limit-equilibrium model:
 
 ![The global parameters form](images/lem01_studio_global.png)
@@ -250,8 +258,10 @@ Click **OK**.
 Here we name each material in the model and enter its properties — unit weight
 and strength parameters. Everything else will reference the material by its ID,
 which is why it comes first. This problem has one material. Click **Materials**.
-The editor opens on **Table view**, a material per row; press **List view** for
-the per-material form, then **Add**:
+The editor opens on **Table view**, a material per row. Above the table, the
+**Show parameters for:** checkboxes set which inputs the editor shows. Tick
+**LEM** and untick the others, then press **List view** for the per-material
+form, and **Add**:
 
 1. **Name** = `soil`.
 2. **γ** = `125`.
@@ -306,7 +316,7 @@ the geometry you just entered and proposes the same circle typed by hand on the
 Excel path — center (10, 40), above the middle of the face at twice the slope height,
 tangent to the rigid base.
 
-Its rule is the one to learn: **one circle through the toe, and one at the base of
+The generator proposes **one circle through the toe, and one at the base of
 each layer**. Here the two candidates share a center and differ only in radius,
 and the one that survives is the layer-base circle: R = 40, tangent to the rigid
 base at y = 0. Reaching the toe from that same center would take R = 41.23, which
@@ -351,30 +361,32 @@ Click **Run LEM…**. Choose:
 
 ## Exploring the results
 
-### The search result — and the warnings that come with it
+### The search result and its warnings {#the-search-result-and-the-warnings-that-come-with-it}
 
 When the search completes, the search-results plot shows every circle it tried in
-gray, the path its center walked in green, and the critical circle it settled on:
+gray, the path its center followed in green, and the critical circle it settled on:
 
-![The circular search](images/lem01_search.png){width=1000}
+![The circular search](images/lem01_search.png){width=660}
 
 Spencer's answer on that circle:
 
 ![Spencer's critical surface](images/lem01_solution_search.png){width=1000}
 
-**FS = 1.276** — but do not stop at the number. The solution arrives with an amber
-strip across the top listing *admissibility warnings*: interslice tension, and a
-line of thrust outside the slices on about half the boundaries. Warnings like these
-are not decoration. They are the analysis telling you that the solution required the
-soil to do something soil cannot do — here, carry tension.
+**FS = 1.276**. In Studio, the solution view also has an amber strip across the top
+listing *admissibility warnings*: interslice tension, a line of thrust outside the
+slices on about half the boundaries, and tension on the base of 3 slices near
+the crest. These warnings mean the solution requires the soil near the crest to
+carry tension, which soil cannot do.
 
-### Reading the anomaly
+### Comparing with Bishop's method {#reading-the-anomaly}
 
 Now we run the same search with **Method** = `Bishop's Simplified`. Bishop satisfies
 moment equilibrium only, and for a φ = 0 soil that has a useful consequence: on any
 one circle, every moment-equilibrium method — Bishop, Spencer, Morgenstern-Price —
-computes exactly the same factor of safety. They cannot disagree about a circle;
-they can only disagree about which circles they managed to solve.
+computes exactly the same factor of safety. This is true only when φ = 0. With
+friction, the methods give different values on the same circle. So here, any
+difference between their searches comes from which circles each method was able
+to solve.
 
 ![Bishop's critical surface](images/lem01_solution_bishop.png){width=1000}
 
@@ -382,32 +394,35 @@ Bishop finds **FS = 1.215** on a smaller, shallower circle — radius 33.5 again
 Spencer's 40.4, breaking out of the crest at x = 36 rather than x = 44 — and that
 is a *lower* answer than Spencer's on the same model. Look at the crest end of
 the surface: the last few slices' base-stress bars are drawn in red, meaning the
-computed normal stress on the base is negative. The model is asking the top of the
+computed normal stress on the base is negative. The solution needs the top of the
 slope to hold itself together in tension.
 
-That tension is why the two searches disagree. On the circles nearest the true
-minimum, Spencer's stricter equilibrium — force *and* moment, with one interslice
-force inclination — has no solution at all: no inclination can balance slices that
-are being pulled apart. The search can only report the best circle it could solve,
-which is how a method that agrees with Bishop circle-for-circle came back with a
-higher number.
-
-The search says this out loud. Its run output includes the line:
+Because φ = 0 here, Spencer would also give 1.215 on Bishop's circle. It reports
+1.276 because it could not solve that circle. The run output shows this:
 
 ```text
-[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no admissible solution); 26 of them rank lower than the reported minimum by the moment measure.
+[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (on 56, no interslice force inclination satisfies both force and moment equilibrium)
+[⚠️ crest tension] Tension on the base of 3 slices near the crest. Consider adding a tension crack.
+Critical FS = 1.276
+Sliding mass = 60,436.2 lb/ft over 50.80 ft of failure surface
 ```
 
-Fifty-six trial circles admit no solution that keeps every slice's forces
-admissible, and twenty-six of those rank below the reported 1.276 — Bishop's 1.215
-circle is one of them. The disagreement, the amber warnings, the red bars and the
-unsolved-trials line are all the same message: **something about this model is not
-physical.**
+Spencer's method could not solve 56 of the 211 circles. Spencer has to satisfy both
+force and moment equilibrium, and on those circles the tension near the crest is so
+large that no solution satisfies both. The second line of the output gives the remedy:
+a tension crack.
 
-### The fix is in the ground, not the settings
+Neither Spencer's 1.276 nor Bishop's 1.215 is right. Both solutions put the clay
+near the crest in tension: the top of the sliding mass hangs on the soil behind
+it. Real soil cannot carry tension. It cracks. So both factors of safety count on
+strength that is not there. The warnings, the red bars and the unsolved circles
+all come from that tension.
 
-An undrained soil with cohesion but no friction cannot carry tension near a free
-surface — in the field, it cracks. The theoretical depth of that tension crack is
+### Adding a tension crack {#the-fix-is-in-the-ground-not-the-settings}
+
+The remedy is to put the crack in the model, so that the solution no longer relies
+on tension near the crest. For a soil with cohesion and no friction, the
+theoretical depth of the tension crack is
 
 $$ z_c = \frac{2c}{\gamma} = \frac{2 \times 500}{125} = 8 \text{ ft} $$
 
@@ -429,19 +444,55 @@ We run the Spencer search again:
 **FS = 1.084**, and this time the solution is clean: no amber strip, no red bars,
 and the line of thrust (the dashed red curve) stays inside the sliding mass. Run
 Bishop or Morgenstern-Price on the cracked model and they land on the *same* circle
-and the *same* factor of safety — once the model stops asking the soil to carry
-tension, the methods stop disagreeing.
+and the *same* factor of safety: with no tension in the model, the methods agree.
 
-Two things to carry out of this:
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, tcrack_depth=8, tcrack_water=0, fs_spencer=1.084, fs_bishop=1.084, fs_mprice=1.084, tolerance=0.005 -->
 
-- **The cracked answer is lower.** 1.276 → 1.084 is a 15% drop: the uncracked model
-  was counting cohesion along a stretch of surface that the soil would in reality
-  have already torn open. The warnings were flagging an answer biased high.
-- **The warnings did their job.** The amber strip, the red bars and the
-  method disagreement all pointed at the same modeling omission. Reading them — not
-  silencing them — is what turned a plausible-looking 1.276 into a defensible 1.084.
+The cracked answer is lower. 1.276 → 1.084 is a 15% drop: the uncracked model was
+counting cohesion along a stretch of surface that the soil would in reality have
+already torn open, so its answer was too high. The amber strip, the red bars and
+the disagreement between methods on the uncracked run all pointed to the missing
+crack.
 
-### How deep does the crack really need to be?
+### Filling the crack with water
+
+A tension crack open at the crest can fill with water after rain. The water pushes
+horizontally on the face of the crack, toward the slope, and adds to the forces
+driving the slide. Assuming the crack is full of water is therefore more
+conservative than assuming it is dry: it gives a lower factor of safety. We fill
+the 8 ft crack to the top and run the search again:
+
+- **Studio** — open **Global parameters** and set **Water in crack** = `8`.
+- **Excel** — `main!D12` **Depth of water in crack** = `8`.
+- **Assistant** — say: *"Fill the tension crack with water to its full 8 ft depth."*
+
+The water pressure rises from zero at the crest to 62.4 × 8 = 499 psf at the bottom
+of the crack, so the force on the crack face is the area of that triangle:
+
+$$ P_w = \tfrac{1}{2}\gamma_w d_w^2 = \tfrac{1}{2} \times 62.4 \times 8^2 = 1{,}997 \text{ lb/ft} $$
+
+where γw is the unit weight of water and dw the depth of water in the crack.
+$P_w$ is the resultant of the triangular water-pressure distribution that
+the figure below draws on the crack face. XSLOPE applies this resultant to the
+slice against the crack, horizontally, at one third of the water depth (2.67 ft)
+above the bottom of the crack.
+
+![Spencer on the cracked model with the crack full of water](images/lem01_solution_crack_water.png){width=1000}
+
+**FS = 1.013**, 6.5% below the dry-crack 1.084. The blue triangle at the crack is the
+water pressure, with its arrows pointing into the sliding mass. Bishop and
+Morgenstern-Price land on the same circle and the same 1.013. One base-stress bar is
+red: the slice against the crack, where Spencer's solution puts about −340 psf of
+tension on the base. With φ = 0 the strength along the base does not depend on the
+normal stress, so the tension on that one slice does not change the factor of
+safety. The line of thrust stays inside the sliding mass.
+
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, tcrack_depth=8, tcrack_water=8, fs_spencer=1.013, fs_bishop=1.013, fs_mprice=1.013, tolerance=0.005 -->
+
+Set **Water in crack** back to `0` before going on; the rest of this page uses the
+dry crack.
+
+### Finding the minimum crack depth {#how-deep-does-the-crack-really-need-to-be}
 
 The theoretical depth $z_c = 2c/\gamma$ is a hand-calculation estimate, and it
 usually overshoots: it is derived for a level ground surface at active failure, and
@@ -450,19 +501,20 @@ to eliminate the tension is the smallest change that fixes the model — anythin
 deeper removes strength the soil actually has.
 
 We can find that depth with the search itself: re-run it at a few trial depths and
-watch for the shallowest clean solution. The tension does not switch off — it
-thins. On this slope 15% of the interior boundaries are in tension at a 4 ft
+watch for the shallowest clean solution. The tension decreases gradually as the
+crack deepens. On this slope 15% of the interior boundaries are in tension at a 4 ft
 crack, 8% at 6 ft and 3% at 7 ft, and the last of it goes at about **7¼ ft**, a
 little short of the theoretical 8. The factor of safety there is **1.084**, which
 is the 8-ft answer to three decimals.
 
-Which to use is an engineering call, and on this slope a mild one — the two depths
-are 0.06% apart in factor of safety. The verge depth is the most defensible model
-of the soil; the theoretical depth is the conservative habit. What is not
-defensible is the uncracked model: both cracked answers sit far below its 1.276.
+Which to use is a matter of judgment, and on this slope the impact is minor — the
+two depths are 0.06% apart in factor of safety. The 7¼ ft depth is the closer
+model of the soil; the theoretical 8 ft depth is the more conservative choice.
+The uncracked model is not a reasonable choice: both cracked answers are well
+below its 1.276.
 
-The [sample page](../lem/samples.md#1-simple-embankment) catalogs the uncracked
-variant of this model; the cracked model is yours — keep it with **Save As**.
+The completed file linked at the top of this page is the uncracked model; keep the
+cracked one with **Save As**.
 
 ---
 
@@ -477,9 +529,31 @@ This tutorial covered:
   surface.
 - Spencer's method as the default, with admissibility warnings that flag a
   solution requiring impossible soil behavior.
-- Reading past the factor of safety: crest tension on a φ = 0 slope is a
-  modeling omission, fixed with a tension crack.
+- Recognizing crest tension on a φ = 0 slope as a modeling omission, and fixing
+  it with a tension crack.
+- Water in the tension crack as a horizontal force on the crack face, and the
+  factor of safety it costs.
 
 **Where to go next:** [Tutorial LEM-2](lem02_loads_on_the_crest.md) adds loads to
 this same section — a surcharge on the crest, the same force as a line load, an
 earthquake, and the strength it would take to carry them.
+
+---
+
+## Factor of safety by method
+
+The table gives each method's own search on the uncracked model, before the
+tension crack is added:
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.276 | 1.226 |
+
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276, fs_mprice=1.226 -->
+
+The Ordinary Method of Slices (OMS) lands on Bishop's 1.215: with φ = 0 the
+strength on a slice base does not depend on the normal force, so the two compute
+the same factor of safety on any circle. Morgenstern-Price also satisfies moment
+equilibrium, so its 1.226, 0.9% above Bishop, means its search settled on a
+different circle. The three force-equilibrium procedures come out higher still:
+Lowe & Karafiath 4.0% above Bishop, the Corps of Engineers 8.6% and Janbu 9.9%.

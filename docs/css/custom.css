@@ -164,6 +164,27 @@
 .corpus-summary.match7 th:nth-child(7),
 .corpus-summary.match7 td:nth-child(7) { width: 36%; }
 
+/* Eight-column variant: # | dot | problem | referee | RS2 vs referee |
+   also published | RS2 without/with | notes. Add `match8` beside
+   `corpus-summary match` on the wrapping div. It is `match7` with the
+   same-method deviation split out of the notes into a column of its own, so
+   the two deviations a row is read on sit side by side. Measured on
+   rs2_joints.md: Problem ~35, Referee ~44, RS2 vs referee ~22, Also published
+   ~17, RS2 without/with ~11, Notes ~70 characters mean. The eight widths sum
+   to 100%, which `table-layout: fixed` needs. */
+.corpus-summary.match8 th:nth-child(3),
+.corpus-summary.match8 td:nth-child(3) { width: 14%; }
+.corpus-summary.match8 th:nth-child(4),
+.corpus-summary.match8 td:nth-child(4) { width: 22%; }
+.corpus-summary.match8 th:nth-child(5),
+.corpus-summary.match8 td:nth-child(5) { width: 14%; }
+.corpus-summary.match8 th:nth-child(6),
+.corpus-summary.match8 td:nth-child(6) { width: 10%; }
+.corpus-summary.match8 th:nth-child(7),
+.corpus-summary.match8 td:nth-child(7) { width: 8%; }
+.corpus-summary.match8 th:nth-child(8),
+.corpus-summary.match8 td:nth-child(8) { width: 24%; }
+
 /* Corpus match-key: the insufficient-data symbol is the text glyph U+2298
    (renders in text color = black, unlike the colored emoji dots), scaled up
    to emoji height so it doesn't read as tiny next to them. */
@@ -456,3 +477,65 @@
 .wy-menu-vertical p.caption.nav-collapsible .caption-text::before {
   content: "\25BE"; display: inline-block; width: 1em; }
 .wy-menu-vertical p.caption.nav-closed .caption-text::before { content: "\25B8"; }
+
+/* Program output quoted on a page (```text blocks): a long line wraps at the
+   content edge instead of running out of sight behind a horizontal scroll.
+   Code blocks in other languages keep their horizontal-scroll behavior. */
+.rst-content pre code.language-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Every table wraps its cells. The readthedocs theme sets white-space: nowrap on
+   every table cell and lets a content-sized table run past the content column, so a
+   table with a few sentences in it overflows the page instead of wrapping. The
+   browser's own table layout then balances the column widths against their content
+   (long prose columns wide, numeric columns narrow) within the column's width. The
+   corpus-summary and tut-summary rules above keep their declared widths. */
+.rst-content table.docutils,
+.wy-table-responsive table {
+  max-width: 100%;
+}
+.rst-content table.docutils td,
+.rst-content table.docutils th,
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  vertical-align: top;
+}
+
+/* Printing: the content column and its tables fit the sheet, and the eight-column
+   corpus summary reads a little smaller so it fits a letter or A4 page in portrait. */
+@media print {
+  .wy-nav-content-wrap, .wy-nav-content, .rst-content {
+    width: auto !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important;
+  }
+  .rst-content table.docutils, .corpus-summary table, .wy-table-responsive table {
+    width: 100% !important; max-width: 100% !important;
+  }
+  .rst-content .corpus-summary.match8 table td,
+  .rst-content .corpus-summary.match8 table th,
+  .rst-content .corpus-summary.match8 table.docutils td,
+  .rst-content .corpus-summary.match8 table.docutils th {
+    font-size: 80%; padding: 4px 5px;
+  }
+}
+
+
+/* reinforce-sheet header colors from the input template: geometry black, LEM only green,
+   LEM and FEM red, FEM only blue (reinforcement Overview and Types tables) */
+.rc, .rst-content code.rc {
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 1px 6px;
+    white-space: nowrap;
+}
+span.rc { font-size: 88%; }
+.rc.rc-geom { background: #000000; }
+.rc.rc-lem  { background: #3B7D22; }
+.rc.rc-both { background: #C00000; }
+.rc.rc-fem  { background: #0432FF; }
+.rc-legend { margin-bottom: 0.6em; }
+.rc-legend .rc { margin-right: 4px; }

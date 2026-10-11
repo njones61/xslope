@@ -83,7 +83,7 @@ ELEMENT_LEGS = {"seep_elements": ("tri3", "tri6", "quad4", "quad8", "quad9"),
 PASSFAIL_TYPES = {"mp_spencer", "gsat_pair", "roundtrip"}
 
 #: Types holding exactly one number, checked once: the tag's own expected value.
-SCALAR_TYPES = {"fem_ssrm", "fem_elements", "fem_reliability", "seep",
+SCALAR_TYPES = {"fem_ssrm", "fem_tilt", "fem_elements", "fem_reliability", "seep",
                 "seep_elements", "critical_kc", "reliability", "slip_depth",
                 "support_force"}
 

@@ -136,6 +136,9 @@ LEM12_FILE = os.path.join(_REPO, "docs/lem/files/xslope_piles.xlsx")
 #: Tutorial SEEP-1's completed model — the confined sheetpile problem, whose two
 #: specified-head boundaries and absent exit face are what its pins are read on.
 SEEP01_FILE = os.path.join(_REPO, "docs/seep/files/xslope_clay_blanket.xlsx")
+#: Tutorial W-2's imported section, which its GeoStudio leg is read on: a polygon
+#: model the GeoStudio writer accepts, given a pool over its toe.
+W02_FILE = os.path.join(_REPO, "docs/tutorials/files/w02_section_imported.xlsx")
 #: The editable master template, whose ``reinforce`` sheet carries the support-type
 #: lookup block LEM-8 reproduces as a table.
 TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
@@ -1258,6 +1261,10 @@ LEM12_PILE_FIELDS = ("Vcap (per element, lb)", "Mcap (per element, lb·ft)")
 #: not only a seepage one, which is what the page's Studio path says.
 SEEP01_INPUT_CATEGORIES = ("Seep BC",)
 
+#: The Inputs tree row FEM-3 and FEM-5 open the joints editor from (and its
+#: Build network… button). The tree lists the same rows in every mode.
+FEM_JOINTS_INPUT_ROW = ("Joints", "joints")
+
 #: The two Run-menu actions SEEP-1 names, in the same source-string convention as
 #: ``LEM02_RUN_ACTIONS`` (Qt's ``&`` removed, the ellipsis kept). The Run action's
 #: text follows the Mode switch, so the seepage label is read with the window put
@@ -1452,6 +1459,27 @@ def _seep01_editor_labels(mw):
         fails.append(f"Global parameters has no {SEEP01_GLOBAL_TIME_ROW!r} row; "
                      f"Tutorial SEEP-1 tells the reader to set it. Its rows read "
                      f"{sorted(r for r in rows if r)}")
+    glob.deleteLater()
+
+    # SEEP-1 starts from the template's Imperial and picks SI. The water row's value
+    # follows (9.81), and so must its unit: the label once kept "(pcf)" beside 9.81
+    # until the form was reopened.
+    from xslope.units import labels as _unit_labels
+    glob = GlobalEditor().build(dict(data, unit_system="imperial"), None)
+    edit = glob._edits["gamma_water"]
+    water = next(f.labelForField(edit) for f in glob.findChildren(QFormLayout)
+                 if f.labelForField(edit) is not None)
+    glob._units.setCurrentIndex(glob._units.findText("SI"))
+    want = f"({_unit_labels('si')['unit_weight']})"
+    if not water.text().endswith(want):
+        fails.append(f"Global parameters' water row reads {water.text()!r} after "
+                     f"Units was switched to SI and the value to "
+                     f"{glob._edits['gamma_water'].text()}; SEEP-1's screenshot "
+                     f"shows it ending {want!r}")
+    glob._units.setCurrentIndex(glob._units.findText(""))
+    if "(" in water.text():
+        fails.append(f"with Units blank the water row still names a unit: "
+                     f"{water.text()!r}")
     glob.deleteLater()
 
     panel = SeepDisplayPanel(data.get("materials") or [])
@@ -1691,7 +1719,7 @@ def _seep02_editor_labels():
     if SEEP02_MESH_QUAD_GROUP not in {g.title()
                                       for g in mesh2.findChildren(QGroupBox)}:
         fails.append(f"Build Mesh has no {SEEP02_MESH_QUAD_GROUP!r} group; "
-                     f"Tutorial SEEP-2 tells the reader why it is greyed out at a "
+                     f"Tutorial SEEP-2 tells the reader why it is grayed out at a "
                      f"triangular element type")
     mesh2.deleteLater()
 
@@ -2482,6 +2510,8 @@ def _lem09_editor_labels(mw):
                          f"{LEM09_ANCHOR_PRESET} — the page tells the reader to pick "
                          f"the Type and let Dir and Appl fill themselves")
 
+    fails += _lem09_search_tolerances(mw)
+
     dlg = PilesEditor().build(data, None)
     if dlg.windowTitle() != "Piles":
         fails.append(f"the piles editor is titled {dlg.windowTitle()!r}, not 'Piles'")
@@ -2498,6 +2528,132 @@ def _lem09_editor_labels(mw):
             fails.append(f"the piles editor has no {field!r} field; Tutorial LEM-9 "
                          f"tells the reader what to put in it")
     dlg.deleteLater()
+    return fails
+
+
+def _lem09_search_tolerances(mw):
+    """Run LEM's search tolerances on LEM-9's non-circular model.
+
+    The page's wedge, its five-method table and its support table (and their test
+    tags and figures) are ``noncircular_search`` at its own defaults. The dialog
+    once filled ``circular_search``'s FS tol and Max iterations for every surface,
+    so the same search in Studio stopped early on a different wedge. Read off the
+    two signatures, so a change of either default moves this pin with it.
+
+    Three ways the circular values could still reach a non-circular run are
+    driven through the window's own Run LEM path (the dialog's exec answered
+    in place, the solve itself not started): a fresh window; a circular run
+    earlier in the session; and Surface switched on a model carrying both
+    families. The last run's values for the SAME family must still come back.
+    """
+    import copy
+    import inspect
+
+    import studio.main_window as main_window
+    from xslope.search import circular_search, noncircular_search
+
+    def sig(fn):
+        p = inspect.signature(fn).parameters
+        return (float(p["fs_tol"].default), int(p["max_iter"].default))
+
+    NONCIRC, CIRC = sig(noncircular_search), sig(circular_search)
+    fails = []
+    seen = []                      # what each dialog opened on: (surface, fs_tol, max_iter)
+    edits = []                     # what the next dialog does before Run
+    real = main_window.RunLemDialog
+
+    class _Answered(real):
+        def exec(self):
+            seen.append((self._surface_value(), self.fs_tol.value(),
+                         self.max_iter.value()))
+            if edits:
+                edits.pop(0)(self)
+            return 1
+
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM09_FILE)
+    mw._start_lem = lambda opts: None           # the dialog is the question, not the solve
+    main_window.RunLemDialog = _Answered
+    try:
+        mw._last_lem_opts = {}
+        mw._lem_search_tols = {}
+        _quiet(mw.run_lem)
+        if seen[-1] != ("noncircular",) + NONCIRC:
+            fails.append(f"Run LEM opens LEM-9's non-circular search on FS tol / Max "
+                         f"iterations {seen[-1][1:]}, not noncircular_search's own "
+                         f"{NONCIRC} — the values the page's numbers are searched at")
+
+        # A circular run made earlier in the session, with its own values typed.
+        mw._last_lem_opts = {"method": "spencer", "analysis": "auto_search",
+                             "surface": "circular", "fs_tol": 0.0007, "tol": 0.02,
+                             "max_iter": 60}
+        mw._lem_search_tols = {"circular": {"fs_tol": 0.0007, "tol": 0.02,
+                                            "max_iter": 60}}
+        _quiet(mw.run_lem)
+        if seen[-1] != ("noncircular",) + NONCIRC:
+            fails.append(f"after a circular run, Run LEM opens LEM-9's non-circular "
+                         f"search on {seen[-1][1:]}: the circular run's tolerances "
+                         f"carried over to the other search")
+
+        # A run the assistant made, which records the tolerances it was handed —
+        # None when its script stated none — as the session's last LEM options.
+        mw._last_lem_opts = {"method": "janbu", "analysis": "auto_search",
+                             "surface": "noncircular", "fs_tol": None, "tol": None,
+                             "max_iter": None}
+        mw._lem_search_tols = {}
+        try:
+            _quiet(mw.run_lem)
+        except TypeError as exc:
+            fails.append(f"Run LEM cannot open after an assistant run that stated "
+                         f"no tolerances: {exc}")
+        else:
+            if seen[-1] != ("noncircular",) + NONCIRC:
+                fails.append(f"after an assistant run that stated no tolerances, Run "
+                             f"LEM opens on {seen[-1][1:]}, not {NONCIRC}")
+
+        # Both families: the circle comparison step. Run the circles once with
+        # typed values, then come back to the wedge.
+        sd = mw.doc.slope_data
+        sd["circles"] = [{"Xo": 20.0, "Yo": 90.0, "Depth": -5.0, "R": 95.0}]
+        sd["surface_family"] = "noncircular"
+        sd["circular"] = False
+        mw._last_lem_opts, mw._lem_search_tols = {}, {}
+
+        def to_circles(dlg):
+            dlg.surface.setCurrentIndex(dlg.surface.findData("circular"))
+            got = (dlg.fs_tol.value(), dlg.max_iter.value())
+            if got != CIRC:
+                fails.append(f"Surface switched to Circular shows {got}, not "
+                             f"circular_search's own {CIRC}")
+            dlg.fs_tol.setValue(0.0007)
+            dlg.max_iter.setValue(60)
+
+        def back_to_wedge(dlg):
+            got = (dlg.fs_tol.value(), dlg.max_iter.value())
+            if got != (0.0007, 60):
+                fails.append(f"Run LEM reopens the circles on {got}, not the "
+                             f"(0.0007, 60) the last circular run was made with")
+            dlg.surface.setCurrentIndex(dlg.surface.findData("noncircular"))
+            got = (dlg.fs_tol.value(), dlg.max_iter.value())
+            if got != NONCIRC:
+                fails.append(f"Surface switched back to Non-circular shows {got}: "
+                             f"the circular run's values carried into the wedge "
+                             f"search, not noncircular_search's {NONCIRC}")
+
+        edits[:] = [to_circles, back_to_wedge]
+        _quiet(mw.run_lem)
+        _quiet(mw.run_lem)
+        if (mw._last_lem_opts.get("surface"), mw._last_lem_opts.get("fs_tol"),
+                mw._last_lem_opts.get("max_iter")) != ("noncircular",) + NONCIRC:
+            fails.append(f"the wedge run after the circles was made with "
+                         f"{mw._last_lem_opts.get('fs_tol')} / "
+                         f"{mw._last_lem_opts.get('max_iter')}, not "
+                         f"noncircular_search's {NONCIRC}")
+    finally:
+        main_window.RunLemDialog = real
+        del mw._start_lem
+        edits.clear()
+        mw.doc._dirty = False
     return fails
 
 
@@ -2642,6 +2798,16 @@ def _lem02_editor_labels(mw):
             fails.append(f"the line-loads table has no {name!r} column; Tutorial "
                          f"LEM-2 dictates a value into it. Its columns read "
                          f"{headers}")
+    # A cleared Angle is what an empty cell is in the workbook: straight down. A
+    # plain number field read it as 0.0 and turned the footing load horizontal.
+    col = [f.key for f in LineLoadsEditor.FIELDS].index("angle")
+    lloads._editable._set_cell_text(0, col, "")
+    LineLoadsEditor().apply(ll_data, lloads)
+    got = ll_data["line_loads"][0]["angle"]
+    if got != -90.0:
+        fails.append(f"a cleared Angle in the line-loads table is stored as {got!r}, "
+                     f"not -90 (straight down), which is what a blank Angle cell "
+                     f"means in the workbook")
     lloads.deleteLater()
 
     sens = SensitivityDialog(defaults={"mode": "design"}, slope_data=data)
@@ -2717,6 +2883,15 @@ def test_tutorial_labels():
             if name not in rows:
                 fails.append(f"the Inputs tree has no {name!r} row; Tutorial SEEP-1 "
                              f"tells the reader to click it. It reads {rows}")
+        from studio.main_window import CATEGORY_ROLE
+        name, category = FEM_JOINTS_INPUT_ROW
+        opens = [tree.topLevelItem(i).data(0, CATEGORY_ROLE)
+                 for i in range(tree.topLevelItemCount())
+                 if tree.topLevelItem(i).text(0) == name]
+        if opens != [category]:
+            fails.append(f"the Inputs tree has no {name!r} row opening the joints "
+                         f"editor; Tutorials FEM-3 and FEM-5 tell the reader to "
+                         f"click it. It reads {rows}")
 
         for attr, label in LEM02_RUN_ACTIONS.items():
             action = getattr(mw, attr, None)
@@ -2779,17 +2954,59 @@ def test_tutorial_labels():
     return fails
 
 
+_FENCE_OPEN = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})")
+
+
+def _strip_fences(text):
+    """``text`` with its fenced code blocks removed, as CommonMark reads them.
+
+    A fence is three or more backticks or tildes, and it is closed only by a
+    line of the same character at least as long. Matching a three-backtick
+    pair instead misread the recorded transcripts, which fence a turn with four
+    backticks because the turn quotes three-backtick blocks inside it: the
+    inner fences closed the outer one early and left stray backticks to pair
+    across lines.
+    """
+    out, fence = [], None
+    for line in text.split("\n"):
+        m = _FENCE_OPEN.match(line)
+        if fence is None:
+            if m:
+                fence = m.group(1)
+                continue
+            out.append(line)
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                and not line.strip()[len(m.group(1)):].strip():
+            fence = None
+    return "\n".join(out)
+
+
+def _split_spans(text):
+    """``(offset, body)`` for every single-backtick span that wraps a line."""
+    text = _strip_fences(text)
+    return [(text[:m.start()].count("\n") + 1, m.group(1))
+            for m in re.finditer(r"(?<!`)`(?!`)([^`]*)`(?!`)", text)
+            if "\n" in m.group(1)]
+
+
 def test_split_code_spans():
     """No inline code span may wrap across a source line: the renderer keeps the
     break inside the backticks, splitting phrases like `Latin hypercube` mid-word
     on the published page. Fenced blocks are skipped; only single-backtick spans
     that open and close on different lines fail."""
     fails = []
+    # The fence reader itself: a four-backtick fence quoting a three-backtick
+    # block is one block, and a span that really wraps is still caught.
+    nested = ("````text\nYou: hi\n```\nx = 1\n```\nsee `a`\n````\n\n"
+              "prose `fine` here\n")
+    if _split_spans(nested):
+        fails.append("the fence reader splits a four-backtick fence at the "
+                     "three-backtick block inside it")
+    if not _split_spans("text `opens here\nand closes` there\n"):
+        fails.append("the fence reader no longer catches a wrapped span")
     for path in sorted(glob.glob(os.path.join(_REPO, "docs", "**", "*.md"),
                                  recursive=True)):
-        text = open(path, encoding="utf-8").read()
-        # strip fenced code blocks so their backticks cannot pair across lines
-        text = re.sub(r"```.*?```", "", text, flags=re.S)
+        text = _strip_fences(open(path, encoding="utf-8").read())
         for m in re.finditer(r"(?<!`)`(?!`)([^`]*)`(?!`)", text):
             if "\n" in m.group(1):
                 rel = os.path.relpath(path, _REPO)
@@ -2843,6 +3060,197 @@ def test_lem12_pile_console_block():
     return fails
 
 
+def test_w02_import_notes():
+    """W-2 tells the reader to read the import notes, and the water note names the
+    main-sheet cell that holds the water-load mode. Both importers named D23 after
+    template v25 moved that cell to D24 (D23 is Side BC), so the cell is pinned to
+    the one the writer actually fills, not to a constant of ours.
+
+    The notes come from real imports of W-2's section given a pool over its toe:
+    written to a .gsz by ``export_gsz`` and read back by ``gsz_to_slope_data``, and
+    Part 1's DXF read through Studio's own ``build_from_dxf_mapping`` with its PIEZO
+    layer raised and its load layer left out.
+    """
+    import openpyxl
+
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    from xslope.geostudio import export_gsz, gsz_to_slope_data, read_gsz
+
+    fails = []
+    sd = _quiet(load_slope_data, W02_FILE)
+    sd["piezo_line"] = [(-60.0, 6.0), (60.0, 6.0), (140.0, 6.0)]   # 6 ft over the toe
+    sd["water_loads"] = "auto"
+    path = os.path.join(_tmp(), "w02_pool.gsz")
+    _quiet(export_gsz, sd, path)
+    _back, notes = _quiet(gsz_to_slope_data, _quiet(read_gsz, path))
+    note = next((n for n in notes if "derive automatically" in n), None)
+    if note is None:
+        return [f"the GeoStudio import of a pooled section gave no water note: {notes}"]
+    water_notes = {"GeoStudio": note}
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception:                                         # noqa: BLE001
+        QApplication = None
+    if QApplication is not None:
+        from xslope.cad import suggest_dxf_target
+        from studio.document import ProjectDocument
+        QApplication.instance() or QApplication([])
+        doc = ProjectDocument()
+        layers, _warn = doc.read_dxf_layers(
+            os.path.join(_REPO, "docs/tutorials/files/w02_section.dxf"))
+        layers["PIEZO"]["open"] = [[(-60.0, 6.0), (60.0, 6.0), (140.0, 6.0)]]
+        mapping = {name: {"target": suggest_dxf_target(name, lay), "material": name}
+                   for name, lay in layers.items()}
+        mapping["DLOADS"]["target"] = "ignore"
+        dxf_notes = _quiet(doc.build_from_dxf_mapping, layers, mapping)
+        dxf_note = next((n for n in dxf_notes if "water loads are automatic" in n),
+                        None)
+        if dxf_note is None:
+            fails.append(f"the DXF import of a pooled section gave no water note: "
+                         f"{dxf_notes}")
+        else:
+            water_notes["DXF"] = dxf_note
+    named = []                                  # (importer, cell) pairs
+    for which, text in water_notes.items():
+        found = re.findall(r"\b(D\d+)\b", text)
+        if not found:
+            fails.append(f"the {which} import's water note names no main-sheet "
+                         f"cell: {text!r}")
+        named += [(which, cell) for cell in found]
+
+    # Where the writer puts the mode on the current template.
+    out = os.path.join(_tmp(), "w02_manual.xlsx")
+    _quiet(save_slope_data_to_xlsx, dict(sd, water_loads="manual"), out)
+    wb = openpyxl.load_workbook(out, read_only=True)
+    try:
+        held = [(which, cell, wb["main"][cell].value) for which, cell in named]
+    finally:
+        wb.close()
+    for which, cell, value in held:
+        if str(value).strip().lower() != "manual":
+            fails.append(f"the {which} import's water note names {cell} as the "
+                         f"water-load mode, but on the current template {cell} "
+                         f"holds {value!r}, not the mode")
+    return fails
+
+
+def test_main_sheet_cells():
+    """Every message that tells a reader which main-sheet cell to change reads it
+    from ``fileio.main_sheet_cell``, and that lookup names the cells the files use.
+
+    Three ways it could still be wrong, each checked here:
+
+    * the table: on every input template the docs ship (v19 to the current one),
+      each run option sits where the template's own label says it does, so a row
+      inserted above the block cannot go unnoticed (D23 became D24 at v25);
+    * the writer: a model saved into the current template carries each run option
+      in the cell the lookup names;
+    * the messages: no import note, remedy or save refusal spells a cell from D20
+      down as text -- the rows that move -- instead of asking the lookup. A remedy
+      label names the cell of the model's own template (D23 on a v23 file).
+    """
+    import ast
+
+    import openpyxl
+
+    from xslope import remedies
+    from xslope.fileio import (MAIN_SHEET_CELLS, load_slope_data, main_sheet_cell,
+                               save_slope_data_to_xlsx, template_main_sheet_cell)
+
+    fails = []
+    for path in sorted(glob.glob(os.path.join(_REPO, "docs", "inputs",
+                                              "input_template*.xlsx"))):
+        wb = openpyxl.load_workbook(path, read_only=True)
+        try:
+            version = int(float(wb["main"]["D5"].value))
+        finally:
+            wb.close()
+        for key, (label, _row, _since) in MAIN_SHEET_CELLS.items():
+            on_sheet = template_main_sheet_cell(label, path)
+            if on_sheet is not None and on_sheet != main_sheet_cell(key, version):
+                fails.append(f"{os.path.basename(path)} (v{version}) labels "
+                             f"{label!r} at {on_sheet}; main_sheet_cell names "
+                             f"{main_sheet_cell(key, version)}")
+    for key, (label, _row, _since) in MAIN_SHEET_CELLS.items():
+        if template_main_sheet_cell(label) != main_sheet_cell(key):
+            fails.append(f"the bundled template labels {label!r} at "
+                         f"{template_main_sheet_cell(label)}, not "
+                         f"{main_sheet_cell(key)}")
+
+    stated = {"lem_method": ("bishop", "bishop"), "num_slices": (33, 33),
+              "k0": (0.6, 0.6), "tension_srf": (False, "NO"),
+              "element_type": ("tri6", "tri6"), "target_size": (1.3, 1.3),
+              "element_size_1d": (0.7, 0.7), "ssrm_f_min": (1.1, 1.1),
+              "ssrm_f_max": (2.2, 2.2), "side_bc": ("fixed", "fixed"),
+              "water_loads": ("manual", "manual"),
+              "surface_family": ("noncircular", "non-circular")}
+    sd = _quiet(load_slope_data, W02_FILE)
+    sd.update({k: v for k, (v, _cell) in stated.items()})
+    out = os.path.join(_tmp(), "main_cells.xlsx")
+    _quiet(save_slope_data_to_xlsx, sd, out)
+    wb = openpyxl.load_workbook(out, read_only=True)
+    try:
+        for key, (_v, want) in stated.items():
+            cell = main_sheet_cell(key)
+            got = wb["main"][cell].value
+            if str(got).strip().lower() != str(want).lower() and got != want:
+                fails.append(f"main_sheet_cell({key!r}) names {cell}, but the "
+                             f"writer put {got!r} there, not {want!r}")
+    finally:
+        wb.close()
+
+    moving = re.compile(r"\bD2\d\b")
+    for rel in ("xslope/fileio.py", "xslope/geostudio.py", "xslope/slide2.py",
+                "xslope/rs2.py", "xslope/remedies.py", "studio/document.py"):
+        tree = ast.parse(open(os.path.join(_REPO, rel), encoding="utf-8").read())
+        docs = {id(n.body[0].value) for n in ast.walk(tree)
+                if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                  ast.AsyncFunctionDef))
+                and n.body and isinstance(n.body[0], ast.Expr)
+                and isinstance(n.body[0].value, ast.Constant)}
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and id(node) not in docs and " " in node.value
+                    and moving.search(node.value)):
+                fails.append(f"{rel}:{node.lineno} spells a moving main-sheet "
+                             f"cell in a message: {node.value.strip()[:70]!r}")
+
+    for version, want in ((None, main_sheet_cell("water_loads")),
+                          (23, main_sheet_cell("water_loads", 23))):
+        model = dict(sd, water_loads="manual", template_version=version,
+                     piezo_line=[(-60.0, 6.0), (60.0, 6.0), (140.0, 6.0)])
+        labels = [p.label for p in remedies._propose_switch_to_auto(model)]
+        if labels != [f"Water loads (main {want})"]:
+            fails.append(f"the switch-to-auto remedy on a v{version or 'current'} "
+                         f"model is labeled {labels}, not 'Water loads (main "
+                         f"{want})'")
+    return fails
+
+
+def test_fem01_nu_message():
+    """The model checks' Poisson's ratio note says only what holds on any model.
+
+    FEM-1's pass found it claiming nu = 0 moved "the reference model's" factor of
+    safety by a third -- a model it never named, and a claim nothing measured
+    supports (FEM-1's own run returns the same factor of safety at nu = 0).
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.preflight import preflight
+
+    sd = _quiet(load_slope_data, W02_FILE)
+    for m in sd["materials"]:
+        m["nu"], m["E"] = 0.0, 1.0e5
+    notes = [f.message for f in preflight(sd, "fem").errors
+             if f.rule_id == "mat.nu_unusable"]
+    if not notes:
+        return ["nu = 0 raised no mat.nu_unusable finding"]
+    fails = []
+    for claim in ("reference model", "by a third"):
+        if any(claim in n for n in notes):
+            fails.append(f"the nu = 0 note still claims {claim!r}: {notes[0]!r}")
+    return fails
+
+
 CHECKS = [
     ("A. one verb, and it is named", test_verb_gate),
     ("B. only XSLOPE's own sites", test_allowlist),
@@ -2854,6 +3262,9 @@ CHECKS = [
     ("H. Studio reads as the tutorials say", test_tutorial_labels),
     ("I. code spans stay on one line", test_split_code_spans),
     ("J. LEM-12 quotes the pile summary the code prints", test_lem12_pile_console_block),
+    ("K. W-2's import note names the water-load cell", test_w02_import_notes),
+    ("L. messages name the main-sheet cells the files use", test_main_sheet_cells),
+    ("M. the nu = 0 note says what holds on any model", test_fem01_nu_message),
 ]
 
 

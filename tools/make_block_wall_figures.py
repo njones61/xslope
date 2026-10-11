@@ -1,0 +1,813 @@
+"""Regenerate Tutorial FEM-3's plot figures in ``docs/tutorials/images/``.
+
+FEM-3 puts slip joints into a structure: a segmental block wall standing on the
+contacts between its own courses, the same wall with three geogrid layers tied
+into it, and two bonded-against-jointed pairs that show what the Joint column
+does to a sheet under an embankment.  Every figure here is one standard plot call
+on one of the seven models ``tools/build_block_wall.py`` writes, at the run
+settings the page tells the reader to use:
+
+    the wall models   tri6, global target size 0.8 m (each block polygon carries
+                      its own 0.3 m Size, which the mesher reads from the file)
+    part 3's models   tri6, target size 1.2 m
+    both              SSRM, F in [1.0, 2.0], tolerance 0.01, failure criterion
+                      Hybrid, 100,000 sweeps a trial
+
+Nothing is restyled: the plots are called the way Studio calls them, with
+Studio's own titles and Studio's own autoscaling, so the reader's screen and the
+committed figure are the same picture.  What cannot be drawn is printed instead —
+the mesh and interface counts, the bracket walk trial by trial, and how far each
+jointed line has slipped at the last standing trial, which is the measurement the
+page's slip table is read from.
+
+The Studio dialog captures are a separate producer, because they need Qt:
+``tools/capture_block_wall_screenshots.py``.  The other tutorials' figures are
+``tools/make_tutorial_figures.py``, whose ``capture`` helper this module reuses
+rather than copies.
+
+Run:  PYTHONPATH=. python3 tools/make_block_wall_figures.py             # everything
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py inputs      # one group
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py wall grid   # by name
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py fem03_grid_long
+                                            # the 500,000-iteration run, only
+                                            # when named (about 40 minutes)
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py --from wall grid_1M
+                                            # redraw a panel pair from a STORED
+                                            # solve (FEM03_STORED), no solving
+      PYTHONPATH=. python3 tools/make_block_wall_figures.py --from wall \
+                  --only fem03_fem_shear_failure.png
+                                            # ... writing only the named files
+
+``--from`` draws each named stored result through the same ``_pair`` call its
+live group makes, at the same size, dpi and box, so a change to the plot code
+reaches the committed figures without a strength reduction.  ``--only`` limits
+which of the pair's files are written (every panel and state is still drawn,
+because the deformation figure takes the strain figure's size).
+"""
+
+from __future__ import annotations
+
+import contextlib
+import io
+import os
+import sys
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+import matplotlib
+matplotlib.use("Agg")
+
+from xslope.fileio import load_slope_data                            # noqa: E402
+from xslope.plot import declared_unit_labels, plot_inputs            # noqa: E402
+
+# The capture idiom — swap ``plt.show`` for a save, one PNG per state — belongs to
+# the tutorial figure producer and is used here unchanged, so a change to how a
+# tutorial figure is written reaches FEM-3's figures too.
+from tools.make_tutorial_figures import OUT_DIR, capture              # noqa: E402,F401
+
+FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
+#: Where the per-member profiles behind the detail figures are written.  A
+#: profile is the solved field read along one line, and re-deriving one costs the
+#: whole strength reduction again — a quarter of an hour on the wall — so every
+#: profile a figure is drawn from is also written out as a CSV.  A later question
+#: about what the figure shows is then answered from the file rather than from a
+#: second run, and never by eye off the PNG.  Outside the repo: these are working
+#: measurements of a round, not content of the package.
+OUT_DATA = os.path.join(os.path.expanduser("~"), "python_projects", "xslope_private",
+                        "reports", "campaign_joints_2026-09", "r34_data",
+                        "fem03_figures")
+FEM03_START = os.path.join(FILES, "xslope_block_wall_start.xlsx")
+FEM03_WALL = os.path.join(FILES, "xslope_block_wall.xlsx")
+FEM03_GRID = os.path.join(FILES, "xslope_block_wall_grid.xlsx")
+FEM03_SHEET_BONDED = os.path.join(FILES, "xslope_base_geotextile_bonded.xlsx")
+FEM03_SHEET_JOINTED = os.path.join(FILES, "xslope_base_geotextile_jointed.xlsx")
+FEM03_LINER_BONDED = os.path.join(FILES, "xslope_liner_bonded.xlsx")
+FEM03_LINER_JOINTED = os.path.join(FILES, "xslope_liner_jointed.xlsx")
+
+#: Quadratic triangles, because a joint is read on the relative displacement of
+#: two faces and a quadratic interface element carries a mid-side pair as well as
+#: its ends.  The size is the GLOBAL target; each of the six block polygons
+#: carries its own 0.3 m Size in the file, which a 0.6 m course needs and which
+#: costs far fewer nodes than refining the whole 24 m section.
+FEM03_ELEMENT_TYPE = "tri6"
+FEM03_TARGET_SIZE = 0.8
+#: Part 3's embankment is a 60 m section with one sheet in it and no thin zone, so
+#: it is meshed coarser than the wall.
+FEM03_SHEET_TARGET_SIZE = 1.2
+#: Run FEM: the dialog's own bracket and bisection tolerance, and ``hybrid`` —
+#: which is the criterion the dialog opens on for a jointed model.  On a jointed
+#: model almost all of the out-of-balance force sits on the joints, and a pair of
+#: faces at its limit alternates between slipping and sticking, so a standing
+#: trial never converges on force alone (docs/fem/joints.md, "How a trial is
+#: decided").  Part 3's four models are run at the same criterion so the bonded
+#: half and the jointed half of a pair are decided the same way.
+FEM03_CRITERION = "hybrid"
+FEM03_F_MIN, FEM03_F_MAX = 1.0, 2.0
+FEM03_TOLERANCE = 0.01
+#: 100,000 sweeps a trial — the model checks' floor for a jointed model and the
+#: Run FEM box's own ceiling.  A joint reaches equilibrium by growing slip a
+#: little per sweep, so a jointed trial settles over tens of thousands of sweeps
+#: where a bonded one settles over hundreds, and a trial that runs out of budget
+#: is recorded undecided and read as not standing — which reports the budget
+#: rather than the wall.
+FEM03_MAX_ITERATIONS = 100000
+#: The geogrid wall once more at five times the limit — the run behind the page's
+#: sentence that raising Max iterations per trial moves the number.  No figures
+#: are drawn from it.
+FEM03_LONG_MAX_ITERATIONS = 500000
+#: The displacement-vs-F figure's size: the one ``docs/fem/images/
+#: fem01_ssrm_curve.png`` was drawn at (a 9 x 5 in axes figure, tight layout).
+FEM03_CURVE_FIGSIZE = (9.0, 5.0)
+#: The layer the page reads the 1D Details panel on: the middle of the three, the
+#: one the block column's own movement develops tension in from both ends.
+FEM03_DETAIL_LINE = "grid-02"
+
+
+# --------------------------------------------------------------------------- #
+# helpers
+# --------------------------------------------------------------------------- #
+def _mesh(model, target_size):
+    """The mesh Studio's Build Mesh dialog builds for this model.
+
+    The constraint lines are carried in twice, and both are needed: as lines, so
+    every joint trace and every sheet lies on element edges, and through
+    ``extract_joint_options``, which is what tells the mesher to SPLIT the mesh
+    along the jointed ones and give every node on such a trace one copy per wedge
+    of material around it.  Without the second the traces are meshed and bonded
+    and the model has no joints in it at all.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_joint_options,
+                             extract_point_constraints,
+                             extract_size_regions, get_material_polygons)
+
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(model)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model, reinf_lines=lines),
+            target_size, FEM03_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=model.get("element_size_1d"),
+            point_constraints=extract_point_constraints(model),
+            size_regions=extract_size_regions(model),
+            joint_lines=extract_joint_options(model))
+
+
+def _solve(model, mesh, max_iterations=FEM03_MAX_ITERATIONS):
+    """One strength reduction at the page's settings, on the reference kernel.
+
+    ``fast_kernel=False`` is pinned the way every producer of a committed number
+    pins it: the compiled Mohr-Coulomb kernel is built on some machines and not
+    others, and on this wall the two paths do not agree — so the figure has to
+    carry the answer the reference path gives.  Returns
+    ``(fem_data, result, seconds)``.  ``max_iterations`` is the page's 100,000
+    for every figure; only the long run behind the page's iteration-limit
+    sentence passes another.
+    """
+    import time
+
+    import run_tests as RT
+    import xslope.fem as _fem
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    fem_data = build_fem_data(model, mesh)
+    t0 = time.time()
+    with RT._force_fast_kernel(_fem, False):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = solve_ssrm(fem_data, F_min=FEM03_F_MIN, F_max=FEM03_F_MAX,
+                                tolerance=FEM03_TOLERANCE, debug_level=0,
+                                failure_criterion=FEM03_CRITERION,
+                                max_iterations=max_iterations)
+    return fem_data, result, time.time() - t0
+
+
+def _dump(tag, prof):
+    """Write one member's profile out as a CSV, station by station.
+
+    ``fem_details.write_profile_csv`` is the package's own exporter, so the file
+    carries the same columns the detail view reads and nothing is transcribed.
+    """
+    from xslope.fem_details import write_profile_csv
+
+    os.makedirs(OUT_DATA, exist_ok=True)
+    path = os.path.join(OUT_DATA, "%s.csv" % tag)
+    write_profile_csv(prof, path)
+    print("   wrote       %s" % path)
+    return path
+
+
+def _stations(prof, units):
+    """Every station of one jointed line, printed.
+
+    The figure shows a shape; this is what the shape is made of — where along the
+    line each station sits, what the bar is carrying there against its capacity,
+    what the interface is carrying against its own limit, and how far the two
+    faces have moved past each other.  The page quotes these rather than reading
+    the panel by eye.
+    """
+    import numpy as np
+
+    s = np.asarray(prof["s"], dtype=float)
+    ts = np.asarray(prof["ts"], dtype=float)
+    tlim = np.asarray(prof["tlim"], dtype=float)
+    slip = np.asarray(prof["slip"], dtype=float)
+    slipping = np.asarray(prof["slipping"], dtype=bool)
+    opened = np.asarray(prof["open"], dtype=bool)
+    bar_s = np.asarray(prof["bar_s"], dtype=float)
+    bar_T = np.asarray(prof["bar_T"], dtype=float)
+    bar_cap = np.asarray(prof["bar_cap"], dtype=float)
+    print("   stations    %s — %d station(s) over %.4f %s"
+          % (prof["label"], len(s), prof["length"], units))
+    for k in range(len(s)):
+        print("        s %6.3f  ts %10.4f  limit %10.4f  |ts|/limit %6.3f  "
+              "slip %10.6f  %s"
+              % (s[k], ts[k], tlim[k],
+                 abs(ts[k]) / tlim[k] if tlim[k] > 1e-12 else float("nan"),
+                 slip[k],
+                 "OPEN" if opened[k] else ("slipping" if slipping[k] else "")))
+    # The bar is sampled at its own element centroids, not at the interface's
+    # stations, so it is printed as its own short list rather than folded into
+    # the rows above.
+    for k in range(len(bar_s)):
+        print("        bar s %6.3f  T %10.4f  capacity %10.4f  T/cap %6.3f"
+              % (bar_s[k], bar_T[k], bar_cap[k],
+                 bar_T[k] / bar_cap[k] if bar_cap[k] > 1e-12 else float("nan")))
+    # How far back from end 1 the interface is actually at its limit: the span
+    # the flagged stations cover, which is the number the page needs rather than
+    # a count of stations.
+    flagged = np.flatnonzero(slipping | opened)
+    if len(flagged):
+        print("        at limit from s %.3f to s %.3f (%.3f %s of %.3f %s), "
+              "largest slip %.6f %s"
+              % (s[flagged[0]], s[flagged[-1]],
+                 s[flagged[-1]] - s[flagged[0]], units, prof["length"], units,
+                 float(slip.max()), units))
+    else:
+        print("        no station at its limit · largest slip %.6f %s"
+              % (float(slip.max()) if len(slip) else float("nan"), units))
+
+
+def _counts(label, model, mesh, fem_data):
+    """What the meshed model came to: the counts the page prints."""
+    jd = fem_data.get("joint_data") or {}
+    print("   %-11s %d nodes · %d elements · %d joint elements on %d jointed "
+          "line(s) · %d row(s) on the joints sheet · %d reinforcement line(s) · "
+          "%s at %g %s"
+          % (label, len(mesh["nodes"]), len(mesh["elements"]),
+             int(jd.get("n", 0)), len(jd.get("jointed_lines", []) or []),
+             len(model.get("joint_lines") or []),
+             len(model.get("reinforcement_lines") or []),
+             model["element_type"], model["target_size"],
+             declared_unit_labels(model)["length"]))
+
+
+def _report(label, result, seconds, units=""):
+    """The bracket walk: what each trial was asked, how it ended, and how far the
+    section had moved when it stopped; then the run's closing summary."""
+    print("   %-11s FS %s%.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
+          "step(s) · %.0f s"
+          % (label, ">= " if result.get("fs_is_lower_bound") else "",
+             result["FS"], result["final_interval"][0],
+             result["final_interval"][1], result["interval_width"],
+             result["iterations_ssrm"], seconds))
+    for tr in result["trials"]:
+        u = tr.get("max_displacement")
+        print("        F %.4f  %-6s  %-13s  %-11s  %s sweeps  max disp %s"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("exit_reason"),
+                 tr.get("iterations"),
+                 "n/a" if u is None else "%.6f%s" % (u, (" " + units) if units else "")))
+    last = result["last_solution"]
+    print("        last standing trial F %.4f · %s · %s sweeps (%s)"
+          % (last.get("F", float("nan")),
+             "equilibrium" if last.get("converged") else "no equilibrium",
+             last.get("iterations"), last.get("exit_reason")))
+    # The run's own closing summary, verbatim, so the page quotes the words a
+    # reader's run prints rather than a paraphrase of them.
+    print("closing summary:")
+    print(result["summary"])
+
+
+def _layer_loads(model, fem_data, result):
+    """Each geogrid sheet's peak bar tension against its capacity at the last
+    standing trial, as a percentage, read from the sheet's joint profile (which
+    carries ``bar_T`` and ``bar_cap`` at the bar's own element centroids)."""
+    import numpy as np
+
+    from xslope import fem_details
+
+    last = result["last_solution"]
+    force = declared_unit_labels(model)["force_per_len"]
+    print("layer loads:")
+    print("   at the last standing trial, F %.4f" % last.get("F", float("nan")))
+    # The capacity is the one at the station the peak sits at (a pullout-limited
+    # end carries less than the sheet's Tmax); the last column is the highest
+    # T/cap at any station, which differs from the first ratio only where it does.
+    print("   %-8s %12s %12s %8s %14s"
+          % ("sheet", "peak T", "capacity", "T/cap", "max T/cap"))
+    for row in fem_details.list_lines(fem_data, last, model):
+        if row["kind"] != "joint" or not str(row["label"]).startswith("grid-"):
+            continue
+        prof = fem_details.joint_profile(fem_data, last, row["index"],
+                                         slope_data=model, field_state="converged")
+        T = np.abs(np.asarray(prof["bar_T"], dtype=float))
+        cap = np.asarray(prof["bar_cap"], dtype=float)
+        if not len(T):
+            print("   %-8s no bar stations" % row["label"])
+            continue
+        k = int(np.argmax(T))
+        ratio = np.where(cap > 1e-12, T / np.where(cap > 1e-12, cap, 1.0), np.nan)
+        print("   %-8s %12.4f %12.4f %7.1f%% %13.1f%%   (%s)"
+              % (row["label"], T[k], cap[k],
+                 100.0 * T[k] / cap[k] if cap[k] > 1e-12 else float("nan"),
+                 100.0 * float(np.nanmax(ratio)), force))
+
+
+def _curve(name, fem_data, result):
+    """The displacement-vs-F figure: every trial's largest displacement against
+    its F, drawn by the standard plot call from the run's own result, at the
+    size the overview's FEM-1 figure was drawn at, saved through ``capture``."""
+    import matplotlib.pyplot as plt
+    from xslope.plot_fem import plot_ssrm_curve
+
+    def _draw():
+        fig, ax = plt.subplots(figsize=FEM03_CURVE_FIGSIZE)
+        plot_ssrm_curve(ax, result, fem_data=fem_data)
+        fig.tight_layout()
+
+    capture(name, _draw)
+
+
+def _joints(model, fem_data, result, dump=None):
+    """Which jointed line slipped at the last standing trial, and how far.
+
+    Read station by station rather than element by element: a quadratic interface
+    element carries three node pairs and shares its end pairs with the element
+    next along it, so counting slots would count the shared pairs twice.
+    ``fem_details.joint_profile`` keys its record by the split node itself, which
+    makes exactly one record per node pair on the line, and names the line with
+    the label the joints sheet gave it.
+
+    The raw arrays are read as well, and the two are printed side by side: the
+    per-slot ``solution["joint_slip"]`` / ``["joint_slipping"]`` against
+    ``fem_data["joint_data"]["line_id"]`` is the measurement, the profile is what
+    the reader sees, and they have to agree.
+    """
+    import numpy as np
+
+    from xslope import fem_details
+
+    last = result["last_solution"]
+    units = declared_unit_labels(model)["length"]
+    jd = fem_data["joint_data"]
+    line_of = np.asarray(jd["line_id"], dtype=int)
+    # Slip is SIGNED — which way the two faces went past each other — so every
+    # reading of it is taken in magnitude.  The unsigned maximum of a line whose
+    # faces all slid the same, negative way is zero, which reads as a joint that
+    # never moved.
+    slip_raw = np.abs(np.asarray(last["joint_slip"], dtype=float)).reshape(-1)
+    slipping_raw = np.asarray(last["joint_slipping"], dtype=bool).reshape(-1)
+    # Every interface element carries the same number of slots, so the per-element
+    # line id repeats across its slots.
+    per_el = slip_raw.size // int(jd["n"])
+    line_slot = np.repeat(line_of, per_el)
+    for line_id in fem_details.joint_line_ids(fem_data, last):
+        prof = fem_details.joint_profile(fem_data, last, line_id,
+                                         slope_data=model,
+                                         field_state="converged")
+        slipping = np.asarray(prof["slipping"], dtype=bool)
+        slip = np.asarray(prof["slip"], dtype=float)
+        sel = line_slot == line_id
+        print("   joint %-2d    %-11s %d of %d node pair(s) slipping · largest "
+              "slip %.6f %s · %d open · peak |ts|/limit %s · %s   "
+              "[raw: %d of %d slot(s) slipping, max slip %.6f]"
+              % (line_id, prof["label"], int(slipping.sum()), len(slip),
+                 float(slip.max()) if len(slip) else float("nan"), units,
+                 int(np.asarray(prof["open"], dtype=bool).sum()),
+                 "n/a" if prof["peak_utilization"] is None
+                 else "%.3f" % prof["peak_utilization"], prof["status"],
+                 int(slipping_raw[sel].sum()), int(sel.sum()),
+                 float(slip_raw[sel].max()) if sel.any() else float("nan")))
+        if dump:
+            _dump("%s_joint_%02d_%s" % (dump, line_id,
+                                        str(prof["label"]).replace(" ", "_")),
+                  prof)
+
+
+# --------------------------------------------------------------------------- #
+# A — the figures that need no solve
+# --------------------------------------------------------------------------- #
+def fem03_inputs():
+    """The section as the reader opens it, the seven joint lines they type into
+    it, the three geogrid layers of part 2, and the split mesh part 1 runs on.
+
+    Printed rather than drawn: the four materials, every joint line's own
+    geometry and strength, and the mesh and interface counts of both wall models —
+    which is what says the 0.3 m block Size in the file reached the mesher.
+    """
+    from xslope.fem import build_fem_data
+    from xslope.plot_fem import plot_fem_data
+
+    # ---- the section as it opens -------------------------------------------- #
+    start = load_slope_data(FEM03_START)
+    _u = declared_unit_labels(start)
+    for m in start["materials"]:
+        print("   material    %-16s γ %g %s · %s · c %g %s · φ %g° · E %g %s · ν %g"
+              % (m["name"], m["gamma"], _u["unit_weight"], m["option"], m["c"],
+                 _u["stress"], m["phi"], m["E"], _u["stress"], m["nu"]))
+    print("   starter     %d polygon(s) · %d row(s) on the joints sheet"
+          % (len(start["polygons"]), len(start["joint_lines"] or [])))
+    capture("fem03_inputs_start.png", plot_inputs, start, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    # ---- part 1: the seven contacts ----------------------------------------- #
+    wall = load_slope_data(FEM03_WALL)
+    for row in wall["joint_lines"]:
+        print("   joint line  %-11s (%.4f, %.4f) to (%.4f, %.4f) · c %s %s · "
+              "φ %g° · t_cut %s · kn %s · ks %s"
+              % (row["label"], row["x1"], row["y1"], row["x2"], row["y2"],
+                 row["c"], _u["stress"], row["phi"], row["t_cut"], row["kn"],
+                 row["ks"]))
+    capture("fem03_inputs_joints.png", plot_inputs, wall, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    # ---- part 2: the three layers ------------------------------------------- #
+    grid = load_slope_data(FEM03_GRID)
+    for row in grid["reinforcement_lines"]:
+        print("   geogrid     %-11s (%.4f, %.4f) to (%.4f, %.4f) · Tmax %g %s · "
+              "Tend1 %g %s · adhesion %g %s · delta %g° · Joint %r"
+              % (row["label"], row["x1"], row["y1"], row["x2"], row["y2"],
+                 row["t_max"], _u["force_per_len"],
+                 row["tend1"], _u["force_per_len"],
+                 row["adhesion"], _u["stress"], row["delta"], row["joint"]))
+    capture("fem03_inputs_grid.png", plot_inputs, grid, mode="fem",
+            title="Slope Geometry and Inputs")
+
+    # ---- the mesh part 1 runs on -------------------------------------------- #
+    mesh = _mesh(wall, FEM03_TARGET_SIZE)
+    fem_data = build_fem_data(wall, mesh)
+    _counts("wall", wall, mesh, fem_data)
+    capture("fem03_mesh.png", plot_fem_data, fem_data)
+
+    # The grid model's mesh is not drawn — the page shows one mesh — but its
+    # counts are what say the three layers cost what the page claims they do.
+    mesh_g = _mesh(grid, FEM03_TARGET_SIZE)
+    fem_data_g = build_fem_data(grid, mesh_g)
+    _counts("wall + grid", grid, mesh_g, fem_data_g)
+    capture("fem03_mesh_grid.png", plot_fem_data, fem_data_g)
+
+
+# --------------------------------------------------------------------------- #
+# C1 — part 1: the wall on its seven contacts
+# --------------------------------------------------------------------------- #
+def fem03_wall():
+    """The strength reduction on the wall as built, and the two panels the page
+    reads it from: the blocks, and the shear strain in the soil around them.
+
+    On a jointed model the deformation panel, with Show joints on, is the block
+    picture: the scaled deformed mesh with both faces of every joint drawn, because
+    a jointed model's mechanism is wedges moving as bodies on their contacts.
+    """
+    from xslope.plot_fem import plot_fem_results
+
+    wall = load_slope_data(FEM03_WALL)
+    mesh = _mesh(wall, FEM03_TARGET_SIZE)
+    fem_data, result, seconds = _solve(wall, mesh)
+    _counts("wall", wall, mesh, fem_data)
+    _report("wall", result, seconds, declared_unit_labels(wall)["length"])
+    _joints(wall, fem_data, result, dump="wall")
+    _pair("fem03_fem_blocks.png", "fem03_fem_shear.png", fem_data, result,
+          "deformation")
+    _keep_solution("wall", fem_data, result)
+    _curve("fem03_ssrm_curve.png", fem_data, result)
+
+    # The back face's 1D details: the panel the page's slip table is read from,
+    # shown for the contact that carries the failure so the reader can see the
+    # slip curve and the slipping stations the table counts.
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_detail
+
+    last = result["last_solution"]
+    for line_id in fem_details.joint_line_ids(fem_data, last):
+        prof = fem_details.joint_profile(fem_data, last, line_id,
+                                         slope_data=wall, field_state="converged")
+        if str(prof.get("label", "")).strip().lower() == "back face":
+            capture("fem03_1d_details_back_face.png", plot_detail, prof)
+            break
+    else:
+        raise SystemExit("no joint line labelled 'back face' on the wall")
+
+
+# --------------------------------------------------------------------------- #
+# C2 — part 2: the same wall with three geogrid layers
+# --------------------------------------------------------------------------- #
+def fem03_grid():
+    """The same wall with the geogrid tied in: the blocks again, and the 1D
+    Details panel for the middle layer.
+
+    A layer declared ``Joint = Yes`` is two members on one chord — the bar, whose
+    tension is read against its capacity, and the interface the mesh was split
+    along, whose shear traction is read against its Mohr-Coulomb limit — and the
+    joint profile carries both, which is why the panel is drawn from it rather
+    than from the reinforcement profile.
+    """
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_detail
+    from xslope.plot_fem import plot_fem_results
+
+    grid = load_slope_data(FEM03_GRID)
+    mesh = _mesh(grid, FEM03_TARGET_SIZE)
+    fem_data, result, seconds = _solve(grid, mesh)
+    _counts("wall + grid", grid, mesh, fem_data)
+    _report("wall + grid", result, seconds, declared_unit_labels(grid)["length"])
+    _joints(grid, fem_data, result, dump="grid")
+    _pair("fem03_fem_blocks_grid.png", "fem03_fem_shear_grid.png", fem_data,
+          result, "deformation")
+    _keep_solution("wall_grid", fem_data, result)
+    _curve("fem03_ssrm_curve_grid.png", fem_data, result)
+    _layer_loads(grid, fem_data, result)
+
+    last = result["last_solution"]
+    rows = fem_details.list_lines(fem_data, last, grid)
+    for row in rows:
+        print("   member      %-14s %-11s %d station(s) · utilization %s · %s"
+              % (row["kind"], row["label"], row["n_elements"],
+                 "n/a" if row["utilization"] is None
+                 else "%.3f" % row["utilization"], row["status"]))
+    want = [r for r in rows
+            if r["kind"] == "joint" and r["label"] == FEM03_DETAIL_LINE]
+    if not want:
+        raise SystemExit("no joint member named %r among %s"
+                         % (FEM03_DETAIL_LINE,
+                            [r["label"] for r in rows]))
+    # All three layers are read station by station, not just the one the figure
+    # is drawn from: the page says whether the middle layer is representative,
+    # and that is a claim about the other two.
+    units = declared_unit_labels(grid)["length"]
+    for row in rows:
+        if row["kind"] == "joint" and str(row["label"]).startswith("grid-"):
+            _stations(fem_details.joint_profile(fem_data, last, row["index"],
+                                                slope_data=grid,
+                                                field_state="converged"), units)
+
+    prof = fem_details.joint_profile(fem_data, last, want[0]["index"],
+                                     slope_data=grid, field_state="converged")
+    print("   detail      %s · %d station(s) · peak bar tension %.4f of "
+          "capacity %.4f · peak |ts| %.4f against limit %.4f · largest slip %.6f"
+          % (prof["label"], len(prof["s"]),
+             float(max(abs(prof["bar_T"]))) if len(prof["bar_T"]) else float("nan"),
+             float(max(prof["bar_cap"])) if len(prof["bar_cap"]) else float("nan"),
+             float(max(abs(prof["ts"]))) if len(prof["ts"]) else float("nan"),
+             float(max(prof["tlim"])) if len(prof["tlim"]) else float("nan"),
+             float(max(prof["slip"])) if len(prof["slip"]) else float("nan")))
+    capture("fem03_1d_details.png", plot_detail, prof)
+
+
+def fem03_grid_long():
+    """The geogrid wall at the page's settings but 500,000 iterations a trial.
+
+    No figures and no kept solution: the run exists for its factor, its bracket
+    and its closing summary, which say whether raising the iteration limit moves
+    the number the 100,000-iteration run reports.
+    """
+    grid = load_slope_data(FEM03_GRID)
+    mesh = _mesh(grid, FEM03_TARGET_SIZE)
+    fem_data, result, seconds = _solve(grid, mesh,
+                                       max_iterations=FEM03_LONG_MAX_ITERATIONS)
+    _counts("wall + grid", grid, mesh, fem_data)
+    _report("grid 500k", result, seconds, declared_unit_labels(grid)["length"])
+    _layer_loads(grid, fem_data, result)
+    print("   wall time   %.0f s (%.1f min)" % (seconds, seconds / 60.0))
+
+
+# --------------------------------------------------------------------------- #
+# C3 — part 3: the two bonded-against-jointed pairs
+# --------------------------------------------------------------------------- #
+#: The four runs, in the order the page reads them: a sheet the surface has to
+#: cross, then a sheet the mass can slide along, each bonded and jointed.
+FEM03_PAIRS = (
+    ("sheet bonded", FEM03_SHEET_BONDED, "fem03_shear_sheet_bonded.png"),
+    ("sheet jointed", FEM03_SHEET_JOINTED, "fem03_shear_sheet_jointed.png"),
+    ("liner bonded", FEM03_LINER_BONDED, "fem03_shear_liner_bonded.png"),
+    ("liner jointed", FEM03_LINER_JOINTED, "fem03_shear_liner_jointed.png"),
+)
+
+
+def fem03_sheets():
+    """Part 3's four runs, each drawn as its own viscoplastic shear strain panel.
+
+    The four panels are autoscaled to their own ranges, the way Studio draws
+    every field state.  What the page reads off them is WHERE the band runs —
+    across the sheet in the geotextile pair, along it in the liner pair — and a
+    shared color scale would be a fifth thing on the page rather than the picture
+    the reader's own run produces.
+    """
+    from xslope.plot_fem import plot_fem_results
+
+    for label, path, name in FEM03_PAIRS:
+        model = load_slope_data(path)
+        mesh = _mesh(model, FEM03_SHEET_TARGET_SIZE)
+        fem_data, result, seconds = _solve(model, mesh)
+        _counts(label, model, mesh, fem_data)
+        _report(label, result, seconds)
+        if (fem_data.get("joint_data") or {}).get("n"):
+            _joints(model, fem_data, result)
+        # Both field states, so the page can choose: the last converged trial
+        # (the slope still standing) and the captured at-failure state (the
+        # mechanism). The solve itself is kept beside the report so either can
+        # be redrawn without re-solving.
+        # The deformation panel first (the blocks with their faces on a jointed
+        # model, the deformed mesh on a bonded one), then the strain panel,
+        # each in both field states.
+        _pair(name.replace("fem03_shear_", "fem03_deform_"), name, fem_data,
+              result, "deformation")
+        _keep_solution(label, fem_data, result)
+
+
+def _both_states(name, fem_data, result, plot_type):
+    """One results panel in both field states: the last converged trial under
+    ``name`` and the captured at-failure state under ``name`` + ``_failure``."""
+    from xslope.plot_fem import plot_fem_results
+
+    fail = result.get("failure_solution")
+    lower = bool(result.get("fs_is_lower_bound"))
+    capture(name, plot_fem_results, fem_data, result["last_solution"],
+            plot_type=plot_type, fs=result["FS"], failure_solution=fail,
+            field_state="converged", fs_is_lower_bound=lower)
+    if fail is not None:
+        capture(name.replace(".png", "_failure.png"), plot_fem_results, fem_data,
+                result["last_solution"], plot_type=plot_type, fs=result["FS"],
+                failure_solution=fail, field_state="failure",
+                fs_is_lower_bound=lower)
+
+
+def _pair(deform_name, strain_name, fem_data, result, deform_type, only=None):
+    """A deformation panel and a strain panel that sit one above the other on
+    the page, in both field states, saved so that they MATCH: the same image
+    size, the same section frame, the same font size.
+
+    The strain panel carries two color scales and the deformation panel one, so
+    each deformation figure takes the strain figure's size and axes position
+    (the sections are drawn at the same scale) and each is saved to ITS OWN
+    tight box, with no blank paper. The two images then differ in width, and
+    the page sets the deformation figure's width in proportion so the sections
+    line up: the width to use at a strain-panel width of 1000 is printed beside
+    each file. ``only`` is the set of file names to write (None: all of them);
+    every panel is still drawn, since the deformation figure is sized from the
+    strain one."""
+    import matplotlib.pyplot as plt
+    from xslope.plot_fem import plot_fem_results
+
+    fail = result.get("failure_solution")
+    states = [("converged", "")] + ([("failure", "_failure")] if fail is not None else [])
+    for state, suffix in states:
+        kw = dict(fs=result["FS"], failure_solution=fail, field_state=state,
+                  fs_is_lower_bound=bool(result.get("fs_is_lower_bound")))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plt.close("all")
+            plot_fem_results(fem_data, result["last_solution"],
+                             plot_type=[deform_type], **kw)
+            fig_d = plt.gcf()
+            plt.close("all")
+            plot_fem_results(fem_data, result["last_solution"],
+                             plot_type=["shear_strain"], **kw)
+            fig_s = plt.gcf()
+        fig_s.canvas.draw()
+        box_s = fig_s.get_tightbbox(fig_s.canvas.get_renderer())
+        ax_s = fig_s.axes[0]
+        fig_d.set_size_inches(fig_s.get_size_inches())
+        fig_d.axes[0].set_position(ax_s.get_position())
+        fig_d.canvas.draw()
+        box_d = fig_d.get_tightbbox(fig_d.canvas.get_renderer())
+        # Each axes keeps an equal aspect by shrinking its own box at draw time,
+        # so the two frames are not the same width even at the same position.
+        # The page width that lines the frames up is set from the frames AS
+        # DRAWN: the fraction of each image the frame occupies.
+        def _frame_frac(fig, box):
+            ax = fig.axes[0]
+            ext = ax.get_window_extent(fig.canvas.get_renderer())
+            return (ext.width / fig.dpi) / (box.width + 0.2)
+        frac_s = _frame_frac(fig_s, box_s)
+        for fig, name, box in ((fig_s, strain_name, box_s), (fig_d, deform_name, box_d)):
+            out = os.path.join(OUT_DIR, name.replace(".png", suffix + ".png"))
+            if only is not None and os.path.basename(out) not in only:
+                continue
+            fig.savefig(out, dpi=200, bbox_inches=box.padded(0.1))
+            width = round(1000 * frac_s / _frame_frac(fig, box))
+            print("-> %s  (page width %d at a strain-panel width of 1000)"
+                  % (os.path.basename(out), width))
+        plt.close("all")
+
+
+#: Where the kept solves live: ``_keep_solution`` writes the part 1-3 runs here.
+SOLUTIONS_DIR = os.path.join(os.path.expanduser("~"), "python_projects",
+                             "xslope_private", "reports", "campaign_joints_2026-09",
+                             "fem03_part3_solutions")
+#: The stored solves the figures can be redrawn from, by name: the pickle (a
+#: ``{"fem_data", "result"}`` dict, ``solve_ssrm``'s own result) and the pair of
+#: files its live group draws from it.  ``grid_1M`` is the geogrid wall at
+#: 1,000,000 iterations a trial, the run behind the page's long-run section.
+FEM03_STORED = {
+    "wall": (os.path.join(SOLUTIONS_DIR, "wall.pkl"),
+             "fem03_fem_blocks.png", "fem03_fem_shear.png"),
+    "wall_grid": (os.path.join(SOLUTIONS_DIR, "wall_grid.pkl"),
+                  "fem03_fem_blocks_grid.png", "fem03_fem_shear_grid.png"),
+    "grid_1M": (os.path.join(os.path.expanduser("~"), "python_projects",
+                             "xslope_private", "handoffs", "fem03_long_2026-10-10",
+                             "grid_1M.pkl"),
+                "fem03_fem_blocks_grid_long.png", "fem03_fem_shear_grid_long.png"),
+}
+for _label, _path, _name in FEM03_PAIRS:
+    FEM03_STORED[_label.replace(" ", "_")] = (
+        os.path.join(SOLUTIONS_DIR, "%s.pkl" % _label.replace(" ", "_")),
+        _name.replace("fem03_shear_", "fem03_deform_"), _name)
+
+
+def fem03_from(names, only=None):
+    """Redraw the panel pairs of the named stored solves (``FEM03_STORED``)
+    through ``_pair``, the call the live groups make, without solving.
+    ``only`` is the set of file names to write; None writes them all."""
+    import pickle
+
+    for name in names:
+        if name not in FEM03_STORED:
+            raise SystemExit("no stored result %r; known: %s"
+                             % (name, ", ".join(sorted(FEM03_STORED))))
+        path, deform_name, strain_name = FEM03_STORED[name]
+        if not os.path.exists(path):
+            raise SystemExit("stored result %r is missing: %s" % (name, path))
+        with open(path, "rb") as fh:
+            kept = pickle.load(fh)
+        print("== %s  (from %s, FS %s)" % (name, path, kept["result"].get("FS")))
+        _pair(deform_name, strain_name, kept["fem_data"], kept["result"],
+              "deformation", only=only)
+
+
+def _keep_solution(label, fem_data, result):
+    """Pickle a part 3 solve under the private campaign directory so both field
+    states can be redrawn and compared without the solve."""
+    import pickle
+
+    d = SOLUTIONS_DIR
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "%s.pkl" % label.replace(" ", "_")), "wb") as fh:
+        pickle.dump({"fem_data": fem_data, "result": result}, fh)
+
+
+GROUPS = {
+    "fem03_inputs": fem03_inputs,
+    "fem03_wall": fem03_wall,
+    "fem03_grid": fem03_grid,
+    "fem03_grid_long": fem03_grid_long,
+    "fem03_sheets": fem03_sheets,
+}
+
+#: Groups the no-argument run leaves out.
+OPT_IN = {"fem03_grid_long"}
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    os.makedirs(OUT_DIR, exist_ok=True)
+    # --from NAME ... [--only FILE ...]: redraw from stored solves, no solving.
+    if "--from" in argv:
+        def _after(flag):
+            if flag not in argv:
+                return None
+            out = []
+            for a in argv[argv.index(flag) + 1:]:
+                if a.startswith("--"):
+                    break
+                out.append(a)
+            return out
+        stored = _after("--from")
+        only = _after("--only")
+        if not stored:
+            print("--from needs one or more of: %s"
+                  % ", ".join(sorted(FEM03_STORED)))
+            return 1
+        fem03_from(stored, only=None if only is None else set(only))
+        print("\nredrew %d stored result(s) into docs/tutorials/images/"
+              % len(stored))
+        return 0
+    # A group named in full is that group alone ("fem03_grid" must not also run
+    # "fem03_grid_long"); anything else is matched as a substring.
+    # The 500,000-iteration run is forty minutes and draws nothing, so it runs
+    # only when it is named.
+    names = [n for n in GROUPS
+             if (not argv and n not in OPT_IN)
+             or any(a == n or (a not in GROUPS and a in n) for a in argv)]
+    if not names:
+        print("no figure group matching %s; known groups: %s"
+              % (argv, ", ".join(sorted(GROUPS))))
+        return 1
+    for name in names:
+        print("== %s" % name)
+        GROUPS[name]()
+    print("\nwrote %d group(s) to docs/tutorials/images/" % len(names))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

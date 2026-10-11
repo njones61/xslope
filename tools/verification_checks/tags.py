@@ -31,7 +31,7 @@ import sys
 from decimal import Decimal, ROUND_HALF_UP
 
 TAG = re.compile(r"<!-- test:(.*?)-->")
-DOT = re.compile(r"🟢|🟡|🔴|🟣")
+DOT = re.compile(r"🟢|🟡|🔴")
 
 #: The pages set a minus sign as U+2212; tag values are ASCII.  Normalised in
 #: the body before matching so a locked −0.0932 is found where it is printed.

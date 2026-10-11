@@ -28,6 +28,8 @@ What this file locks:
 Run directly:  PYTHONPATH=. python3 test/hybrid_criterion_check.py
 Exits non-zero on any failure.
 """
+import contextlib
+import io
 import os
 import sys
 
@@ -87,6 +89,13 @@ def check_classifier():
     check("displacement cap tripped -> FAILED regardless of history",
           v == 'FAILED')
 
+    # A force-settled field outside the yield surface is not a standing field,
+    # while a corrector refusal is not a proof of failure.
+    v, _, _ = classify_nonconvergence([10.0 + i for i in range(40)], 1.0,
+                                      'yield_gate')
+    check("yield-gate refusal -> AMBIGUOUS even on growing displacement",
+          v == 'AMBIGUOUS')
+
     # Degenerate inputs must never claim STABLE_STUCK.
     v, ur, g = classify_nonconvergence([], 0.0, 'iteration_cap')
     check("no elastic scale -> AMBIGUOUS, no numbers",
@@ -136,6 +145,10 @@ def _stub_solution(F, kind):
         return {"converged": False, "stable": False, "verdict": "AMBIGUOUS",
                 "u_ratio": 1.4, "u_growth": 0.0, "exit_reason": "inconclusive",
                 "iterations": 50000}
+    if kind == 'yield_gate':
+        return {"converged": False, "stable": False, "verdict": "AMBIGUOUS",
+                "u_ratio": 1.4, "u_growth": 0.0, "exit_reason": "yield_gate",
+                "iterations": 1800, "gate_failed": True}
     return {"converged": False, "stable": False, "verdict": "FAILED",
             "u_ratio": 12.0, "u_growth": 3.0, "exit_reason": "iteration_cap",
             "iterations": 1600}
@@ -223,23 +236,57 @@ def check_wiring():
               f"{len(trials or [])} trials")
 
     # An INCONCLUSIVE trial — the iteration ceiling reached with the residual still
-    # falling — is not a failure. The bisection carries on below it and reports the
-    # final bracket's MIDPOINT, exactly as on any other run; what the trial changes is
-    # what the bracket's upper edge means, which the result states in words.
+    # falling — is not a failure. The bisection carries on below it. Where such an
+    # undecided trial is still the TOP of the final bracket, the search found no
+    # failure, so the answer is the bracket's bottom reported as a lower bound
+    # (`fs_is_lower_bound`, commit 5bbaf791; docs/fem/overview.md); the run states
+    # the undecided trial in words either way.
     def kinds_inc(F):
         return 'converged' if F < 1.4 else ('inconclusive' if F < 1.8 else 'failed')
 
     res_inc, _ = _bisect(kinds_inc, hybrid=False)
     _lo, _hi = res_inc['final_interval']
-    check("an inconclusive trial is still reported as the bracket midpoint",
-          abs(res_inc['FS'] - 0.5 * (_lo + _hi)) < 1e-12 and _hi >= 1.4,
-          f"FS={res_inc['FS']:.3f} interval={res_inc['final_interval']}")
-    check("the run reports the inconclusive trial in words",
-          bool(res_inc.get('note')) and 'inconclusive' in res_inc['note'].lower()
+    check("an undecided top trial is reported as the bracket's bottom, a lower bound",
+          res_inc['FS'] == _lo and res_inc.get('fs_is_lower_bound') is True
+          and _hi >= 1.4,
+          f"FS={res_inc['FS']:.4f} interval={res_inc['final_interval']} "
+          f"lower_bound={res_inc.get('fs_is_lower_bound')}")
+    check("the run reports the undecided trial in words",
+          bool(res_inc.get('note')) and 'undecided' in res_inc['note'].lower()
           and len(res_inc.get('inconclusive') or []) >= 1,
           f"note={res_inc.get('note')}")
+
+    # The control: an inconclusive trial that a failure later displaces from the top
+    # of the bracket changes nothing about the answer. It is still recorded and
+    # stated, and the factor of safety is the final bracket's MIDPOINT.
+    def kinds_inc_low(F):
+        return ('converged' if F < 1.4 else
+                'failed' if F < 1.45 else
+                'inconclusive' if F < 1.8 else 'failed')
+
+    res_ctl, _ = _bisect(kinds_inc_low, hybrid=False)
+    _lo_c, _hi_c = res_ctl['final_interval']
+    check("an undecided trial below a failure leaves the midpoint answer",
+          abs(res_ctl['FS'] - 0.5 * (_lo_c + _hi_c)) < 1e-12
+          and not res_ctl.get('fs_is_lower_bound')
+          and len(res_ctl.get('inconclusive') or []) >= 1,
+          f"FS={res_ctl['FS']:.4f} interval={res_ctl['final_interval']} "
+          f"lower_bound={res_ctl.get('fs_is_lower_bound')}")
     check("the factor of safety comes from a trial that reached equilibrium",
           res_inc['last_solution']['converged'] is True)
+
+    # A yield-gate refusal uses that same uncertainty route, while retaining the
+    # distinct exit reason in both the trial table and the explanatory note.
+    def kinds_gate(F):
+        return 'converged' if F < 1.4 else ('yield_gate' if F < 1.8 else 'failed')
+
+    res_gate, _ = _bisect(kinds_gate, hybrid=False)
+    gate_rows = [t for t in res_gate['trials']
+                 if t.get('exit_reason') == 'yield_gate']
+    check("a yield-gate refusal is carried as bracket uncertainty",
+          bool(gate_rows) and bool(res_gate.get('inconclusive'))
+          and 'yield surface' in (res_gate.get('note') or ''),
+          f"note={res_gate.get('note')}")
 
     # The criterion is threaded down to every trial, not just to the driver.
     _, stub = _bisect(kinds, hybrid=True)
@@ -332,9 +379,16 @@ def check_real_solve():
     # the plateau watch, which must not end a solve on its own.
     sol_d = solve_fem(fem_data, F=2.5, debug_level=0, max_iterations=2000,
                       max_disp_factor=None, early_exit=True, early_failure=False)
+    # 'not_slowing' is the trend reading's ending AT Max iterations (rL_creep_rule.md:
+    # the movement did not slow, FAILED); it is a budget exit, read at the budget.
+    _sr = sol_d.get('stop_reading') or {}
     check("a residual plateau never ends a solve",
-          sol_d['exit_reason'] in ('converged', 'iteration_cap', 'disp_limit'),
-          f"exit_reason={sol_d['exit_reason']}")
+          sol_d['exit_reason'] in ('converged', 'iteration_cap', 'disp_limit')
+          or (sol_d['exit_reason'] == 'not_slowing'
+              and _sr.get('rule') == 'not_slowing'
+              and _sr.get('iteration') == 2000),
+          f"exit_reason={sol_d['exit_reason']} "
+          f"read at {_sr.get('iteration')}")
     check("a non-converged trial spends its whole budget",
           sol_d['converged'] is False and sol_d['iterations'] == 2000,
           f"iterations={sol_d['iterations']}")
@@ -431,39 +485,54 @@ def _fires_at(disp, oob, **kw):
 def check_early_failure():
     """The rule that closes a running-away trial before its budget runs out.
 
-    Its whole safety argument is a threshold placement, so that is what is locked
-    here — against the recorded sampled series of three real strength-reduction
-    trials (see the fixtures at the bottom of this file). Two are gross failures,
-    one on each of the rule's two tests; the third is the near-critical trial that
-    the reinforced slope's factor of safety turns on, which grows past FIVE times
-    its elastic displacement, sits with a flat residual for thousands of
-    iterations, and THEN converges at iteration 20,085. The rule must catch the
-    first two and must not touch the third — and the mutation checks below show
-    that the third is a live constraint, not a fixture that passes whatever the
-    thresholds are: moving either threshold a little way down fires on it, which
-    would move the factor of safety.
+    Since r37 (xslope_private/reports/campaign_joints_2026-09/r37_runaway_rule.md)
+    the rule is ONE test, a level: max|u| past `_EARLY_FAIL_U_MAX` = 15 elastic
+    displacements and still gaining. The trend test (a flat residual over a
+    2,000-iteration window while the field moves) is retired behind
+    `_EARLY_FAIL_TREND_TEST = False`: it closed two stable, admissible locked
+    edges (RJ-2, RS2-50). Its safety argument is a threshold placement, so that
+    is what is locked here, against the recorded sampled series of three real
+    strength-reduction trials (see the fixtures at the bottom of this file): a
+    gross runaway the level must catch; a trial whose residual went flat while
+    its field was still moving, which the retired test used to close and which
+    is now left to its budget; and the near-critical trial the reinforced
+    slope's factor of safety turns on, which grows past FIVE times its elastic
+    displacement and THEN converges at iteration 20,085. The mutation check
+    shows the third is a live constraint on the level: moving it down to 5
+    fires on it, which would move the factor of safety.
     """
-    print("\n6. early failure — the thresholds, on recorded trials")
+    print("\n6. early failure — the level, on recorded trials")
 
     check("early-failure constants unchanged",
           (fem._EARLY_FAIL_WINDOW, fem._EARLY_FAIL_WARMUP,
-           fem._EARLY_FAIL_GAIN, fem._EARLY_FAIL_U_MAX) == (2000, 500, 1.0, 8.0),
+           fem._EARLY_FAIL_GAIN, fem._EARLY_FAIL_U_MAX) == (2000, 500, 1.0, 15.0)
+          and fem._EARLY_FAIL_TREND_TEST is False,
           f"{fem._EARLY_FAIL_WINDOW}/{fem._EARLY_FAIL_WARMUP}/"
-          f"{fem._EARLY_FAIL_GAIN}/{fem._EARLY_FAIL_U_MAX}")
+          f"{fem._EARLY_FAIL_GAIN}/{fem._EARLY_FAIL_U_MAX} "
+          f"trend_test={fem._EARLY_FAIL_TREND_TEST}")
 
-    # (f) — the absolute-runaway test, on a trial that reaches 78 elastic
-    # displacements. Recorded firing: iteration 1,160 of the 12,000 it used to spend.
+    # The level test, on a trial that runs away to 78 elastic displacements.
+    # Recorded firing under the level of 15: iteration 2,230 (it was 1,160 at 8).
     d, o = _series(RUNAWAY_DISP), _series(RUNAWAY_OOB)
     it, sig = _fires_at(d, o)
     check("gross runaway is caught, on the recorded iteration",
-          (it, sig) == (1160, 'runaway'), f"{it} ({sig})")
+          (it, sig) == (2230, 'runaway'), f"{it} ({sig})")
+    # ...and not a sample before the level: the prefix up to 14.99 is silent.
+    _k = next(j for j, v in enumerate(d) if v >= fem._EARLY_FAIL_U_MAX)
+    check("...and not before the field reaches the level",
+          _fires_at(d[:_k], o[:_k]) == (None, None) and d[_k - 1] < 15.0 <= d[_k],
+          f"{d[_k - 1]:.4f} -> {d[_k]:.4f} at iteration "
+          f"{_k * fem._HYBRID_SAMPLE_EVERY}")
 
-    # (b) — the stalled-residual test, on a trial whose residual goes flat while the
-    # field keeps moving. Recorded firing: iteration 3,140 of 36,000 (two extensions).
+    # A stalled residual with the field still moving: no longer an early verdict.
+    # The trend test that closed this trial at iteration 3,140 is retired (r37), and
+    # the field (7.34 elastic displacements at that point) is below the level, so the
+    # rule stays silent and the trial is decided at its budget.
     d, o = _series(STALLED_DISP), _series(STALLED_OOB)
     it, sig = _fires_at(d, o)
-    check("a stalled residual with the field still moving is caught",
-          (it, sig) == (3140, 'stalled_residual'), f"{it} ({sig})")
+    check("a stalled residual with the field still moving is left to its budget",
+          it is None and max(d) < fem._EARLY_FAIL_U_MAX,
+          f"fired at {it} ({sig}); field reaches {max(d):.3f} elastic displacements")
 
     # The near-critical CONVERGED trial: silent over its whole 20,085 iterations.
     d, o = _series(NEARCRIT_DISP), _series(NEARCRIT_OOB)
@@ -473,14 +542,12 @@ def check_early_failure():
     check("...and it is genuinely near the thresholds",
           4.5 < max(d) < 8.0, f"reaches {max(d):.3f} elastic displacements")
 
-    # Mutation: the margins are 1.59x on the level and 3.0x on the window gain, so a
-    # threshold moved inside them fires on a trial that reaches equilibrium.
+    # Mutation: a level moved down inside the converging trial's path fires on it.
     it_u, _ = _fires_at(d, o, u_max=5.0)
     check("a level threshold lowered to 5x elastic WOULD fire on it",
           it_u is not None, f"fired at {it_u}")
-    it_g, _ = _fires_at(d, o, gain=0.3)
-    check("a window-gain floor lowered to 0.3 WOULD fire on it",
-          it_g is not None, f"fired at {it_g}")
+    # (The window-gain mutation is removed: the trend test it exercised is retired,
+    # r37_runaway_rule.md.)
 
     # Degenerate inputs: no elastic yardstick, no history.
     check("no elastic scale -> no verdict",
@@ -529,6 +596,198 @@ def check_early_failure_wiring():
           f"{sol_off['max_displacement']:.3g} vs {sol['max_displacement']:.3g}")
 
 
+def check_log_wording():
+    """The trial log says what the bracket did with the trial, not what some
+    other criterion would have done with it.
+
+    A settled or frozen trial is counted as standing only under the hybrid
+    criterion. Under the default one the same trial moves the bracket DOWN, and
+    a log line reading "counted STABLE" beside a bracket that just stepped down
+    tells the reader the opposite of what happened.
+    """
+    print("\n8. the trial log names the criterion's own reading")
+
+    stuck = _stub_solution(1.5, 'stuck')
+    settled = dict(stuck, verdict='JOINT_SETTLED', exit_reason='no_progress')
+
+    for name, sol in (("STABLE_STUCK", stuck), ("JOINT_SETTLED", settled)):
+        yes = fem._verdict_note(sol, hybrid=True)
+        no = fem._verdict_note(sol, hybrid=False)
+        check(f"{name} under hybrid is counted stable",
+              "counted STABLE" in yes, yes)
+        check(f"{name} under the default criterion is counted failed",
+              "counted FAILED" in no and "counted STABLE" not in no, no)
+
+    # The wording is unchanged for every trial whose reading the criterion does
+    # not enter: a converged trial, a real failure, and the steady interface
+    # mechanism, which is a failure under both.
+    for kind, article in (('converged', 'a'), ('failed', 'a'),
+                          ('ambiguous', 'an')):
+        sol = _stub_solution(1.5, kind)
+        check(f"{article} {kind} trial reads the same either way",
+              fem._verdict_note(sol, True) == fem._verdict_note(sol, False),
+              fem._verdict_note(sol, True))
+
+    # And the driver passes its own criterion down, so the printed log agrees
+    # with the bracket it is printed beside.
+    def kinds(F):
+        return 'converged' if F < 1.4 else ('stuck' if F < 1.8 else 'failed')
+
+    for hybrid, want in ((True, "counted STABLE"), (False, "counted FAILED")):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            with _stub_solve_fem(kinds):
+                fem._ssrm_displacement_limit(
+                    {}, F_min=1.0, F_max=2.0, tolerance=0.05,
+                    max_disp_factor=None, debug_level=1, hybrid=hybrid)
+        log = buf.getvalue()
+        got = [ln.strip() for ln in log.splitlines() if "STABLE_STUCK" in ln]
+        check(f"the run log under hybrid={hybrid} says {want!r}",
+              bool(got) and all(want in ln for ln in got),
+              got[0] if got else "no STABLE_STUCK trial was logged")
+
+
+# ===================== 9. the yield gate leaves the fixed boundary out ============
+
+def _gp_group(sig_rows, on_bnd, t_cap=None, pairs=None):
+    """Gauss points carrying exactly the stresses asked for, as a `_yield_reading`
+    group (B = 0, the whole stress is the in-situ term), c = 10, phi = 30."""
+    import numpy as np
+    n = len(sig_rows)
+    ph = np.radians(30.0)
+    g = {'B': np.zeros((n, 3, 2)), 'D4': np.zeros((n, 4, 4)),
+         'dof': np.zeros((n, 2), dtype=int), 'evp': np.zeros((n, 4)),
+         'w': np.ones(n), 'u_gp': np.zeros(n),
+         'pairs': pairs or [(i, 0) for i in range(n)],
+         'c_r': np.full(n, 10.0), 'snph': np.full(n, np.sin(ph)),
+         'csph': np.full(n, np.cos(ph)),
+         'sig0': np.array(sig_rows, dtype=float),
+         'on_bnd': np.array(on_bnd, dtype=bool)}
+    if t_cap is not None:
+        g['t_cap'] = np.array(t_cap, dtype=float)
+    return g
+
+
+def _inject(target_elem, add):
+    """A `_yield_reading` that, on the GATE's reading only, reads the Gauss points of
+    `target_elem` with `add` (sx, sy, txy, sz) added to their stress — the solve
+    itself never sees it — so the gate's response to an overstress at a chosen
+    place is measured on a real solve."""
+    import numpy as np
+    real = fem._yield_reading
+
+    def reading(gp_groups, u, sq3=None, floor=0.0, split_boundary=False):
+        if not split_boundary:
+            return real(gp_groups, u, sq3, floor)
+        saved = []
+        for grp in gp_groups:
+            rows = [i for i, (e, _) in enumerate(grp['pairs']) if e == target_elem]
+            if not rows:
+                continue
+            old = grp.get('sig0')
+            new = (np.zeros((len(grp['pairs']), 4)) if old is None
+                   else np.array(old, dtype=float, copy=True))
+            new[rows] += np.asarray(add, dtype=float)
+            saved.append((grp, old))
+            grp['sig0'] = new
+        try:
+            return real(gp_groups, u, sq3, floor, split_boundary=True)
+        finally:
+            for grp, old in saved:
+                if old is None:
+                    grp.pop('sig0', None)
+                else:
+                    grp['sig0'] = old
+    return reading
+
+
+def check_gate_boundary():
+    print("\n9. the yield gate leaves elements on the fixed boundary out of its reading")
+    import numpy as np
+
+    # --- the reading itself, on states chosen by hand -------------------------
+    over = [0.0, 0.0, 40.0, 0.0]        # pure shear 40 against c = 10: far outside
+    fine = [-50.0, -50.0, 0.0, -50.0]   # isotropic compression: inside
+    grp = _gp_group([over, fine], on_bnd=[True, False])
+    v, n, _, w, b = fem._yield_reading([grp], np.zeros(2), split_boundary=True)
+    v0, n0, _, w0 = fem._yield_reading([grp], np.zeros(2))
+    check("a boundary-only overstress is left out of the gate's reading",
+          v <= fem._VP_YIELD_GATE and n == 0 and w is None,
+          f"reading {v:.3e} on {n} point(s)")
+    check("... and reported apart: count, worst and where",
+          b['n'] == 1 and b['max'] > fem._VP_YIELD_GATE and b['at'] == (0, 0),
+          f"{b}")
+    check("the reading off the gate is unchanged (boundary point counted)",
+          v0 == b['max'] and n0 == 1 and w0 == (0, 0))
+    grp = _gp_group([over, over], on_bnd=[True, False])
+    v, n, _, w, b = fem._yield_reading([grp], np.zeros(2), split_boundary=True)
+    check("an interior overstress still reads over the gate",
+          v > fem._VP_YIELD_GATE and n == 1 and w == (1, 0) and b['n'] == 1,
+          f"reading {v:.3e} on {n} point(s) at {w}")
+    # The count and the worst are one quantity: a point over only its tension cap
+    # is counted, not reported as the worst beside a count of zero.
+    grp = _gp_group([[5.0, 5.0, 0.0, 5.0]], on_bnd=[False], t_cap=[0.0])
+    v, n, t, w = fem._yield_reading([grp], np.zeros(2))
+    check("a tension-cap-only violation is counted with the worst it sets",
+          v > fem._YIELD_FLAG_FRAC and n == 1 and t is not None and w == (0, 0),
+          f"worst {v:.3e}, count {n}, tension {t}")
+
+    # --- the gate on a real solve ---------------------------------------------
+    fem_data = _real_model()
+    if fem_data is None:
+        check("griffiths1 input present", False)
+        return
+    bnd = fem._boundary_element_mask(fem_data)
+    nodes = np.asarray(fem_data['nodes'], float)
+    els = np.asarray(fem_data['elements'], int)
+    et = np.asarray(fem_data['element_types'], int)
+    bc = np.asarray(fem_data['bc_type'])
+    on_node = np.isin(bc, (1, 2, 3))
+    # the mask is exactly "some node of the element is constrained"
+    want = np.array([bool(on_node[els[e, :et[e]]].any()) for e in range(len(els))])
+    check("the boundary mask marks exactly the elements with a constrained node",
+          bool(np.array_equal(bnd, want)) and bnd.any() and not bnd.all(),
+          f"{int(bnd.sum())} of {len(bnd)} elements")
+    cen = np.array([nodes[els[e, :et[e]]].mean(axis=0) for e in range(len(els))])
+    e_bnd = int(np.flatnonzero(bnd)[0])
+    interior = np.flatnonzero(~bnd)
+    # the interior element farthest from every boundary element's centroid
+    d = np.min(np.linalg.norm(cen[interior][:, None, :] - cen[bnd][None, :, :],
+                              axis=2), axis=1)
+    e_int = int(interior[int(np.argmax(d))])
+    add = [0.0, 0.0, 1e4, 0.0]
+    saved = (fem._yield_reading, fem._CORRECTOR_YIELD_TOL, fem._vp_gate_armed)
+    try:
+        # The corrector refuses everything and the gate is armed from the first
+        # settled state, so the gate's reading alone decides how the trial ends.
+        fem._CORRECTOR_YIELD_TOL = -1.0
+        fem._vp_gate_armed = lambda *a, **k: True
+        fem._yield_reading = _inject(e_bnd, add)
+        sa = fem.solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=4000,
+                           max_disp_factor=None)
+        fem._yield_reading = _inject(e_int, add)
+        sb = fem.solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=4000,
+                           max_disp_factor=None)
+    finally:
+        fem._yield_reading, fem._CORRECTOR_YIELD_TOL, fem._vp_gate_armed = saved
+    gb = sa.get('gate_boundary') or {}
+    check("force-settled, overstress only in a fixed-boundary element: NOT ended "
+          "by the gate",
+          sa['converged'] and sa['exit_reason'] == 'converged'
+          and not sa.get('gate_failed'),
+          f"exit {sa['exit_reason']!r}, {sa['iterations']} iterations")
+    check("... and the trial records the left-out points and where",
+          int(gb.get('n', 0)) > 0 and gb.get('at') is not None
+          and gb['at'][0] == e_bnd and gb.get('remaining_max', 1.0)
+          <= fem._VP_YIELD_GATE, f"{gb}")
+    check("... and its log line names them",
+          "left out of the yield reading" in fem._verdict_note(sa))
+    check("force-settled, overstress in an interior element: ended by the gate",
+          (not sb['converged']) and sb['exit_reason'] == 'yield_gate'
+          and sb.get('gate_failed'),
+          f"exit {sb['exit_reason']!r}, {sb['iterations']} iterations")
+
+
 def main():
     print("=" * 72)
     print("Hybrid failure-criterion checks")
@@ -540,6 +799,8 @@ def main():
     check_budget_extension()
     check_early_failure()
     check_early_failure_wiring()
+    check_log_wording()
+    check_gate_boundary()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))
@@ -562,10 +823,13 @@ def run():
 # trials, taken from two complete bisection walks on the tutorial models:
 #
 #   RUNAWAY   the FEM-1 embankment (3.5 ft tri6) at F = 1.500000 — FAILED, and
-#             gross: 78 elastic displacements. Truncated at the recorded firing.
+#             gross: 78 elastic displacements. Truncated at the recorded firing of
+#             the level test at 15 (iteration 2,230; re-recorded 2026-09-27 on the
+#             viscoplastic driver, its first 117 samples identical to the series
+#             recorded under the old level of 8).
 #   STALLED   the FEM-2 reinforced slope (2.0 ft tri6, elastic-perfectly-plastic
 #             bars) at F = 1.625000 — FAILED after two budget extensions, on the
-#             residual test. Truncated at the recorded firing.
+#             retired residual (trend) test. Truncated at that recorded firing.
 #   NEARCRIT  the same model at F = 1.546875 — CONVERGED at iteration 20,085, and
 #             it is the trial the reinforced slope's factor of safety turns on. Its
 #             whole life is kept: the rule must stay silent across all of it.
@@ -584,16 +848,30 @@ RUNAWAY_DISP = """\
 4.6977,4.7636,4.8295,4.8955,4.9614,5.0273,5.0931,5.159,5.2249,5.2907,5.3565,5.4223,5.4881,
 5.5539,5.6197,5.6855,5.7512,5.817,5.8827,5.9484,6.0141,6.0798,6.1455,6.2112,6.2769,6.3425,
 6.4082,6.4739,6.5397,6.6056,6.6714,6.7372,6.803,6.8688,6.9346,7.0004,7.0662,7.132,7.1977,
-7.2635,7.3292,7.3949,7.4607,7.5264,7.5921,7.6578,7.7235,7.7892,7.8549,7.9205,7.9862,8.0519"""
+7.2635,7.3292,7.3949,7.4607,7.5264,7.5921,7.6578,7.7235,7.7892,7.8549,7.9205,7.9862,8.0519,
+8.1175,8.1832,8.2488,8.3145,8.3801,8.4457,8.5113,8.5769,8.6425,8.7081,8.7737,8.8393,8.9049,
+8.9705,9.0361,9.1016,9.1672,9.2328,9.2983,9.3639,9.4294,9.495,9.5605,9.626,9.6916,9.7571,
+9.8226,9.8881,9.9537,10.0192,10.0847,10.1502,10.2157,10.2812,10.3467,10.4122,10.4777,10.5431,10.6086,
+10.6741,10.7396,10.8051,10.8705,10.936,11.0015,11.0669,11.1324,11.1978,11.2632,11.3287,11.3941,11.4596,
+11.525,11.5904,11.6559,11.7213,11.7867,11.8521,11.9175,11.983,12.0484,12.1138,12.1792,12.2446,12.31,
+12.3754,12.4408,12.5062,12.5716,12.6369,12.7023,12.7677,12.8331,12.8985,12.9638,13.0292,13.0946,13.16,
+13.2253,13.2907,13.3561,13.4215,13.4868,13.5522,13.6175,13.6829,13.7483,13.8136,13.879,13.9443,14.0097,
+14.075,14.1404,14.2057,14.2711,14.3364,14.4018,14.4671,14.5325,14.5978,14.6631,14.7285,14.7938,14.8592,
+14.9245,14.9898,15.0552"""
 
 RUNAWAY_OOB = """\
 1,1.25,1.92,1.96,1.88,1.83,1.79,1.76,1.74,1.72,1.71,1.7,1.7,1.69,1.68,1.68,1.68,1.67,1.67,
-1.67,1.67,1.67,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.65,1.65,1.65,1.65,1.65,
-1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,
-1.65,1.65,1.65,1.65,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,
-1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,
-1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.63,1.64,1.64,1.64,1.64,1.63,
-1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63"""
+1.67,1.67,1.67,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.66,1.65,1.65,1.65,1.65,1.65,1.65,
+1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,1.65,
+1.65,1.65,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,
+1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,
+1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.64,1.63,1.64,1.64,1.64,1.64,1.63,1.63,1.63,1.63,1.63,1.63,
+1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,
+1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,
+1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,
+1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,
+1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.63,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,
+1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62"""
 
 #STALLED
 STALLED_DISP = """\

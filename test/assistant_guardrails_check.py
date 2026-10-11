@@ -75,6 +75,21 @@ does regardless of the model, and that is what this file covers:
      assistant says can be opened has to be openable: a report generated with no
      path lands in the output folder the dock's Files button opens, and is named
      among the files the snippet reports.
+  O. WHAT THE RECORDINGS OF 2026-10-10 FOUND — a snippet that printed a whole
+     strength-reduction result sent 820,000 characters back to the model in one
+     call, so a snippet's printout is capped (head and tail kept, a marker in
+     between) and the dock shows the same capped text; the model summary printed
+     the ground surface's range where it read as the zones' extent, so it says
+     whose range it is; a sweep that moved the profile lines and put them back
+     was told its polygon edit had been discarded, so the discard test compares
+     against the last rebuild; a table written directly under a line of text
+     reached the dock as rows of pipes; everything after a reply that ended
+     on a bulleted list was drawn as more bullets of it; and a reply that the
+     Responses-API route split into a text choice and a tool-call choice lost
+     its tool call; and a file a snippet wrote under a name already in the
+     Files folder was never reported or shown; and a sweep step's unsolved
+     trials and admissibility notes never reached the model; and a new
+     project's summary named a surface family nobody chose.
   N. TRANSIENT SEEPAGE, AND THE SNIPPET THAT NEVER RETURNS — a corpus sweep met a
      transient model with no helper for it, and the assistant spent the turn
      reverse-engineering engine signatures instead of answering; another sweep sat
@@ -1187,16 +1202,23 @@ def check_every_finding_is_quoted_once():
 def check_two_faults_on_one_row():
     """Two different faults about one row are two findings.
 
-    vp047 states one pullout length per end, and both exceed the line: the same
+    vp047 with both of its development lengths typed with a minus sign: the same
     rule fires twice on one reinforcement line, once for Lp1 and once for Lp2. The
     messages differ only in a digit that belongs to a FIELD NAME, so blanking it
     with the values made the pair one finding — the second was never reported, and
     repairing the first left the model reading the survivor as unchanged text it
     had already been given. Digit-suffixed names run through the whole schema
     (x1/y1, x2/y2, lp1/lp2, k1/k2), so this is a class, not a case.
+
+    The pair is an ERROR, and an edit-answerable error is quoted in every block,
+    so the real path shows both quoted but cannot show the survivor collapsing.
+    That half is replayed on the same two findings as warnings, through
+    ChecksMemo itself.
     """
+    from dataclasses import replace
     from studio.ai import assistant as A
     from xslope.preflight import preflight
+    rule = "reinforce.pullout_negative"
     out = []
     deck = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
                         "vp047.xlsx")
@@ -1205,14 +1227,16 @@ def check_two_faults_on_one_row():
     mw, asst = _session()
     mw.doc.load(deck)
     sd = mw.doc.slope_data
+    for line in sd["reinforcement_lines"]:
+        line["lp1"], line["lp2"] = -abs(line["lp1"]), -abs(line["lp2"])
     pair = [f for f in preflight(sd, "lem", A._checks_selection(sd)).findings
-            if f.rule_id == "reinforce.envelope_inconsistent"
+            if f.rule_id == rule
             and f.message.startswith("Reinforcement line 1 ")]
     if len(pair) != 2 or not ("Lp1 =" in pair[0].message
                               and "Lp2 =" in pair[1].message):
         mw.deleteLater()
-        return [f"vp047 no longer carries the Lp1/Lp2 pair on one row: "
-                f"{[f.message[:60] for f in pair]}"]
+        return [f"vp047 with negative development lengths no longer carries the "
+                f"Lp1/Lp2 pair on one row: {[f.message[:60] for f in pair]}"]
     # Precisely: the two share a _finding_key, because identity is the rule plus
     # the row and both are about row 1. What separates them is the occurrence
     # counter ChecksMemo.keys appends — which makes them two entries rather than
@@ -1224,8 +1248,20 @@ def check_two_faults_on_one_row():
     if len(set(A.ChecksMemo.keys(pair))) != 2:
         out.append("the two faults on one row are tracked as one entry")
 
+    # As warnings, which collapse once quoted: with both quoted and Lp1 repaired,
+    # the Lp2 survivor takes the entry the Lp1 fault held, and it must read as
+    # changed rather than as the Lp1 text already given.
+    warned = [replace(f, severity="warning") for f in pair]
+    memo = A.ChecksMemo()
+    keys, _fresh = memo.delta(warned)
+    memo.record(keys, warned, set(range(len(warned))))
+    keys, fresh = memo.delta(warned[1:])
+    if keys[0] not in fresh:
+        out.append("with Lp1 repaired, the Lp2 warning collapsed under the Lp1 "
+                   "text already given")
+
     # ... and through the real path: both quoted, and repairing Lp1 leaves the
-    # Lp2 fault quoted in full rather than filed under the text of Lp1.
+    # Lp2 fault standing alone and quoted in full.
     blk = _block(_run(asst, "slope_data['materials'][0]['gamma'] += 1.0\n"
                             "print('unit weight nudged')"))
     for f in pair:
@@ -1239,7 +1275,7 @@ print('first pullout length repaired on every line')
 """))
     left = [f for f in preflight(mw.doc.slope_data, "lem",
                                  A._checks_selection(mw.doc.slope_data)).findings
-            if f.rule_id == "reinforce.envelope_inconsistent"]
+            if f.rule_id == rule]
     if not left or any("Lp1 =" in f.message for f in left):
         out.append(f"the repair did not leave the Lp2 faults standing alone: "
                    f"{[f.message[:40] for f in left]}")
@@ -1849,7 +1885,7 @@ DOC_QUESTIONS = [
                                           "seep/seep_slope/", "studio/editing/",
                                           "tutorials/lem04_water_in_the_slope/")),
     ("Does xslope support anchors or tiebacks?",
-     ("lem/reinforcement/", "usage/input_template/",
+     ("reinforcement/lem/", "usage/input_template/",
       "tutorials/lem09_tieback_wall/")),
 ]
 
@@ -2416,7 +2452,8 @@ def check_report_lands_in_the_files_folder():
 
     It goes to the assistant's output folder — what the dock's Files button opens
     — and the snippet's own result names it, so the sentence the assistant writes
-    about opening it is true.
+    about opening it is true. A report left unfinished says its contents page has
+    no page numbers yet.
     """
     out = []
     mw, asst, _ = _solved_session()
@@ -2441,9 +2478,17 @@ def check_report_lands_in_the_files_folder():
     if f"REPORT {in_the_folder}" not in result:
         out.append("generate_report() returned a path other than the one in the "
                    f"output folder: {result[-400:]}")
-    if "small_slope_report.docx" not in result.split("[saved", 1)[-1]:
+    import re
+    saved = " ".join(re.findall(r"\[saved \d+ file\(s\)[^\]]*\]", result))
+    if "small_slope_report.docx" not in saved:
         out.append("the report is not among the files the snippet reports the "
                    "user can open")
+    # Left unfinished, its contents page has no page numbers, and the printout
+    # says so: the helper's own description promises them, and a model repeats
+    # that promise unless the run tells it otherwise.
+    if "no page numbers yet" not in result:
+        out.append("an unfinished report's printout does not say its contents "
+                   f"page has no page numbers: {result[-400:]!r}")
     # An explicit path still goes exactly where it was asked to go.
     asked_for = os.path.join(tmpdir, "named.docx")
     _run(asst, f"generate_report(path={asked_for!r}, finalize=False)")
@@ -2643,6 +2688,431 @@ def check_cache_marks_walk_the_history():
     return []
 
 
+# --- O. what the recordings of 2026-10-10 found -----------------------------
+
+def check_printout_is_capped():
+    """A snippet's printout reaches the model, and the dock, capped.
+
+    One recorded snippet printed a strength reduction's whole result, arrays and
+    all — 820,000 characters — and the next completion read it back as 453,000
+    tokens of input. What is asserted: a printout under the cap is passed whole;
+    one over it keeps its first and last lines with a marker between them saying
+    how much was cut; the MODEL CHECKS block a changing snippet earns still
+    arrives after it, whole; and the dock is sent the same text the model gets.
+    """
+    from studio.ai import assistant as A
+    out = []
+    mw, asst = _session()
+    seen = []
+    asst.tool_ran.connect(lambda code, text, outputs: seen.append(text))
+
+    small = "x" * (A.OUTPUT_CAP_CHARS - 500)
+    result = _run(asst, f"print({small!r})")
+    if small not in result:
+        out.append("a printout under the cap was cut")
+
+    big = ("print('FIRST LINE')\n"
+           "for i in range(30000): print('row %05d ' % i + 'y' * 40)\n"
+           "print('LAST LINE')\n")
+    result = _run(asst, big)
+    if len(result) > A.OUTPUT_CAP_CHARS + 600:
+        out.append(f"a 1.5-million-character printout came back at "
+                   f"{len(result):,} characters, over the cap")
+    for want in ("FIRST LINE", "LAST LINE", "characters (", "of printed output cut here",
+                 "Print less"):
+        if want not in result:
+            out.append(f"the capped printout lost {want!r}")
+    if seen and seen[-1] != result:
+        out.append("the dock is shown a different text from the one the model gets")
+
+    # A big printout from a snippet that also edits the model: the checks block
+    # is the harness's, not the printout's, and is never cut.
+    _run(asst, SNIPPET_MATERIALS)
+    result = _run(asst, SNIPPET_GEOMETRY.rstrip() + "\n" + big)
+    if _block(result) is None:
+        out.append("the MODEL CHECKS block was lost behind a capped printout")
+    elif not result.rstrip().endswith(_block(result).rstrip()):
+        out.append("the MODEL CHECKS block no longer ends the tool result")
+    mw.deleteLater()
+    return out
+
+
+def check_summary_says_whose_range_it_prints():
+    """The summary's geometry line says the range is the ground surface's.
+
+    Printed bare after "(2 zones)", the ground surface's y range read as the
+    zones' extent, and a recorded session told the user the zones only reached
+    y = 0 on a model whose foundation runs to the maximum depth at -10.
+    """
+    from studio.ai.assistant import model_summary_text
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    text = model_summary_text(mw.doc.slope_data, {}, name="m.xlsx")
+    line = next((l for l in text.splitlines() if l.startswith("Geometry:")), "")
+    if "ground surface x" not in line:
+        out.append(f"the geometry line does not say whose range it is: {line!r}")
+    if "profile lines (1)" not in line:
+        out.append(f"a profile-line model is not named as one: {line!r}")
+    if "zones; x" in line or "zones), x" in line:
+        out.append(f"a bare range still follows the zone count: {line!r}")
+    mw.deleteLater()
+    return out
+
+
+#: A sweep on the profile lines that puts them back, the way recorded sessions
+#: wrote it: move the crest, resync, run, and restore the original line after.
+SNIPPET_PROFILE_SWEEP_RESTORED = """
+orig = list(slope_data['profile_lines'][0]['coords'])
+for x in (30.0, 40.0, 50.0):
+    slope_data['profile_lines'][0]['coords'] = [(0.0, 5.0), (x, 20.0), (90.0, 20.0)]
+    resync_geometry(slope_data)
+slope_data['profile_lines'][0]['coords'] = orig
+resync_geometry()
+print('swept and restored')
+"""
+
+
+def check_profile_sweep_is_not_a_polygon_edit():
+    """A sweep that edits only the profile lines raises no discard warning.
+
+    The discard test compared the polygons with the snippet's starting geometry;
+    after a sweep restores its profile lines, the polygons are still the ones the
+    LAST resync built from the moved lines, so three recorded sweeps were told
+    their polygon edit had been thrown away. They had not edited a polygon.
+    The control: a real polygon edit made after a resync is still named.
+    """
+    from studio.ai.kernel import POLYGON_EDIT_WARNING
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    result = _run(asst, SNIPPET_PROFILE_SWEEP_RESTORED)
+    if POLYGON_EDIT_WARNING in result:
+        out.append("a profile-line sweep that restored its lines was told its "
+                   f"polygon edit was discarded: {result[:300]!r}")
+    result = _run(asst, SNIPPET_PROFILE_SWEEP_RESTORED + SNIPPET_POLYGON_EDIT_ON_PROFILE_MODEL)
+    if POLYGON_EDIT_WARNING not in result:
+        out.append("a polygon edit made after the sweep's last resync is no longer "
+                   "named")
+    mw.deleteLater()
+    return out
+
+
+def check_table_under_a_line_renders():
+    """A table written directly under a line of text renders as a table.
+
+    Models write "**Critical circle**" and the table on the next line, often with
+    an empty header row. GitHub's markdown accepts that; Qt's parser folds the
+    table into the paragraph, and the dock showed rows of pipes.
+    """
+    from studio.chat_dock import ChatDock
+    out = []
+    mw, asst = _session()
+    dock = ChatDock(asst)
+    dock._on_assistant_text("**Critical circle**\n| | |\n|:--|:--|\n"
+                            "| FS (Spencer) | 1.546 |\n| R | 53.33 |\n")
+    text = dock.transcript.toPlainText()
+    if "|" in text:
+        out.append(f"the table reached the transcript as raw pipes: {text[-120:]!r}")
+    if "<table" not in dock.transcript.toHtml():
+        out.append("the table is not rendered as a table")
+    for want in ("Critical circle", "1.546", "53.33"):
+        if want not in text:
+            out.append(f"the rendered reply lost {want!r}")
+    dock.deleteLater()
+    mw.deleteLater()
+    return out
+
+
+def check_a_rewritten_file_is_reported():
+    """A file a snippet writes under a name already in the Files folder is
+    reported like a new one.
+
+    The kernel told new files from old ones by name alone, so a second sweep's
+    sensitivity.csv and sensitivity.png — and a plot saved over an earlier
+    session's assistant_plot_001.png — were written, never named in the tool
+    result, and never shown in the dock. The sweep helper also said it wrote a
+    plot when it was told not to draw one.
+    """
+    import time
+    out = []
+    mw, asst = _session()
+    write = ("import os\n"
+             "with open(os.path.join(OUTPUT_DIR, 'w1_rewrite_probe.csv'), 'w') as fh:\n"
+             "    fh.write('step,%s\\n' % STEP)\n")
+    first = _run(asst, "STEP = 'first'\n" + write)
+    if "w1_rewrite_probe.csv" not in first:
+        out.append(f"a new file was not reported: {first[:300]!r}")
+    time.sleep(0.05)
+    second = _run(asst, "STEP = 'second, longer'\n" + write)
+    if "w1_rewrite_probe.csv" not in second:
+        out.append(f"a file rewritten under its old name was not reported: "
+                   f"{second[:300]!r}")
+    third = _run(asst, "print('nothing written')")
+    if "w1_rewrite_probe.csv" in third:
+        out.append("a file the snippet did not touch was reported as its output")
+    try:
+        os.remove(os.path.join(asst._kernel.outdir, "w1_rewrite_probe.csv"))
+    except OSError:
+        pass
+    mw.deleteLater()
+
+    # The case a user meets: a second sweep writes its table and plot over the
+    # first one's. Both are reported, and a sweep run without a plot does not
+    # claim to have written one.
+    model = os.path.join(_REPO, "docs", "lem", "files",
+                         "xslope_simple_mult_layers.xlsx")
+    if not os.path.exists(model):
+        return out + [f"the sample model is missing: {model}"]
+    mw, asst = _session()
+    mw.doc.load(model)
+    sweep = ("def bump(v):\n"
+             "    slope_data['materials'][0]['c'] = v\n"
+             "sensitivity([100.0, 200.0], bump, param='c', search=False, "
+             "name='w1_rewrite_sweep'{plot})\n")
+    _run(asst, sweep.format(plot=""))
+    time.sleep(0.05)
+    again = _run(asst, sweep.format(plot=""))
+    def saved(text):        # the names the tool result says were saved
+        import re
+        return " ".join(re.findall(r"\[saved \d+ file\(s\)[^\]]*\]", text))
+    for f in ("w1_rewrite_sweep.csv", "w1_rewrite_sweep.png"):
+        if f not in saved(again):
+            out.append(f"a second sweep's {f} was not reported: {again[-400:]!r}")
+    quiet = _run(asst, sweep.format(plot=", plot=False"))
+    if "w1_rewrite_sweep.png" in quiet:
+        out.append(f"a sweep run with plot=False names a plot: {quiet[-400:]!r}")
+    if "w1_rewrite_sweep.csv" not in saved(quiet):
+        out.append(f"a sweep run with plot=False did not report its table: "
+                   f"{quiet[-400:]!r}")
+    for f in ("w1_rewrite_sweep.csv", "w1_rewrite_sweep.png"):
+        try:
+            os.remove(os.path.join(asst._kernel.outdir, f))
+        except OSError:
+            pass
+    mw.deleteLater()
+    return out
+
+
+def check_a_sweep_step_reports_its_warnings():
+    """What a sweep step's solve says about itself reaches the model.
+
+    Both sweep helpers once ran the engine muted and kept only the factor of
+    safety, so Spencer's unsolved trials and the admissibility notes never
+    reached the model, which could not mention them. Each step now prints them
+    once, each cut to its finding, on one line under its result, and the
+    sweep's table carries them; the search's progress lines stay out.
+    """
+    import re
+    out = []
+    model = os.path.join(_REPO, "docs", "lem", "files",
+                         "xslope_simple_mult_layers.xlsx")
+    if not os.path.exists(model):
+        return [f"the sample model is missing: {model}"]
+    mw, asst = _session()
+    mw.doc.load(model)
+    swept = _run(asst, "def setc(v):\n"
+                       "    slope_data['materials'][1]['c'] = v\n"
+                       "df = sensitivity([200.0], setc, param='c', "
+                       "name='w1_warnings_probe', plot=False)\n"
+                       "print('CELL', df['warnings'].iloc[0])\n")
+    designed = _run(asst, "r = design_sweep('mat:foundation:c', 200, 250, steps=2, "
+                          "target_fs=1.0, plot=False)\n")
+    for name, text in (("sensitivity", swept), ("design_sweep", designed)):
+        lines = [ln for ln in text.splitlines()
+                 if ln.strip().startswith("warnings:")]
+        if not any("could not solve" in ln for ln in lines):
+            out.append(f"{name}: a step's unsolved trials did not reach the "
+                       f"model: {text[-500:]!r}")
+        if not any("interslice tension" in ln for ln in lines):
+            out.append(f"{name}: a step's admissibility notes did not reach the "
+                       f"model: {text[-500:]!r}")
+        if any("(min Z" in ln or "(on " in ln for ln in lines):
+            out.append(f"{name}: a step's warnings are not cut to their finding: "
+                       f"{lines!r}")
+        if "iteration" in text:
+            out.append(f"{name}: the search's progress lines reached the model")
+    cell = re.search(r"^CELL (.*)$", swept, re.M)
+    if not cell or "could not solve" not in cell.group(1):
+        out.append(f"the sweep's table does not carry the step's warnings: "
+                   f"{swept[-300:]!r}")
+    if swept.count("could not solve") != 2:      # the step's line, and the cell
+        out.append("a step's warning is printed more than once: "
+                   f"{swept.count('could not solve')} times")
+    try:
+        os.remove(os.path.join(asst._kernel.outdir, "w1_warnings_probe.csv"))
+    except OSError:
+        pass
+    mw.deleteLater()
+    return out
+
+
+SNIPPET_BUILD_TWO_LAYERS = """
+from studio.document import _blank_material
+def _mat(name, gamma, c):
+    m = _blank_material(name)
+    m.update(gamma=gamma, option='mc', c=c, phi=0.0, u='none')
+    return m
+slope_data['materials'] = [_mat('embankment', 130.0, 400.0),
+                           _mat('foundation', 135.0, 800.0)]
+slope_data['profile_lines'] = [
+    dict(coords=[(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)], mat_id=0),
+    dict(coords=[(-30.0, 0.0), (90.0, 0.0)], mat_id=1)]
+slope_data['max_depth'] = -10.0
+"""
+
+
+def check_a_new_project_names_no_surface_family():
+    """A new project's summary claims no failure-surface family, and circles a
+    snippet adds are run as circles.
+
+    Studio's blank document starts with the family flag off, so the summary said
+    "family=non-circular" on a project with no surface at all, and every build
+    then reported that it had "switched the model to circular" — a change to a
+    choice nobody made. With one family defined, that family is the model's, as
+    the Circles editor and the Run LEM dialog already treat it.
+    """
+    from studio.ai.assistant import model_summary_text
+    out = []
+    mw, asst = _session()
+    surface = [ln for ln in model_summary_text(mw.doc.slope_data).splitlines()
+               if ln.startswith("Failure surfaces")]
+    if not surface or "family=" in surface[0] or "none yet" not in surface[0]:
+        out.append(f"a new project's summary names a surface family: {surface!r}")
+
+    # Circles added by a snippet, with the flag left as the new project set it,
+    # are what the run uses — in the same snippet, and afterwards.
+    ran = _run(asst, SNIPPET_BUILD_TWO_LAYERS +
+               "slope_data['circles'] = [dict(Xo=20.0, Yo=40.0, Depth=0.0, R=40.0)]\n"
+               "r = run_lem(search=False, plot=False)\n"
+               "print('FS', round(r['FS'], 3))\n")
+    if "FS " not in ran or "Traceback" in ran:
+        out.append(f"circles added to a new project did not run as circles: "
+                   f"{ran[-400:]!r}")
+    if mw.doc.slope_data.get("circular") is not True:
+        out.append("the circles a snippet added left the model's family flag "
+                   f"at {mw.doc.slope_data.get('circular')!r}")
+    surface = [ln for ln in model_summary_text(mw.doc.slope_data).splitlines()
+               if ln.startswith("Failure surfaces")]
+    if not surface or "family=circular" not in surface[0]:
+        out.append(f"a model with circles is not summarized as circular: {surface!r}")
+    mw.deleteLater()
+
+    # A non-circular surface on a new project stays non-circular.
+    mw, asst = _session()
+    _run(asst, SNIPPET_BUILD_TWO_LAYERS +
+         "slope_data['non_circ'] = [dict(X=-5.0, Y=0.0, Movement='Free'),\n"
+         "    dict(X=20.0, Y=-2.0, Movement='Horiz'),\n"
+         "    dict(X=60.0, Y=20.0, Movement='Free')]\n")
+    if mw.doc.slope_data.get("circular"):
+        out.append("a non-circular surface on a new project turned the family "
+                   "flag on")
+    surface = [ln for ln in model_summary_text(mw.doc.slope_data).splitlines()
+               if ln.startswith("Failure surfaces")]
+    if not surface or "family=non-circular" not in surface[0]:
+        out.append(f"a non-circular model is not summarized as non-circular: "
+                   f"{surface!r}")
+    mw.deleteLater()
+    return out
+
+
+def check_a_split_reply_keeps_its_tool_call():
+    """A reply split across choices still runs its tool call.
+
+    LiteLLM's bridge onto OpenAI's Responses API (the gpt-5.6 and gpt-6 route)
+    returns one choice per output item, so "I'll build the model now" and the
+    run_python call arrive as two choices. The loop read only the first: a
+    recorded build session ended on that sentence with nothing built.
+    """
+    import types
+    from studio.ai import assistant as A
+
+    ran = []
+
+    class _Worker(A._AgentWorker):
+        def _run(self, name, args):
+            ran.append(args.get("code", ""))
+            return "(no output)"
+
+    replies = []
+
+    def completion(**kwargs):
+        if replies:
+            msg = types.SimpleNamespace(content="Done.", tool_calls=None)
+            return types.SimpleNamespace(
+                choices=[types.SimpleNamespace(message=msg)], usage=None)
+        replies.append(1)
+        call = types.SimpleNamespace(
+            id="call_1", type="function",
+            function=types.SimpleNamespace(name="run_python",
+                                           arguments='{"code": "print(1)"}'))
+        first = types.SimpleNamespace(content="I'll build the model now.",
+                                      tool_calls=None)
+        second = types.SimpleNamespace(content=None, tool_calls=[call])
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=first),
+                     types.SimpleNamespace(message=second)], usage=None)
+
+    stub = types.ModuleType("litellm")
+    stub.drop_params = False
+    stub.suppress_debug_info = False
+    stub.completion = completion
+    saved = sys.modules.get("litellm")
+    sys.modules["litellm"] = stub
+    texts = []
+    try:
+        worker = _Worker({}, "system", [], [A.RUN_PYTHON_TOOL])
+        worker.text.connect(texts.append)
+        failures = []
+        worker.failed.connect(failures.append)
+        worker.run()
+    finally:
+        if saved is None:
+            sys.modules.pop("litellm", None)
+        else:
+            sys.modules["litellm"] = saved
+    out = []
+    if failures:
+        out.append(f"the loop failed: {failures}")
+    if ran != ["print(1)"]:
+        out.append(f"the tool call in the second choice did not run: {ran}")
+    if not any("build the model" in t for t in texts):
+        out.append("the announcement in the first choice was not shown")
+    return out
+
+
+def check_a_list_ends_with_its_reply():
+    """What follows a reply that ended on a bulleted list is not part of it.
+
+    ``QTextEdit.append`` starts each new paragraph with the last one's format,
+    list included, so after a reply ending in bullets the next "You:" label, the
+    drawing pasted with it and the next reply were drawn as more bullets.
+    """
+    from studio.chat_dock import ChatDock
+    out = []
+    mw, asst = _session()
+    dock = ChatDock(asst)
+    dock._on_assistant_text("The model has **2 materials**:\n\n- embankment\n"
+                            "- foundation\n")
+    dock._add_block("You", "What height is written on this drawing?", "#1a5fb4")
+    dock._on_assistant_text("The height is 20 ft.")
+    doc = dock.transcript.document()
+    block = doc.begin()
+    while block.isValid():
+        text = block.text()
+        if ("What height" in text or "The height is 20 ft" in text
+                or text.startswith("Assistant:")) and block.textList() is not None:
+            out.append(f"{text[:40]!r} is drawn as a bullet of the reply above it")
+        if text.strip() in ("embankment", "foundation") and block.textList() is None:
+            out.append(f"the reply's own list item {text!r} lost its bullet")
+        block = block.next()
+    dock.deleteLater()
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -2710,6 +3180,17 @@ CHECKS = [
     ("N. the transient route is in the brief",
      check_transient_helper_is_told_to_the_model),
     ("N. a runaway snippet is stopped", check_a_runaway_snippet_is_stopped),
+    ("O. a snippet's printout is capped", check_printout_is_capped),
+    ("O. the summary says whose range it prints",
+     check_summary_says_whose_range_it_prints),
+    ("O. a profile-line sweep is not a polygon edit",
+     check_profile_sweep_is_not_a_polygon_edit),
+    ("O. a table under a line of text renders", check_table_under_a_line_renders),
+    ("O. a list ends with its reply", check_a_list_ends_with_its_reply),
+    ("O. a split reply keeps its tool call", check_a_split_reply_keeps_its_tool_call),
+    ("O. a rewritten file is reported", check_a_rewritten_file_is_reported),
+    ("O. a sweep step reports its warnings", check_a_sweep_step_reports_its_warnings),
+    ("O. a new project names no surface family", check_a_new_project_names_no_surface_family),
 ]
 
 

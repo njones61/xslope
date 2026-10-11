@@ -7,6 +7,8 @@ docs/parametric/ and docs/tutorials/ for test tags of the form:
 
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, expected_fs=1.234, num_slices=30 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
+    <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.5625, fs_bound=lower, target_size=0.8, tolerance=0.01 -->
+    <!-- test: file=files/foo.xlsx, type=fem_tilt, k_stand=0.147656, k_fail=0.150391, expected_tilt=8.5, tolerance=0.1, target_size=0.09 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=seep_head, points=2:2:4.05;4:2:4.15, tolerance=0.02 -->
@@ -21,12 +23,27 @@ docs/parametric/ and docs/tutorials/ for test tags of the form:
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, size_divisions=100, expected_fs=1.016 -->
     <!-- test: file=files/foo.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, expected_first=1.4563, critical_time=50, min_fs=1.0157 -->
 
+``fs_bound=lower`` marks a strength reduction lock whose run found no failure:
+the top of its final bracket is an undecided trial, the run reports the bracket's
+bottom as a lower bound (``result['fs_is_lower_bound']``), and ``expected_fs`` is
+that bound. The row fails if the run's kind of answer differs from the tag's.
+
 ``seep=steady`` / ``seep=transient`` RUN the model's own seepage before the
 stability analysis and stage its pore pressures, instead of reading a solved
 sidecar shipped beside the workbook — the route of a page that meshes, solves the
 flow, and only then searches or reduces strength (see ``_stage_seep_fields``).
 ``size_divisions`` is the Build Mesh dialog's auto-size spinner: the section width
 over that number, so a page is locked at the mesh it actually built.
+
+The fem_tilt type locks a published TILT ANGLE — the angle a tilt table is
+raised to before a model fails, which is what a tilt-table test reports in place
+of a factor of safety. The model is pushed by a horizontal seismic coefficient k
+toward the face at FULL strength (F = 1, nothing reduced), a coefficient k
+standing for a tilt of atan(k). The row solves twice: at ``k_stand``, where the
+model must STAND, and at ``k_fail``, where it must FAIL, each read the way a
+strength-reduction bracket edge is read; the tilt the two bracket, the mean of
+atan(k_stand) and atan(k_fail) in degrees, must lie within ``tolerance`` (in
+DEGREES, absolute) of ``expected_tilt``. See run_fem_tilt_test.
 
 The pullout_envelope type locks a published PULLOUT TABLE -- the resistance a
 reinforcement layer develops beyond an assumed failure surface, layer by layer.
@@ -191,8 +208,11 @@ LEGACY_TEMPLATE_FMT = _repo('docs/inputs/input_template_v{}.xlsx')
 # is post-shift but pre-v21/v22 — so the set spans every layout the loader must
 # still read. Content-wise it spans circular & non-circular surfaces, profile &
 # polygon geometry, reinforcement, piles, distributed loads (both sets), a second
-# piezo line, reliability sigmas, and seepage BCs (both sets).
+# piezo line, reliability sigmas, and seepage BCs (both sets). The non-circular
+# surface is the LEM non-circular sample's, the one file here that carries one:
+# the finite element files carry no surface, since nothing runs one on them.
 ROUNDTRIP_FILES = [
+    (_repo('docs/lem/files/xslope_noncircular.xlsx'), 12),
     (_repo('docs/inputs/slope/xslope_simple1.xlsx'), 12),
     (_repo('docs/inputs/slope/xslope_dam.xlsx'), 12),
     (_repo('docs/inputs/slope/xslope_rapid.xlsx'), 12),
@@ -433,6 +453,10 @@ def _roundtrip_diff(a, b, path=''):
     return out
 
 
+#: Tag fields spelled ``fs_*`` that are not a per-method factor of safety.
+_FS_TAG_FIELDS = frozenset(('fs_bound',))
+
+
 def parse_test_tags(md_path):
     """Parse <!-- test: ... --> tags from a markdown file.
 
@@ -467,7 +491,8 @@ def parse_test_tags(md_path):
                     'expected_pf', 'pf_tol',
                     'expected_depth', 'depth_x', 'depth_datum',
                     'expected_force', 'target_fs', 'force_elev', 'grid',
-                    'refine_grid', 'min_depth']:
+                    'refine_grid', 'min_depth',
+                    'expected_tilt', 'k_stand', 'k_fail']:
             if key in params:
                 params[key] = float(params[key])
         for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index',
@@ -480,9 +505,11 @@ def parse_test_tags(md_path):
 
         # Expand a compact multi-method tag (fs_oms=..., fs_bishop=..., ...) into
         # one test per method; otherwise keep the single tag as-is.
-        fs_keys = [k for k in params if k.startswith('fs_')]
+        # ``fs_bound`` is not a method: it says what kind of answer the lock is.
+        fs_keys = [k for k in params
+                   if k.startswith('fs_') and k not in _FS_TAG_FIELDS]
         if fs_keys:
-            shared = {k: v for k, v in params.items() if not k.startswith('fs_')}
+            shared = {k: v for k, v in params.items() if k not in fs_keys}
             for k in fs_keys:
                 t = dict(shared)
                 t['method'] = k[3:]      # fs_<method> tag -> solver function name
@@ -752,6 +779,28 @@ def run_lem_test(test):
         for m in slope_data.get('materials', []):
             m['u'] = u_option
 
+    # `tcrack_depth=<ft|m>` and `tcrack_water=<ft|m>` override main!D11/D12, the
+    # tension crack depth and the depth of water standing in it. They exist for a
+    # tutorial that runs its shipped (uncracked) workbook with a crack added — LEM-1's
+    # dry crack and water-filled crack — so the page's numbers are guarded without a
+    # second copy of the model. The derived crack line is rebuilt exactly as
+    # load_slope_data builds it from those two cells (fileio, "BUILD TENSILE CRACK
+    # LINE"), so the run sees what loading a workbook with the cells set would give.
+    # Absent keys leave the loaded model untouched.
+    _tc_depth = str(test.get('tcrack_depth', '')).strip()
+    _tc_water = str(test.get('tcrack_water', '')).strip()
+    if _tc_depth or _tc_water:
+        from shapely.geometry import LineString
+        if _tc_depth:
+            slope_data['tcrack_depth'] = float(_tc_depth)
+        if _tc_water:
+            slope_data['tcrack_water'] = float(_tc_water)
+        _d = slope_data.get('tcrack_depth') or 0.0
+        _gs = slope_data.get('ground_surface')
+        slope_data['tcrack_surface'] = (
+            LineString([(x, y - _d) for (x, y) in _gs.coords])
+            if _d > 0 and _gs is not None and not _gs.is_empty else None)
+
     # `seep=steady|transient` runs the model's own seepage first and stages the
     # field(s) a u = 'seep' run reads (see _stage_seep_fields).
     err = _stage_seep_fields(slope_data, test)
@@ -759,6 +808,30 @@ def run_lem_test(test):
         return None, err
 
     if test_type == 'single_circle':
+        # `circle_xo=`, `circle_yo=`, `circle_r=` give the circle in the tag itself,
+        # for a published circle that is not on the workbook's circles sheet (a
+        # source's critical circle, say). All three solve that circle instead of
+        # the sheet's `circle_index` circle; none leaves the sheet in charge; a
+        # partial set is an error. The dict is the loader's own structure for a
+        # circle with an explicit radius (fileio, Option = Radius: Depth = Yo - R).
+        _cc = [str(test.get(k, '')).strip() for k in ('circle_xo', 'circle_yo', 'circle_r')]
+        if any(_cc) and not all(_cc):
+            return None, ("circle_xo, circle_yo and circle_r must all be given to "
+                          "put a circle in the tag; got only "
+                          + ", ".join(k for k, v in zip(('circle_xo', 'circle_yo', 'circle_r'), _cc) if v))
+        if all(_cc):
+            _xo, _yo, _r = (float(v) for v in _cc)
+            circle = {"Xo": _xo, "Yo": _yo, "Depth": _yo - _r, "R": _r}
+            success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
+                                              composite=composite, right_facing=right_facing,
+                                              suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+            if not success:
+                return None, f"generate_slices failed: {result}"
+            slice_df, failure_surface = result
+            solver_result = solve_selected(method, slice_df, rapid=rapid)
+            if isinstance(solver_result, str):
+                return None, f"solve failed: {solver_result}"
+            return solver_result['FS'], None
         # circle_index picks one of several specified surfaces stored in the same
         # file (default 0, the historical behaviour). A model whose published
         # answers are per-surface — SLOPE/W's Cannon Dam #2 stores nine of
@@ -1363,28 +1436,21 @@ def run_design_test(test):
     return fs_cache[0]['FS'], None
 
 
-def build_fem_ssrm_case(test):
-    """Turn a ``fem_ssrm`` test tag into everything ``solve_ssrm`` needs.
+def _fem_case_model(test):
+    """The model and mesh an FEM test tag describes: ``(slope_data, mesh)``.
 
-    Returns ``(fem_data, kwargs, f_min, f_max, ssrm_tolerance)``. Split out of
-    ``run_fem_test`` so that the tag -> (mesh, fem_data, solver options) mapping has
-    exactly ONE implementation: the suite calls it, and so does any driver that has
-    to run the same benchmark under different solver settings (e.g.
-    ``benchmarks/hybrid_criterion_ab.py``, which solves each case under two failure
-    criteria). Keeping it here rather than copying the mapping is what stops a
-    driver from silently benchmarking a different mesh than the lock."""
+    The one tag -> (model, mesh) mapping every FEM row type shares, so a strength
+    reduction row (``build_fem_ssrm_case``) and a tilt row (``run_fem_tilt_test``)
+    on one workbook solve the same discretization. Raises ValueError where the
+    tag's own seepage staging fails."""
     from xslope.fileio import load_slope_data
-    from xslope.fem import build_fem_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                              extract_constraint_line_geometry, extract_joint_options,
                              extract_point_constraints, extract_size_regions)
 
-    file_path = test['file']
     element_type = test.get('element_type', 'tri6')
     target_size = test.get('target_size')  # default computed from domain extent below
-    ssrm_tolerance = test.get('tolerance', 0.05)
-
-    slope_data = load_slope_data(file_path)
+    slope_data = load_slope_data(test['file'])
 
     # `seep=steady|transient` runs the model's own seepage first (see
     # _stage_seep_fields) — the route of a page that meshes, solves the flow and
@@ -1423,6 +1489,23 @@ def build_fem_ssrm_case(test):
             **_refine_kwargs(test)
         )
 
+    return slope_data, mesh
+
+
+def build_fem_ssrm_case(test):
+    """Turn a ``fem_ssrm`` test tag into everything ``solve_ssrm`` needs.
+
+    Returns ``(fem_data, kwargs, f_min, f_max, ssrm_tolerance)``. Split out of
+    ``run_fem_test`` so that the tag -> (mesh, fem_data, solver options) mapping has
+    exactly ONE implementation: the suite calls it, and so does any driver that has
+    to run the same benchmark under different solver settings (e.g.
+    ``benchmarks/hybrid_criterion_ab.py``, which solves each case under two failure
+    criteria). Keeping it here rather than copying the mapping is what stops a
+    driver from silently benchmarking a different mesh than the lock."""
+    from xslope.fem import build_fem_data
+
+    ssrm_tolerance = test.get('tolerance', 0.05)
+    slope_data, mesh = _fem_case_model(test)
     fem_data = build_fem_data(slope_data, mesh)
     f_min = test.get('f_min', 0.5)
     f_max = test.get('f_max', 3.0)
@@ -1564,9 +1647,45 @@ def run_fem_test(test, fast_kernel=None):
                                 debug_level=0, **kwargs)
 
     if result.get('converged', False):
+        bound_err = _fs_bound_mismatch(test, result)
+        if bound_err is not None:
+            return None, bound_err
         return result['FS'], None
     else:
         return None, f"SSRM failed: {result.get('error', 'Unknown error')}"
+
+
+def _fs_bound_lower(test):
+    """Does this ``fem_ssrm`` tag lock a LOWER BOUND (``fs_bound=lower``)?
+
+    A strength reduction whose final bracket ends on an undecided trial found no
+    failure, and reports the bracket's bottom as a lower bound
+    (``result['fs_is_lower_bound']``). Its tag says so with ``fs_bound=lower``
+    and carries the bound as ``expected_fs``. Absent, the lock is a midpoint.
+    Raises ValueError on any other value, so a misspelt tag is reported rather
+    than read as a midpoint."""
+    value = str(test.get('fs_bound', '') or '').strip().lower()
+    if value in ('', 'midpoint'):
+        return False
+    if value == 'lower':
+        return True
+    raise ValueError(f"fs_bound={test.get('fs_bound')!r}: the one value a tag "
+                     f"may carry is 'lower'")
+
+
+def _fs_bound_mismatch(test, result):
+    """The error for a run whose kind of answer is not the one the tag locks —
+    a lower bound where the tag holds a midpoint, or the reverse — else None."""
+    try:
+        want = _fs_bound_lower(test)
+    except ValueError as exc:
+        return str(exc)
+    got = bool(result.get('fs_is_lower_bound'))
+    if want == got:
+        return None
+    return (f"the run reported {'a lower bound' if got else 'a midpoint'} "
+            f"(FS {'>=' if got else '='} {result.get('FS')}); the tag locks "
+            f"{'a lower bound (fs_bound=lower)' if want else 'a midpoint'}")
 
 
 class _force_fast_kernel:
@@ -1729,7 +1848,7 @@ def _row_key(test):
             return Path(s).name
     size = test.get('target_size')
     size = '-' if size in (None, '') else f"{float(size):g}"
-    lock = test.get('expected_fs')
+    lock = test.get('expected_fs', test.get('expected_tilt'))
     lock = '-' if lock in (None, '') else f"{float(lock):g}"
     return (f"{test.get('type', '?')}|{test.get('benchmark', '-')}"
             f"|{_rel(test.get('file', '-'))}|{test.get('method', '-')}|{size}"
@@ -1779,7 +1898,10 @@ def _save_row_timings(updates, path=None):
 def _row_mode(test):
     """How a standard-tier run would exercise this row: ``'edges'`` for a lock
     checked on its two bracket edges, ``'bracket'`` for one re-proved by the
-    bisection, ``'run'`` for everything that is not a strength-reduction lock."""
+    bisection, ``'tilt'`` for a tilt lock's two full-strength solves, ``'run'``
+    for everything else."""
+    if test.get('type') == 'fem_tilt':
+        return 'tilt'
     if test.get('type') != 'fem_ssrm':
         return 'run'
     return 'edges' if _edges_pair(test) is not None else 'bracket'
@@ -1794,7 +1916,7 @@ def _row_tier(test, timings, threshold=GATE_SECONDS):
     * MEASURED. The last wall-clock recorded for the row IN THE MODE THE
       STANDARD TIER WOULD RUN IT — a lock's edges check and its bisection are
       different work and are timed separately — decides it. Only strength
-      reduction rows are subject to this: they are the rows whose cost the tier
+      reduction and tilt rows are subject to this: they are the rows whose cost the tier
       exists for, and a rule that could silently drop any row that once ran long
       is a rule that quietly stops checking things.
     * A row nothing has measured is STANDARD. Unmeasured is unknown, not
@@ -1808,7 +1930,7 @@ def _row_tier(test, timings, threshold=GATE_SECONDS):
       to be expensive the measured rule above holds the row on its own.
     """
     mode = _row_mode(test)
-    if test.get('type') == 'fem_ssrm':
+    if test.get('type') in ('fem_ssrm', 'fem_tilt'):
         recorded = (timings or {}).get(_row_key(test), {}).get(mode)
         if recorded is not None and float(recorded) > threshold:
             return 'gate'
@@ -1888,16 +2010,28 @@ def _edge_reading(trials, factor, ceiling):
     return verdict, decided
 
 
-def _edges_check(trials, f_stand, f_fail, ceiling):
+def _edges_check(trials, f_stand, f_fail, ceiling, lower=False):
     """Does the lock's bracket still close where it closed? ``(ok, note)``.
 
     ``ok`` requires both trials to be decided AND to fall the way the lock says:
     standing at ``f_stand``, failing at ``f_fail``. ``note`` names what happened
-    at each factor, so a flip says which edge moved and in which direction."""
+    at each factor, so a flip says which edge moved and in which direction.
+
+    ``lower`` is a lower-bound lock (``fs_bound=lower``): its top trial is the
+    undecided one the bound was cut on, so what must hold there is that it is
+    STILL undecided (an ending in ``xslope.fem.SSRM_UNDECIDED_EXITS``) — a trial
+    that now fails or stands has moved the answer."""
     v_lo, lo_ok = _edge_reading(trials, f_stand, ceiling)
     v_hi, hi_ok = _edge_reading(trials, f_fail, ceiling)
     stands = lo_ok and v_lo in ('CONVERGED', 'JOINT_SETTLED')
-    fails = hi_ok and v_hi == 'FAILED'
+    if lower:
+        from xslope.fem import SSRM_UNDECIDED_EXITS
+        top = _trial_at(trials, f_fail) or {}
+        fails = (top.get('exit_reason') in SSRM_UNDECIDED_EXITS
+                 and not top.get('stable'))
+        v_hi = top.get('exit_reason') or v_hi
+    else:
+        fails = hi_ok and v_hi == 'FAILED'
     note = (f"F={f_stand:g} {v_lo or 'not solved'}, "
             f"F={f_fail:g} {v_hi or 'not solved'}")
     if stands and fails:
@@ -1920,7 +2054,11 @@ def _edges_check(trials, f_stand, f_fail, ceiling):
         flipped.append(_why(f_stand, v_lo, lo_ok,
                             'CONVERGED or JOINT_SETTLED', 'standing'))
     if not fails:
-        flipped.append(_why(f_fail, v_hi, hi_ok, 'FAILED', 'failing'))
+        if lower:
+            flipped.append(f"the undecided edge F={f_fail:g} now reads "
+                           f"{v_hi or 'not solved'}, not undecided")
+        else:
+            flipped.append(_why(f_fail, v_hi, hi_ok, 'FAILED', 'failing'))
     return False, "; ".join(flipped)
 
 
@@ -1976,7 +2114,12 @@ def _run_fem_ssrm_edges(test, pair):
     f_stand, f_fail = pair
     reference_only = bool(test.get('_reference_only', False))
     ceiling = _trial_ceiling(test)
-    mid = 0.5 * (f_stand + f_fail)
+    try:
+        lower = _fs_bound_lower(test)
+    except ValueError as exc:
+        return None, str(exc), None
+    # A lower-bound lock IS its standing edge; every other lock the midpoint.
+    mid = f_stand if lower else 0.5 * (f_stand + f_fail)
 
     kernels = [] if (reference_only or not _fast_kernel_available()) else [True]
     kernels.append(False)
@@ -1987,7 +2130,7 @@ def _run_fem_ssrm_edges(test, pair):
         if err is not None:
             notes.append(f"{which}: {err}")
             continue
-        ok, note = _edges_check(trials, f_stand, f_fail, ceiling)
+        ok, note = _edges_check(trials, f_stand, f_fail, ceiling, lower=lower)
         if ok:
             return mid, None, ('edges', f'edges hold on the {which} ({note})')
         notes.append(f"{which}: {note}")
@@ -2018,6 +2161,119 @@ def _run_fem_ssrm(test):
         return None, ("check=edges needs both f_stand and f_fail on the tag "
                       "(tools/lock_edges.py writes them)"), None
     return _run_fem_ssrm_bracket(test)
+
+
+def tilt_of(k):
+    """The tilt a seismic coefficient stands for, in degrees: a body force of
+    k*gamma toward the face points where gravity points on a model tilted by
+    atan(k)."""
+    import math
+    return math.degrees(math.atan(abs(float(k))))
+
+
+def solve_fem_tilt(slope_data, mesh, k, test):
+    """One solve at FULL STRENGTH with the model pushed by ``k`` toward the face.
+    Returns ``(slope_data_as_solved, fem_data, sol)``.
+
+    F = 1 and nothing reduced: what a tilt row asks of a coefficient is whether
+    the model stands under it, which is the question a tilt table asks and not the
+    one a strength reduction answers. The coefficient is applied as
+    ``k_seismic = -|k|`` (the sign is its direction, toward the face). The
+    reference kernel is forced for the reason every suite path forces it: a lock
+    is a property of the reference path, not of whether a machine has the
+    compiled kernel built.
+
+    This is the ONE implementation: the RS2 joint figure producer
+    (``make_rs2_joint_figures._solve_at``) calls it, so the figure a tilt row
+    draws and the check that locks it are the same two solves."""
+    import xslope.fem as _fem
+    from xslope.fem import build_fem_data, solve_fem
+
+    sd = {**slope_data, 'k_seismic': -abs(float(k))}
+    fem_data = build_fem_data(sd, mesh)
+    k0 = test.get('k0')
+    with _force_fast_kernel(_fem, False):
+        sol = solve_fem(fem_data, F=1.0, debug_level=0,
+                        max_iterations=int(float(test.get('max_iter', 250000))),
+                        tension_srf=str(test.get('tension_srf', '')).lower()
+                        in ('true', '1', 'yes'),
+                        k0=float(k0) if k0 not in (None, '') else None,
+                        fast_kernel=False)
+    return sd, fem_data, sol
+
+
+def _tilt_reading(sol, ceiling):
+    """``(verdict, decided)`` for one full-strength tilt solve, read by the rule a
+    strength-reduction bracket edge is read by (``_edge_reading``): decided means
+    CONVERGED, JOINT_SETTLED or FAILED inside the budget (or certified by the
+    corrector), and a solve that ran out of budget answers nothing."""
+    trial = dict(sol)
+    trial['F'] = 1.0
+    return _edge_reading([trial], 1.0, ceiling)
+
+
+def run_fem_tilt_test(test):
+    """One ``fem_tilt`` row. Returns ``(tilt_degrees, error_msg, annotation)``.
+
+    Builds the tag's model and mesh once (``_fem_case_model``, the mesh every FEM
+    row type shares) and solves it at full strength twice (``solve_fem_tilt``):
+    at ``k_stand`` the model must STAND (CONVERGED or JOINT_SETTLED, decided) and
+    at ``k_fail`` it must FAIL (FAILED, decided). When both hold, the computed
+    value is the tilt the two bracket, the mean of atan(k_stand) and atan(k_fail)
+    in degrees, which the summary compares with ``expected_tilt`` inside the
+    tag's ``tolerance`` (degrees, absolute). A coefficient that reads the other
+    way, or runs out of budget, is an error naming which one moved: the tilt no
+    longer lies between the two coefficients the lock was cut on.
+
+    ``annotation`` is ``('tilt', text)`` with both angles, so the row's printed
+    line reads like a strength-reduction row's edges note."""
+    try:
+        k_stand = float(test['k_stand'])
+        k_fail = float(test['k_fail'])
+    except (KeyError, TypeError, ValueError):
+        return None, "fem_tilt needs numeric k_stand and k_fail on the tag", None
+    if not abs(k_stand) < abs(k_fail):
+        return None, (f"fem_tilt: k_stand={k_stand:g} must be below "
+                      f"k_fail={k_fail:g}"), None
+    try:
+        slope_data, mesh = _fem_case_model(test)
+    except ValueError as exc:
+        return None, str(exc), None
+    ceiling = _trial_ceiling(test)
+
+    readings = []
+    for k in (k_stand, k_fail):
+        t0 = time.time()
+        _sd, _fd, sol = solve_fem_tilt(slope_data, mesh, k, test)
+        verdict, decided = _tilt_reading(sol, ceiling)
+        readings.append((k, verdict, decided, int(sol.get('iterations') or 0),
+                         time.time() - t0))
+    (ks, vs, ds, its, ws), (kf, vf, df, itf, wf) = readings
+    a_stand, a_fail = tilt_of(ks), tilt_of(kf)
+    detail = (f"k={ks:g} {vs}, {its} iterations, {ws:.1f}s; "
+              f"k={kf:g} {vf}, {itf} iterations, {wf:.1f}s")
+    stands = ds and vs in ('CONVERGED', 'JOINT_SETTLED')
+    fails = df and vf == 'FAILED'
+    if stands and fails:
+        text = f"stands at {a_stand:.2f}°, topples at {a_fail:.2f}° ({detail})"
+        return 0.5 * (a_stand + a_fail), None, ('tilt', text)
+    text = f"{vs} at {a_stand:.2f}°, {vf} at {a_fail:.2f}° ({detail})"
+
+    def _why(k, verdict, decided, iterations, want, verb):
+        if not decided:
+            return (f"the {verb} coefficient k={k:g} ({tilt_of(k):.2f}°) is "
+                    f"undecided at the iteration budget ({verdict}, "
+                    f"{iterations} iterations)")
+        return (f"the {verb} coefficient k={k:g} ({tilt_of(k):.2f}°) now "
+                f"reads {verdict}, not {want}")
+
+    problems = []
+    if not stands:
+        problems.append(_why(ks, vs, ds, its, 'CONVERGED or JOINT_SETTLED',
+                             'standing'))
+    if not fails:
+        problems.append(_why(kf, vf, df, itf, 'FAILED', 'failing'))
+    return None, '; '.join(problems), ('tilt', text)
 
 
 def _run_fem_ssrm_bracket(test):
@@ -2800,6 +3056,92 @@ def run_gsat_pair_test(test):
     return 0.0, None    # pass/fail test: 0.0 = the two formulations agree
 
 
+def _check_bottom_elevation_roundtrip(source, template):
+    """Check missing profile bottoms and the explicit/polygon save controls.
+
+    A profile-line model with no bottom elevation is saved with B2 blank and
+    reopens with no zones (the loader checks structure only); preflight's
+    geometry.bottom_elevation_missing refuses a run until one is entered."""
+    import tempfile
+    from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
+                               write_cells_to_xlsx)
+    from xslope.preflight import preflight
+    from shapely.geometry import Polygon
+
+    def _flags_bottom(sd):
+        rep = preflight(sd, 'lem', ids=['geometry.bottom_elevation_missing'])
+        return any(f.rule_id == 'geometry.bottom_elevation_missing'
+                   for f in rep.errors)
+
+    model = dict(source, profile_lines=[
+        {'coords': [(0.0, 10.0), (10.0, 20.0), (20.0, 20.0)], 'mat_id': 0}],
+        max_depth=0.0, polygons=[])
+    problems = []
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / 'bottom.xlsx'
+        for value in (-5.0, 0.0, 5.0):
+            save_slope_data_to_xlsx(dict(model, max_depth=value), str(target),
+                                   template=template)
+            if load_slope_data(str(target))['max_depth'] != value:
+                problems.append(f'explicit bottom {value} did not round-trip')
+        for label, value in (('omitted', None), ('None', None),
+                             ('NaN', float('nan'))):
+            blank = dict(model, max_depth=value)
+            if label == 'omitted':
+                blank.pop('max_depth')
+            try:
+                save_slope_data_to_xlsx(blank, str(target), template=template)
+            except Exception as exc:
+                problems.append(f'{label}: writer refused a missing bottom: {exc}')
+                continue
+            from openpyxl import load_workbook
+            wb = load_workbook(target, read_only=True, data_only=True)
+            try:
+                if wb['profile']['B2'].value is not None:
+                    problems.append(f'{label}: B2 is not blank')
+            finally:
+                wb.close()
+        for n_lines in (1, 2):
+            lines = list(model['profile_lines'])
+            if n_lines == 2:
+                lines.append({'coords': [(0.0, 8.0), (20.0, 8.0)], 'mat_id': 0})
+            save_slope_data_to_xlsx(dict(model, profile_lines=lines), str(target),
+                                   template=template)
+            write_cells_to_xlsx(str(target), {'profile': {'B2': None}})
+            try:
+                back = load_slope_data(str(target))
+            except Exception as exc:
+                problems.append(f'{n_lines} lines: blank B2 did not open: {exc}')
+                continue
+            if back.get('max_depth') is not None:
+                problems.append(f'{n_lines} lines: blank B2 loaded as '
+                                f'{back.get("max_depth")!r}, not None')
+            if len(back.get('profile_lines') or []) != n_lines:
+                problems.append(f'{n_lines} lines: profile lines not kept')
+            if back.get('polygons'):
+                problems.append(f'{n_lines} lines: zones built with no bottom')
+            if not _flags_bottom(back):
+                problems.append(f'{n_lines} lines: preflight did not flag the '
+                                f'missing bottom')
+        polygon = dict(model, profile_lines=[], polygons=[{
+            'polygon': Polygon([(0, 0), (20, 0), (20, 20), (0, 10)]), 'mat_id': 0}])
+        for label in ('omitted', 'None', 'NaN'):
+            blank = dict(polygon, max_depth=float('nan') if label == 'NaN' else None)
+            if label == 'omitted':
+                blank.pop('max_depth')
+            save_slope_data_to_xlsx(blank, str(target), template=template)
+            from openpyxl import load_workbook
+            wb = load_workbook(target, read_only=True, data_only=True)
+            try:
+                if wb['profile']['B2'].value is not None:
+                    problems.append(f'polygon {label}: B2 is not blank')
+            finally:
+                wb.close()
+            if load_slope_data(str(target))['max_depth'] is not None:
+                problems.append(f'polygon {label}: blank bottom did not load as None')
+    return problems
+
+
 def run_roundtrip_test(test):
     """Verify save_slope_data_to_xlsx round-trips a file: load -> save into a
     blank template -> reload must reproduce every input category.
@@ -2848,7 +3190,8 @@ def run_roundtrip_test(test):
                 template=test.get('template', ROUNDTRIP_TEMPLATE))
             md_back = load_slope_data(tmp_md).get('max_depth')
 
-    mismatches = []
+    mismatches = _check_bottom_elevation_roundtrip(
+        d1, test.get('template', ROUNDTRIP_TEMPLATE))
     if md_back is not _NOT_CHECKED and md_back != POLYGON_MAX_DEPTH:
         mismatches.append(f"max_depth declared on a polygon model came back "
                           f"{md_back!r}, not {POLYGON_MAX_DEPTH}")
@@ -3226,13 +3569,22 @@ def run_v21_roundtrip_test(test):
     if d2.get('side_bc') != 'fixed':
         problems.append(f"side_bc: {d2.get('side_bc')!r} != 'fixed'")
 
-    # A refine polygon with no Size is a no-op the user could not see — refused.
+    # A refine polygon with no Size is a no-op. It saves and reopens as drawn
+    # (anything Studio can save must reopen) and preflight names it before a
+    # mesh-based run — the loader no longer refuses it.
+    from xslope.preflight import preflight as _pf
     try:
-        _roundtrip(base, lambda d: d.update(
+        _, _d_nosize = _roundtrip(base, lambda d: d.update(
             refine_zones=[{'polygon': list(refine_ring), 'size': None}]))
-        problems.append("a refine polygon with no Size was accepted")
-    except ValueError:
-        pass
+        _rz = _d_nosize.get('refine_zones') or []
+        if len(_rz) != 1 or _rz[0].get('size') is not None:
+            problems.append(f"a refine polygon with no Size came back as {_rz!r}")
+        if not any(f.rule_id == 'mesh.refine_zone_no_size'
+                   for f in _pf(_d_nosize, 'fem').findings):
+            problems.append("a refine polygon with no Size reopened, but preflight "
+                            "did not name it")
+    except ValueError as exc:
+        problems.append(f"a refine polygon with no Size did not reopen: {exc}")
 
     # --- profile geometry: a per-line Size, and dload Directions ---
     prof_file = test.get('profile_file')
@@ -4734,8 +5086,8 @@ _V16_BACKCOMPAT_EXPECTED = {
     # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; blank gsat -> None)
     _repo('docs/inputs/slope/xslope_dam.xlsx'): [
         {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Core', 'gamma': 122.0, 'gamma_sat': None, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 300.0, 'psi': 20.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 100.0, 'psi': 19.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Core', 'gamma': 122.0, 'gamma_sat': None, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
     # docs/verification/files/rocscience/vp042.xlsx — read at v16 (t_cut column
@@ -4940,6 +5292,7 @@ PREFLIGHT_BASE_PILES = _repo('docs/lem/files/xslope_piles.xlsx')
 PREFLIGHT_BASE_PILES_FEM = _repo('docs/fem/files/xslope_piles_fem.xlsx')
 PREFLIGHT_BASE_REINF = _repo('docs/inputs/slope/xslope_reinf.xlsx')
 PREFLIGHT_BASE_REINF_FEM = _repo('docs/fem/files/xslope_reinforce_fem.xlsx')
+PREFLIGHT_BASE_GRID_WALL = _repo('docs/tutorials/files/xslope_block_wall_grid.xlsx')
 PREFLIGHT_BASE_CRACK = _repo('docs/verification/files/rocscience/vp053.xlsx')
 #: A profile-line model, so its domain is built from Max Depth (profile sheet B2)
 #: and the writer can express the mutation that breaks it. This is also the file
@@ -5183,6 +5536,15 @@ def _pf_joint_pair(sd, both=True):
     return sd
 
 
+def _pf_bonded_grid(sd, gap=0.0):
+    """The FEM-3 geogrid wall with its second sheet left bonded, its wall end
+    moved ``gap`` back from the back face (the face and a block course both
+    stand at that end)."""
+    r = sd['reinforcement_lines'][1]
+    r.update(joint='No', x1=float(r['x1']) + gap)
+    return sd
+
+
 def _pf_joint_overlap(sd, overlap=True):
     """Two jointed lines lying on one another, or merely crossing.
 
@@ -5268,6 +5630,50 @@ def _pf_joint_on_boundary(sd, on=True):
 #:             carry a paired 'excel' spec asserting the load-time refusal.
 #:   expect    a substring the finding's message must contain
 #:   load_error   for a paired spec: the substring the LOADER must refuse with
+def _pf_lload(sd, dy=0.0, **kw):
+    """One line load on the middle of the first ground-surface segment, raised by
+    ``dy`` off it; ``kw`` overrides x, y, P or angle."""
+    (xa, ya), (xb, yb) = list(sd['ground_surface'].coords)[:2]
+    row = {'x': 0.5 * (xa + xb), 'y': 0.5 * (ya + yb) + dy, 'P': 10.0,
+           'angle': -90.0, 'label': 'probe'}
+    row.update(kw)
+    sd['line_loads'] = [row]
+    return sd
+
+
+def _pf_profile_mat(sd, i, mat_id):
+    """Point profile line ``i`` (and the zone it builds) at a 0-based ``mat_id``."""
+    sd['profile_lines'][i]['mat_id'] = mat_id
+    sd['polygons'][i]['mat_id'] = mat_id
+    return sd
+
+
+def _pf_extra_profile_point(sd):
+    """Append a profile line carrying one point, inside the section."""
+    x, y = list(sd['ground_surface'].coords)[0]
+    sd['profile_lines'].append({'coords': [(x, y - 1.0)], 'mat_id': 0,
+                                'size': None})
+    return sd
+
+
+def _pf_overlap(sd):
+    """Draw a second copy of polygon 1 over it."""
+    p = sd['polygons'][0]
+    sd['polygons'].append(dict(p))
+    return sd
+
+
+def _pf_bc2(sd, **head_kw):
+    """Boundary set 2 built from set 1's specified heads, each updated with
+    ``head_kw`` (a reservoir kind, a series name)."""
+    bc = sd['seepage_bc']
+    sd['seepage_bc2'] = {
+        'specified_heads': [dict(b, **head_kw) for b in bc['specified_heads']],
+        'specified_fluxes': [], 'exit_face': list(bc.get('exit_face') or [])}
+    sd['has_seepage_bc2'] = True
+    return sd
+
+
 PREFLIGHT_RULE_SPECS = [
     # --- water and the unit weight of water --------------------------------
     dict(rule='water.gamma_water_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -5398,7 +5804,7 @@ PREFLIGHT_RULE_SPECS = [
     # --- surface family and method compatibility ---------------------------
     dict(rule='surface.none_defined', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
-         expect='defines no failure surface'),
+         expect='has no failure surface'),
     # Selection-awareness: the SAME empty-sheet model, and the only difference is
     # that the control's run brought its own surface (generate_slices(circle=...),
     # a search's trial circle, a sweep step). The sheet is then not the source, so
@@ -5409,7 +5815,7 @@ PREFLIGHT_RULE_SPECS = [
          control_selection={'surface': 'circular', 'surface_supplied': True},
          mutation=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
          control=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
-         expect='defines no failure surface'),
+         expect='has no failure surface'),
     dict(rule='surface.method_requires_circle', base=PREFLIGHT_BASE_NONCIRC,
          mode='dict', selection={'surface': 'noncircular', 'method': 'oms'},
          control_selection={'surface': 'noncircular', 'method': 'spencer'},
@@ -5514,6 +5920,10 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_mats(_pf_set(sd, unit_system=None), gamma=20.0),
          control=lambda sd: _pf_set(sd, unit_system=None),
          expect='Two independent signals disagree'),
+    dict(rule='units.time_unit_unknown', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_set(sd, time_unit='years'),
+         control=lambda sd: _pf_set(sd, time_unit='yr'),
+         expect='not one of the time units'),
     dict(rule='mat.E_unusable', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(sd, E=0.0),
@@ -6001,10 +6411,27 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=-2.0),
          expect='read as FULLY ANCHORED'),
+    # A development length a hundred times too long (Lp = 4 entered as 400 on a
+    # 20-long line) holds the line to 2.5% of Tmax. The control is the entry the
+    # rule must NOT question: each Lp longer than the line, which is how a
+    # pullout-governed member is entered (a third of Tmax here, vp047's nails 62%).
     dict(rule='reinforce.envelope_inconsistent', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel',
-         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=500.0),
-         expect='longer than the line itself'),
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      lp1=400.0, lp2=400.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     lp1=30.0, lp2=30.0),
+         expect='adds almost nothing to the run'),
+    # Tres above Tmax: a warning on a finite element run, which reads Tres, and an
+    # INFO on a limit-equilibrium run, which does not.
+    dict(rule='reinforce.envelope_inconsistent', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_res=900.0),
+         expect='never softens this line'),
+    dict(rule='reinforce.tres_above_tmax_on_lem', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_res=900.0),
+         expect='does not read Tres'),
     dict(rule='reinforce.no_surface_engagement', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict',
          mutation=lambda sd: _pf_move(sd, 'reinforcement_lines', dx=1.0e5),
@@ -6060,7 +6487,30 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint_pair(sd, both=False),
          control=lambda sd: _pf_joint_pair(sd, both=True),
-         expect='is a joint and touches'),
+         expect='crosses jointed line'),
+    # The FEM-3 geogrid wall with one sheet's Joint cleared: the bar ends on the
+    # back face and on a block course. A millionth of a meter off the face is
+    # still ON it for the mesher, so it is for the rule too; a millimeter short
+    # is clear of both. An exact touch is reported once for the bar, however
+    # many jointed lines it ends on.
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_GRID_WALL,
+         analysis='ssrm',
+         mutation=lambda sd: _pf_bonded_grid(sd, gap=1e-6),
+         control=lambda sd: sd,
+         expect="ends on jointed lines 'back face' and 'course-03'", count=1),
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_GRID_WALL,
+         analysis='ssrm',
+         mutation=lambda sd: _pf_bonded_grid(sd, gap=0.0),
+         control=lambda sd: _pf_bonded_grid(sd, gap=1e-3),
+         expect='set Joint = Yes on the reinforcement line, or end it short',
+         count=1),
+    # A pile has no Joint column: the message calls it a pile line and the fix
+    # is to move it.
+    dict(rule='joint.crosses_constraint_line', base=PREFLIGHT_BASE_PILES_FEM,
+         analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, x1=0.0, y1=0.0, x2=8.0, y2=0.0),
+         control=lambda sd: _pf_joint_sheet(sd, x1=20.0, y1=0.0, x2=28.0, y2=0.0),
+         expect="Pile line 1 ('pile') crosses jointed line 'seam'", count=1),
     # The joints sheet's own rows: a line with no reinforcement in it. What the
     # interface law cannot do without, and the two geometries the split cannot
     # represent.
@@ -6173,12 +6623,23 @@ PREFLIGHT_RULE_SPECS = [
              {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
               'label': 'North block', 'size': None, 'mat_id': None}]),
          expect='never meshed as a region'),
+    # The control keeps the file's Tres (600 on every line): the bar on a
+    # jointed line still softens to it, so a filled Tres is no finding.
     dict(rule='joint.bond_inputs_ignored', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_joint(sd),
-         control=lambda sd: _pf_joint(sd, lp1=0.0, lp2=0.0,
-                                      t_res=float('nan')),
+         control=lambda sd: _pf_joint(sd, lp1=0.0, lp2=0.0),
          expect='does not read on a jointed line'),
+    # Two bonded bars that cross are joined at the crossing in the FEM mesh. The
+    # sample's second sheet is stood up at x = 12 to cross the first (y = 0); the
+    # control stops it ON the first, a T, which is a meeting and no crossing.
+    dict(rule='structural.members_cross', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: (sd['reinforcement_lines'][1].update(
+             x1=12.0, y1=-4.0, x2=12.0, y2=6.0) or sd),
+         control=lambda sd: (sd['reinforcement_lines'][1].update(
+             x1=12.0, y1=0.0, x2=12.0, y2=6.0) or sd),
+         expect='joined at the crossing', count=1),
 
     # --- magnitude plausibility (the sniff tests) --------------------------
     dict(rule='mat.E_off_soil_type_band', base=PREFLIGHT_BASE_FEM, mode='excel',
@@ -6298,6 +6759,163 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_drop(_pf_mats(sd, sigma_c=1.0), 'mesh'),
          control=lambda sd: _pf_mats(sd, sigma_c=1.0),
          expect='generated automatically at a target element size'),
+
+    # --- values the file carries as typed ------------------------------------
+    # Each of these was a refusal at file load. Every spec runs through the real
+    # writer and the real loader ('excel'), so a pass is also the proof that the
+    # file a user saved with the value in it reopens, and the rule, not the loader,
+    # is what names it.
+    dict(rule='geometry.none_defined', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, profile_lines=[], polygons=[]),
+         expect='has no geometry yet'),
+    dict(rule='mat.none_defined', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, materials=[]),
+         expect='has no materials yet'),
+    dict(rule='geometry.material_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_profile_mat(sd, 0, 11),
+         expect='Profile line 1 has Mat ID 12'),
+    dict(rule='geometry.material_missing', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: (sd['polygons'][0].update(mat_id=11), sd)[1],
+         expect='Polygon 1 has Mat ID 12'),
+    # A blank Mat ID: the writer used to drop such a zone on save, so the proof
+    # that it is kept is the rule finding it after the round trip.
+    dict(rule='geometry.material_missing', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: (sd['polygons'][0].update(mat_id=None), sd)[1],
+         expect='Polygon 1 has no Mat ID'),
+    *[dict(rule='geometry.bottom_elevation_missing', base=PREFLIGHT_BASE_PROFILE,
+           mode='dict', analysis=analysis,
+           mutation=lambda sd, value=value: (
+               sd.pop('max_depth', None), sd)[1] if value == 'omitted'
+               else _pf_set(sd, max_depth=value),
+           control=lambda sd: _pf_set(sd, max_depth=0.0),
+           expect='no numeric bottom elevation')
+      for analysis in ('lem', 'fem', 'ssrm', 'seep', 'tseep')
+      for value in ('omitted', None, float('nan'), '', 'not a number')],
+    dict(rule='geometry.bottom_elevation_missing', base=PREFLIGHT_BASE_THIN,
+         mode='dict', analysis='fem', mutation=lambda sd: _pf_set(
+             sd, max_depth=None, profile_lines=[{
+                 'coords': list(sd['ground_surface'].coords), 'mat_id': 0}]),
+         expect='no numeric bottom elevation',
+         control=lambda sd: _pf_set(sd, profile_lines=[])),
+    dict(rule='geometry.profile_line_too_short', base=PREFLIGHT_BASE_PROFILE,
+         mode='excel', mutation=_pf_extra_profile_point,
+         expect='so it bounds no zone'),
+    dict(rule='geometry.zones_overlap', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem', mutation=_pf_overlap,
+         expect='Material zones must tile the section'),
+    dict(rule='mat.gamma_sat_below_gamma', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, gamma_sat=1.0),
+         expect='Soil below the water table is at least as heavy'),
+    dict(rule='mat.pow_params_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='pow', pow_a=2.0, pow_b=0.0),
+         control=lambda sd: _pf_mats(sd, option='pow', pow_a=2.0, pow_b=0.7),
+         expect='pow_b = 0'),
+    dict(rule='mat.hb_params_invalid', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='hb', hb_sci=30000.0, hb_mi=10.0,
+                                      hb_gsi=0.0, hb_d=0.0),
+         control=lambda sd: _pf_mats(sd, option='hb', hb_sci=30000.0, hb_mi=10.0,
+                                     hb_gsi=60.0, hb_d=0.0),
+         expect='Geological Strength Index'),
+    dict(rule='piezo.line_too_short', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, piezo_line=sd['piezo_line'][:1]),
+         expect='Piezometric line 1 has one point'),
+    dict(rule='dload.line_too_short', base=PREFLIGHT_BASE_REINF, mode='excel',
+         mutation=lambda sd: _pf_set(sd, dloads=[sd['dloads'][0][:1]]),
+         expect='Distributed load #1 has one point'),
+    dict(rule='main.num_slices_too_few', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, num_slices=1),
+         control=lambda sd: _pf_set(sd, num_slices=30),
+         expect='Enter at least 2'),
+    dict(rule='fem.k0_nonpositive', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, k0=-0.5),
+         control=lambda sd: _pf_set(sd, k0=0.5),
+         expect='Enter a positive at-rest coefficient'),
+    dict(rule='mesh.size_nonpositive', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, target_size=0.0),
+         control=lambda sd: _pf_set(sd, target_size=2.0),
+         expect='Target element size is 0'),
+    dict(rule='mesh.size_nonpositive', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: (sd['polygons'][0].update(size=-1.0), sd)[1],
+         expect='Polygon 1 has a Size of -1'),
+    dict(rule='mesh.refine_zone_no_size', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, refine_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'size': None}]),
+         control=lambda sd: _pf_set(sd, refine_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'size': 0.5}]),
+         expect='Refine region 1 has no Size'),
+    dict(rule='ssrm.bracket_reversed', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_set(sd, ssrm_f_min=3.0, ssrm_f_max=1.0),
+         control=lambda sd: _pf_set(sd, ssrm_f_min=0.5, ssrm_f_max=3.0),
+         expect='F min must be the smaller'),
+    dict(rule='surface.search_window_reversed', base=PREFLIGHT_BASE_LEM,
+         mode='excel', selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: _pf_set(sd, search_window={'entry_x_min': 50.0,
+                                                        'entry_x_max': 10.0}),
+         control=lambda sd: _pf_set(sd, search_window={'entry_x_min': 10.0,
+                                                       'entry_x_max': 50.0}),
+         expect='nowhere to look'),
+    dict(rule='reinforce.pullout_length_missing', base=PREFLIGHT_BASE_REINF,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=float('nan')),
+         expect='leaves Lp1 blank'),
+    dict(rule='reinforce.spacing_nonpositive', base=PREFLIGHT_BASE_REINF,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', spacing=0.0),
+         expect='has Spacing = 0'),
+    dict(rule='reinforce.end_capacity_negative', base=PREFLIGHT_BASE_REINF,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', tend1=-1.0),
+         expect='has Tend1 = -1'),
+    dict(rule='joint.endpoints_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, y2=float('nan')),
+         control=lambda sd: _pf_joint_sheet(sd),
+         expect='leaves y2 blank'),
+    dict(rule='lload.incomplete', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_lload(sd, P=float('nan')),
+         control=lambda sd: _pf_lload(sd),
+         expect='leaves P blank'),
+    dict(rule='lload.magnitude_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_lload(sd, P=-5.0),
+         control=lambda sd: _pf_lload(sd),
+         expect='has P = -5'),
+    dict(rule='lload.off_ground_surface', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_lload(sd, dy=5.0),
+         control=lambda sd: _pf_lload(sd),
+         expect='from the ground surface'),
+    dict(rule='seep.set2_reservoir', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc2(sd, kind='reservoir'),
+         control=lambda sd: _pf_bc2(sd, kind='head'),
+         expect='has Type reservoir'),
+    dict(rule='seep.set2_time_series', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc2(sd, head='t1'),
+         control=lambda sd: _pf_bc2(sd),
+         expect='names the time series'),
+    dict(rule='seep.series_undefined', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'],
+             specified_heads=[dict(sd['seepage_bc']['specified_heads'][0],
+                                   head='nosuch')]
+             + sd['seepage_bc']['specified_heads'][1:])),
+         expect="names the time series 'nosuch', which is not defined"),
+    dict(rule='seep.bc_polyline_too_short', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(_pf_bc2(sd), seepage_bc2=dict(
+             sd['seepage_bc2'], specified_fluxes=[
+                 {'flux': 0.0,
+                  'coords': sd['seepage_bc']['specified_heads'][0]['coords'][:1]}])),
+         control=lambda sd: _pf_bc2(sd),
+         expect='of boundary set 2 has fewer than two points'),
 ]
 
 
@@ -6390,6 +7008,9 @@ def run_preflight_rules_test(test):
             elif not any(spec['expect'] in f.message for f in fired):
                 problems.append(f"{rid}: fired, but no message contained "
                                 f"{spec['expect']!r} (got {fired[0].message[:80]!r})")
+            elif 'count' in spec and len(fired) != spec['count']:
+                problems.append(f"{rid}: fired {len(fired)} time(s), expected "
+                                f"{spec['count']}")
 
             # 2. the negative control: the rule must be silent on a model that
             #    satisfies it.
@@ -6440,6 +7061,9 @@ PREFLIGHT_TAG_ANALYSIS = {
     'seep_elements': ('seep', {}),
     'tseep_head': ('tseep', {}),
     'fem_ssrm': ('ssrm', {}),
+    # A tilt row is one FEM solve at full strength per coefficient, no strength
+    # reduction: the plain FEM analysis, at the sweep budget its tag states.
+    'fem_tilt': ('fem', {}),
     'fem_elements': ('fem', {}),
     # A mesh-size lock names no analysis of its own: the file's OTHER tags say
     # what the model is for, and this row only counts what the mesher produced.
@@ -6492,7 +7116,7 @@ def run_preflight_corpus_test(test):
         # joint.iteration_budget_low is a question about exactly that: a jointed row
         # whose tag allows the budget must not be reported as if it did not. Carried
         # into the selection so the corpus is checked as it is actually run.
-        if t.get('type') == 'fem_ssrm':
+        if t.get('type') in ('fem_ssrm', 'fem_tilt'):
             sel = dict(sel)
             if t.get('max_iter'):
                 sel['max_iterations'] = int(float(t['max_iter']))
@@ -7747,7 +8371,7 @@ def run_corpus_circles_test(test):
         return all(not any(_val(m.get(k)) for k in ('c', 'phi', 'gamma'))
                    for m in mats)
 
-    problems, checked, skipped = [], 0, 0
+    problems, checked, skipped, no_circle = [], 0, 0, []
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
         for path in _corpus_circle_files():
@@ -7762,6 +8386,7 @@ def run_corpus_circles_test(test):
             circles = sd.get('circles') or []
             if not circles or not isinstance(circles[0], dict):
                 skipped += 1
+                no_circle.append(name)
                 continue
             if _blank_strength(sd):
                 skipped += 1
@@ -7815,6 +8440,8 @@ def run_corpus_circles_test(test):
                     f"{name}: circle 1 (Xo={c.get('Xo')}, Yo={c.get('Yo')}, "
                     f"R={c.get('R')}) produces no slices -- {reason[:110]}")
 
+    print(f"    {checked} workbook(s) checked; {skipped} skipped, {len(no_circle)} "
+          f"of them carrying no circle")
     if problems:
         return None, (f"{len(problems)} of {checked} shipped workbook(s) carry a "
                       f"first circle that cannot be sliced (fix the BUILDER, never "
@@ -7988,7 +8615,7 @@ def run_fem_elastic_units_test(test):
     from xslope.fileio import load_slope_data
 
     tag_re = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
-    fem_types = {'fem_ssrm', 'fem_elements', 'fem_reliability'}
+    fem_types = {'fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'}
     root = Path(__file__).parent
     fem_files = set()
     for md in sorted(root.glob('docs/**/*.md')):
@@ -8162,8 +8789,8 @@ def run_tutorial_restatements_test(test):
     written. tools/verification_checks/tutorials.py reads every factor of
     safety a tutorial attributes to a run of its own and scores it against the
     tags in scope — the page's own, and the tags anywhere under docs/ on a
-    model file the page links, which is how LEM-3 inherits the seven method
-    locks its workbook carries on docs/lem/samples.md.
+    model file the page links, which is how FEM-4 inherits the seven method
+    locks its pile workbook carries on docs/tutorials/lem12_piles.md.
 
     Each number is guarded (it restates a lock, verbatim or correctly rounded),
     disagreeing (its own column header, row label or sentence names a method
@@ -8289,6 +8916,18 @@ def run_tag_k0_test(test):
                               f"({prev[0]:g} and {value:g})")
             wanted.setdefault(os.path.normpath(path), (value, md.name))
 
+    # The RS2 joint rows reported WITHOUT a tag are solved at the K0 their
+    # producer registration states (benchmarks/rocscience/rs2_joint_cases.py), so
+    # their files owe it too, read from that same table. A tag wins, as it does in
+    # the producer.
+    from benchmarks.tag_k0 import registered_k0_entries
+    tagged_names = {os.path.basename(p) for p in wanted}
+    for rel, value in registered_k0_entries():
+        if os.path.basename(rel) in tagged_names:
+            continue
+        path = _repo(os.path.join('docs', 'verification', rel))
+        wanted[os.path.normpath(path)] = (value, 'rs2_joint_cases.py')
+
     problems = []
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
@@ -8353,6 +8992,35 @@ def run_tag_k0_test(test):
     return 0.0, None
 
 
+def _tilt_pair_problems(t):
+    """What is wrong with one ``fem_tilt`` tag's coefficient pair (see
+    ``run_lock_edges_test``); empty when nothing is."""
+    name = t.get('benchmark') or Path(str(t.get('file', '?'))).name
+    out = []
+    if any(k in t for k in ('f_stand', 'f_fail', 'check')):
+        out.append(f"{name}: a fem_tilt tag carries f_stand/f_fail/check, which "
+                   f"no tilt check reads (its pair is k_stand/k_fail)")
+    try:
+        k_stand, k_fail = float(t['k_stand']), float(t['k_fail'])
+    except (KeyError, TypeError, ValueError):
+        return out + [f"{name}: fem_tilt needs numeric k_stand and k_fail"]
+    if not abs(k_stand) < abs(k_fail):
+        return out + [f"{name}: k_stand={k_stand:g} is not below k_fail={k_fail:g}"]
+    if t.get('expected_tilt') is None:
+        return out + [f"{name}: fem_tilt tag with no expected_tilt"]
+    expected = float(t['expected_tilt'])
+    tol = float(t.get('tolerance', 0.1))
+    a_stand, a_fail = tilt_of(k_stand), tilt_of(k_fail)
+    mid = 0.5 * (a_stand + a_fail)
+    if abs(mid - expected) > tol + 1e-12:
+        out.append(f"{name}: k pair brackets {mid:.3f} deg, more than {tol:g} deg "
+                   f"from the lock {expected:g}")
+    if (a_fail - a_stand) > 2.0 * tol + 1e-12:
+        out.append(f"{name}: k pair is {a_fail - a_stand:.4g} deg wide, more than "
+                   f"twice the tolerance {tol:g} — not the sweep's final pair")
+    return out
+
+
 def run_lock_edges_test(test):
     """Guard: every ``check=edges`` tag states a pair of trials that can only be
     true of the lock it carries.
@@ -8366,7 +9034,9 @@ def run_lock_edges_test(test):
     * ``f_stand < expected_fs <= f_fail``. The lock is the midpoint of its final
       bracket, so it lies between the edges — a pair that does not straddle it
       belongs to some other run of some other model, which is exactly what a
-      sidecar written before a re-lock is;
+      sidecar written before a re-lock is. A lower-bound lock
+      (``fs_bound=lower``) IS its standing edge, so there it is
+      ``expected_fs == f_stand``;
     * ``f_fail - f_stand <= 2 x tolerance``. The bisection stops when the bracket
       is narrower than the tolerance, so a wider pair is not a final bracket: it
       is two trials from somewhere in the middle of the search, and they would
@@ -8375,11 +9045,22 @@ def run_lock_edges_test(test):
     ``tools/lock_edges.py`` writes the fields, from the trial record the figure
     producers persist beside each model; this is what stops a hand-edited or
     stale pair from standing in for a bracket.
+
+    A ``fem_tilt`` tag is ALWAYS an edge pair — ``k_stand`` and ``k_fail``, the
+    last coefficient the sweep stood at and the first it failed at — and the same
+    three properties are checked on it in angles: both present with
+    ``|k_stand| < |k_fail|``; the tilt they bracket (the mean of the two angles)
+    within ``tolerance`` degrees of ``expected_tilt``; and the two angles no more
+    than twice the tolerance apart. It carries no ``f_stand``/``f_fail``/
+    ``check`` keys, which would not be read.
     """
     problems = []
     n_edges = 0
     for md in sorted(Path(_repo('docs')).rglob('*.md')):
         for t in parse_test_tags(md):
+            if t.get('type') == 'fem_tilt':
+                problems.extend(_tilt_pair_problems(t))
+                continue
             if t.get('type') != 'fem_ssrm':
                 continue
             name = t.get('benchmark') or Path(str(t.get('file', '?'))).name
@@ -8402,7 +9083,16 @@ def run_lock_edges_test(test):
                 problems.append(f"{name}: check=edges on a tag with no expected_fs")
                 continue
             expected = float(expected)
-            if not (f_stand < expected <= f_fail):
+            try:
+                lower = _fs_bound_lower(t)
+            except ValueError as exc:
+                problems.append(f"{name}: {exc}")
+                continue
+            if lower:
+                if abs(expected - f_stand) > 1e-9 * max(1.0, abs(f_stand)):
+                    problems.append(f"{name}: a lower-bound lock {expected:g} is "
+                                    f"not its standing edge {f_stand:g}")
+            elif not (f_stand < expected <= f_fail):
                 problems.append(f"{name}: edges [{f_stand:g}, {f_fail:g}] do not "
                                 f"straddle the lock {expected:g}")
             if (f_fail - f_stand) > 2.0 * tol + 1e-12:
@@ -8514,6 +9204,28 @@ def run_cwd_invariant_test(test):
         return None, (f"discovery depends on the working directory: repo root gives "
                       f"{n_root}, another directory gives {n_else}"
                       + (f"; sources differing: {', '.join(missing)}" if missing else ''))
+    return 0.0, None
+
+
+def run_docs_prose_test(test):
+    """Guard: the docs and the program's user-facing strings carry none of the
+    phrases and sentence shapes the documentation does not use — list-announcing
+    openers ("Two things follow."), "worth noting" and its cousins, imagined
+    readers, coined phrases ("the march"), solver internals in a tutorial, the
+    comma contrast in a program sentence, British spellings. The rules and their
+    scopes live in test/docs_prose_check.py; a hit is fixed by rewriting the
+    sentence, never by widening a rule.
+    """
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'docs_prose_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('docs_prose_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, f"{len(failures)} prose hit(s): " + "; ".join(failures[:5])
     return 0.0, None
 
 
@@ -8667,6 +9379,33 @@ def run_beam_element_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('beam_element_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_elastic_base_test(test):
+    """A slip surface riding along the underside of an elastic zone.
+
+    A wall drawn as an elastic polygon sits on its foundation, so a surface along
+    its base finds the wall as each slice's deepest layer. The slice must bind
+    the foundation's strength, and a circular search that grazes the wall must
+    score the circle rather than stop.
+
+    The check itself lives in test/elastic_base_check.py, on Tutorial FEM-3's
+    block wall.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'elastic_base_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('elastic_base_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -8881,6 +9620,11 @@ MODULE_CHECKS = {
         'hybrid_criterion_check.py',
         "The opt-in strength-reduction criterion that requires displacement "
         "evidence before a non-converged trial is counted as a failed slope."),
+    'plot_aspect_limits': (
+        'plot_aspect_limits_check.py',
+        "No standard plot logs Matplotlib's \"Ignoring fixed y limits\" warning: "
+        "the equal-aspect frames set their starting window as bounds, not as "
+        "fixed limits the data-lim aspect then overrides."),
     'units_check': (
         'units_check.py',
         "xslope.units, the single source of truth for the unit systems: the "
@@ -8947,6 +9691,12 @@ MODULE_CHECKS = {
         "block on a plane cut in two, the same slab as a two-course stack, and "
         "an elastic block sliding out of an L-shaped joint at the friction the "
         "joint states."),
+    'bonded_junction': (
+        'bonded_junction_check.py',
+        "Bonded reinforcement and pile lines that meet share a mesh node: a bar "
+        "ending partway down a pile, a bar crossing a pile, two bars crossing and "
+        "a T, in tri6 and quad8; lines that do not meet are left alone, and a 1D "
+        "element off the soil edges is refused."),
     'joint_junction_mesh': (
         'joint_junction_check.py',
         "The junction fixtures alone — the wedge counts at a T, an X, an L, a "
@@ -8977,6 +9727,48 @@ MODULE_CHECKS = {
         "of it (the trial audit, lock_edges and the suite's own edge check) to "
         "the same answer, and holds the certification into a committed sidecar "
         "without its machine time."),
+    'fem_guards': (
+        'fem_guards_check.py',
+        "The solver's guards: a programming error inside the Newton corrector or "
+        "the hold test stops the run instead of being filed as a refusal, and a "
+        "numerical failure is filed with its class; a prepared model reused with "
+        "different options, a shared array changed behind the solver, a continued "
+        "run on an edited model, and a seed that does not fit its model each "
+        "raise and say what differs; an element whose stiffness cannot be built "
+        "raises; a search whose trials contradict each other records the pair; no "
+        "function carries code after a return."),
+    'driver_agreement': (
+        'driver_agreement_check.py',
+        "The three strength-reduction drivers (the plain viscoplastic loop, the "
+        "default with its Newton corrector, and the Newton driver) on problems "
+        "with a known answer: a homogeneous soil slope against Bishop & "
+        "Morgenstern's chart, a block on a plane and the same block cut in two "
+        "against tan phi_j / tan beta. Each driver must land on the answer, the "
+        "three within one bisection step of each other, and their displacement "
+        "fields must agree at the highest factor all three stood at."),
+    'ssrm_curve': (
+        'ssrm_curve_check.py',
+        "The strength reduction run's own record of itself: every trial carries "
+        "the displacement it reached, the saved meta gives the trials back, the "
+        "displacement-vs-F plot draws them, and the closing summary says how "
+        "each bracket edge was decided, including when the failing edge was "
+        "only the sweep budget's verdict."),
+    'ssrm_resume': (
+        'ssrm_resume_check.py',
+        "Continuing a strength reduction run with a higher iteration limit: "
+        "the run keeps the end state of exactly the trials a higher limit "
+        "could still decide, a continued trial ends bit-identical to the same "
+        "trial run straight through, the continued run finds the bracket a "
+        "fresh run at the new limit finds, records every trial once with "
+        "resumed_from, says where it was continued from in its closing "
+        "summary, refuses in plain words a run that cannot be continued, and "
+        "Studio shows Continue with a higher limit… only while it can."),
+    'ssrm_resume_slow': (
+        'ssrm_resume_check.py',
+        "The slow half: FEM-1 and the FEM-3 wall keep nothing and offer "
+        "nothing, and the FEM-3 geogrid wall run at 100,000 iterations and "
+        "continued to 1,000,000 reports the fresh million-iteration bracket "
+        "(about 70 minutes; skipped with --quick)."),
     'joint_verdict': (
         'joint_verdict_check.py',
         "How an undecided jointed strength-reduction trial is read. Seven rows "
@@ -10081,6 +10873,42 @@ def run_circles_editor_test(test):
     except Exception:
         pass                       # no PySide6: the module skips itself
     spec = importlib.util.spec_from_file_location('circles_editor_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_studio_results_teardown_test(test):
+    """Studio's FEM results view being closed mid-session: that the Run menu still
+    updates afterwards.
+
+    OK on an input editor, a mesh rebuild and opening another file each close the
+    FEM results view, whose toolbar buttons go with it. A handle the main window
+    kept on a deleted button raised at the next Run menu update, which stopped part
+    way and left Run FEM disabled for the rest of the session: no second FEM run
+    without restarting Studio.
+
+    The check itself lives in test/studio_results_teardown_check.py: each of the
+    three actions after a results view is open, the Run menu update that follows,
+    and the window's handles cleared.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'studio_results_teardown_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('studio_results_teardown_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -13507,7 +14335,7 @@ def run_rs2_import_test(test):
         # and its piezometric surface is a whole-domain surface rather than a water
         # table drawn on the ground. Deriving ground-against-piezo here would invent a
         # plateau of water the model never had -- wrong, not merely redundant. So the
-        # import pins D23 to manual, keeps the vendor's own loads, and says why.
+        # import pins Water loads to manual, keeps the vendor's own loads, and says why.
         from xslope.water import with_water_loads, derived_blocks, derive_water_loads
         if sd.get("water_loads") != "manual":
             problems.append(
@@ -13517,7 +14345,9 @@ def run_rs2_import_test(test):
         if derived_blocks(with_water_loads(sd), 1):
             problems.append("an RS2 import derived a water load on top of the "
                             "vendor's own explicit ponded-water load")
-        if not any("D23" in c and "MANUAL" in c.upper() for c in caveats):
+        from xslope.fileio import main_sheet_cell
+        if not any(main_sheet_cell("water_loads") in c and "MANUAL" in c.upper()
+                   for c in caveats):
             problems.append("the import did not report that it left the water-load "
                             "mode on manual, or did not name the cell")
         # The REASON for pinning the mode is a claim about RS2's whole-domain piezo,
@@ -13525,10 +14355,8 @@ def run_rs2_import_test(test):
         # vendor's own archive, in run_rs2_water_mode_test.
 
         # Round-trip: the geometry must survive the .xlsx writer AND reload. An RS2
-        # import carries no surface, so give it one (as a user must) before saving —
-        # load_slope_data rejects a surface-less file, which is the real consumer.
-        sd["circular"] = True
-        sd["circles"] = [{"Xo": 20.0, "Yo": 30.0, "R": 26.0, "Depth": 4.0}]
+        # import carries no surface, and the file loads without one: whether a model
+        # can run limit equilibrium is preflight's question, not the loader's.
         xlsx = os.path.join(td, "synthetic.xlsx")
         save_slope_data_to_xlsx(sd, xlsx, template=default_template_path())
         reloaded = load_slope_data(xlsx)
@@ -14603,6 +15431,8 @@ def run_test(test):
     boundary back to the summary."""
     if test.get('type', '') == 'fem_ssrm':
         return _run_fem_ssrm(test)
+    if test.get('type', '') == 'fem_tilt':
+        return run_fem_tilt_test(test)
     computed, error_msg = _dispatch_test(test)
     return computed, error_msg, None
 
@@ -14709,6 +15539,8 @@ def _dispatch_test(test):
         return run_nr_ssrm_test(test)
     if test_type == 'beam_element':
         return run_beam_element_test(test)
+    if test_type == 'elastic_base':
+        return run_elastic_base_test(test)
     if test_type == 'pile_capacity':
         return run_pile_capacity_test(test)
     if test_type == 'one_d_compatibility':
@@ -14735,6 +15567,8 @@ def _dispatch_test(test):
         return run_noncircular_generator_test(test)
     if test_type == 'circles_editor':
         return run_circles_editor_test(test)
+    if test_type == 'studio_results_teardown':
+        return run_studio_results_teardown_test(test)
     if test_type == 'seep_bc_series':
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
@@ -14799,6 +15633,8 @@ def _dispatch_test(test):
         return run_cwd_invariant_test(test)
     if test_type == 'docs_heading_trap':
         return run_docs_heading_trap_test(test)
+    if test_type == 'docs_prose':
+        return run_docs_prose_test(test)
     if test_type == 'verification_pages':
         return run_verification_pages_test(test)
     if test_type == 'tutorial_restatements':
@@ -14825,6 +15661,9 @@ def _dispatch_test(test):
         # solve_fem's 'auto' default, because the lock is a property of the
         # reference path.
         return run_fem_test(test, fast_kernel=False)
+    if test_type == 'fem_tilt':
+        # Unreachable in practice (run_test intercepts it for its annotation).
+        return run_fem_tilt_test(test)[:2]
     if test_type == 'seep_elements':
         return run_seep_elements_test(test)
     if test_type == 'fem_elements':
@@ -14874,6 +15713,10 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type == 'critical_kc':
         expected = test.get('expected_kc')
         tol = test.get('kc_tol', 0.01)
+    elif test_type == 'fem_tilt':
+        # ABSOLUTE, in degrees: the tilt the two coefficients bracket.
+        expected = test.get('expected_tilt')
+        tol = test.get('tolerance', 0.1)
     elif test_type == 'slip_depth':
         # ABSOLUTE, in the model's length units: a depth of zero is a real
         # reading (a surface that grazes the station) and no relative band
@@ -14894,7 +15737,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -14904,7 +15747,8 @@ def _expected_and_tol(test, default_tolerance):
                        'rapid_stage1_frames', 'pullout_envelope',
                        'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
-                       'noncircular_generator', 'circles_editor', 'seep_bc_series', 'table_paste',
+                       'noncircular_generator', 'circles_editor', 'studio_results_teardown',
+                       'seep_bc_series', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'report_template_field', 'report_no_resolve',
@@ -14932,7 +15776,7 @@ def _expected_and_tol(test, default_tolerance):
 
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
-_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_elements': 5,
+_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_tilt': 4, 'fem_elements': 5,
               'preflight_corpus': 5, 'preflight_rules': 4, 'corpus_circles': 5,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
               'support_force': 4, 'slip_depth': 2,
@@ -14944,11 +15788,13 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
-              'reinforce_mesh_geometry': 2, 'joint_mesh': 3,
+              'plot_aspect_limits': 2,
+              'reinforce_mesh_geometry': 2, 'bonded_junction': 2, 'joint_mesh': 3,
               'joint_junction': 5, 'joint_junction_mesh': 3,
               'joint_element': 5, 'joint_surfaces': 4, 'joint_network': 3,
               'joint_network_dialog': 2, 'joint_verdict': 1,
-              'corrector_certified': 1,
+              'corrector_certified': 1, 'ssrm_curve': 2,
+              'ssrm_resume': 2, 'ssrm_resume_slow': 6,
               'gamma_sat_fem': 4,
               'transient_studio_smoke': 4, 'assistant_capture': 2,
               'docs_index_sync': 3, 'assistant_docs_answers': 2,
@@ -15033,6 +15879,12 @@ def main():
                              'The element rows solve and strength-reduce '
                              'several small models, so this scope runs in '
                              'minutes rather than seconds.')
+    parser.add_argument('--drivers', action='store_true',
+                        help='Run only the driver-agreement check: the plain '
+                             'viscoplastic loop, the default path and the Newton '
+                             'driver on three small known-answer models. Opt-in '
+                             'while it reports open disagreements (about four '
+                             'minutes).')
     parser.add_argument('--mesh', action='store_true',
                         help='Run only the mesh-size locks (type=mesh_elements): '
                              'the element and node counts the verification pages '
@@ -15063,7 +15915,7 @@ def main():
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
                    or args.dxf or args.gsz or args.slide2 or args.rs2
                    or args.preflight or args.mesh or args.tutorials
-                   or args.joints)
+                   or args.joints or args.drivers)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -15138,7 +15990,7 @@ def main():
     for verification_md in sorted(Path(_repo('docs/verification')).glob('*.md')):
         for t in parse_test_tags(verification_md):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'mesh_elements':
@@ -15213,7 +16065,7 @@ def main():
                       'file': 'transient seepage through the Studio panels',
                       'method': '-', 'source': 'transient_studio_smoke'})
 
-    # docs/seep/samples.md carries the steady seep sample locks AND (Problems 8-9)
+    # docs/seep/samples.md carries the steady seep sample locks AND (Problem 6)
     # the transient tseep_head locks — route each by type so --tseep picks up the
     # transient sample locks and --seep the steady ones (mirrors the verification
     # pages and seep_slope.md).
@@ -15232,7 +16084,7 @@ def main():
     if seep_slope.exists():
         for t in parse_test_tags(seep_slope):
             ttype = t.get('type', '')
-            if ttype == 'fem_ssrm':
+            if ttype in ('fem_ssrm', 'fem_tilt'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'seep':
@@ -15252,7 +16104,7 @@ def main():
     for tutorial_md in sorted(Path(_repo('docs/tutorials')).glob('*.md')):
         for t in parse_test_tags(tutorial_md):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'mesh_elements':
@@ -15296,7 +16148,7 @@ def main():
                 if not t.get('file'):
                     continue    # a prose example of the tag syntax, not a fixture
                 ttype = t.get('type', '')
-                if ttype == 'fem_ssrm':
+                if ttype in ('fem_ssrm', 'fem_tilt'):
                     if run_fem:
                         tests.append(t); n_priv += 1
                 elif ttype == 'seep':
@@ -15554,6 +16406,13 @@ def main():
         tests.append({'type': 'reinforce_mesh_geometry',
                       'file': 'reinforcement line mesh geometry (both laws)',
                       'method': '-', 'source': 'reinforce_mesh_geometry'})
+        # Bonded lines that meet (a tieback ending on a pile, a bar crossing a pile
+        # or another bar) must share a node, and no 1D element may leave the soil
+        # edges; before, gmsh honored one curve and the other's element cut
+        # through the soil with no message.
+        tests.append({'type': 'bonded_junction',
+                      'file': 'bonded lines that meet (shared nodes)',
+                      'method': '-', 'source': 'bonded_junction'})
         # A jointed reinforcement line is a slip surface: the mesh splits along
         # it into soil-above, bar and soil-below node sets, with joint elements
         # between them and the soil faces rejoining at the ends.
@@ -15600,6 +16459,8 @@ def main():
         # assembles only the beam matrices build_fem_data returns).
         tests.append({'type': 'beam_element', 'file': 'pile beam element vs beam theory',
                       'method': '-', 'source': 'beam_element'})
+        tests.append({'type': 'elastic_base', 'file': 'surface along the underside of an elastic wall',
+                      'method': '-', 'source': 'elastic_base'})
         # Guard that a pile's structural capacities are enforced by the
         # equilibrium and not merely reported: the moment capacity as a plastic
         # hinge whose moment diagram the equilibrium bounds (a correction at the
@@ -15764,6 +16625,12 @@ def main():
         # rows the user already has. Builds dialogs offscreen and solves nothing.
         tests.append({'type': 'circles_editor', 'file': 'Studio circles editor',
                       'method': '-', 'source': 'circles_editor'})
+        # Guard a second FEM run in one Studio session: OK on an editor, a mesh
+        # rebuild or opening a file closes the FEM results view, and the Run menu
+        # must still update afterwards. Builds the window offscreen; solves nothing.
+        tests.append({'type': 'studio_results_teardown',
+                      'file': 'Studio FEM results view closed',
+                      'method': '-', 'source': 'studio_results_teardown'})
         # Guard the Seep BC editor's value fields: that a flux takes a tseep series
         # name the way a head does (a series name typed into a flux used to be
         # answered with 0.0, turning a time-varying boundary into a no-flow one),
@@ -15831,6 +16698,9 @@ def main():
         # xslope.units, the single source of truth for the unit systems.
         tests.append({'type': 'units_check', 'file': 'xslope.units',
                       'method': '-', 'source': 'units_check'})
+        # The standard plots draw without the fixed-limits aspect warning.
+        tests.append({'type': 'plot_aspect_limits', 'file': 'standard plots',
+                      'method': '-', 'source': 'plot_aspect_limits'})
         tests.append({'type': 'assistant_suite',
                       'file': 'assistant scenario suite (scored)',
                       'method': '-', 'source': 'assistant_suite'})
@@ -15839,6 +16709,11 @@ def main():
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.
         tests.append({'type': 'docs_heading_trap', 'file': 'docs line-initial # heading trap',
                       'method': '-', 'source': 'docs_heading_trap'})
+        # The docs and the program's user-facing strings read like a colleague
+        # wrote them: no list-announcing openers, no "worth noting", no coined
+        # phrases, no British spellings. See test/docs_prose_check.py.
+        tests.append({'type': 'docs_prose', 'file': 'docs and program prose',
+                      'method': '-', 'source': 'docs_prose'})
         # The suite must discover the same tests from any working directory. A
         # CWD-relative fixture path does not error when it misses — the .exists()
         # guards around the docs scan just collect fewer rows — so a shrunken run
@@ -16064,11 +16939,46 @@ def main():
         tests.append({'type': 'joint_verdict',
                       'file': 'the verdict on an undecided jointed trial',
                       'method': '-', 'source': 'joint_verdict'})
-        # Pure-function: what makes a bracket edge answered, and that the three
-        # tools that decide it give one answer. No solve.
+        # What makes a bracket edge answered, and that the three tools that decide
+        # it give one answer — pure-function, plus two small solves for the K0
+        # step's own certification (seconds).
         tests.append({'type': 'corrector_certified',
                       'file': 'a corrector certification answers a bracket edge',
                       'method': '-', 'source': 'corrector_certified'})
+        # The trial record's displacement, its round trip through the meta
+        # sidecar, the displacement-vs-F plot and the closing summary — one small
+        # strength reduction run (seconds) and synthetic records.
+        tests.append({'type': 'ssrm_curve',
+                      'file': 'the displacement curve and the closing summary',
+                      'method': '-', 'source': 'ssrm_curve'})
+        # The solver's own guards: a prepared model that no longer matches its
+        # options, a seed of the wrong size, a continuation from another model,
+        # a non-monotone search — each raised, never worked around. Seconds.
+        tests.append({'type': 'fem_guards',
+                      'file': 'the FEM invariant guards',
+                      'method': '-', 'source': 'fem_guards'})
+    if args.drivers:
+        # The three strength-reduction drivers (the plain viscoplastic loop, the
+        # default path with its corrector, and the Newton driver) on three small
+        # known-answer models. Opt-in: it reports real disagreements today (the
+        # Newton driver on a jointed junction; the plain loop's early stop on a
+        # coarse soil slope), recorded as open diagnoses in the joints campaign's
+        # loose ends, and it must not turn --joints red until they are ruled on.
+        tests.append({'type': 'driver_agreement',
+                      'file': 'the three drivers on known answers',
+                      'method': '-', 'source': 'driver_agreement'})
+        # Continuing a run with a higher limit: a stand-in solver for the
+        # bookkeeping, then the smallest shipped model and Studio (seconds).
+        tests.append({'type': 'ssrm_resume',
+                      'file': 'a run continued with a higher limit',
+                      'method': '-', 'source': 'ssrm_resume'})
+        # ... and the FEM-3 geogrid wall continued from 100,000 to 1,000,000,
+        # which takes as long as the fresh million-iteration run it matches.
+        if not args.quick:
+            tests.append({'type': 'ssrm_resume_slow',
+                          'file': 'the FEM-3 geogrid wall continued to 1,000,000',
+                          'method': '-', 'source': 'ssrm_resume',
+                          'entry': 'run_slow'})
         # The path a MODEL takes to the element: the column, the mesher, the
         # plots, the detail panel and the report, on one solve of the shipped
         # reinforcement sample with two of its lines made joints in memory.
@@ -16286,7 +17196,9 @@ def main():
         if annotation is not None:
             bucket, ann_text = annotation
             status = f"{status} [{ann_text}]"
-            if bucket == 'edges':
+            if bucket == 'tilt':
+                pass          # full-strength solves: no kernel routing to tally
+            elif bucket == 'edges':
                 route_edges += 1
             elif bucket == 'edges_bracket':
                 route_edges_bracket += 1
@@ -16297,7 +17209,7 @@ def main():
                     route_fallback += 1
                 else:
                     route_direct += 1
-            if status.startswith('FAIL'):
+            if bucket != 'tilt' and status.startswith('FAIL'):
                 route_fail += 1
         exp_str = _fmt(expected)
         print(f"{i:<4} {file_name:<45} {test_type:<20} {method:<10} {exp_str}  {comp_str}  {status}",

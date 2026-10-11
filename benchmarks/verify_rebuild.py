@@ -187,6 +187,26 @@ GROUPS = {
                      corpus='docs/fem/files',
                      builders=lambda m: list(m.BUILDERS),
                      slow=False),
+    # The finite element samples and fixtures no other builder writes (the
+    # samples page's problems 3 and 4, the two-pile slope and its twin, the
+    # loaded Griffiths slope). They only WRITE files -- no solve.
+    'fem_samples': dict(module='benchmarks.build_fem_samples', outattr='OUT',
+                        corpus='docs/fem/files',
+                        builders=lambda m: list(m.BUILDERS),
+                        slow=False),
+    # The five earth-dam workbooks (samples problems 8 and 16 and the two-stage
+    # rapid-drawdown fixture), built from one definition of the dam. They only
+    # WRITE files -- no solve; the seepage companions are staged, not rebuilt.
+    'lem_samples': dict(module='benchmarks.build_lem_samples', outattr='OUT',
+                        corpus='docs/lem/files',
+                        builders=lambda m: list(m.BUILDERS),
+                        slow=False),
+    # The same dam's two driver-script inputs under docs/inputs/slope, from the
+    # same definition.
+    'lem_sample_inputs': dict(module='benchmarks.build_lem_samples',
+                              outattr='OUT_INPUTS', corpus='docs/inputs/slope',
+                              builders=lambda m: list(m.INPUT_BUILDERS),
+                              slow=False),
     # The worked design-manual problems of docs/verification/published.md: the
     # FHWA MSE wall examples.  They only WRITE files -- no solve -- so they are
     # cheap.  build_fhwa_e1 exposes one builder, build_fhwa_e3_e7 a BUILDERS
@@ -204,6 +224,13 @@ GROUPS = {
                                      lambda: m.build_sheetpile(0.5),
                                      lambda: m.build_sheetpile(0.75)],
                  slow=False),
+    # The steady seepage samples no other builder writes (the sea trench and the
+    # earth dam with a filter on docs/seep/samples.md). They only WRITE files --
+    # no solve; earth_dam2's mesh and field companions are staged from the corpus.
+    'seep_samples': dict(module='benchmarks.build_seep_samples', outattr='OUT',
+                         corpus='docs/seep/files',
+                         builders=lambda m: list(m.BUILDERS),
+                         slow=False),
 }
 
 DEFAULT_GROUPS = tuple(k for k, v in GROUPS.items() if not v['slow'])

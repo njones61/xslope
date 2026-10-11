@@ -300,9 +300,9 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         vg_n_by_mat[i] = material.get("vg_n", 0.0)
         _l = material.get("vg_l")
         vg_l_by_mat[i] = 0.5 if _l is None else float(_l)
-        # v18 transient storage: None (blank) -> 0 here; the transient path
-        # validates presence at load time (fileio), so a 0 only survives on the
-        # steady path where it is never read. Never affects steady behavior.
+        # v18 transient storage: None (blank) -> 0 here; a transient run is refused
+        # by preflight's tseep.storage_nonpositive before it gets here, so a 0 only
+        # survives on the steady path where it is never read.
         _ss = material.get("Ss")
         _sy = material.get("Sy")
         ss_by_mat[i] = 0.0 if _ss is None else float(_ss)
@@ -3714,7 +3714,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             # is starting from a field that is not a steady state, so every frame
             # downstream of it inherits that, and the flag says so.
             print("WARNING: the transient initial condition did not converge — the "
-                  "march starts from a field that is not a steady state "
+                  "transient run starts from a field that is not a steady state "
                   "(solution['converged'] is False).")
 
     # characteristic head scale for the Picard tolerance and the dh limiter
@@ -4288,7 +4288,7 @@ def export_seep_u(nodes, u, filename, gamma_water):
         # A total-flowrate footer, matching export_seep_solution's format so the same
         # readers (which skip "#" comment lines) treat both files identically. There is
         # no solved flowrate here -- the field was imported, not computed.
-        f.write("# Total Flowrate: not computed (field imported, not solved)\n")
+        f.write("# Total Flowrate: not computed (field imported)\n")
 
 
 def import_seep_solution(seep_data, filename):

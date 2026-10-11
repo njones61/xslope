@@ -71,12 +71,16 @@ Run from the repo root:  PYTHONPATH=. python3 benchmarks/published/build_fhwa_e1
 """
 import math
 import os
+import sys
 
 from shapely.geometry import Polygon
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+from tools.fill_reinforce_formula_cache import fill_reinforce_cache  # noqa: E402
 OUT = os.path.join(ROOT, 'docs', 'verification', 'files', 'published')
 SEED = os.path.join(ROOT, 'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 #: Output file name.  The directory is read from OUT at CALL time, not
@@ -244,6 +248,7 @@ def build_fhwa_e1():
     os.makedirs(OUT, exist_ok=True)
     dest = os.path.join(OUT, NAME)
     save_slope_data_to_xlsx(sd, dest)
+    fill_reinforce_cache(dest)     # Dir/Appl formula results, stored for non-Excel readers
     return dest
 
 

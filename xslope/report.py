@@ -858,10 +858,11 @@ DEFAULT_OPTIONS = {
                                       # stiffnesses, which no LEM method reads
     "fem_mesh_figure": True,          # the mesh the section was solved on
     "fem_figure": True,
-    "fem_convergence_figure": True,   # the search that reached the factor of
-                                      # safety: every trial, and the interval
-                                      # still open after each — drawn only where
-                                      # the run kept a trial record
+    "fem_convergence_figure": True,   # displacement vs F: every trial's
+                                      # maximum displacement against its factor,
+                                      # with the factor of safety and the final
+                                      # bracket — drawn only where the run's
+                                      # trial record carries displacements
     "fem_state_failure": True,        # which field state the result panels draw:
     "fem_state_converged": False,     # the mechanism at failure, the last
                                       # converged trial, or both, on one scale
@@ -1136,6 +1137,7 @@ def _fem_sidecar_bundle(stem, slope_data, notes):
     # section says about how the run was solved is read off it rather than
     # assumed, and a fact it does not carry is not stated.
     return {"fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
+            "fs_is_lower_bound": bool(meta.get("fs_is_lower_bound")),
             "analysis": analysis, "failure_solution": failure, "meta": meta}
 
 
@@ -2590,6 +2592,27 @@ def _reinforcement_fields(slope_data):
     }
 
 
+def _pile_end(m, head):
+    """A pile's head (the higher end) or tip, whichever order it was entered in."""
+    first_is_head = (_num(m.get("y1")) or 0.0) >= (_num(m.get("y2")) or 0.0)
+    if first_is_head == head:
+        return _point(m, "x1", "y1")
+    return _point(m, "x2", "y2")
+
+
+def _pile_theta(m):
+    """The force angle: as stated or derived for a vertical pile; for a battered
+    pile the angle is the batter from vertical, ``±`` because its sign follows
+    the facing of each failure surface (``slice.pile_force_angle``)."""
+    if m.get("theta_p") is not None:
+        return _fmt(m.get("theta_p"), "{:g}")
+    x1, y1, x2, y2 = (_num(m.get(k)) for k in ("x1", "y1", "x2", "y2"))
+    if None in (x1, y1, x2, y2) or y1 == y2:
+        return ""
+    from math import atan2, degrees
+    return "±" + _fmt(abs(degrees(atan2(x2 - x1, abs(y1 - y2)))), "{:.1f}")
+
+
 def _pile_fields(slope_data):
     """Every pile property the report can print, by key."""
     unit = _unit_suffix(slope_data)
@@ -2614,12 +2637,12 @@ def _pile_fields(slope_data):
         mu = f" ({force}·{label['length']} per {label['length']})" if fu and lu else ""
     return {
         "label": ("label", "Label", lambda m: str(m.get("label") or ""), True),
-        "top": ("x1", "Top (x, y)", lambda m: _point(m, "x1", "y1"), True),
-        "bottom": ("x2", "Bottom (x, y)", lambda m: _point(m, "x2", "y2"), True),
+        "top": ("x1", "Top (x, y)", lambda m: _pile_end(m, head=True), True),
+        "bottom": ("x2", "Bottom (x, y)", lambda m: _pile_end(m, head=False), True),
         "H": ("H", f"H{fu}",
               lambda m: _fmt(m.get("H"), "{:g}") or "computed", True),
         "theta_p": ("theta_p", "θ (deg)",
-                    lambda m: _fmt(m.get("theta_p"), "{:g}"), True),
+                    _pile_theta, True),
         "D_pile": ("D_pile", f"D{lu}",
                    lambda m: _fmt(m.get("D_pile"), "{:g}"), True),
         "S": ("S", f"Spacing{lu}", lambda m: _fmt(m.get("S"), "{:g}"), True),
@@ -2724,7 +2747,7 @@ def _pile_assumption(slope_data, engine):
     its own section stiffness by the spacing declared for it. That is exact for a
     wall and an idealization of a row of separate piles — the row's average
     stiffness is reproduced; the soil arching between piles at wide spacing, and
-    the slip on each pile's surface, are not (``docs/fem/piles.md``,
+    the slip on each pile's surface, are not (``docs/piles/fem.md``,
     Applicability). Every number in the table beside this sentence is stated
     under that assumption, so it is stated before them.
 
@@ -7127,7 +7150,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # than one: a model documented on the steady states alone has no other basis
     # for the sentence to distinguish it from.
     basis = ("This is a steady state: the field was solved with the boundary "
-             "conditions held where this set puts them, not stepped through time. "
+             "conditions held where this set puts them. "
              if basis_named else "")
     if unconfined is None:
         text = basis + SEEP_BC_UNRECORDED
@@ -7975,6 +7998,12 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
 #: imported because report.py loads without matplotlib and plot_fem does not.
 #: The field had four names: this caption said "Maximum shear strain", which is
 #: the name of the OTHER strain column.
+#:
+#: The fourth is not a field. It is drawn from the run's trial record — every
+#: trial's maximum displacement against its factor — once per run rather than
+#: once per field state, and only where the record carries the displacements
+#: (:func:`_fem_search_figure`). Its name is
+#: :data:`xslope.plot_fem.SSRM_CURVE_LABEL`, written out for the same reason.
 FEM_PANELS = (
     ("shear_strain", "Viscoplastic shear strain",
      "the viscoplastic shear strain — where the section is shearing"),
@@ -7982,14 +8011,22 @@ FEM_PANELS = (
      "the deformed mesh over the original section"),
     ("displace_vector", "Displacement vectors",
      "the displacement at every node as an arrow — how the section is moving"),
+    ("ssrm_curve", "Displacement vs F",
+     "the maximum displacement of every trial against its strength reduction "
+     "factor"),
 )
+
+#: The panels drawn from a solved FIELD, once per field state: every entry of
+#: :data:`FEM_PANELS` but the displacement curve, which is drawn from the trials.
+FEM_FIELD_PANELS = tuple(entry for entry in FEM_PANELS
+                         if entry[0] != "ssrm_curve")
 
 #: The published page each kind of one-dimensional member is modelled after.
 #: Both formulations differ from the limit equilibrium treatment of the same
 #: member, so the paragraph that describes one links the page that derives it.
 FEM_DETAIL_DOC_PAGES = {
-    "reinforcement": "fem/reinforcement.md",
-    "pile": "fem/piles.md",
+    "reinforcement": "reinforcement/fem.md",
+    "pile": "piles/fem.md",
 }
 
 #: What a run records itself as when it solved the section once, at one strength.
@@ -8686,9 +8723,12 @@ def _deformation_exaggeration(scale, stated=None):
     states that landed on the same one say it once.
     """
     scale = _num(scale)
-    if not scale or scale <= 1.0:
+    if not scale:
         return ""
-    shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
+    from .plot_fem import format_deform_scale
+    shown = format_deform_scale(scale)
+    if shown == "1.0":
+        return ""
     if stated is not None:
         if shown in stated:
             return ""
@@ -8742,6 +8782,17 @@ FEM_FIELD_STATES = (("failure", "fem_state_failure"),
 #: control ("at failure", "last converged") and not as the start of a sentence.
 FEM_STATE_LEADS = {"failure": "At failure",
                    "converged": "At the last converged trial"}
+#: The "failure" state's lead and name on a run that found no failure, whose
+#: failure field is the undecided top trial of its final bracket.
+FEM_UNDECIDED_LEAD = "At the last trial, which the search could not decide"
+FEM_UNDECIDED_NAME = "last trial (undecided)"
+
+
+def _fs_is_lower_bound(bundle):
+    """Did this run find no failure, so that its factor of safety is a lower
+    bound? Read off the bundle, then the run record it carries."""
+    return bool(bundle.get("fs_is_lower_bound")
+                or (bundle.get("meta") or {}).get("fs_is_lower_bound"))
 
 
 def _fem_states(bundle, opts):
@@ -8779,7 +8830,7 @@ def _fem_primary_state(bundle, opts):
     return states[0] if states else "converged"
 
 
-def _fem_state_sentence(states, wanted, ssrm):
+def _fem_state_sentence(states, wanted, ssrm, lower=False):
     """What the panels below are drawn from, in the words the results view's own
     Field state control uses.
 
@@ -8791,6 +8842,15 @@ def _fem_state_sentence(states, wanted, ssrm):
     if not states:
         return ""
     missed = "failure" in wanted and "failure" not in states
+    if lower and "failure" in states:
+        # A run that found no failure draws its undecided top trial there.
+        if len(states) > 1:
+            return ("The plots below are drawn twice: first the last trial the "
+                    "search solved, which it could not decide, and then the last "
+                    "trial that reached equilibrium. Each state is drawn on its "
+                    "own scale.")
+        return ("The plots below show the last trial the search solved, which "
+                "it could not decide.")
     if states == ["failure"]:
         return ("The plots below show the mechanism at failure — the trial at "
                 "which the section could not reach equilibrium.")
@@ -8842,10 +8902,12 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     # drawn — the rule the paired seepage sets follow, and for the same reason: a
     # caption reading "at failure" on the only field there is qualifies nothing.
     figures = []
+    lower = ssrm and _fs_is_lower_bound(bundle)
     if opts["fem_figure"]:
         for state in states:
-            named_state = field_state_label(state)
-            for panel, caption, shows in FEM_PANELS:
+            named_state = (FEM_UNDECIDED_NAME if (lower and state == "failure")
+                           else field_state_label(state))
+            for panel, caption, shows in FEM_FIELD_PANELS:
                 stem = (f"fem_{tag}_{panel}" if len(states) == 1
                         else f"fem_{tag}_{panel}_{state}")
                 path = os.path.join(figure_dir, f"{stem}.png")
@@ -8858,6 +8920,7 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
                     # time and at a different rounding from the paragraph above.
                     plot_fem_results(fem_data, solution, plot_type=[panel],
                                      fig=fig, fs=_num(bundle.get("FS")),
+                                     fs_is_lower_bound=lower,
                                      failure_solution=failure, show_title=False,
                                      field_state=state,
                                      deform_scale=scales[state]["deform_scale"],
@@ -8899,7 +8962,9 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
             wheres.append(where)
         if not named:
             continue
-        lead = f"{FEM_STATE_LEADS[state]}, " if len(states) > 1 else ""
+        lead_words = (FEM_UNDECIDED_LEAD if (lower and state == "failure")
+                      else FEM_STATE_LEADS[state])
+        lead = f"{lead_words}, " if len(states) > 1 else ""
         if described:
             draw = "show" if len(wheres) > 1 else "shows"
             said = (f"{lead}{_join(wheres)} {draw} the same "
@@ -8922,11 +8987,25 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     if ssrm and fs is not None:
         # The state sentence is empty where no panels were asked for: there is
         # then no field drawn to say anything about.
-        state = _fem_state_sentence(states, wanted, ssrm)
-        sub.blocks.append(Prose(
-            f"The shear strength reduction method gives a factor of safety of "
-            f"{fs:.3f}." + (f" {state}" if state else "") + drawn,
-            bold=[f"{fs:.3f}"], links=links))
+        state = _fem_state_sentence(states, wanted, ssrm, lower=lower)
+        if lower:
+            # The search found no failure, so the number is the highest
+            # strength the slope was confirmed to stand at: a lower bound, cut
+            # down to the closing summary's two decimals.
+            from .fem import ssrm_bound_text
+            bound = ssrm_bound_text(fs)
+            top = (ssrm_record(bundle).get("final_interval") or (fs, fs))[1]
+            sub.blocks.append(Prose(
+                f"The shear strength reduction search found no failure up to "
+                f"F = {float(top):.4f}, so it "
+                f"gives a lower bound on the factor of safety: at least {bound}."
+                + (f" {state}" if state else "") + drawn,
+                bold=[bound], links=links))
+        else:
+            sub.blocks.append(Prose(
+                f"The shear strength reduction method gives a factor of safety of "
+                f"{fs:.3f}." + (f" {state}" if state else "") + drawn,
+                bold=[f"{fs:.3f}"], links=links))
     else:
         F = _num(solution.get("F"))
         at = f" at a strength reduction factor of {F:.3f}" if F is not None else ""
@@ -8964,11 +9043,11 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     for _panel, _state, figure in figures:
         sub.blocks.append(figure)
 
-    # How the factor of safety was reached, where the run kept a record of its
-    # trials: the paragraph above the section says the search halves an interval,
-    # and this is that search. A run that kept no trials — a displacement
-    # catastrophe run keeps none, and so does one saved before the record was
-    # persisted — has nothing to draw and no sentence about it.
+    # The fourth plot, where the run kept a record of its trials with their
+    # displacements: every trial's maximum displacement against its factor. A run
+    # that kept no trials — a displacement catastrophe run keeps none, and so does
+    # one saved before the record was persisted, or before trials carried their
+    # displacement — has nothing to draw and no sentence about it.
     search = _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress)
     if search is not None:
         sub.blocks.append(search[0])
@@ -8999,45 +9078,113 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
 
 
 def _fem_search_drawn(bundle, opts):
-    """Will this run's block carry the search figure? The option, and whether the
-    run kept trials to draw — the one question, asked by the builder and by
-    :func:`planned_figures`, so the count and the build cannot disagree."""
+    """Will this run's block carry the displacement-vs-F figure? The option, and
+    whether the run kept trials with displacements to draw — the one question,
+    asked by the builder and by :func:`planned_figures`, so the count and the
+    build cannot disagree."""
     if not opts["fem_convergence_figure"]:
         return False
     if str(bundle.get("analysis")) != "ssrm":
         return False
     try:
-        from .plot_fem import ssrm_has_convergence_history
-        return ssrm_has_convergence_history(ssrm_record(bundle))
+        from .plot_fem import ssrm_curve_unavailable
+        return ssrm_curve_unavailable(ssrm_record(bundle)) is None
     except Exception:
         return False
 
 
 def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
-    """``(sentence, figure)`` for the search that reached the factor of safety, or
-    ``None``."""
+    """``(sentence, figure)`` for the displacement of every trial against its
+    strength reduction factor, or ``None``."""
     if not _fem_search_drawn(bundle, opts):
         return None
-    from .plot_fem import plot_ssrm_convergence, ssrm_trials
+    from .plot_fem import plot_ssrm_curve, ssrm_curve_points
     record = ssrm_record(bundle)
-    path = os.path.join(figure_dir, f"fem_{tag}_search.png")
+    fem_data = bundle.get("fem_data") or {}
+    path = os.path.join(figure_dir, f"fem_{tag}_ssrm_curve.png")
+    caption, shows = next((c, s) for p, c, s in FEM_PANELS if p == "ssrm_curve")
 
     def draw(fig):
-        plot_ssrm_convergence(record, fig=fig, show_title=False)
+        ax = fig.add_subplot(111)
+        plot_ssrm_curve(ax, record, fem_data=fem_data, show_title=False)
+        fig.tight_layout()
 
     if progress:
-        progress("the strength reduction search")
+        progress(f"the {caption.lower()} plot")
     if not _render(draw, path, opts):
         return None
-    figure = Figure(path, "Strength reduction search", counter.next_figure(),
-                    source=f"fem {tag} search")
+    figure = Figure(path, f"{caption} — strength reduction analysis",
+                    counter.next_figure(), source=f"fem {tag} ssrm_curve")
     where, links = cite("Figure", figure.number)
-    trials = len(ssrm_trials(record))
-    return (Prose(
-        f"The strength reduction search is shown in {where}. It plots each of "
-        f"the {trials} trials at its own reduction factor, marked by whether "
-        f"the section stood under that factor, with the bracket that remained "
-        f"after each trial.", links=links), figure)
+    points = ssrm_curve_points(record)
+    open_ = any(not p["stood"] for p in points)
+    said = (f"{where} shows {shows}, for each of the {len(points)} trials the "
+            f"search solved. The line joins the trials in which the slope reached "
+            f"equilibrium"
+            + ("; an open marker is a trial that was stopped before it did, drawn "
+               "where it was when it was stopped, still moving" if open_ else "")
+            + ".")
+    interval = record.get("final_interval")
+    if record.get("fs_is_lower_bound") and interval:
+        # The ruled line is the lower bound; say what it is and why.
+        said += (f" The dashed line marks the lower bound on the factor of "
+                 f"safety, F = {float(interval[0]):.4f}, the highest strength at "
+                 f"which the slope came to rest. The trial above it, at "
+                 f"F = {float(interval[1]):.4f}, ended undecided, so the search "
+                 f"found no failure up to that strength.")
+    cycled = _standing_edge_cycled(record)
+    if cycled is not None:
+        said += " " + cycled
+    limited = _failing_edge_on_budget(record)
+    if limited is not None:
+        F, iterations = limited
+        said += (f" At F = {F:.3f}, the top of the bracket, the trial hit the "
+                 f"{iterations:,}-iteration limit while the slope was still moving "
+                 f"slowly. The factor of safety depends on the iteration limit "
+                 f"here.")
+    return Prose(said, links=links), figure
+
+
+def _standing_edge_cycled(record):
+    """The contact-cycle verdict of the standing bracket edge, as the sentence
+    :func:`xslope.fem.contact_cycle_sentence` gives it, when that trial stood on
+    the contact-cycle reading (see ``xslope.fem.JOINT_CYCLE_ON``); else ``None``.
+    The run log and :func:`xslope.fem.ssrm_run_summary` give the same words."""
+    interval = record.get("final_interval")
+    if not interval:
+        return None
+    from .fem import _edge_trial, _stop_reading, contact_cycle_sentence
+    trial = _edge_trial([t for t in (record.get("trials") or [])
+                         if isinstance(t, dict)], float(interval[0]), True)
+    reading = None if trial is None else _stop_reading(trial, "contact_cycle")
+    if reading is None:
+        return None
+    return contact_cycle_sentence(reading, float(trial["F"]))
+
+
+def _failing_edge_on_budget(record):
+    """``(F, iterations)`` for a run whose failing bracket edge is a trial the
+    iteration limit stopped while the slope was still moving slowly, else
+    ``None`` — the reading
+    :func:`xslope.fem.ssrm_run_summary` gives the same trial."""
+    interval = record.get("final_interval")
+    if not interval:
+        return None
+    from .fem import _HYBRID_GROWTH_MIN, _edge_trial
+    trial = _edge_trial([t for t in (record.get("trials") or [])
+                         if isinstance(t, dict)], float(interval[1]), False)
+    if trial is None or trial.get("exit_reason") in (
+            "diverging", "disp_limit", "displacement_limit", "steady_slip",
+            "nonfinite", "yield_gate", "inconclusive"):
+        return None
+    # A trial still moving fast when the iteration limit stopped it was failing;
+    # only one still moving slowly leaves the answer depending on the limit.
+    if trial.get("verdict") in ("FAILED", "STABLE_STUCK", "JOINT_SETTLED"):
+        return None
+    growth = _num(trial.get("growth"))
+    if growth is None or growth <= _HYBRID_GROWTH_MIN:
+        return None
+    return float(trial["F"]), int(trial.get("iterations") or 0)
 
 
 #: What each failure criterion decides, in one sentence, keyed by the value
@@ -9097,8 +9244,8 @@ SSRM_CATASTROPHE = (
     "that displacement jumps hardest, and that interval is halved until it is "
     "{narrower}. The factor of safety is the midpoint of that final "
     "interval{bracket}. What locates it is the jump in displacement across the "
-    "interval, not a trial that failed to reach equilibrium: both ends of the "
-    "interval may have reached one.")
+    "interval. It is not located by a trial that failed to reach equilibrium: both "
+    "ends of the interval may have reached one.")
 
 #: The opening of the procedure paragraph: the method named in full and defined,
 #: which is true of every criterion. A reader who has not met the method before
@@ -9131,7 +9278,8 @@ FEM_MODEL_LEADS = {True: "Each trial is solved by the finite element method.",
 #: itself. The keys are :func:`xslope.fem.ssrm_run_record`'s, which is what a
 #: saved run's meta sidecar carries and what a live run hands over on its bundle.
 SSRM_RECORD_KEYS = ("trials", "FS", "tolerance", "final_interval",
-                    "failure_criterion", "method", "ssr_zones", "ssr_exclude")
+                    "failure_criterion", "method", "ssr_zones", "ssr_exclude",
+                    "fs_is_lower_bound")
 
 
 def ssrm_record(bundle):
@@ -9679,7 +9827,7 @@ def planned_figures(slope_data, solutions, opts):
             # subsection draws from, so a run drawn twice is counted twice and one
             # whose second state fell back onto the first is counted once.
             if opts["fem_figure"]:
-                n += len(FEM_PANELS) * len(_fem_states(bundle, opts))
+                n += len(FEM_FIELD_PANELS) * len(_fem_states(bundle, opts))
             n += 1 if _fem_search_drawn(bundle, opts) else 0
             state = _fem_primary_state(bundle, opts)
             for kind, spec in DETAIL_KINDS.items():

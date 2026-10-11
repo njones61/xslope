@@ -22,18 +22,18 @@ whenever XSLOPE changes.
 
 Every comparison the suite runs is declared by a test tag on the page that
 publishes it, so the corpus counts itself: `python3 tools/count_verification_cases.py`
-prints how many tags, locked comparisons, locked values and distinct models
-these pages currently hold, broken down by source.
+prints how many tags, comparisons, values and distinct models these pages
+currently hold, broken down by source.
 
-A locked factor of safety is **proved** once, by the strength-reduction
-bisection that cut it, and **checked** afterwards. The two are not the same
-work: a bisection is nine solves rediscovering a number nobody has moved, while
-the pair of trials it closed on — the highest strength the slope stood at and
-the lowest it failed at — is what the lock is, and re-solving those two says
-whether it still reproduces. Rows whose tag carries that pair are checked in two
+A strength-reduction factor of safety is **proved** once, by the bisection
+that cut it, and **checked** afterwards. The two are not the same work: a
+bisection is nine solves rediscovering a number nobody has moved, while the pair
+of trials it closed on — the highest strength the slope stood at and the lowest
+it failed at — is what the factor rests on, and re-solving those two says whether
+it still reproduces. Rows whose tag carries that pair are checked in two
 solves; the rest are re-bisected. The heaviest rows of all, where one model is
 hours of iterations, are marked for the release gate and run there.
-`python run_tests.py --gate` is that gate: every row, every lock re-proved.
+`python run_tests.py --gate` is that gate: every row, every factor re-proved.
 
 ---
 
@@ -46,6 +46,7 @@ hours of iterations, are marked for the release gate and run there.
 | [Rocscience Slide2 Corpus](rocscience.md) | The 111-problem Slide2 verification manual, problem by problem |
 | [Rocscience Groundwater Corpus](rocscience_groundwater.md) | The 21-problem Slide2 groundwater (FE seepage) verification manual, problem by problem |
 | [Rocscience RS2 (SSRM) Corpus](rs2.md) | The RS2 shear-strength-reduction manual, Parts I–IV — the corpus's FEM/SSRM backbone |
+| [Rocscience RS2 Joint Corpus](rs2_joints.md) | The 23-problem RS2 joint verification manual: jointed rock slopes and the joint's own law, problem by problem |
 | [GeoStudio (SLOPE/W) Corpus](geostudio.md) | The 47-problem SLOPE/W verification manual, cross-referenced |
 | [Published Problems](published.md) | Worked hand calculations from design manuals and the literature, table by table |
 
@@ -60,10 +61,9 @@ Every corpus page's summary table carries a match dot per problem.
 | 🟢 | within 3% of the vendor and/or reference figure |
 | 🟡 | 3–6% |
 | 🔴 | more than 6% |
-| 🟣 | in progress |
-| <span class="nodata">⊘</span> | insufficient data or out of scope |
+| <span class="nodata">⊘</span> | one of the [status terms](#status-terms) in place of a dot |
 
-The dot scores the **match quality of what is locked**, not how much of a problem is built: a
+The dot scores the **match quality of what is built**, not how much of a problem is built: a
 partly built problem is scored on the stages that are built, and the partial or blocked detail is
 in the row text. **Only same-method pairings derive a dot.** Most rows here are strength-reduction
 rows, and their pairing is XSLOPE's SSRM against RS2's own SSR column — the same method under two
@@ -80,7 +80,7 @@ printed or figure resolution counts as a match. The problem's *published* answer
 referee/consensus value, or the source author's own factor — is a reference authority in its own
 right whatever engine produced it, as is a closed form, which governs only where XSLOPE is itself
 within band of it. Where a row has more than one valid pairing the dot takes the **best of them**;
-where a row locks several cases, the worst locked case sets it. These conventions apply to every
+where a row scores several cases, the worst scored case sets it. These conventions apply to every
 summary table on this page.
 
 **How the tables show it.** Every valid pairing carries its difference inline, in parentheses,
@@ -101,18 +101,17 @@ Ueta's Bishop, Fredlund & Krahn's four methods).
 
 ## Status terms {#status-terms}
 
-Every corpus page's summary table carries one of these in its Notes column where a
-row is not fully built and verified:
+Every row on a corpus page's summary table carries exactly one of these:
 
-- *covered* — the same problem is built under another corpus page, and the row links there;
-- *partial* — some cases are built, and the row names what remains;
-- *planned* — reachable with today's capability and source data, not yet built;
-- *blocked* — cannot be built today, and the row names what is missing (source data or a capability);
-- *no lock possible* — the source publishes no reproducible numeric target;
-- *not supported* — a deliberate scope exclusion.
+- **a match dot** — built, checked, and how close it lands on its referee: 🟢 within 3%, 🟡 3–6%, 🔴 more than 6%;
+- *unconfirmed* — a number was found but the run did not settle it; the row says why in one clause;
+- *planned* — can be built with the program and the source data as they stand, and is not built yet;
+- *blocked* — cannot be built yet; the row names what is missing;
+- *not supported* — left out on purpose;
+- *no reference value* — the source publishes nothing comparable to the run.
 
-A row with a match dot and none of these terms is fully built and verified; a parenthetical
-may narrow it (*(caveat)*, *(3 of 6)*).
+A row with a status term shows <span class="nodata">⊘</span> in place of a dot. A row whose
+problem is built on another corpus page reads *covered* and links there.
 
 ---
 

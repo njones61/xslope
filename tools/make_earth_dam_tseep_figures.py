@@ -1,7 +1,7 @@
 """Render the figures for the transient reservoir-drawdown seepage samples
 (docs/seep/samples.md).
 
-One deterministic script serves both transient samples — each is solved once
+One deterministic script serves the Johnson transient sample — it is solved once
 (serial) and rendered into the figures its page carries, in docs/seep/images/:
 
   <sample>_flownet.png   The time-stamped transient series: a handful of panels
@@ -41,7 +41,7 @@ The flow-net panels are rendered one-per-figure through the unchanged
 losslessly with Pillow. Deterministic: same mesh, same solve, same frames.
 
 Run from the repo root:
-  PYTHONPATH=. python3 tools/make_earth_dam_tseep_figures.py            # both
+  PYTHONPATH=. python3 tools/make_earth_dam_tseep_figures.py            # Johnson
   PYTHONPATH=. python3 tools/make_earth_dam_tseep_figures.py johnson    # one
 """
 
@@ -79,18 +79,6 @@ IMG = os.path.join(REPO_ROOT, "docs", "seep", "images")
 # panels       (time, label) pairs to stack in the flow-net series figure.
 # panel_size   per-panel figsize (in), sized to the domain aspect.
 SAMPLES = {
-    "earth_dam": dict(
-        xlsx="xslope_earth_dam_tseep.xlsx",
-        stem="earth_dam_tseep",
-        target=110.0 / 64.0,
-        panel_size=(8.6, 2.55),
-        panels=[(0, "full pool"), (15, "early drawdown"), (30, "mid drawdown"),
-                (47, "end of drawdown (max lag)"), (120, "recovery"),
-                (360, "quasi-equilibrium")],
-        # SEEP-3 builds this model input by input, so the sample entry carries
-        # the solved series alone and no inputs panel of its own.
-        inputs=False,
-    ),
     "johnson": dict(
         xlsx="xslope_johnson_res_tseep.xlsx",
         stem="johnson_res_tseep",

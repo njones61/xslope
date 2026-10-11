@@ -128,6 +128,11 @@ MUTATIONS = [
     # heading resolved that way is checked like any other, not left alone.
     ("rs2", "dots", "D3 dot changed on a multi-row section",
      "### \U0001F7E2 RS2-39/41/43:", "### \U0001F534 RS2-39/41/43:"),
+    # A ⊘ row carries one of the status terms index.md#status-terms defines; a
+    # retired one ("reported, no lock") in its place must fail.
+    ("rs2_joints", "dots", "D4 retired status term on a nodata row",
+     "*unconfirmed* \u2014 the answer moves with the mesh",
+     "*reported, no lock* \u2014 the answer moves with the mesh"),
 
     # A caption claiming all four panels of a composite on a figure that is a
     # single axes.  M14 runs the other way (a four-panel figure captioned as
@@ -300,6 +305,10 @@ VOICE_MUTATIONS = [
      "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}",
      "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}\n\n"
      "Those factors are withdrawn rather than restated.\n"),
+    ("seep", "voice", "V5 test vocabulary in prose",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}\n\n"
+     "The discharge is locked at four decimals.\n"),
 ]
 
 #: Capability negations.  C1 is the sentence the check was written for: the
@@ -308,12 +317,13 @@ VOICE_MUTATIONS = [
 #: `fem.py`'s `line_loads` were grepped.  C2 plants a fresh absence nobody has
 #: entered on the ABSENT list.  Both must be caught; `NEGATIVE`'s N6 runs the
 #: other way, with a sentence citing a listed absence, and must pass.
-#: The anchor all three hang on: one sentence of the terminations section, which
+#: The anchor all three hang on: one sentence of the page's methodology, which
 #: every row of the corpus is read against and which no row's own result can
 #: move. A fixture anchored in a row's text goes stale the moment that row is
 #: re-cut, which is how C1, C2 and N6 came to be anchored on text the page no
-#: longer carried.
-CAP_ANCHOR = "An end already on another line is left exactly where it is."
+#: longer carried; the terminations section that held it next moved to
+#: docs/fem/joints.md, which is why it is a methodology sentence now.
+CAP_ANCHOR = "Each row shows the recomputed value beside the one its source prints."
 
 CAPABILITY_MUTATIONS = [
     ("rs2_joints", "capabilities", "C1 the line-load claim, restored",
@@ -335,8 +345,8 @@ NEGATIVE = [
     # grepped before writing it.
     ("rs2_joints", "capabilities", "N6 a sentence citing a listed absence",
      CAP_ANCHOR,
-     CAP_ANCHOR + " XSLOPE has no staged construction, so a model built in two "
-     "stages is out of reach."),
+     CAP_ANCHOR + " XSLOPE has no staged construction: staged excavation is "
+     "outside a slope program's scope."),
     ("rocscience_groundwater", "tags",
      "N1 a list element reprinted at the tag's own precision",
      "read 6.35 / 6.55", "read 6.346 / 6.55"),
@@ -359,15 +369,20 @@ NEGATIVE = [
     # it also exercises the narrowing that picks the quad8 lock out of the four
     # the section carries.
     ("ssrm", "tags", "N5 a correct restatement in a sentence of its own",
-     "*The dot is scored on the first row.",
+     "*Example 1, without the foundation, reads",
      "XSLOPE's SSRM on the same quad8 mesh reads 1.34 there too.\n\n"
-     "*The dot is scored on the first row."),
+     "*Example 1, without the foundation, reads"),
     # M5's control: the same planted table with the delta its authority column
     # implies, (0.781 − 0.81) / 0.81 = −3.6%.  Without this, M5 would be
     # satisfied by the check finding no pair at all rather than by the
     # authority-column pairing reading the wrong one.
     ("rs2", "deltas", "N4 authority-column table, delta correct",
      AUTH_HEAD, AUTH_HEAD + AUTH_TABLE.format("−3.6")),
+    # "block" and "blocked" are not "lock": the voice ban matches the whole word.
+    ("seep", "voice", "N7 blocked is not lock",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}",
+     "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}\n\n"
+     "No wall blocks the flow, and no boundary is blocked.\n"),
 ]
 
 #: Exemptions planted to prove that an exemption which never fires is itself a
@@ -551,6 +566,23 @@ CAPTURE_MUTATIONS = [
       "capture_truncated_at": 1, "capture_truncated_kind": "runaway_jump"}),
     ("capture moving less than the state it left",
      {"max_displacement": 1.6961024750084593e-05}),
+    # The distance fence (xslope.fem._CAPTURE_DISTANCE_FRAC) is a stop like the
+    # others: one that fires inside the first sweep has drawn nothing, and the
+    # iteration floor refuses it whatever the stop is called.
+    ("distance stop inside the first sweep",
+     {"iterations": 40, "converged": False, "capture_truncated": True,
+      "capture_truncated_at": 40, "capture_truncated_kind": "distance",
+      "capture_fence": 28.8}),
+]
+
+#: Readings planted into the same sound row that must still be ACCEPTED: a capture
+#: the distance fence stopped once the mechanism had run is the at-failure state,
+#: and it clears the iteration floor and moves more than the standing field.
+CAPTURE_SOUND = [
+    ("distance stop past the floor (control)",
+     {"iterations": 345, "converged": False, "capture_truncated": True,
+      "capture_truncated_at": 345, "capture_truncated_kind": "distance",
+      "capture_fence": 28.8}),
 ]
 
 #: A sound committed capture the mutations are planted into — a jointed row, so
@@ -569,7 +601,8 @@ def _capture_fixtures(fails):
     from . import captures
     src = os.path.join(certify.REPO, CAPTURE_STEM)
     total = 0
-    for name, planted in [("sound capture (control)", None)] + CAPTURE_MUTATIONS:
+    sound = [("sound capture (control)", None)] + CAPTURE_SOUND
+    for name, planted in sound + CAPTURE_MUTATIONS:
         total += 1
         tmp = tempfile.mkdtemp()
         try:
@@ -584,7 +617,7 @@ def _capture_fixtures(fails):
             why = captures.scan_stem(stem)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-        if planted is None:
+        if (name, planted) in sound:
             print(f"  {'FLAGGED' if why else 'PASSED '} {name} (captures)")
             if why:
                 fails.append(name + f" (refused a sound capture: {why})")

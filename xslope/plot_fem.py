@@ -19,13 +19,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import Polygon
+from matplotlib.patches import Patch, Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
 from .plot import (adaptive_colorbar_ticks, declared_unit_labels,
-                   JOINT_COLOR, JOINT_LINEWIDTH, JOINT_TICK_MAX_LINES,
-                   JOINT_HALO_COLOR as _JOINT_HALO_COLOR,
-                   JOINT_HALO_LINEWIDTH as _JOINT_HALO_PT)
+                   JOINT_COLOR, JOINT_LINEWIDTH, JOINT_TICK_MAX_LINES)
 
 
 def _fem_cbar_label(fem_data, base, unit_key):
@@ -55,12 +53,19 @@ _DEFORMED_GRID_UNDER_JOINTS = '0.62'
 _DEFORMED_BOUNDARY_COLOR = '#22262b'
 _DEFORMED_BOUNDARY_PT = 1.4
 
-#: The tints the blocks of a jointed mesh are filled with, cycling by block. Very
-#: light and few: the tint says "this much material moves as one body", and three
-#: of them are enough for neighbors to differ while the element edges and the
-#: field stay readable through the fill.
-_BLOCK_TINTS = ('#c8d8ea', '#ecd9c0', '#cfe3c6')
-_BLOCK_TINT_ALPHA = 0.45
+#: The deformed mesh of a jointed model is filled with a faint tint
+#: (:func:`_draw_block_tints`), at ``_BLOCK_TINT_ALPHA`` so the element edges and
+#: the field stay readable through the fill. By default (``color_blocks=False``)
+#: the tint is one per MATERIAL zone, in the colors the inputs and mesh plots
+#: give the zones, and the blocks are read from the joint faces drawn between
+#: them. With ``color_blocks=True`` each block takes its own tint from
+#: ``_BLOCK_TINTS`` at ``_BLOCK_TINT_ALPHA_BY_BLOCK``, assigned so that two
+#: blocks sharing a joint face never take the same one
+#: (:func:`_block_tint_indices`); the fourth tint is used only where a block's
+#: neighbors already hold the first three.
+_BLOCK_TINTS = ('#c8d8ea', '#ecd9c0', '#cfe3c6', '#e3d3e6')
+_BLOCK_TINT_ALPHA = 0.22
+_BLOCK_TINT_ALPHA_BY_BLOCK = 0.45
 
 # Median rendered element edge (device px) below which two full interleaved grids
 # (original + deformed) tangle; below it the original mesh collapses to its domain
@@ -78,10 +83,13 @@ CAPTURE_FALLBACK_TITLE = "last converged state — at-failure capture not availa
 def _fallback_clause(solution, title):
     """``title``, naming the state a failure panel is actually drawing.
 
-    Two cases, and a panel drawing a capture that ran to its own ceiling gets
-    neither. A capture the finite guard STOPPED is the mechanism — the state the
-    section was in a few iterations into coming apart — and the clause names the
-    iteration it was taken at, so the reader knows the field is a moment and not
+    Two cases, and a panel drawing a capture that ran to its own ceiling, or that
+    the distance fence stopped (see ``xslope.fem._CAPTURE_DISTANCE_FRAC``), gets
+    neither: a fenced capture is the at-failure state the panel's own title
+    names, taken at a set distance instead of a set iteration count. A capture
+    the finite guard STOPPED is the mechanism — the state the section was in a
+    few iterations into coming apart — and the clause names the iteration it
+    was taken at, so the reader knows the field is a moment and not
     an equilibrium. A panel standing on the converged field because there was no
     capture at all says that instead.
 
@@ -94,7 +102,8 @@ def _fallback_clause(solution, title):
     """
     if solution.get("_capture_fallback", False):
         return f"{title}\n{CAPTURE_FALLBACK_TITLE}"
-    if solution.get("capture_truncated"):
+    if (solution.get("capture_truncated")
+            and solution.get("capture_truncated_kind") != "distance"):
         at = solution.get("capture_truncated_at")
         # Every stop but one is the section running away; the exception is the
         # arithmetic giving out, and it is the only one named differently.
@@ -107,28 +116,59 @@ def _fallback_clause(solution, title):
     return title
 
 
-def _fs_title(base, F, fs=None, at_failure=False):
+#: What a panel drawing the undecided top trial of a run that found no failure
+#: says in place of "at Failure": the field is the last trial the search solved,
+#: and the search could not decide it.
+UNDECIDED_TRIAL_TITLE = "Last trial (undecided)"
+
+
+def _failure_words(solution, fs_follows=False):
+    """The state words a panel title carries for the field it draws: " at
+    Failure" for the captured at-failure field, the undecided-trial words for
+    the top trial of a run that found no failure (where ``fs_follows`` is False;
+    :func:`_fs_title` places them before the factor of safety otherwise), and
+    nothing for a converged field."""
+    if not solution.get("_at_failure", False):
+        return ""
+    if solution.get("_undecided", False):
+        return "" if fs_follows else f"  {UNDECIDED_TRIAL_TITLE}"
+    return " at Failure"
+
+
+def _fs_title(base, F, fs=None, at_failure=False, lower=False, undecided=False):
     """Result-panel title that keeps the SSRM factor of safety and the rendered
     viscoplastic state unambiguous.
 
-    Normal (converged) panels are rendered at the LAST CONVERGED strength-reduction
-    factor (``solution['F']``); the reported factor of safety is the SSRM bracket
-    midpoint (``result['FS']``), which at a wide tolerance can round differently. When
-    both are known and differ at two-decimal display, the title names both; otherwise
-    it keeps the simple ``F = X.XX`` form (or just ``base`` when no F is available).
+    Normal SSRM panels draw the last-converged field. When ``fs`` is supplied,
+    they read "<base> at Last Converged (Scale = Nx)  FS = X.XXX", with the
+    state before any scale and the factor of safety once, to three decimals.
+    The field's trial factor ``F`` is not printed alongside it. Without ``fs``,
+    standalone trial panels retain "F = X.XXX" (or just ``base`` without F).
 
     ``at_failure`` marks a panel rendering the UNCONVERGED at-failure field (captured
     a margin beyond critical). It leads with the factor of safety and stops there —
     "at Failure" already discloses the field is the unconverged trial state, so a
     parenthetical naming the trial F would only repeat that disclosure as noise.
+
+    ``lower`` marks a run that found no failure, whose ``fs`` is a lower bound:
+    every panel then reads "FS ≥ X" (two decimals, cut down), and the panel
+    drawing the undecided top trial (``undecided``) reads
+    "Last trial (undecided)  FS ≥ X".
     """
+    if lower and fs is not None:
+        from .fem import ssrm_fs_text
+        state = f"  {UNDECIDED_TRIAL_TITLE}" if (at_failure and undecided) else ""
+        return f"{base}{state}  {ssrm_fs_text(fs, True)}"
     if at_failure and fs is not None:
-        return f"{base}  FS = {fs:.2f}"
+        return f"{base}  FS = {fs:.3f}"
+    if fs is not None:
+        first, newline, rest = base.partition("\n")
+        label, scale, suffix = first.partition(" (Scale =")
+        first = f"{label} at Last Converged{scale}{suffix}"
+        return f"{first}{newline}{rest}  FS = {fs:.3f}"
     if F is None:
         return base
-    if fs is None or f"{fs:.2f}" == f"{F:.2f}":
-        return f"{base}  F={F:.2f}"
-    return f"{base}  FS = {fs:.2f} (rendered at last converged F = {F:.2f})"
+    return f"{base}  F = {F:.3f}"
 
 
 #: What the viscoplastic maximum shear strain field is called — the name the
@@ -167,6 +207,17 @@ _DEFORM_MAX_FRACTION = 0.04
 _DEFORM_NEGLIGIBLE_FRACTION = 1e-8
 
 
+def format_deform_scale(scale):
+    """The multiplier as the plot title and the report print it: whole numbers
+    from 10 up, one decimal from 1 to 10, two significant digits below 1."""
+    scale = float(scale)
+    if round(scale, 1) >= 10:
+        return f"{scale:.0f}"
+    if scale >= 1:
+        return f"{scale:.1f}"
+    return f"{scale:.2g}"
+
+
 def deformation_scale(fem_data, field, deform_percent=15):
     """The exaggeration the deformed-mesh panel is drawn at.
 
@@ -180,6 +231,10 @@ def deformation_scale(fem_data, field, deform_percent=15):
     ``field`` is the solve_fem field the panel renders (the at-failure snapshot
     where one is being drawn), and the scale is measured on its viscoplastic
     displacement where the elastic part is known, matching plot_deformed_mesh.
+
+    The multiplier is not floored at 1: a field that has already moved further
+    than ``deform_percent`` of the mesh height (an at-failure field) gets a
+    multiplier below 1, so the percentage still sets the drawn size.
     """
     nodes = fem_data["nodes"]
     max_disp = float(np.max(displacement_magnitude(fem_data, field)))
@@ -194,8 +249,8 @@ def deformation_scale(fem_data, field, deform_percent=15):
     # tall one, and a mechanism of a few microns cannot be exaggerated into a
     # shape that is no longer the slope.
     extent = _section_extent(fem_data)
-    return max(1.0, min(mesh_height * deform_percent / 100,
-                        extent * _DEFORM_MAX_FRACTION) / max_disp)
+    return min(mesh_height * deform_percent / 100,
+               extent * _DEFORM_MAX_FRACTION) / max_disp
 
 
 def _section_extent(fem_data):
@@ -598,34 +653,82 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
                           edgecolor="none", label=label)
         )
 
-    # Plot 1D elements (reinforcement truss + pile beam) using LineCollection
+    # Plot 1D elements (reinforcement truss + pile beam + joint trace) using
+    # LineCollection. A bar-less joint line — a row of the joints sheet — has 1D
+    # elements of its own but no member between its faces, so it is drawn as the
+    # joint it is rather than counted as reinforcement. The split itself cannot
+    # show on a mesh plot (the node copies stand at one point), so this trace is
+    # the only thing that tells a jointed line from a line the mesh is not split
+    # along, which is what docs/fem/joints.md says a mesh plot does.
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
     pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(elements_1d), dtype=bool))
+    barless_mask = _barless_mask(fem_data, len(elements_1d))
     n_reinf_plotted = 0
     n_pile_plotted = 0
+    n_joint_plotted = 0
+    # A reinforcement line whose Joint column reads yes is split along like a
+    # joint line, and carries two interface elements per span (soil above
+    # against the bar, bar against soil below). Its bars are drawn in the
+    # reinforcement style with the joint ticks the inputs plot gives a jointed
+    # sheet, so the mesh plot tells a jointed sheet from a bonded one; and the
+    # title's joint count is the interface-element count the mesh dialog
+    # reports, which includes them, not just the bar-less joint lines.
+    jd = fem_data.get("joint_data") or {}
+    jointed_line_ids = set(int(v) for v in (jd.get("jointed_lines") or []))
+    line_of_1d = np.asarray(fem_data.get("element_materials_1d",
+                                         np.zeros(len(elements_1d))), dtype=int)
+    n_joint_total = int(jd.get("n", 0) or 0)
+    jointed_reinf_segs = []
     if len(elements_1d) > 0:
         reinf_segs = []
         pile_segs = []
+        joint_segs = []
         for elem_idx in range(len(elements_1d)):
             elem_nodes_1d = elements_1d[elem_idx]
             seg = [nodes[elem_nodes_1d[0]], nodes[elem_nodes_1d[1]]]
-            if pile_elem_mask[elem_idx]:
+            if barless_mask[elem_idx]:
+                joint_segs.append(seg)
+                n_joint_plotted += 1
+            elif pile_elem_mask[elem_idx]:
                 pile_segs.append(seg)
                 n_pile_plotted += 1
             else:
                 reinf_segs.append(seg)
                 n_reinf_plotted += 1
+                if (elem_idx < len(line_of_1d)
+                        and int(line_of_1d[elem_idx]) in jointed_line_ids):
+                    jointed_reinf_segs.append(seg)
         if reinf_segs:
             lc = LineCollection(reinf_segs, colors='red', linewidths=2.5, zorder=5, gid='REINFORCEMENT')
             ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='red', lw=2.5, label=f'Reinforcement ({n_reinf_plotted} elements)')
             )
+        if jointed_reinf_segs:
+            from .plot import draw_joint_ticks
+            span = float(np.ptp(nodes[:, 0])) if len(nodes) else 1.0
+            for seg in jointed_reinf_segs:
+                draw_joint_ticks(ax, [seg[0][0], seg[1][0]], [seg[0][1], seg[1][1]],
+                                 span, 'red', alpha=0.9, zorder=5)
+            n_sheet_joint = n_joint_total - n_joint_plotted
+            legend_handles.append(
+                plt.Line2D([0], [0], color='red', lw=2.5, marker='|', markersize=7,
+                           markeredgewidth=1.0,
+                           label=f'Jointed reinforcement ({n_sheet_joint} joint elements)')
+            )
         if pile_segs:
             lc = LineCollection(pile_segs, colors='green', linewidths=3.5, zorder=5, gid='PILES')
             ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='green', lw=3.5, label=f'Pile ({n_pile_plotted} elements)')
+            )
+        if joint_segs:
+            lc = LineCollection(joint_segs, colors=JOINT_COLOR,
+                                linewidths=JOINT_LINEWIDTH, zorder=5, gid='JOINTS')
+            ax.add_collection(lc)
+            legend_handles.append(
+                plt.Line2D([0], [0], color=JOINT_COLOR, lw=JOINT_LINEWIDTH,
+                           label=f'Joint ({n_joint_plotted} elements)')
             )
 
     # Plot boundary conditions
@@ -677,6 +780,8 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
         parts.append(f"{n_reinf_plotted} reinforcement")
     if n_pile_plotted > 0:
         parts.append(f"{n_pile_plotted} pile")
+    if max(n_joint_total, n_joint_plotted) > 0:
+        parts.append(f"{max(n_joint_total, n_joint_plotted)} joint")
     title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
     
     if show_title:
@@ -826,12 +931,14 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
+                    block_grid=None, joint_linewidth=None, color_blocks=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
                     show_original='outline', deformed_color='k', deform_scale=None,
                     field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis',
-                    vmin=None, vmax=None, vector_max=None, show_joints=True):
+                    vmin=None, vmax=None, vector_max=None, show_joints=None,
+                    ssrm_record=None, fs_is_lower_bound=None):
     """
     Plot FEM results with various visualization options.
 
@@ -841,16 +948,29 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         plot_type: Comma-separated plot types. Valid types:
             'deformation' - deformed mesh overlay
             'displace_mag' - displacement magnitude contours
-            'displace_vector' - displacement vectors at corner nodes; on a model
-                whose field carries joint state this panel becomes the scaled
-                deformed mesh with the joint faces drawn, because a jointed
-                model's mechanism is blocks moving as bodies on their joints and
-                an arrow field sampled at nodes does not show that
+            'displace_vector' - displacement vectors at corner nodes, on a
+                jointed model as on any other; a jointed model's blocks are
+                drawn on the 'deformation' panel (``show_joints``)
             'stress' - von Mises stress contours
             'strain' - equivalent strain contours
             'shear_strain' - viscoplastic max shear strain contours
             'yield' - Mohr-Coulomb yield function contours
+            'ssrm_curve' - the maximum displacement of every strength reduction
+                trial against its F, drawn from ``ssrm_record`` on its own axes
+                (no section, no colorbar); see :func:`plot_ssrm_curve`
+        ssrm_record: The strength reduction run the 'ssrm_curve' panel is drawn
+            from — :func:`xslope.fem.solve_ssrm`'s result, or the meta sidecar
+            a saved run was written with (:func:`xslope.fem.import_fem_meta`).
+            Asking for the panel without a record that carries at least two
+            trials with a displacement raises ``ValueError`` with the reason.
         deform_percent: Target deformation as percentage of mesh height (default 15).
+        block_grid: On a jointed model's deformation panel, whether the element
+            grid is drawn under the blocks; None follows :func:`block_grid_default`.
+        joint_linewidth: Width in points of the joint faces on that panel; None
+            takes :data:`JOINT_FACE_LINEWIDTH`.
+        color_blocks: On a jointed model's deformation panel, fill each block
+            with its own tint (cycling :data:`_BLOCK_TINTS`) instead of one tint
+            per material zone (the default, False).
         show_mesh: Show mesh lines where the mesh IS the content — the deformation
             panel's original-vs-deformed grid (and the displace_vector panel's edge
             context). It does NOT overlay edges on the filled-field contour panels
@@ -866,7 +986,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         show_reinforcement: Show reinforcement elements
         show_joints: Draw each interface (joint) element's state on the line it
             runs along — intact, slipping or open — with a colorbar for the
-            relative displacement. Inert on a model with no jointed line.
+            relative displacement. None (default) follows the model: on when
+            it has joints, off otherwise. With no joints, the default deformation
+            plot has black mesh lines and no material fill. An explicit boolean
+            retains the caller's display choice.
         figsize: Figure size (width, height)
         label_elements: Show element ID labels at centroids
         plot_nodes: For displace_vector, show dots at node locations
@@ -886,10 +1009,15 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         save_png: Save figure to PNG file
         dpi: Resolution for saved PNG
         fs: Optional SSRM factor of safety (the bracket-midpoint result['FS']). When
-            given and it differs at display rounding from the last-converged F the
-            field was rendered at (solution['F']), the panel titles name both — e.g.
-            "FS = 0.45 (rendered at last converged F = 0.43)". When omitted or equal
-            at two decimals, titles keep the simple "F = X.XX" form.
+            given, converged panel titles read "at Last Converged … FS = X.XXX"
+            and at-failure titles retain "at Failure … FS = X.XXX". The trial
+            factor is not printed alongside FS. When omitted, standalone trial
+            titles retain "F = X.XXX".
+        fs_is_lower_bound: True for a run that found no failure
+            (``result['fs_is_lower_bound']``): ``fs`` is then the lower bound it
+            confirmed, every title reads "FS ≥ X", and ``failure_solution`` is
+            the undecided top trial, titled "Last trial (undecided)" in place of
+            "at Failure". None reads it off ``ssrm_record``.
         failure_solution: Optional at-failure (unconverged) solve_fem field captured by
             solve_ssrm (result['failure_solution']). When given, the deformation and
             displacement-vector panels render it — the runaway rotational mechanism
@@ -905,8 +1033,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             at-failure (unconverged) field, titled "...at Failure  FS = X". 'converged'
             renders every panel from the last-converged ``solution`` instead — the
             deformation panel gets its own auto-scale exaggeration on that field, and
-            every panel keeps the established dual-title convention ("FS = X (rendered
-            at last converged F = Y)"). With no ``failure_solution``, both selections
+            panels carrying FS read "at Last Converged … FS = X.XXX".
+            With no ``failure_solution``, both selections
             are identical (there's only one field to render) — automatic fallback.
         strain_state: Pre-generalization alias for ``field_state`` (it originally
             governed only the filled-contour panels, before the deformation and
@@ -936,11 +1064,18 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     element_types = fem_data["element_types"]
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
 
+    if show_joints is None:
+        show_joints = bool((fem_data.get("joint_data") or {}).get("n"))
+
     # Carry the SSRM factor of safety into the solution the panels see, so titles can
     # name BOTH it and the last-converged F the field was rendered at. Shallow copy:
     # shares the arrays, never mutates the caller's dict (result['last_solution']).
+    if fs_is_lower_bound is None:
+        fs_is_lower_bound = bool((ssrm_record or {}).get("fs_is_lower_bound"))
+    fs_is_lower_bound = bool(fs_is_lower_bound)
     if fs is not None:
-        solution = {**solution, "_ssrm_fs": fs}
+        solution = {**solution, "_ssrm_fs": fs,
+                    "_ssrm_fs_lower": fs_is_lower_bound}
 
     # ``field_state`` is the SINGLE switch governing EVERY result panel — deformation,
     # displace_vector, and the filled-contour panels (displace_mag / stress / strain /
@@ -968,9 +1103,15 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         _fallback = bool(failure_solution.get("capture_failed"))
         failure_field = {**failure_solution,
                          "_at_failure": not _fallback,
-                         "_capture_fallback": _fallback}
+                         "_capture_fallback": _fallback,
+                         # On a run that found no failure the field is the
+                         # undecided top trial, and is titled as that.
+                         "_undecided": (not _fallback and (
+                             fs_is_lower_bound
+                             or bool(failure_solution.get("undecided_trial"))))}
         if fs is not None:
             failure_field["_ssrm_fs"] = fs
+            failure_field["_ssrm_fs_lower"] = fs_is_lower_bound
     else:
         failure_field = solution
 
@@ -987,12 +1128,19 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         plot_types = [plot_type.strip().lower()]
     else:
         plot_types = [pt.strip().lower() for pt in plot_type]
-    valid_types = ['displace_mag', 'displace_vector', 'deformation', 'stress', 'strain', 'shear_strain', 'yield']
+    valid_types = ['displace_mag', 'displace_vector', 'deformation', 'stress', 'strain', 'shear_strain', 'yield',
+                   'ssrm_curve']
     
     # Validate plot types
     for pt in plot_types:
         if pt not in valid_types:
             raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
+    # The displacement curve is drawn from the run's trial record, not from the
+    # field: refuse up front, with the reason, rather than draw an empty axes.
+    if 'ssrm_curve' in plot_types:
+        _why = ssrm_curve_unavailable(ssrm_record)
+        if _why:
+            raise ValueError(_why)
     
     # Auto-calculate deformation scale so max displacement is deform_percent of the mesh
     # height, measured on the field the deformation panel actually renders (the at-
@@ -1027,7 +1175,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # whose internal colorbar we can suppress; any other field type falls back to the
     # legacy inline colorbars so nothing else regresses.
     single = n_plots == 1
-    _deferrable = {'deformation', 'shear_strain', 'displace_vector'}
+    _deferrable = {'deformation', 'shear_strain', 'displace_vector', 'ssrm_curve'}
     defer_cbars = (not single) and all(pt in _deferrable for pt in plot_types)
 
     own_fig = fig is None
@@ -1050,7 +1198,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # and the colorbar matches its height.
         data_w = (x_max - x_min) + 2 * x_margin
         data_h = (y_max - y_min) + 2 * y_margin
-        if data_w > 0:
+        if plot_types[0] == 'ssrm_curve':
+            # A curve, not a section: no data aspect to follow, so the figure's
+            # own proportions, capped at the height asked for.
+            single_height = float(np.clip(0.55 * figsize[0], 2.0, figsize[1]))
+        elif data_w > 0:
             single_height = figsize[0] * (data_h / data_w)
             # Clamp to a sensible range so very flat/steep slopes stay readable
             single_height = float(np.clip(single_height, 2.0, figsize[1]))
@@ -1106,6 +1258,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # (populated only when reinforcement forces are present) so they can be placed
     # beside the field colorbar without collision.
     reinf_cbar_specs = []
+    deform_cbar_specs = []
     # displace_vector's OWN deferred mappable (only set when color_by_magnitude is
     # on) — placed on its own panel below, the same mappable/label-return
     # convention as the shear-strain field above.
@@ -1136,6 +1289,16 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if cbar_shrink is not None:
             cb_shrink = cbar_shrink
 
+        # The displacement curve is not a section: its own axes, its own limits,
+        # no equal aspect and no colorbar.
+        if pt == 'ssrm_curve':
+            _interval = (ssrm_record or {}).get("final_interval")
+            plot_ssrm_curve(ax, ssrm_record, fs=fs, final_interval=_interval,
+                            fem_data=fem_data, show_title=show_title,
+                            show_legend=show_legend,
+                            fs_is_lower_bound=fs_is_lower_bound)
+            continue
+
         # Filled-field contour panels take ``mesh_on_fields`` (opt-in edge overlay,
         # default off) so the fill reads clean; the deformation panel keeps
         # ``show_mesh`` because there the grid IS the content, and displace_vector
@@ -1143,20 +1306,6 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if pt == 'displace_mag':
             plot_displacement_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
-        elif pt == 'displace_vector' and solution_has_joint_state(fem_data, deform_field):
-            # A jointed model's mechanism is block motion: wedges that translate
-            # and rotate as bodies, with every bit of the movement taken up AT
-            # the joints. An arrow field samples that at nodes and says nothing
-            # about the joints themselves, so this panel becomes the scaled
-            # deformed mesh with the faces drawn — where a slipped joint is two
-            # lines that have parted, and a toppling column leans.
-            plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
-                             show_original=show_original, deformed_color=deformed_color,
-                             show_reinforcement=show_reinforcement,
-                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
-                             label_elements=label_elements, single_panel=defer_panel_cbar,
-                             at_failure=deform_field.get("_at_failure", False),
-                             joint_faces=True)
         elif pt == 'displace_vector':
             vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
@@ -1166,12 +1315,17 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                                     vector_max=vector_max,
                                     single_panel=defer_panel_cbar)
         elif pt == 'deformation':
-            plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
+            deform_cbar_specs = plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
                              show_original=show_original, deformed_color=deformed_color,
                              show_reinforcement=show_reinforcement,
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
-                             at_failure=deform_field.get("_at_failure", False))
+                             at_failure=deform_field.get("_at_failure", False),
+                             joint_faces=show_joints, block_grid=block_grid,
+                             joint_linewidth=joint_linewidth,
+                             color_blocks=color_blocks) or []
+            if single:
+                reinf_cbar_specs = deform_cbar_specs
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1183,7 +1337,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                 ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                 cmap=cmap, single_panel=defer_panel_cbar, vmin=vmin, vmax=vmax,
-                show_joints=show_joints)
+                show_joints=show_joints, joint_linewidth=joint_linewidth)
             single_cbar_label = SHEAR_STRAIN_LABEL
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
@@ -1215,7 +1369,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # A single-panel deformation view carries its Original/Deformed legend inside
         # the axes too (empty corner above the profile), so Studio matches the stack.
         if plot_types[0] == 'deformation':
-            _place_deform_legend(axes[0], show_legend)
+            # The block look (tints, dark outline, dashed original) carries its
+            # meaning in the drawing and takes no legend, like the blocks panel.
+            _place_deform_legend(axes[0], show_legend and not show_joints)
         try:
             fig.tight_layout()
         except Exception:
@@ -1242,7 +1398,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                        else []) + list(reinf_cbar_specs)
         vector_idx = plot_types.index('displace_vector') if 'displace_vector' in plot_types else None
         vector_specs = [(vector_mappable, vector_cbar_label)] if vector_mappable is not None else []
-        n_slots = max(len(field_specs), len(vector_specs))
+        # The deformation panel's own slip colorbar, when its joints are
+        # colored by slip.
+        deform_idx = plot_types.index('deformation') if 'deformation' in plot_types else None
+        deform_specs = list(deform_cbar_specs)
+        n_slots = max(len(field_specs), len(vector_specs), len(deform_specs))
         field_cbars = []
         vector_cbars = []
         for j, ax_j in enumerate(axes):
@@ -1252,13 +1412,18 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             elif j == vector_idx and vector_specs:
                 padded = vector_specs + [(None, "")] * (n_slots - len(vector_specs))
                 vector_cbars = _place_stacked_cbars(fig, ax_j, padded)
+            elif j == deform_idx and deform_specs:
+                padded = deform_specs + [(None, "")] * (n_slots - len(deform_specs))
+                vector_cbars += _place_stacked_cbars(fig, ax_j, padded)
             elif n_slots:
                 # Match the widest panel's reserved width with invisible slots.
                 _place_stacked_cbars(fig, ax_j, [(None, "")] * n_slots)
         # Original/Deformed legend inside the deformation panel (zero layout height),
         # replacing the old full-width legend band between panels.
         if plot_types[0] == 'deformation':
-            _place_deform_legend(axes[0], show_legend)
+            # The block look (tints, dark outline, dashed original) carries its
+            # meaning in the drawing and takes no legend, like the blocks panel.
+            _place_deform_legend(axes[0], show_legend and not show_joints)
         try:
             # The figure this stack was opened at was sized from an estimated
             # axes width; the colorbar slots just placed are what that estimate
@@ -1278,7 +1443,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # Legacy multi-panel (non-default combos): inline colorbars already drawn;
         # just drop the deformation legend inside its panel.
         if plot_types and plot_types[0] == 'deformation':
-            _place_deform_legend(axes[0], show_legend)
+            # The block look (tints, dark outline, dashed original) carries its
+            # meaning in the drawing and takes no legend, like the blocks panel.
+            _place_deform_legend(axes[0], show_legend and not show_joints)
 
     if save_png:
         fig.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')
@@ -1355,9 +1522,7 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
         _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')
-    title = 'Displacement Magnitude Contours'
-    if solution.get("_at_failure", False):
-        title += ' at Failure'
+    title = 'Displacement Magnitude Contours' + _failure_words(solution)
     ax.set_title(_fallback_clause(solution, title))
 
 
@@ -1654,7 +1819,9 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     # by plot_fem_results): leads with FS; "at Failure" already discloses the state.
     title = _fs_title(_fallback_clause(solution, title), F,
                       solution.get("_ssrm_fs"),
-                      at_failure=solution.get("_at_failure", False))
+                      at_failure=solution.get("_at_failure", False),
+                      lower=solution.get("_ssrm_fs_lower", False),
+                      undecided=solution.get("_undecided", False))
     ax.set_title(title, fontsize=12, pad=15)
 
     return mappable if single_panel else None
@@ -1749,9 +1916,9 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     if show_mesh:
         plot_mesh_lines(ax, fem_data, color='gray', alpha=0.3, linewidth=0.3)
     
-    # Plot reinforcement with force visualization. The joint hairlines go on
-    # first, under the bars they stand beside; they carry no legend entry of
-    # their own — their colorbar is their legend.
+    # Plot reinforcement with force visualization. The joint lines go on
+    # first, under the bars they stand beside; their colorbar carries the
+    # slip and their key names the three states (plot_joint_states).
     plot_joint_states(ax, fem_data, solution)
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_forces(ax, fem_data, solution)
@@ -1761,9 +1928,8 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')
-    title = 'von Mises Stress (Red outline = Yielding/Plastic Elements)'
-    if solution.get("_at_failure", False):
-        title += ' at Failure'
+    title = ('von Mises Stress (Red outline = Yielding/Plastic Elements)'
+             + _failure_words(solution))
     ax.set_title(_fallback_clause(solution, title))
 
 
@@ -1771,7 +1937,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                        show_original='outline', deformed_color='k', show_reinforcement=True,
                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
                        single_panel=False, at_failure=False, show_mesh=None,
-                       joint_faces=False):
+                       joint_faces=False, block_grid=None, joint_linewidth=None,
+                       color_blocks=False):
     """
     Plot deformed mesh overlay on original mesh.
 
@@ -1795,12 +1962,26 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         show_mesh: Legacy boolean alias for ``show_original`` (True→'mesh',
             False→off); prefer ``show_original``. None (default) leaves show_original
             in effect.
+        block_grid: On a jointed model, whether the light-gray element grid is
+            drawn under the blocks. None (default) follows
+            :func:`block_grid_default`; True or False is the user's own choice.
+        joint_linewidth: Width of the joint faces in points; None takes
+            :data:`JOINT_FACE_LINEWIDTH`.
+        color_blocks: With ``joint_faces``, fill each block (a connected piece
+            of the mesh after the joint split, :func:`xslope.mesh.block_components`)
+            with its own tint, cycling :data:`_BLOCK_TINTS`. False (default)
+            fills one tint per material zone.
         joint_faces: Draw the two faces of every joint element over the deformed
             grid, and drop the grid itself to a light gray so they read over it.
             Both copies of each face are drawn, so a joint that has slipped or
             opened shows as two lines that no longer lie on each other — which is
             the whole picture on a jointed model: the blocks move as bodies and
             the motion is AT the joints, not spread through the elements.
+            Where the field measured the joints' state, a closed face is gray
+            at ``joint_linewidth``, a slipping one is on the green slip ramp
+            at the same width, an opened stretch is two thin gray lines with a
+            white gap, the key goes off the section, and the slip colorbar's
+            spec is returned for the caller to place.
     """
     # Legacy alias: an explicit show_mesh bool maps onto the tri-state so older
     # callers keep working (True == the former full-grid-or-outline behavior).
@@ -1862,26 +2043,30 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # joint's own green, the outside of the mesh in a dark line of its own — and
     # the element edges come off entirely once there are enough joints that the
     # grid is all a reader can see.
-    draw_faces = joint_faces and bool((fem_data.get("joint_data") or {}).get("n"))
+    # The same look on a model with no joint: one block, one tint, the grid in
+    # light gray under it and the deformed outline dark against the dashed
+    # original — so a bonded and a jointed run of one section draw alike, and
+    # the only difference on the page is the faces the joints add.
+    block_look = bool(joint_faces)
+    draw_faces = block_look and bool((fem_data.get("joint_data") or {}).get("n"))
+    face_cbar_specs = []
     show_edges = True
-    if draw_faces:
+    if block_look:
         from .mesh import block_boundary_edges, block_components
         comp = block_components(fem_data)
         blocks, exterior = block_boundary_edges(fem_data, comp)
-        n_jlines = len(np.unique(np.asarray(
-            fem_data["joint_data"]["line_id"], dtype=int)))
-        # The same count at which the section drawings drop the joint ticks: past
-        # it the marks are all there is. Here it is the element grid that becomes
-        # that — on a 234-trace network the blocks are a few elements each and the
-        # edges bury the outlines that are the whole reading.
-        show_edges = n_jlines <= JOINT_TICK_MAX_LINES
-        _draw_block_tints(ax, fem_data, nodes_deformed, comp)
+        # The grid's default follows the jointed-line count (see
+        # block_grid_default); an explicit block_grid is the user's override.
+        show_edges = (block_grid_default(fem_data) if block_grid is None
+                      else bool(block_grid))
+        _draw_block_tints(ax, fem_data, nodes_deformed, comp,
+                          per_block=color_blocks)
     if show_edges:
         plot_mesh_lines(ax, fem_data_deformed,
-                        color=_DEFORMED_GRID_UNDER_JOINTS if draw_faces
+                        color=_DEFORMED_GRID_UNDER_JOINTS if block_look
                         else deformed_color,
                         alpha=1.0, linewidth=lw, label='Deformed')
-    if draw_faces:
+    if block_look:
         # The outside of the deformed mesh, as a line of its own: what moved,
         # against the dashed outline of where it was.
         if exterior:
@@ -1890,13 +2075,10 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
                 colors=_DEFORMED_BOUNDARY_COLOR,
                 linewidths=max(lw, floor_pt, _DEFORMED_BOUNDARY_PT), alpha=1.0,
                 zorder=6.4, label='Deformed (outline)'))
-        faces = [e for edges in blocks.values() for e in edges]
-        if faces:
-            ax.add_collection(LineCollection(
-                [nodes_deformed[e, :2] for e in faces],
-                colors=JOINT_COLOR,
-                linewidths=max(lw, floor_pt, JOINT_LINEWIDTH), alpha=1.0,
-                zorder=6.5, label='Joint faces'))
+        if draw_faces:
+            face_cbar_specs = _draw_joint_faces(
+                ax, fem_data, solution, nodes_deformed, blocks,
+                max(floor_pt, float(joint_linewidth or JOINT_FACE_LINEWIDTH)))
 
     # Plot members in both original and deformed configurations. The two
     # configurations are told apart by COLOR, on both kinds of member: the
@@ -1920,7 +2102,13 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # x-axis alignment stays consistent across stacked subplots. Skipped for a
     # single-panel plot (the Studio case), where there's nothing to align to and
     # the invisible colorbar would just steal the right margin.
-    if not single_panel:
+    if not single_panel and face_cbar_specs:
+        # Joints colored by slip carry the slip colorbar, here as on the strain
+        # panel, in the slot the invisible spacer would have taken.
+        for sm, lbl in face_cbar_specs:
+            cbar = ax.figure.colorbar(sm, ax=ax, shrink=cbar_shrink)
+            cbar.set_label(lbl, rotation=270, labelpad=cbar_labelpad)
+    elif not single_panel:
         dummy_data = np.array([[0, 1]])
         dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
         cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
@@ -1936,7 +2124,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     # When used as a standalone plot, matplotlib will auto-scale appropriately
     F = solution.get("F", None)
     disp_label = 'Viscoplastic Deformation' if disp_elastic is not None else 'Mesh Deformation'
-    if at_failure:
+    if at_failure and not solution.get("_undecided", False):
         disp_label += ' at Failure'
     if deformation_below_resolution(fem_data, solution):
         # Nothing was drawn but the undeformed mesh (deform_scale is 1 here), and
@@ -1944,15 +2132,17 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
         # measured, when what the field holds is residue.
         base = f'{disp_label} below drawing resolution (undeformed)'
     else:
-        scale_str = (f'{deform_scale:.0f}' if deform_scale >= 10
-                     else f'{deform_scale:.1f}')
+        scale_str = format_deform_scale(deform_scale)
         base = f'{disp_label} (Scale = {scale_str}x)'
     # The at-failure field is the UNCONVERGED state, solved a margin beyond critical to
     # develop the mechanism; _fs_title(at_failure=...) leads with FS — "at Failure"
     # already carries the disclosure, so no trial-F clause.
     title = _fs_title(_fallback_clause(solution, base), F,
-                      solution.get("_ssrm_fs"), at_failure=at_failure)
+                      solution.get("_ssrm_fs"), at_failure=at_failure,
+                      lower=solution.get("_ssrm_fs_lower", False),
+                      undecided=solution.get("_undecided", False))
     ax.set_title(title, fontsize=12, pad=15)
+    return face_cbar_specs
 
 
 def _add_element_labels(ax, fem_data):
@@ -2126,6 +2316,24 @@ PILE_COLOR = 'green'
 #: reinforcement's own geometry color is gray. Original and deformed piles were
 #: both drawn in green and could not be told apart at any exaggeration.
 PILE_DEFORMED_COLOR = 'red'
+
+
+def block_grid_default(fem_data):
+    """Whether the deformed-blocks panel draws its element grid by default.
+
+    The grid comes off past :data:`JOINT_TICK_MAX_LINES` jointed lines — the
+    same count at which the section drawings drop their joint ticks — because
+    on a generated network the blocks are a few elements each and the grid
+    buries the block outlines that are the whole reading. Below it the grid
+    shows how each block deformed inside its faces. Studio reads this to set
+    the "Element edges" box when a jointed result comes up; the user can then
+    set the box either way.
+    """
+    jd = (fem_data or {}).get("joint_data") or {}
+    if not jd.get("n"):
+        return True
+    n_jlines = len(np.unique(np.asarray(jd["line_id"], dtype=int)))
+    return n_jlines <= JOINT_TICK_MAX_LINES
 
 
 def _barless_mask(fem_data, n):
@@ -2438,9 +2646,136 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     # Add legend if any special states exist
     handles, labels = ax.get_legend_handles_labels()
     if handles:
-        ax.legend(loc='lower right', fontsize=9, framealpha=0.9)
+        if not _merge_joint_bar_legend(ax, 'bars', handles, labels):
+            _tag_legend(ax.legend(loc='lower right', fontsize=9, framealpha=0.9),
+                        'bars', handles, labels)
 
     return cbar_specs
+
+
+def _tag_legend(leg, role, handles, labels):
+    """Mark a legend as the joint key ('joints') or the bars' ('bars')."""
+    leg._xslope_role = (role, list(handles), list(labels))
+    return leg
+
+
+def _merge_joint_bar_legend(ax, role, handles, labels):
+    """Fold this key into the other's when the joint key and the bars' legend
+    share a panel: one legend, joint entries first, in the joint key's corner
+    and style. Returns False (draw nothing) when the axes carries no legend
+    from the other of the two."""
+    prev = getattr(ax.get_legend(), '_xslope_role', None)
+    other = 'bars' if role == 'joints' else 'joints'
+    if prev is None or prev[0] != other:
+        return False
+    if role == 'joints':
+        h, l = list(handles) + prev[1], list(labels) + prev[2]
+    else:
+        h, l = prev[1] + list(handles), prev[2] + list(labels)
+    leg = _place_joint_key(ax, h, l)
+    leg._xslope_role = ('both', h, l)
+    return True
+
+
+def _section_shape(ax):
+    """The ground the panel draws, as one shapely geometry in data coordinates:
+    the union of every element's corner polygon at each node set the drawer
+    registered on ``ax`` (the model's own nodes, plus the deformed ones on the
+    deformation panel). Cached on the axes. None when nothing registered."""
+    reg = getattr(ax, '_xslope_section', None)
+    if reg is None:
+        return None
+    cached = getattr(ax, '_xslope_section_shape', None)
+    if cached is not None:
+        return cached
+    import shapely
+    from .mesh import element_corner_polygons
+    fem_data, node_sets = reg
+    polys = []
+    for nodes_xy in node_sets:
+        for poly in element_corner_polygons(fem_data, nodes_xy):
+            if poly is not None and len(poly) >= 3:
+                polys.append(shapely.Polygon(np.asarray(poly, dtype=float)[:, :2]))
+    shape = None
+    if polys:
+        try:
+            shape = shapely.union_all(polys)
+        except Exception:
+            # GEOS can refuse the overlay on a deformed mesh whose element
+            # polygons overlap or fold (RJ-14: "found two shells in EdgeRing
+            # list"). The key placer only asks whether a corner box touches the
+            # ground, so the unmerged polygons answer that just as well.
+            shape = _PolygonList(polys)
+    ax._xslope_section_shape = shape
+    return shape
+
+
+class _PolygonList:
+    """A stand-in for a shapely geometry when the union cannot be built: the
+    element polygons kept apart, answering ``intersects`` as any of them."""
+
+    def __init__(self, polys):
+        self._polys = polys
+
+    def intersects(self, other):
+        return any(p.intersects(other) for p in self._polys)
+
+
+def _register_section(ax, fem_data, *node_sets):
+    """Tell the key placer which ground this panel draws (see _section_shape)."""
+    prev = getattr(ax, '_xslope_section', None)
+    sets = list(prev[1]) if prev is not None else []
+    sets += [np.asarray(n, dtype=float) for n in node_sets]
+    ax._xslope_section = (fem_data, sets)
+    ax._xslope_section_shape = None
+
+
+def _place_joint_key(ax, handles, labels):
+    """The joint key, off the section: in the first corner of the axes whose box
+    the drawn ground (``_section_shape``) does not reach, or, where no corner is
+    clear, below the axes under the tick labels — the rule ``_ssrm_curve_legend``
+    applies to the curve. The corner is chosen when the legend is drawn or
+    measured, so it is tested against the panel's final limits, which the
+    callers set after the drawers return."""
+    from matplotlib.legend import Legend
+    from matplotlib.legend_handler import HandlerTuple
+    from shapely.geometry import box as _box
+    leg = ax.legend(handles, labels, loc="upper left", fontsize=8, frameon=True,
+                    framealpha=0.92, edgecolor="#cccccc", borderpad=0.6,
+                    handlelength=2.6,
+                    handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)})
+    draw0, ext0 = leg.draw, leg.get_window_extent
+
+    def _choose(renderer):
+        shape = _section_shape(ax)
+        inv = ax.transData.inverted()
+        for loc in ("upper left", "upper right", "lower right", "lower left"):
+            leg._loc = Legend.codes[loc]
+            leg.set_bbox_to_anchor(None)
+            bb = Legend.get_window_extent(leg, renderer).padded(4)
+            (x0, y0), (x1, y1) = inv.transform([[bb.x0, bb.y0], [bb.x1, bb.y1]])
+            if shape is None or not shape.intersects(
+                    _box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))):
+                return
+        # No corner is clear: below the axes, under the x tick labels.
+        tb = ax.xaxis.get_tightbbox(renderer)
+        ybot = (tb.y0 if tb is not None else ax.bbox.y0) - 4
+        yfrac = ax.transAxes.inverted().transform((0.0, ybot))[1]
+        leg._loc = Legend.codes["upper center"]
+        leg.set_bbox_to_anchor((0.5, yfrac), transform=ax.transAxes)
+
+    def _draw(renderer):
+        _choose(renderer)
+        return draw0(renderer)
+
+    def _extent(renderer=None):
+        r = renderer if renderer is not None else ax.figure._get_renderer()
+        _choose(r)
+        return ext0(r)
+
+    leg.draw = _draw
+    leg.get_window_extent = _extent
+    return leg
 
 
 #: How a joint reads on a results panel. Slip is the only quantity a joint has,
@@ -2451,7 +2786,6 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
 #: field underneath it.
 _JOINT_INTACT_COLOR = '#999999'
 _JOINT_SLIP_CMAP = 'joint_slip'
-_JOINT_OPEN_MARK_COLOR = '#33383d'
 
 #: The slip ramp itself: bright lime through to dark green. The field under this
 #: overlay is ``coolwarm`` — blue low, WHITE through the middle, red high — so
@@ -2463,8 +2797,7 @@ _JOINT_OPEN_MARK_COLOR = '#33383d'
 #: runs from the smallest reading to the largest across a field that goes from
 #: dark blue to red through white. A standard ``YlGn`` truncated at its pale end
 #: was the other candidate and lost on its low end: its light yellow-green spans
-#: went soft exactly where the field is at its white middle, and against their
-#: own white under-stroke. A saturated lime does not — it is far from white at
+#: went soft exactly where the field is at its white middle. A saturated lime does not — it is far from white at
 #: any value, and far from both of the field's ends.
 #:
 #: Dark at zero and bright at the top: the brightest color marks the largest
@@ -2482,19 +2815,16 @@ _JOINT_HAIRLINE_PT = 0.9
 #: overlay exists to carry, so it takes the extra weight and the intact spans
 #: stay out of the way.
 _JOINT_SLIP_PT = 1.6
+#: The white gap, in points, between the two thin lines an OPENED stretch is
+#: drawn as: the faces drawn apart, along the whole stretch that parted.
+_JOINT_OPEN_GAP_PT = 1.4
 
-#: The white under-stroke is the section drawing's (``plot.JOINT_HALO_*``): half
-#: a point of white on each side keeps a dark green span readable where the field
-#: beneath it goes dark blue or dark red. The intact gray hairlines carry no
-#: halo, so nothing is spent saying that nothing happened.
+#: No span carries a white under-stroke on a results panel: a slipping span is
+#: its green alone, a closed one plain gray (the hairline on the strain panel,
+#: the joint-face width on the block drawing), and white is kept for the one
+#: place it means something, the gap down an OPENED stretch.
 
-#: The open mark's weight, unchanged: the tick is the same mark it was.
-_JOINT_OPEN_MARK_PT = 1.0
 
-#: An open mark's half length, as a fraction of the larger domain dimension —
-#: the idiom the inputs plot's joint ticks use, so the mark is the same size on
-#: a 10 m block and a 100 m slope.
-_JOINT_OPEN_MARK_FRACTION = 0.012
 
 
 def solution_has_joint_state(fem_data, solution):
@@ -2514,30 +2844,181 @@ def solution_has_joint_state(fem_data, solution):
     return bool(_measured(solution, jd["n"]))
 
 
-def _draw_block_tints(ax, fem_data, nodes_xy, comp):
-    """Fill each block of a jointed mesh with a faint tint, cycling by block.
+def _draw_joint_faces(ax, fem_data, solution, nodes_deformed, blocks, lw):
+    """Draw the joints on the deformation panel.
 
-    Two blocks that touch take different tints, which is the whole job: on a
-    toppling set every column is its own body and the tints are what says so at
-    a glance, while on a section whose joints stop inside the mass most of it
-    comes back as ONE block, takes one tint, and says that too.
+    Where this field measured the joints' state they are drawn by
+    :func:`plot_joint_states` at the deformed node positions, with the strain
+    panel's styling except for one weight: a closed span is gray at ``lw`` (the
+    joint-face width), not the hairline, because the thick gray closed joints
+    are what make the blocks read as blocks. A slipping span is on the green
+    ramp at ``lw`` with no white under-stroke, an opened one is two thin gray
+    lines with a white gap, the key goes off the section and the slip
+    colorbar's spec is returned for the caller to place. A field that measured no
+    joint state draws the faces plain, in the joint's own green, and returns
+    nothing.
+    """
+    if not solution_has_joint_state(fem_data, solution):
+        faces = [e for edges in blocks.values() for e in edges]
+        if faces:
+            ax.add_collection(LineCollection(
+                [nodes_deformed[e, :2] for e in faces], colors=JOINT_COLOR,
+                linewidths=lw, alpha=1.0, zorder=6.5))
+        return []
+    return plot_joint_states(ax, fem_data, solution, draw_cbar=False,
+                             linewidth=lw, closed_linewidth=lw,
+                             nodes=nodes_deformed)
+
+
+def _draw_block_tints(ax, fem_data, nodes_xy, comp, per_block=False):
+    """Fill the deformed mesh with a faint tint, per material zone or per block.
+
+    ``per_block=False`` (default): one tint per MATERIAL zone, the same colors
+    the inputs and mesh plots give the zones, so a bonded and a jointed run of
+    one section draw alike and the blocks are read from the faces drawn between
+    them.
+
+    ``per_block=True``: each block (``comp``, the block index per element from
+    :func:`xslope.mesh.block_components`) takes a tint from ``_BLOCK_TINTS`` at
+    ``_BLOCK_TINT_ALPHA_BY_BLOCK``, chosen by :func:`_block_tint_indices` so no
+    two blocks that share a joint face take the same tint: on a toppling set the
+    columns alternate, while a section whose joints stop inside the mass comes
+    back as one block under one tint.
     """
     from matplotlib.collections import PolyCollection
     from .mesh import element_corner_polygons
+    alpha = _BLOCK_TINT_ALPHA
+    if per_block:
+        keys = np.asarray(comp, dtype=int)
+        tint = _block_tint_indices(fem_data, keys)
+        color_of = {c: _BLOCK_TINTS[t] for c, t in tint.items()}
+        alpha = _BLOCK_TINT_ALPHA_BY_BLOCK
+    else:
+        from .style import material_style, resolve_style
+        keys = np.asarray(fem_data.get("element_materials",
+                                       np.ones(len(fem_data["elements"]))), dtype=int)
+        # Mesh material ids are 1-based (gmsh); the style sheet keys by the
+        # 0-based mat_id, as the mesh plot does, so the zones take the Inputs
+        # view's colors.
+        st = resolve_style(None)
+        color_of = {int(m): material_style(st, int(m) - 1)["color"]
+                    for m in np.unique(keys)}
     polys, colors = [], []
-    for poly, c in zip(element_corner_polygons(fem_data, nodes_xy),
-                       np.asarray(comp, dtype=int)):
+    for poly, k in zip(element_corner_polygons(fem_data, nodes_xy), keys):
         if poly is None:
             continue
         polys.append(poly)
-        colors.append(_BLOCK_TINTS[int(c) % len(_BLOCK_TINTS)])
+        colors.append(color_of[int(k)])
     if polys:
         ax.add_collection(PolyCollection(
             polys, facecolors=colors, edgecolors='none',
-            alpha=_BLOCK_TINT_ALPHA, zorder=0.5))
+            alpha=alpha, zorder=0.5))
 
 
-def _joint_spans(fem_data, solution):
+def _block_tint_indices(fem_data, comp):
+    """Which of ``_BLOCK_TINTS`` each block takes, as ``{block: tint index}``.
+
+    Two blocks are neighbors when they share a joint face: a node pair of an
+    interface element has one node in each. The blocks are visited in order of
+    their centroid x starting from the toe side (the end of the section whose
+    top is lower), and each takes the first of the first three tints no
+    already-colored neighbor holds; the fourth only when all three are taken.
+    Visiting from the toe keeps the assignment stable and makes a column set
+    alternate.
+    """
+    comp = np.asarray(comp, dtype=int)
+    blocks = [int(b) for b in np.unique(comp)]
+    elements = np.asarray(fem_data["elements"], dtype=int)
+    nodes = np.asarray(fem_data["nodes"], dtype=float)[:, :2]
+    # Every node's block(s), through the elements it belongs to.
+    blocks_of = {}
+    for e, b in zip(elements, comp):
+        for n in e:
+            if n >= 0:
+                blocks_of.setdefault(int(n), set()).add(int(b))
+    nbrs = {b: set() for b in blocks}
+    jd = fem_data.get("joint_data") or {}
+    if jd.get("n"):
+        conn = np.asarray(jd["conn"], dtype=int)
+        n_pairs = np.asarray(jd.get("n_pairs", [conn.shape[1] // 2] * len(conn)),
+                             dtype=int)
+        for row, npr in zip(conn, n_pairs):
+            for a, c in zip(row[:npr], row[npr:2 * npr]):
+                for ba in blocks_of.get(int(a), ()):
+                    for bc in blocks_of.get(int(c), ()):
+                        if ba != bc:
+                            nbrs[ba].add(bc)
+                            nbrs[bc].add(ba)
+    # Centroid x of each block (undeformed), and which end is the toe.
+    cx = {}
+    for b in blocks:
+        cx[b] = float(nodes[np.unique(elements[comp == b][elements[comp == b] >= 0]),
+                            0].mean())
+    x0, x1 = nodes[:, 0].min(), nodes[:, 0].max()
+    band = 0.01 * max(x1 - x0, 1e-12)
+    top_left = nodes[nodes[:, 0] <= x0 + band, 1].max()
+    top_right = nodes[nodes[:, 0] >= x1 - band, 1].max()
+    toe_right = top_right < top_left
+    order = sorted(blocks, key=lambda b: (-cx[b] if toe_right else cx[b], b))
+    tint = {}
+    for b in order:
+        taken = {tint[n] for n in nbrs[b] if n in tint}
+        tint[b] = next((t for t in range(3) if t not in taken), 3)
+    return tint
+
+
+#: Width, in points, of a joint face on the deformation panel. Studio's display
+#: panel overrides it per view ("Joint width"); a face reads at this weight on a
+#: page figure where the 1.6 pt trace of the inputs plot was too thin to see.
+JOINT_FACE_LINEWIDTH = 2.6
+
+#: How far, in points, each face of a jointed sheet is drawn from the bar.
+_JOINT_FACE_OFFSET_PT = 3.2
+
+
+def _spans_on_bars(fem_data, spans):
+    """Per span, whether its line carries a bar (a jointed reinforcement sheet)
+    rather than being a bar-less joint line."""
+    n1d = len(fem_data.get("elements_1d", []))
+    barless = _barless_mask(fem_data, n1d)
+    line_of = np.asarray(fem_data.get("element_materials_1d", np.zeros(n1d)),
+                         dtype=int)
+    bar_lines = set(int(v) for v in line_of[~barless]) if n1d else set()
+    return [int(r["line"]) in bar_lines for r in spans]
+
+
+def _offset_sheet_spans(ax, coords, slipping, slips, on_bar, opened=None):
+    """Draw a jointed sheet's spans as two lines, one each side of the bar.
+
+    The offset is fixed in points and applied in display space, so it is the
+    same width at any scale and stays perpendicular to the sheet whatever the
+    axes' aspect."""
+    if opened is None:
+        opened = np.zeros(len(coords), dtype=bool)
+    if not any(on_bar):
+        return coords, slipping, slips, np.asarray(opened, dtype=bool)
+    d_px = _JOINT_FACE_OFFSET_PT * (ax.figure.dpi or 100.0) / 72.0
+    to_disp = ax.transData.transform
+    to_data = ax.transData.inverted().transform
+    out_c, out_s, out_v, out_o = [], [], [], []
+    for c, sl, v, ob, op in zip(coords, slipping, slips, on_bar, opened):
+        if not ob:
+            out_c.append(c); out_s.append(sl); out_v.append(v); out_o.append(op)
+            continue
+        p = to_disp(np.asarray(c, dtype=float))
+        t = p[1] - p[0]
+        L = float(np.hypot(*t))
+        if L <= 0.0:
+            continue
+        nrm = np.array([-t[1], t[0]]) / L * d_px
+        for sgn in (1.0, -1.0):
+            out_c.append(to_data(p + sgn * nrm)); out_s.append(sl); out_v.append(v)
+            out_o.append(op)
+    return (out_c, np.asarray(out_s, dtype=bool), np.asarray(out_v, dtype=float),
+            np.asarray(out_o, dtype=bool))
+
+
+def _joint_spans(fem_data, solution, nodes=None):
     """One record per station span of every jointed line: where it is, what state
     it is in, and how far the two faces have slid.
 
@@ -2546,13 +3027,18 @@ def _joint_spans(fem_data, solution):
     read together: the span's state is the worse of the two and its slip is the
     larger. Drawing them separately would put one line exactly on top of the
     other and report whichever happened to be drawn last.
+
+    ``nodes`` (default the model's own) are the positions the spans are drawn
+    at; the deformation panel passes the deformed ones. Each record also
+    carries ``faces``: every distinct face of the span's elements at those
+    positions, so a panel that shows the faces apart can draw each.
     """
     if not solution_has_joint_state(fem_data, solution):
         return []      # no joint, or a saved field that measured none of them
     jd = fem_data["joint_data"]
     conn = np.asarray(jd["conn"], dtype=int)
     side = np.asarray(jd["side"], dtype=int)
-    nodes = np.asarray(fem_data["nodes"], dtype=float)
+    nodes = np.asarray(fem_data["nodes"] if nodes is None else nodes, dtype=float)
     n = int(jd["n"])
     slip = np.asarray(solution.get("joint_slip", np.zeros((n, 3))), dtype=float)
     opened = np.asarray(solution.get("joint_open", np.zeros((n, 3), dtype=bool)))
@@ -2569,15 +3055,40 @@ def _joint_spans(fem_data, solution):
         if rec is None:
             rec = spans[key] = {
                 "line": int(jd["line_id"][i]),
-                "coords": nodes[conn[i, 0:2], :2],
-                "open": False, "slipping": False, "slip": 0.0}
+                # the element's three stations: start, end, midside
+                "xy": nodes[conn[i, 0:3], :2],
+                "open_st": np.zeros(3, dtype=bool),
+                "slip_st": np.zeros(3, dtype=bool),
+                "slip_v": np.zeros(3, dtype=float),
+                "faces": {}}
+        for f in (conn[i, 0:3], conn[i, 3:6]):
+            rec["faces"].setdefault(tuple(sorted(int(v) for v in f)),
+                                    [int(v) for v in f])
         active = w[i]
-        rec["open"] = rec["open"] or bool(np.any(opened[i] & active))
-        rec["slipping"] = rec["slipping"] or bool(np.any(slipping[i] & active))
-        if np.any(active):
-            rec["slip"] = max(rec["slip"],
-                              float(np.max(np.abs(slip[i][active]))))
-    return list(spans.values())
+        rec["open_st"] |= (opened[i] & active)
+        rec["slip_st"] |= (slipping[i] & active)
+        rec["slip_v"] = np.maximum(rec["slip_v"],
+                                   np.where(active, np.abs(slip[i]), 0.0))
+    # Each station span is drawn as its two halves, start-to-midside and
+    # midside-to-end, so a state can be read at the resolution the element
+    # measured it. A half has OPENED only when both of its stations have — a
+    # single parted station between two that are still in contact is below
+    # what the drawing can honestly show — and a half that has not opened is
+    # slipping when either of its stations is.
+    out = []
+    for rec in spans.values():
+        xy, op, sl, sv = rec["xy"], rec["open_st"], rec["slip_st"], rec["slip_v"]
+        for (p, q) in ((0, 2), (2, 1)):
+            is_open = bool(op[p] and op[q])
+            faces = [np.array([nodes[f[p], :2], nodes[f[q], :2]])
+                     for f in rec["faces"].values()]
+            out.append({"line": rec["line"],
+                        "coords": np.array([xy[p], xy[q]]),
+                        "faces": faces,
+                        "open": is_open,
+                        "slipping": bool((sl[p] or sl[q]) and not is_open),
+                        "slip": float(max(sv[p], sv[q]))})
+    return out
 
 
 def _joint_slip_cmap():
@@ -2586,48 +3097,6 @@ def _joint_slip_cmap():
     from matplotlib.colors import LinearSegmentedColormap
     return LinearSegmentedColormap.from_list(
         _JOINT_SLIP_CMAP, list(_JOINT_SLIP_COLORS))
-
-
-def _joint_open_marks(spans, scale):
-    """Perpendicular tick segments marking the OPENED stretches of every line.
-
-    One tick per continuous run of opened stations, not one per station: a line
-    that has parted along half its length parts in one stretch, and a tick at
-    every station of it would draw a comb rather than a mark. Stations of a line
-    are ordered along that line's own direction and split into runs wherever the
-    gap between neighbours exceeds half again the median station length — the
-    spacing that separates two parted stretches from one.
-    """
-    by_line = {}
-    for r in spans:
-        if r["open"]:
-            by_line.setdefault(r["line"], []).append(r)
-    segs = []
-    for rows in by_line.values():
-        mids = np.array([r["coords"].mean(axis=0) for r in rows])
-        vecs = np.array([r["coords"][1] - r["coords"][0] for r in rows])
-        lens = np.hypot(vecs[:, 0], vecs[:, 1])
-        axis = vecs[0] / (lens[0] if lens[0] > 0 else 1.0)
-        t = mids @ axis
-        order = np.argsort(t)
-        gap = 1.5 * float(np.median(lens[lens > 0])) if np.any(lens > 0) else 0.0
-        runs, run = [], [int(order[0])]
-        for a, b in zip(order[:-1], order[1:]):
-            if t[b] - t[a] <= gap:
-                run.append(int(b))
-            else:
-                runs.append(run)
-                run = [int(b)]
-        runs.append(run)
-        half = _JOINT_OPEN_MARK_FRACTION * scale
-        for run in runs:
-            k = run[len(run) // 2]
-            L = lens[k] if lens[k] > 0 else 1.0
-            nx, ny = -vecs[k][1] / L, vecs[k][0] / L
-            mx, my = mids[k]
-            segs.append([(mx - half * nx, my - half * ny),
-                         (mx + half * nx, my + half * ny)])
-    return segs
 
 
 def _joint_slip_panel(fem_data):
@@ -2651,47 +3120,43 @@ def _joint_slip_panel(fem_data):
     return bool(names) and all(n in elastic for n in names)
 
 
-def _joint_open_note(fem_data, solution):
-    """The key for the opened-joint tick, or "" where no tick is drawn.
-
-    The results plots carry no legend, so the one mark on this panel that is not
-    on its colorbar says what it means in the panel's own subtitle. It appears
-    only on a figure that actually draws a tick.
-    """
-    spans = _joint_spans(fem_data, solution)
-    if not spans:
-        return ""
-    nodes = np.asarray(fem_data["nodes"], dtype=float)
-    scale = max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
-    if not _joint_open_marks(spans, scale):
-        return ""
-    return "tick across a joint marks a stretch that opened"
-
-
-def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
-    """Draw the joint (interface) elements as hairlines colored by their slip.
+def plot_joint_states(ax, fem_data, solution, draw_cbar=True, linewidth=None,
+                      nodes=None, closed_linewidth=None):
+    """Draw the joint (interface) elements colored by their slip.
 
     A joint has no strain, so it appears in a shear-strain field only through
     what it does to the soil beside it. This is the joint's own reading, and it
-    is drawn so that a network of hundreds of traces still leaves the field
-    underneath legible:
+    is drawn the same way on the strain panel and on the deformation panel, so
+    that a network of hundreds of traces still leaves the panel legible:
 
-    * every station span is a thin line, floored at one device pixel so it
-      stays crisp;
+    * a span that is closed (not slipping) is neutral gray — nothing happened
+      there, and it says so quietly. Its weight is ``closed_linewidth``: None
+      (the strain panel and the joints' own panel) is the hairline,
+      :data:`_JOINT_HAIRLINE_PT`; the block drawing passes the joint-face
+      width, because there the thick gray closed joints are what make the
+      blocks read as blocks. Either is floored at one device pixel so it stays
+      crisp;
     * a span that is slipping is colored by how far its faces have slid, on a
-      green ramp the ``coolwarm`` field underneath cannot produce at any of its
-      values (see :data:`_JOINT_SLIP_COLORS`), at :data:`_JOINT_SLIP_PT` over a thin
-      white under-stroke so a dark green line still reads where the field goes
-      dark blue or dark red; the colorbar IS the legend, and no per-state
-      legend entries go on the axes;
-    * a span that is not slipping is a lighter neutral gray hairline with no
-      under-stroke — nothing happened there, and it says so quietly;
-    * an OPENED stretch is marked rather than colored: one short tick drawn
-      perpendicular to the joint, in a dark neutral, at the middle of each
-      continuous run of opened stations (see :func:`_joint_open_marks`), its
-      length a fixed fraction of the domain so it reads the same at any scale;
-    * when nothing on the model is slipping there is no colorbar at all and
-      every joint draws gray.
+      green ramp the ``coolwarm`` field cannot produce at any of its values (see
+      :data:`_JOINT_SLIP_COLORS`), with no white under-stroke; its weight is
+      ``linewidth`` — :data:`_JOINT_SLIP_PT` over a strain field (None), the
+      joint-face width on the block drawing and on the joints' own panel;
+    * an OPENED stretch is drawn as its two faces apart — two gray hairlines
+      with a white gap of :data:`_JOINT_OPEN_GAP_PT` between them, on every
+      panel — rather than colored, because opening is a condition and not a
+      quantity;
+    * a jointed reinforcement SHEET is drawn as its two faces, one each side of
+      the bar, so the bar keeps the middle;
+    * a key names the three states, placed off the section
+      (:func:`_place_joint_key`); the colorbar carries the slip, and when
+      nothing on the model is slipping there is no colorbar and every joint
+      draws gray.
+
+    ``nodes`` are the positions to draw at (the deformation panel passes the
+    deformed ones; default the model's own). There, a span that is closed or
+    slipping draws each of its faces at its own deformed position, so faces
+    that slid apart show apart; an opened span and a sheet's span are drawn
+    about the faces' mean line.
 
     Returns the ``(mappable, label)`` specs, empty on a model with no joint and
     on one where no joint slipped, so a caller that stacks colorbars can place
@@ -2700,16 +3165,27 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
     import matplotlib.cm as cm
     from matplotlib.colors import Normalize
 
-    spans = _joint_spans(fem_data, solution)
+    spans = _joint_spans(fem_data, solution, nodes)
     if not spans:
         return []
+    _register_section(ax, fem_data, fem_data["nodes"],
+                      *([nodes] if nodes is not None else []))
 
     floor = _mesh_pixel_floor_pt(ax)
     lw_intact = max(_JOINT_HAIRLINE_PT, floor)
-    lw_slip = max(_JOINT_SLIP_PT, floor)
-    coords = [r["coords"] for r in spans]
+    # A closed span is the hairline, except on the block drawing, which passes
+    # the joint-face width: there the thick gray joints outline the blocks.
+    lw_closed = max(float(closed_linewidth) if closed_linewidth is not None
+                    else _JOINT_HAIRLINE_PT, floor)
+    # Over a strain field the slipped lengths stay at _JOINT_SLIP_PT so the
+    # field is not buried; the block drawing and the joints' own panel pass the
+    # joint-face width (Studio's Joint width sets it).
+    lw_slip = max(float(linewidth) if linewidth is not None else _JOINT_SLIP_PT,
+                  floor)
+    on_bar = _spans_on_bars(fem_data, spans)
     slipping = np.array([bool(r["slipping"]) for r in spans])
     slips = np.array([float(r["slip"]) for r in spans])
+    opened = np.array([bool(r["open"]) for r in spans])
 
     cbar_specs = []
     smax = float(slips[slipping].max()) if slipping.any() else 0.0
@@ -2725,33 +3201,72 @@ def plot_joint_states(ax, fem_data, solution, draw_cbar=True):
             cbar.set_label(label, rotation=270, labelpad=15, fontsize=10)
     else:
         slipping = np.zeros(len(spans), dtype=bool)   # nothing to color
-    # Opaque throughout: a thin line has no contrast to spare, and blending it
-    # into the field underneath takes the little it has. The two states are two
-    # collections, because they carry different weight and only the slipping one
-    # is given the white under-stroke that keeps it off a dark patch of field.
-    intact = [c for c, sl in zip(coords, slipping) if not sl]
-    slid = [c for c, sl in zip(coords, slipping) if sl]
+
+    # What each span draws as. At the model's own nodes a span is its chord.
+    # At deformed nodes a closed or slipping bar-less span is each of its faces
+    # where it went; an opened span and a sheet's span are the faces' mean line
+    # (the sheet's two faces are drawn either side of the bar below, and the
+    # opened symbol is itself the two faces apart).
+    coords, sl_l, sv_l, op_l, ob_l = [], [], [], [], []
+    for r, sl, sv, op, ob in zip(spans, slipping, slips, opened, on_bar):
+        if nodes is None:
+            lines = [r["coords"]]
+        elif ob or op:
+            lines = [np.mean(np.asarray(r["faces"]), axis=0)]
+        else:
+            lines = r["faces"]
+        for c in lines:
+            coords.append(c); sl_l.append(sl); sv_l.append(sv)
+            op_l.append(op); ob_l.append(ob)
+    # A span on a jointed SHEET shares its chord with the bar's own overlay,
+    # which is three points wide with a black outline: a line drawn down its
+    # middle is invisible. So on a bar-carrying line each span is drawn twice,
+    # a few points either side of the bar — where the two faces are — and the
+    # bar keeps the middle.
+    coords, slipping, slips, opened = _offset_sheet_spans(
+        ax, coords, np.asarray(sl_l, dtype=bool), np.asarray(sv_l, dtype=float),
+        ob_l, np.asarray(op_l, dtype=bool))
+    intact = [c for c, sl, op in zip(coords, slipping, opened) if not sl and not op]
+    slid = [c for c, sl, op in zip(coords, slipping, opened) if sl and not op]
+    parted = [c for c, op in zip(coords, opened) if op]
+    # Opaque throughout: a thin line has no contrast to spare.
     if intact:
         ax.add_collection(LineCollection(
-            intact, colors=_JOINT_INTACT_COLOR, linewidths=lw_intact,
+            intact, colors=_JOINT_INTACT_COLOR, linewidths=lw_closed,
             alpha=1.0, zorder=6.5))
     if slid:
         ax.add_collection(LineCollection(
-            slid, colors=_JOINT_HALO_COLOR,
-            linewidths=lw_slip + 2 * _JOINT_HALO_PT,
-            alpha=1.0, zorder=6.45))
-        ax.add_collection(LineCollection(
-            slid, colors=[cmap(norm(s)) for s, sl in zip(slips, slipping) if sl],
+            slid, colors=[cmap(norm(s)) for s, sl, op in zip(slips, slipping, opened)
+                          if sl and not op],
             linewidths=lw_slip, alpha=1.0, zorder=6.5))
-
-    nodes = np.asarray(fem_data["nodes"], dtype=float)
-    scale = max(float(np.ptp(nodes[:, 0])), float(np.ptp(nodes[:, 1]))) or 1.0
-    marks = _joint_open_marks(spans, scale)
-    if marks:
+    # An OPENED stretch is drawn as its two faces apart: a gray line the width
+    # of two hairlines and the gap, with a white line the width of the gap down
+    # its middle, along the whole stretch that parted.
+    gap = max(_JOINT_OPEN_GAP_PT, floor)
+    if parted:
         ax.add_collection(LineCollection(
-            marks, colors=_JOINT_OPEN_MARK_COLOR,
-            linewidths=max(_JOINT_OPEN_MARK_PT, floor),
-            alpha=1.0, zorder=6.6))
+            parted, colors=_JOINT_INTACT_COLOR, linewidths=2 * lw_intact + gap,
+            alpha=1.0, zorder=6.55))
+        ax.add_collection(LineCollection(
+            parted, colors='white', linewidths=gap, alpha=1.0, zorder=6.6))
+
+    # The key: the three states a joint can be in on this panel.
+    from matplotlib.lines import Line2D
+    handles, labels = [], []
+    if intact:
+        handles.append(Line2D([0], [0], color=_JOINT_INTACT_COLOR, lw=lw_closed))
+        labels.append("closed, no slip")
+    if slid:
+        handles.append(Line2D([0], [0], color=cmap(0.7), lw=lw_slip))
+        labels.append("slipping (color = slip)")
+    if parted:
+        handles.append((Line2D([0], [0], color=_JOINT_INTACT_COLOR,
+                               lw=2 * lw_intact + gap),
+                        Line2D([0], [0], color='white', lw=gap)))
+        labels.append("opened")
+    if handles and not _merge_joint_bar_legend(ax, 'joints', handles, labels):
+        _tag_legend(_place_joint_key(ax, handles, labels),
+                    'joints', handles, labels)
     return cbar_specs
 
 
@@ -2867,15 +3382,6 @@ def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_
     return fig, axes
 
 
-#: What the search figure draws each trial as. A trial the section STOOD under
-#: moves the lower end of the interval up; one it did not moves the upper end
-#: down. Two marks, so the closing is readable in grayscale as well as in color.
-_TRIAL_STYLE = {
-    True: ("#2e7d32", "o", "the section stood"),
-    False: ("#c62828", "v", "the section did not stand"),
-}
-
-
 def ssrm_trials(record):
     """The per-trial record a strength reduction run kept, oldest first.
 
@@ -2901,12 +3407,12 @@ def ssrm_trials(record):
 
 
 def ssrm_has_convergence_history(record):
-    """True when a run's record carries enough trials to draw the search closing.
+    """True when a run's record holds a search at all: two trials or more.
 
-    The question asked before :func:`plot_ssrm_convergence` is called, so a caller
-    counts the figures it will get right. A displacement catastrophe run keeps no
-    trial record at all, and a run restored from a file written before the record
-    was persisted keeps none either.
+    A displacement catastrophe run keeps no trial record, and a run restored from
+    a file written before the record was persisted keeps none either. The
+    displacement curve asks the stricter question, whether the trials carry their
+    displacements (:func:`ssrm_curve_unavailable`).
     """
     return len(ssrm_trials(record)) >= 2
 
@@ -2935,94 +3441,231 @@ def ssrm_interval_history(record):
     return history
 
 
-def plot_ssrm_convergence(record, fs=None, tolerance=None, figsize=(7.4, 4.4),
-                          fig=None, show_title=True, show_legend=True,
-                          save_png=False, dpi=300):
-    """How the strength reduction search closed on the factor of safety.
+#: What the fourth finite element results plot is called — in the results view's
+#: plot list, in the report's caption for it, and as ``plot_fem_results``'s
+#: ``plot_type`` key ``"ssrm_curve"``.
+SSRM_CURVE_LABEL = "Displacement vs F"
 
-    One axes: every trial the run solved, at the factor it was solved at, marked
-    by whether the section stood under it; the interval the search had narrowed
-    to after each of them, shaded behind them; and the factor of safety the run
-    reported, ruled across. Read left to right it is the search closing.
+#: Its title on the figure.
+SSRM_CURVE_TITLE = "Displacement vs strength reduction factor"
+
+#: How a trial that did not stand ended, keyed by its ``exit_reason``, as the
+#: key names it. A reason not listed was stopped by the iteration limit: the
+#: solve stops on equilibrium, on a displacement or divergence test, or there.
+_SSRM_CURVE_ENDINGS = {
+    "diverging": ("displacements ran away", "v"),
+    "disp_limit": ("past the displacement limit", "^"),
+    "displacement_limit": ("past the displacement limit", "^"),
+    "steady_slip": ("sliding steadily on its joints", "D"),
+    "not_slowing": ("did not slow, counted as sliding", "D"),
+    "inconclusive": ("still slowing when the limit came, left undecided", "p"),
+    "yield_gate": ("settled outside the yield surface", "D"),
+    "nonfinite": ("calculation stopped producing numbers", "X"),
+}
+_SSRM_CURVE_BUDGET = ("stopped at the iteration limit, still moving", "s")
+_SSRM_CURVE_STOOD_COLOR = "#1f4e79"
+_SSRM_CURVE_FELL_COLOR = "#c62828"
+
+
+def ssrm_curve_points(record):
+    """The trials a strength reduction run recorded a displacement for, sorted by F.
+
+    Each is ``{"F", "max_displacement", "stood", "converged", "ending"}``, where
+    ``ending`` is the key's words for how a trial that did not stand ended (None
+    for one that stood). A trial with no finite displacement — a record written before trials
+    carried one, or a trial whose arithmetic gave out — has no place on the curve
+    and is left off it.
+    """
+    points = []
+    for trial in ((record or {}).get("trials") or []):
+        if not isinstance(trial, dict):
+            continue
+        try:
+            F = float(trial.get("F"))
+            u = float(trial.get("max_displacement"))
+        except (TypeError, ValueError):
+            continue
+        if not (np.isfinite(F) and np.isfinite(u)):
+            continue
+        if trial.get("stable") is not None:
+            stood = bool(trial["stable"])
+        elif trial.get("converged") is not None:
+            stood = bool(trial["converged"])
+        else:
+            stood = trial.get("verdict") == "CONVERGED"
+        ending = None
+        if not stood:
+            ending = _SSRM_CURVE_ENDINGS.get(trial.get("exit_reason"),
+                                             _SSRM_CURVE_BUDGET)[0]
+        converged = bool(trial.get("converged",
+                                   trial.get("verdict") == "CONVERGED"))
+        points.append({"F": F, "max_displacement": u, "stood": stood,
+                       "converged": converged, "ending": ending})
+    points.sort(key=lambda p: p["F"])
+    return points
+
+
+def ssrm_curve_unavailable(record):
+    """Why ``record`` cannot be drawn as a displacement curve, in one line, or None.
+
+    A single finite element solve keeps no trial record; a run saved before the
+    trials carried their displacement keeps trials with nothing to plot.
+    """
+    trials = (record or {}).get("trials") or []
+    if not trials:
+        return ("No strength reduction trials are recorded for this result, so "
+                "there is no displacement curve to draw.")
+    if len(ssrm_curve_points(record)) < 2:
+        return ("This run's trials do not record their displacements (it was "
+                "saved before they did); solve it again to draw the curve.")
+    return None
+
+
+def _ssrm_curve_legend(ax, handles, labels, title):
+    """The key, in the joint-slip panel's styling, in the first corner of the axes
+    the drawing leaves empty — tested against the drawn points, the lines joining
+    them and the factor-of-safety rule — or, where no corner is clear, in reserved
+    space below the axes, in two columns, so the plot keeps its full width."""
+    from matplotlib.legend_handler import HandlerTuple
+    style = dict(fontsize=8, frameon=True, framealpha=0.92, edgecolor="#cccccc",
+                 borderpad=0.6, handlelength=2.6, title=title, title_fontsize=8,
+                 handler_map={tuple: HandlerTuple(ndivide=1, pad=0.0)})
+    fig = ax.figure
+    canvas = fig.canvas
+    if not hasattr(canvas, "get_renderer"):
+        # A bare Figure (the report's, a test's) has no renderer until a canvas
+        # gives it one; Agg is the canvas savefig would use.
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    renderer = canvas.get_renderer()
+    # Everything drawn, as display points: the markers, the lines sampled along
+    # their length, and the vertical rules.
+    pts = []
+    for line in ax.lines:
+        xy = np.column_stack([np.asarray(line.get_xdata(), float),
+                              np.asarray(line.get_ydata(), float)])
+        if line.get_transform() != ax.transData:
+            xy = line.get_transform().transform(xy)
+        else:
+            xy = ax.transData.transform(xy)
+        for a, b in zip(xy[:-1], xy[1:]):
+            pts.extend(a + (b - a) * t for t in np.linspace(0.0, 1.0, 24))
+        pts.extend(xy)
+    pts = np.asarray(pts, float) if pts else np.zeros((0, 2))
+    for loc in ("upper left", "lower right", "upper right", "lower left"):
+        leg = ax.legend(handles, labels, loc=loc, **style)
+        box = leg.get_window_extent(renderer).padded(4)
+        inside = ((pts[:, 0] >= box.x0) & (pts[:, 0] <= box.x1)
+                  & (pts[:, 1] >= box.y0) & (pts[:, 1] <= box.y1)) if len(pts) else []
+        if not np.any(inside):
+            return leg
+        leg.remove()
+    return ax.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, -0.16),
+                     ncol=2, **style)
+
+
+def plot_ssrm_curve(ax, record, fs=None, final_interval=None, fem_data=None,
+                    show_title=True, show_legend=True, fs_is_lower_bound=None):
+    """The maximum displacement of every strength reduction trial against its F.
+
+    One marker per trial, sorted by F. Filled markers are trials in which the
+    slope reached equilibrium, joined by a thin line. Open markers are trials
+    that were stopped before it did, drawn with no line through them at the
+    displacement they had when they were stopped, and the key names how each
+    ended. The reported factor of safety is ruled as a vertical line and the
+    final bracket is shaded behind it. On a run that found no failure
+    (``fs_is_lower_bound``, read off the record when None) the line sits at the
+    highest strength the slope was confirmed to stand at and the key reads
+    "FS ≥ X", three decimals cut down.
+
+    Read it for its shape. A flat run and a sharp knee is a strength limit. A
+    steady climb with no knee means the slope kept moving at every strength the
+    search tried, and the factor of safety depends on the iteration limit.
 
     ``record`` is :func:`xslope.fem.solve_ssrm`'s result or the meta sidecar a
-    saved run was written with. ``fs`` and ``tolerance`` default to the record's
-    own. Ask :func:`ssrm_has_convergence_history` first: a run that kept no trial
-    record — a displacement catastrophe run keeps none — cannot be drawn, and
-    raises rather than producing an empty axes.
-
-    This read ``F_history`` and ``convergence_history``, which solve_ssrm has
-    never emitted under any criterion, so it drew nothing on every run there has
-    ever been.
-
-    Returns ``(fig, ax)``.
+    saved run was written with (:func:`xslope.fem.ssrm_run_record`, restored by
+    :func:`xslope.fem.import_fem_meta`). ``fs`` and ``final_interval`` default to
+    the record's own. ``fem_data`` supplies the declared length unit for the axis
+    label. Raises ``ValueError`` with a one-line reason
+    (:func:`ssrm_curve_unavailable`) where the record has fewer than two trials
+    with a displacement.
     """
-    trials = ssrm_trials(record)
-    if len(trials) < 2:
-        raise ValueError("this run kept no trial record to draw: "
-                         f"{len(trials)} trial(s) with a factor on them")
-    intervals = ssrm_interval_history(record)
+    from matplotlib.lines import Line2D
+    why = ssrm_curve_unavailable(record)
+    if why:
+        raise ValueError(why)
+    points = ssrm_curve_points(record)
     if fs is None:
         fs = (record or {}).get("FS")
-    if tolerance is None:
-        tolerance = (record or {}).get("tolerance")
+    if final_interval is None:
+        final_interval = (record or {}).get("final_interval")
+    if fs_is_lower_bound is None:
+        fs_is_lower_bound = bool((record or {}).get("fs_is_lower_bound"))
 
-    own_fig = fig is None
-    if own_fig:
-        fig = plt.figure(figsize=figsize)
-    else:
-        fig.clear()
-    ax = fig.subplots(1, 1)
+    us = [p["max_displacement"] for p in points]
+    handles, labels = [], []
+    stood = [p for p in points if p["stood"]]
+    # The line joins only the trials in which the slope reached equilibrium. A
+    # trial that was stopped still moving sits where it was when it was stopped,
+    # which is not where it was going, and a line through it would read as the
+    # displacement going back down.
+    if len(stood) > 1:
+        ax.plot([p["F"] for p in stood], [p["max_displacement"] for p in stood],
+                "-", color="0.45", lw=1.0, zorder=2)
+    if stood:
+        ax.plot([p["F"] for p in stood], [p["max_displacement"] for p in stood],
+                "o", color=_SSRM_CURVE_STOOD_COLOR, ms=6.5, ls="none", zorder=4)
+        handles.append(Line2D([0], [0], marker="o", ls="none", ms=6.5,
+                              color=_SSRM_CURVE_STOOD_COLOR))
+        # A trial the hybrid criterion counted as standing without converging
+        # (its displacements had stopped) is still a standing trial, and the key
+        # does not claim convergence for it.
+        labels.append("reached equilibrium" if all(p["converged"] for p in stood)
+                      else "reached equilibrium or stopped moving")
+    endings = []
+    for p in points:
+        if p["ending"] is not None and p["ending"] not in endings:
+            endings.append(p["ending"])
+    markers = {label: marker for label, marker in
+               list(_SSRM_CURVE_ENDINGS.values()) + [_SSRM_CURVE_BUDGET]}
+    for ending in endings:
+        mine = [p for p in points if p["ending"] == ending]
+        ax.plot([p["F"] for p in mine], [p["max_displacement"] for p in mine],
+                markers[ending], mfc="white", mec=_SSRM_CURVE_FELL_COLOR, mew=1.5,
+                ms=6.5, ls="none", zorder=4)
+        handles.append(Line2D([0], [0], marker=markers[ending], ls="none", ms=6.5,
+                              mfc="white", mec=_SSRM_CURVE_FELL_COLOR, mew=1.5))
+        labels.append(ending)
 
-    steps = list(range(1, len(trials) + 1))
-
-    # The interval, behind everything: a band from the low end to the high end,
-    # held flat across the trial that produced it (step='post'), so its width at
-    # any trial is the width the search had reached by then.
-    band = [(n, lo, hi) for n, (lo, hi) in zip(steps, intervals)
-            if lo is not None and hi is not None and hi > lo]
-    if band:
-        bx = [n for n, _lo, _hi in band] + [band[-1][0] + 0.5]
-        blo = [lo for _n, lo, _hi in band] + [band[-1][1]]
-        bhi = [hi for _n, _lo, hi in band] + [band[-1][2]]
-        ax.fill_between(bx, blo, bhi, step="post", color="#7f8c9a", alpha=0.18,
-                        linewidth=0, label="the interval still open")
-
-    # The trials themselves, in the order they were solved.
-    ax.plot(steps, [t["F"] for t in trials], "-", color="0.55", lw=1.0,
-            zorder=2)
-    for stood in (True, False):
-        color, marker, label = _TRIAL_STYLE[stood]
-        xs = [n for n, t in zip(steps, trials) if t["stood"] is stood]
-        ys = [t["F"] for t in trials if t["stood"] is stood]
-        if xs:
-            ax.plot(xs, ys, marker, color=color, ms=6, ls="none", label=label,
-                    zorder=3)
-
+    if final_interval is not None and len(final_interval) == 2:
+        lo, hi = float(final_interval[0]), float(final_interval[1])
+        if hi > lo:
+            ax.axvspan(lo, hi, color="#7f8c9a", alpha=0.18, lw=0, zorder=1)
+            handles.append(Patch(facecolor="#7f8c9a", alpha=0.18, edgecolor="none"))
+            labels.append("final bracket")
     if fs is not None:
-        note = f"FS = {float(fs):.3f}"
-        if tolerance is not None:
-            note += f" ± {float(tolerance) / 2:g}"
-        ax.axhline(float(fs), color="#1f4e79", ls="--", lw=1.6, zorder=4,
-                   label=note)
+        ax.axvline(float(fs), color="#1f4e79", ls="--", lw=1.4, zorder=3)
+        handles.append(Line2D([0], [0], color="#1f4e79", ls="--", lw=1.4))
+        from .fem import ssrm_fs_text
+        labels.append(ssrm_fs_text(float(fs), bool(fs_is_lower_bound), 3))
 
-    ax.set_xlabel("Trial, in the order it was solved")
-    ax.set_ylabel("Strength reduction factor $F$")
-    ax.set_xlim(0.5, len(trials) + 0.5)
-    ax.set_xticks(steps)
+    ax.set_xlabel("Strength reduction factor, F")
+    ax.set_ylabel(_fem_cbar_label(fem_data, "Maximum displacement", "length"))
+    # Displacement is measured from zero, so the axis is too: a flat branch then
+    # reads as flat rather than being stretched to fill the height.
+    top = max(us)
+    ax.set_ylim(0.0, top * 1.1 if top > 0 else 1.0)
+    ax.margins(x=0.06)
     ax.grid(alpha=0.25)
     if show_title:
-        ax.set_title("Strength reduction search", fontsize=11)
-    if show_legend:
-        ax.legend(loc="best", fontsize=8.5, framealpha=0.9)
-
-    try:
-        fig.tight_layout()
-    except Exception:
-        pass
-    if save_png:
-        fig.savefig('plot_ssrm_convergence.png', dpi=dpi, bbox_inches='tight')
-    return fig, ax
+        ax.set_title(SSRM_CURVE_TITLE, fontsize=12, pad=15)
+    if show_legend and handles:
+        title = ("open marker: where the trial was when it was stopped, "
+                 "still moving"
+                 if endings else None)
+        _ssrm_curve_legend(ax, handles, labels, title)
+    return ax
 
 
 def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
@@ -3054,7 +3697,8 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 
 def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                               cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, cmap=None,
-                              single_panel=False, vmin=None, vmax=None, show_joints=True):
+                              single_panel=False, vmin=None, vmax=None, show_joints=True,
+                              joint_linewidth=None):
     """
     Plot viscoplastic max shear strain contours.
 
@@ -3104,12 +3748,23 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # defer the force colorbar the same way and hand its spec back, so the two bars
     # get separate full-height slots instead of colliding in one.
     # A joint carries no strain of its own, so the contour field says nothing
-    # about it. Its state goes on the line as a hairline colored by slip, under
-    # the bar it stands beside, with no legend entry of its own — the slip
-    # colorbar is the legend.
-    joint_cbar_specs = (plot_joint_states(ax, fem_data, solution,
-                                          draw_cbar=not single_panel)
-                        if show_joints else [])
+    # about it. With Show joints on, every jointed model draws every joint on
+    # this panel — wall contacts, rock joints and a jointed sheet's two faces
+    # either side of its bar — colored by slip, with the slip colorbar beside
+    # the field's and the key naming closed / slipping / opened, off the
+    # section (plot_joint_states). The deformation panel draws them the same
+    # way. On a model whose soil or rock can yield the joints are drawn over
+    # the strain field, at the thin over-field width, and the panel keeps its
+    # strain title and colorbar; on an all-elastic model the panel is the
+    # joints' own (slip_panel), titled Joint slip, and the slipped lengths draw
+    # at the joint-face width.
+    jointed = bool((fem_data.get("joint_data") or {}).get("n"))
+    joint_cbar_specs = (plot_joint_states(
+                            ax, fem_data, solution,
+                            draw_cbar=not single_panel,
+                            linewidth=((joint_linewidth or JOINT_FACE_LINEWIDTH)
+                                       if slip_panel else None))
+                        if (show_joints and jointed) else [])
     reinf_cbar_specs = []
     if show_reinforcement and 'elements_1d' in fem_data:
         reinf_cbar_specs = plot_reinforcement_forces(
@@ -3118,19 +3773,14 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
     F = solution.get("F", None)
     at_failure = solution.get("_at_failure", False)
-    title = panel_label
-    if at_failure:
-        title += ' at Failure'
+    title = panel_label + _failure_words(solution, fs_follows=True)
     # at_failure when plot_fem_results routed this panel onto the at-failure field
     # (field_state='failure', the default): leads with FS, matching the
     # deformation/displace_vector panels so the figure tells one story.
     title = _fs_title(_fallback_clause(solution, title), F,
-                      solution.get("_ssrm_fs"), at_failure=at_failure)
-    # The opened-joint tick is the one mark here that no colorbar explains, so
-    # the panel says what it is. Only on a figure that draws one.
-    note = _joint_open_note(fem_data, solution) if show_joints else ""
-    if note:
-        title = f'{title}\n{note}'
+                      solution.get("_ssrm_fs"), at_failure=at_failure,
+                      lower=solution.get("_ssrm_fs_lower", False),
+                      undecided=solution.get("_undecided", False))
     ax.set_title(title, fontsize=12, pad=15)
     return mappable, reinf_cbar_specs
 
@@ -3299,9 +3949,8 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
         plot_reinforcement_lines(ax, fem_data, solution)
     
     # Add title indicating yield state
-    title = 'Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)'
-    if solution.get("_at_failure", False):
-        title += ' at Failure'
+    title = ('Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)'
+             + _failure_words(solution))
     ax.set_title(_fallback_clause(solution, title), fontsize=12, pad=15)
     
     # Add statistics to the plot

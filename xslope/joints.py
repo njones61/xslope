@@ -71,6 +71,13 @@ from shapely.ops import unary_union
 #: reasonable size, and a zero-length one is a mesher failure.
 MIN_TRACE_FRAC = 1.0e-3
 
+#: A Voronoi cell wall shorter than this fraction of the block size is a sliver of
+#: the tessellation — two seeds that happened to fall almost in line — not a joint.
+#: Below it the wall is dropped and the two cells share a rock bridge. The mesher
+#: snaps a line's ends onto boundary points within a twentieth of the element
+#: size, and a wall shorter than that collapses to nothing when it does.
+VORONOI_MIN_WALL_FRAC = 0.1
+
 #: How close to a vertex of the region a clipped endpoint may land before it is
 #: SNAPPED onto it, as a fraction of the region's diameter.
 #:
@@ -518,7 +525,7 @@ def _overlap_tol(rows):
 
 
 def voronoi(slope_data, block_size, seed, region=None, label="vor", props=None,
-            band=None):
+            band=None, short_walls="drop"):
     """A blocky mass: a seeded Voronoi tessellation, as joint lines.
 
     A rock mass with no through-going set is described by its BLOCK SIZE rather
@@ -543,12 +550,29 @@ def voronoi(slope_data, block_size, seed, region=None, label="vor", props=None,
         reproduce is not an input.
     region, label, props, band
         As :func:`parallel_set`.
+    short_walls : {"drop", "merge"}, optional
+        What happens to a cell wall shorter than ``VORONOI_MIN_WALL_FRAC`` x
+        ``block_size``. ``"drop"`` (the default, and what every stored network
+        was generated with) leaves it out: the two cells either side stay joined
+        through the gap it leaves, a bridge of intact rock up to that width, and
+        read as one block. ``"merge"`` collapses it instead: its two ends become
+        one junction, at their midpoint, so every cell stays a block of its own.
+        A junction standing within that distance of the region's boundary moves
+        onto it (onto a corner of the region, if one is that close), so a sliver
+        of cell between the junction and the boundary goes with it and the walls
+        that met there reach the boundary at one point. Merging moves a junction
+        by at most about half the threshold; it changes no wall that does not
+        meet a short one.
 
     Returns
     -------
     list of dict
     """
     from scipy.spatial import Voronoi          # local: scipy is a heavy import
+
+    if short_walls not in ("drop", "merge"):
+        raise ValueError(
+            f"short_walls must be 'drop' or 'merge', not {short_walls!r}.")
 
     block_size = float(block_size)
     if block_size <= 0.0:
@@ -561,7 +585,7 @@ def voronoi(slope_data, block_size, seed, region=None, label="vor", props=None,
 
     minx, miny, maxx, maxy = poly.bounds
     diag = math.hypot(maxx - minx, maxy - miny)
-    min_len = MIN_TRACE_FRAC * diag
+    min_len = max(MIN_TRACE_FRAC * diag, VORONOI_MIN_WALL_FRAC * float(block_size))
     bnd_tol = BOUNDARY_TOL_FRAC * diag
     snap_tol = SNAP_TOL_FRAC * diag
     boundary = _boundary_of(whole)             # see parallel_set: the band's edges
@@ -582,11 +606,17 @@ def voronoi(slope_data, block_size, seed, region=None, label="vor", props=None,
             "tessellation to make. Use a smaller block_size.")
 
     vor = Voronoi(pts)
+    vv = vor.vertices
+    if short_walls == "merge":
+        vv = _merge_short_walls(vor, poly, boundary, _region_vertices(whole),
+                                min_len)
     rows = []
     for (a, b) in vor.ridge_vertices:
         if a < 0 or b < 0:
             continue                              # a ridge running to infinity
-        wall = LineString([vor.vertices[a], vor.vertices[b]])
+        if short_walls == "merge" and np.array_equal(vv[a], vv[b]):
+            continue                              # a wall merged to a point
+        wall = LineString([vv[a], vv[b]])
         for seg in _segments(wall.intersection(poly)):
             if not _keep(seg, boundary, min_len, bnd_tol):
                 continue
@@ -601,6 +631,66 @@ def voronoi(slope_data, block_size, seed, region=None, label="vor", props=None,
             "size close to the region's own size leaves every cell wall on its "
             "boundary; use a smaller block_size.")
     return rows
+
+
+def _merge_short_walls(vor, poly, boundary, corners, min_len, passes=8):
+    """The tessellation's vertices with every short wall collapsed.
+
+    ``voronoi(..., short_walls="merge")``. Vertices joined by a finite wall no
+    longer than ``min_len`` are one junction, placed at their mean; a junction
+    within ``min_len`` of the region's boundary goes onto the nearest boundary
+    point, or onto a corner of the region within ``min_len`` of that point.
+    Only vertices within ``2 * min_len`` of the region are moved: the rest never
+    reach a joint line. Repeated until no wall between two distinct junctions
+    near the region is ``min_len`` or shorter, since a move can bring two
+    junctions together. Returns a new (n, 2) array; the tessellation itself is
+    not modified.
+    """
+    from shapely.geometry import Point as _Pt
+    V = np.array(vor.vertices, dtype=float)
+    near = np.array([poly.distance(_Pt(p)) <= 2.0 * min_len for p in V])
+    ridges = [(a, b) for (a, b) in vor.ridge_vertices
+              if a >= 0 and b >= 0 and (near[a] or near[b])]
+    for _ in range(passes):
+        parent = list(range(len(V)))
+
+        def _find(k):
+            while parent[k] != k:
+                parent[k] = parent[parent[k]]
+                k = parent[k]
+            return k
+
+        short = 0
+        for a, b in ridges:
+            if not (near[a] and near[b]):
+                continue
+            if 0.0 < math.hypot(*(V[a] - V[b])) <= min_len:
+                ra, rb = _find(a), _find(b)
+                if ra != rb:
+                    parent[max(ra, rb)] = min(ra, rb)
+                    short += 1
+        groups = {}
+        for k in np.flatnonzero(near):
+            groups.setdefault(_find(int(k)), []).append(int(k))
+        moved = 0
+        for members in groups.values():
+            p = V[members].mean(axis=0)
+            q = _Pt(p)
+            if boundary.distance(q) <= min_len:
+                foot = boundary.interpolate(boundary.project(q))
+                p = np.array([foot.x, foot.y])
+                if len(corners):
+                    d = np.hypot(corners[:, 0] - p[0], corners[:, 1] - p[1])
+                    i = int(np.argmin(d))
+                    if d[i] <= min_len:
+                        p = corners[i].astype(float)
+            for k in members:
+                if not np.array_equal(V[k], p):
+                    V[k] = p
+                    moved += 1
+        if short == 0 and moved == 0:
+            break
+    return V
 
 
 # ---------------------------------------------------------------------------

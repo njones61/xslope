@@ -378,16 +378,26 @@ class FemDetailsDialog(QDialog):
             # The at-failure field this panel is reading is a capture the guard
             # stopped: the mechanism, taken at a named iteration rather than at an
             # equilibrium. The verdict is stated, with where it was read from
-            # standing beside it — the same words the figure's title carries.
-            from xslope.plot_fem_details import capture_stop_note
+            # standing beside it.
+            from xslope.plot_fem_details import (capture_distance_words,
+                                                 capture_stop_note)
             note = capture_stop_note(prof)
             verdict = prof.get("status", "")
             self.status.setText(f"{verdict} — {note}" if verdict and note
                                 else (verdict or note))
-            self.status.setToolTip(
-                "Read from the at-failure capture, which the solver stopped at "
-                "that iteration: the section was running away and this is the "
-                "state it was in. The converged field is one switch away.")
+            stop = prof.get("capture_stop")
+            if stop and stop[1] == "distance":
+                self.status.setToolTip(
+                    "Read from the at-failure capture, which the solver stopped "
+                    f"at that iteration once the section had "
+                    f"{capture_distance_words()}: the mechanism had formed and "
+                    "this is the state it was in. The converged field is one "
+                    "switch away.")
+            else:
+                self.status.setToolTip(
+                    "Read from the at-failure capture, which the solver stopped at "
+                    "that iteration: the section was running away and this is the "
+                    "state it was in. The converged field is one switch away.")
         else:
             self.status.setText(prof.get("status", ""))
             meaning = reinforcement_state_meaning(prof.get("status_key"))

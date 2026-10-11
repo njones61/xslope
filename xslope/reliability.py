@@ -1524,7 +1524,7 @@ def _ccd_design(d, alpha):
     """Coded coordinates of the central composite design in ``d`` parameters.
 
     Rows are, in order: the ``2^d`` factorial corners at +/-1, the ``2d`` axial
-    points at +/-``alpha``, and the centre. Coded units are standard deviations
+    points at +/-``alpha``, and the center. Coded units are standard deviations
     about the most-likely values.
     """
     import itertools
@@ -1581,7 +1581,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
 
     1. **Design.** A central composite design about the most-likely values — the
        ``2^d`` factorial corners at +/-1 sigma, ``2d`` axial points at
-       +/-``alpha`` sigma, and the centre — each solved with the real pipeline.
+       +/-``alpha`` sigma, and the center — each solved with the real pipeline.
     2. **Fit.** A full quadratic in the ``d`` uncertain parameters
        (``1 + d + d(d+1)/2`` coefficients), least squares.
     3. **Gate.** ``n_gate`` further realizations, drawn from the sampling
@@ -1680,7 +1680,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
         return False, (
             f"Response surface: this model carries {d} uncertain parameters, so the "
             f"central composite design would be {n_design} real solves "
-            f"(2^{d} corners + {2 * d} axial + 1 centre), past the {RS_MAX_DESIGN} "
+            f"(2^{d} corners + {2 * d} axial + 1 center), past the {RS_MAX_DESIGN} "
             f"limit. Monte Carlo samples the same distributions without a design "
             f"that doubles with every parameter.")
     n_terms = 1 + d + d * (d + 1) // 2
@@ -1935,7 +1935,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
         print(tabulate(table, headers=["Parameter", "MLV", "σ", "COV"],
                        tablefmt="grid", colalign=["left", "center", "center", "center"]))
         print(f"\nDesign: {n_design} real solves (2^{d} corners at ±1σ, {2 * d} axial "
-              f"at ±{alpha:g}σ, 1 centre) | quadratic terms: {n_terms} | rank {rank}")
+              f"at ±{alpha:g}σ, 1 center) | quadratic terms: {n_terms} | rank {rank}")
         print(f"Gate: {n_gate_valid} held-out real solves | R² = {gate_r2:.6f} | "
               f"RMS = {gate_rms:.5f} (≤ {rms_limit:.5f}) | max = {gate_max:.5f} | "
               f"real σ over the gate draws = {gate_sigma:.4f}")

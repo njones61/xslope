@@ -15,16 +15,16 @@ follows the mode: **Run LEM…**, **Run Seep…**, **Run FEM…**).
 
 Every run dialog checks the model against what the analysis it is about to start
 actually needs, and shows the result in a **Model checks** column beside the run
-controls. The point is the answer that looks fine: a blank pore-pressure ratio, a
-hydraulic conductivity of zero, a material with no tensile cap, a boundary set that
-drives no flow — each of those runs to completion and returns a number, and the
-number is wrong. The checks say so before the solve rather than after the report.
+controls. The checks target inputs that give an answer that looks reasonable but is wrong:
+a blank pore-pressure ratio, a hydraulic conductivity of zero, a material with no tensile cap,
+a boundary set that drives no flow. Each of those runs to completion and returns a wrong
+number. The checks report these before the solve rather than after the report.
 
 The column is a **list**: one line per finding, marked with its severity, with the
 full text of the selected line underneath it. The dialog opens on the first error,
-or on the first line when there is none, so what is on screen is always the thing
-most worth reading. A check that fires once per material — four materials with no
-tensile cap, say — takes **one line, not four**: the line says how many and which
+or on the first line when there is none, so the most serious finding is always the one
+on screen. A check that fires once per material — four materials with no
+tensile cap, say — takes **one line, not four**: the line gives how many and which
 (*"… — 4 materials: 1 ('Shell'), 2 ('Core'), 3 ('Clay'), 4 ('Sand')"*), and the
 detail states the explanation they share once, with each material's own numbers
 under it. Anything the checks offer to fix is offered once, on that one entry.
@@ -36,20 +36,19 @@ Findings come in three severities, and they behave differently:
   and the field it is about.
 - A **warning** means the run will proceed and the answer may well be fine, but
   the model matches a pattern that has produced wrong answers before. A warning
-  **never blocks a run**. It is on screen beside the button so it informs the
-  decision instead of annotating the regret.
+  **never blocks a run**. It is shown beside the button so that it can be weighed
+  before the run starts.
 - A **note** records a default that was applied or an input that is inert. Notes
   are collapsed behind a *n notes* line, available without being in the way.
 
-Here the circles sheet is empty, so there is no surface to analyse — an error, and
-**Run** is greyed out until it is resolved:
+Here the circles sheet is empty, so there is no surface to analyze — an error, and
+**Run** is grayed out until it is resolved:
 
 ![Run LEM with an error and a remedy button](images/analysis_run_lem_preflight.png)
 
 The button under the finding's text is a **remedy**: a fix the check can offer for
-what it found. A remedy is always offered and never applied by itself, because a change you
-did not ask for is the same disease in a helpful disguise — the model would quietly
-stop matching the file you typed. Pressing the button first shows exactly what the
+what it found. A remedy is always offered and never applied automatically, because an
+unrequested change would make the model stop matching the file you entered. Pressing the button first shows exactly what the
 change would be (*"Add 6 starting circles to the circles sheet: …"*); applying it
 lands on the normal undo stack, is saved like any other edit, and re-runs the checks
 so the list reflects the model that would now run. A remedy that cannot fully
@@ -57,12 +56,12 @@ succeed on this model — a piezometric line whose x values rise and then fall c
 simply be reversed — shows its button dimmed, with the reason as its tooltip, rather
 than failing when pressed.
 
-The checks offer these fixes today: reverse a load or piezometric line entered
+The checks offer these fixes: reverse a load or piezometric line entered
 right-to-left, generate a starting set of circles from the slope geometry, add
 standing water as a distributed load (manual water-load models), and switch a model
-to [automatic water loads](../usage/input_template.md#worksheet-main), which is the better fix of the
-last two — a written-in load is a snapshot that goes stale the moment the pool
-moves, and a derived one cannot.
+to [automatic water loads](../usage/input_template.md#worksheet-main), which is the better of the
+last two fixes, because a written-in load does not follow a change in the pool level and a
+derived one does.
 
 The same checks drive what the dialog lets you pick. OMS and Bishop take moments
 about a circle center, so on a non-circular surface they are dimmed, with the reason
@@ -71,9 +70,9 @@ the spot:
 
 ![Method list with OMS and Bishop dimmed](images/analysis_run_lem_methods.png)
 
-A model that defines both a circular and a non-circular surface has no way, in the
-file's geometry, of saying which one it means, and the circles simply win with no
-message. The **Surface** selector is that choice, and it is written back to the model
+A model that defines both a circular and a non-circular surface does not state in its
+geometry which one it means, and the circular surface is then used. The **Surface**
+selector makes that choice, and it is written back to the model
 when you run — into the **main** sheet's **Surface family** cell, so it survives saving
 and reopening the file — and the next run, the plots and the saved file all read the
 same answer.
@@ -113,13 +112,13 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   wrong family can converge 20% or more too high with no warning — or when you
   have no idea where the critical circle is (the circles sheet may even be
   empty). It reports the most critical surface anywhere in the model; leave it
-  off to interrogate a specific mechanism with your own circles.
+  off to examine a specific mechanism with your own circles.
 - **Ignore surficial (skin) failures** — rejects trial surfaces shallower than the
   **Min slip depth** below the ground surface. Off by default, and available for the
   auto-search. On a cohesionless face the critical surface is an infinitely shallow
-  skin slide, and without the filter the search chases it instead of the deep-seated
+  skin slide, and without the filter the search finds it instead of the deep-seated
   mechanism a design wants; see [surficial failures and the minimum-slip-depth
-  filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
+  filter](../fem/solver.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
   for how to choose the depth.
 - **Search tolerances** (`fs_tol`, `tol`, `max_iter`) — enabled for the
   search-driven analyses.
@@ -138,14 +137,15 @@ The result depends on the analysis type:
 ![LEM Solution view](images/analysis_lem_solution.png)
 
 When the accepted solution carries admissibility defects — base tension on a
-cohesionless slice, interslice tension, or a line of thrust that leaves the
-slices — an amber strip across the top of the **LEM · Solution** view lists
-them, so an inadmissible FS is never mistaken for a clean success:
+cohesionless slice, interslice tension, a line of thrust that leaves the
+slices, or [tension on the base of the slices at the crest](../lem/search.md#tension-at-the-crest)
+— an amber strip across the top of the **LEM · Solution** view lists them, so an
+inadmissible FS is never mistaken for a clean success:
 
 ![LEM Solution with admissibility warnings](images/analysis_solution_warnings.png)
 
-The warnings never change the factor of safety — they say the internal force
-distribution behind it is strained, and not all of them are equally alarming —
+The warnings never change the factor of safety — they indicate that the internal force
+distribution behind it is questionable, and some matter more than others —
 see [Interpreting the Admissibility
 Warnings](../lem/spencer.md#interpreting-the-admissibility-warnings). A clean
 solution shows no strip.
@@ -173,8 +173,7 @@ are shared by all of them:
 a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a **Property**
 dropdown listing that material's option-aware sweepable fields (both drawn from the engine's
 `list_params`). A **Re-search the critical surface at each step** checkbox applies throughout:
-on by default — the honest setting, since the critical surface moves as the parameter changes
-— and off re-solves the entered surface only (much faster, but right only for that prescribed
+on by default, because the critical surface moves as the parameter changes; off re-solves the entered surface only (much faster, but right only for that prescribed
 surface).
 
 **Sensitivity** sweeps several parameters and visualizes how FS responds. A **Plot type**
@@ -219,17 +218,17 @@ The fourth mode sweeps the saved instants of a
 [transient seepage](../seep/transient.md) analysis instead of a parameter. Each point solves
 the same model against that instant's pore pressures — no input changes between them, so
 the axis is time — and the reservoir load is re-derived from the pool as it stood at that
-moment. The parameter picker steps aside and a **Saved frames** checklist takes its place,
+moment. The parameter picker is replaced by a **Saved frames** checklist,
 listing every instant the run stored with all of them ticked; **All** and **None** set the
 whole list, and unticking samples a long one, each frame being a full stability run. The
 **Method**, **Number of slices** and **Re-search the critical surface at each step**
 controls apply as they do everywhere else, and the circles sheet's search window is
-applied, which is what keeps the curve on one mechanism rather than letting it jump
+applied, which keeps the curve on one mechanism rather than letting it jump
 families between instants. A **Grid search (auto-seed the circular search)** checkbox
 under the frames list does here what it does in
 [Limit equilibrium](#limit-equilibrium-lem): every instant is
 searched from a geometry-derived sweep of centers and tangent elevations rather than from
-the circles sheet alone, which is what a curve needs when the critical mechanism moves
+the circles sheet alone, which a curve needs when the critical mechanism moves
 between parts of the section — a dam whose downstream face governs at full pool and whose
 upstream face governs during a drawdown, for instance:
 
@@ -240,20 +239,20 @@ into a three-stage [rapid drawdown](../lem/rapid.md) instead of a single-stage
 analysis: stage 1 is the transient run's initial state (the `tseep` sheet's `stage_1`, normally
 t = 0 at full pool), stage 2 is that instant's drawn-down state, and stage 3 re-checks the
 same section with drained strengths. The reported value is the drawdown's own — the lower of
-stages 2 and 3 — so the curve answers *how safe is this slope if the pool falls to where it
-stands at t*, instant by instant. The box is available only on a model whose materials carry
-the drawdown strengths `d` and ψ; without them it is greyed and says so, because all three
-stages would read the same strengths. A drawdown point is always searched from the starting
-circle, so **Re-search** is held on and greyed while the box is ticked.
+stages 2 and 3 — so each point is the factor of safety of the slope if the pool falls to its
+level at that instant. The box is available only on a model whose materials carry
+the drawdown strengths `d` and ψ; without them it is grayed with the reason in its tooltip,
+because all three stages would use the same strengths. A drawdown point is always searched from the starting
+circle, so **Re-search** is held on and grayed while the box is ticked.
 
 The mode is available in **LEM** and **FEM** mode on a model that carries a transient
 seepage solution and at least one material reading `u = seep`. Without one of those it is
 disabled and names the reason — *Run a transient seepage analysis first*, *No material takes
 its pore pressure from the seepage solution*, or, in Seepage mode, that the seepage solution
-is this run's input rather than its output. The drawdown option is LEM only: the three-stage
+is an input to this run. The drawdown option is LEM only: the three-stage
 procedure is a limit-equilibrium construction with no SSRM equivalent. The engine page
 [Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
-carries the sweep itself.
+describes the sweep itself.
 
 ### Running and cancelling
 
@@ -267,7 +266,7 @@ sweep stops and the app is left consistent, with no partial result stored.
 
 **Sensitivity** opens a **Sensitivity** tab with the selected plot. For the default
 **tornado** — one horizontal bar per parameter, widest on top, with the base-case FS drawn as
-a labelled vertical reference line:
+a labeled vertical reference line:
 
 ![Sensitivity tornado](images/analysis_sensitivity_tornado.png)
 
@@ -307,17 +306,16 @@ the lower of stages 2 and 3:
 
 ![FS vs Time result tab](images/analysis_sensitivity_fs_time.png)
 
-When the swept range never reaches the target, the result is honest about it: no crossing is
-drawn, and an amber note reports the FS span and which way to widen the range — the GUI face
-of the engine's
-[never-extrapolate discipline](../parametric/design.md#honest-about-misses):
+When the swept range never reaches the target, no crossing is drawn, and an amber note
+reports the FS span and which way to widen the range, following the engine's rule of
+[never extrapolating](../parametric/design.md#honest-about-misses):
 
 ![Design honest miss](images/analysis_sensitivity_design_miss.png)
 
 Every result view above carries two sub-tabs: **Plot**, which it opens on, and **Table** — the
 numbers the plot is drawn from, as a grid. Each mode shows its own: the low and high bound of
 each tornado bar, the swept values and factors of safety of a design or back-analysis curve,
-and, for a march, one row per instant with its factor of safety, the critical circle and the
+and, for a transient run, one row per instant with its factor of safety, the critical circle and the
 face that circle sits on (plus the three stage values and the governing stage on a drawdown).
 An instant that produced no result carries its reason in the row rather than leaving a gap.
 **Save CSV…** writes the grid to a comma-separated file, offered as `<model>_<mode>.csv`
@@ -334,7 +332,7 @@ so build one first. The variance Pareto and Monte Carlo rank plots reuse the LEM
 Taylor-series and Monte-Carlo reliability, so they are offered only for an LEM study
 that carries sigmas.
 
-The dialog's solver rows follow the app mode: in **FEM** they become the SSRM knobs
+The dialog's solver rows follow the app mode: in **FEM** they become the SSRM settings
 (`F_min` / `F_max`, tolerance, failure criterion), and in **Seepage** they become the BC
 set and convergence tolerance, with the design target a discharge **q** rather than an FS:
 
@@ -347,9 +345,8 @@ set and convergence tolerance, with the design target a discharge **q** rather t
 ## Reliability analysis
 
 A **Reliability…** button sits beside **Parametric…** on the **Run menu** and the
-**toolbar** — its probabilistic sibling. Where the Parametric study answers
-deterministic what-ifs, Reliability turns the material standard deviations (the
-`s(·)` columns of the mat sheet) into a reliability index **β** and a **probability
+**toolbar**. The Parametric study varies inputs deterministically; Reliability turns
+the material standard deviations (the σ columns of the mat sheet) into a reliability index **β** and a **probability
 of failure**. It is available in **LEM** and **FEM** modes (not Seepage); the FEM run
 needs a built mesh, like Run.
 
@@ -366,18 +363,18 @@ The dialog offers a **Method** selector with three engines:
   with the finite-element SSRM, so it is **disabled in FEM mode** (a one-line note
   explains why, and FEM reliability stays on the Taylor series):
 - **Response surface (RS)** — the same sampling with the factor of safety taken from
-  a quadratic surrogate, fitted to a few dozen real solves and measured against
-  held-out ones before it is used. Ten million realizations at no sampling cost, so
-  a small probability of failure is resolved; a surrogate that fails its accuracy
-  gate refuses the run rather than answering (the [Monte Carlo
+  a quadratic surrogate, fitted to a few dozen real solves and checked against
+  held-out ones before it is used. It draws ten million realizations at no sampling
+  cost, so a small probability of failure is resolved; a surrogate that fails its
+  accuracy check stops the run without a result (the [Monte Carlo
   page](../reliability/monte_carlo.md#sampling-a-fitted-response-surface) gives the
-  design, the gate and the measured accuracy). Limit-equilibrium only, for the same
+  design, the check and the measured accuracy). Limit-equilibrium only, for the same
   reason as Monte Carlo:
 
 ![Reliability dialog (FEM)](images/analysis_reliability_dialog_fem.png)
 
 Below the engine controls, a read-only **Standard deviations in this file** summary
-lists every `s(·)` column with its value, σ, and COV, so you can confirm what the run
+lists every σ column with its value, σ, and COV, so you can confirm what the run
 will vary. **LEM** adds the solver method, surface, slice count, rapid-drawdown flag,
 and a *search the critical surface at the mean values* toggle; **Monte Carlo** adds an
 **MC samples** count, a **seed** (fixed by default, so the result is reproducible),
@@ -403,7 +400,7 @@ follows the engine:
 | --- | --- |
 | **Taylor series (LEM)** | **LEM · Reliability** — the most-likely-value surface with the F⁺/F⁻ perturbation surfaces. |
 | **Monte Carlo (LEM)** | **Reliability · MC** — the FS histogram with the FS = 1 line, the mean, and fitted normal / lognormal overlays (a display-panel toggle). β in both conventions and the probability of failure are in the title. |
-| **Response surface (LEM)** | **Reliability · RS** — the same FS histogram, drawn from a 10,000-realization subsample of the surrogate draws. The fit and gate summary — design solves, $R^2$, RMS error, the failure-region check — is in the Log pane and the run summary. |
+| **Response surface (LEM)** | **Reliability · RS** — the same FS histogram, drawn from a 10,000-realization subsample of the surrogate draws. The fit and accuracy-check summary — design solves, $R^2$, RMS error, the failure-region check — is in the Log pane and the run summary. |
 | **Taylor series (FEM)** | **FEM · Results** — the deformation at the most-likely values; β and the probability of failure are in the run summary. |
 
 ![LEM Reliability view](images/analysis_lem_reliability.png)
@@ -412,10 +409,10 @@ follows the engine:
 
 Those views carry the same **Table** sub-tab the Parametric ones do. The Taylor series lists
 each parameter with its most-likely value, its σ, the factor of safety at plus and minus one
-σ, and the swing ΔF the variance is built from; a sampling run lists the statistics its
-histogram is a picture of. **Save CSV…** writes either one to a file beside the model.
+σ, and the swing ΔF the variance is built from; a sampling run lists the statistics behind
+its histogram. **Save CSV…** writes either one to a file beside the model.
 
-The engines are the same ones the library exposes — `reliability` (the front door),
+The engines are the same ones the library exposes — `reliability` (the general entry point),
 `reliability_taylor`, `reliability_mc`, `reliability_rs`, and `reliability_fem`; see
 [Reliability Analysis](../reliability/index.md) for the theory and worked examples.
 
@@ -457,23 +454,22 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 - **Refine thin zones** — on by default. A material zone too thin for the mesh to
   resolve does not fail: it solves, and returns a factor of safety that is too high,
   because a shear band cannot form across a single element. Checked, every thin zone
-  is meshed with about four element rows across its local width, down to a limit of six
-  times the target size — a very thin band in a large section would otherwise multiply
-  the node count from a box nobody ticked on this run. A zone the limit leaves under
-  three element rows is named in the model checks, which measure the mesh that was
-  built; giving it the full size it asks for is then a **Size** on the zone, which is
-  not capped, or a finer target size. Thickness is measured on the **material**: a layer
+  is meshed with about four element rows across its local width, down to a limit of one
+  sixth of the target size; without the limit, a very thin band in a large section would
+  multiply the node count. A zone the limit leaves under three element rows is named in
+  the model checks, which measure the mesh that was built; to give it the size it needs,
+  enter a **Size** on the zone, which is not capped, or use a finer target size. Thickness is measured on the **material**: a layer
   stored as several polygons because the ground surface steps through it is measured as
   the one layer it is, so a layer the global size already resolves is left alone. A
   section with no thin zone meshes exactly as it would with the box clear, and the Log
-  names every zone that was refined, the local size it got and the rows that buys. The
+  names every zone that was refined, the local size it got and the number of rows that gives. The
   **Refinement factor** above does not enter — a thin zone is sized by its own
   thickness. See [Thin material zones](../fem/mesh.md#thin-material-zones).
 
 The mesh is built on a background thread (it includes reinforcement and pile
 constraint lines, so it serves FEM too), shown in a **Mesh** tab, and written to a
 `{stem}_mesh.json` sidecar. Seep/FEM **Run** stays disabled until a mesh exists; a
-geometry edit that invalidates the mesh clears it and re-gates Run.
+geometry edit that invalidates the mesh clears it and disables Run again.
 
 ![Mesh view](images/analysis_mesh_view.png)
 
@@ -514,13 +510,13 @@ so rapid-drawdown problems show BC 1 and BC 2 together.
 
 When the open file carries a **tseep** sheet (a transient-seepage time series —
 see the [Input Template](../usage/input_template.md)), the **Run Seep…** dialog
-grows a **Run type** selector with a **Transient (time-dependent)** choice
+shows a **Run type** selector with a **Transient (time-dependent)** choice
 alongside **Steady**. A transient solve marches the variably-saturated flow
 equation through time and saves a sequence of frames, each a full seepage
 solution at one instant. The theory — the storage formulation, time-stepping, the
 submerged-only boundary rule, and the initial condition — is on the
 [Transient Seepage](../seep/transient.md) page, whose
-[Studio](../seep/transient.md#studio) section walks the same workflow from the
+[Studio](../seep/transient.md#studio) section describes the same workflow from the
 theory side.
 
 A transient run drives the flow with BC set 1's time series. The run's other
@@ -564,7 +560,7 @@ the flow-net-only **Flow lines** and **Base material** controls are omitted — 
 transient state has no flow net (see the note below). Changing an option re-renders
 the shown frame.
 
-An **LEM** or **FEM** run consumes ONE frame: with `u = seep`, the instant named in
+An **LEM** or **FEM** run uses one frame: with `u = seep`, the instant named in
 the Run dialog's **Seepage time** group supplies the pore pressures. A
 **rapid-drawdown** LEM run instead stages the `stage_1` and `stage_2` frames into the
 drawdown analysis. See [Rapid Drawdown from a Transient
@@ -578,15 +574,15 @@ single instant, so the **Run LEM** and **Run FEM** dialogs carry a **Seepage tim
 group whenever a transient solution is loaded. It offers three ways to name the
 instant:
 
-- **Saved frame** — a dropdown of the times this solution actually saved. Instant:
-  the pore pressures already exist.
+- **Saved frame** — a dropdown of the times this solution actually saved. The pore
+  pressures already exist, so the run starts at once.
 - **Frame shown in the results viewer** — the time the Seep · Transient play bar is
-  displaying. Also instant, and offered only while that tab is open.
+  displaying. This also starts at once, and is offered only while that tab is open.
 - **Another time** — any instant within the run duration. The pore pressures for it
   do not exist yet and are never interpolated between frames, so choosing it
   **reruns** the transient seepage analysis with that instant added to the save schedule,
-  then starts the stability analysis. The dialog says so before you commit, the rerun reports
-  progress, and it can be cancelled — cancelling it abandons the analysis too.
+  then starts the stability analysis. The dialog states this before the run starts, the rerun
+  reports progress, and it can be cancelled — cancelling it abandons the analysis too.
 
 The group opens on the model's own `stability_time` when the tseep sheet declares one,
 and otherwise on the **last saved frame** — usually the drained end state, which is
@@ -594,190 +590,126 @@ what a blank `stability_time` means. The note under the controls states which in
 will be read either way.
 
 The choice governs that run only. Tick **Save as the model's stability time** to write
-it into the tseep sheet as well, which is what makes a scripted or headless re-run read
-the same frame.
+it into the tseep sheet as well, so a scripted or headless re-run reads the same frame.
 
 On a model with a tseep sheet but no solution loaded the group is present but
 disabled, carrying the reason; a steady model has one pore-pressure field and no
 group at all.
 
-The [model checks](#model-checks-before-a-run) read the group. A material with
+The [model checks](#model-checks-before-a-run) use the group. A material with
 `u = seep` needs a solved pore-pressure field, and a transient model does not carry
 one in the file — the chosen frame is written into the model when the run starts. So
-while a solution is loaded, the checks take the **Seepage time** choice as the answer
-and note which instant it is (*Pore pressures come from the transient seepage
-solution, at t = …*) rather than refusing a run for a field that is one step away.
+while a solution is loaded, the checks accept the **Seepage time** choice and note
+which instant it is (*Pore pressures come from the transient seepage solution, at
+t = …*) rather than blocking a run for a field that is supplied when the run starts.
 A **rapid drawdown** names both stage times the same way, and those two frames are
-the stage-1 / stage-2 pair the drawdown check asks for — one instant is not, because
-it supplies stage 1 only. With no solution loaded there is nothing to stage, and the
-checks refuse as they would on any other model: run the seepage analysis first.
+the stage-1 / stage-2 pair the drawdown check requires — one instant is not enough,
+because it supplies stage 1 only. With no solution loaded there is nothing to stage,
+and the checks block the run as they would on any other model until the seepage
+analysis is run.
 
 ### Rapid-drawdown stage times {#stage-times}
 
 Ticking **Rapid drawdown** in the Run LEM dialog replaces the single-instant selector
 with **Stage 1 time** and **Stage 2 time**, pre-filled from the model. These are the
-two instants the drawdown stages read out of the transient solution — pure extraction parameters,
-since the drawdown schedule itself lives in the boundary conditions — so they are
-edited here, at the point of use, as well as under
+two instants the drawdown stages read out of the transient solution. They only select
+instants, since the drawdown schedule itself is set in the boundary conditions, so they
+are edited here, where they are used, as well as under
 [Inputs → Transient](editing.md#transient-seepage). Both places write the same two
 values on the tseep sheet, and an edit here lands in the model immediately.
 
-Run refuses stage times it cannot use — one blank, stage 2 at or before stage 1, or a
-stage beyond the run duration — and says which. Stage times the loaded solution never
+Run rejects stage times it cannot use — one blank, stage 2 at or before stage 1, or a
+stage beyond the run duration — and names the problem. Stage times the loaded solution never
 saved trigger the same rerun as a free-entry seepage time.
 
 ---
 
 ## Finite element (FEM)
 
-In **FEM** mode, **Run FEM…** offers a **single trial** or an **SSRM** run (the
-Shear Strength Reduction Method), with `F` (or `F_min`/`F_max`), a tolerance, and
-the failure criterion.
+Build a mesh in **FEM** mode, then choose **Run FEM…**. The Run FEM dialog sets up either a
+single trial at a strength reduction factor you choose, or a shear strength reduction (SSRM) search for the factor of
+safety. Its options are listed below; the [Solver page](../fem/solver.md#run-settings) shows the
+dialog and explains each option, with the Excel cell and the `solve_fem()` / `solve_ssrm()`
+argument that set it.
 
-![Run FEM dialog](images/analysis_run_fem_dialog.png)
+- **Analysis** — single trial or SSRM search.
+- **F (single)** — the trial's strength reduction factor.
+- **F min / F max (SSRM)** — the starting search bracket.
+- **Tolerance (SSRM)** — the final bracket width.
+- **Max iterations per trial** — the trial's iteration limit.
+- **Iteration ceiling** — the upper limit on trial extensions.
+- **Accelerate convergence** — enable accelerated iteration steps.
+- **Side BC** — Rollers or Fixed side restraints.
+- **K0 initial stress / K0** — enable at-rest initialization and set its coefficient.
+- **Reduce the tensile cap with F (Tension SRF)** — reduce positive tensile caps; dimmed for single trials or no positive cap (tooltip gives the reason).
+- **Failure criterion** — the rule used to classify trials.
+- **Ignore surficial (skin) failures / Min slip depth** — enable the depth filter and set its depth.
+- **SSR exclusions…** — select material zones kept at full strength (SSRM only).
+- **Capture failure-state mechanism / Capture margin** — capture a mechanism above the reported factor (SSRM only).
+- **Set capture iteration budget / Capture max iterations** — override the automatic capture budget (SSRM only).
+- **Seepage time** — select the transient pore-pressure instant, when a solution is loaded; see [Seepage time](#seepage-time).
 
-**Max iterations per trial** (12000) is the viscoplastic budget each trial *starts*
-with, not a hard stop. A trial that uses it up with its out-of-balance force still
-falling is given another budget's worth, repeatedly, until either it settles or it
-reaches the **Iteration ceiling** (50000). That is what keeps the answer from
-depending on the budget: a model needing 16,000 iterations returns the same factor
-of safety whether the budget was typed as 3000 or 12000. A trial that reaches the
-ceiling while still improving is *inconclusive* — neither settled nor failed — and
-the run says so in the Log rather than counting it as a failure. The factor of safety
-is still the final bracket's midpoint, as on any other run; what changes is that the
-bracket's upper edge is an undecided trial rather than a measured failure, which the
-Log states beside the answer. Raise the ceiling, or loosen the SSRM tolerance, when
-that happens.
+Options start from the open file and are remembered for the session, not written back to the file.
 
-The [model checks](#model-checks-before-a-run) in the dialog's second column are the
-finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the
-strength-reduction factor of safety by a third on the reference model), a modulus of
-zero, a mesh that references a material the table does not define, and — above — a
-cohesive material with no tensile cap, which leaves it the tension its own envelope
-admits — up to the Mohr-Coulomb apex c/tan φ — and raises the factor of safety with
-nothing else on screen to show it.
+Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)).
 
-**Reduce the tensile cap with F (Tension SRF)** decides whether each material's
-tensile cutoff is divided by the trial factor along with *c* and tan φ, or held at the
-value entered. It is offered only where some material declares a cutoff above zero. A
-blank cutoff leaves the envelope's own apex, which is the same at every trial factor,
-and a cutoff of 0 is still 0 however it is divided, so on
-a model whose materials are each blank or 0 the setting has nothing to reduce and the
-checkbox is dimmed, with the reason in its tooltip. It is also dimmed for a single
-trial, which has no bracket to reduce anything over.
+The seismic note in the dialog explains the entered sign: **+k** pushes right and **−k** left; see [Seismic forces](../fem/overview.md#seismic-forces).
 
-When the seismic coefficient is nonzero the checks also carry a note about what its
-**sign** means here, because it does not mean the same thing in both engines. The
-finite-element engine reads `main!D13` as a vector: `+k` pushes in `+x` and `−k` in
-`−x`, and since both faces of an embankment are analysed at once, choosing the
-direction is a modelling decision the engine will not make for you — a pseudo-static
-factor of safety can legitimately come out *above* the static one for the face the
-shaking stabilises. The limit-equilibrium engine reads the same cell as a magnitude
-and orients it itself, and its own dialog says so.
-
-**Side BC** chooses what holds the left and right edges of the model. **Rollers** —
-the default, and what every model that does not say otherwise means — fixes the
-horizontal component and leaves the vertical free, so the truncated ground can still
-settle under its own weight. **Fixed** clamps both components, which is what RS2 does
-on its side boundaries. Fixed is a vendor-parity option rather than a better model: it
-adds shear restraint the real ground does not have, and stiffens a domain truncated
-close to the slope. The setting is part of how the model is restrained rather than
-part of the strength reduction, so it applies to a single trial and an SSRM alike. Like
-the other run options it is seeded from the open file (`main!D22`) and remembered for
-the session, but a choice made here is not written back into the file.
-
-When the model carries a transient seepage solution the dialog also carries the
-**Seepage time** group, which names the instant the pore pressures are read from —
-the same control the Run LEM dialog uses, described under
-[Seepage time](#seepage-time).
-
-For an SSRM run, the **SSR exclusions…** button opens a checkbox picker — one row per
-material zone in the model, checked (included) by default:
+**SSR exclusions…** opens the picker below; uncheck a material zone to hold it at full strength. The button and selection summary appear only for SSRM, and the selection is not saved; see [SSR exclusions](../fem/solver.md#ssr-exclusion-zones).
 
 ![SSR exclusions dialog](images/analysis_ssr_exclude_dialog.png)
 
-Unchecking a zone holds it at full strength through every trial factor instead of
-dividing its c and tan(φ) like the rest of the model — RS2's per-material *Apply_SSR*
-flag / SSR Exclusion Area. The mechanism is pushed up and out of an excluded zone, which
-is useful for keeping a non-participating zone (a stiff foundation, say) from carrying
-the failure, and for reproducing a vendor analysis that constrains the mechanism the same
-way — see [SSR Exclusion Zones](../fem/overview.md#ssr-exclusion-zones) for the
-engineering rationale and a worked comparison against RS2. The button and the summary
-label next to it are gated to the SSRM analysis; the choice is a run option, not a model
-property, so it lives with the rest of the dialog's settings (remembered for the session
-to prefill the next run) rather than being saved into the input file.
+During a run, follow progress and the Log or press **Cancel**. The closing summary gives the factor of safety, bracket, evidence at both ends and wall time; if it reports an [inconclusive trial](../fem/solver.md#creep-trend), raise the ceiling or loosen SSRM tolerance, and if it reports that the factor of safety depends on the iteration limit, raise **Max iterations per trial**.
 
-An SSRM run also offers **failure-state capture**. Once the factor-of-safety
-bracket resolves, **Capture failure-state mechanism** (on by default) re-solves
-once just beyond the critical factor with the displacement cap off, so the
-unconverged field develops the actual collapse *mechanism* the deformation and
-displacement-vector figures render — rather than the diffuse settlement of the last
-converged trial. **Capture margin** sets how far beyond critical that snapshot is
-solved (a fraction of FS), and an optional **capture iteration budget** overrides
-the automatic ceiling. Turning capture off skips the extra solve; the factor of
-safety and the bracket are unaffected either way. The controls are gated to the
-SSRM analysis, since a single trial has no bracket to capture beyond.
+**Continue with a higher limit…** appears for an SSRM run made in this session when the top trial ended undecided at the iteration limit, or was counted failed while still slowing. Choose a new limit (initially five times the old one); progress, Cancel and the Log continue, results are replaced and the Run dialog keeps the new limit (see [Continuation](../fem/solver.md#creep-trend)). For sweeps, use [Parametric study](#sweeps-in-fem-and-seepage-mode).
 
-The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
-**FEM · Results** (deformation, shear strain, displacement vectors). An SSRM run
-reports the factor of safety and can be **cancelled** mid-run. The solution is
-exported alongside the model so it can be restored on the next Open without
-re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
-for a model with reinforcement or piles, the per-element structural results
-(`{stem}_fem_reinf.csv` / `{stem}_fem_piles.csv`), so a reloaded solution redraws
-the reinforcement-force and pile-shear plots without solving again.
+The run opens **FEM · Data** (mesh, boundary conditions and reinforcement) and **FEM · Results**, shown below.
 
 ![FEM Data view](images/analysis_fem_data.png)
 
+The FEM · Results view displays the solved field and its plot controls:
+
 ![FEM Results view](images/analysis_fem_results.png)
 
-The FEM · Results [Display panel](#display-options-per-view) carries the controls
-that shape these plots. When SSRM captured an at-failure mechanism, a **Field
-state** switch chooses which field every panel renders — **At failure** (the
-default: the developed collapse mechanism) or **Last converged** (the sub-critical
-converged solution) — and it applies to the deformation, shear-strain, and
-displacement-vector plots alike, so they always tell the same story. The
-deformation plot adds its own controls: the **Original mesh** reference (dashed
-outline, full grid, or off), the **Deformed color** of the displaced grid, and
-the exaggeration pair — **Scale ×**, the displacement multiplier the plot title
-prints, whose **Auto** default picks whatever draws the largest displacement at
-the **Auto size** percent of the mesh height; entering an explicit Scale ×
-dims Auto size until the box returns to Auto. The displacement-vector plot can **color arrows by magnitude** (with
-a colorbar) instead of solid black.
+Results, captured mechanisms and reinforcement/pile profiles are saved beside the model and restored on Open without re-solving; see [Exported files](../fem/overview.md#exported-files).
 
-On a jointed model the displacement-vector plot is the scaled deformed mesh instead, drawn as the blocks the joints
-cut the section into — each under a faint tint, its joint faces green, the deformed outside of the mesh a dark line
-against the dashed undeformed outline: a jointed slope fails by blocks moving as bodies on their joints, and an arrow
-field sampled at nodes misses the parting and sliding that is the whole mechanism. On a network of more than eight
-jointed lines the element edges come off so the blocks can be seen. Where the displacements are too small to draw the
-mesh is shown undeformed and the title says so. A **Joint state** switch draws
-each joint on the line it runs along, colored by how far its faces have slid on a green ramp the strain field cannot
-produce, gray where it is not slipping and ticked across where it has opened.
+The Results [Display panel](#display-options-per-view) redraws the saved solution without solving again, using the controls below; controls that do not apply to the selected plot are dimmed.
 
-The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
-listing every reinforcement line and pile in the model with a utilization badge, and
-plotting the selected member's profiles along its own length: mobilized axial force
-against its capacity envelope for a reinforcement line, and lateral displacement,
-shear, moment, and mobilized soil reaction against depth for a pile. Under the list is
-a map of the section with the selected member picked out and named, so a row of the list
-is a place on the slope; it is the same drawing the report prints above its member
-details. Its own **Field
-state** control switches those profiles between the at-failure mechanism and the last
-converged solution, exactly as the one on the results view does. **Export** in that
-panel writes the current view as a PNG and its plotted series as a CSV, both named for
-the field state they were taken at. The button is
-dimmed, with a tooltip saying why, for a model that carries neither reinforcement lines
-nor piles. See [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and
-[FEM Piles](../fem/piles.md#inspecting-the-results) for what the profiles show.
+| Control | What it does |
+|---|---|
+| Title | Show or hide the plot title. |
+| Plot type | Choose Deformed mesh, Viscoplastic shear strain, Displacement vectors or Displacement vs F. |
+| Color ramp | Choose the shear-strain colors. |
+| Field state | Choose At failure (default when captured) or Last converged for deformation, shear strain and vectors. |
+| Original mesh | Draw the undeformed reference as a dashed Outline, Full mesh or Off. |
+| Deformed color | Choose Black or Blue for the displaced grid. |
+| Scale × | Set the displacement multiplier printed in the title, or Auto. |
+| Auto size | Set Auto's largest displacement as a percent of mesh height; dimmed while Scale × is explicit. |
+| Element edges | Toggle the grid; on jointed deformation plots it defaults off above eight jointed lines. |
+| Reinforcement | Toggle the structural-member overlay. |
+| Show joints | Draw joints colored by slip; remembered separately for deformation and shear strain, on by default. |
+| Joint width (pt) | Set the joint-face line weight on the deformation plot. |
+| Color by block | Give each block its own tint instead of a material tint; available with Show joints on a jointed deformation plot. |
+| Element numbers | Label elements. |
+| Boundary edges | Outline the domain in black on the vector plot. |
+| Node dots | Mark vector-plot nodes. |
+| Auto-scale vectors | Enlarge arrows for visibility while retaining relative magnitudes, or draw at true scale. |
+| Vector cutoff | Hide arrows below the selected fraction of maximum displacement. |
+| Color by magnitude | Color arrows by displacement magnitude with a colorbar, instead of solid black. |
 
-Each reinforcement row also carries the state the line is in — *within capacity*, *near
-capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive* — and so does the
-line under the plot, with its meaning in the tooltip. Two lines both standing at 100% are
-told apart by that word and not by the badge: *pullout* is an end slipping at what its
-embedment can develop, *yielded* is the middle of the line at its full tensile capacity.
-The states are defined in [The state of a
-line](../fem/reinforcement.md#the-state-of-a-line), and they are the words
-`print_reinforcement_summary()` prints and a generated report writes.
+**Displacement vs F** shows the run's trials, with filled markers for equilibrium, open markers for stopped trials, and the factor of safety over the shaded bracket; section controls are dimmed. A single trial or older results without displacement records show a note instead; see [Displacement vs F](../fem/overview.md#displacement-vs-f).
+
+On a jointed model the deformation plot draws the blocks and their joints colored by slip. **Show joints**, **Joint width** and **Color by block** shape that drawing; see [What the results show](../fem/joints.md#what-the-results-show).
+
+**1D Details…** opens a non-modal member panel:
+
+- Lists reinforcement lines and piles with utilization badges, plus a section map locating the selected member.
+- Plots reinforcement axial force against capacity and pile lateral displacement, shear, moment and soil reaction along the member.
+- **Field state** switches between the captured mechanism and last converged solution.
+- **Export** writes the current view as PNG and its series as CSV, named for the field state.
+- The button is dimmed when there are no reinforcement lines or piles; its tooltip gives the reason.
+
+Reinforcement rows and the plot label show *within capacity*, *near capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive*, with the meaning in the tooltip; see [The state of a line](../reinforcement/fem.md#the-state-of-a-line). Profile interpretation is on [FEM Reinforcement](../reinforcement/fem.md#inspecting-the-results) and [FEM Piles](../piles/fem.md#inspecting-the-results).
 
 ---
 
@@ -849,16 +781,16 @@ module — see [DXF Import/Export](../usage/dxf.md) for the full layer table and
 details. Reading and writing DXF uses the **ezdxf** package, installed with the `gui`
 extra; if it's missing, the import/export actions show an actionable install message.
 
-**Water loads follow what the drawing carries.** A DXF can hold both a `DLOADS` layer
+**Water loads.** A DXF can hold both a `DLOADS` layer
 and a `PIEZO` layer, so the import decides the model's
 [Water loads](../usage/input_template.md#worksheet-main) mode from the geometry rather
 than assuming one. A load block lying along the stretch of ground the piezo line covers
-*is* ponded water somebody drew, so the model imports **manual** and that block carries
+represents ponded water that was drawn in, so the model imports **manual** and that block carries
 the reservoir once you give it its pressures — switching to `auto` without deleting it
 would count the water twice. A drawing whose only statement of the water is the piezo
 line imports **auto**, and the engine derives the reservoir itself. A surcharge
 elsewhere on the ground is user data: it is kept, and it does not make the model manual.
-Whichever way it goes, the post-import notes say so.
+Either way, the post-import notes state which mode was set.
 
 ---
 
@@ -868,7 +800,7 @@ Studio also exchanges whole models — not just geometry — with other slope-st
 packages: GeoStudio SLOPE/W in both directions, and Rocscience Slide2 and RS2 as imports.
 
 **Import** — **File → Import GeoStudio (SLOPE/W)…** reads a `.gsz`. Unlike DXF, there
-is no mapping wizard to work through: a `.gsz` already knows what its geometry means, so
+is no mapping wizard to work through: a `.gsz` already identifies what its geometry represents, so
 material zones, strengths, water conditions and the seismic coefficient all arrive
 identified. The one prompt is **which analysis** to import, because a GeoStudio file
 usually holds several over the same geometry — and they can differ in *materials*, not
@@ -902,12 +834,12 @@ load object, and its piezometric surface is a whole-domain surface rather than a
 table drawn on the ground, so measuring ground against piezo would invent a plateau of
 water the model never had. RS2 models therefore import with
 [Water loads](../usage/input_template.md#worksheet-main) on `manual`, carrying RS2's own
-load objects, and the notes say why. They arrive as XSLOPE distributed loads with the
+load objects, and the notes give the reason. They arrive as XSLOPE distributed loads with the
 [Direction](../usage/input_template.md#worksheet-dloads) RS2 gave them: a *normal* load
 perpendicular to the loaded surface, a *vertical* one (a dead-weight surcharge) straight
 down. A load RS2 aims straight down by *global angle* is vertical too, and crosses only
 when the model's own solved edge tractions confirm which way it points — RS2 writes that
-same downward load two contradictory ways, so the file's solved answer settles it, and a
+same downward load two contradictory ways, so the file's solved tractions decide it, and a
 model that was never solved leaves the load out rather than guessing. Materials bring
 their Young's modulus and Poisson's ratio across as well, for the FEM. Whatever RS2
 defines that cannot cross (its SSR settings, joints, reinforcement, line loads, and loads
@@ -924,13 +856,13 @@ surface — you define circles afterward.
 `.gsz`. It needs a polygon-based model (material zones), since a profile-line model has
 no regions to map onto.
 
-Both directions replace nothing silently: whatever cannot cross the format boundary —
+In both directions nothing is dropped without notice: whatever cannot cross the format boundary —
 SLOPE/W's search definition, reinforcement, piles, loads, non-Mohr-Coulomb strengths — is
 listed in a notes dialog and in the Log pane, so you know exactly what to re-create by
 hand.
 
 Units are one thing a `.gsz` does not carry: the format has no unit-system field, so
-XSLOPE infers it from the unit weight of water and refuses to guess when that value is
+XSLOPE infers it from the unit weight of water and does not guess when that value is
 neither metric nor imperial. See
 [GeoStudio Import/Export](../usage/geostudio.md) for the full mapping table, the
-per-analysis materials wrinkle, and the limits of export.
+per-analysis materials issue, and the limits of export.

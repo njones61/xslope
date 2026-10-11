@@ -19,102 +19,11 @@ from shapely.geometry import Polygon  # noqa: E402
 
 from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
-from xslope.fileio import build_polygons as _build_polygons  # noqa: E402
-from xslope.fileio import build_ground_surface_from_polygons as _ground_from_polys  # noqa: E402
 from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 from benchmarks.tag_k0 import apply_tag_k0  # noqa: E402
 
-
-def _circle_through(P1, P2, yn):
-    """The circle through ground points P1 and P2 whose LOWEST point sits at
-    elevation ``yn``. This is the standing starting-circle rule made constructive:
-    choose where the surface enters the ground (P1), where it daylights (P2), and
-    how deep it is tangent (yn) -- the circle is then fully determined, rather than
-    hunted for by trial. Returns {'Xo', 'Yo', 'Depth', 'R'}, or None when no such
-    circle exists (both points must sit above yn, and the roots must be real)."""
-    (x1, y1), (x2, y2) = P1, P2
-    A, B = y1 - yn, y2 - yn
-    if A <= 0 or B <= 0:
-        return None
-    a = B - A
-    b = 2.0 * (A * x2 - B * x1)
-    c = B * x1 * x1 - A * x2 * x2 - A * B * (y2 - y1)
-    roots = []
-    if abs(a) < 1e-14:
-        if abs(b) > 1e-14:
-            roots = [-c / b]
-    else:
-        disc = b * b - 4 * a * c
-        if disc < 0:
-            return None
-        sq = math.sqrt(disc)
-        roots = [(-b + sq) / (2 * a), (-b - sq) / (2 * a)]
-    best = None
-    lo, hi = min(x1, x2), max(x1, x2)
-    for Xo in roots:
-        Yo = ((Xo - x1) ** 2 + y1 * y1 - yn * yn) / (2.0 * A)
-        R = Yo - yn
-        if R <= 0:
-            continue
-        pen = 0.0 if lo <= Xo <= hi else min(abs(Xo - lo), abs(Xo - hi))
-        cand = (pen, {'Xo': Xo, 'Yo': Yo, 'Depth': yn, 'R': R})
-        if best is None or cand[0] < best[0]:
-            best = cand
-    return best[1] if best else None
-
-
-def _entry_exit_tangent_circle(ground_surface, domain_polygon,
-                                entry_frac=0.1, exit_frac=0.9, tangent_frac=0.4):
-    """A first starting circle derived from the section's own geometry, by the
-    standing rule: enter the ground near the crest (``entry_frac`` of the way
-    across the ground surface's x-range), daylight near the toe (``exit_frac``),
-    and bottom out ``tangent_frac`` of the way from the shallower of those two
-    ground points down to the domain floor. Narrow sections need this solved
-    exactly (via ``_circle_through``) rather than picked from a generic ladder of
-    candidates, because the admissible band that actually daylights twice on the
-    ground can be tight."""
-    coords = list(ground_surface.coords)
-    xs = [p[0] for p in coords]
-    ys = [p[1] for p in coords]
-    x0, x1 = min(xs), max(xs)
-    floor = float(domain_polygon.bounds[1])
-    xe = x0 + entry_frac * (x1 - x0)
-    xx = x0 + exit_frac * (x1 - x0)
-    ye = float(np.interp(xe, xs, ys))
-    yx = float(np.interp(xx, xs, ys))
-    yn = floor + tangent_frac * (min(ye, yx) - floor)
-    return _circle_through((xe, ye), (xx, yx), yn)
-
-
-def _circle_from_polygons(polygons, **kwargs):
-    """``_entry_exit_tangent_circle`` starting from the same polygon list a
-    ``_poly_slope_data``-style builder already assembles, in either the
-    ``[(mat_id, [(x, y), ...]), ...]`` or ``[{'mat_id':..., 'polygon': Polygon}, ...]``
-    form."""
-    polys = []
-    for p in polygons:
-        if isinstance(p, dict):
-            polys.append(p)
-        else:
-            mid, coords = p
-            polys.append({'mat_id': mid, 'polygon': Polygon(coords)})
-    ground_surface, domain_polygon = _ground_from_polys(polys)
-    return _entry_exit_tangent_circle(ground_surface, domain_polygon, **kwargs)
-
-
-def _circle_from_profile(profile_lines, max_depth, **kwargs):
-    """``_entry_exit_tangent_circle`` starting from profile lines, mirroring the
-    loader's own profile-lines -> polygons -> ground-surface conversion
-    (``build_polygons`` / ``build_ground_surface_from_polygons``) so the geometry
-    matches what ``generate_slices`` will actually see once the file round-trips
-    through the sheet."""
-    polys = [{'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
-             for p in _build_polygons(slope_data={'profile_lines': profile_lines,
-                                                   'max_depth': max_depth})]
-    ground_surface, domain_polygon = _ground_from_polys(polys)
-    return _entry_exit_tangent_circle(ground_surface, domain_polygon, **kwargs)
 
 # Loaded only as a geometry/format donor; its elastic constants are RS2-1's, not the
 # derived problem's, so they are stripped at the door (see build_problems).
@@ -202,14 +111,8 @@ def _pruska_slope_data(H, gamma, c, phi, problem=None):
     toe (fully dimensioned in each section's Figure 1). Vendor elastic constants
     (see _PRUSKA_ELASTIC) and psi = 0. Each section's lock pair brackets its
     material family (weakest and strongest case); every case in the 17-case
-    tables is built, so each published value is reproducible.
-
-    The starting circle is inert for these files (SSRM only, see rs2.md) but must
-    still slice. The generic H = 7/10.5 (#56/#57) geometries already do; the
-    steeper H = 14 (#58) section is narrow enough that the same generic circle
-    never daylights twice on the ground, so #58 gets a circle derived from its own
-    ground surface instead (entry near the crest, tangent 40% of the way down to
-    the foundation floor, exit near the toe)."""
+    tables is built, so each published value is reproducible. Strength reduction
+    only (see rs2.md): the files carry no failure surface."""
     nu, E = _PRUSKA_ELASTIC[float(c)]
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
@@ -227,12 +130,7 @@ def _pruska_slope_data(H, gamma, c, phi, problem=None):
     sd['piezo_line'] = []
     sd['circular'] = True
     sd['non_circ'] = []
-    if problem == 58:
-        sd['circles'] = [_circle_from_profile(profile_lines, sd['max_depth'],
-                                              tangent_frac=0.4)]
-    else:
-        sd['circles'] = [{'Xo': 20.0, 'Yo': 8.0 + H + 5.0, 'Depth': 6.0,
-                          'R': H + 7.0}]
+    sd['circles'] = []
     return sd
 
 
@@ -424,7 +322,8 @@ def _poly_slope_data(polygons, materials, circle, max_depth,
     ``polygons`` is a list of (mat_id, [(x, y), ...]) exterior rings; ``materials``
     a list of dicts merged onto the ACADS-1a template material (so every physics
     field the loader expects is present); ``circle`` a single starting circle for
-    the LEM search; ``max_depth`` the search floor. Geometry coordinates are
+    the LEM search, or None for a strength-reduction file that carries no failure
+    surface; ``max_depth`` the search floor. Geometry coordinates are
     transcribed from the vendor RS2 .fez models (dev-side cross-check only) and
     hard-coded here so the corpus rebuilds without them.
 
@@ -452,7 +351,7 @@ def _poly_slope_data(polygons, materials, circle, max_depth,
     sd['piezo_phreatic'] = bool(piezo_phreatic)
     sd['circular'] = True
     sd['non_circ'] = []
-    sd['circles'] = [circle]
+    sd['circles'] = [circle] if circle is not None else []
     return sd
 
 
@@ -483,8 +382,8 @@ def rs2_59():
     water table, tension crack, seismic or loads in the model.
 
     Geometry transcribed from the RS2 vendor model 'slope stability #059_01.fez'
-    via the .fez zone polygonizer; the circle is an inert placeholder the loader
-    requires (SSRM only -- no LEM surface is defined on an RS2 SSR model)."""
+    via the .fez zone polygonizer. SSRM only -- no LEM surface is defined on an RS2
+    SSR model, and the file carries none."""
     zones = [
         (0, [(0.858, 120.076), (0.858, 122.016), (115.713, 126.355),
              (132.493, 136.770), (147.248, 136.192), (267.021, 157.022),
@@ -506,7 +405,7 @@ def rs2_59():
             dict(name='GreyClay', c=250.0, phi=30.0, gamma=22.0, gamma_sat=22.0,
                  E=50000.0, nu=0.4),
         ],
-        circle={'Xo': 100.0, 'Yo': 160.0, 'Depth': 100.0, 'R': 60.0},
+        circle=None,
         max_depth=0.0)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_59.xlsx'))
     return 'rs2_59.xlsx'
@@ -574,7 +473,7 @@ def rs2_31d():
     sd['piezo_line'] = []
     sd['circular'] = True
     sd['non_circ'] = []
-    sd['circles'] = [{'Xo': 3.0, 'Yo': 10.0, 'Depth': -1.0, 'R': 11.0}]
+    sd['circles'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp044d.xlsx'))
     return 'vp044d.xlsx'
 
@@ -676,8 +575,7 @@ def _rs2_66_slope_data(h1):
             dict(name='bearing stratum', c=100.0, phi=0.0, gamma=18.82,
                  gamma_sat=18.82),
         ],
-        circle={'Xo': 75.0, 'Yo': crest + 20.0, 'Depth': 9.0,
-                'R': crest + 20.0 - 9.0},
+        circle=None,
         max_depth=0.0)
     sd['refine_zones'] = [{'polygon': list(soft), 'size': 1.05}]
     return sd
@@ -768,7 +666,7 @@ def rs2_66e():
 # downstream bench, so the downstream pool has zero depth and no downstream load exists —
 # which is why #067_02, _05 and _06 all carry `num distributed loads: 0` downstream.
 #
-# The circle is an inert placeholder (SSRM only). Case 3 downstream (03) runs an
+# The files carry no failure surface (SSRM only). Case 3 downstream (03) runs an
 # UNCONSTRAINED SSR (downstream is the weaker face); Case 3 upstream (04) confines
 # strength reduction to RS2's upstream SSR Search Area (rectangle x in [-6.96, 102.32])
 # via the tag's ssr_zone, so the mechanism is the upstream face — the two stages share the
@@ -794,7 +692,7 @@ def _rs2_67_slope_data(u='none', outline=None):
         polygons=[(0, outline or _RS2_67_DAM)],
         materials=[dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
                         E=1.0e5, nu=0.3, u=u)],
-        circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
+        circle=None,
         max_depth=0.0)
 
 
@@ -875,7 +773,7 @@ def _rs2_67b_seep_slope_data():
     sd = _poly_slope_data(
         polygons=[(0, _RS2_67_DAM)],
         materials=[_rs2_67_gw_material()],
-        circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
+        circle=None,
         max_depth=0.0)
     sd['seepage_bc'] = {
         'specified_heads': [
@@ -1002,7 +900,7 @@ def _rs2_67ef_seep_slope_data():
     sd = _poly_slope_data(
         polygons=[(0, _RS2_67_DAM)],
         materials=[_rs2_67_gw_material()],
-        circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
+        circle=None,
         max_depth=0.0)
     sd['seepage_bc'] = {
         'specified_heads': [
@@ -1229,6 +1127,86 @@ def vp102_transient():
 # fails at ~0.78 (XSLOPE Spencer 0.784, RS2 0.81, Plaxis 0.82). With the vendor caps
 # + SRF reduction the failure boundary is crisp: F = 0.75 converges at 1.03x elastic,
 # F = 0.80 runs away (1.7x -> 10.7x by F = 1).
+# RS2 #30 (Part I) and Part IV VP40 -- Perry (1994), Fig. 6: a 50.2 m dry slope at
+# 1 in 2 in a soil with the power-curve strength tau = A*sigma'^b (A = 2, b = 0.7,
+# gamma = 20). Perry's example is five slices on one specified surface,
+# (4, 53) -> (20, 16) -> (40, 8) -> (60, 4) -> (80, 0.5) -> (105, 2.8), with the toe at
+# (105, 2.8). The vendor's models add a foundation to el. -10 and a 10 m apron at the
+# toe level. The limit-equilibrium row VP40 keeps its own file (vp040.xlsx, built by
+# build_problems.vp040), whose surface and toe are read from the manual's rounded
+# figure labels; these two files are the strength-reduction models at Perry's toe.
+_RS2_30_SURFACE = [(4.0, 53.0), (20.0, 16.0), (40.0, 8.0), (60.0, 4.0), (80.0, 0.5),
+                   (105.0, 2.8)]
+_RS2_30_SOIL = dict(name='Soil', c=0.0, phi=0.0, gamma=20.0, gamma_sat=20.0,
+                    option='pow', pow_a=2.0, pow_b=0.7, pow_c=0.0, pow_d=0.0,
+                    u='none')
+
+
+def _rs2_30_finish(sd):
+    """The settings both RS2-30 files share: dry, foundation to el. -10, and
+    Perry's specified surface (the limit-equilibrium surface of the paper; the
+    strength reduction does not read it)."""
+    sd['max_depth'] = -10.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in _RS2_30_SURFACE]
+    return sd
+
+
+def rs2_30():
+    """RS2 #30 -- Perry (1994) Fig. 6, unconstrained: the whole section can yield.
+    The vendor's native model `slope stability #030.fez`: boundary (0, 53), (4, 53),
+    (105, 2.8), (115, 2.8), base at -10, no strength-reduction constraint. Published
+    RS2 SSR 0.91 (Part I). Perry gives the critical factor for this slope as about
+    0.92 by his own method and about 0.90 from the Charles & Soares charts (p. 239);
+    his 0.98 is the factor on the one specified surface, which he says is not the
+    critical one. The vendor's #030 carries a Generalized Hoek-Brown fit to the
+    power curve; this file carries the power curve itself, as #040 does."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(_RS2_30_SOIL)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 53.0), (4.0, 53.0), (105.0, 2.8), (115.0, 2.8)]},
+    ]
+    save_slope_data_to_xlsx(_rs2_30_finish(sd), os.path.join(OUT, 'rs2_30.xlsx'))
+    return 'rs2_30.xlsx'
+
+
+def rs2_30_split():
+    """RS2 Part IV VP40 -- Perry (1994) Fig. 6 under the vendor's constraint. The
+    Slide2-import model `slope stability #040.fez` carries three SSR exclusion areas
+    that neither Perry nor the manual's text or tables mention (they are drawn on
+    Figs. 40.2-40.3): a strip x = 0-4, the toe block x = 105-115 below 2.8, and a ring
+    whose top is the ground line and whose lower edge follows the specified surface,
+    i.e. the sliding body itself. The vendor backs them with an elastic material
+    partition ('rock2', plasticity None, 50.65% of the area), and its mesh follows the
+    ring edges. Here the three areas are material polygons of an `elastic` material
+    (same unit weight, same E and nu as the soil), so the mesh follows their edges as
+    the vendor's does; the soil is the rest of the section (50.69% held). Ring 3 keeps
+    the vendor's (80, 1) vertex, read off the manual's rounded label rather than
+    Perry's (80, 0.5). The left strip sits on the flat -10 base (the vendor's
+    (4, -9.8681) is a 0.13 m sag of its own base). Published RS2 SSR 0.97 (Part IV)."""
+    soil = dict(_RS2_30_SOIL)
+    held = dict(name='Held', c=0.0, phi=0.0, gamma=20.0, gamma_sat=20.0,
+                option='elastic', u='none')
+    ring3 = [(20.0, 16.0), (40.0, 8.0), (60.0, 4.0), (80.0, 1.0), (102.392, 4.09622),
+             (6.53543, 51.7398)]
+    polys = [
+        (1, [(0.0, 53.0), (0.0, -10.0), (4.0, -10.0), (4.0, 53.0)]),
+        (1, [(105.0, 2.8), (105.0, -10.0), (115.0, -10.0), (115.0, 2.8)]),
+        (1, ring3),
+        (0, [(4.0, 53.0), (6.53543, 51.7398)] + ring3[:5] + [(105.0, 2.8), (105.0, -10.0),
+                                                            (4.0, -10.0)]),
+    ]
+    sd = _poly_slope_data(polygons=polys, materials=[soil, held], circle=None,
+                          max_depth=-10.0)
+    save_slope_data_to_xlsx(_rs2_30_finish(sd), os.path.join(OUT, 'rs2_30_split.xlsx'))
+    return 'rs2_30_split.xlsx'
+
+
 _RS2_62_SOILS = [
     dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
     dict(name='Soil 2 (soft band)', c=0.0, phi=25.0, gamma=19.0, gamma_sat=19.0,
@@ -1237,40 +1215,35 @@ _RS2_62_SOILS = [
 ]
 
 
-def _rs2_62_slope_data(polys, tangent_frac=None):
+def _rs2_62_slope_data(polys):
     """RS2 #62 (Part III) -- Stability of a Three-Layered Slope With a Soft Band, after
 
         Cheng, Y.M., Lansivaara, T. & Wei, W.B. (2007), "Two-dimensional slope stability
         analysis by limit equilibrium and strength reduction methods." Comput. Geotech. 34.
 
-    A 10 m slope carries a thin SOFT band (Soil 2: c = 0, phi = 25 deg) dipping through it,
-    between a stronger cap (Soil 1: c = 20, phi = 35) and base (Soil 3: c = 10, phi = 35);
-    gamma = 19, E = 14 MPa, nu = 0.3 throughout. Three geometries vary the band's DAYLIGHT
-    width (Analysis I / II / III = 28 / 20 / 12 m domains), and each was run at two dilation
-    angles (Case 1 psi = 0, Case 2 psi = phi). XSLOPE's SSRM is non-associated only (psi = 0),
-    so ONLY the Case-1 (psi = 0) column is reproducible here; the Case-2 associated-flow column
-    and Flac3D's much higher associated-flow values are recorded in rs2.md for context.
+    A 10 m slope carries a thin SOFT band (Soil 2: c = 0, phi = 25 deg; 0.5 m thick in the
+    paper, p. 143) dipping through it, between a stronger cap (Soil 1: c = 20, phi = 35) and
+    base (Soil 3: c = 10, phi = 35); gamma = 19, E = 14 MPa, nu = 0.3 throughout. The three
+    analyses cut the same slope off at a right-hand boundary of x = 28 / 20 / 12 m (Analysis
+    I / II / III), the paper's study of the boundary effect; the band daylights at the same
+    place in all three. Each was run at two dilation angles (Case 1 psi = 0, Case 2 psi = phi).
+    XSLOPE's SSRM is non-associated only (psi = 0), so ONLY the Case-1 (psi = 0) column is
+    reproducible here; the Case-2 associated-flow column is recorded in rs2.md for context.
 
     ``polys`` are the three zone polygons (mat_id 0 = Soil 1, 1 = soft band, 2 = Soil 3),
     transcribed from the RS2 vendor models 'slope stability #062_0N.fez' via the .fez zone
-    polygonizer and hard-coded so the corpus rebuilds without them. SSRM only; the circle is
-    an inert placeholder the loader requires, but it still has to slice: Analysis I (28 m
-    domain, rs2_62a) is wide enough for the generic placeholder circle, but the narrower
-    Analysis II/III domains (rs2_62b/c) are not, so those two pass ``tangent_frac`` to get a
-    circle derived from their own (narrower) ground surface instead."""
-    if tangent_frac is None:
-        circle = {'Xo': 10.0, 'Yo': 20.0, 'Depth': 3.0, 'R': 17.0}
-    else:
-        circle = _circle_from_polygons(polys, tangent_frac=tangent_frac)
+    polygonizer and hard-coded so the corpus rebuilds without them. SSRM only; the files
+    carry no failure surface."""
     sd = _poly_slope_data(
         polygons=polys, materials=[dict(m) for m in _RS2_62_SOILS],
-        circle=circle, max_depth=0.0)
+        circle=None, max_depth=0.0)
     return sd
 
 
 def rs2_62a():
-    """RS2 #62 Analysis I (28 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.88,
-    Plaxis 0.86 | Flac3D 1.64 (associated). Case 2 psi = phi: RS2 0.98 (not reproducible)."""
+    """RS2 #62 Analysis I (right-hand boundary at 28 m), psi = 0. Published (psi = 0):
+    Cheng et al. Phase 0.87, Plaxis 0.86, Flac3D 1.64; the vendor's RS2 re-run 0.88.
+    Case 2 psi = phi: RS2 0.98 (not reproducible)."""
     polys = [
         (0, [(5.0, 5.0), (8.0, 8.0), (20.0, 15.0), (28.0, 15.0), (28.0, 10.0), (8.0, 7.5)]),
         (1, [(28.0, 10.0), (28.0, 9.5), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
@@ -1282,30 +1255,31 @@ def rs2_62a():
 
 
 def rs2_62b():
-    """RS2 #62 Analysis II (20 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.89,
-    Plaxis 0.85 | Flac3D 1.30 (associated). Case 2 psi = phi: RS2 0.98 (not reproducible)."""
+    """RS2 #62 Analysis II (right-hand boundary at 20 m), psi = 0. Published (psi = 0):
+    Cheng et al. Phase 0.84, Plaxis 0.85, Flac3D 1.30; the vendor's RS2 re-run 0.89.
+    Case 2 psi = phi: RS2 0.98 (not reproducible)."""
     polys = [
         (0, [(5.0, 5.0), (8.0, 8.0), (20.0, 15.0), (20.0, 8.911), (8.0, 7.5)]),
         (1, [(20.0, 8.911), (20.0, 8.287), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
              (8.0, 7.5)]),
         (2, [(20.0, 8.287), (20.0, 0.0), (0.0, 0.0), (0.0, 5.0), (5.0, 4.5), (8.0, 7.1)]),
     ]
-    save_slope_data_to_xlsx(_rs2_62_slope_data(polys, tangent_frac=0.7),
-                            os.path.join(OUT, 'rs2_62b.xlsx'))
+    save_slope_data_to_xlsx(_rs2_62_slope_data(polys), os.path.join(OUT, 'rs2_62b.xlsx'))
     return 'rs2_62b.xlsx'
 
 
 def rs2_62c():
-    """RS2 #62 Analysis III (12 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.81,
-    Plaxis 0.82 | Flac3D 1.03 (associated). Case 2 psi = phi: RS2 0.93 (not reproducible)."""
+    """RS2 #62 Analysis III (right-hand boundary at 12 m), psi = 0. Published (psi = 0):
+    Cheng et al. Phase 0.77 (0.74-0.84 with mesh and tolerance, Table 4), Plaxis 0.82,
+    Flac3D 1.03; the vendor's RS2 re-run 0.81. Case 2 psi = phi: RS2 0.93 (not
+    reproducible)."""
     polys = [
         (0, [(5.0, 5.0), (8.0, 8.0), (12.0, 10.333), (12.0, 7.97), (8.0, 7.5)]),
         (1, [(12.0, 7.97), (12.0, 7.496), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
              (8.0, 7.5)]),
         (2, [(12.0, 7.496), (12.0, 0.0), (0.0, 0.0), (0.0, 5.0), (5.0, 4.5), (8.0, 7.1)]),
     ]
-    save_slope_data_to_xlsx(_rs2_62_slope_data(polys, tangent_frac=0.8),
-                            os.path.join(OUT, 'rs2_62c.xlsx'))
+    save_slope_data_to_xlsx(_rs2_62_slope_data(polys), os.path.join(OUT, 'rs2_62c.xlsx'))
     return 'rs2_62c.xlsx'
 
 
@@ -1358,8 +1332,8 @@ def rs2_65():
     Published (manual results table): RS2 SSRM 1.29 (the FE target) | Slide2
     circular 1.41 | Slide2 non-circular 1.33 | reference LEM 1.39 | reference FEM
     1.41. Geometry + phreatic line transcribed from 'slope stability #065.fez' via
-    the .fez zone polygonizer; the circle is an inert placeholder the loader
-    requires (SSRM only -- no LEM surface is defined on an RS2 SSR model)."""
+    the .fez zone polygonizer. SSRM only -- no LEM surface is defined on an RS2 SSR
+    model, and the file carries none."""
     zones = [
         (7, [(155.5, 6.808), (155.5, -30.0), (-70.0, -30.0), (-70.0, -11.429),
              (-37.925, -8.257), (31.51, -1.914), (86.672, 3.183), (111.139, 4.769),
@@ -1396,7 +1370,7 @@ def rs2_65():
     sd = _poly_slope_data(
         polygons=zones,
         materials=[dict(m) for m in _RS2_65_SOILS],
-        circle={'Xo': 75.0, 'Yo': 70.0, 'Depth': 0.0, 'R': 70.0},
+        circle=None,
         max_depth=0.0,
         piezo_line=_RS2_65_PIEZO, piezo_phreatic=True)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_65.xlsx'))
@@ -1566,45 +1540,47 @@ def rs2_68c():
 # after Teoman, M.B., Topal, T. & Isik, N.S. (2004), and the RS2 Slope Stability
 # Verification Manual Part III Problem 64 (pp. 219-227).
 #
-# Twelve cases: three Ankara-clay road-cut landslides (Slopes 1/2/3), each in its
-# ORIGINAL and its FAILED (post-slide, with scarp) geometry, evaluated SHORT-TERM
-# (total-stress, dry, no seismic; cases 1-6) and LONG-TERM (effective-stress with a
-# piezometric line + a 0.03 g horizontal pseudo-static coefficient; cases 7-12).
-# Each model is a SINGLE homogeneous Mohr-Coulomb zone; strengths are Tables 1-2 and
-# are read straight from the vendor '.fez'. The manual reports three FS columns: RS2
-# SSR, the Teoman reference (Bishop on a digitized PROPOSED slip surface), and Slide2
-# Bishop on that same surface. The proposed surface exists in NO vendor file -- the
-# '.fez' carry only an SSR Search-Area region -- so XSLOPE can reproduce ONLY the RS2
-# SSR column (an SSRM run); the Ref/Slide2 Bishop columns are recorded as context.
+# Twelve CASES on three cross sections: three Ankara-clay road-cut landslides (Slopes
+# 1/2/3), each drawn as one section and analysed in its ORIGINAL and its FAILED
+# (post-slide, with scarp) profile, SHORT-TERM (total-stress UU, dry, no seismic;
+# cases 1-6) and LONG-TERM (effective-stress CD with a piezometric line + a 0.03 g
+# horizontal pseudo-static coefficient; cases 7-12). Each model is a SINGLE homogeneous
+# Mohr-Coulomb zone; strengths are Tables 1-2 and are read straight from the vendor
+# '.fez'. The manual reports three FS columns: RS2 SSR, the Teoman reference, and
+# Slide2 Bishop. Every Teoman value (paper Table 4, Figs 8-10) is the minimum of a
+# SLOPE/W v.4 Bishop circle search over a grid of centers (30 slices): not a back
+# analysis, not posed at FS = 1, and not on a proposed or observed surface. The
+# vendor's SSR search polygons and elastic material corridors surround a surface of
+# the vendor's own (labelled "Slide (Bishop Method)" in the manual); they are the
+# vendor's construction, absent from the paper. That surface exists in NO vendor
+# file -- the '.fez' carry only the SSR Search-Area region and the partition -- so
+# the scored comparison is the RS2 SSR column (an SSRM run under the same
+# constraint); the Ref/Slide2 Bishop columns are recorded as context.
 #
-# Elastic constants are the corpus convention (E = 14000 kPa, nu = 0.3, psi = 0 --
-# Griffiths non-associated): the '.fez' reader imports E/nu = 0. The 0.03 g seismic is
+# Elastic constants: the helpers below write E = 14000 kPa, nu = 0.3, but the files
+# carry the vendor's own constants (E = 50000 kPa; nu = 0.4 on cases 2, 7 and 12, 0.3
+# elsewhere), because save_slope_data_to_xlsx applies vendor_tcut.VENDOR_E_NU, which
+# overrides a builder literal; psi = 0 (non-associated). The 0.03 g seismic is
 # stored in the '.fez' as a per-element 'seismic forces: bx 0.03' body force that the
 # reader does not extract (it returns k_seismic = 0), so it is set here by hand. For
 # these LEFT-high slopes (crest at x = 0, toe descending to +x) RS2's bx = +0.03
 # points downslope (+x = destabilizing); XSLOPE's FEM applies +k_seismic in +x, so the
 # sign carries over directly (k_seismic = +0.03). Geometry (external boundary) and the
 # piezo line are transcribed from 'slope stability #064_NN.fez' via read_fez (dev-side
-# cross-check, hard-coded so the corpus rebuilds without the vendor files); the circle
-# is an inert placeholder the loader requires (SSRM only -- no LEM surface is defined).
+# cross-check, hard-coded so the corpus rebuilds without the vendor files). SSRM only --
+# no LEM surface is defined, and the files carry none.
 # ======================================================================================
 
 def _rs2_64_slope_data(poly, c, phi, gamma, piezo=None, k=0.0):
     """One RS2 #64 case: a single homogeneous Mohr-Coulomb zone. ``poly`` is the
     external boundary; ``piezo`` (long-term cases) a piezometric line -> u='piezo';
-    ``k`` the horizontal seismic coefficient (long-term = 0.03, set by hand).
-
-    SSRM only; the starting circle is inert but still has to slice. Every one of
-    these twelve boundaries is a narrow single-zone section, so a shared generic
-    circle never daylights twice on the ground -- the circle is derived from each
-    case's own ``poly`` instead (entry near the crest, tangent 30% of the way down
-    to the domain floor, exit near the toe)."""
+    ``k`` the horizontal seismic coefficient (long-term = 0.03, set by hand)."""
     u = 'piezo' if piezo else 'none'
     sd = _poly_slope_data(
         polygons=[(0, poly)],
         materials=[dict(name='soil', c=float(c), phi=float(phi), gamma=float(gamma),
                         gamma_sat=float(gamma), E=14000.0, nu=0.3, u=u)],
-        circle=_circle_from_polygons([(0, poly)], tangent_frac=0.3),
+        circle=None,
         max_depth=0.0,
         piezo_line=list(piezo) if piezo else None)
     if k:
@@ -1660,7 +1636,7 @@ _RS2_64L_PZ = [(0.0, 2.745), (3.603, 2.745), (3.668, 2.457), (5.531, 2.457),
 # --- Vendor MATERIAL PARTITION corridors (elastic-materials run option) -----------
 # The RS2 #64 long-term-Failed sub-unity cases C8/C12 constrain their SSR two ways at
 # once: an SSR_polygonal_zones search area AND a material partition — the Mohr-Coulomb
-# material ('rock1') is placed only in a corridor hugging the proposed slip surface,
+# material ('rock1') is placed only in a corridor hugging the vendor's own Bishop surface,
 # while the rest is 'rock2' with "Plasticity Specifications: None" (linear-elastic,
 # cannot yield). ssr_zone can only hold the outside at FULL STRENGTH, so for these
 # sub-unity slopes the failing skin outside the corridor could not be suppressed and
@@ -1713,11 +1689,7 @@ def _rs2_64_split_slope_data(ext, mc_poly, c, phi, g_mc, g_el, piezo, k=0.03,
     model's ground surface below the true one and leave the piezometric line standing
     above it. ``min_frac`` therefore only rejects the sub-mesh-scale debris that the
     corridor-to-boundary snap can leave behind, and the total area is asserted.
-    Unit weights are the vendor's per-zone values (rock1 = g_mc, rock2 = g_el).
-
-    SSRM only; the starting circle is derived from the whole-domain ``ext`` boundary
-    the same way as the single-material case (_rs2_64_slope_data), so the split file
-    gets an identical, slicing first circle."""
+    Unit weights are the vendor's per-zone values (rock1 = g_mc, rock2 = g_el)."""
     dom = Polygon(ext)
     corr = Polygon(mc_poly)
     diff = dom.difference(corr)
@@ -1744,7 +1716,7 @@ def _rs2_64_split_slope_data(ext, mc_poly, c, phi, g_mc, g_el, piezo, k=0.03,
         elastic_names.append(nm)
     sd = _poly_slope_data(
         polygons=polygons, materials=mats,
-        circle=_circle_from_polygons([(0, ext)], tangent_frac=0.3), max_depth=0.0,
+        circle=None, max_depth=0.0,
         piezo_line=list(piezo))
     if k:
         sd['k_seismic'] = float(k)
@@ -1984,6 +1956,9 @@ def _rs2_28_slope_data(head):
     sd['materials'] = [soil, outer]
     sd['polygons'] = ([{'mat_id': 0, 'polygon': corr}]
                       + [{'mat_id': 1, 'polygon': p} for p in pieces])
+    # VP38's circle stays with VP38: these rows are strength reduction only.
+    sd['circles'] = []
+    sd['non_circ'] = []
     return sd
 
 
@@ -2090,9 +2065,7 @@ def rs2_29clay():
     sd['dloads2'] = []
     sd['circular'] = True
     sd['non_circ'] = []
-    # vp039a's stored clay circle, carried so the file opens with a starting surface;
-    # this row is solved by the SSRM, which does not read it.
-    sd['circles'] = [{'Xo': 14.967, 'Yo': 12.276, 'Depth': 0.0, 'R': 12.276}]
+    sd['circles'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_29clay.xlsx'))
     return 'rs2_29clay.xlsx'
 
@@ -2227,9 +2200,7 @@ def rs2_9(target_size=1.0):
     sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['circular'] = True
     sd['non_circ'] = []
-    # A nominal deep circle so the file opens with a starting surface; this row is
-    # solved by the SSRM, which does not read it.
-    sd['circles'] = [{'Xo': 15.0, 'Yo': 20.0, 'Depth': 20.0 - 15.0, 'R': 15.0}]
+    sd['circles'] = []
     path = os.path.join(OUT, 'rs2_9.xlsx')
     save_slope_data_to_xlsx(sd, path)
     reloaded = load_slope_data(path)
@@ -2250,6 +2221,7 @@ if __name__ == '__main__':
     for fn in tuple(globals()[n] for n in PRUSKA_BUILDERS) + (hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_31d, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
+               rs2_30, rs2_30_split,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
                rs2_67a, rs2_67b, rs2_67c, rs2_67d, rs2_67e, rs2_67f,
                rs2_68a, rs2_68b, rs2_68c,

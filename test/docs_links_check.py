@@ -2954,17 +2954,59 @@ def test_tutorial_labels():
     return fails
 
 
+_FENCE_OPEN = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})")
+
+
+def _strip_fences(text):
+    """``text`` with its fenced code blocks removed, as CommonMark reads them.
+
+    A fence is three or more backticks or tildes, and it is closed only by a
+    line of the same character at least as long. Matching a three-backtick
+    pair instead misread the recorded transcripts, which fence a turn with four
+    backticks because the turn quotes three-backtick blocks inside it: the
+    inner fences closed the outer one early and left stray backticks to pair
+    across lines.
+    """
+    out, fence = [], None
+    for line in text.split("\n"):
+        m = _FENCE_OPEN.match(line)
+        if fence is None:
+            if m:
+                fence = m.group(1)
+                continue
+            out.append(line)
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                and not line.strip()[len(m.group(1)):].strip():
+            fence = None
+    return "\n".join(out)
+
+
+def _split_spans(text):
+    """``(offset, body)`` for every single-backtick span that wraps a line."""
+    text = _strip_fences(text)
+    return [(text[:m.start()].count("\n") + 1, m.group(1))
+            for m in re.finditer(r"(?<!`)`(?!`)([^`]*)`(?!`)", text)
+            if "\n" in m.group(1)]
+
+
 def test_split_code_spans():
     """No inline code span may wrap across a source line: the renderer keeps the
     break inside the backticks, splitting phrases like `Latin hypercube` mid-word
     on the published page. Fenced blocks are skipped; only single-backtick spans
     that open and close on different lines fail."""
     fails = []
+    # The fence reader itself: a four-backtick fence quoting a three-backtick
+    # block is one block, and a span that really wraps is still caught.
+    nested = ("````text\nYou: hi\n```\nx = 1\n```\nsee `a`\n````\n\n"
+              "prose `fine` here\n")
+    if _split_spans(nested):
+        fails.append("the fence reader splits a four-backtick fence at the "
+                     "three-backtick block inside it")
+    if not _split_spans("text `opens here\nand closes` there\n"):
+        fails.append("the fence reader no longer catches a wrapped span")
     for path in sorted(glob.glob(os.path.join(_REPO, "docs", "**", "*.md"),
                                  recursive=True)):
-        text = open(path, encoding="utf-8").read()
-        # strip fenced code blocks so their backticks cannot pair across lines
-        text = re.sub(r"```.*?```", "", text, flags=re.S)
+        text = _strip_fences(open(path, encoding="utf-8").read())
         for m in re.finditer(r"(?<!`)`(?!`)([^`]*)`(?!`)", text):
             if "\n" in m.group(1):
                 rel = os.path.relpath(path, _REPO)

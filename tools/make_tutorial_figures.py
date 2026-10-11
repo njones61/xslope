@@ -329,12 +329,15 @@ def lem01_crack_water():
 
 
 def lem01_placeholders():
-    """The two LEM-1 figures no script can take.
+    """The two LEM-1 figures this module does not draw.
 
-    A full main-window capture is the owner's — it carries the real window chrome
-    at the project's fixed capture size — The assistant figure (lem01_assistant.png) is a
-    live-session hand capture — the owner's, 2026-08-11, taken after the skill
-    hardening round — since a provider conversation cannot be scripted.
+    Both are main-window grabs, made by the screenshot producers rather than here.
+    The Studio canvas (lem01_studio_canvas.png) is an offscreen grab in
+    ``tools/capture_tutorial_screenshots.py``. The assistant figure
+    (lem01_assistant.png) is a recorded session: ``lem1_assistant_build`` in
+    ``tools/assistant_sessions.py`` sends "Build this model" with the problem
+    drawing to a real provider and grabs the window, so it costs a provider call
+    and runs only when named.
     """
     # lem01_studio_canvas.png is now produced by capture_tutorial_screenshots.py
     # (offscreen main-window grab — the hand-capture convention is retired).

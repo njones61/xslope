@@ -19,7 +19,8 @@ import sys
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt, QUrl, Signal
 from PySide6.QtGui import (
-    QDesktopServices, QImage, QTextDocument, QTextOption,
+    QDesktopServices, QImage, QTextBlockFormat, QTextCursor, QTextDocument,
+    QTextOption,
 )
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
@@ -193,6 +194,38 @@ def _escape_outside_code(text):
                    for part in _CODE_SPANS.split(text or ""))
 
 
+_TABLE_RULE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$")
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+
+
+def _separate_tables(text):
+    """Put a blank line before a table that follows a paragraph line directly.
+
+    GitHub markdown lets a table start right under a line of text, and models
+    write it that way ("**Critical circle**" and the table on the next line).
+    Qt's parser does not: it reads the table into the paragraph and the reader
+    gets rows of pipes. A table is a row of cells followed by its rule line;
+    one that starts under a non-blank line that is not itself a table row gets
+    the blank line the parser needs. Code fences are left alone.
+    """
+    lines = (text or "").split("\n")
+    out, fence = [], None
+    for i, line in enumerate(lines):
+        m = _FENCE.match(line)
+        if m:
+            mark = m.group(1)
+            if fence is None:
+                fence = mark
+            elif mark[0] == fence[0] and len(mark) >= len(fence):
+                fence = None
+        elif (fence is None and "|" in line and i + 1 < len(lines)
+                and _TABLE_RULE.match(lines[i + 1]) and out
+                and out[-1].strip() and "|" not in out[-1]):
+            out.append("")
+        out.append(line)
+    return "\n".join(out)
+
+
 def markdown_to_html(text):
     """One markdown message as an HTML fragment for the transcript.
 
@@ -207,7 +240,7 @@ def markdown_to_html(text):
     """
     try:
         doc = QTextDocument()
-        doc.setMarkdown(_escape_outside_code(strip_latex(text)),
+        doc.setMarkdown(_escape_outside_code(_separate_tables(strip_latex(text))),
                         QTextDocument.MarkdownDialectGitHub)
         rendered = doc.toHtml()
         open_tag = rendered.find("<body")
@@ -416,7 +449,7 @@ class ChatDock(QWidget):
         if img.isNull():
             return
         if not self._assistant.config.capabilities().get("vision", True):
-            self.transcript.append(
+            self._append(
                 '<div style="color:#9a6700;margin-top:8px;">The current model '
                 'cannot read images. Every model the Settings dialog lists can — '
                 'pick one from the list rather than a typed-in id.</div>')
@@ -475,7 +508,7 @@ class ChatDock(QWidget):
             frag += (f'<pre style="{pre.replace("#f4f4f4", "#eef3ee")}">'
                      f'{html.escape(output)}</pre>')
         frag += "</div>"
-        self.transcript.append(frag)            # one complete block -> own paragraph
+        self._append(frag)            # one complete block -> own paragraph
         for path in outputs or []:              # plots inline, other files as links
             if path.lower().endswith(_IMAGE_EXTS):
                 self._append_image(path)
@@ -483,11 +516,11 @@ class ChatDock(QWidget):
                 self._append_file(path)
 
     def _on_tool_declined(self, code):
-        self.transcript.append('<div style="color:#9a6700;margin-top:8px;">'
+        self._append('<div style="color:#9a6700;margin-top:8px;">'
                                'Declined to run the code.</div>')
 
     def _on_failed(self, message):
-        self.transcript.append(f'<div style="color:#b00020;margin-top:8px;">'
+        self._append(f'<div style="color:#b00020;margin-top:8px;">'
                                f'<b>Error:</b> {html.escape(message)}</div>')
         self._idle()
 
@@ -495,6 +528,27 @@ class ChatDock(QWidget):
         self._idle()
 
     # --- rendering helpers ----------------------------------------------
+    def _append(self, fragment):
+        """Append one HTML block to the transcript, outside any list.
+
+        ``QTextEdit.append`` starts the new paragraph with the last one's format,
+        list membership included, so after a reply that ended on a bulleted list
+        the next speaker's label, a pasted drawing and the next reply were each
+        drawn as one more bullet of it. The list is closed first.
+        """
+        cursor = QTextCursor(self.transcript.document())
+        cursor.movePosition(QTextCursor.End)
+        block = cursor.block()
+        if block.textList() is not None:
+            cursor.insertBlock(QTextBlockFormat())
+            plain = cursor.block()
+            if plain.textList() is not None:
+                plain.textList().remove(plain)
+            fmt = cursor.blockFormat()
+            fmt.setIndent(0)
+            cursor.setBlockFormat(fmt)
+        self.transcript.append(fragment)
+
     def _idle(self):
         self.send_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
@@ -504,7 +558,7 @@ class ChatDock(QWidget):
         """A block of VERBATIM text (what the user typed), escaped and line-broken
         as written."""
         body = html.escape(text).replace("\n", "<br>")
-        self.transcript.append(
+        self._append(
             f'<div style="margin-top:8px;">'
             f'<b style="color:{color};">{who}:</b> {body}</div>')
 
@@ -515,11 +569,11 @@ class ChatDock(QWidget):
         The speaker's label leads on its own line rather than inline, because a
         reply that opens on a heading or a table has no first line to sit in.
         """
-        self.transcript.append(f'<div style="margin-top:8px;">'
+        self._append(f'<div style="margin-top:8px;">'
                                f'<b style="color:{color};">{who}:</b></div>')
         body = markdown_to_html(text)
         if body.strip():
-            self.transcript.append(body)
+            self._append(body)
 
     # --- generated outputs (clickable to open / reveal) -----------------
     def _register(self, path):
@@ -538,7 +592,7 @@ class ChatDock(QWidget):
         ident = self._register(path)
         url = self._image_resource(img)
         name = html.escape(os.path.basename(path))
-        self.transcript.append(
+        self._append(
             f'<a href="xopen:{ident}"><img src="{url}"></a>'
             f'<div style="font-size:11px;color:#666;">{name} — '
             f'<a href="xopen:{ident}">open</a> &middot; '
@@ -548,7 +602,7 @@ class ChatDock(QWidget):
         """A non-image generated file (CSV, xlsx, …): shown as a link row."""
         ident = self._register(path)
         name = html.escape(os.path.basename(path))
-        self.transcript.append(
+        self._append(
             f'<div style="margin-top:6px;">📄 <a href="xopen:{ident}">{name}</a> '
             f'<span style="font-size:11px;color:#666;">'
             f'(<a href="xreveal:{ident}">show in folder</a>)</span></div>')
@@ -557,7 +611,7 @@ class ChatDock(QWidget):
         """Inline a QImage with no backing file (e.g. a pasted user attachment)."""
         url = self._image_resource(img)
         if url:
-            self.transcript.append(f'<img src="{url}">')
+            self._append(f'<img src="{url}">')
 
     def _image_resource(self, img):
         if img.isNull():

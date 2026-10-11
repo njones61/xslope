@@ -1,28 +1,30 @@
 {
   "schema": 1,
-  "updated": "2026-08-29",
+  "updated": "2026-10-10",
   "note": "Curated model recommendations for the XSLOPE Studio assistant. Published as a release asset beside latest.json and read at most once a day, so the advice can be corrected between app releases. It only MARKS and ORDERS what the dialog lists - nothing here hides a model, and any model id can still be typed into the dialog by hand. 'recommended' is what a fresh install selects; 'good_choices' sort to the top with the labels below; 'deprecated' ids stay selectable and are marked as superseded. Only models that can read an image are offered, since the assistant is regularly shown a sketch or a photograph of a cross section - so every id named here is a vision model. Ollama is deliberately absent: its list is whatever the user has pulled locally.",
   "providers": {
     "anthropic": {
-      "recommended": "claude-opus-5",
+      "recommended": "claude-opus-5-5",
       "good_choices": [
         {
-          "id": "claude-opus-5",
+          "id": "claude-opus-5-5",
           "label": "flagship",
           "note": "Strongest on multi-step edits and long autonomous runs. Prompt caching keeps the large xslope system prompt cheap on repeat turns."
         },
         {
-          "id": "claude-sonnet-5",
+          "id": "claude-sonnet-5-5",
           "label": "balanced",
-          "note": "Near-flagship quality on coding and agentic work at a lower price per token."
+          "note": "Near-flagship quality on coding and agentic work at half the flagship's price per token."
         },
         {
-          "id": "claude-haiku-4-5",
+          "id": "claude-haiku-5-5",
           "label": "economical",
           "note": "Fastest and cheapest. Good for short edits and quick questions about a model."
         }
       ],
       "deprecated": [
+        "claude-sonnet-5",
+        "claude-opus-5",
         "claude-opus-4-1",
         "claude-opus-4-0",
         "claude-sonnet-4-0",
@@ -33,20 +35,20 @@
       ]
     },
     "openai": {
-      "recommended": "gpt-5.5",
+      "recommended": "gpt-6-astra",
       "good_choices": [
         {
-          "id": "gpt-5.5",
+          "id": "gpt-6-astra",
           "label": "flagship",
-          "note": "Current general-purpose flagship: tool use and vision, with server-side caching of the prompt prefix."
+          "note": "OpenAI's most capable model: tool use and image input, reached through OpenAI's Responses API, with server-side caching of the prompt prefix."
         },
         {
-          "id": "gpt-5.4",
-          "label": "previous flagship",
-          "note": "Half the price of gpt-5.5 per token; tool use and vision."
+          "id": "gpt-6.1-sol",
+          "label": "balanced",
+          "note": "A fifth of the flagship's price per token; tool use and image input."
         },
         {
-          "id": "gpt-5.4-mini",
+          "id": "gpt-6-luna",
           "label": "economical",
           "note": "Much cheaper per turn; enough for routine edits and questions."
         }
@@ -95,6 +97,11 @@
           "note": "Z.ai's largest vision model; exact on sweeps, finite element runs and reports in XSLOPE's own tests."
         },
         {
+          "id": "glm-5.3-flash",
+          "label": "newest",
+          "note": "Z.ai's newest model that reads images; tool use, and a low price per token."
+        },
+        {
           "id": "glm-4.6v",
           "label": "economical",
           "note": "Cheaper per token; tool use and vision."
@@ -102,7 +109,7 @@
         {
           "id": "glm-4.6v-flash",
           "label": "free tier",
-          "note": "Free at Z.ai's list; the least capable of the three."
+          "note": "Free at Z.ai's list; the least capable of these."
         }
       ],
       "deprecated": [

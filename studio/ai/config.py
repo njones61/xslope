@@ -40,22 +40,30 @@ KEYRING_SERVICE = "XSlope Studio"
 PROVIDERS = {
     "anthropic": {
         "label": "Claude (Anthropic)", "prefix": "anthropic/", "needs_key": True,
-        "models": ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
+        "models": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
         "tools": True, "vision": True, "prompt_cache": True,
     },
     "openai": {
         "label": "OpenAI", "prefix": "openai/", "needs_key": True,
-        "models": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"],
+        "models": ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna", "gpt-5.5"],
         # Gets the Studio brief; OpenAI caches the prompt prefix server-side
         # automatically, so repeat turns are cheap.
         "tools": True, "vision": None, "skill": True,
         # OpenAI's catalogue mixes vision chat models with text-only ones
         # (gpt-3.5, the dated gpt-4 snapshots, o1-mini / o3-mini, the search
         # previews, bare chat-latest). Image input: every gpt-4o / gpt-4.1 /
-        # gpt-4-turbo / gpt-5.x model, and the o1 / o3 / o4-mini reasoners.
+        # gpt-4-turbo / gpt-5.x / gpt-6.x model, and the o1 / o3 / o4-mini
+        # reasoners.
         "vision_only": True,
-        "vision_match": r"^(gpt-4o(?!.*search)|gpt-4\.1|gpt-4-turbo|gpt-5(?!.*search)|"
+        "vision_match": r"^(gpt-4o(?!.*search)|gpt-4\.1|gpt-4-turbo|gpt-[56](?!.*search)|"
                         r"o1(?!-mini)|o3(?!-mini)|o4-mini|chatgpt-4o)",
+        # The models OpenAI serves function tools to ONLY through its Responses
+        # API: on /v1/chat/completions the gpt-5.6 and gpt-6 families refuse
+        # tools while reasoning is on, and the gpt-6 family refuses
+        # ``max_tokens``. LiteLLM bridges a chat-completions call onto the
+        # Responses API when the model id carries ``responses/``, so these ids
+        # are sent that way and the agent loop keeps its one message format.
+        "responses_match": r"^(gpt-5\.(?:[6-9]|\d\d)|gpt-(?:[6-9]|\d\d))",
     },
     "kimi": {
         # Moonshot AI's OpenAI-compatible endpoint. litellm routes it natively
@@ -87,14 +95,21 @@ PROVIDERS = {
         # cannot read a cross section, and GLM-OCR — the other model that takes an
         # image — has no function calling, so it cannot drive the assistant.
         "editable_model": True,
-        "models": ["glm-5v-turbo", "glm-4.6v", "glm-4.6v-flashx",
-                   "glm-4.6v-flash", "glm-4.5v"],
+        "models": ["glm-5v-turbo", "glm-5.3-flash", "glm-5.3-flashx", "glm-4.6v",
+                   "glm-4.6v-flashx", "glm-4.6v-flash", "glm-4.5v"],
         # A GLM vision model carries a "V" right after the version number
-        # (glm-4.6v, glm-5v-turbo); that is what both the list filter and the
-        # per-model capability read.
+        # (glm-4.6v, glm-5v-turbo) — except the GLM-5.3 Flash models, which are
+        # natively multimodal and named without one (glm-5.3-flash,
+        # glm-5.3-flashx; the plain glm-5.3 beside them reads text only, and so
+        # do the older glm-4.x-flash models). Both the list filter and the
+        # per-model capability read this.
         "tools": True, "vision": None, "skill": True,
         "vision_only": True,
-        "vision_match": r"\dv",
+        "vision_match": r"\dv|^glm-5\.(?:[3-9]|\d\d)-flash",
+        # Z.ai's list-models endpoint names its text models and the GLM-5.3
+        # Flash pair, and none of the V models above, although every one of them
+        # answers. The dialog keeps these shipped ids beside what it lists.
+        "listing_incomplete": True,
     },
     "ollama": {
         "label": "Ollama (local, free)", "prefix": "ollama_chat/", "needs_key": False,
@@ -289,7 +304,12 @@ class AssistantConfig:
         """The provider-specific kwargs for ``litellm.completion(...)``."""
         prov = self.provider()
         spec = PROVIDERS[prov]
-        kw = {"model": spec["prefix"] + self.model()}
+        model = self.model()
+        route = spec.get("responses_match")
+        if route and re.search(route, str(model).lower()):
+            # LiteLLM's chat-to-Responses bridge (see PROVIDERS["openai"]).
+            model = "responses/" + model
+        kw = {"model": spec["prefix"] + model}
         if spec["needs_key"]:
             kw["api_key"] = self.api_key(prov)
         if spec.get("base"):

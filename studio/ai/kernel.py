@@ -700,6 +700,22 @@ class PythonKernel:
                 and now["profile_lines"] != before["profile_lines"]):
             self._warn_geometry(PROFILE_EDIT_WARNING)
 
+    def _rebase_geometry_watch(self, slope_data):
+        """After a resync, make the geometry it just built the reference.
+
+        The watch is armed with the geometry the snippet started from, and the
+        test for a discarded polygon edit is "the polygons differ from that, the
+        profile lines do not". A sweep that moves the profile lines, resyncs,
+        and puts the lines back passes that test without ever touching a
+        polygon: its polygons are the ones the LAST resync built from the moved
+        lines. Comparing against the most recent build instead keeps the warning
+        for what it is about, a polygon edit made after the last rebuild.
+        """
+        watch = self._geom_watch
+        if not watch or slope_data is not self._doc.slope_data:
+            return
+        self._geom_watch = (watch[0], _geometry_sigs(slope_data))
+
     def _warn_geometry(self, text):
         if text not in self._geom_warnings:
             self._geom_warnings.append(text)
@@ -815,6 +831,7 @@ class PythonKernel:
             sd = doc.slope_data if slope_data is None else slope_data
             self._note_geometry_source(sd)   # before the rebuild discards an edit
             _resync_geometry(sd)
+            self._rebase_geometry_watch(sd)  # later checks compare to THIS build
             return sd.get("ground_surface")
 
         def run_lem(method=None, num_slices=40, rapid=False, plot=True,

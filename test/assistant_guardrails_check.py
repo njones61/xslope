@@ -75,6 +75,18 @@ does regardless of the model, and that is what this file covers:
      assistant says can be opened has to be openable: a report generated with no
      path lands in the output folder the dock's Files button opens, and is named
      among the files the snippet reports.
+  O. WHAT THE RECORDINGS OF 2026-10-10 FOUND — a snippet that printed a whole
+     strength-reduction result sent 820,000 characters back to the model in one
+     call, so a snippet's printout is capped (head and tail kept, a marker in
+     between) and the dock shows the same capped text; the model summary printed
+     the ground surface's range where it read as the zones' extent, so it says
+     whose range it is; a sweep that moved the profile lines and put them back
+     was told its polygon edit had been discarded, so the discard test compares
+     against the last rebuild; a table written directly under a line of text
+     reached the dock as rows of pipes; everything after a reply that ended
+     on a bulleted list was drawn as more bullets of it; and a reply that the
+     Responses-API route split into a text choice and a tool-call choice lost
+     its tool call.
   N. TRANSIENT SEEPAGE, AND THE SNIPPET THAT NEVER RETURNS — a corpus sweep met a
      transient model with no helper for it, and the assistant spent the turn
      reverse-engineering engine signatures instead of answering; another sweep sat
@@ -2664,6 +2676,239 @@ def check_cache_marks_walk_the_history():
     return []
 
 
+# --- O. what the recordings of 2026-10-10 found -----------------------------
+
+def check_printout_is_capped():
+    """A snippet's printout reaches the model, and the dock, capped.
+
+    One recorded snippet printed a strength reduction's whole result, arrays and
+    all — 820,000 characters — and the next completion read it back as 453,000
+    tokens of input. What is asserted: a printout under the cap is passed whole;
+    one over it keeps its first and last lines with a marker between them saying
+    how much was cut; the MODEL CHECKS block a changing snippet earns still
+    arrives after it, whole; and the dock is sent the same text the model gets.
+    """
+    from studio.ai import assistant as A
+    out = []
+    mw, asst = _session()
+    seen = []
+    asst.tool_ran.connect(lambda code, text, outputs: seen.append(text))
+
+    small = "x" * (A.OUTPUT_CAP_CHARS - 500)
+    result = _run(asst, f"print({small!r})")
+    if small not in result:
+        out.append("a printout under the cap was cut")
+
+    big = ("print('FIRST LINE')\n"
+           "for i in range(30000): print('row %05d ' % i + 'y' * 40)\n"
+           "print('LAST LINE')\n")
+    result = _run(asst, big)
+    if len(result) > A.OUTPUT_CAP_CHARS + 600:
+        out.append(f"a 1.5-million-character printout came back at "
+                   f"{len(result):,} characters, over the cap")
+    for want in ("FIRST LINE", "LAST LINE", "characters (", "of printed output cut here",
+                 "Print less"):
+        if want not in result:
+            out.append(f"the capped printout lost {want!r}")
+    if seen and seen[-1] != result:
+        out.append("the dock is shown a different text from the one the model gets")
+
+    # A big printout from a snippet that also edits the model: the checks block
+    # is the harness's, not the printout's, and is never cut.
+    _run(asst, SNIPPET_MATERIALS)
+    result = _run(asst, SNIPPET_GEOMETRY.rstrip() + "\n" + big)
+    if _block(result) is None:
+        out.append("the MODEL CHECKS block was lost behind a capped printout")
+    elif not result.rstrip().endswith(_block(result).rstrip()):
+        out.append("the MODEL CHECKS block no longer ends the tool result")
+    mw.deleteLater()
+    return out
+
+
+def check_summary_says_whose_range_it_prints():
+    """The summary's geometry line says the range is the ground surface's.
+
+    Printed bare after "(2 zones)", the ground surface's y range read as the
+    zones' extent, and a recorded session told the user the zones only reached
+    y = 0 on a model whose foundation runs to the maximum depth at -10.
+    """
+    from studio.ai.assistant import model_summary_text
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    text = model_summary_text(mw.doc.slope_data, {}, name="m.xlsx")
+    line = next((l for l in text.splitlines() if l.startswith("Geometry:")), "")
+    if "ground surface x" not in line:
+        out.append(f"the geometry line does not say whose range it is: {line!r}")
+    if "profile lines (1)" not in line:
+        out.append(f"a profile-line model is not named as one: {line!r}")
+    if "zones; x" in line or "zones), x" in line:
+        out.append(f"a bare range still follows the zone count: {line!r}")
+    mw.deleteLater()
+    return out
+
+
+#: A sweep on the profile lines that puts them back, the way recorded sessions
+#: wrote it: move the crest, resync, run, and restore the original line after.
+SNIPPET_PROFILE_SWEEP_RESTORED = """
+orig = list(slope_data['profile_lines'][0]['coords'])
+for x in (30.0, 40.0, 50.0):
+    slope_data['profile_lines'][0]['coords'] = [(0.0, 5.0), (x, 20.0), (90.0, 20.0)]
+    resync_geometry(slope_data)
+slope_data['profile_lines'][0]['coords'] = orig
+resync_geometry()
+print('swept and restored')
+"""
+
+
+def check_profile_sweep_is_not_a_polygon_edit():
+    """A sweep that edits only the profile lines raises no discard warning.
+
+    The discard test compared the polygons with the snippet's starting geometry;
+    after a sweep restores its profile lines, the polygons are still the ones the
+    LAST resync built from the moved lines, so three recorded sweeps were told
+    their polygon edit had been thrown away. They had not edited a polygon.
+    The control: a real polygon edit made after a resync is still named.
+    """
+    from studio.ai.kernel import POLYGON_EDIT_WARNING
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    result = _run(asst, SNIPPET_PROFILE_SWEEP_RESTORED)
+    if POLYGON_EDIT_WARNING in result:
+        out.append("a profile-line sweep that restored its lines was told its "
+                   f"polygon edit was discarded: {result[:300]!r}")
+    result = _run(asst, SNIPPET_PROFILE_SWEEP_RESTORED + SNIPPET_POLYGON_EDIT_ON_PROFILE_MODEL)
+    if POLYGON_EDIT_WARNING not in result:
+        out.append("a polygon edit made after the sweep's last resync is no longer "
+                   "named")
+    mw.deleteLater()
+    return out
+
+
+def check_table_under_a_line_renders():
+    """A table written directly under a line of text renders as a table.
+
+    Models write "**Critical circle**" and the table on the next line, often with
+    an empty header row. GitHub's markdown accepts that; Qt's parser folds the
+    table into the paragraph, and the dock showed rows of pipes.
+    """
+    from studio.chat_dock import ChatDock
+    out = []
+    mw, asst = _session()
+    dock = ChatDock(asst)
+    dock._on_assistant_text("**Critical circle**\n| | |\n|:--|:--|\n"
+                            "| FS (Spencer) | 1.546 |\n| R | 53.33 |\n")
+    text = dock.transcript.toPlainText()
+    if "|" in text:
+        out.append(f"the table reached the transcript as raw pipes: {text[-120:]!r}")
+    if "<table" not in dock.transcript.toHtml():
+        out.append("the table is not rendered as a table")
+    for want in ("Critical circle", "1.546", "53.33"):
+        if want not in text:
+            out.append(f"the rendered reply lost {want!r}")
+    dock.deleteLater()
+    mw.deleteLater()
+    return out
+
+
+def check_a_split_reply_keeps_its_tool_call():
+    """A reply split across choices still runs its tool call.
+
+    LiteLLM's bridge onto OpenAI's Responses API (the gpt-5.6 and gpt-6 route)
+    returns one choice per output item, so "I'll build the model now" and the
+    run_python call arrive as two choices. The loop read only the first: a
+    recorded build session ended on that sentence with nothing built.
+    """
+    import types
+    from studio.ai import assistant as A
+
+    ran = []
+
+    class _Worker(A._AgentWorker):
+        def _run(self, name, args):
+            ran.append(args.get("code", ""))
+            return "(no output)"
+
+    replies = []
+
+    def completion(**kwargs):
+        if replies:
+            msg = types.SimpleNamespace(content="Done.", tool_calls=None)
+            return types.SimpleNamespace(
+                choices=[types.SimpleNamespace(message=msg)], usage=None)
+        replies.append(1)
+        call = types.SimpleNamespace(
+            id="call_1", type="function",
+            function=types.SimpleNamespace(name="run_python",
+                                           arguments='{"code": "print(1)"}'))
+        first = types.SimpleNamespace(content="I'll build the model now.",
+                                      tool_calls=None)
+        second = types.SimpleNamespace(content=None, tool_calls=[call])
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=first),
+                     types.SimpleNamespace(message=second)], usage=None)
+
+    stub = types.ModuleType("litellm")
+    stub.drop_params = False
+    stub.suppress_debug_info = False
+    stub.completion = completion
+    saved = sys.modules.get("litellm")
+    sys.modules["litellm"] = stub
+    texts = []
+    try:
+        worker = _Worker({}, "system", [], [A.RUN_PYTHON_TOOL])
+        worker.text.connect(texts.append)
+        failures = []
+        worker.failed.connect(failures.append)
+        worker.run()
+    finally:
+        if saved is None:
+            sys.modules.pop("litellm", None)
+        else:
+            sys.modules["litellm"] = saved
+    out = []
+    if failures:
+        out.append(f"the loop failed: {failures}")
+    if ran != ["print(1)"]:
+        out.append(f"the tool call in the second choice did not run: {ran}")
+    if not any("build the model" in t for t in texts):
+        out.append("the announcement in the first choice was not shown")
+    return out
+
+
+def check_a_list_ends_with_its_reply():
+    """What follows a reply that ended on a bulleted list is not part of it.
+
+    ``QTextEdit.append`` starts each new paragraph with the last one's format,
+    list included, so after a reply ending in bullets the next "You:" label, the
+    drawing pasted with it and the next reply were drawn as more bullets.
+    """
+    from studio.chat_dock import ChatDock
+    out = []
+    mw, asst = _session()
+    dock = ChatDock(asst)
+    dock._on_assistant_text("The model has **2 materials**:\n\n- embankment\n"
+                            "- foundation\n")
+    dock._add_block("You", "What height is written on this drawing?", "#1a5fb4")
+    dock._on_assistant_text("The height is 20 ft.")
+    doc = dock.transcript.document()
+    block = doc.begin()
+    while block.isValid():
+        text = block.text()
+        if ("What height" in text or "The height is 20 ft" in text
+                or text.startswith("Assistant:")) and block.textList() is not None:
+            out.append(f"{text[:40]!r} is drawn as a bullet of the reply above it")
+        if text.strip() in ("embankment", "foundation") and block.textList() is None:
+            out.append(f"the reply's own list item {text!r} lost its bullet")
+        block = block.next()
+    dock.deleteLater()
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -2731,6 +2976,14 @@ CHECKS = [
     ("N. the transient route is in the brief",
      check_transient_helper_is_told_to_the_model),
     ("N. a runaway snippet is stopped", check_a_runaway_snippet_is_stopped),
+    ("O. a snippet's printout is capped", check_printout_is_capped),
+    ("O. the summary says whose range it prints",
+     check_summary_says_whose_range_it_prints),
+    ("O. a profile-line sweep is not a polygon edit",
+     check_profile_sweep_is_not_a_polygon_edit),
+    ("O. a table under a line of text renders", check_table_under_a_line_renders),
+    ("O. a list ends with its reply", check_a_list_ends_with_its_reply),
+    ("O. a split reply keeps its tool call", check_a_split_reply_keeps_its_tool_call),
 ]
 
 

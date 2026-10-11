@@ -30,6 +30,7 @@ import contextlib
 import io
 import os
 import sys
+import tempfile
 import threading
 import time
 
@@ -261,6 +262,69 @@ def _pinned_settings(values):
 
 
 # --------------------------------------------------------------------------- #
+# What the recorded sessions may read
+# --------------------------------------------------------------------------- #
+#: Documentation pages a recorded session cannot find with ``docs()``: the
+#: tutorial the sessions are recorded FOR. Its pages quote the answers each
+#: session is scored on, and a recording found them — a documentation-questions
+#: session searched the docs, landed on W-1's own account of the same two
+#: questions, and answered from it. The exclusion lives here and nowhere else:
+#: the product's search still finds W-1, which is a page a user may want.
+#: Prefix match on the index's page URL; the transcripts and workbooks under
+#: docs/tutorials/files are not in the index at all.
+EXCLUDED_DOC_URLS = ("tutorials/w01_ai_assistant/",)
+
+
+@contextlib.contextmanager
+def _docs_without(prefixes=EXCLUDED_DOC_URLS):
+    """Serve the kernel's documentation search without the pages in ``prefixes``.
+
+    The search is built once per process from the shipped index and cached on
+    the kernel module; for the length of the block the cache holds a copy built
+    from the same index with those pages taken out, and the original is put back
+    afterwards. Yields the prefixes actually excluded (empty when the install
+    ships no index).
+    """
+    from studio.ai import kernel as K
+    saved = K._DOCS_CACHE
+    full = K._docs_search()
+    if full is None or not prefixes:
+        yield ()
+        return
+    try:
+        filtered = _filtered_docs_search(K, tuple(prefixes))
+    except Exception:
+        filtered = None
+    if filtered is None:
+        yield ()
+        return
+    K._DOCS_CACHE = filtered
+    try:
+        yield tuple(prefixes)
+    finally:
+        K._DOCS_CACHE = saved
+
+
+def _filtered_docs_search(K, prefixes):
+    """The kernel's search, rebuilt from the shipped index minus ``prefixes``."""
+    import base64
+    import json
+    import lzma
+    from importlib import resources
+
+    raw = (resources.files("xslope") / "resources" / "docs_index.json").read_text(
+        encoding="utf-8")
+    index = json.loads(raw)
+    packed = index.get("bodies") or ""
+    bodies = (lzma.decompress(base64.b64decode(packed)).decode("utf-8")
+              if index.get("encoding") == "lzma+base64" else packed)
+    keep = dict(index)
+    keep["pages"] = [p for p in index.get("pages") or []
+                     if not str(p.get("url", "")).startswith(prefixes)]
+    return K._DocsSearch(keep, bodies)
+
+
+# --------------------------------------------------------------------------- #
 # The watchdog
 # --------------------------------------------------------------------------- #
 #: Seconds a turn is allowed to overrun its own timeout before the watchdog
@@ -474,7 +538,7 @@ def _install_stub(assistant, reply="…"):
 # The session
 # --------------------------------------------------------------------------- #
 def run_assistant_session(name, model_path, turns, *, provider="anthropic",
-                          model="claude-opus-5", images=None,
+                          model="claude-opus-5-5", images=None,
                           out_dir=IMAGES_DIR, files_dir=FILES_DIR,
                           timeout_s=600, dry_run=False, dock_width=560,
                           window_size=(1500, 950), max_height=6400,
@@ -586,7 +650,9 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
     print("assistant session %r: %d turn(s), %s/%s%s"
           % (name, len(turns), provider, model, "  [dry run]" if dry_run else ""))
 
-    with _pinned_settings(pins), _usage_probe() as probe:
+    with _pinned_settings(pins), _usage_probe() as probe, \
+            _docs_without() as excluded:
+        result["docs_excluded"] = list(excluded)
         try:
             win = MainWindow()
             win.resize(*window_size)
@@ -874,10 +940,12 @@ W1_MODEL = os.path.join(
 #: ``tools/build_w1_lem3.py``, which asserts that undoing exactly those three
 #: gives LEM-3's 1.244 back; Spencer returns 1.004 on it.
 W1_BROKEN = os.path.join(REPO_ROOT, "docs/tutorials/files/w1_diagnose_start.xlsx")
-#: The drawing of the problem, the figure LEM-3 opens on. It carries the layer
-#: thicknesses, the 2:1 face and both soils' unit weight and cohesion, and NOT
-#: the horizontal extents — which is why the build session states those in words.
-W1_SKETCH = os.path.join(REPO_ROOT, "docs/lem/sample_images/simple_mult_layers.png")
+#: The drawing of the problem, the figure LEM-3 opens on and the one W-1 tells
+#: the reader to copy. It carries the layer thicknesses, the 2:1 face, the
+#: horizontal extents (30 ft past the toe, 40 ft of face, 50 ft of crest), both
+#: soils with their names, unit weights, cohesions and phi = 0, and the rigid
+#: rock — everything but where to put the origin, which the request supplies.
+W1_SKETCH = os.path.join(IMAGES_DIR, "lem03_problem_sketch.png")
 
 
 def w1_smoke(dry_run=False):
@@ -897,18 +965,15 @@ def w1_smoke(dry_run=False):
 def w1_build_from_image(dry_run=False):
     """From an empty project and a drawing, to a solved model.
 
-    The drawing gives heights, the face inclination and both soils, but no
-    horizontal extents — a section is not determined by it. The turn supplies
-    the three things it cannot: where the toe is, how far the ground runs past
-    the toe and behind the crest break, and that the base is rigid. Those make
-    the section LEM-3's, so the answer is comparable to its published 1.244.
+    The drawing at the top of LEM-3 determines the section: thicknesses, face,
+    extents, both soils and the rigid rock. The turn supplies only what no
+    drawing can, where the origin is, and asks for the run. Built as drawn, the
+    section is LEM-3's, so the answer is comparable to its published 1.244.
     """
     return run_assistant_session(
         "build_from_image", None,
-        [("Build this model: a 20 ft embankment on a 10 ft foundation layer over "
-          "rigid rock. Both soils are undrained. Put the toe at x = 0, run the "
-          "ground 30 ft past the toe and 50 ft behind the crest break. Add "
-          "starting circles and run Spencer with a search.",
+        [("Build this model with the toe at x = 0. Add starting circles and run "
+          "Spencer with a search.",
           W1_SKETCH)],
         timeout_s=900, max_height=20000, dry_run=dry_run, window_grab=True)
 
@@ -1051,9 +1116,48 @@ def w1_report(dry_run=False):
         dry_run=dry_run)
 
 
+#: The drawing LEM-1 opens on, which its assistant path pastes into the dock.
+LEM01_SKETCH = os.path.join(IMAGES_DIR, "lem01_problem_sketch.png")
+#: The figure LEM-1 shows beside that path: the whole window after the build.
+LEM01_FIGURE = os.path.join(IMAGES_DIR, "lem01_assistant.png")
+
+
+def lem1_assistant_build(dry_run=False):
+    """LEM-1's build-from-drawing figure: "Build this model" and the drawing.
+
+    The session starts from an empty project, attaches LEM-1's problem drawing
+    and sends the three words the tutorial tells the reader to type. Its one
+    published artifact is the whole-window grab, which becomes
+    ``lem01_assistant.png``; the dock grab, transcript and workbook go to a
+    scratch folder (or ``XSLOPE_SESSIONS_OUT``), since LEM-1 links none of them.
+
+    Check the workbook before keeping the figure: a Spencer search on it should
+    return LEM-1's published 1.276. A dry run writes no figure.
+
+    Named without "lem01" on purpose: the screenshot producer selects sessions by
+    substring, and a routine ``capture_tutorial_screenshots.py lem01`` must not
+    start a billed conversation.
+    """
+    import shutil
+
+    out = os.environ.get("XSLOPE_SESSIONS_OUT") or tempfile.mkdtemp(
+        prefix="lem1_assistant_build_")
+    result = run_assistant_session(
+        "assistant", None, [("Build this model", LEM01_SKETCH)],
+        timeout_s=900, max_height=20000, window_grab=True, prefix="lem01",
+        out_dir=out, files_dir=out, save_after=True, dry_run=dry_run)
+    grab = result.get("window_image")
+    if grab and not dry_run and not result.get("error"):
+        shutil.copyfile(grab, LEM01_FIGURE)
+        result["figure"] = LEM01_FIGURE
+        print("   -> %s  (re-solve %s before keeping it)"
+              % (os.path.basename(LEM01_FIGURE), result.get("workbook")))
+    return result
+
+
 for _fn in (w1_smoke, w1_build_from_image, w1_modify, w1_sweep_builtin,
             w1_sweep_adhoc, w1_elastic_fem, w1_capability, w1_conceptual,
-            w1_diagnose, w1_report):
+            w1_diagnose, w1_report, lem1_assistant_build):
     SESSIONS[_fn.__name__] = _fn
 del _fn
 

@@ -32,13 +32,16 @@ class AssistantSettingsDialog(QDialog):
         self._runner = None
         self._source = "static"
         self._listed = 0
-        self.setMinimumWidth(460)
 
         layout = QVBoxLayout(self)
         # The notes under the form are word-wrapped and change length with the
         # provider; the dialog must grow with them rather than squeeze the form
         # rows above (the Model row collapsed to a sliver on Kimi's longer note).
         layout.setSizeConstraint(QLayout.SetMinimumSize)
+        # That constraint replaces the widget's own minimum with the layout's, so
+        # the dialog's floor width rides in the layout itself; a setMinimumWidth
+        # here is overwritten and the dialog opens narrow, wrapping every note.
+        layout.addStrut(460)
         form = QFormLayout()
         # Let the field column grow to the dialog width (so the URL isn't clipped)
         # and give the rows breathing room.
@@ -202,7 +205,18 @@ class AssistantSettingsDialog(QDialog):
     def _set_models_note(self, error=""):
         label = self._spec()["label"]
         if self._source == "live":
-            text = f"{self._listed} models listed by {label}."
+            # The source, never a count: a count tells the user nothing. Where
+            # the box holds more than the provider listed, say where the rest
+            # came from — the vision models a provider's list leaves out (Z.ai),
+            # or the recommended models the recommendations add.
+            text = f"Listed by {label}."
+            if self.model.count() > self._listed:
+                if self._spec().get("listing_incomplete"):
+                    text = (f"Listed by {label}, plus its vision models, which "
+                            f"its list leaves out.")
+                else:
+                    text = (f"Listed by {label}, plus the recommended models its "
+                            f"list leaves out.")
         elif self._source == "cache":
             text = f"Last list seen from {label}."
         else:
@@ -261,7 +275,12 @@ class AssistantSettingsDialog(QDialog):
         keep = self.current_model()
         if models:
             model_list.save_cached(settings, provider, models)
-            self._populate(models, "live", keep=keep)
+            # The live list, plus the shipped ids a provider's endpoint is known
+            # to leave out (Z.ai's V models); the caption still counts only what
+            # the provider listed.
+            shown, _ = model_list.resolve_models(provider, live=models)
+            self._populate(shown, "live", keep=keep)
+            self._listed = len(models)
             self._set_models_note()
         else:
             # Nothing live: keep whatever is showing, but re-apply the overlay in

@@ -20,8 +20,8 @@ at Austin.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Assistant</span><p>30–45 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>40–60 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model failure along a weak layer: how to enter a

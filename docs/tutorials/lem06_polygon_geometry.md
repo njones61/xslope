@@ -16,7 +16,7 @@ instead, one per material zone, and the base of the model is whatever the polygo
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>

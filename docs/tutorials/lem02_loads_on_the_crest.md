@@ -15,8 +15,8 @@ unchanged — the load is the only new input.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>20–25 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to apply loads to a slope model: how to enter

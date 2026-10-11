@@ -41,7 +41,7 @@ is repeated here.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Finite element</p></div>
-<div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~60 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~60 min, 2 h with the optional long run</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how the contacts in a block wall are entered as slip

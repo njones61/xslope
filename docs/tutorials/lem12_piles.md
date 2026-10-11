@@ -70,11 +70,9 @@ it beside the bar.
 
 The two pile rows are defined by two rows of the piles sheet, which we read
 before running anything. Open
-**Piles** in the **Inputs** tree and press **Table view**. Its columns match
-the piles worksheet, all sixteen of them. **Show parameters for:** opens with
-both **LEM** and **FEM** ticked; untick **FEM** and the five columns only the
-finite element engine reads (`E`, `I`, `Area`, `Head`, `Tip`) go away, leaving
-the eleven a limit equilibrium run uses:
+**Piles** in the **Inputs** tree, set its **Show parameters for:** toggles to
+**LEM** alone, and press **Table view**. The table then has the eleven columns of
+the piles worksheet that a limit equilibrium run uses, in the sheet's order:
 
 ![The two pile rows as entered in the file](images/lem12_studio_piles_table.png)
 

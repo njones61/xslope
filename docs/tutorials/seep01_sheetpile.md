@@ -193,12 +193,12 @@ Treating the ends as no-flow is a judgment call: the section is drawn far
 enough either side of the wall that the flow has become horizontal by the
 time it reaches them, so nothing crosses.
 
-These tables contain the entire model. The vertex and boundary tables are laid
-out exactly as their destinations are — the template's worksheets and Studio's
-editors, same columns in the same order. Select one of those blocks of values,
-copy, and paste it straight into the sheet or editor rather than retyping it. Type
-the material row instead: on the `mat` sheet its `name` and seepage columns are
-far apart, and Studio's editor has no `mat` column.
+These tables contain the entire model. The vertex table is laid out exactly as
+its destination is — the `profile` worksheet and Studio's profile editor, same
+columns in the same order — so select its block of values, copy, and paste it
+straight into the sheet or editor. Type the material properties and the two
+boundary blocks instead: the worksheets and the editors hold those values in
+separate cells and fields, not in the tables' layout.
 
 ---
 
@@ -318,8 +318,8 @@ mesh time. Leave them however they stand.
 ### 2. The `mat` worksheet
 
 The `mat` sheet is wide, and a seepage-only material fills one band of it: the
-**Seepage** band at columns AG–AQ. Enter (or copy-paste) the material properties
-from the table above into the first row of the table, row 11:
+**Seepage** band at columns AG–AQ. Type the material properties from the table
+above into the first row of the table, row 11:
 
 ![The seepage band of the finished mat worksheet](images/seep01_sheet_mat.png)
 

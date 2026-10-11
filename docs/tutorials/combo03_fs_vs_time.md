@@ -312,7 +312,7 @@ Applying the file's search window: min_slip_depth.
 Searching for the critical circular surface with SPENCER…
 [↻ iteration 9] center=(5.20, 65.90), FS=1.5134, grid=0.2996
 [↻ iteration 10] center=(5.20, 65.90), FS=1.5134, grid=0.1498
-[✓ converged] Iter=10, FS=1.5134 (ΔFS<0.0005) at (x=5.20, y=65.90, depth=0.02)
+[✓ converged] Iter=10, FS=1.5134 (ΔFS<0.0005) at (x=5.20, y=65.90, depth=0.02), elapsed time=3.44 seconds
 Critical FS = 1.513
 Sliding mass = 6,237.1 kN/m over 60.20 m of failure surface
 ```
@@ -525,13 +525,12 @@ the seepage boundary sets, the pool schedule and the stage times on it.
 ### Opening the model
 
 Download [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx) and
-open it with **File → Open…**. Studio opens it with the mode strip on **FEM**;
-click **LEM** (`Ctrl+1`). Its three
-companions — `xslope_johnson_fs_time_mesh.json`, `xslope_johnson_fs_time_tseep.csv`
-and `xslope_johnson_fs_time_tseep_meta.json` — sit in the same folder as the workbook and Studio
-reads them on open, so the mesh and the seepage solution are already loaded. In
-**LEM** the inputs
-view draws that mesh behind the zones.
+open it with **File → Open…**. Its three companions —
+`xslope_johnson_fs_time_mesh.json`, `xslope_johnson_fs_time_tseep.csv` and
+`xslope_johnson_fs_time_tseep_meta.json` — sit in the same folder as the workbook,
+and Studio reads them on open, so the mesh and the seepage solution are already
+loaded. Studio opens this file with the mode strip on **FEM**; switch it to
+**LEM** (`Ctrl+1`). In **LEM** the inputs view draws the mesh behind the zones.
 
 ![The Johnson Reservoir dam in LEM mode, the mesh behind it](images/combo03_rapid_inputs.png){width=1000}
 

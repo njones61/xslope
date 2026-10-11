@@ -325,6 +325,9 @@ Rapid drawdown stages on the critical surface: Stage 1 FS = 1.4835, Stage 2 FS =
 Sliding mass = 1,101,634.4 lb/ft over 256.56 ft of failure surface
 ```
 
+The `unsolved trials` line counts the trial surfaces Spencer's method could not
+solve, 5 of the 855 the search tried. The search skips them.
+
 Every trial surface in that search received a full three-stage analysis, and the
 last lines of the log give the three stages of the critical surface:
 

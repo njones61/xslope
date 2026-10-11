@@ -308,11 +308,14 @@ We start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials, profile lines and water
 
-Click **Materials**, and in **Table view** press **Add row** four times and
+Click **Materials** and set the **Show parameters for:** toggles to **LEM** and
+**FEM**. The table above includes the worksheet's empty `t_cut`, `E` and `nu`
+columns, and the editor shows those only with **FEM** ticked, so this setting
+lets the table paste as one block. In **Table view**, press **Add row** four times and
 enter (or copy-paste) the four soils in the order the table above lists them —
 the row order fixes the Mat IDs. Check the seam's row: `Soft Clay` is the only one with cohesion, and the only one whose `u` is `none`:
 
-![The materials editor on this problem's four soils](images/lem05_studio_materials.png){width=1166}
+![The materials editor on this problem's four soils](images/lem05_studio_materials.png){width=1162}
 
 Then **Profile lines**: set **Max depth (bottom boundary elevation):** to `-10`,
 and press **Add line** four times, each line taking its **Material:** and its
@@ -467,7 +470,7 @@ the black line against the intended shape before using the number on it.
 
 ### Which methods support non-circular surfaces {#which-methods-support-non-circular-surfaces}
 
-In the **Method** list of **Run LEM…**, the Ordinary Method of Slices and
+In the **Method** list of **Run LEM…**, the Ordinary Method of Slices (OMS) and
 Bishop's Simplified are dimmed on a non-circular surface and cannot be chosen.
 Hold the pointer over the OMS entry to read why:
 

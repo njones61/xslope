@@ -798,6 +798,19 @@ def _all_usages(dlg):
     return dlg
 
 
+def _lem_and_fem(dlg):
+    """Tick LEM and FEM, untick Seepage and Reliability.
+
+    For LEM-4 and LEM-5, whose material tables carry the worksheet's empty
+    ``t_cut``, ``E`` and ``nu`` columns so that one block pastes into both the
+    sheet and the editor: the editor shows those columns only with FEM ticked,
+    and the page tells the reader to set exactly these two.
+    """
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag in ("lem", "fem"))
+    return dlg
+
+
 def _lem_only(dlg):
     """Untick every non-LEM usage toggle so the capture shows the LEM problem.
 
@@ -1075,7 +1088,7 @@ def lem04_materials():
     """
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(_all_usages(MaterialsEditor().build(_load(LEM04), None))),
+    return _grab(_mat_table(_lem_and_fem(MaterialsEditor().build(_load(LEM04), None))),
                  "lem04_studio_materials.png")
 
 
@@ -1108,10 +1121,19 @@ def lem04_run_lem():
 
 def lem05_materials():
     """The materials editor, table view, on LEM-5's four soils — the seam of soft
-    clay among them, told from the sand fill by its cohesion."""
+    clay among them, told from the sand fill by its cohesion.
+
+    The completed file carries stiffnesses the page's table leaves empty (E, ν
+    and a zero t_cut, which the limit equilibrium run never reads). They are
+    cleared here, so the shot shows the rows the reader pastes from the table,
+    not the saved model's extra cells.
+    """
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(_all_usages(MaterialsEditor().build(_load(LEM05), None))),
+    d = _load(LEM05)
+    d = dict(d, materials=[dict(m, E=0.0, nu=0.0, t_cut=None)
+                           for m in d["materials"]])
+    return _grab(_mat_table(_lem_and_fem(MaterialsEditor().build(d, None))),
                  "lem05_studio_materials.png")
 
 
@@ -1209,11 +1231,18 @@ def lem08_dloads():
 
 def lem08_circles():
     """The circles editor holding LEM-8's two starting circles, typed rather than
-    generated: one tangent to the toe elevation, one to the bottom of the model."""
+    generated: one tangent to the toe elevation, one to the bottom of the model.
+
+    Photographed as the step leaves it, before **OK**: the editor computes ``R``
+    only when OK applies the rows, so a typed or pasted row shows R = 0 until
+    then. The file stores the computed radii, and they are cleared here so the
+    shot shows the reader's screen rather than the saved model.
+    """
     from studio.editors import CirclesEditor
 
-    return _grab(CirclesEditor().build(_load(LEM08), None),
-                 "lem08_studio_circles.png")
+    d = _load(LEM08)
+    d = dict(d, circles=[dict(c, R=0.0) for c in d["circles"]])
+    return _grab(CirclesEditor().build(d, None), "lem08_studio_circles.png")
 
 
 def lem08_run_lem():

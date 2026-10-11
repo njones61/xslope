@@ -121,12 +121,10 @@ its contents page just lists the headings without numbers.
 
 ## What the document contains {#what-the-document-carries}
 
-The report runs to 28 pages and 24 figures:
-
-(The linked copies below have their figures at reduced resolution to keep the
-download small; a report you generate yourself has them at full
-resolution.)
-[w03_report.docx](files/w03_report.docx). Its sections follow the analyses, with
+The report runs to 28 pages and 24 figures. A copy is linked here,
+[w03_report.docx](files/w03_report.docx), with its figures at reduced resolution
+to keep the download small; a report you generate yourself has them at full
+resolution. Its sections follow the analyses, with
 seepage ahead of the one stability section that consumes its answer. Both methods
 sit inside that section, §4.5 Bishop's Simplified Method and §4.6 Spencer's
 Method, under a §4.4 *Factors of Safety* table that lists the two side by side and
@@ -157,9 +155,10 @@ in it.
 
 Spencer's method solves for a pair — a factor of safety and an interslice
 inclination θ — at which both the force sum and the moment sum vanish, so it
-prints both sums rather than a single quotient. On the page after this one in
-the linked report, they close at F = 1.257 and θ = −16.28°, with residuals of
-−1.000e-11 and 5.355e-09 against terms coming to 371418 and 84337150. Every number
+prints both sums rather than a single quotient. In the linked report they are on
+the page after the one shown above, and they close at F = 1.257 and θ = −16.28°,
+with residuals of −1.000e-11 and 5.355e-09 against terms coming to 371418 and
+84337150. Every number
 is printed at a precision the factor of safety can be rebuilt from: Bishop divides
 its own two sums, 485408 and 394283, and prints the 1.231 they give. A report you
 generate yourself closes at the same F and θ, with slightly different residuals
@@ -231,10 +230,10 @@ Under **Output**, click **Browse…** on the **Template** row and choose
 path. Change **Save as** to `w03_report_example_template.docx` so the first report
 survives. Under **Limit equilibrium analysis**, untick **Bishop's Simplified
 Method**, leaving
-Spencer's finished search as the only stability run. Under **Title page**, enter
-the **Project title** and **Project number** again, because the dialog does not
-keep them between openings, and set **Organization** to `ACME Geotechnical`. Click
-**Generate**.
+Spencer's finished search as the only stability run. Under **Title page**,
+**Project title** reopens on a name made from the file name and **Project number**
+reopens empty; enter both again as before, and set **Organization** to
+`ACME Geotechnical`. Click **Generate**.
 
 ![The first body page of the report built on the example template: the firm's name in the head, the firm's line in the foot](images/w03_page_template.png){width=620}
 

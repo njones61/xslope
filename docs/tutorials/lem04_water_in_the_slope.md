@@ -260,7 +260,10 @@ We start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials and profile lines
 
-Click **Materials**, and in **Table view** press **Add row** three times and
+Click **Materials** and set the **Show parameters for:** toggles to **LEM** and
+**FEM**. The table above includes the worksheet's empty `t_cut`, `E` and `nu`
+columns, and the editor shows those only with **FEM** ticked, so this setting
+lets the table paste as one block. In **Table view**, press **Add row** three times and
 enter (or copy-paste) the three soils in the order the table above lists them —
 the row order fixes the Mat IDs. Both unit-weight columns are filled here and
 every row's **u** is `piezo`:

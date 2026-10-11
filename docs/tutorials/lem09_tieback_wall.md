@@ -467,9 +467,10 @@ to `Non-circular`, and raise the slice count to 60:
 
 **FS = 1.469** with Janbu's correction factor f₀ = 1.024 applied, 1.434 without
 it, and 1.439 with Spencer's method.
-[Verification problem VP49](../verification/rocscience.md#vp49) records the 1.469
-and the 1.439 against the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 33%
-more soil than the searched surface, and takes the same 35,570 lb/ft from the
+[Verification problem VP49](../verification/rocscience.md#vp49) compares the 1.469
+and the 1.439 with the published solutions. The wedge carries 157,936 lb/ft on a
+90.1 ft base, 33% more soil than the searched surface, and takes the same
+35,570 lb/ft from the
 anchors, since it too crosses both outside their development lengths. Its
 lower leg leaves the toe at 42° against the search's 49°. A specified surface is a
 trial surface, not necessarily the critical one, which is why the search comes
@@ -479,8 +480,8 @@ first.
 
 Now we take both anchors out and search the same wall again — same soils, same
 pile, same starting points, a separate search with its own critical surface. In
-**Run LEM…**, set **Analysis** back to `Auto search`, **Surface** to
-`Non-circular` and the slice count back to 40:
+**Run LEM…**, set **Analysis** back to `Auto search` and the slice count back to
+40:
 
 ![Janbu on the wall with no tiebacks](images/lem09_solution_bare.png){width=1000}
 

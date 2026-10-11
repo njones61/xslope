@@ -250,9 +250,10 @@ Click **OK**.
 Here we name each material in the model and enter its properties — unit weight
 and strength parameters. Everything else will reference the material by its ID,
 which is why it comes first. This problem has one material. Click **Materials**.
-The editor opens on **Table view**, a material per row. Set the **Show parameters
-for:** toggles to **LEM** alone, press **List view** for the per-material form,
-then **Add**:
+The editor opens on **Table view**, a material per row. Above the table, the
+**Show parameters for:** checkboxes set which inputs the editor shows. Tick
+**LEM** and untick the others, then press **List view** for the per-material
+form, and **Add**:
 
 1. **Name** = `soil`.
 2. **γ** = `125`.

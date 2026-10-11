@@ -368,8 +368,8 @@ six lines match the tables above.
 Click **Circles** and enter the two circles from the table above, or paste the
 block into the first cell — its four columns are the editor's first four, and
 the rows come with it. **Depth is an elevation**: 0 is the toe, -10 the bottom
-of the model. The preview draws both arcs on the section as you type, and the `R`
-column is filled in when you click **OK**:
+of the model. The preview draws both arcs on the section as you type. The `R`
+column reads 0 until you click **OK**, which computes each radius:
 
 ![The circles editor on the two starting circles](images/lem08_studio_circles.png)
 

@@ -294,10 +294,10 @@ for the fastest read on which mechanism this section has. **The table below
 collects three separate runs; the program does not print it.** Each row is a run
 you can repeat with **Run LEM…** and **Analysis** = `Single surface`, which solves
 the first circle in the **Circles** list. To solve another circle, select the rows
-above it in the **Circles** editor, press **Remove selected**, run, and then undo
-the removal. The toe circle is in the model only if you generated the circles in
-Studio. The factor of safety is the number on that run's solution plot, and the
-weight is ΣW summed over the run's slices:
+above it in the **Circles** editor, press **Remove selected** and then **OK**, run,
+and choose **Edit → Undo** to put the removed rows back. The factor of safety is
+the number on that run's solution plot, and the weight is ΣW summed over the
+run's slices:
 
 | Circle | Depth | Factor of safety | Weight of the sliding mass (lb/ft) |
 | --- | :---: | :---: | :---: |

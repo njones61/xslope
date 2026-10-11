@@ -78,6 +78,22 @@ for its list again.
 and stored in your operating system's keychain, not in a settings file. Ollama
 needs no key, and the field is disabled when Ollama is selected.
 
+Each hosted provider issues keys from its own developer console:
+
+| Provider | Create a key at |
+| --- | --- |
+| Claude (Anthropic) | [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys) |
+| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| Kimi (Moonshot AI) | [platform.kimi.ai/console/api-keys](https://platform.kimi.ai/console/api-keys) |
+| Z.ai (GLM) | [z.ai/manage-apikey/apikey-list](https://z.ai/manage-apikey/apikey-list) |
+
+Calls are billed to the account the key belongs to, so a new account usually
+needs a payment method or a prepaid balance before its first call, and money
+added to the account serves every key on it. Most providers show a new key
+only once, so copy it when you create it. Providers move these pages from time
+to time; if a link no longer works, sign in at the provider's site and look for
+API keys.
+
 **Base URL** — the address the provider is reached at, filled in for you. Leave
 it alone unless your provider gave you a different endpoint. It is disabled for
 Claude and OpenAI, whose addresses are fixed.

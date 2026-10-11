@@ -216,7 +216,7 @@ a dialog to pick the provider and model and store credentials:
 | **Claude** (Anthropic) | The current Claude family | Tool use + vision; prompt caching keeps the large system prompt cheap on repeat turns. |
 | **OpenAI / GPT** | The current GPT family | Tool use + vision; the prompt prefix is cached server-side. |
 | **Kimi** (Moonshot AI) | The K-series vision models (`kimi-k2.6`, `kimi-k2.5`, `kimi-k3`, `kimi-latest`) and the `moonshot-v1` vision previews | Tool use + vision, with server-side prefix caching, so it gets the full system prompt. |
-| **Z.ai (GLM)** | The GLM-**V** models only (`glm-4.6v`, `glm-5v-turbo`, …) | Tool use + vision. The text GLMs are not offered — see below. |
+| **Z.ai (GLM)** | The vision models: the GLM-**V** family (`glm-5v-turbo`, `glm-4.6v`, …) and the GLM-5.3 Flash models | Tool use + vision. The text GLMs are not offered — see below. |
 | **Ollama** (local) | Vision models only (`llava`, `llama3.2-vision`, `gemma3`, `qwen2.5vl`, `minicpm-v`, …) | Runs on your machine — free, no API key, fully offline. Whether a given local model can run code depends on the model. |
 
 **Every model on offer can read an image.** Building a model from a photograph or a
@@ -229,6 +229,22 @@ box states this. The model box still accepts free text, so a text-only id can be
 you want one.
 
 ![Assistant Settings dialog](images/assistant_settings.png)
+
+**Getting a key.** Each hosted provider issues API keys from its own developer console:
+
+| Provider | Create a key at |
+| --- | --- |
+| Claude (Anthropic) | [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys) |
+| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| Kimi (Moonshot AI) | [platform.kimi.ai/console/api-keys](https://platform.kimi.ai/console/api-keys) |
+| Z.ai (GLM) | [z.ai/manage-apikey/apikey-list](https://z.ai/manage-apikey/apikey-list) |
+
+Calls are billed to the account the key belongs to, so a new account usually
+needs a payment method or a prepaid balance before its first call, and money
+added to the account serves every key on it. Most providers show a new key
+only once, so copy it when you create it. Providers move these pages from time
+to time; if a link no longer works, sign in at the provider's site and look for
+API keys.
 
 API keys are stored in the **OS keychain** (not in plaintext), and the base URL is
 configurable for Kimi, Z.ai and Ollama. The dock shows the active provider · model,

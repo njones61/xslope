@@ -87,7 +87,8 @@ does regardless of the model, and that is what this file covers:
      on a bulleted list was drawn as more bullets of it; and a reply that the
      Responses-API route split into a text choice and a tool-call choice lost
      its tool call; and a file a snippet wrote under a name already in the
-     Files folder was never reported or shown.
+     Files folder was never reported or shown; and a sweep step's unsolved
+     trials and admissibility notes never reached the model.
   N. TRANSIENT SEEPAGE, AND THE SNIPPET THAT NEVER RETURNS — a corpus sweep met a
      transient model with no helper for it, and the assistant spent the turn
      reverse-engineering engine signatures instead of answering; another sweep sat
@@ -2894,6 +2895,59 @@ def check_a_rewritten_file_is_reported():
     return out
 
 
+def check_a_sweep_step_reports_its_warnings():
+    """What a sweep step's solve says about itself reaches the model.
+
+    Both sweep helpers once ran the engine muted and kept only the factor of
+    safety, so Spencer's unsolved trials and the admissibility notes never
+    reached the model, which could not mention them. Each step now prints them
+    once, each cut to its finding, on one line under its result, and the
+    sweep's table carries them; the search's progress lines stay out.
+    """
+    import re
+    out = []
+    model = os.path.join(_REPO, "docs", "lem", "files",
+                         "xslope_simple_mult_layers.xlsx")
+    if not os.path.exists(model):
+        return [f"the sample model is missing: {model}"]
+    mw, asst = _session()
+    mw.doc.load(model)
+    swept = _run(asst, "def setc(v):\n"
+                       "    slope_data['materials'][1]['c'] = v\n"
+                       "df = sensitivity([200.0], setc, param='c', "
+                       "name='w1_warnings_probe', plot=False)\n"
+                       "print('CELL', df['warnings'].iloc[0])\n")
+    designed = _run(asst, "r = design_sweep('mat:foundation:c', 200, 250, steps=2, "
+                          "target_fs=1.0, plot=False)\n")
+    for name, text in (("sensitivity", swept), ("design_sweep", designed)):
+        lines = [ln for ln in text.splitlines()
+                 if ln.strip().startswith("warnings:")]
+        if not any("could not solve" in ln for ln in lines):
+            out.append(f"{name}: a step's unsolved trials did not reach the "
+                       f"model: {text[-500:]!r}")
+        if not any("interslice tension" in ln for ln in lines):
+            out.append(f"{name}: a step's admissibility notes did not reach the "
+                       f"model: {text[-500:]!r}")
+        if any("(min Z" in ln or "(on " in ln for ln in lines):
+            out.append(f"{name}: a step's warnings are not cut to their finding: "
+                       f"{lines!r}")
+        if "iteration" in text:
+            out.append(f"{name}: the search's progress lines reached the model")
+    cell = re.search(r"^CELL (.*)$", swept, re.M)
+    if not cell or "could not solve" not in cell.group(1):
+        out.append(f"the sweep's table does not carry the step's warnings: "
+                   f"{swept[-300:]!r}")
+    if swept.count("could not solve") != 2:      # the step's line, and the cell
+        out.append("a step's warning is printed more than once: "
+                   f"{swept.count('could not solve')} times")
+    try:
+        os.remove(os.path.join(asst._kernel.outdir, "w1_warnings_probe.csv"))
+    except OSError:
+        pass
+    mw.deleteLater()
+    return out
+
+
 def check_a_split_reply_keeps_its_tool_call():
     """A reply split across choices still runs its tool call.
 
@@ -3065,6 +3119,7 @@ CHECKS = [
     ("O. a list ends with its reply", check_a_list_ends_with_its_reply),
     ("O. a split reply keeps its tool call", check_a_split_reply_keeps_its_tool_call),
     ("O. a rewritten file is reported", check_a_rewritten_file_is_reported),
+    ("O. a sweep step reports its warnings", check_a_sweep_step_reports_its_warnings),
 ]
 
 

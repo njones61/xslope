@@ -171,6 +171,64 @@ def _written_since(folder, before):
     return [name for name, stamp in now.items() if before.get(name) != stamp]
 
 
+def _brief_warning(note):
+    """A run's warning cut to its finding: the text before its first
+    parenthesis, colon or second sentence — 'interslice tension on 15% of
+    interior boundaries', 'Spencer could not solve 67 of 330 trial surfaces'."""
+    text = " ".join(str(note).split())
+    for stop in (" (", ": ", ". "):
+        i = text.find(stop)
+        if i > 0:
+            text = text[:i]
+    return text.rstrip(". ")
+
+
+def _step_warnings(notes):
+    """One sweep step's warnings as one string, each cut to its finding and said
+    once ('' when the step raised none)."""
+    seen = []
+    for note in notes or ():
+        brief = _brief_warning(note)
+        if brief and brief not in seen:
+            seen.append(brief)
+    return "; ".join(seen)
+
+
+def _print_step_warnings(brief, previous):
+    """Print a step's warnings line under its result, unless it has none. A step
+    whose warnings read exactly as the step before's says so rather than
+    repeating them."""
+    if not brief:
+        return
+    if brief == previous:
+        print("    warnings: the same as the step before")
+    else:
+        print(f"    warnings: {brief}")
+
+
+def _print_sweep_steps(res):
+    """The steps of an LEM design or back-analysis sweep, one line each, with the
+    warnings each step's solve raised on a line under it — what the muted engine
+    would otherwise have left out."""
+    df = res.get("df")
+    if df is None or not len(df) or "value" not in df.columns:
+        return
+    label = res.get("param") or "value"
+    out = res.get("output", "FS")
+    previous = ""
+    steps = df.loc[~df["is_base"].astype(bool)].sort_values("value")
+    for _i, r in steps.iterrows():
+        if bool(r.get("success")):
+            print(f"  {label}={r['value']:g}: {out}={float(r['fs']):.3f}")
+            brief = _step_warnings(str(r.get("warnings") or "").split("; "))
+            _print_step_warnings(brief, previous)
+            previous = brief
+        else:
+            print(f"  {label}={r['value']:g}: no result — "
+                  f"{r.get('msg') or 'no result'}")
+            previous = ""
+
+
 def _geometry_sigs(slope_data):
     """Per-key JSON signatures of the geometry inputs (shapely objects fall back
     to their WKT via ``str``), so a snippet's geometry edits can be located."""
@@ -1561,6 +1619,10 @@ class PythonKernel:
 
             For each v in `values`: call apply(v) to edit slope_data, recompute the
             factor of safety, and record (v, FS) — with NO per-step solution plot.
+            Each step is the run `run_lem` makes, and what it says about itself —
+            unsolved trials, admissibility notes, crest tension — is printed under
+            the step and kept in the table's `warnings` column, each note cut to
+            its finding.
             Writes `<name>.csv` and one `<name>.png` (FS vs param) to the output
             folder, restores the project to its original state (a sweep is analysis,
             not an edit), and returns the DataFrame.
@@ -1580,53 +1642,58 @@ class PythonKernel:
             import copy
             import contextlib
             import io as _io
-            import numpy as np
             import pandas as pd
             import matplotlib.pyplot as plt
-            from xslope.slice import generate_slices
-            from xslope.solve import solve_selected
-            from xslope.search import circular_search, noncircular_search
+            from xslope.search import AnalysisError, run_lem_analysis
 
             sd = doc.slope_data
             snapshot = copy.deepcopy(sd)
             rows = []
+            previous = ""
             try:
                 for v in values:
                     apply(v)
                     resync_geometry(sd)
-                    non_circ = sd.get("non_circ") or None
+                    # Each step is the run Studio's Run LEM makes — the same entry
+                    # point `run_lem` drives, the model's own search window
+                    # included — and it keeps what that run says about itself:
+                    # unsolved trials, admissibility, crest tension. Muted, so
+                    # the search's progress lines stay out of the printout.
+                    family = ("circular" if (sd.get("circular", True)
+                                             and sd.get("circles"))
+                              else "noncircular")
                     fs = float("nan")
-                    with contextlib.redirect_stdout(_io.StringIO()):  # quiet the engine
-                        if search:
-                            if non_circ:
-                                fs_cache, *_ = noncircular_search(
-                                    sd, method, rapid=rapid, num_slices=num_slices,
-                                    diagnostic=False)
-                            else:
-                                fs_cache, *_ = circular_search(
-                                    sd, method, rapid=rapid, num_slices=num_slices,
-                                    diagnostic=False)
-                            if fs_cache:
-                                sr = fs_cache[0].get("solver_result")
-                                fs = sr["FS"] if isinstance(sr, dict) and "FS" in sr \
-                                    else fs_cache[0].get("fs", float("nan"))
+                    notes = []
+                    try:
+                        with contextlib.redirect_stdout(_io.StringIO()):
+                            bundle = run_lem_analysis(
+                                sd, method,
+                                analysis="auto_search" if search
+                                else "single_surface",
+                                surface=family, num_slices=num_slices,
+                                rapid=rapid, announce=False)
+                        res = bundle.get("results")
+                        unsolved = (bundle.get("search") or {}).get("unsolved") or {}
+                        if unsolved.get("sentence"):
+                            notes.append(unsolved["sentence"])
+                        if isinstance(res, dict):
+                            fs = float(res["FS"])
+                            notes.extend(res.get("warnings") or [])
                         else:
-                            circle = (sd["circles"][0] if sd.get("circular")
-                                      and sd.get("circles") else None)
-                            ok, res = generate_slices(sd, circle=circle,
-                                                      non_circ=non_circ,
-                                                      num_slices=num_slices)
-                            if ok:
-                                r = solve_selected(method, res[0], rapid=rapid)
-                                if isinstance(r, dict):
-                                    fs = r["FS"]
-                    rows.append((v, fs))
+                            notes.append("no solution: %s"
+                                         % (bundle.get("failure") or "no solution"))
+                    except AnalysisError as exc:
+                        notes.append(str(exc))
+                    brief = _step_warnings(notes)
+                    rows.append((v, fs, brief))
                     print(f"  {param}={v}: FS={fs:.3f}")
+                    _print_step_warnings(brief, previous)
+                    previous = brief
             finally:
                 sd.clear()
                 sd.update(snapshot)     # leave the project exactly as it was
 
-            df = pd.DataFrame(rows, columns=[param, ylabel])
+            df = pd.DataFrame(rows, columns=[param, ylabel, "warnings"])
             df.to_csv(f"{name}.csv", index=False)
             if plot:
                 fig, ax = plt.subplots(figsize=(8, 5))
@@ -1636,9 +1703,10 @@ class PythonKernel:
                 ax.set_title(f"{ylabel} vs {param}")
                 ax.grid(True, alpha=0.3)
                 fig.savefig(f"{name}.png", dpi=150, bbox_inches="tight")
-                print(f"Wrote {name}.csv and {name}.png ({len(df)} points).")
-            else:
-                print(f"Wrote {name}.csv ({len(df)} points).")
+            flagged = int((df["warnings"] != "").sum())
+            tail = (f"; {flagged} with warnings, listed above" if flagged else "")
+            wrote = f"{name}.csv and {name}.png" if plot else f"{name}.csv"
+            print(f"Wrote {wrote} ({len(df)} points{tail}).")
             return df
 
         def list_params(slope_data=None, mode="lem"):
@@ -1743,13 +1811,21 @@ class PythonKernel:
                     f"{'SSRM' if mode == 'fem' else 'seepage'} solver, which needs a "
                     "mesh in slope_data['mesh'] — build a mesh first (Studio: the "
                     "Mesh toolbar/menu, or xslope.mesh.build_mesh_from_polygons).")
-            ok, res = _design(sd, param=param, low=low, high=high, steps=steps,
-                              target_fs=target_fs, mode=mode, method=method,
-                              search=search, num_slices=num_slices, fem_opts=fem_opts,
-                              seep_opts=seep_opts, modify=modify, label=label)
+            # An LEM sweep's searches each print a dozen progress lines; muted, and
+            # each step is printed once below with the warnings its solve raised.
+            quiet = (contextlib.redirect_stdout(StringIO()) if mode == "lem"
+                     else contextlib.nullcontext())
+            with quiet:
+                ok, res = _design(sd, param=param, low=low, high=high, steps=steps,
+                                  target_fs=target_fs, mode=mode, method=method,
+                                  search=search, num_slices=num_slices,
+                                  fem_opts=fem_opts, seep_opts=seep_opts,
+                                  modify=modify, label=label)
             if not ok:
                 raise RuntimeError(res)
             out = res.get("output", "FS")
+            if mode == "lem":
+                _print_sweep_steps(res)
             print(res["message"])
             if not res["bracketed"]:
                 lo, hi = res["fs_range"]
@@ -1785,12 +1861,18 @@ class PythonKernel:
             sd = doc.slope_data if slope_data is None else slope_data
             if mode in ("fem", "seep") and sd.get("mesh") is None:
                 raise RuntimeError(f"mode='{mode}' needs a mesh in slope_data['mesh'].")
-            ok, res = _back(sd, param=param, low=low, high=high, steps=steps,
-                            target_fs=target_fs, mode=mode, method=method,
-                            search=search, num_slices=num_slices, fem_opts=fem_opts,
-                            seep_opts=seep_opts, modify=modify, label=label)
+            quiet = (contextlib.redirect_stdout(StringIO()) if mode == "lem"
+                     else contextlib.nullcontext())
+            with quiet:
+                ok, res = _back(sd, param=param, low=low, high=high, steps=steps,
+                                target_fs=target_fs, mode=mode, method=method,
+                                search=search, num_slices=num_slices,
+                                fem_opts=fem_opts, seep_opts=seep_opts,
+                                modify=modify, label=label)
             if not ok:
                 raise RuntimeError(res)
+            if mode == "lem":
+                _print_sweep_steps(res)
             print(res["message"])
             if not res["bracketed"]:
                 out = res.get("output", "FS")

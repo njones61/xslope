@@ -109,9 +109,9 @@ twice the slope height:
 | 20 | 40 | Depth | -10.7887 |
 | 20 | 40 | Depth | 0 |
 
-The first is as deep as a circle from that center can be and still fit inside the
-domain: its lowest point sits at elevation −10.7887, and the bedrock beneath the
-center is at −10.88. The second is tangent to the contact between the two soils.
+The first is very nearly as deep as a circle from that center can be and still
+fit inside the domain: its lowest point sits at elevation −10.7887, and the
+bedrock beneath the center is at −10.88. The second is tangent to the contact between the two soils.
 **Depth is an elevation**, and on a dipping base a circle tangent to that base
 touches it at a single point rather than running along it — which is what the
 [last section](#circles-that-will-not-fit) of this page is about.

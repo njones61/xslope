@@ -173,8 +173,8 @@ neither one moves the answer: the critical circle crosses every layer more than
 Spencer returns 1.587 on that circle with 4 ft at both ends, with 2 ft at the
 buried end, and under the overburden law alike.
 
-**Starting circles** — two, sharing a center above the face at twice the slope
-height:
+**Starting circles** — two, with centers 40 ft up, one above the toe and one
+above the middle of the face:
 
 | Xo | Yo | Option | Depth |
 | :---: | :---: | --- | :---: |

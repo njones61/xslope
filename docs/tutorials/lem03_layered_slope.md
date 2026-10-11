@@ -118,7 +118,7 @@ into the chat box and type `Build this model`, or describe it:
 
 <div class="prompt-block" markdown>
 ```text
-Build a model for a 20 ft embankment with a 2:1 face on a 10 ft foundation layer over rigid rock. The embankment is 130 pcf with c = 400 psf, phi = 0; the foundation is 135 pcf with c = 800 psf, phi = 0. The crest runs 50 ft back from the top of the face, and the ground continues 30 ft beyond the toe. Add starting circles for a critical-surface search.
+Build a model for a 20 ft embankment with a 2:1 face, toe at (0, 0) and crest break at (40, 20), on a 10 ft foundation layer over rigid rock. The embankment is 130 pcf with c = 400 psf, phi = 0; the foundation is 135 pcf with c = 800 psf, phi = 0. The crest runs 50 ft back from the top of the face, and the ground continues 30 ft beyond the toe. Add starting circles for a critical-surface search.
 ```
 </div>
 

@@ -119,15 +119,15 @@ The eight conversations below cost this much between them, measured as they ran:
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Building a model from a drawing | 1 | 3 | 64,053 (42,064) | 2,371 | 37 s |
 | Modifying the model | 3 | 9 | 195,368 (170,963) | 4,495 | 78 s |
-| A sweep with the helper | 1 | 2 | 39,682 (38,624) | 806 | 64 s |
-| A sweep written ad hoc | 1 | 3 | 59,792 (58,511) | 1,315 | 31 s |
+| A sweep with the helper | 1 | 2 | 40,377 (19,568) | 1,193 | 70 s |
+| A sweep written ad hoc | 1 | 3 | 60,035 (58,526) | 1,464 | 34 s |
 | Stiffnesses and a strength reduction run | 2 | 4 | 83,255 (77,723) | 1,835 | 436 s |
 | Two documentation questions | 2 | 4 | 88,380 (82,373) | 4,038 | 98 s |
 | A broken file | 1 | 3 | 60,884 (58,888) | 2,203 | 62 s |
 | Generating a report | 2 | 4 | 80,927 (79,156) | 935 | 26 s |
-| **Total** | **13** | **32** | **672,341 (608,302)** | **17,998** | **832 s** |
+| **Total** | **13** | **32** | **673,279 (589,261)** | **18,534** | **841 s** |
 
-That comes to **\$0.92** at Anthropic's list prices on 2026-10-10: \$4.00 per
+That comes to **\$1.08** at Anthropic's list prices on 2026-10-10: \$4.00 per
 million input tokens, \$5.00 per million for a five-minute cache write and \$8.00
 for a one-hour write, \$0.20 per million for a cache read, and \$20.00 per million
 output tokens. The input counts above include the cache writes and the cache
@@ -335,23 +335,24 @@ Sweep the foundation cohesion from 200 to 800 psf in steps of 100 psf, Spencer w
 ```
 </div>
 
-![The sweep in the dock: one code block handing a short function to a preloaded sensitivity helper, the seven searched steps, the plot of factor of safety against cohesion, and the table of results](images/w1_sweep_builtin_1.png){width=560}
+![The sweep in the dock: one call to a design-sweep helper, the seven searched steps each with the warnings its solve raised, the plot of factor of safety against cohesion with rings at the two steps where a different critical surface takes over and a reference line at 1.5, and the reply's table of factors of safety and admissibility notes](images/w1_sweep_builtin_1.png){width=560}
 
 Nothing in the request names a tool, and the assistant reached for one on its
-own — a sensitivity helper built into the assistant, the counterpart of Studio's
-**Run → Parametric…** dialog. It handed the helper a short function that sets the
-foundation's cohesion, ran the seven searches, and put the cohesion back —
-`foundation c after: 800.0`.
+own — a design-sweep helper built into the assistant, the counterpart of the
+**Design** mode of Studio's **Run → Parametric…** dialog. One call ran the seven
+searches and left the foundation's cohesion as it found it —
+`foundation c after sweep: 800.0`. Under each step the helper prints what that
+step's solve reported about itself, and the reply carries it into its table.
 
-| Foundation c (psf) | FS (Spencer, searched) |
-| :---: | :---: |
-| 200 | 0.627 |
-| 300 | 0.792 |
-| 400 | 0.964 |
-| 500 | 1.135 |
-| 600 | 1.244 |
-| 700 | 1.244 |
-| 800 | 1.244 |
+| Foundation c (psf) | FS (Spencer, searched) | Trial circles Spencer could not solve |
+| :---: | :---: | :---: |
+| 200 | 0.627 | 67 of 330 |
+| 300 | 0.792 | 11 of 347 |
+| 400 | 0.964 | 2 of 356 |
+| 500 | 1.135 | none |
+| 600 | 1.244 | none |
+| 700 | 1.244 | none |
+| 800 | 1.244 | none |
 
 The rise below 500 psf is close to linear, and the last three rows are
 identical. The assistant did not print the critical circles, and said so: it
@@ -359,14 +360,17 @@ offered the likely cause of the plateau, the critical surface moving up into the
 embankment, as untested. Re-running the steps confirms it. Below 600 psf every
 critical circle bottoms on the rock at elevation −10, and from 600 psf up the
 surface sits on the contact and the embankment governs, capping the factor of
-safety at 1.244. The transcript is
-[w1_sweep_builtin_transcript.md](files/w1_sweep_builtin_transcript.md).
+safety at 1.244.
 
-The weakest steps are the ones to treat with care. Run on its own, the 200-psf
-search raises an **unsolved trials** warning: Spencer could not solve 67 of the
-330 circles it tried, and 11 and 2 at 300 and 400 psf. The assistant did not
-mention it. The count falls as the cohesion rises, and from 500 psf up every
-trial circle solves.
+The weakest steps are the ones to treat with care, and the reply says so. Beside
+the unsolved trial circles, every step raised at least one admissibility note:
+interslice tension on 8 to 22% of the boundaries, at most steps a line of thrust
+outside the slice, and at five of the seven tension on the base of two slices
+near the crest. The assistant listed them beside each factor of safety and named
+the 200 to 400 psf values the least reliable. It also pointed out that the
+helper had drawn a reference line at FS = 1.5, a target nobody asked for, which
+no step reaches. The transcript is
+[w1_sweep_builtin_transcript.md](files/w1_sweep_builtin_transcript.md).
 
 ### Check its work
 
@@ -393,12 +397,14 @@ Compute the factor of safety for face slopes of 2:1, 2.5:1 and 3:1, keeping the 
 ```
 </div>
 
-![The face-slope sweep in the dock: the geometry read back, the function that moves the crest break handed to the sensitivity helper, the three searched steps and the restored face line, the saved table and its plot of factor of safety against slope, and the finished table](images/w1_sweep_adhoc_1.png){width=560}
+![The face-slope sweep in the dock: the geometry read back, the function that moves the crest break handed to the sensitivity helper, the three searched steps each with its warnings, the restored face line, the saved table and its plot of factor of safety against slope, and the reply's table with each face's warnings](images/w1_sweep_adhoc_1.png){width=560}
 
-It wrote a short function that moves the crest break and handed it to the same
-sensitivity helper the last section used, which rebuilds the section and runs the
-search at each step. The toe stays at (0, 0), the crest at elevation 20, and
-the file's two starting circles are used every time.
+It wrote a short function that moves the crest break and handed it to the
+assistant's sensitivity helper, which takes a function that edits the model where
+the design-sweep helper of the last section takes a named property, and which
+rebuilds the section and runs the search at each step. The toe stays at (0, 0),
+the crest at elevation 20, and the file's two starting circles are used every
+time.
 
 | Face slope | Crest break | FS (Spencer, searched) |
 | :---: | :---: | :---: |
@@ -408,14 +414,12 @@ the file's two starting circles are used every time.
 
 It put the geometry back the way it found it, and saved the table and a plot of
 the factor of safety against the slope to its **Files…** folder; both appear in
-the dock. It did not print where the critical circles sit, and said so rather
-than describing them. It also raised a possible problem it did not test: at 3:1
-only 30 ft of crest is left behind the crest break.
-
-One sentence in the reply is wrong. It says the steady gain, about 0.15 per half
-step, makes sense because both soils are φ = 0. That is not the reason: with
-φ = 20° in both soils the same three faces search to 2.304, 2.647 and 2.988,
-just as evenly spaced. The transcript is
+the dock. It reported each face's admissibility warnings — interslice tension and
+a line of thrust outside the slice on 15, 13 and 10% of the boundaries, and at
+2:1 tension on the base of two slices near the crest — and judged the 2:1 result
+the least reliable of the three. It also raised a possible problem it did not
+test: at 3:1 only 30 ft of crest is left behind the crest break. The transcript
+is
 [w1_sweep_adhoc_transcript.md](files/w1_sweep_adhoc_transcript.md).
 
 ### Check its work
@@ -692,36 +696,34 @@ about the mechanism or the finding is right.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5.5 | 32 | 672,341 (608,302) | 17,998 | \$0.92 | 8 of 8 | 7 of 8 |
-| Claude Sonnet 5.5 | 35 | 749,362 (684,380) | 18,432 | \$0.47 | 8 of 8 | 7 of 8 |
-| OpenAI gpt-6-astra | 35 | 494,321 (464,298) | 5,200 | \$1.02 | 8 of 8 | 7 of 8 |
-| Kimi K3 (Moonshot AI) | 38 | 569,327 (502,230) | 56,197 | \$1.19 | 8 of 8 | 3 of 8 |
-| GLM-5V-Turbo (Z.ai) | 47 | 696,715 (649,088) | 19,797 | \$0.29 | 5 of 8 | 2 of 8 |
+| Claude Opus 5.5 | 32 | 673,279 (589,261) | 18,534 | \$1.08 | 8 of 8 | 8 of 8 |
+| Claude Sonnet 5.5 | 36 | 769,262 (685,212) | 17,878 | \$0.54 | 8 of 8 | 7 of 8 |
+| OpenAI gpt-6-astra | 36 | 509,307 (467,583) | 5,788 | \$1.17 | 8 of 8 | 7 of 8 |
+| Kimi K3 (Moonshot AI) | 39 | 583,645 (502,486) | 51,879 | \$1.17 | 8 of 8 | 4 of 8 |
+| GLM-5V-Turbo (Z.ai) | 46 | 683,160 (622,720) | 19,898 | \$0.30 | 6 of 8 | 1 of 8 |
 
 gpt-6-astra is the model OpenAI names as its flagship. All five build the section
-the drawing shows and get the 1.244 that LEM-3 publishes for this slope, and all
-five run the strength reduction to the same 1.270. They part ways elsewhere.
-GLM-5V-Turbo built the section with its toe at x = 30 rather than at x = 0,
-where the request put it, and then reported the toe at x = 0. In the face-slope
-sweep it generated new starting circles for each face, and at 3:1 its search
-stayed with a deep circle: 1.861, against the 1.546 a search finds when one
-starting circle is tangent to the top of the foundation. It also missed the
-swapped materials in the broken file and reported 1.208 as the repaired answer.
-The other four get every number right.
+the drawing shows and get the 1.244 that LEM-3 publishes for this slope, all five
+run the strength reduction to the same 1.270, and in the cohesion sweep all five
+report the trial circles Spencer could not solve at the weakest steps. They
+part ways elsewhere. GLM-5V-Turbo built the section with its toe at x = 30
+rather than at x = 0, where the request put it, and then reported the toe at
+x = 0. It also missed the swapped materials in the broken file and reported 1.208
+as the repaired answer. The other four get every number right.
 
-No model is scored right in both columns in all eight sessions. Opus 5.5's one
-miss is the reason it gave in the face-slope sweep: it put the steady gain down
-to φ = 0, and the gain is just as steady at φ = 20°. Sonnet 5.5's is in the
-broken file, where it placed the exit of the repaired file's critical circle
-beyond the toe, on the foundation; it is on the face, at x = 4.6.
-gpt-6-astra's is the first documentation question: it explained why all the
-methods agree without running any of them, and they do not all agree. The other
-misses are mostly a right number with a wrong sentence beside it: a circle that
-only touches the top of the foundation described as tangent to the rock, a
-foundation twice as strong as the embankment called 40% stronger, a strength
-reduction result said to come out higher because the finite element method is
-free to find a more critical surface, the rise under ponded water put down to
-heavier slices the model does not have.
+Opus 5.5 is the only one scored right in both columns in all eight sessions.
+Sonnet 5.5's one miss is in the broken file, where it placed the exit of the
+repaired file's critical circle beyond the toe, on the foundation; it is on the
+face, at x = 4.6. gpt-6-astra's is the first documentation question: it
+explained why all the methods agree without running any of them, and they do not
+all agree. The other misses are mostly a right number with a wrong sentence
+beside it: a circle that only touches the top of the foundation described as
+tangent to the rock or as deep and wide, a foundation twice as strong as the
+embankment called 40% stronger, a strength reduction result said to come out
+higher because the finite element method is free to find a more critical
+surface, the rise under ponded water put down to heavier slices the model does
+not have.
+
 Z.ai publishes no price for GLM-5V-Turbo; its cost here is at the rate a
 reseller lists for it.
 
@@ -761,7 +763,7 @@ the checks above re-run the measurements rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about \$0.92.
+  13 turns of work for about \$1.08.
 - Building a layered model from a drawing and editing it three ways — face, water
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without leaving a

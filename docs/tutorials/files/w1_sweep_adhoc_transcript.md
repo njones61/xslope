@@ -13,58 +13,64 @@ You: Compute the factor of safety for face slopes of 2:1, 2.5:1 and 3:1, keeping
 
 Ran code:
     for i,pl in enumerate(slope_data['profile_lines']): print(i, pl['mat_id'], pl['coords'])
-    print(slope_data['circles'], slope_data['max_depth'])
+    print(slope_data['circles'], slope_data['max_depth'], slope_data.get('lem_method'))
 
 Output:
     0 0 [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)]
     1 1 [(-30.0, 0.0), (90.0, 0.0)]
-    [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}] -10.0
+    [{'Xo': 20.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 20.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}] -10.0 None
 
 Ran code:
-    import copy
-    orig = copy.deepcopy(slope_data['profile_lines'][0]['coords'])
     def apply(n):
         slope_data['profile_lines'][0]['coords'] = [(0.0,0.0),(20.0*n,20.0),(90.0,20.0)]
-    out = sensitivity([2.0,2.5,3.0], apply, param='H:V ratio', method='spencer', search=True)
+    out = sensitivity([2.0,2.5,3.0], apply, param='H:V (horizontal per 1 vertical)', method='spencer', search=True)
     print(out)
-    print(slope_data['profile_lines'][0]['coords'], slope_data['profile_lines'][0]['coords']==orig)
+    print(slope_data['profile_lines'][0]['coords'])
 
 Output:
-      H:V ratio=2.0: FS=1.244
-      H:V ratio=2.5: FS=1.396
-      H:V ratio=3.0: FS=1.546
-    Wrote sensitivity.csv and sensitivity.png (3 points).
-       H:V ratio        FS
-    0        2.0  1.244108
-    1        2.5  1.396239
-    2        3.0  1.546016
-    [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)] True
+      H:V (horizontal per 1 vertical)=2.0: FS=1.244
+        warnings: interslice tension on 15% of interior boundaries; line of thrust outside the slice on 15% of boundaries; Tension on the base of 2 slices near the crest
+      H:V (horizontal per 1 vertical)=2.5: FS=1.396
+        warnings: interslice tension on 13% of interior boundaries; line of thrust outside the slice on 13% of boundaries
+      H:V (horizontal per 1 vertical)=3.0: FS=1.546
+        warnings: interslice tension on 10% of interior boundaries; line of thrust outside the slice on 10% of boundaries
+    Wrote sensitivity.csv and sensitivity.png (3 points; 3 with warnings, listed above).
+       H:V (horizontal per 1 vertical)  ...                                           warnings
+    0                              2.0  ...  interslice tension on 15% of interior boundari...
+    1                              2.5  ...  interslice tension on 13% of interior boundari...
+    2                              3.0  ...  interslice tension on 10% of interior boundari...
+    
+    [3 rows x 3 columns]
+    [(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)]
     [saved 2 file(s) the user can open: sensitivity.csv, sensitivity.png]
 
 [file: sensitivity.csv]
 
 [file: sensitivity.png]
 
-Assistant: I ran a Spencer search at each slope, keeping the toe at (0, 0) and the crest at elevation 20. Only the crest corner moved: it sat at x = 40, 50 and 60.
+Assistant: The factor of safety rises steadily as the face flattens: 1.244 at 2:1, 1.396 at 2.5:1 and 1.546 at 3:1. Each case is Spencer with a search. I held the toe at (0, 0) and the crest at elevation 20, and moved the crest point out to x = 40, 50 and 60.
 
-| Face slope (H:V) | Crest corner x (ft) | Critical FS (Spencer, searched) |
+| Face slope (H:V) | Crest point | FS (Spencer, searched) |
 |:--|:--|:--|
-| 2:1 (the model's current slope) | 40 | 1.244 |
-| 2.5:1 | 50 | 1.396 |
-| 3:1 | 60 | 1.546 |
+| 2:1 | (40, 20) | **1.244** |
+| 2.5:1 | (50, 20) | **1.396** |
+| 3:1 | (60, 20) | **1.546** |
 
-Each half-step flatter adds about 0.15 to the factor of safety. That steady gain makes sense because both materials are φ = 0 (strength comes only from cohesion).
+**Every run came back with a warning about whether the result is physically admissible.** This doesn't change the FS values, but the 2:1 case is the least reliable:
+- **2:1:** tension between slices on 15% of the internal slice boundaries, the line of thrust outside the slice on 15%, and tension on the base of 2 slices near the crest.
+- **2.5:1:** tension between slices and the line of thrust outside the slice, both on 13% of boundaries.
+- **3:1:** the same two warnings, on 10% of boundaries.
 
-The model is unchanged. The embankment's top boundary still reads (0, 0) → (40, 20) → (90, 20).
+These are typical of undrained (φ = 0) cohesive soil near the crest, which pulls in tension at the top of the slide. The usual way to handle it is a tension crack, which I haven't tested here.
 
-I didn't print the critical circle for each case, so I haven't checked where the circles came out on the ground. At 3:1 the crest ground beyond the slope is only 30 ft long (1.5 × the 20 ft height). If a critical circle reaches the right edge at x = 90, that FS would be limited by the model width. I can rerun with the circle details printed, or with the crest ground extended, if you want that checked.
+One other point: at 3:1 the flat ground runs only 30 ft beyond the crest, which is 1.5 times the slope height. That's shorter than the roughly 2 times the reference recommends. I didn't check whether the 3:1 critical circle comes close to the right-hand edge of the model.
 
-The table and a plot are saved as **sensitivity.csv** and **sensitivity.png**.
+The model is back as it was: the face is 0,0 → 40,20 → 90,20 again, and the sweep didn't change anything else. I saved the table and a plot of FS against slope as `sensitivity.csv` and `sensitivity.png`.
 ```
 
-Tokens: input 59,792 · cached_input 58,511 · output 1,315 · calls 3 · 28.2s
+Tokens: input 60,035 · cached_input 58,526 · output 1,464 · calls 3 · 30.8s
 
 ## Session total
 
-- Tokens: input 59,792 · cached_input 58,511 · output 1,315 · calls 3
-- Wall time: 31.2s
+- Tokens: input 60,035 · cached_input 58,526 · output 1,464 · calls 3
+- Wall time: 33.8s

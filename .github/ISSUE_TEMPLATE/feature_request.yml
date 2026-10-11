@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest something XSLOPE should do that it doesn't yet.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you would like XSLOPE to do
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem it would solve, or a case you can't analyze now.
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Papers, manuals or other programs that describe or do this, if you know of any.

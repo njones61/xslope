@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Email the developer
+    url: https://github.com/njones61/xslope#support-and-contributing
+    about: For a model you can't share publicly, or if you don't have a GitHub account — the email addresses are in the README.
+  - name: Documentation and tutorials
+    url: https://xslope.org
+    about: Theory, the input template, the Studio guide, tutorials and verification.

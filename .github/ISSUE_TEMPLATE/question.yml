@@ -1,0 +1,20 @@
+name: Question
+description: Ask how to do something, or whether XSLOPE can handle your problem.
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you have tried
+      description: The documentation pages or tutorials you looked at, or what you did so far.
+  - type: input
+    id: version
+    attributes:
+      label: XSLOPE version
+      description: "In Studio: About XSLOPE Studio in the XSLOPE Studio menu (macOS) or Help → About (Windows). In Python: `import xslope; print(xslope.__version__)`."

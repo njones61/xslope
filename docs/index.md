@@ -261,6 +261,26 @@ He can be reached at [njones@byu.edu](mailto:njones@byu.edu) or
     XSLOPE follows semantic versioning. Workbooks from earlier versions open in
     the current one, and the Python API keeps its names within a major version.
     As with any slope stability software, check results independently before
-    you rely on them in practice. Feedback and
-    [issue reports](https://github.com/njones61/xslope/issues){target="blank"}
-    are welcome.
+    you rely on them in practice. Feedback is welcome — see
+    [Feedback and bug reports](#feedback-and-bug-reports) below.
+
+## Feedback and bug reports
+
+The best way to report a bug, suggest a feature, or ask whether XSLOPE can handle
+your problem is a GitHub issue. Go to
+[github.com/njones61/xslope/issues](https://github.com/njones61/xslope/issues){target="blank"},
+click **New issue**, and pick **Bug report**, **Feature request** or **Question**.
+Each form asks for what is needed to act on it. For a bug, that is:
+
+- what you did — the steps, or the analysis you ran;
+- what you expected, and what happened instead, with any error message;
+- your XSLOPE version — in Studio, **About XSLOPE Studio** in the **XSLOPE
+  Studio** menu on macOS or **Help → About** on Windows; in Python,
+  `xslope.__version__` — and whether you ran Studio on macOS or Windows or the
+  Python package;
+- the input workbook, or a smaller one that shows the same problem, if you can
+  share it.
+
+Opening an issue needs a free GitHub account. Issues are public, so leave out
+anything confidential. If a model can't be shared, or you don't have a GitHub
+account, email instead.

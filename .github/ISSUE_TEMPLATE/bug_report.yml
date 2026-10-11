@@ -1,0 +1,53 @@
+name: Bug report
+description: Something gives a wrong answer, an error, or doesn't work as the documentation says.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Issues are public, so leave out anything confidential.
+        If your model can't be shared, email instead (the addresses are in the README).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What you did, and what happened
+      description: The steps you took or the analysis you ran, and what came out — including any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: The result or behavior you expected, and where it comes from if you know (a hand calculation, another program, a documentation page).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: XSLOPE version
+      description: "In Studio: About XSLOPE Studio in the XSLOPE Studio menu (macOS) or Help → About (Windows). In Python: `import xslope; print(xslope.__version__)`."
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: How you ran it
+      options:
+        - XSLOPE Studio on macOS
+        - XSLOPE Studio on Windows
+        - Python package
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Input file
+      description: Drag the workbook (.xlsx) into this box, or a smaller one that shows the same problem. A screenshot helps too.
+  - type: textarea
+    id: log
+    attributes:
+      label: Log or traceback
+      description: Anything from Studio's Log pane or the Python console. Pasted text is formatted automatically.
+      render: text

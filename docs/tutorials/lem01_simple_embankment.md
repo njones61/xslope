@@ -98,10 +98,12 @@ inclination, unit weight, strength.
 
 ![The assistant reading the drawing and building the model](images/lem01_assistant.png){width=1500}
 
-After every snippet that changes the model, the assistant gets back the input
-checks Studio runs before an analysis. In the figure, the first check reports
-that the model has no failure surface yet; the next snippet adds the starting
-circle, and the checks come back clean.
+The assistant works by running short pieces of Python code, each shown in the
+dock under **Ran code**, and after every one that changes the model it gets back
+the input checks Studio runs before an analysis. In the figure, the first check
+reports that the model has no failure surface yet: that code worked out a
+starting circle and printed it but did not store it. A later step stores it —
+the dashed circle on the canvas.
 
 A geometry this simple is faster to describe than to paste, and a sentence works with
 a model that has no vision. Use this instead if you prefer:

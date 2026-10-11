@@ -96,7 +96,12 @@ inclination, unit weight, strength.
 2. Click in the assistant's chat box and press Ctrl/Cmd+V to attach it.
 3. Type `Build this model` and press **Enter**.
 
-![The assistant reading the drawing and building the model](images/lem01_assistant.png){width=1000}
+![The assistant reading the drawing and building the model](images/lem01_assistant.png){width=1500}
+
+After every snippet that changes the model, the assistant gets back the input
+checks Studio runs before an analysis. In the figure, the first check reports
+that the model has no failure surface yet; the next snippet adds the starting
+circle, and the checks come back clean.
 
 A geometry this simple is faster to describe than to paste, and a sentence works with
 a model that has no vision. Use this instead if you prefer:

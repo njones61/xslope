@@ -404,7 +404,7 @@ slope_data = {
     'unit_system':  'imperial',  # 'si' or 'imperial' (v18); or None to infer from gamma_water.
                                  #   Fixes gamma_water's canonical value and records the system.
                                  #   xslope never converts — it only declares/labels.
-    'time_unit':    None,        # 'sec' | 'min' | 'hr' | 'day' | None (v18). Declares the time
+    'time_unit':    None,        # 'sec' | 'min' | 'hr' | 'day' | 'yr' | None (v18). Declares the time
                                  #   unit for k, flux, and transient series. NEVER inferred — set
                                  #   only when the model has time-bearing inputs.
     'gamma_water':  62.4,        # unit weight of water: 62.4 pcf (Imperial) or 9.81 kN/m3 (SI).

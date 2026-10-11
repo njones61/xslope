@@ -1148,8 +1148,20 @@ def _water_line(sd):
 
 
 def _surface_line(sd):
+    """The failure surfaces, and the family a run would use — only once the model
+    defines a surface. A new project carries a family flag but no surface, and
+    naming a family there states a choice nobody made."""
     circles, non_circ = sd.get("circles") or [], sd.get("non_circ") or []
-    family = "circular" if sd.get("circular", True) else "non-circular"
+    if not circles and not non_circ:
+        return ("Failure surfaces: none yet (no circles, no non-circular "
+                "surface)")
+    if circles and non_circ:
+        # Both defined: the model's own choice, as the Run LEM dialog opens on it.
+        fam = str(sd.get("surface_family") or "").strip().lower()
+        circular = (not fam.startswith("non")) if fam else sd.get("circular", True)
+        family = "circular" if circular else "non-circular"
+    else:
+        family = "circular" if circles else "non-circular"
     bits = [f"family={family}"]
     bits.append(f"{len(circles)} circle(s)")
     if circles:
@@ -1839,6 +1851,11 @@ class Assistant(QObject):
             # trial-and-error retries can't compound (e.g. a +5 applied 5 times).
             doc.rollback_edit()
         else:
+            # Circles or a non-circular surface the snippet defined name the family
+            # the model runs as, as the Circles editor makes them do — inside this
+            # edit, so the change is part of the snippet's undo step.
+            from .kernel import keep_surface_family_in_step
+            keep_surface_family_in_step(doc.slope_data)
             after = _source_key_sigs(doc.slope_data)
             if before is None or after is None:
                 changed = None              # couldn't compare -> assume an edit

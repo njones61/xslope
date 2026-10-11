@@ -704,6 +704,72 @@ def check_elastic_props_declared_system():
     return fails
 
 
+def check_time_unit_outside_the_list():
+    """A declared time unit outside the template's list draws a warning naming the
+    units it accepts; a listed unit (in any case), or none, draws nothing.
+
+    The list is the template's own (the Time selector's validation range), and the
+    Claude Code skill and its bundled copy name every unit on it -- the skill once
+    left out 'yr'.
+    """
+    import contextlib
+    import io
+    import re
+    import warnings as _w
+    import openpyxl
+    from xslope.fileio import load_slope_data
+    from xslope.preflight import TIME_UNITS, preflight
+    fails = []
+
+    with _w.catch_warnings():
+        _w.simplefilter("ignore")
+        ws = openpyxl.load_workbook(_V18_TEMPLATE)["main"]
+    listed = None
+    for dv in ws.data_validations.dataValidation:
+        if "D9" in str(dv.sqref) and dv.formula1:
+            first, last = dv.formula1.replace("$", "").split(":")
+            col, r0, r1 = first[0], int(first[1:]), int(last[1:])
+            listed = tuple(str(ws[f"{col}{r}"].value).strip()
+                           for r in range(r0, r1 + 1) if ws[f"{col}{r}"].value)
+    if listed != TIME_UNITS:
+        fails.append(f"the template's Time list {listed!r} is not the list the "
+                     f"check accepts {TIME_UNITS!r}")
+
+    path = os.path.join(_REPO_ROOT, "docs", "lem", "files",
+                        "xslope_simple_mult_layers.xlsx")
+    with contextlib.redirect_stdout(io.StringIO()), _w.catch_warnings():
+        _w.simplefilter("ignore")
+        sd = load_slope_data(path)
+
+    def findings(unit):
+        sd["time_unit"] = unit
+        return [f for f in preflight(sd, "lem").findings
+                if f.rule_id == "units.time_unit_unknown"]
+
+    for unit in (None, "", "  ") + TIME_UNITS + ("Day", "YR"):
+        if findings(unit):
+            fails.append(f"time unit {unit!r} is on the list, but drew a warning")
+    for unit in ("days", "s", "hours", "month"):
+        hits = findings(unit)
+        if not hits:
+            fails.append(f"time unit {unit!r} is not on the list, and passed silently")
+        elif hits[0].severity != "warning":
+            fails.append(f"time unit {unit!r} drew a {hits[0].severity}, not a warning")
+        elif ", ".join(TIME_UNITS) not in hits[0].message:
+            fails.append(f"the warning for {unit!r} does not say which units are "
+                         f"accepted: {hits[0].message!r}")
+
+    for rel in (("docs", "usage", "claude", "xslope.md"),
+                ("xslope", "resources", "xslope_skill.md")):
+        text = open(os.path.join(_REPO_ROOT, *rel), encoding="utf-8").read()
+        line = next((ln for ln in text.splitlines() if "'time_unit':" in ln), "")
+        named = set(re.findall(r"'(\w+)'", line.split("#", 1)[-1]))
+        missing = [u for u in TIME_UNITS if u not in named]
+        if missing:
+            fails.append(f"{'/'.join(rel)} leaves out the time unit(s) {missing}")
+    return fails
+
+
 def main():
     print("xslope.units unit checks:")
     checks = [
@@ -724,6 +790,7 @@ def main():
         ("v18 tseep absent = legacy", check_v18_tseep_absent_is_legacy),
         ("v18 validation errors", check_v18_validation_errors),
         ("elastic_props declared system", check_elastic_props_declared_system),
+        ("time unit outside the list", check_time_unit_outside_the_list),
     ]
     failures = []
     for name, fn in checks:

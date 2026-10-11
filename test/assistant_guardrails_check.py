@@ -88,7 +88,8 @@ does regardless of the model, and that is what this file covers:
      Responses-API route split into a text choice and a tool-call choice lost
      its tool call; and a file a snippet wrote under a name already in the
      Files folder was never reported or shown; and a sweep step's unsolved
-     trials and admissibility notes never reached the model.
+     trials and admissibility notes never reached the model; and a new
+     project's summary named a surface family nobody chose.
   N. TRANSIENT SEEPAGE, AND THE SNIPPET THAT NEVER RETURNS — a corpus sweep met a
      transient model with no helper for it, and the assistant spent the turn
      reverse-engineering engine signatures instead of answering; another sweep sat
@@ -2948,6 +2949,75 @@ def check_a_sweep_step_reports_its_warnings():
     return out
 
 
+SNIPPET_BUILD_TWO_LAYERS = """
+from studio.document import _blank_material
+def _mat(name, gamma, c):
+    m = _blank_material(name)
+    m.update(gamma=gamma, option='mc', c=c, phi=0.0, u='none')
+    return m
+slope_data['materials'] = [_mat('embankment', 130.0, 400.0),
+                           _mat('foundation', 135.0, 800.0)]
+slope_data['profile_lines'] = [
+    dict(coords=[(0.0, 0.0), (40.0, 20.0), (90.0, 20.0)], mat_id=0),
+    dict(coords=[(-30.0, 0.0), (90.0, 0.0)], mat_id=1)]
+slope_data['max_depth'] = -10.0
+"""
+
+
+def check_a_new_project_names_no_surface_family():
+    """A new project's summary claims no failure-surface family, and circles a
+    snippet adds are run as circles.
+
+    Studio's blank document starts with the family flag off, so the summary said
+    "family=non-circular" on a project with no surface at all, and every build
+    then reported that it had "switched the model to circular" — a change to a
+    choice nobody made. With one family defined, that family is the model's, as
+    the Circles editor and the Run LEM dialog already treat it.
+    """
+    from studio.ai.assistant import model_summary_text
+    out = []
+    mw, asst = _session()
+    surface = [ln for ln in model_summary_text(mw.doc.slope_data).splitlines()
+               if ln.startswith("Failure surfaces")]
+    if not surface or "family=" in surface[0] or "none yet" not in surface[0]:
+        out.append(f"a new project's summary names a surface family: {surface!r}")
+
+    # Circles added by a snippet, with the flag left as the new project set it,
+    # are what the run uses — in the same snippet, and afterwards.
+    ran = _run(asst, SNIPPET_BUILD_TWO_LAYERS +
+               "slope_data['circles'] = [dict(Xo=20.0, Yo=40.0, Depth=0.0, R=40.0)]\n"
+               "r = run_lem(search=False, plot=False)\n"
+               "print('FS', round(r['FS'], 3))\n")
+    if "FS " not in ran or "Traceback" in ran:
+        out.append(f"circles added to a new project did not run as circles: "
+                   f"{ran[-400:]!r}")
+    if mw.doc.slope_data.get("circular") is not True:
+        out.append("the circles a snippet added left the model's family flag "
+                   f"at {mw.doc.slope_data.get('circular')!r}")
+    surface = [ln for ln in model_summary_text(mw.doc.slope_data).splitlines()
+               if ln.startswith("Failure surfaces")]
+    if not surface or "family=circular" not in surface[0]:
+        out.append(f"a model with circles is not summarized as circular: {surface!r}")
+    mw.deleteLater()
+
+    # A non-circular surface on a new project stays non-circular.
+    mw, asst = _session()
+    _run(asst, SNIPPET_BUILD_TWO_LAYERS +
+         "slope_data['non_circ'] = [dict(X=-5.0, Y=0.0, Movement='Free'),\n"
+         "    dict(X=20.0, Y=-2.0, Movement='Horiz'),\n"
+         "    dict(X=60.0, Y=20.0, Movement='Free')]\n")
+    if mw.doc.slope_data.get("circular"):
+        out.append("a non-circular surface on a new project turned the family "
+                   "flag on")
+    surface = [ln for ln in model_summary_text(mw.doc.slope_data).splitlines()
+               if ln.startswith("Failure surfaces")]
+    if not surface or "family=non-circular" not in surface[0]:
+        out.append(f"a non-circular model is not summarized as non-circular: "
+                   f"{surface!r}")
+    mw.deleteLater()
+    return out
+
+
 def check_a_split_reply_keeps_its_tool_call():
     """A reply split across choices still runs its tool call.
 
@@ -3120,6 +3190,7 @@ CHECKS = [
     ("O. a split reply keeps its tool call", check_a_split_reply_keeps_its_tool_call),
     ("O. a rewritten file is reported", check_a_rewritten_file_is_reported),
     ("O. a sweep step reports its warnings", check_a_sweep_step_reports_its_warnings),
+    ("O. a new project names no surface family", check_a_new_project_names_no_surface_family),
 ]
 
 

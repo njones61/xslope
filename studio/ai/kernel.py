@@ -171,6 +171,27 @@ def _written_since(folder, before):
     return [name for name, stamp in now.items() if before.get(name) != stamp]
 
 
+def keep_surface_family_in_step(slope_data):
+    """With exactly one surface family defined, the stored ``circular`` flag names
+    it — what Studio's Circles editor does when circles are entered, and the rule
+    the Run LEM dialog follows (with one family present the surface is a fixed
+    label and the flag is not consulted). With both defined the flag is the
+    model's choice and is left alone; with neither there is nothing to name.
+
+    A new project starts with the flag off and no surface at all, so circles a
+    snippet adds would otherwise be run as a non-circular model that has no
+    non-circular surface. Returns True when the flag changed.
+    """
+    if not isinstance(slope_data, dict):
+        return False
+    has_c = bool(slope_data.get("circles"))
+    has_n = bool(slope_data.get("non_circ"))
+    if has_c == has_n or bool(slope_data.get("circular")) == has_c:
+        return False
+    slope_data["circular"] = has_c
+    return True
+
+
 def _brief_warning(note):
     """A run's warning cut to its finding: the text before its first
     parenthesis, colon or second sentence — 'interslice tension on 15% of
@@ -914,6 +935,7 @@ class PythonKernel:
             sd = doc.slope_data if slope_data is None else slope_data
             self._note_geometry_source(sd)   # before the rebuild discards an edit
             _resync_geometry(sd)
+            keep_surface_family_in_step(sd)  # the family is the one defined
             self._rebase_geometry_watch(sd)  # later checks compare to THIS build
             return sd.get("ground_surface")
 

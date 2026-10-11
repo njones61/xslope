@@ -3085,6 +3085,28 @@ def _units_signals_disagree(ctx):
             f"table, mat sheet).")
 
 
+#: The time units the input template offers: its Time selector's validation list,
+#: main!D54:D58. The unit is a label -- nothing converts by it -- so a word outside
+#: the list is a warning, not an error.
+TIME_UNITS = ("sec", "min", "hr", "day", "yr")
+
+
+@rule("units.time_unit_unknown", WARNING, ("*",),
+      "A declared time unit is one of the template's: sec, min, hr, day, yr.")
+def _units_time_unit_unknown(ctx):
+    unit = ctx.sd.get("time_unit")
+    if unit is None or not str(unit).strip():
+        return None            # undeclared: tseep.time_unit_missing's question
+    word = str(unit).strip()
+    if word.lower() in TIME_UNITS:
+        return None
+    return (f"Time is {word!r}, which is not one of the time units the template "
+            f"accepts: {', '.join(TIME_UNITS)}. The unit is a label -- nothing is "
+            f"converted by it -- so no number changes, but conductivities and "
+            f"transient times would be read in a unit the model does not name "
+            f"(Global parameters; main D9).")
+
+
 # The Young's-modulus MAGNITUDE signal is deliberately absent from this family.
 #
 # ``units._E_BOUNDS`` cannot fire for the case it was written for: its SI and

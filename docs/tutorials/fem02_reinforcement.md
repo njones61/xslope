@@ -290,8 +290,8 @@ are the 240 psf surcharge.
 
 The mesh exists, but the run cannot start on it yet. The starter contains the
 limit equilibrium model, so the inputs the finite element run
-needs are still blank: the two elastic properties on each soil, and two of the
-three finite element columns on each reinforcement line. Opening **Run → Run
+needs are still blank: the two elastic properties on each soil, and the
+`E (psf)` and `Area` columns on each reinforcement line. Opening **Run → Run
 FEM…** now would show the same refusal we walked through in
 [FEM-1](fem01_strength_reduction.md#youngs-modulus-and-poissons-ratio) — errors
 naming each blank input, with **Run** disabled — so we go straight to entering
@@ -337,7 +337,8 @@ The toggle hides `Type`, `Dir` and `Appl`, which only the limit equilibrium run
 reads. The capacity columns stay in view, because the finite element run reads
 them too, and the six lines are complete on every one of them: 800 lb/ft in
 `Tmax`, a 4 ft pullout length in `Lp1` and `Lp2`, and 0 in `Tend1` and `Tend2`,
-which is no end anchorage. `Spacing` reads 1, because geogrid properties are
+which is no end anchorage. `Adhesion` and `Delta` are blank, so the run reads the
+pullout lengths. `Spacing` reads 1, because geogrid properties are
 already per unit width. Of the seven blue columns, `Tres`, `E (psf)` and `Area`
 are empty. The other four, `Joint`, `kn`, `ks` and `Jred`, are for a line the
 soil can slide along, and they stay blank on this model.
@@ -366,7 +367,7 @@ under a name of your own.
 50,000. Leave them as they are. Every run on this page is made at those values.
 They set how long a slow trial may run before the program decides whether the
 slope is standing or sliding. On this model a smaller budget can move the answer
-by one bisection step: at 3,000 the elastic-perfectly-plastic run below returns
+by one bisection cell: at 3,000 the elastic-perfectly-plastic run below returns
 1.574 instead of 1.566. Each run takes a few minutes on an ordinary laptop.
 
 ---
@@ -727,8 +728,9 @@ search can follow.
 ## What the two stiffnesses change
 
 In [FEM-1](fem01_strength_reduction.md#where-e-comes-from-and-what-it-changes)
-we measured that a hundredfold sweep in Young's modulus left the factor of safety
-identical to every printed digit. A reinforced slope has a second stiffness in
+we measured that a hundredfold sweep in Young's modulus moved the factor of
+safety by at most one bisection cell: ten times the modulus returned the same
+1.3711, and a tenth of it 1.3633. A reinforced slope has a second stiffness in
 it — the layers' — and the two do not have to move together, so that result is
 checked here rather than assumed.
 
@@ -756,7 +758,7 @@ everything the envelope allows and there is little further to mobilize.
 Scale the layers by the same ten as the soil and the answer returns to 1.5352, to
 the printed digit and from the same bracket. A reinforced finite element model
 responds to the **ratio** of soil stiffness to layer stiffness, not the absolute
-value of either. The invariance measured in FEM-1 holds only where there
+value of either. What FEM-1 measured holds only where there
 is one stiffness to sweep; put a second one in the model and the pair matters. A round
 soil modulus against a catalog number for the geogrid is a modeling decision with
 a real consequence for the factor of safety, and the two values should be chosen
@@ -811,7 +813,7 @@ This tutorial covered:
 - The three finite element reinforcement inputs, the axial stiffness *EA* two of
   them amount to, and the model checks that block a run without them.
 - The per-trial iteration budget and the ceiling it extends to, left at their
-  defaults for every run, and the one bisection step a smaller budget moves the
+  defaults for every run, and the one bisection cell a smaller budget moves the
   answer on this model.
 - Reading a reinforced result: the mechanism out of shear strain, and each
   layer's force profile, bond transfer and how it is working, out of the 1D details panel at

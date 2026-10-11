@@ -111,12 +111,12 @@ strength of the surface between the two faces.
 
 ![The joints editor with the two rows of this model entered](images/fem05_studio_joints_editor.png){width=1102}
 
-Only the endpoints and `phi` have to be filled in. `c` at 0 is a cohesionless
-joint. The rest of the row — the residual strengths, the dilation angle, the
-tension cutoff, the two stiffnesses and `Jred`, which says whether the joint is
-weakened along with the rest of the model — keeps the value a new row opens with.
-Those columns are covered on the
-[Joints and Interface Elements](../fem/joints.md) page.
+A new row opens with its endpoints, `c`, `phi` and `t_cut` at 0 and every other
+column blank. Only the endpoints and `phi` have to be typed. `c` at 0 is a
+cohesionless joint. The rest of the row — the residual strengths, the dilation
+angle, the tension cutoff, the two stiffnesses and `Jred`, which says whether the
+joint is weakened along with the rest of the model — stays as it opens, and is
+covered on the [Joints and Interface Elements](../fem/joints.md) page.
 
 The endpoints are not free choices — they follow from the shape of the slope.
 The face runs from the crest at x = 14 down to the toe, and at 60° that toe is
@@ -139,10 +139,8 @@ Enter the two rows below, or paste them straight into the worksheet.
 | bedding | 12.000 | 6.252 | 20.928 | 0.000 | 0 | 40 |
 | release | 12.000 | 6.252 | 12.000 | 12.000 | 0 | 40 |
 
-A new row opens with its endpoints, `c`, `phi` and `t_cut` at 0 and every other
-column blank. Type the endpoints and `phi` over the zeros, and leave the rest as
-it opens. With the two rows in, the Inputs plot draws
-the joint lines in their own style, distinct from profile lines and reinforcement:
+With the two rows in, the Inputs plot draws the joint lines in their own style,
+distinct from profile lines and reinforcement:
 
 ![The two joint lines on the Inputs plot, drawn in the joint line style](images/fem05_inputs_joints.png){width=900}
 
@@ -295,7 +293,7 @@ on its bedding plane, Part 2 puts a **base plane** a little deeper, at 30°, and
 fills the wedge of rock above it — the block that Part 1 slid as one piece —
 with a generated set of joints, so that it becomes a stack of columns instead.
 
-![The Part 2 problem: the same 12 m face at 60°, a base plane dipping 30° from 5 m behind the crest to the toe, and above it a joint region filled by a set of columns dipping 110° at 1.5 m spacing](images/fem05_problem_sketch_topple.png){width=800}
+![The Part 2 problem: the same 12 m face at 60°, a base plane dipping 30° from x = 9, 5 m behind the crest, to the toe, and above it a joint region filled by a set of columns dipping 110° at 1.5 m spacing](images/fem05_problem_sketch_topple.png){width=800}
 
 Two inputs make a set. The first is *where* in the section the set exists,
 which can be given three ways:
@@ -345,7 +343,7 @@ stated dip; the other two are `Cross-jointed (two sets)`, which crosses two sets
 and `Voronoi (blocky mass)`, which fills the region with a tessellated block mass
 at no preferred orientation. This set is a parallel one.
 
-**Dip** is the orientation, measured anticlockwise from horizontal, so a dip
+**Dip** is the orientation, measured counterclockwise from horizontal, so a dip
 between 0 and 90 leans out of the face and a dip between 90 and 180 leans back
 into it. **110°** here is a set standing 70° from horizontal and leaning back
 into the slope, so the rock above the base plane forms a stack of
@@ -486,7 +484,9 @@ The mass comes to rest at 1.0625, 1.0781 and 1.0859, each in about 310
 iterations. At 1.0938 it is still moving, though slowing, when the 100,000
 iterations run out, and the run counts that trial as failed. The Log's closing
 summary notes that the factor of safety depends on the iteration limit here and
-may change if **Max iterations per trial** is raised. The factor is a little under
+may change if **Max iterations per trial** is raised. With the limit raised to
+200,000 the answer does not change: the trial at 1.0938 is still creeping at the
+new limit, and the search returns the same 1.090. The factor is a little under
 the column set's 1.105, and the figures show why the two are close in number and
 differ in kind:
 

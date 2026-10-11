@@ -190,7 +190,8 @@ What the columns mean, in the order they appear on the editor:
 ### Building the mesh
 
 Build the mesh with **Run → Build Mesh…**: element type **tri6**, a global
-target size of **0.8 m**, and **Refine thin zones** unticked.
+target size of **0.8 m**, and **Refine thin zones** unticked, because each block
+polygon already carries its own element size.
 
 A 0.6 m course cannot be resolved at a 0.8 m target size, so each block polygon
 carries a local **Size** of **0.3 m** in its own row of the polygons worksheet.
@@ -256,8 +257,9 @@ nearer twelve on an install that does not include the
 ![The deformed blocks at the critical factor: the block column has leaned out away from the fill behind it](images/fem03_fem_blocks_failure.png){width=918}
 
 On a jointed model the displacement panel is the deformed section drawn as the
-**blocks** the joints cut it into — each block under a faint tint of its own,
-the joint faces in green colored by how far they have slid, the undeformed
+**blocks** the joints cut it into — each material under a faint tint of its own,
+the slipping joint faces in green colored by how far they have slid, the closed
+ones in gray, the undeformed
 outline dashed behind, and the whole thing exaggerated by the scale printed in
 the title. The element grid steps back to a light gray under the blocks: on a
 jointed model the movement happens at the joints, not spread through the
@@ -291,8 +293,8 @@ slip:
 
 The wall failed on its back face. The block column has slid down past the
 fill along its own back, five times as far as it has slid forward on its base,
-and the top four course joints have not moved on each other at all — the four
-upper courses are traveling as one piece. Modeling the contacts separately makes
+and the top three course joints have not slipped at all — the four upper
+courses are traveling as one piece. Modeling the contacts separately makes
 that visible; a wall meshed as a single solid can only bend, and would not show
 which of its seven surfaces was failing.
 

@@ -306,12 +306,9 @@ exists, not on how far the slope had to move to reach it. A rough E is therefore
 A real one starts to matter the moment a displacement is read as a prediction of
 ground movement.
 
-ν is checked more strictly. A blank cell loads as 0, and a Poisson's ratio of 0
-describes a material that does not push outward when it is loaded from above,
-which no soil does. The model checks therefore raise it as an error rather than a
-warning. On this embankment ν = 0 returns the same 1.3711 from the same bracket.
-0.3 is the paper's nominal value too, and a real problem needs a value chosen for
-its own soil.
+0.3 is the paper's nominal value for ν too, and a real problem needs a value
+chosen for its own soil. A blank ν loads as 0, which no soil has, so the model
+checks block the run until one is entered.
 
 ---
 
@@ -429,7 +426,10 @@ trial spends it with the slope still moving, the program compares how far the
 slope moved in successive blocks of iterations. If the movement is dying away, the
 trial is given another budget's worth, and another, up to the
 **Iteration ceiling** on the same dialog, which opens at 50,000. If the movement
-is not slowing, the trial stops at its budget and is recorded as failed.
+is not slowing, the trial stops at its budget and is recorded as failed. A trial
+whose movement keeps growing is stopped sooner, once the slope has moved 15 times
+as far as its elastic response, and is recorded as failed too. The 341 and 2,231
+iterations in the table above are two such trials.
 
 The third bisection step above shows this. The trial at
 *F* = 1.3750 spent a full **12,000** iterations, and over the last 6,000 of them
@@ -440,7 +440,7 @@ settles at all settles inside four hundred.
 On this model the budget does not decide the answer. Run the same model with it
 set to 3,000 and the search returns **the same 1.3711** from the same bracket. The
 trial at 1.3750 stops at 3,000 iterations instead of 12,000, because its movement
-is not slowing there either, and it is recorded as failed either way.
+is not slowing at that point either, and it is recorded as failed.
 
 The one result the ceiling can leave open is **inconclusive**: a trial that
 reaches 50,000 with its leftover force still falling has neither settled nor run
@@ -492,7 +492,7 @@ none of them, is the better check there.
 The run leaves its results on the **FEM · Results** tab. Its **Plot type**
 selector offers four plots, one at a time. The first three draw the slope, and the
 **Field state** switch beside the selector applies to all three at once, so a
-figure never mixes states. It opens on **At failure**. The fourth,
+figure never mixes states. The switch opens on **At failure**. The fourth,
 **Displacement vs F**, plots each trial of the search against the largest
 displacement it reached.
 

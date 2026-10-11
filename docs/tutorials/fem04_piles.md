@@ -272,8 +272,8 @@ response is subtracted — and the two pile lines are drawn in green, each beam
 element shaded by the shear force it carries per foot of slope, on the second
 color scale. The band starts on the flat ground beyond the toe,
 runs down to the rigid base at the pile tips, and comes back up the uphill side
-of the upper row to the face at its head, near (10, 10), where the strain peaks
-at 0.77 in the element centered on (10.4, 9.0). Nowhere does it pass *through*
+of the upper row to the face at its head, near (10, 10). The strain peaks just
+below that head, at 0.68 near (10.8, 8.5). Nowhere does it pass *through*
 a row, because in plane strain there is nothing to pass through: each row is a
 continuous obstruction over the full length of the slope. The soil between the
 toe and the upper row shears down to the base and carries both rows with it,
@@ -320,8 +320,8 @@ peaks 16 ft below the head at 4,427 lb·ft per foot of slope, 26,562 lb·ft per
 shaft, 44% of the 60,000 lb·ft capacity. The shear is largest at the toe, the pin
 reaction.
 
-Open **Piles**, set `Tip` to `fixed` on both rows, and **OK**. The mesh survives
-a fixity change. Run the same bracket again.
+Open **Piles**, set `Tip` to `fixed` on both rows, and **OK**. Run the same
+bracket again.
 
 **FS = 1.410**. Holding both toes adds 0.047, and the shafts' own capacity
 limits the gain: six of the 18 beam elements now stand at their moment capacity,
@@ -334,8 +334,8 @@ ran away past the bound the capture allows, so the run kept the last finite
 state rather than the one that overflowed. It is early in the collapse — far
 enough to place the shearing, not to develop it.
 
-The failure has moved. The shipped file's mechanism peaked near the upper row's
-head, at (10.5, 9.0). Here the shearing is a compact band between the two rows
+The failure has moved. The shipped file's mechanism peaked just below the upper
+row's head, near (10.8, 8.5). Here the shearing is a compact band between the two rows
 and below them, from about elevation −3 down to −9, peaking at 0.10 in the
 element centered on (8.9, −5.9). Held at both ends, the shafts stay where they
 are, and what moves has to pass under them.
@@ -576,7 +576,7 @@ already `1.00` to `2.00`. Click
 The band takes much the route the pile model's did — up from the toe, over the
 wall, and out on the crest behind it — and it concentrates in two places, at the
 toe and on the uphill side of the wall's head. The strain peaks at the toe, at
-0.37 against the pile model's 0.77.
+0.37 against the pile model's 0.68.
 
 ### What the wall carries
 
@@ -633,7 +633,7 @@ to **2,418 triangles**, because the constraint line's nodes are the soil mesh's
 nodes. Run the same bracket: it takes noticeably longer than the run above.
 
 **FS = 1.684**, and the peak moment 76,055 lb·ft/ft
-against 90,600. Both moved: the answer came down 0.047, and the toe moment that
+against 90,600. Both moved: the answer came down 0.046, and the toe moment that
 stood at 93% of capacity on ten beam elements stands at 84% on forty. The
 profiles show the effect of the finer beam:
 
@@ -646,7 +646,7 @@ with the soil reaction's second sign change near the toe and its rise to about
 1,600 lb/ft per ft against the toe resolved. Refine the 1D size when the profile
 shapes are the deliverable — a section check down the member, a soil reaction
 distribution — and read the factor of safety off the refined run too: on this
-wall refining the beam moved it by 0.047.
+wall refining the beam moved it by 0.046.
 
 ---
 

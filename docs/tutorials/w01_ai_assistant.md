@@ -666,7 +666,8 @@ generates the document and gives its name. The step that
 [numbers the contents page](../studio/reports.md#building-the-page-numbers) was
 switched off for this session, and the reply says the page has no numbers yet
 and how to fill them in: open the file in Word, select all and press F9. With
-that step on, as it is by default, Studio fills them in itself. The report contains
+that step on, as it is by default, Studio fills them in itself, and the linked
+copy below has been through it. The report contains
 six figures and three tables across its Traceability, Project Definition and
 Limit Equilibrium Analysis sections — a short version of the full report built
 in [W-3](w03_report.md), where the model includes all three engines and the

@@ -123,8 +123,8 @@ If you use xslope in published work, please cite the paper:
 
 To cite the exact version you ran, add the archived release:
 
-> Jones, N. L. (2026). *xslope* (Version 0.5.2) [Computer software].
-> https://doi.org/10.5281/zenodo.22669320
+> Jones, N. L. (2026). *xslope* (Version 1.0.0) [Computer software].
+> https://doi.org/10.5281/zenodo.23303432
 
 Every released version has its own DOI; the concept DOI
 https://doi.org/10.5281/zenodo.20709269 always resolves to the newest one.

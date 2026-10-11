@@ -257,13 +257,6 @@ and has taught *CE 544 — Seepage and Slope Stability Analysis* at BYU for seve
 He can be reached at [njones@byu.edu](mailto:njones@byu.edu) or
 [norm@jonesgeo.com](mailto:norm@jonesgeo.com).
 
-!!! note "Versions"
-    XSLOPE follows semantic versioning. Workbooks from earlier versions open in
-    the current one, and the Python API keeps its names within a major version.
-    As with any slope stability software, check results independently before
-    you rely on them in practice. Feedback is welcome — see
-    [Feedback and bug reports](#feedback-and-bug-reports) below.
-
 ## Feedback and bug reports
 
 The best way to report a bug, suggest a feature, or ask whether XSLOPE can handle
@@ -286,3 +279,10 @@ bug, that is:
 Opening an issue needs a free GitHub account. Issues are public, so leave out
 anything confidential. If a model can't be shared, or you don't have a GitHub
 account, email instead.
+
+!!! note "Versions"
+    XSLOPE follows semantic versioning. Workbooks from earlier versions open in
+    the current one, and the Python API keeps its names within a major version.
+    As with any slope stability software, check results independently before
+    you rely on them in practice. Feedback is welcome — see
+    [Feedback and bug reports](#feedback-and-bug-reports) above.

@@ -113,7 +113,8 @@ the provider's prompt cache at a twentieth of the price of fresh input. A
 conversation that edits and re-solves the model several times costs several
 times that: the three edits below spend 195,000 across nine calls.
 
-The eight conversations below cost this much between them, measured as they ran:
+The eight conversations below were run on Claude Opus 5.5, one of the more
+expensive models, and cost this much between them, measured as they ran:
 
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Time |
 | --- | :---: | :---: | :---: | :---: | :---: |
@@ -134,6 +135,9 @@ output tokens. The input counts above include the cache writes and the cache
 reads. Price and elapsed time do not track each other: the strength reduction run
 takes more than half the total time for under a tenth of the cost, because
 404 of its 436 seconds are spent inside the finite element solver.
+
+The same eight conversations cost between \$0.30 and \$1.17 on the four other
+models compared under [Other models](#other-models).
 
 Prices change; the current ones are on each provider's pricing page:
 [Anthropic](https://claude.com/pricing),

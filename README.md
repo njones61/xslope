@@ -107,7 +107,7 @@ Questions, bug reports, and feature requests go to
 [GitHub Issues](https://github.com/njones61/xslope/issues): click **New issue** and
 pick **Bug report**, **Feature request** or **Question**. Issues are public; if a
 model can't be shared, or you don't have a GitHub account, email
-[njones@byu.edu](mailto:njones@byu.edu) or [norm@jonesgeo.com](mailto:norm@jonesgeo.com)
+[njones@byu.edu](mailto:njones@byu.edu) or [xslope@jonesgeo.com](mailto:xslope@jonesgeo.com)
 instead. Contributors should start
 with the [contributing guide](https://xslope.org/en/latest/coding/contributing/),
 which covers the development install, coding conventions, and the test suite.

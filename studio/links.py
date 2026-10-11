@@ -18,7 +18,7 @@ checks that they do, along with every page below still existing in ``docs/``.
 from __future__ import annotations
 
 __all__ = ["DOCS_URL", "GETTING_STARTED_URL", "SAMPLES_URL", "VERIFICATION_URL",
-           "SUPPORT_EMAIL", "SUPPORT_MAILTO"]
+           "SUPPORT_EMAIL", "SUPPORT_MAILTO", "ISSUES_URL", "bug_report_url"]
 
 #: The documentation root — ``mkdocs.yml``'s ``site_url``. Read The Docs serves the
 #: current release at ``/en/latest/``, and every URL below extends this one.
@@ -43,3 +43,22 @@ VERIFICATION_URL = DOCS_URL + "verification/"
 #: in a screenshot.
 SUPPORT_EMAIL = "xslope@jonesgeo.com"
 SUPPORT_MAILTO = "mailto:" + SUPPORT_EMAIL
+
+#: Where problems, feature requests and questions are filed: the repository's
+#: issues, whose New issue button offers the forms in ``.github/ISSUE_TEMPLATE``.
+ISSUES_URL = "https://github.com/njones61/xslope/issues"
+
+
+def bug_report_url(version, platform_label):
+    """The bug-report form with what Studio already knows filled in.
+
+    GitHub fills an issue form's fields from query parameters named by the fields'
+    ``id``: ``version`` and ``platform`` in ``bug_report.yml``. ``platform_label``
+    must be one of that dropdown's options, word for word, or GitHub leaves it
+    unset; ``test/report_problem_check.py`` holds the two files together.
+    """
+    from urllib.parse import urlencode
+
+    query = urlencode({"template": "bug_report.yml", "version": version,
+                       "platform": platform_label})
+    return f"{ISSUES_URL}/new?{query}"

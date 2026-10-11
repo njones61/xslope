@@ -124,8 +124,10 @@ package, or following an **Open in Studio** link — opens that project and no w
 over it. The next launch with nothing to open is greeted as usual.
 
 The rest of the Help menu is **Documentation**, which opens the documentation root
-in your browser, the two update items described under
-[App management](app_management.md), and **About**.
+in your browser; **Report a Problem…**, which opens the bug-report form on GitHub
+with your version and platform already entered (see
+[Feedback and bug reports](../index.md#feedback-and-bug-reports)); the two update
+items described under [App management](app_management.md); and **About**.
 
 ---
 

@@ -270,7 +270,9 @@ The best way to report a bug, suggest a feature, or ask whether XSLOPE can handl
 your problem is a GitHub issue. Go to
 [github.com/njones61/xslope/issues](https://github.com/njones61/xslope/issues){target="blank"},
 click **New issue**, and pick **Bug report**, **Feature request** or **Question**.
-Each form asks for what is needed to act on it. For a bug, that is:
+In Studio, **Help → Report a Problem…** opens the bug report with your version and
+platform already entered. Each form asks for what is needed to act on it. For a
+bug, that is:
 
 - what you did — the steps, or the analysis you ran;
 - what you expected, and what happened instead, with any error message;

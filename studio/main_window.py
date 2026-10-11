@@ -99,6 +99,15 @@ def _log_sanitize(text):
     return _LOG_EMOJI_STRIP_RE.sub("", text)
 
 
+def studio_platform_label():
+    """This copy of Studio as the bug-report form's "How you ran it" names it."""
+    if sys.platform == "darwin":
+        return "XSLOPE Studio on macOS"
+    if sys.platform.startswith("win"):
+        return "XSLOPE Studio on Windows"
+    return "Other"
+
+
 class _LogStream(QObject):
     """stdout/stderr tee: forwards to the original stream and the log pane.
 
@@ -605,6 +614,11 @@ class MainWindow(QMainWindow):
         self.act_documentation = QAction("&Documentation", self,
                                          triggered=self.open_documentation)
         self.act_welcome = QAction("&Welcome", self, triggered=self.show_welcome)
+        # The bug-report form on GitHub, with the version and platform filled in.
+        # Its role is explicit so macOS leaves it in Help.
+        self.act_report_problem = QAction("Report a &Problem…", self,
+                                          triggered=self.report_problem)
+        self.act_report_problem.setMenuRole(QAction.ApplicationSpecificRole)
         # Update items live in Help on every platform. macOS would otherwise be
         # free to re-home them by matching the text, so the role is explicit.
         self.act_check_updates = QAction("Check for &Updates…", self,
@@ -674,6 +688,7 @@ class MainWindow(QMainWindow):
         m_help = mb.addMenu("&Help")
         m_help.addAction(self.act_documentation)
         m_help.addAction(self.act_welcome)
+        m_help.addAction(self.act_report_problem)
         m_help.addSeparator()
         m_help.addAction(self.act_check_updates)
         m_help.addAction(self.act_startup_check)
@@ -3749,6 +3764,16 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QDesktopServices
 
         return QDesktopServices.openUrl(QUrl(links.DOCS_URL))
+
+    def report_problem(self):
+        """Help → Report a Problem… — GitHub's bug-report form, in the browser,
+        with this copy's version and platform already entered."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        from xslope import __version__
+
+        return QDesktopServices.openUrl(
+            QUrl(links.bug_report_url(__version__, studio_platform_label())))
 
     def show_welcome(self):
         """Help → Welcome, and the first launch (opened from ``studio.app``).

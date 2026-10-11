@@ -10917,6 +10917,36 @@ def run_studio_results_teardown_test(test):
     return 0.0, None
 
 
+def run_report_problem_test(test):
+    """Studio's Help → Report a Problem…: that it opens GitHub's bug-report form with
+    the version and platform filled in, and that the form still has the fields and
+    the dropdown option Studio fills.
+
+    The check itself lives in test/report_problem_check.py. Builds the window
+    offscreen and intercepts the browser call.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'report_problem_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('report_problem_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_seep_bc_series_test(test):
     """The value fields of Studio's Seep BC editor: that a head and a flux read a
     typed value by the same rule, and that Set 2 holds both of them to numbers.
@@ -15569,6 +15599,8 @@ def _dispatch_test(test):
         return run_circles_editor_test(test)
     if test_type == 'studio_results_teardown':
         return run_studio_results_teardown_test(test)
+    if test_type == 'report_problem':
+        return run_report_problem_test(test)
     if test_type == 'seep_bc_series':
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
@@ -15748,6 +15780,7 @@ def _expected_and_tol(test, default_tolerance):
                        'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'studio_results_teardown',
+                       'report_problem',
                        'seep_bc_series', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
@@ -16631,6 +16664,11 @@ def main():
         tests.append({'type': 'studio_results_teardown',
                       'file': 'Studio FEM results view closed',
                       'method': '-', 'source': 'studio_results_teardown'})
+        # Guard Help → Report a Problem…: the bug-report form opens with the version
+        # and platform filled, and the form keeps the field ids and the option.
+        tests.append({'type': 'report_problem',
+                      'file': 'Studio Help → Report a Problem…',
+                      'method': '-', 'source': 'report_problem'})
         # Guard the Seep BC editor's value fields: that a flux takes a tseep series
         # name the way a head does (a series name typed into a flux used to be
         # answered with 0.0, turning a time-varying boundary into a no-flow one),

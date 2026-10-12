@@ -12,10 +12,10 @@ in it:
 * **One verb.** ``open`` and nothing else. An unknown verb is refused by name rather
   than guessed at, so a future verb can be added without any old build doing
   something surprising with it.
-* **One allowlisted host, over https, on port 443.** :data:`ALLOWED_HOSTS` is the
-  documentation site and nothing else — the one place XSLOPE publishes packages, and
-  the only place any Open in Studio link points. Anything else is refused with a
-  message naming the URL. Redirects are re-checked against the same list
+* **The documentation site only, over https, on port 443.** :data:`ALLOWED_HOSTS`
+  is the documentation site's two addresses and nothing else — the one place XSLOPE
+  publishes packages, and the only place any Open in Studio link points. Anything
+  else is refused with a message naming the URL. Redirects are re-checked against the same list
   (:class:`_AllowlistRedirects`), because a redirect from an allowlisted host to
   somewhere else is exactly the way a bare check would be walked around.
 * **No local paths, ever.** ``file:``, ``data:`` and a bare filesystem path are not
@@ -57,10 +57,13 @@ SCHEME = "xslope"
 #: later breaks no existing link; accepting an unknown one today would.
 VERBS = ("open",)
 
-#: The only host a package may be fetched from: the documentation site, which is
-#: where every Open in Studio link on it points (``mkdocs.yml`` ``site_url``). This
-#: tuple is the whole of the trust decision — it is not read from the URL, from a
-#: setting, or from anything a link can influence.
+#: The only hosts a package may be fetched from: the documentation site's two
+#: addresses. Every Open in Studio link names its Read the Docs address
+#: (``mkdocs.yml`` ``site_url``), which forwards to the site's own domain, xslope.org,
+#: where the file is actually served; the forward is re-checked
+#: (:class:`_AllowlistRedirects`), so both must be here. This tuple is the whole of
+#: the trust decision — it is not read from the URL, from a setting, or from anything
+#: a link can influence.
 #:
 #: GitHub is deliberately NOT here. ``github.com``, ``raw.githubusercontent.com`` and
 #: ``objects.githubusercontent.com`` serve every repository anyone has ever pushed,
@@ -68,7 +71,7 @@ VERBS = ("open",)
 #: — a host name is not an identity there. If a link ever has to point at the
 #: repository, allow it by host AND path prefix (the ``njones61/xslope`` account and
 #: nothing else), not by host alone.
-ALLOWED_HOSTS = ("xslope.readthedocs.io",)
+ALLOWED_HOSTS = ("xslope.org", "xslope.readthedocs.io")
 
 #: The only port a package may be fetched over. An https URL naming any other port is
 #: refused: on a shared host, a service on some other port is some other service.
@@ -145,8 +148,7 @@ def check_url(url):
     Three questions, all answered from the URL's own parts and never from its text:
     is the transport https, is the host one of :data:`ALLOWED_HOSTS`, and is the port
     the one https means? A host that merely *ends with* an allowed name is not
-    allowed — ``xslope.readthedocs.io.evil.example`` and ``evilxslope.readthedocs.io``
-    are other hosts.
+    allowed — ``xslope.org.evil.example`` and ``evilxslope.org`` are other hosts.
 
     A URL malformed enough that it cannot be taken apart is refused here rather than
     raising: this is the gate a hostile link meets, and it answers in one currency.

@@ -9,8 +9,9 @@ Studio answers the link. Both halves have failure modes nobody would see by look
      gate is mutation-tested: widen ``VERBS`` and the same link is accepted, which is
      how we know the refusal comes from the gate and not from a parse failure.
   B. THE ALLOWLIST. The scheme is registered system-wide, so any page anywhere can
-     put an ``xslope://`` link in front of a user. One host may be fetched from — the
-     documentation site, where every emitted link points — over https, on port 443,
+     put an ``xslope://`` link in front of a user. Only the documentation site may be
+     fetched from — its Read the Docs address, where every emitted link points, and
+     xslope.org, where that address forwards — over https, on port 443,
      and never a local path: a ``file:`` URL through this door would let a web page
      hand Studio a file on the user's disk. GitHub is deliberately absent and checked
      to be: those hosts serve every repository anyone has pushed, so allowing them
@@ -255,6 +256,12 @@ def test_allowlist():
         # service (a readthedocs.io user's tunnel, a proxy, anything).
         "https://xslope.readthedocs.io:8080/x.xslz",
         "https://xslope.readthedocs.io:80/x.xslz",
+        # The site's own domain gets the same treatment.
+        "https://xslope.org.evil.example/x.xslz",
+        "https://evilxslope.org/x.xslz",
+        "https://www.xslope.org/x.xslz",                       # not a name it uses
+        "http://xslope.org/x.xslz",
+        "https://xslope.org:8080/x.xslz",
     ]
     hostile += [
         # Not URLs at all. urlparse raises on these, and a raise is not a refusal:
@@ -296,9 +303,9 @@ def test_allowlist():
         finally:
             urlscheme.ALLOWED_HOSTS = saved
 
-    if urlscheme.ALLOWED_HOSTS != ("xslope.readthedocs.io",):
+    if urlscheme.ALLOWED_HOSTS != ("xslope.org", "xslope.readthedocs.io"):
         fails.append(f"this build fetches from {urlscheme.ALLOWED_HOSTS}; only the "
-                     f"docs site publishes packages, and every emitted link is on it")
+                     f"docs site's two addresses publish packages")
     return fails
 
 
@@ -321,14 +328,19 @@ def test_redirect_guard():
     else:
         fails.append("a redirect to evil.example was followed")
 
-    same = "https://xslope.readthedocs.io/en/stable/lem/files/x.xslz"
-    try:
-        out = handler.redirect_request(req, None, 302, "Found", headers, same)
-    except urlscheme.SchemeError as exc:
-        fails.append(f"a redirect within the docs site was refused: {exc}")
-    else:
-        if out is None or out.full_url != same:
-            fails.append("a redirect within the docs site was not followed")
+    # Within the docs site, including the forward every emitted link takes: the
+    # Read the Docs address sends the request on to xslope.org. Refusing that hop
+    # broke every Open in Studio link once the site moved to its own domain.
+    for same in ("https://xslope.readthedocs.io/en/stable/lem/files/x.xslz",
+                 "https://xslope.org/en/latest/lem/files/x.xslz"):
+        try:
+            out = handler.redirect_request(req, None, 302, "Found", headers, same)
+        except urlscheme.SchemeError as exc:
+            fails.append(f"a redirect within the docs site was refused: {exc}")
+        else:
+            if out is None or out.full_url != same:
+                fails.append(f"a redirect within the docs site ({same}) was not "
+                             f"followed")
     return fails
 
 

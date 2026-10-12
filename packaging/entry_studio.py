@@ -27,7 +27,41 @@ import sys
 # before the GUI).
 os.environ.setdefault("QT_API", "pyside6")
 
+
+def use_bundled_certificates():
+    """Point Python's https checks at the certificate list the bundle carries.
+
+    Studio downloads with urllib (Open in Studio links, the update check, the AI
+    providers' model lists), and urllib checks a site's certificate against
+    OpenSSL's default certificate file. In the frozen app that default is a path on
+    the BUILD machine (``/Library/Frameworks/Python.framework/...`` on macOS), which
+    a user's Mac does not have, so every one of those downloads failed with
+    "unable to get local issuer certificate" (1.0.1, on xslope.org). certifi's list
+    ships inside the bundle; ``SSL_CERT_FILE`` makes it the default. On Windows the
+    system certificate store is still read as well. A user's own ``SSL_CERT_FILE``
+    is left alone, and a source checkout is not touched.
+    """
+    if not getattr(sys, "frozen", False) or os.environ.get("SSL_CERT_FILE"):
+        return
+    try:
+        import certifi
+
+        path = certifi.where()
+    except Exception:
+        return
+    if os.path.isfile(path):
+        os.environ["SSL_CERT_FILE"] = path
+
+
+use_bundled_certificates()
+
 SELF_TEST_SAMPLE = "xslope_simple1.xlsx"
+
+#: Fetched over https by the self-test through Open in Studio's own code. The Read
+#: the Docs address is the one older links name: the fetch follows its forward to
+#: xslope.org, so it checks the allowlist and both sites' certificate chains.
+SELF_TEST_PACKAGE_URL = ("https://xslope.readthedocs.io/en/stable/lem/files/"
+                         "xslope_simple_mult_layers.xslz")
 
 # A windowed build has no console on Windows, so stdout is not attached to the
 # shell that launched it. Every diagnostic line therefore goes to stdout AND, if
@@ -195,6 +229,41 @@ def _self_test(path=None):
     except ImportError as exc:
         emit(f"[warn] compiled fast kernel not bundled ({exc}); "
              f"SSRM runs use the pure-NumPy path")
+
+    # --- https downloads (Open in Studio, the update check, model lists) -------
+    # The frozen app must check certificates against the list it carries, not a
+    # path on the build machine: a build runner that happens to have that path
+    # would pass a live fetch while every user's install fails it.
+    import ssl
+    import tempfile
+
+    import certifi
+
+    cafile = ssl.get_default_verify_paths().cafile or ""
+    n_ca = ssl.create_default_context().cert_store_stats().get("x509_ca", 0)
+    if getattr(sys, "frozen", False) and (
+            os.path.realpath(cafile) != os.path.realpath(certifi.where())):
+        emit(f"[fail] https certificates come from {cafile or 'nowhere'!r}, not "
+             f"from the bundled list {certifi.where()!r}")
+        return 8
+    if n_ca < 50:
+        emit(f"[fail] only {n_ca} https root certificates are loaded")
+        return 8
+    emit(f"[ok] https certificates: {n_ca} roots from {os.path.basename(cafile)}")
+    from studio import updater, urlscheme
+
+    def _twice(fetch):
+        try:
+            return fetch()
+        except Exception:
+            return fetch()              # one retry for a passing network hiccup
+
+    with tempfile.TemporaryDirectory() as tmp:
+        pkg = _twice(lambda: urlscheme.download_package(SELF_TEST_PACKAGE_URL, tmp))
+        emit(f"[ok] https download {os.path.basename(pkg)}, "
+             f"{os.path.getsize(pkg)} bytes, via xslope.org")
+    manifest = _twice(updater.fetch_manifest)
+    emit(f"[ok] https update check: latest release {manifest.get('version')}")
 
     # --- the GUI itself, offscreen (PySide6 plugins + matplotlib Qt backend) --
     from PySide6 import QtCore

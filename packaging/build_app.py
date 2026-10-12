@@ -304,7 +304,12 @@ EXPECTED_MARKERS = [
     # POSIX and blocks the user's next save, delete or Excel open on Windows.
     "[ok] saved file released",
     "[ok] packaged skill prompt", "[ok] gmsh",
-    "[ok] bishop FS", "[ok] window title", "[ok] self-test passed",
+    "[ok] bishop FS",
+    # Downloads over https, through the app's own code and the certificates it
+    # carries. Without them every Open in Studio link and update check failed on
+    # a user's Mac (1.0.1) while the build stayed green.
+    "[ok] https certificates", "[ok] https download", "[ok] https update check",
+    "[ok] window title", "[ok] self-test passed",
 ]
 
 

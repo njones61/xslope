@@ -4883,7 +4883,9 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
                           f"{output} = {base['fs'].iloc[0]:.3g})")
     if is_fs:                                    # FS = 1 guide only for a safety factor
         ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
-    if target_fs is not None:
+    # A target of FS = 1 (a back-analysis) is the guide just drawn; a second line
+    # would only repeat it in the legend.
+    if target_fs is not None and not (is_fs and np.isclose(target_fs, 1.0)):
         ax.axhline(target_fs, color='gray', linestyle='--', linewidth=0.8,
                    label=f'{output} = {target_fs:g}')
     ax.set_xlabel(param)
@@ -4928,17 +4930,68 @@ def annotate_design_crossing(ax, target_fs, summary):
                     bbox=dict(boxstyle="round,pad=0.3", fc="white",
                               ec="#0a7d2c", alpha=0.9))
     else:
-        # Put the note in the empty band: just under the target line when the
-        # curve sits below the target (need a higher FS), else near the bottom.
+        # The note goes on the far side of the target line from the curve, in
+        # headroom the y-axis is extended to hold, so it covers neither the curve
+        # nor the line it is about. One clause per line, re-wrapped if still wider
+        # than the axes, keeps it inside the plot at any window width.
         fs_min = (summary.get("fs_range") or (None, None))[0]
         below_range = fs_min is not None and target_fs < fs_min
-        y, va = (0.05, "bottom") if below_range else (0.95, "top")
-        ax.text(0.5, y, summary.get("message", "Target FS not reached."),
-                transform=ax.transAxes, ha="center", va=va, fontsize=9,
-                color="#7a5200", wrap=True, zorder=9,
-                bbox=dict(boxstyle="round,pad=0.4", fc="#fff4d6",
-                          ec="#e0b400", alpha=0.95))
+        text = (summary.get("message", f"Target {out} not reached.")
+                .replace(" — ", "\n").replace(". ", ".\n"))
+        gap = 6                                  # points between line and note
+        note = ax.annotate(text, xy=(0.5, target_fs),
+                           xycoords=ax.get_yaxis_transform(),
+                           xytext=(0, -gap if below_range else gap),
+                           textcoords="offset points", ha="center",
+                           va="top" if below_range else "bottom", fontsize=9,
+                           color="#7a5200", zorder=9, annotation_clip=False,
+                           bbox=dict(boxstyle="round,pad=0.4", fc="#fff4d6",
+                                     ec="#e0b400", alpha=0.95))
+        _fit_note(ax, note, gap, below_range, target_fs)
     return ax
+
+
+def _fit_note(ax, note, gap, below, y_line):
+    """Wrap an annotation to the axes width, then extend the y-axis past ``y_line``
+    far enough to hold it, on the side the note sits (``below`` the line or above).
+
+    Both are measured on the drawn text, so the note fits at whatever size the
+    figure is drawn; with no renderer to measure against it is left as placed.
+    """
+    import textwrap
+    fig = ax.figure
+    try:
+        renderer = fig.canvas.get_renderer()
+    except AttributeError:
+        return
+
+    def box():
+        note.update_bbox_position_size(renderer)
+        return note.get_bbox_patch().get_window_extent(renderer)
+
+    clauses = note.get_text().split("\n")
+    chars = max(len(s) for s in clauses)
+    for _ in range(5):                           # each pass narrows the lines
+        width = box().width
+        if width <= ax.bbox.width or chars <= 10:
+            break
+        # Re-wrap the original clauses every pass, so a narrower width never
+        # strands the tail of an earlier wrap on a line of its own.
+        chars = max(10, min(chars - 1, int(chars * ax.bbox.width / width)))
+        note.set_text("\n".join(w for s in clauses
+                                for w in textwrap.wrap(s, chars)))
+
+    # The fraction of the axes height the note needs beyond the line: the box, its
+    # gap from the line, and the same gap again to the axes edge.
+    need = box().height + 2 * gap * fig.dpi / 72
+    frac = need / ax.bbox.height
+    if not 0 < frac < 0.9:
+        return
+    y0, y1 = ax.get_ylim()
+    if below:
+        ax.set_ylim(min(y0, (y_line - frac * y1) / (1 - frac)), y1)
+    else:
+        ax.set_ylim(y0, max(y1, (y_line - frac * y0) / (1 - frac)))
 
 
 #: The two faces of an embankment, in the colors an FS-versus-time curve marks its
@@ -5582,7 +5635,9 @@ def plot_spider(sweeps, x_mode='pct', figsize=(8, 5), save_png=False, dpi=300,
                     label=f'base case ({output} = {base_fs:.3g})')
     if output == 'FS':
         ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
-    if target_fs is not None:
+    # A target of FS = 1 is the guide just drawn; a second line would only repeat
+    # it in the legend.
+    if target_fs is not None and not (output == 'FS' and np.isclose(target_fs, 1.0)):
         ax.axhline(target_fs, color='gray', linestyle='--', linewidth=0.8,
                    label=f'{output} = {target_fs:g}')
     ax.set_xlabel('Change from base case (%)' if x_mode == 'pct'

@@ -65,6 +65,11 @@ Parametric captures:
     the mesh that page builds, because the mode reads saved frames: a synthesized
     ledger would list instants no field stands behind, and the result tab would draw
     a curve nothing computed. The march is the minute in this producer.
+  * ``analysis_sensitivity_dialog*.png`` and the tornado, curve, design-curve,
+    design-miss and back-analysis result tabs — the dialog in each study mode and
+    the result each one opens, all on the ACADS simple slope and set up as the
+    Parametric pages' worked examples are, so a shot shows the numbers its text
+    quotes. The FEM and Seepage versions of the dialog are grabbed unrun.
 
 The remaining dialogs and dock panels — Build mesh, the steady Run Seepage dialog,
 the welcome window, the DXF import wizard, the Global parameters form, the two
@@ -78,7 +83,8 @@ The Assistant settings dialog runs against a THROWAWAY ``QSettings`` file and a
 config whose ``api_key`` returns a fixed dummy: the shot must not depend on (or
 show anything about) whoever runs it, and it must never touch the real keychain.
 
-Run:  python tools/capture_studio_screenshots.py     # regenerate every PNG
+Run:  python tools/capture_studio_screenshots.py              # regenerate every PNG
+      python tools/capture_studio_screenshots.py parametric   # the Parametric set only
 
 Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
 layer to capture), mirroring the transient studio smoke test.
@@ -1206,7 +1212,187 @@ def capture_sensitivity_fs_time_result():
     return out
 
 
+# The Parametric pages' worked examples all run on the ACADS simple slope, so the
+# dialog and result shots do too, set up as those examples are: each picture carries
+# the numbers the text beside it quotes.
+ACADS = os.path.join(REPO_ROOT, "docs/lem/files/xslope_acads_simple.xlsx")
+ACADS_TORNADO = ("mat:Soil:c", "mat:Soil:phi", "mat:Soil:gamma")
+ACADS_DESIGN = {"low": 6.0, "high": 18.0, "steps": 7, "target_fs": 1.5}
+ACADS_DESIGN_MISS = {"low": 3.0, "high": 9.0, "steps": 7, "target_fs": 1.5}
+ACADS_BACK = {"low": 1.0, "high": 6.0, "steps": 11}
+EARTH_DAM1 = os.path.join(REPO_ROOT, "docs/seep/files/xslope_earth_dam1.xlsx")
+
+
+def _parametric_dialog(mode, path=ACADS, app_mode="lem", **defaults):
+    """The Parametric dialog on a sample, in one study mode, sized to its layout."""
+    from xslope.fileio import load_slope_data
+    from studio.dialogs import SensitivityDialog
+
+    d = _quiet(load_slope_data, path)
+    base = {"mode": mode, "method": "bishop", "num_slices": 30}
+    dlg = SensitivityDialog(defaults={**base, **defaults}, slope_data=d,
+                            app_mode=app_mode)
+    dlg.mode.setCurrentIndex(dlg.mode.findData(mode))
+    return d, dlg
+
+
+def _tornado_dialog():
+    rows = [{"ref": r, "pct": 25.0} for r in ACADS_TORNADO]
+    return _parametric_dialog("sensitivity", default_pct=25.0, n=5,
+                              _remember_params=rows)
+
+
+def _design_dialog(mode="design", ranges=ACADS_DESIGN):
+    d, dlg = _parametric_dialog(mode, **ranges)
+    dlg.prop.setCurrentIndex(dlg.prop.findData("mat:Soil:c"))
+    return d, dlg
+
+
+def _sweep(d, dlg):
+    """Run the study the dialog is set up for, through Studio's own runner."""
+    from studio.runners import SensitivityRunner
+
+    runner = SensitivityRunner(d, dlg.options())
+    bundle, err = {}, {}
+    runner.succeeded.connect(lambda b: bundle.update(b))
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    _quiet(runner.run)
+    dlg.close()
+    if err or not bundle:
+        raise RuntimeError("sweep failed: %s" % err.get("msg", "no result"))
+    return bundle
+
+
+def _grab_result(name, render, table, size=(760, 540)):
+    """A Parametric result tab — the plot with its Plot and Table sub-tabs, as the
+    main window shows it — grabbed on its Plot sub-tab. The tornado draws at a
+    compact bar-chart scale, so its tab is grabbed shorter."""
+    from studio.main_window import SweepCanvas
+    from studio.sweep_table import SweepResultView
+
+    view = SweepResultView(SweepCanvas())
+    view.resize(*size)
+    view.show()
+    _settle()
+    render(view)
+    view.set_table(*table[:2])
+    _settle()
+    view.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, name)
+    view.grab().save(out)
+    view.close()
+    return out
+
+
+_acads_tornado = {}
+
+
+def _acads_tornado_bundle():
+    """The three-parameter tornado, run once: the result shot and the click-through
+    curve are two views of the same sweep."""
+    if "bundle" not in _acads_tornado:
+        _acads_tornado["bundle"] = _sweep(*_tornado_dialog())
+    return _acads_tornado["bundle"]
+
+
+def capture_parametric_dialog():
+    """Sensitivity mode, the tornado set up: c, phi and gamma at +/-25%."""
+    _, dlg = _tornado_dialog()
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_sensitivity_dialog.png")
+
+
+def capture_parametric_design_dialog():
+    """Design mode: cohesion from 6 to 18 kPa in seven solves, toward FS = 1.5."""
+    _, dlg = _design_dialog()
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_sensitivity_dialog_design.png")
+
+
+def capture_parametric_back_dialog():
+    """Back-Analysis mode: the target drops to FS = 1.0 on its own."""
+    _, dlg = _design_dialog("back_analysis", ACADS_BACK)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_sensitivity_dialog_backanalysis.png")
+
+
+def capture_parametric_fem_dialog():
+    """FEM mode: the SSRM settings take the Method and slices rows' place."""
+    _, dlg = _parametric_dialog("design", app_mode="fem", **ACADS_DESIGN)
+    dlg.prop.setCurrentIndex(dlg.prop.findData("mat:Soil:c"))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_sensitivity_dialog_fem.png")
+
+
+def capture_parametric_seep_dialog():
+    """Seepage mode on the earth dam: the target is a discharge, and the picker
+    offers hydraulic conductivities and boundary heads. The shell's k1 range the
+    dialog seeds (23 to 69) carries q from about 30 to 43 through the section, so
+    q = 40 is a target the sweep reaches."""
+    _, dlg = _parametric_dialog("design", path=EARTH_DAM1, app_mode="seep",
+                                steps=5, target_fs=40.0)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_sensitivity_dialog_seep.png")
+
+
+def capture_parametric_tornado():
+    from studio.sweep_table import parametric_table
+
+    b = _acads_tornado_bundle()
+    return _grab_result("analysis_sensitivity_tornado.png",
+                        lambda v: v.render_tornado(b["tornado"]),
+                        parametric_table(b), size=(760, 340))
+
+
+def capture_parametric_curve():
+    """The click-through curve of the tornado's widest bar (phi)."""
+    from studio.sweep_table import curve_table
+
+    b = _acads_tornado_bundle()
+    df = b["sweeps"]["mat:Soil:phi"]
+    return _grab_result("analysis_sensitivity_curve.png",
+                        lambda v: v.render_curve(df),
+                        curve_table("mat:Soil:phi", df))
+
+
+def _design_result(name, mode="design", ranges=ACADS_DESIGN):
+    from studio.sweep_table import parametric_table
+
+    b = _sweep(*_design_dialog(mode, ranges))
+    return _grab_result(name,
+                        lambda v: v.render_design(b["df"], b["target_fs"], b),
+                        parametric_table(b))
+
+
+def capture_parametric_design_curve():
+    return _design_result("analysis_sensitivity_design_curve.png")
+
+
+def capture_parametric_design_miss():
+    """The same question over a range that never reaches the target."""
+    return _design_result("analysis_sensitivity_design_miss.png",
+                          ranges=ACADS_DESIGN_MISS)
+
+
+def capture_parametric_back_curve():
+    return _design_result("analysis_sensitivity_backanalysis_curve.png",
+                          mode="back_analysis", ranges=ACADS_BACK)
+
+
+PARAMETRIC_SHOTS = (capture_parametric_dialog, capture_parametric_design_dialog,
+                    capture_parametric_back_dialog, capture_parametric_fem_dialog,
+                    capture_parametric_seep_dialog, capture_parametric_tornado,
+                    capture_parametric_curve, capture_parametric_design_curve,
+                    capture_parametric_design_miss, capture_parametric_back_curve)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "parametric":
+        print("capture_studio_screenshots: regenerating the Parametric images")
+        for fn in PARAMETRIC_SHOTS:
+            print(f"  wrote {os.path.relpath(fn(), REPO_ROOT)}")
+        return
     print("capture_studio_screenshots: regenerating Studio dialog images")
     analysis_reliability_dialog_lem()
     for fn in (capture_run_dialog, capture_playbar, capture_transient_editor,
@@ -1230,7 +1416,7 @@ def main():
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,
-               capture_display_dock_fem):
+               capture_display_dock_fem) + PARAMETRIC_SHOTS:
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     global _MW

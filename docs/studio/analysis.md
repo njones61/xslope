@@ -161,10 +161,10 @@ searches. Search iteration progress streams to the Log pane, and a search can be
 A second entry point sits beside Run — **Parametric…** — on both the **Run menu**
 and the main **toolbar**, in all three modes (LEM, Seepage, FEM). It is available whenever
 a model is open — in Seepage and FEM mode it additionally needs a built mesh, exactly like
-Run — and is disabled while another analysis is running. Every version of it drives the
-same sweep engine as the library — see
-[Parametric Studies](../parametric/index.md) for the engine, and the
-[`/xslope` skill](../usage/claude/index.md) for the scripted recipes.
+Run — and is disabled while another analysis is running. This section lists its controls;
+[Parametric Studies](../parametric/index.md) explains what each study answers and walks
+through a worked example of each. Every version of the dialog drives the same sweep engine
+as the library and the [`/xslope` skill](../usage/claude/index.md).
 
 One dialog covers four study modes, chosen by its **Mode** selector — **Sensitivity**,
 **Design**, **Back-Analysis**, and **Factor of safety vs time**. In **LEM** three controls

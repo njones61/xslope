@@ -22,9 +22,9 @@ have to move together:
 Every tag `vX.Y.Z` pushed to GitHub runs the installer workflow, which publishes
 the installers as a GitHub Release; Zenodo archives every GitHub Release and
 mints a version DOI for it. So every released version, patch or not, carries its
-own DOI (accepted 2026-09-09). The concept DOI in `CITATION.cff` always resolves
-to the newest release; update the `version`, `date-released` and `doi` fields
-after each release once Zenodo shows the new record.
+own DOI (accepted 2026-09-09). Nothing needs updating afterwards: the SoftwareX
+paper is the citation, and the concept DOI in `CITATION.cff` and `README.md`
+always resolves to the newest release on its own (owner, 2026-10-12).
 
 ## Before a minor or major release
 
@@ -88,11 +88,10 @@ Patch releases skip this.
 - The **concept DOI** ("Cite all versions" on the Zenodo record) always resolves
   to the newest version. Put the concept DOI in `CITATION.cff` once a second
   version exists, so the citation metadata tracks the latest release.
-- Update the `version`, `date-released`, and `doi` fields in `CITATION.cff` and the
-  citation block in `README.md` after each release, once Zenodo shows the new record
-  (the SoftwareX paper reference in both stays as it is; only the version line and
-  its DOI change)
-  (query `https://zenodo.org/api/records?q=%22xslope%22&all_versions=true`).
+- `CITATION.cff` and the citation block in `README.md` are not updated per release.
+  Their version line is an example of pinning a version; the concept DOI beside it
+  covers the newest release (owner, 2026-10-12). A version DOI can be looked up at
+  `https://zenodo.org/api/records?q=%22xslope%22&all_versions=true`.
 
 ## Notes
 

@@ -371,7 +371,8 @@ def reports_warnings():
 # --------------------------------------------------------------------------- #
 # Citations
 # --------------------------------------------------------------------------- #
-_DOC_URL = re.compile(r"xslope\.readthedocs\.io/en/latest/([A-Za-z0-9_/\-]*)")
+_DOC_URL = re.compile(r"(?:xslope\.org|xslope\.readthedocs\.io)/en/(?:stable|latest)/"
+                      r"([A-Za-z0-9_/\-]*)")
 
 
 def cites_docs(at_least=1):

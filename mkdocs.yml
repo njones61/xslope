@@ -1,5 +1,9 @@
 site_name: XSLOPE
-site_url: https://xslope.readthedocs.io/en/latest/
+# Read the Docs sets READTHEDOCS_CANONICAL_URL to the address of the version being
+# built (https://xslope.org/en/stable/ for the release), so each page's canonical
+# address and its Open in Studio links name the version the reader is on. Builds
+# outside Read the Docs use the fallback.
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, "https://xslope.org/en/latest/"]
 site_description: >-
   Free, open-source slope stability and seepage analysis software: seven limit
   equilibrium methods, finite element seepage and finite element strength reduction

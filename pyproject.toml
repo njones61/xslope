@@ -53,7 +53,7 @@ xslope-studio = "studio.app:main"
 
 [project.urls]
 Homepage = "https://github.com/njones61/xslope"
-Documentation = "https://xslope.readthedocs.io/en/latest/"
+Documentation = "https://xslope.org/en/stable/"
 Source = "https://github.com/njones61/xslope"
 Issues = "https://github.com/njones61/xslope/issues"
 

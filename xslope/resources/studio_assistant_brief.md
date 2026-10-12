@@ -346,7 +346,7 @@ Otherwise answer at the level the question was asked, state the conventions (sig
 units, degrees not radians, per unit width, u positive in compression), then point
 at the page that carries the derivation. The table below is the map — which page
 owns which subject — and `docs()` is how you read it. Real pages, all under
-`https://xslope.readthedocs.io/en/latest/`:
+`https://xslope.org/en/stable/`:
 
 | Topic | Page |
 |:------|:-----|

@@ -411,9 +411,17 @@ def _corpus_from_skill():
 # page and anchor to cite.
 # --------------------------------------------------------------------------- #
 
-#: Site the index's relative page paths hang off. The index carries its own copy
-#: (a future docs move changes it there); this is only the fallback.
-_DOCS_BASE_URL = "https://xslope.readthedocs.io/en/latest/"
+#: Site the index's relative page paths hang off: the released docs. The index
+#: carries its own copy (a future docs move changes it there); this is only the
+#: fallback.
+_DOCS_BASE_URL = "https://xslope.org/en/stable/"
+
+#: Earlier addresses of the same pages, still recognized when a page is looked up
+#: by its full URL: the docs' working copy at xslope.org, and the Read the Docs
+#: address that served (and still forwards to) both.
+_DOCS_OTHER_BASE_URLS = ("https://xslope.org/en/latest/",
+                         "https://xslope.readthedocs.io/en/stable/",
+                         "https://xslope.readthedocs.io/en/latest/")
 
 #: Field weights, as token repetitions. A heading is a title for the section and
 #: says what it is about in five words, so a hit there is worth several in a
@@ -588,7 +596,7 @@ class _DocsSearch:
         if "#" in url:
             url, _, tail = url.partition("#")
             anchor = anchor or tail
-        for prefix in (self.base_url, _DOCS_BASE_URL):
+        for prefix in (self.base_url, _DOCS_BASE_URL) + _DOCS_OTHER_BASE_URLS:
             if url.startswith(prefix):
                 url = url[len(prefix):]
         url = url.strip("/")
@@ -2124,7 +2132,7 @@ class PythonKernel:
             if not all_rows:
                 print("The verification corpus index is not available in this "
                       "install; the pages are at "
-                      "https://xslope.readthedocs.io/en/latest/verification/")
+                      "https://xslope.org/en/stable/verification/")
                 return []
             if not query:
                 print("Corpus topics (pass one to corpus_index):")
@@ -2178,7 +2186,7 @@ class PythonKernel:
             search = _docs_search()
             if search is None:
                 print("The documentation index is not available in this install; "
-                      "the pages are at https://xslope.readthedocs.io/en/latest/")
+                      "the pages are at https://xslope.org/en/stable/")
                 return []
             hits = search.search(query, limit=limit)
             if not hits:

@@ -8350,14 +8350,23 @@ def test_docs_links():
     from xslope.report import (DOCS_BASE_URL, METHOD_DOC_PAGES, docs_url,
                                method_doc_url)
 
+    # The report cites the RELEASED docs (/en/stable/) on the domain mkdocs
+    # publishes; site_url's fallback names that domain.
+    import re
+    from urllib.parse import urlparse
     mkdocs = os.path.join(_REPO, "mkdocs.yml")
     with open(mkdocs, encoding="utf-8") as f:
         for line in f:
             if line.startswith("site_url:"):
                 declared = line.split(":", 1)[1].strip()
-                if declared.rstrip("/") != DOCS_BASE_URL.rstrip("/"):
+                hosts = {urlparse(u).hostname
+                         for u in re.findall(r"https://[^\s\"'\]]+", declared)}
+                if urlparse(DOCS_BASE_URL).hostname not in hosts:
                     fails.append(f"the report links to {DOCS_BASE_URL}, the site "
                                  f"is published at {declared}")
+                if urlparse(DOCS_BASE_URL).path != "/en/stable/":
+                    fails.append(f"the report links to {DOCS_BASE_URL}, not the "
+                                 f"released docs (/en/stable/)")
                 break
         else:
             fails.append("mkdocs.yml declares no site_url to check against")

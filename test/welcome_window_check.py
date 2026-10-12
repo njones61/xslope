@@ -528,15 +528,23 @@ def test_targets():
             "Sample problems": links.SAMPLES_URL,
             "Verification": links.VERIFICATION_URL}
 
-    # The documentation root is the site mkdocs publishes.
+    # The documentation root is the RELEASED docs (/en/stable/) on the domain mkdocs
+    # publishes. site_url names each version's own address when Read the Docs builds
+    # it, with a fallback for builds elsewhere; the domain is the fallback's.
     with open(os.path.join(_REPO, "mkdocs.yml"), encoding="utf-8") as fh:
         mkdocs = fh.read()
-    site_url = re.search(r"^site_url:\s*(\S+)\s*$", mkdocs, re.M)
+    site_url = re.search(r"^site_url:\s*(.+?)\s*$", mkdocs, re.M)
     if site_url is None:
         fails.append("mkdocs.yml declares no site_url to check the links against")
-    elif links.DOCS_URL.rstrip("/") != site_url.group(1).rstrip("/"):
-        fails.append(f"DOCS_URL is {links.DOCS_URL}, but mkdocs publishes "
-                     f"{site_url.group(1)}")
+    else:
+        hosts = {urlparse(u).hostname
+                 for u in re.findall(r"https://[^\s\"'\]]+", site_url.group(1))}
+        if urlparse(links.DOCS_URL).hostname not in hosts:
+            fails.append(f"DOCS_URL is {links.DOCS_URL}, but mkdocs publishes on "
+                         f"{sorted(hosts) or site_url.group(1)}")
+        if urlparse(links.DOCS_URL).path != "/en/stable/":
+            fails.append(f"DOCS_URL is {links.DOCS_URL}, not the released docs "
+                         f"(/en/stable/)")
 
     host = urlparse(links.DOCS_URL).hostname
     if host not in urlscheme.ALLOWED_HOSTS:

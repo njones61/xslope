@@ -1723,7 +1723,7 @@ def _is_the_page_index(text):
     """True for the shared table of documentation pages, false for skill prose."""
     lines = [ln for ln in text.splitlines() if ln.strip()]
     rows = sum(1 for ln in lines if ln.lstrip().startswith("|"))
-    return bool(lines) and "xslope.readthedocs.io" in text and rows >= 0.6 * len(lines)
+    return bool(lines) and "xslope.org/en/stable/" in text and rows >= 0.6 * len(lines)
 
 
 def check_skill_body_is_not_in_the_prompt():

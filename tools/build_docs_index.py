@@ -85,15 +85,18 @@ BLANKS_RE = re.compile(r'\n{3,}')
 def read_nav():
     """``[(md_path, nav_title)]`` for every page in ``mkdocs.yml``'s nav, in order.
 
-    mkdocs.yml carries python-object tags mkdocs itself resolves (``!!python/name``
-    style hooks are configured elsewhere, but plugin blocks still use YAML that
-    ``safe_load`` accepts), so the file is read with the safe loader and only the
-    ``nav`` key is used.
+    The file is read with the safe loader and only the ``nav`` key is used. It
+    carries mkdocs's own ``!ENV`` tag (``site_url``), which the safe loader does not
+    know, so that tag is read as nothing: no value it names is used here.
     """
     import yaml
 
+    class _Loader(yaml.SafeLoader):
+        pass
+
+    _Loader.add_constructor('!ENV', lambda loader, node: None)
     with open(MKDOCS, encoding='utf-8') as fh:
-        cfg = yaml.safe_load(fh)
+        cfg = yaml.load(fh, Loader=_Loader)
     pages = []
 
     def walk(node, title=None):
@@ -409,7 +412,7 @@ def build_index(verbose=True):
 
     return {'schema_version': SCHEMA_VERSION,
             'encoding': 'lzma+base64',
-            'base_url': 'https://xslope.readthedocs.io/en/latest/',
+            'base_url': 'https://xslope.org/en/stable/',
             'bodies': packed,
             'pages': pages,
             'template': {'sheets': sheets},

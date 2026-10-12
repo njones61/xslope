@@ -8,7 +8,8 @@ two artifacts:
   * ``docs/verification/corpus_index.json`` — the machine index: one record per
     distinct model, carrying a FEATURE SIGNATURE read out of the model file
     itself (never from its name), the topics that signature implies, and every
-    verification-page section that documents it, with a real readthedocs URL.
+    verification-page section that documents it, with its URL on the released
+    docs site.
 
   * a TOPIC -> EXAMPLES table injected into the assistant skill
     (``docs/usage/claude/xslope.md``) between the ``corpus-index`` markers, so a
@@ -46,7 +47,7 @@ DOCS = REPO_ROOT / 'docs'
 INDEX_PATH = DOCS / 'verification' / 'corpus_index.json'
 SKILL_PATH = DOCS / 'usage' / 'claude' / 'xslope.md'
 BUNDLED_SKILL = REPO_ROOT / 'xslope' / 'resources' / 'xslope_skill.md'
-BASE_URL = 'https://xslope.readthedocs.io/en/latest/'
+BASE_URL = 'https://xslope.org/en/stable/'
 
 BEGIN_MARKER = '<!-- corpus-index:begin -->'
 END_MARKER = '<!-- corpus-index:end -->'

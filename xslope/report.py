@@ -199,7 +199,7 @@ METHOD_SUMMARIES = {
 #: declares as ``site_url`` and ``tools/make_corpus_index.py`` writes into the
 #: corpus index; that tool is not shipped in the wheel, so the constant is here
 #: too, and the two are checked against ``mkdocs.yml`` by the report checks.
-DOCS_BASE_URL = "https://xslope.readthedocs.io/en/latest/"
+DOCS_BASE_URL = "https://xslope.org/en/stable/"
 
 #: The documentation page each limit-equilibrium method is derived on, as a path
 #: under ``docs/``. The force-equilibrium methods share one page.

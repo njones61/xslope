@@ -22,7 +22,7 @@ __all__ = ["DOCS_URL", "GETTING_STARTED_URL", "SAMPLES_URL", "VERIFICATION_URL",
 
 #: The documentation root — ``mkdocs.yml``'s ``site_url``. Read The Docs serves the
 #: current release at ``/en/latest/``, and every URL below extends this one.
-DOCS_URL = "https://xslope.readthedocs.io/en/latest/"
+DOCS_URL = "https://xslope.org/en/stable/"
 
 #: Installing Studio: the downloads, the system requirements, what a first launch
 #: does, where the application's files land, and keeping it up to date.

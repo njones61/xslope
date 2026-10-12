@@ -51,7 +51,7 @@ about:
     mesh capabilities.
   license: Apache-2.0
   license_file: LICENSE.txt
-  doc_url: https://xslope.readthedocs.io/en/latest/
+  doc_url: https://xslope.org/en/stable/
   dev_url: https://github.com/njones61/xslope
 
 extra:

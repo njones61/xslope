@@ -17,7 +17,8 @@ import sys
 import traceback
 from urllib.parse import urlparse
 
-from PySide6.QtCore import Qt, QObject, QSettings, QStandardPaths, QThread, Signal
+from PySide6.QtCore import (Qt, QEvent, QObject, QSettings, QStandardPaths, QThread,
+                            QTimer, Signal)
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
@@ -285,6 +286,21 @@ class SweepCanvas(MplCanvas):
         annotate_design_crossing(ax, target_fs, summary)
 
 
+_DROP_EVENTS = (QEvent.DragEnter, QEvent.DragMove, QEvent.Drop)
+
+
+def _dropped_project(mime):
+    """The one file a drag carries, when it is something File → Open opens (an
+    input workbook or a project package); else None. A drag of several files is
+    refused rather than opening one of them."""
+    urls = mime.urls() if mime.hasUrls() else []
+    if len(urls) != 1 or not urls[0].isLocalFile():
+        return None
+    path = urls[0].toLocalFile()
+    ext = os.path.splitext(path)[1].lower()
+    return path if ext in (".xlsx", PACKAGE_EXT) and os.path.isfile(path) else None
+
+
 class MainWindow(QMainWindow):
     # Emitted to hand a mesh build to the persistent mesh thread (queued).
     _mesh_requested = Signal(object, object)
@@ -311,6 +327,12 @@ class MainWindow(QMainWindow):
         self.doc.loaded.connect(self._on_loaded)
         self.doc.changed.connect(self._render)
         self.doc.dirty_changed.connect(lambda *_: self._update_title())
+
+        # A project file dropped anywhere on the window opens as File → Open would.
+        # The filter is application-wide because the canvases and text panes take
+        # drags of their own; it acts only on drags over this window.
+        self.setAcceptDrops(True)
+        QApplication.instance().installEventFilter(self)
 
         # Central area: a tab strip of result views (plan §7). The Inputs view is
         # always present; the LEM Solution view is added after the first solve.
@@ -938,6 +960,20 @@ class MainWindow(QMainWindow):
             "Project packages (*.xslz);;All files (*)")
         if path:
             self.open_path(path)
+
+    def eventFilter(self, obj, event):
+        if (event.type() in _DROP_EVENTS and isinstance(obj, QWidget)
+                and (obj is self or self.isAncestorOf(obj))):
+            path = _dropped_project(event.mimeData())
+            if path:
+                event.acceptProposedAction()
+                if event.type() == QEvent.Drop:
+                    # After the drop returns: opening may ask about unsaved
+                    # changes, and a dialog inside a drop handler holds the
+                    # drag open in the file manager it came from.
+                    QTimer.singleShot(0, lambda: self.open_path(path))
+                return True
+        return super().eventFilter(obj, event)
 
     def open_path(self, path):
         if not self._confirm_discard():

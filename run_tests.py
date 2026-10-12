@@ -10977,6 +10977,37 @@ def run_log_font_test(test):
     return 0.0, None
 
 
+def run_drop_open_test(test):
+    """Dropping a file on Studio's window: an input workbook or a project package
+    is taken anywhere on the window (canvas, Log pane, frame) and opens as File →
+    Open would; another kind of file, several files, a missing file, or a drop on
+    another window opens nothing.
+
+    The check itself lives in test/drop_open_check.py. Builds a window offscreen
+    against a scratch settings file.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'drop_open_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('drop_open_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_seep_bc_series_test(test):
     """The value fields of Studio's Seep BC editor: that a head and a flux read a
     typed value by the same rule, and that Set 2 holds both of them to numbers.
@@ -15633,6 +15664,8 @@ def _dispatch_test(test):
         return run_report_problem_test(test)
     if test_type == 'log_font':
         return run_log_font_test(test)
+    if test_type == 'drop_open':
+        return run_drop_open_test(test)
     if test_type == 'seep_bc_series':
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
@@ -15812,7 +15845,7 @@ def _expected_and_tol(test, default_tolerance):
                        'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'studio_results_teardown',
-                       'report_problem', 'log_font',
+                       'report_problem', 'log_font', 'drop_open',
                        'seep_bc_series', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
@@ -16707,6 +16740,12 @@ def main():
         tests.append({'type': 'log_font',
                       'file': 'Studio Log pane font size',
                       'method': '-', 'source': 'log_font'})
+        # Guard dropping a file on the window: a workbook or package opens wherever
+        # it lands (the canvases and text panes take drags of their own), and other
+        # drops open nothing.
+        tests.append({'type': 'drop_open',
+                      'file': 'Studio drop a file to open',
+                      'method': '-', 'source': 'drop_open'})
         # Guard the Seep BC editor's value fields: that a flux takes a tseep series
         # name the way a head does (a series name typed into a flux used to be
         # answered with 0.0, turning a time-varying boundary into a no-flow one),

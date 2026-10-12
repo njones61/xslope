@@ -500,7 +500,7 @@ round-trip between Studio, scripts, and notebooks.
 | Action | What happens |
 | --- | --- |
 | **New** | Creates an empty project — every category present but blank, a blank canvas. Build it up with the editors (start with a material and a profile line) or the [assistant](assistant.md), then Save As. A new project takes its [water loads](../usage/input_template.md#worksheet-main) automatically, like the template it will be saved into: draw the piezometric line or the seepage boundaries and the engine supplies the weight of the standing water itself. |
-| **Open** | Loads an Excel file and renders the Inputs view. Auto-loads any `{stem}_mesh.json`, `{stem}_seep.csv`, FEM, and `{stem}_styles.json` sidecars, restoring saved seep/FEM solutions without re-solving. Open also accepts a `.xslz` [project package](../usage/packaging.md), which is unpacked to loose files first and then opened like any other project. |
+| **Open** | Loads an Excel file and renders the Inputs view. Auto-loads any `{stem}_mesh.json`, `{stem}_seep.csv`, FEM, and `{stem}_styles.json` sidecars, restoring saved seep/FEM solutions without re-solving. Open also accepts a `.xslz` [project package](../usage/packaging.md), which is unpacked to loose files first and then opened like any other project. Dropping either kind of file onto the Studio window opens it the same way. |
 | **Save** | Writes back to the same file, preserving the template formatting, and reconciles the mesh/seep/FEM/style sidecars against the current model. |
 | **Save As** | Writes a new file through the bundled blank template. |
 

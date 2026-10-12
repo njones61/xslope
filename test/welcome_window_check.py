@@ -130,7 +130,7 @@ def _isolated_launch(tmp):
 
     So the window's own store is replaced with a scratch ini after it is built —
     ``self.settings`` is the one store MainWindow writes through (``_add_recent``
-    is its only ``setValue``) — and the open path is recorded rather than run,
+    and the Log's font size are its only ``setValue`` calls) — and the open path is recorded rather than run,
     since what this leg is about is the gate and not the loading of a workbook.
 
     **Every handle, not just the window's.** ``UpdateController.__init__`` takes its

@@ -10947,6 +10947,36 @@ def run_report_problem_test(test):
     return 0.0, None
 
 
+def run_log_font_test(test):
+    """Studio's Log pane font size: 9 pt to start on Windows and 12 pt elsewhere,
+    the size picked kept through an open, saved, and taken up by a new window (on
+    Windows a file opened from Explorer starts a new copy of Studio).
+
+    The check itself lives in test/log_font_check.py. Builds windows offscreen
+    against a scratch settings file.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'log_font_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('log_font_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_seep_bc_series_test(test):
     """The value fields of Studio's Seep BC editor: that a head and a flux read a
     typed value by the same rule, and that Set 2 holds both of them to numbers.
@@ -15601,6 +15631,8 @@ def _dispatch_test(test):
         return run_studio_results_teardown_test(test)
     if test_type == 'report_problem':
         return run_report_problem_test(test)
+    if test_type == 'log_font':
+        return run_log_font_test(test)
     if test_type == 'seep_bc_series':
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
@@ -15780,7 +15812,7 @@ def _expected_and_tol(test, default_tolerance):
                        'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'studio_results_teardown',
-                       'report_problem',
+                       'report_problem', 'log_font',
                        'seep_bc_series', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
@@ -16669,6 +16701,12 @@ def main():
         tests.append({'type': 'report_problem',
                       'file': 'Studio Help → Report a Problem…',
                       'method': '-', 'source': 'report_problem'})
+        # Guard the Log pane's font size: the platform's starting size, and the
+        # size picked kept through an open and into a new window (a file opened
+        # from Explorer starts a new copy of Studio on Windows).
+        tests.append({'type': 'log_font',
+                      'file': 'Studio Log pane font size',
+                      'method': '-', 'source': 'log_font'})
         # Guard the Seep BC editor's value fields: that a flux takes a tseep series
         # name the way a head does (a series name typed into a flux used to be
         # answered with 0.0, turning a time-varying boundary into a no-flow one),

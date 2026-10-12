@@ -131,4 +131,8 @@ iteration counts, search refinement steps, seepage convergence traces, SSRM fact
 brackets. A progress bar and a **Cancel** button appear at the right of the status
 bar during a run; cancelling aborts cleanly and leaves no partial result tab.
 
+The **pt** box in the pane's title bar sets the pane's font size, and Studio
+remembers the size you pick. It starts at 12 pt on macOS and 9 pt on Windows,
+where text of the same point size is drawn larger.
+
 ![Log pane during a run](images/interface_log_pane.png)

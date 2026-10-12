@@ -63,6 +63,11 @@ ORG_NAME = "XSlope"
 #: open the same store with the same literal pair.
 SETTINGS_APP = "XSlope Studio"
 MAX_RECENT = 8
+#: The Log pane's font size until the user picks one. Windows draws a point a third
+#: larger than macOS does (96 pixels per inch against 72), so 9 pt there reads about
+#: like 12 pt on a Mac.
+LOG_FONT_DEFAULT_PT = 9 if sys.platform == "win32" else 12
+LOG_FONT_RANGE = (6, 28)
 MODES = [("LEM", "lem"), ("Seepage", "seep"), ("FEM", "fem")]
 # Blank template used to create files on Save As — the single copy bundled with
 # the engine package (xslope/resources), so the GUI and library share one source.
@@ -478,7 +483,7 @@ class MainWindow(QMainWindow):
                                     "Consolas", "Courier New", "monospace"])
         self._log_font.setStyleHint(QFont.Monospace)
         self._log_font.setFixedPitch(True)
-        self._log_font.setPointSize(12)
+        self._log_font.setPointSize(self._saved_log_font_pt())
         self.log.setFont(self._log_font)
         self.log.setLineWrapMode(QPlainTextEdit.NoWrap)
         dock = QDockWidget("Log", self)
@@ -495,7 +500,7 @@ class MainWindow(QMainWindow):
         # Font-size control, just left of Clear.
         from PySide6.QtWidgets import QSpinBox
         font_spin = QSpinBox()
-        font_spin.setRange(6, 28)
+        font_spin.setRange(*LOG_FONT_RANGE)
         font_spin.setValue(self._log_font.pointSize())
         font_spin.setSuffix(" pt")
         font_spin.setToolTip("Log font size")
@@ -520,10 +525,26 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.BottomDockWidgetArea, dock)
         self.log_dock = dock
 
+    def _saved_log_font_pt(self):
+        """The Log pane's font size: the one last chosen, or the platform default.
+
+        It is saved rather than held by the window because a file opened from
+        Explorer, or an Open in Studio link, starts a new copy of Studio on Windows,
+        and every new copy began at the default again.
+        """
+        try:
+            pt = int(self.settings.value("log_font_pt", LOG_FONT_DEFAULT_PT))
+        except (TypeError, ValueError):
+            pt = LOG_FONT_DEFAULT_PT
+        lo, hi = LOG_FONT_RANGE
+        return min(max(pt, lo), hi)
+
     def _set_log_font_size(self, pt):
-        """Resize the Log pane's (fixed-width) font from the title-bar spinner."""
+        """Resize the Log pane's (fixed-width) font from the title-bar spinner, and
+        remember the size for the next window."""
         self._log_font.setPointSize(int(pt))
         self.log.setFont(self._log_font)
+        self.settings.setValue("log_font_pt", int(pt))
 
     def _arrange_docks(self):
         # A QTreeWidget gives the dock almost no width hint, so without an explicit

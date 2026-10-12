@@ -80,8 +80,10 @@ def main():
     arc, = ax.plot(ax_arc, ay_arc, color=ARC, lw=26, solid_capstyle="round", zorder=4)
     soil_clipped.append(arc)
 
-    # A few slice lines from the ground down to the arc, for the LEM motif.
-    for xs in np.linspace(380, 700, 6):
+    # Slice boundaries from the ground down to the arc, for the LEM motif: one
+    # spacing across the whole sliding mass, past the crest to where the surface
+    # leaves the drawing, not only under the slope face.
+    for xs in np.arange(380, 880, 64):
         ytop = np.interp(xs, gx, gy)
         k = np.argmin(np.abs(ax_arc - xs))
         yb = ay_arc[k]

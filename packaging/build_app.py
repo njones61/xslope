@@ -10,8 +10,8 @@ One command, five steps:
 4. **smoke-test the frozen build**: run the shipped binary offscreen so it opens
    a bundled sample, meshes it with the bundled gmsh, solves it, and reports its
    version — a build that cannot do that is not shipped;
-5. **package**: on macOS, assemble a drag-to-Applications ``.dmg`` with hdiutil
-   and verify it mounts. On Windows the installer is built by NSIS in CI
+5. **package**: on macOS, assemble a drag-to-Applications ``.dmg`` with dmgbuild
+   (the window shows an arrow and an instruction) and verify it mounts. On Windows the installer is built by NSIS in CI
    (``packaging/windows/installer.nsi``) from the directory produced here.
 
 Usage (from a virtualenv that has ``xslope[gui,ai,fem]`` + pyinstaller + Cython)::
@@ -44,6 +44,18 @@ PACKAGING = REPO / "packaging"
 DIST = PACKAGING / "dist"
 WORK = PACKAGING / "build"
 APP_NAME = "XSLOPE Studio"
+
+# The disk image's Finder window, in points: the app on the left, an Applications
+# shortcut on the right (icon centers), and a background drawn from these same
+# numbers by macos/make_dmg_background.py (an arrow between the icons, two lines
+# of instructions just below their labels). The window size includes the title bar,
+# and Finder may also show a path bar along the bottom, so everything is drawn in
+# the top of the window and the bottom stays empty.
+DMG_WINDOW = (640, 400)
+DMG_ICON_SIZE = 128
+DMG_LABEL_SIZE = 14
+DMG_ICONS = {"app": (170, 150), "Applications": (470, 150)}
+DMG_BACKGROUND = PACKAGING / "macos" / "dmg_background.png"   # and its @2x twin
 
 IS_MAC = sys.platform == "darwin"
 IS_WIN = sys.platform == "win32"
@@ -110,7 +122,8 @@ def verify_env():
     print(f"python      {sys.version.split()[0]}  ({sys.executable})")
     print(f"platform    {sys.platform} {os.uname().machine if hasattr(os, 'uname') else ''}")
     missing = []
-    for name in REQUIRED_IMPORTS:
+    # dmgbuild assembles the macOS disk image (step 5).
+    for name in REQUIRED_IMPORTS + (["dmgbuild"] if IS_MAC else []):
         try:
             mod = __import__(name)
             ver = getattr(mod, "__version__", getattr(mod, "GMSH_API_VERSION", ""))
@@ -121,7 +134,8 @@ def verify_env():
     if missing:
         raise SystemExit(
             "Build environment incomplete. Install the app's dependencies:\n"
-            "    pip install '.[gui,ai,fem,cad]' pyinstaller Cython\n  - "
+            "    pip install '.[gui,ai,fem,cad]' pyinstaller Cython"
+            + (" dmgbuild" if IS_MAC else "") + "\n  - "
             + "\n  - ".join(missing))
     print(f"\nxslope version {version()}")
 
@@ -354,18 +368,28 @@ def make_dmg():
     if dmg.exists():
         dmg.unlink()
 
-    staging = Path(tempfile.mkdtemp(prefix="xslope-dmg-"))
-    try:
-        # Drag-to-Applications layout: the app next to a symlink to /Applications.
-        run(["cp", "-R", bundle, staging / bundle.name])
-        os.symlink("/Applications", staging / "Applications")
-        run(["hdiutil", "create", "-quiet", "-volname", f"{APP_NAME} {v}",
-             "-srcfolder", staging, "-fs", "HFS+", "-format", "UDZO",
-             "-ov", dmg])
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
+    # Drag-to-Applications layout: the app next to a symlink to /Applications, in
+    # a window whose background shows an arrow between them and says what to do.
+    # dmgbuild writes the window's layout (.DS_Store) directly, with no Finder
+    # scripting, so it works on a headless CI runner.
+    import dmgbuild
+    print(f"$ dmgbuild {dmg.name}", flush=True)
+    dmgbuild.build_dmg(str(dmg), f"{APP_NAME} {v}", settings={
+        "files": [str(bundle)],
+        "symlinks": {"Applications": "/Applications"},
+        "icon_locations": {bundle.name: DMG_ICONS["app"],
+                           "Applications": DMG_ICONS["Applications"]},
+        "background": str(DMG_BACKGROUND),      # the @2x twin is found beside it
+        "window_rect": ((200, 120), DMG_WINDOW),
+        "hide_extensions": [bundle.name],       # the label reads "XSLOPE Studio"
+        "icon_size": DMG_ICON_SIZE,
+        "text_size": DMG_LABEL_SIZE,
+        "format": "UDZO",
+        "filesystem": "HFS+",
+    })
 
-    # Verify it actually mounts, and that the app is inside.
+    # Verify it actually mounts, that the app is inside, and that the window has
+    # its layout and background.
     mnt = Path(tempfile.mkdtemp(prefix="xslope-mnt-"))
     try:
         run(["hdiutil", "attach", "-quiet", "-nobrowse", "-readonly",
@@ -374,6 +398,9 @@ def make_dmg():
         print(f"mounted {dmg.name}: {contents}")
         if bundle.name not in contents or "Applications" not in contents:
             raise SystemExit("dmg does not have the drag-to-Applications layout")
+        hidden = sorted(p.name for p in mnt.iterdir() if p.name.startswith("."))
+        if ".DS_Store" not in hidden or not any(n.startswith(".background") for n in hidden):
+            raise SystemExit(f"dmg window has no layout or background (found {hidden})")
     finally:
         subprocess.run(["hdiutil", "detach", "-quiet", str(mnt)],
                        stderr=subprocess.DEVNULL)

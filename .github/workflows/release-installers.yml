@@ -85,6 +85,8 @@ jobs:
           python -m pip install --upgrade pip wheel
           python -m pip install ".[gui,ai,fem,cad]"
           python -m pip install pyinstaller Cython pillow
+          # dmgbuild lays out the macOS disk image's window (packaging/build_app.py).
+          if [ "$RUNNER_OS" = "macOS" ]; then python -m pip install dmgbuild==1.6.7; fi
 
       - name: Read version
         id: ver

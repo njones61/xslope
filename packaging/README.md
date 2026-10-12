@@ -15,6 +15,7 @@ assistant and the compiled fast kernel inside it.
 | `make_assistant_manifest.py` | Validates `assistant_models.json` and stages it beside `latest.json`. |
 | `windows/installer.nsi` | NSIS script: per-user install, Start-menu shortcut, uninstaller, silent `/S` upgrade. |
 | `macos/entitlements.plist` | Hardened-runtime entitlements used when a signed build is notarized. |
+| `macos/make_dmg_background.py` | Draws `macos/dmg_background.png` and its `@2x` twin: the disk image's window background, an arrow from the app to Applications and one line of instructions. Rerun it after changing the window layout in `build_app.py`. |
 
 Build outputs go to `packaging/dist` (artifacts) and `packaging/build` (scratch).
 Both are git-ignored; no build output is ever committed.
@@ -24,6 +25,7 @@ Both are git-ignored; no build output is ever committed.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install ".[gui,ai,fem,cad]" pyinstaller Cython pillow
+pip install dmgbuild                     # macOS only: lays out the disk image's window
 python packaging/build_app.py            # macOS: also assembles the .dmg
 python packaging/build_app.py --clean    # remove every build output afterwards
 ```
@@ -181,20 +183,22 @@ attaches the installers, their `.sha256` files, `latest.json` and
 
 **Signing is optional and gated on secrets.** Each signing step runs only when
 its secret is present, so the workflow is green — and the artifacts work — with
-no certificate at all. Today's builds are unsigned: macOS users right-click →
-Open on first launch, Windows users click through SmartScreen. Adding the
-secrets below turns signing on with no change to the workflow.
+no certificate at all. Release builds are signed: on macOS the app and the
+`.dmg` carry the Developer ID of Jones Geoscience LLC and are notarized and
+stapled; on Windows the app `.exe` and the installer are signed through Azure
+Artifact Signing, which the job reaches with a GitHub OIDC token, so no
+certificate file is ever handled.
 
 | Secret | Used for |
 | --- | --- |
 | `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD`, `MACOS_SIGN_IDENTITY` | `codesign` the `.app` with a Developer ID |
 | `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | `notarytool` submit + `stapler staple` the `.dmg` |
-| `WINDOWS_CERT_PFX`, `WINDOWS_CERT_PASSWORD` | `signtool` on the app `.exe` and the installer |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_SUBSCRIPTION_ID` | Azure Artifact Signing of the app `.exe` and the installer (the job's `signing` environment) |
 
 ## Installing, per platform
 
-* **macOS** — open the `.dmg`, drag **XSLOPE Studio** to Applications. Until the
-  build is signed, first launch needs right-click → Open.
+* **macOS** — open the `.dmg` and drag **XSLOPE Studio** onto the Applications
+  shortcut; the window's background shows an arrow and says so.
 * **Windows** — run the setup `.exe`. It installs per user under
   `%LOCALAPPDATA%\Programs\XSLOPE Studio` (no administrator rights), adds a
   Start-menu shortcut and an Add/Remove Programs entry, and supports

@@ -81,13 +81,6 @@ Patch releases skip this.
    afterwards if wanted. If the macOS leg fails on Apple's timestamp service the
    step retries on its own; re-run the workflow from the Actions tab otherwise.
 
-4. **Point the public docs at the new tag.** xslope.org serves Read the Docs'
-   `stable` version, which follows the newest release tag unless a branch named
-   `stable` exists. That branch is how a docs-only fix reaches the site between
-   releases (the release tag plus the changed pages). If it exists, delete it:
-   `git push origin --delete stable` and `git branch -D stable`. Stable then
-   follows the new tag again.
-
 ## DOIs
 
 - Each release gets its own **version DOI**. Anything citing a specific,

@@ -5,14 +5,32 @@ description: "Short video walkthroughs of XSLOPE, each with the model files it s
 
 # Videos
 
-The videos are published on the [xslope YouTube channel](https://www.youtube.com/@xslope-org).
-Each entry below gives what the video covers, a link to it, and the completed
-model it builds. When a video starts from an existing model, that starting file is
-listed too, so you can download it and follow along.
+<div class="vid-hero" markdown>
+
+Short walkthroughs of XSLOPE, each 15 minutes or less, published on the
+**[xslope YouTube channel](https://www.youtube.com/@xslope-org)**. Each video
+below lists the completed model it builds, and the starting model when it doesn't
+begin from a blank one, so you can download the file and follow along.
+
+</div>
+
+<div class="vid-band" markdown>
 
 ## Getting started
 
-### Video 1. A Simple Embankment from Scratch
+<span class="vid-band-sub">Videos 1–2</span>
+
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem01_solution_cracked.png)
+<span class="vid-num">1</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 1 · Limit equilibrium</p>
+
+### A Simple Embankment from Scratch {#video-1}
 
 A 20 ft embankment of undrained clay, built in Studio's editors starting from
 **File → New**: the global parameters, one material, one profile line, and a
@@ -20,112 +38,249 @@ starting circle from the generator. A Spencer search finds the critical circle,
 its warnings show the crest in tension, and an 8 ft tension crack removes the
 tension and lowers the factor of safety.
 
-- **Watch** — coming soon
-- **Related tutorial** — [LEM-1. Simple Embankment](../tutorials/lem01_simple_embankment.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-### Video 2. Building a Model Three Ways
+**Related tutorial** — [LEM-1. Simple Embankment](../tutorials/lem01_simple_embankment.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem01_assistant.png)
+<span class="vid-num">2</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 2 · Limit equilibrium</p>
+
+### Building a Model Three Ways {#video-2}
 
 The Video 1 embankment built two more ways: in the Excel input template and by
 Studio's AI assistant. All three routes produce the same file and the same factor
 of safety.
 
-- **Watch** — coming soon
-- **Related tutorial** — [Building Models Three Ways](../tutorials/building_models.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+
+**Related tutorial** — [Building Models Three Ways](../tutorials/building_models.md)
+
+</div>
+</div>
+
+<div class="vid-band" markdown>
 
 ## Limit equilibrium
 
-### Video 3. Adding Layers
+<span class="vid-band-sub">Videos 3–6</span>
+
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem03_solution.png)
+<span class="vid-num">3</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 3 · Limit equilibrium</p>
+
+### Adding Layers {#video-3}
 
 An embankment on a foundation layer over rigid rock, with a profile line at each
 material boundary and a starting circle at the base of each layer. The search
 result shows why the critical circle settles on the contact between layers.
 
-- **Watch** — coming soon
-- **Related tutorial** — [LEM-3. A Layered Slope](../tutorials/lem03_layered_slope.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-### Video 4. Water in the Slope
+**Related tutorial** — [LEM-3. A Layered Slope](../tutorials/lem03_layered_slope.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem04_solution_wet.png)
+<span class="vid-num">4</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 4 · Limit equilibrium</p>
+
+### Water in the Slope {#video-4}
 
 A piezometric line added to a layered slope, with saturated unit weights below
 it. The same critical surface is solved with the pore pressures on and off to
 show what the water costs.
 
-- **Watch** — coming soon
-- **Related tutorial** — [LEM-4. Water in the Slope](../tutorials/lem04_water_in_the_slope.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-### Video 5. Loads and Earthquake
+**Related tutorial** — [LEM-4. Water in the Slope](../tutorials/lem04_water_in_the_slope.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem02_solution_load.png)
+<span class="vid-num">5</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 5 · Limit equilibrium</p>
+
+### Loads and Earthquake {#video-5}
 
 A surcharge on the Video 1 embankment, entered as a distributed load and as a line
 load, followed by a seismic coefficient.
 
-- **Watch** — coming soon
-- **Related tutorial** — [LEM-2. Loads on the Crest](../tutorials/lem02_loads_on_the_crest.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-### Video 6. A Non-Circular Surface Through a Weak Layer
+**Related tutorial** — [LEM-2. Loads on the Crest](../tutorials/lem02_loads_on_the_crest.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem05_solution.png)
+<span class="vid-num">6</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 6 · Limit equilibrium</p>
+
+### A Non-Circular Surface Through a Weak Layer {#video-6}
 
 A sand slope over a thin seam of soft clay, with the failure surface entered as
 a table of vertices and then searched. The Movement column controls how each
 vertex is allowed to move during the search.
 
-- **Watch** — coming soon
-- **Related tutorial** — [LEM-5. A Weak Layer, Non-Circular](../tutorials/lem05_weak_layer_noncircular.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+
+**Related tutorial** — [LEM-5. A Weak Layer, Non-Circular](../tutorials/lem05_weak_layer_noncircular.md)
+
+</div>
+</div>
+
+<div class="vid-band" markdown>
 
 ## Seepage
 
-### Video 7. Confined Seepage Under a Sheetpile
+<span class="vid-band-sub">Videos 7–9</span>
+
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/seep01_solution_filled.png)
+<span class="vid-num">7</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 7 · Seepage</p>
+
+### Confined Seepage Under a Sheetpile {#video-7}
 
 A sheetpile in a silt foundation behind an impervious clay blanket, built from a
 blank model: the geometry, the three boundary condition types and the no-flow
 default, the mesh, the solution, the discharge, and the flow net.
 
-- **Watch** — coming soon
-- **Related tutorial** — [SEEP-1. Confined Seepage Under a Sheetpile](../tutorials/seep01_sheetpile.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-### Video 8. Unconfined Seepage Through a Zoned Dam
+**Related tutorial** — [SEEP-1. Confined Seepage Under a Sheetpile](../tutorials/seep01_sheetpile.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/seep02_solution.png)
+<span class="vid-num">8</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 8 · Seepage</p>
+
+### Unconfined Seepage Through a Zoned Dam {#video-8}
 
 An earth dam with a shell and a clay core, built from a blank model, with the
 reservoir head on the upstream face and a seepage face downstream. The solution
 locates the phreatic surface.
 
-- **Watch** — coming soon
-- **Related tutorial** — [SEEP-2. Unconfined Seepage Through a Zoned Dam](../tutorials/seep02_johnson_dam.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-### Video 9. Seepage Pore Pressures in a Stability Run
+**Related tutorial** — [SEEP-2. Unconfined Seepage Through a Zoned Dam](../tutorials/seep02_johnson_dam.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/combo01_lem_solution.png)
+<span class="vid-num">9</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 9 · Seepage + limit equilibrium</p>
+
+### Seepage Pore Pressures in a Stability Run {#video-9}
 
 The Video 8 dam searched with Spencer's method on the pore pressures from its
 seepage solution, by setting `u` to `seep` in the materials table.
 
-- **Watch** — coming soon
-- **Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+
+**Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
+
+</div>
+</div>
+
+<div class="vid-band" markdown>
 
 ## Finite element
 
-### Video 10. Strength Reduction on an Embankment
+<span class="vid-band-sub">Videos 10–11</span>
+
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/fem01_shear_strain.png)
+<span class="vid-num">10</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 10 · Finite element</p>
+
+### Strength Reduction on an Embankment {#video-10}
 
 An embankment solved by the shear strength reduction method: the elastic
 properties the run needs, a quadratic mesh, the run, and the deformed mesh and
 shear strain at failure, compared with Spencer's method on the same slope.
 
-- **Watch** — coming soon
-- **Related tutorial** — [FEM-1. Strength Reduction Basics](../tutorials/fem01_strength_reduction.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-### Video 11. Seepage, LEM, and FEM on One Mesh
+**Related tutorial** — [FEM-1. Strength Reduction Basics](../tutorials/fem01_strength_reduction.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/combo01_fem_shear.png)
+<span class="vid-num">11</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 11 · Seepage + LEM + FEM</p>
+
+### Seepage, LEM, and FEM on One Mesh {#video-11}
 
 The Video 8 dam run through all three engines on one quadratic mesh: the seepage
 solution, a Spencer search on its pore pressures, and a strength reduction run.
 
-- **Watch** — coming soon
-- **Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
+**Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
+
+</div>
+</div>
 
 <!--
-Entry format (one per video, grouped under a series heading):
+Entry format. Once a video is uploaded, replace the "Coming soon" pill with
+<a class="vid-pill vid-watch" href="https://youtu.be/VIDEO_ID">▶ Watch · 12 min</a>,
+wrap the thumbnail image in the same link, and add the file lines:
 
-### Video 1. A Simple Embankment from Scratch
-
-Two or three sentences on what the video builds and what it shows.
-
-- **Watch** — [YouTube](https://youtu.be/VIDEO_ID) · 12 min
-- **Starting model** — [name_start.xlsx](files/name_start.xlsx) (only when the video does not start from a blank model)
-- **Completed model** — [name.xlsx](files/name.xlsx)
-- **Related tutorial** — [LEM-1 Simple Embankment](../tutorials/lem01_simple_embankment.md)
+**Starting model** — [name_start.xlsx](files/name_start.xlsx)  (only when the video does not start from a blank model)
+**Completed model** — [name.xlsx](files/name.xlsx)
 -->

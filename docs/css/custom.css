@@ -589,45 +589,45 @@ a.vid-watch, a.vid-watch:visited { background: #e8552d; color: #fff; }
 }
 
 
-/* Tutorials overview (tutorials/index.md): the Videos page's row layout in the
-   icon's earth tones, so the two pages read as siblings but stay distinct. */
+/* Tutorials overview (tutorials/index.md): the Videos page's row layout in
+   charcoal and gray, so the two pages read as siblings but stay distinct. */
 .tut-band {
-    background: #6b5228; color: #f5f1e6; border-radius: 4px;
+    background: #2b2f36; color: #ffffff; border-radius: 4px;
     padding: 12px 20px; margin: 40px 0 18px;
     display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
 }
-.rst-content .tut-band h2 { color: #f5f1e6; margin: 0; font-size: 150%; }
+.rst-content .tut-band h2 { color: #ffffff; margin: 0; font-size: 150%; }
 .tut-band p { margin: 0; }
 .tut-band-sub { font-size: 90%; opacity: 0.8; white-space: nowrap; }
 .tut-row {
     display: flex; gap: 24px; align-items: flex-start;
-    padding: 18px 0 20px; border-bottom: 1px solid #e6dfd2;
+    padding: 18px 0 20px; border-bottom: 1px solid #dfe3e8;
 }
 .tut-thumb { position: relative; flex: 0 0 240px; }
 .tut-thumb p { margin: 0; }
 .tut-thumb img {
     display: block; width: 240px; aspect-ratio: 16 / 10; object-fit: contain;
-    background: #fff; border: 1px solid #ddd3c2; border-radius: 6px;
+    background: #fff; border: 1px solid #d5dae0; border-radius: 6px;
 }
-.tut-thumb a:hover img { border-color: #6b5228; }
+.tut-thumb a:hover img { border-color: #2b2f36; }
 .tut-num {
     position: absolute; left: -10px; top: -10px; width: 32px; height: 32px;
-    border-radius: 6px; background: #c9a86a; color: #2e2410; font-weight: 700;
+    border-radius: 6px; background: #2b2f36; color: #ffffff; font-weight: 700;
     display: flex; align-items: center; justify-content: center; font-size: 15px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
 .tut-body { flex: 1 1 auto; min-width: 0; }
 .rst-content .tut-body h3 { margin: 0 0 8px; }
 .rst-content .tut-body h3 a { color: inherit; }
-.rst-content .tut-body h3 a:hover { color: #6b5228; text-decoration: underline; }
+.rst-content .tut-body h3 a:hover { color: #2b2f36; text-decoration: underline; }
 .tut-kicker {
     margin: 0 0 2px !important; font-size: 78%; font-weight: 700;
-    letter-spacing: 0.06em; text-transform: uppercase; color: #8a6a35;
+    letter-spacing: 0.06em; text-transform: uppercase; color: #5a616b;
 }
 .tut-tags { margin: 4px 0 0 !important; line-height: 1.9; }
 .tut-tag {
     display: inline-block; margin: 0 6px 0 0; padding: 0 9px; border-radius: 999px;
-    background: #f3ead7; color: #5e4a24; font-size: 80%; white-space: nowrap;
+    background: #eceef1; color: #3a3f46; font-size: 80%; white-space: nowrap;
 }
 @media (max-width: 700px) {
     .tut-row { flex-direction: column; gap: 12px; }

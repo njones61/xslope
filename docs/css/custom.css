@@ -590,13 +590,13 @@ a.vid-watch, a.vid-watch:visited { background: #e8552d; color: #fff; }
 
 
 /* Tutorials overview (tutorials/index.md): the Videos page's row layout in
-   charcoal and gray, so the two pages read as siblings but stay distinct. */
+   the same blue bands, with square charcoal number badges and gray tags. */
 .tut-band {
-    background: #2b2f36; color: #ffffff; border-radius: 4px;
+    background: #1f4e79; color: #f5f1e6; border-radius: 4px;
     padding: 12px 20px; margin: 40px 0 18px;
     display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
 }
-.rst-content .tut-band h2 { color: #ffffff; margin: 0; font-size: 150%; }
+.rst-content .tut-band h2 { color: #f5f1e6; margin: 0; font-size: 150%; }
 .tut-band p { margin: 0; }
 .tut-band-sub { font-size: 90%; opacity: 0.8; white-space: nowrap; }
 .tut-row {
@@ -612,7 +612,7 @@ a.vid-watch, a.vid-watch:visited { background: #e8552d; color: #fff; }
 .tut-thumb a:hover img { border-color: #2b2f36; }
 .tut-num {
     position: absolute; left: -10px; top: -10px; width: 32px; height: 32px;
-    border-radius: 6px; background: #2d6cb0; color: #ffffff; font-weight: 700;
+    border-radius: 6px; background: #2b2f36; color: #ffffff; font-weight: 700;
     display: flex; align-items: center; justify-content: center; font-size: 15px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }

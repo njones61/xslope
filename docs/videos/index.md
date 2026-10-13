@@ -47,7 +47,7 @@ tension and lowers the factor of safety.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem01_assistant.png)
+![](../lem/sample_images/simple_foundation_results.png)
 <span class="vid-num">2</span>
 </div>
 <div class="vid-body" markdown>
@@ -55,13 +55,15 @@ tension and lowers the factor of safety.
 
 ### Building a Model Three Ways {#video-2}
 
-The Video 1 embankment built two more ways: in the Excel input template and by
-Studio's AI assistant. All three routes produce the same file and the same factor
-of safety.
+A 30 ft slope of undrained clay over a 10 ft foundation, built three ways: in
+Studio's editors, in the Excel input template, and by Studio's AI assistant from
+the problem sketch. All three routes produce the same file and the same factor of
+safety. The slope as drawn is unstable, with a factor of safety below 1.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-**Related page** — [Building Models Three Ways](../tutorials/building_models.md)
+**Related pages** — [Building Models Three Ways](../tutorials/building_models.md) ·
+[LEM sample problem 1](../lem/samples.md#1-simple-slope-with-foundation)
 
 </div>
 </div>
@@ -70,7 +72,7 @@ of safety.
 
 ## Limit equilibrium
 
-<span class="vid-band-sub">Videos 3–6</span>
+<span class="vid-band-sub">Videos 3–7</span>
 
 </div>
 
@@ -118,13 +120,35 @@ show what the water costs.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem02_solution_load.png)
+![](../lem/sample_images/submerged_slope_results.png)
 <span class="vid-num">5</span>
 </div>
 <div class="vid-body" markdown>
 <p class="vid-kicker">Video 5 · Limit equilibrium</p>
 
-### Loads and Earthquake {#video-5}
+### A Submerged Slope {#video-5}
+
+A clay slope under 10 ft of standing water. The water is entered as a
+piezometric line above the ground, and Studio converts it into the load the water
+applies to the slope surface. Because the clay is analyzed with its undrained
+strength, the water adds load without adding pore pressure in the soil.
+
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+
+**Related page** — [LEM sample problem 2](../lem/samples.md#2-submerged-slope)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem02_solution_load.png)
+<span class="vid-num">6</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 6 · Limit equilibrium</p>
+
+### Loads and Earthquake {#video-6}
 
 A surcharge on the Video 1 embankment, entered as a distributed load and as a line
 load, followed by a seismic coefficient.
@@ -139,12 +163,12 @@ load, followed by a seismic coefficient.
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/lem05_solution.png)
-<span class="vid-num">6</span>
+<span class="vid-num">7</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 6 · Limit equilibrium</p>
+<p class="vid-kicker">Video 7 · Limit equilibrium</p>
 
-### A Non-Circular Surface Through a Weak Layer {#video-6}
+### A Non-Circular Surface Through a Weak Layer {#video-7}
 
 A sand slope over a thin seam of soft clay, with the failure surface entered as
 a table of vertices and then searched. The Movement column controls how each
@@ -161,19 +185,19 @@ vertex is allowed to move during the search.
 
 ## Seepage
 
-<span class="vid-band-sub">Videos 7–9</span>
+<span class="vid-band-sub">Videos 8–10</span>
 
 </div>
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/seep01_solution_filled.png)
-<span class="vid-num">7</span>
+<span class="vid-num">8</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 7 · Seepage</p>
+<p class="vid-kicker">Video 8 · Seepage</p>
 
-### Confined Seepage Under a Sheetpile {#video-7}
+### Confined Seepage Under a Sheetpile {#video-8}
 
 A sheetpile in a silt foundation behind an impervious clay blanket, built from a
 blank model: the geometry, the three boundary condition types and the no-flow
@@ -189,12 +213,12 @@ default, the mesh, the solution, the discharge, and the flow net.
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/seep02_solution.png)
-<span class="vid-num">8</span>
+<span class="vid-num">9</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 8 · Seepage</p>
+<p class="vid-kicker">Video 9 · Seepage</p>
 
-### Unconfined Seepage Through a Zoned Dam {#video-8}
+### Unconfined Seepage Through a Zoned Dam {#video-9}
 
 An earth dam with a shell and a clay core, built from a blank model, with the
 reservoir head on the upstream face and a seepage face downstream. The solution
@@ -210,14 +234,14 @@ locates the phreatic surface.
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/combo01_lem_solution.png)
-<span class="vid-num">9</span>
+<span class="vid-num">10</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 9 · Seepage + limit equilibrium</p>
+<p class="vid-kicker">Video 10 · Seepage + limit equilibrium</p>
 
-### Seepage Pore Pressures in a Stability Run {#video-9}
+### Seepage Pore Pressures in a Stability Run {#video-10}
 
-The Video 8 dam searched with Spencer's method on the pore pressures from its
+The Video 9 dam searched with Spencer's method on the pore pressures from its
 seepage solution, by setting `u` to `seep` in the materials table.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
@@ -231,19 +255,19 @@ seepage solution, by setting `u` to `seep` in the materials table.
 
 ## Finite element
 
-<span class="vid-band-sub">Videos 10–11</span>
+<span class="vid-band-sub">Videos 11–12</span>
 
 </div>
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/fem01_shear_strain.png)
-<span class="vid-num">10</span>
+<span class="vid-num">11</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 10 · Finite element</p>
+<p class="vid-kicker">Video 11 · Finite element</p>
 
-### Strength Reduction on an Embankment {#video-10}
+### Strength Reduction on an Embankment {#video-11}
 
 An embankment solved by the shear strength reduction method: the elastic
 properties the run needs, a quadratic mesh, the run, and the deformed mesh and
@@ -259,14 +283,14 @@ shear strain at failure, compared with Spencer's method on the same slope.
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/combo01_fem_shear.png)
-<span class="vid-num">11</span>
+<span class="vid-num">12</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 11 · Seepage + LEM + FEM</p>
+<p class="vid-kicker">Video 12 · Seepage + LEM + FEM</p>
 
-### Seepage, LEM, and FEM on One Mesh {#video-11}
+### Seepage, LEM, and FEM on One Mesh {#video-12}
 
-The Video 8 dam run through all three engines on one quadratic mesh: the seepage
+The Video 9 dam run through all three engines on one quadratic mesh: the seepage
 solution, a Spencer search on its pore pressures, and a strength reduction run.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>

@@ -61,7 +61,7 @@ of safety.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
-**Related tutorial** — [Building Models Three Ways](../tutorials/building_models.md)
+**Related page** — [Building Models Three Ways](../tutorials/building_models.md)
 
 </div>
 </div>

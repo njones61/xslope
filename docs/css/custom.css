@@ -612,7 +612,7 @@ a.vid-watch, a.vid-watch:visited { background: #e8552d; color: #fff; }
 .tut-thumb a:hover img { border-color: #2b2f36; }
 .tut-num {
     position: absolute; left: -10px; top: -10px; width: 32px; height: 32px;
-    border-radius: 6px; background: #2b2f36; color: #ffffff; font-weight: 700;
+    border-radius: 6px; background: #2d6cb0; color: #ffffff; font-weight: 700;
     display: flex; align-items: center; justify-content: center; font-size: 15px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }

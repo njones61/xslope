@@ -9278,7 +9278,10 @@ def test_solution_plot_legend():
         for key, gid, expected in ((PORE_KEY, "PORE_PRESSURE", wet),
                                    (EFF_KEY, "EFF_NORMAL_STRESS", True)):
             bars = [p for p in ax.patches if p.get_gid() == gid]
-            drawn = sum(1 for p in bars if bar_area(p) > 0)
+            # A bar of zero length still has a shoelace area of round-off size
+            # (1e-16 to 1e-13 ft² on the dry fixture), so "drawn" means an area
+            # well above that: a visible bar here is tens of ft² or more.
+            drawn = sum(1 for p in bars if bar_area(p) > 1e-9)
             if not bars:
                 fails.append(f"the solution plot of {what} drew no {gid} bars "
                              f"at all; the coupling below proves nothing")

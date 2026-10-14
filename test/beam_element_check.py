@@ -78,6 +78,11 @@ EI = E_BEAM * I_BEAM    # 1e6 kN m^2
 # the discretization, not an engineering approximation, so the only thing between
 # the element and the closed form is round-off on quantities of order 1e3.
 RTOL = 1e-9
+# A quantity whose exact value is zero, normalized by its reference, is held to the
+# same round-off bound. 1e-12 was tighter than the linear solve guarantees: the
+# midside node's force came out 4.2e-12 of P/2 on 2026-10-14 with nothing changed
+# in the element. Real loading would show up at order 1.
+ATOL_ZERO = 1e-9
 
 
 # --------------------------------------------------------------------------- #
@@ -341,7 +346,7 @@ def leg_udl_simply_supported():
     V0, M1_0, _, _ = end_actions(fd, u, 0)
     fe0 = udl_element_load(fd, 0, w)
     cmp(fails, "moment at pinned end / (wL^2/8)",
-        abs(M1_0 - fe0[2]) / (w * L ** 2 / 8.0), 0.0, atol=1e-12, unit='-')
+        abs(M1_0 - fe0[2]) / (w * L ** 2 / 8.0), 0.0, atol=ATOL_ZERO, unit='-')
     cmp(fails, "shear at support    wL/2", abs(V0 - fe0[1]), w * L / 2.0, unit='kN')
     return fails
 
@@ -380,7 +385,7 @@ def leg_udl_cantilever():
     V_t, _, M2_t, _ = end_actions(fd, u, n - 1)
     fe_t = udl_element_load(fd, n - 1, w)
     cmp(fails, "moment at free tip / (wL^2/2)",
-        abs(M2_t - fe_t[5]) / (w * L ** 2 / 2.0), 0.0, atol=1e-12, unit='-')
+        abs(M2_t - fe_t[5]) / (w * L ** 2 / 2.0), 0.0, atol=ATOL_ZERO, unit='-')
     return fails
 
 
@@ -607,7 +612,7 @@ def leg3_point_load():
     # P/2 and the midside node carries no net force.
     cmp(fails, "shear, left half    P/2", abs(S[1]), P / 2.0, unit='kN')
     cmp(fails, "mid-node force / (P/2)", abs(S[7]) / (P / 2.0), 0.0,
-        atol=1e-12, unit='-')
+        atol=ATOL_ZERO, unit='-')
     return fails
 
 
@@ -638,7 +643,7 @@ def leg3_udl_simply_supported():
     S0, _ = local_end_actions(fd, u, 0)
     fe0 = quintic_element_load(fd['elem_length_by_pile_elem'][0], w)
     cmp(fails, "moment at pinned end / (wL^2/8)",
-        abs(S0[2] - fe0[2]) / (w * L ** 2 / 8.0), 0.0, atol=1e-12, unit='-')
+        abs(S0[2] - fe0[2]) / (w * L ** 2 / 8.0), 0.0, atol=ATOL_ZERO, unit='-')
     cmp(fails, "shear at support    wL/2", abs(S0[1] - fe0[1]), w * L / 2.0,
         unit='kN')
     return fails
@@ -672,7 +677,7 @@ def leg3_udl_cantilever():
     S_t, _ = local_end_actions(fd, u, n - 1)
     fe_t = quintic_element_load(fd['elem_length_by_pile_elem'][n - 1], w)
     cmp(fails, "moment at free tip / (wL^2/2)",
-        abs(S_t[5] - fe_t[5]) / (w * L ** 2 / 2.0), 0.0, atol=1e-12, unit='-')
+        abs(S_t[5] - fe_t[5]) / (w * L ** 2 / 2.0), 0.0, atol=ATOL_ZERO, unit='-')
     return fails
 
 

@@ -8286,7 +8286,7 @@ GENERATOR_CASES = [
 #: reference, not files anybody runs.
 CORPUS_CIRCLE_ROOTS = ('docs/inputs', 'docs/lem', 'docs/fem', 'docs/seep',
                        'docs/verification', 'docs/tutorials', 'docs/parametric',
-                       'docs/usage')
+                       'docs/usage', 'docs/videos')
 
 
 #: The slicer's absolute minimum slice width (xslope/slice.py, "Remove thin
@@ -16198,8 +16198,10 @@ def main():
     # other files, or on the same file at other settings. Scanned in sorted order
     # (discovery must not depend on directory order) and routed by type exactly as
     # the verification pages are, so one page can lock a seepage discharge, an LEM
-    # search and a strength reduction and each rides its own group.
-    for tutorial_md in sorted(Path(_repo('docs/tutorials')).glob('*.md')):
+    # search and a strength reduction and each rides its own group. The Videos page
+    # rides along: its completed models are what a viewer ends each video with.
+    for tutorial_md in (sorted(Path(_repo('docs/tutorials')).glob('*.md'))
+                        + sorted(Path(_repo('docs/videos')).glob('*.md'))):
         for t in parse_test_tags(tutorial_md):
             ttype = t.get('type', '')
             if ttype in ('fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'):
@@ -16432,7 +16434,8 @@ def main():
             _repo('docs/fem/samples.md'), _repo('docs/seep/samples.md'),
             _repo('docs/seep/seep_slope.md'),
         ] + sorted(glob.glob(_repo('docs/verification/*.md')))
-          + sorted(glob.glob(_repo('docs/tutorials/*.md'))))
+          + sorted(glob.glob(_repo('docs/tutorials/*.md')))
+          + sorted(glob.glob(_repo('docs/videos/*.md'))))
         # The private fixtures are corpus too: they carry the same tags and the same
         # standing locks, so a rule that refuses one of them is equally miscalibrated.
         _pf_priv = _private_dir()

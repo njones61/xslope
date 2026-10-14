@@ -24,7 +24,7 @@ begin from a blank one, so you can download the file and follow along.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem01_solution_cracked.png)
+[![](../tutorials/images/lem01_solution_cracked.png)](https://youtu.be/bNy9WkYUvLc)
 <span class="vid-num">1</span>
 </div>
 <div class="vid-body" markdown>
@@ -38,7 +38,11 @@ starting circle from the generator. A Spencer search finds the critical circle,
 its warnings show the crest in tension, and an 8 ft tension crack removes the
 tension and lowers the factor of safety.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/bNy9WkYUvLc">▶ Watch · 18 min</a></p>
+
+**Completed model** — [xslope_video01_simple_embankment.xlsx](files/xslope_video01_simple_embankment.xlsx)
+
+<!-- test: file=files/xslope_video01_simple_embankment.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.084, tolerance=0.005 -->
 
 **Related tutorial** — [LEM-1. Simple Embankment](../tutorials/lem01_simple_embankment.md)
 

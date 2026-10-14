@@ -43,7 +43,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-fem = ["gmsh"]
+fem = ["gmsh>=4.15"]             # 4.14 quad8 meshes ignore embedded bars and piles
 cad = ["ezdxf"]                  # DXF import/export (xslope.cad)
 gui = ["PySide6", "pyobjc-framework-Cocoa; sys_platform == 'darwin'", "ezdxf"]
 ai = ["litellm", "keyring"]

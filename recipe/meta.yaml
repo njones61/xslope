@@ -29,7 +29,7 @@ requirements:
     - scipy
     - shapely
     - openpyxl
-    - python-gmsh
+    - python-gmsh >=4.15
 
 test:
   imports:

@@ -4,11 +4,10 @@ These problems cover common limit equilibrium setups: a slope with a foundation,
 submerged slope, layered soils, an earth dam, a tension crack, saturated unit weights,
 and a pile-stabilized slope. Each one links its Excel input file. Open the file in
 [XSLOPE Studio](../studio/index.md) with **File → Open** and run it, or load it in
-Python with `load_slope_data()`. The [limit equilibrium tutorials](../tutorials/index.md#limit-equilibrium)
-build models like these step by step.
-
-Comparisons with published solutions and commercial programs are in
-[Verification and Validation](../verification/index.md).
+Python with `load_slope_data()`. The
+[limit equilibrium tutorials](../tutorials/index.md#limit-equilibrium) build models
+like these step by step, and comparisons with published solutions and commercial
+programs are in [Verification and Validation](../verification/index.md).
 
 For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and most problems carry a **Factor of safety by method** table with the result for every method. On a solution figure, the green bars on the base of each slice are the effective stress there, the red bars are tension, and the red dashed line is the line of thrust computed with Spencer's method. The tables follow these conventions:
 

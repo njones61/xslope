@@ -68,6 +68,10 @@ def main(argv=None):
     args = ap.parse_args(argv)
     with open(args.changelog, encoding="utf-8") as f:
         text = f.read()
+    # The notes are UTF-8 (→, —, σ). A Windows runner's stdout defaults to the
+    # cp1252 code page, which cannot encode "→", and the 1.0.3 tag build stopped
+    # here on "File → Open".
+    sys.stdout.reconfigure(encoding="utf-8")
     try:
         print(unwrap(section(text, args.version)))
     except ValueError as exc:

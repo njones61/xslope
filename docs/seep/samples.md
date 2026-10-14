@@ -183,7 +183,7 @@ phreatic surface, so the core is distinct from the shells, and each panel shows 
 water level at that time, so the drop in the pool can be read from panel to panel. Flow lines are not
 shown, because a transient state has no flow net (see [Transient outputs](transient.md#outputs)):
 
-![johnson_res_tseep_flownet.png](images/johnson_res_tseep_flownet.png){width=760px}
+![johnson_res_tseep_flownet.png](images/johnson_res_tseep_flownet.png){width=1000px}
 
 The figure shows the following:
 
@@ -215,7 +215,7 @@ storage and then decays as the dam drains. A single steady "total flowrate" cann
 change in storage
 (see [Per-frame outputs](transient.md#outputs)).
 
-![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=720px}
+![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=1000px}
 
 <!-- Transient regression: total head sampled at interior stations at end of drawdown and quasi-equilibrium, re-solved through the run_tests tseep_head path (tri3, target_size=15.0). -->
 <!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:130.528;350:115:148.797;400:110:122.059, tolerance=0.05 -->

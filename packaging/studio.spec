@@ -161,6 +161,11 @@ elif sys.platform == "win32":
 else:
     hiddenimports += ["keyring.backends.SecretService", "keyring.backends.chainer"]
 hiddenimports += collect_submodules("litellm")
+# tiktoken finds its encodings (cl100k_base, ...) by scanning the tiktoken_ext
+# namespace package for plugins, and nothing imports tiktoken_ext.openai_public by
+# name, so the analysis never sees it. Without it every assistant request in the
+# frozen app failed with "Unknown encoding cl100k_base. Plugins found: []" (1.0.2).
+hiddenimports += collect_submodules("tiktoken_ext")
 
 excludes = [
     # No Tk anywhere: it drags in a whole Tcl/Tk runtime for nothing.

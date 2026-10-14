@@ -220,6 +220,18 @@ def _self_test(path=None):
         encoding="utf-8")
     emit(f"[ok] packaged skill prompt, {len(skill)} chars")
 
+    # --- the assistant's tokenizer (litellm counts tokens with tiktoken) -------
+    # tiktoken finds cl100k_base through its tiktoken_ext plugin package, which the
+    # 1.0.2 bundle left out: every assistant request failed. litellm points tiktoken
+    # at the encoding files it ships, so this runs offline.
+    try:
+        from litellm.litellm_core_utils.default_encoding import encoding
+        n = len(encoding.encode("slope stability"))
+    except Exception as exc:
+        emit(f"[fail] assistant tokenizer: {exc}")
+        return 10
+    emit(f"[ok] assistant tokenizer {encoding.name} ({n} tokens)")
+
     # --- gmsh: build a tri6 mesh (loads gmsh's bundled shared library) --------
     import gmsh  # noqa: F401  (import is itself the test: it dlopens libgmsh)
 

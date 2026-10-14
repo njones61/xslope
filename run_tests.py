@@ -10977,6 +10977,31 @@ def run_log_font_test(test):
     return 0.0, None
 
 
+def run_release_notes_test(test):
+    """CHANGELOG.md and packaging/release_notes.py: every release from 1.0.0 has
+    notes, an Unreleased section is waiting for the next one, sections use only New,
+    Fixed, and Changed, and the script lifts one section whole and refuses a
+    version with none (the release build publishes that section on the GitHub
+    Release page and stops without it).
+
+    The check itself lives in test/release_notes_check.py. No network.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'release_notes_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('release_notes_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_drop_open_test(test):
     """Dropping a file on Studio's window: an input workbook or a project package
     is taken anywhere on the window (canvas, Log pane, frame) and opens as File →
@@ -15666,6 +15691,8 @@ def _dispatch_test(test):
         return run_log_font_test(test)
     if test_type == 'drop_open':
         return run_drop_open_test(test)
+    if test_type == 'release_notes':
+        return run_release_notes_test(test)
     if test_type == 'seep_bc_series':
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
@@ -15846,6 +15873,7 @@ def _expected_and_tol(test, default_tolerance):
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'studio_results_teardown',
                        'report_problem', 'log_font', 'drop_open',
+                       'release_notes',
                        'seep_bc_series', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
@@ -16749,6 +16777,12 @@ def main():
         tests.append({'type': 'drop_open',
                       'file': 'Studio drop a file to open',
                       'method': '-', 'source': 'drop_open'})
+        # Guard the release notes: every release from 1.0.0 has a section in
+        # CHANGELOG.md, and the script the release build publishes it with lifts
+        # one section whole.
+        tests.append({'type': 'release_notes',
+                      'file': 'CHANGELOG.md release notes',
+                      'method': '-', 'source': 'release_notes'})
         # Guard the Seep BC editor's value fields: that a flux takes a tseep series
         # name the way a head does (a series name typed into a flux used to be
         # answered with 0.0, turning a time-varying boundary into a no-flow one),

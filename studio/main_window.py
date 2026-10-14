@@ -933,6 +933,7 @@ class MainWindow(QMainWindow):
     def new_project(self):
         if not self._confirm_discard():
             return
+        self.log.clear()          # the log described the project being replaced
         self.doc.new()
         self.statusBar().showMessage(
             "New project — edit the inputs, then Save As to write an Excel file.")

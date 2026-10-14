@@ -149,6 +149,16 @@ def main(argv=None):
     # by set_window before it — and both mark the window through open_request.
     with_work = bool(getattr(win, "opened_by_request", False))
 
+    # A bare launch comes up on a blank, editable project, as File → New would
+    # leave it, rather than on a window where nothing can be edited until New is
+    # chosen. The empty project is not dirty, so a file opened next (from the
+    # welcome window, File → Open, or a document macOS delivers after this point)
+    # replaces it without asking about unsaved changes. Here rather than in
+    # MainWindow for the same reason as the welcome window below: constructing a
+    # window, which every Studio test does, leaves it with no project.
+    if not with_work:
+        win.new_project()
+
     # The welcome window, on a launch whose settings still ask for one — the first
     # one, and afterwards only while the reader leaves it switched on. Deferred so
     # the main window paints behind it, and it lives HERE rather than in MainWindow

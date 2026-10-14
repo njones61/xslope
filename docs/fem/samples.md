@@ -1,14 +1,15 @@
 # Sample Problems - Finite Element Method
 
-> **Verification benchmarks** (the Griffiths & Lane examples) are documented on the [FEM/SSRM verification page](../verification/ssrm.md).
-
-
-The following examples illustrate how to use XSLOPE's finite element capabilities for slope stability analysis using
-the Shear Strength Reduction Method (SSRM). Each of the Excel input files below can be uploaded and used with the following Google Colab notebook which has been set up specifically for running FEM slope stability analyses:
+These problems apply the shear strength reduction method (SSRM) to a slope with a thin
+weak layer and to a reliability analysis of a two-layer slope. Each one links its
+Excel input file. Open the file in [XSLOPE Studio](../studio/index.md) with
+**File → Open** and run it, or load it in Python with `load_slope_data()`. To run the
+files without installing anything, use the FEM notebook on Google Colab:
 
 <a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_fem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-The FEM implementation is described in the [FEM Overview](overview.md) page.
+The method itself is described in the [FEM Overview](overview.md). Comparisons with
+published solutions are on the [FEM/SSRM verification page](../verification/ssrm.md).
 
 ### 1. Non-Circular Failure Surface with Thin Weak Layer
 

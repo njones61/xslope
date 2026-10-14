@@ -96,6 +96,13 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "xslope version $V"
 
+      # A tagged release needs its notes in CHANGELOG.md; checked here, before
+      # the long build, rather than after it at the publish step.
+      - name: Release notes present
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: python packaging/release_notes.py "${GITHUB_REF_NAME}" > /dev/null
+
       # --- freeze + smoke test (the .app / onedir tree) ---------------------
       # --no-dmg: on macOS the disk image is assembled after signing, below.
       - name: Build and smoke-test
@@ -449,9 +456,13 @@ jobs:
           done
           mapfile -t ASSETS < assets.txt
           printf 'uploading %s\n' "${ASSETS[@]}"
+          # The release's own section of CHANGELOG.md, with GitHub's commit
+          # comparison link appended after it by --generate-notes.
+          python packaging/release_notes.py "$TAG" > release_notes.md
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "XSLOPE $TAG" \
+            --notes-file release_notes.md \
             --generate-notes \
             "${ASSETS[@]}" || \
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${ASSETS[@]}"

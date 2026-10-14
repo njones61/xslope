@@ -59,6 +59,14 @@ Patch releases skip this.
       fail on a stale copy, beside `template_sync` on the packaged template and
       skill.
 
+- [ ] Write the release notes. In `CHANGELOG.md`, rename `## Unreleased` to
+      `## X.Y.Z — YYYY-MM-DD` and start a new, empty `## Unreleased` above it.
+      Read each entry as a user would: what they can now do, or what now works,
+      in plain words, with no commit or code names. The release build copies
+      this section onto the GitHub Release page, which is where Studio's
+      "Release notes" link goes, and stops before building if the section is
+      missing. Add to `## Unreleased` as changes land, not at release time.
+
 ## Steps
 
 1. **Bump the version.** Edit `xslope/_version.py` (`__version__`), e.g.

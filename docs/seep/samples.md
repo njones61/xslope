@@ -1,13 +1,18 @@
 # Sample Problems - Seepage Analysis
 
-> **Verification benchmarks** (the analytical anchors and the SEEP2D cross-check) are documented on the [seepage verification page](../verification/seep.md).
-
-
-The following examples illustrate how to use XSLOPE to perform seepage analysis. The problems feature both saturated and unsaturated conditions. Each of the Excel input files below can be used with the following notebook which has been set up specifically for running seepage analyses:
+These problems cover saturated and unsaturated seepage: a sheetpile trench, earth dams
+with a core and a filter, a levee on a grouted foundation, and a transient reservoir
+drawdown. Each one links its Excel input file. Open the file in
+[XSLOPE Studio](../studio/index.md) with **File → Open** and run it, or load it in
+Python with `load_slope_data()`. To run the files without installing anything, use the
+seepage notebook on Google Colab:
 
 <a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_seep.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-These problems feature standalone seepage analyses. For instructions on how to run an integrated seepage analysis with slope stability analysis, see the [Integrated Seepage and Slope Stability Analysis](seep_slope.md) page.
+These are seepage analyses on their own. To carry a seepage solution into a slope
+stability run, see [Integrated Seepage and Slope Stability Analysis](seep_slope.md).
+Comparisons with analytical solutions and SEEP2D are on the
+[seepage verification page](../verification/seep.md).
 
 ### 1. Sea Trench
 

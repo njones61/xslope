@@ -26,11 +26,11 @@ Excel input file: [xslope_simple_foundation.xlsx](files/xslope_simple_foundation
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![simple_foundation_inputs.png](sample_images/simple_foundation_inputs.png){width=700}
+![simple_foundation_inputs.png](sample_images/simple_foundation_inputs.png){width=1000}
 
 Solution (critical surface and factor of safety):
 
-![simple_foundation_results.png](sample_images/simple_foundation_results.png){width=700}
+![simple_foundation_results.png](sample_images/simple_foundation_results.png){width=1000}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -55,11 +55,11 @@ Excel input file: [xslope_submerged.xlsx](files/xslope_submerged.xlsx){width=900
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![submerged_slope_inputs.png](sample_images/submerged_slope_inputs.png){width=900}
+![submerged_slope_inputs.png](sample_images/submerged_slope_inputs.png){width=1000}
 
 Solution (critical surface and factor of safety):
 
-![submerged_slope_results.png](sample_images/submerged_slope_results.png){width=900}
+![submerged_slope_results.png](sample_images/submerged_slope_results.png){width=1000}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -92,15 +92,15 @@ Excel input file: [xslope_eight_layers.xlsx](files/xslope_eight_layers.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![eight_layers_inputs.png](sample_images/eight_layers_inputs.png){width=900}
+![eight_layers_inputs.png](sample_images/eight_layers_inputs.png){width=1000}
 
 Search results:
 
-![eight_layers_search_results.png](sample_images/eight_layers_search_results.png){width=900}
+![eight_layers_search_results.png](sample_images/eight_layers_search_results.png){width=1000}
 
 Solution (critical surface and factor of safety):
 
-![eight_layers_results.png](sample_images/eight_layers_results.png){width=900}
+![eight_layers_results.png](sample_images/eight_layers_results.png){width=1000}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -148,15 +148,15 @@ Excel input file: [xslope_earth_dam_up.xlsx](files/xslope_earth_dam_up.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![earth_dam_up_inputs.png](sample_images/earth_dam_up_inputs.png){width=900}
+![earth_dam_up_inputs.png](sample_images/earth_dam_up_inputs.png){width=1000}
 
 Search results:
 
-![earth_dam_up_search_results.png](sample_images/earth_dam_up_search_results.png){width=900}
+![earth_dam_up_search_results.png](sample_images/earth_dam_up_search_results.png){width=1000}
 
 Solution (critical surface and factor of safety):
 
-![earth_dam_up_results.png](sample_images/earth_dam_up_results.png){width=900}
+![earth_dam_up_results.png](sample_images/earth_dam_up_results.png){width=1000}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -179,15 +179,15 @@ Excel input file: [xslope_earth_dam_down.xlsx](files/xslope_earth_dam_down.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![earth_dam_down_inputs.png](sample_images/earth_dam_down_inputs.png){width=900}
+![earth_dam_down_inputs.png](sample_images/earth_dam_down_inputs.png){width=1000}
 
 Search results:
 
-![earth_dam_down_search_results.png](sample_images/earth_dam_down_search_results.png){width=900}
+![earth_dam_down_search_results.png](sample_images/earth_dam_down_search_results.png){width=1000}
 
 Solution (critical surface and factor of safety):
 
-![earth_dam_down_results.png](sample_images/earth_dam_down_results.png){width=900}
+![earth_dam_down_results.png](sample_images/earth_dam_down_results.png){width=1000}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -218,11 +218,11 @@ Excel input file: [xslope_tension_KEY.xlsx](files/xslope_tension_KEY.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![tension_inputs1.png](sample_images/tension_inputs1.png){width=900}
+![tension_inputs1.png](sample_images/tension_inputs1.png){width=1000}
 
 Solution (critical surface with the tension crack, Spencer's method):
 
-![tension_results1.png](sample_images/tension_results1.png){width=900}
+![tension_results1.png](sample_images/tension_results1.png){width=1000}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -257,7 +257,7 @@ Excel input file: [xslope_gsat_sidecar.xlsx](files/xslope_gsat_sidecar.xlsx)
 
 Solution (critical surface and factor of safety, Spencer's method):
 
-![gsat_sidecar_results.png](sample_images/gsat_sidecar_results.png){width=900}
+![gsat_sidecar_results.png](sample_images/gsat_sidecar_results.png){width=1000}
 
 <!-- test: file=files/xslope_gsat_sidecar.xlsx, type=circular_search, num_slices=40, fs_bishop=1.420, fs_spencer=1.420, fs_janbu=1.518 -->
 
@@ -282,7 +282,7 @@ Excel input file: [xslope_gsat_piezo.xlsx](files/xslope_gsat_piezo.xlsx)
 
 Solution (critical surface and factor of safety, Spencer's method):
 
-![gsat_piezo_results.png](sample_images/gsat_piezo_results.png){width=900}
+![gsat_piezo_results.png](sample_images/gsat_piezo_results.png){width=1000}
 
 <!-- test: file=files/xslope_gsat_piezo.xlsx, type=circular_search, num_slices=40, fs_bishop=1.538, fs_spencer=1.539, fs_janbu=1.503 -->
 
@@ -299,7 +299,7 @@ mesh and solution are bundled alongside it).
 
 Solution (critical surface and factor of safety, with the seepage head contours):
 
-![gsat_seep_results.png](sample_images/gsat_seep_results.png){width=900}
+![gsat_seep_results.png](sample_images/gsat_seep_results.png){width=1000}
 
 <!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.933, fs_spencer=1.912 -->
 
@@ -314,7 +314,7 @@ Excel input file: [xslope_gsat_rapid.xlsx](files/xslope_gsat_rapid.xlsx)
 
 Solution (governing rapid-drawdown surface and factor of safety):
 
-![gsat_rapid_results.png](sample_images/gsat_rapid_results.png){width=900}
+![gsat_rapid_results.png](sample_images/gsat_rapid_results.png){width=1000}
 
 <!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.100, fs_spencer=1.099 -->
 
@@ -332,7 +332,7 @@ a 1.0 m pile at 2.5 m centers leaves a 1.5 m clear opening, and $1.5/2.5 = 0.6$.
 
 Inputs, with both pile stations drawn together:
 
-![hassiotis_inputs.png](sample_images/hassiotis_inputs.png){width=900}
+![hassiotis_inputs.png](sample_images/hassiotis_inputs.png){width=1000}
 
 Excel input files:
 [xslope_hassiotis.xlsx](files/xslope_hassiotis.xlsx) (unreinforced),
@@ -358,7 +358,7 @@ trial surface from $D$, $S$ and the soil above that surface at the pile.
 
 #### Unreinforced (FS = 1.105)
 
-![hassiotis_results.png](sample_images/hassiotis_results.png){width=900}
+![hassiotis_results.png](sample_images/hassiotis_results.png){width=1000}
 
 Bishop's method gives 1.106 against the 1.12 Hull & Poulos (1999) report with the
 same method (−1.2%). Hassiotis et al. report 1.08 and Ausilio et al. (2001) 1.11,
@@ -368,14 +368,14 @@ both by the friction-circle method, which XSLOPE does not implement.
 
 #### Pile row 13.7 m from the toe (FS = 1.855)
 
-![hassiotis_p1_results.png](sample_images/hassiotis_p1_results.png){width=900}
+![hassiotis_p1_results.png](sample_images/hassiotis_p1_results.png){width=1000}
 
 Bishop's method gives 1.859 against 1.82 (Hassiotis et al., friction circle, +2.1%).
 The row raises the factor of safety by 68%.
 
 #### Pile row 23.1 m from the toe (FS = 1.284)
 
-![hassiotis_p2_results.png](sample_images/hassiotis_p2_results.png){width=900}
+![hassiotis_p2_results.png](sample_images/hassiotis_p2_results.png){width=1000}
 
 Bishop's method gives 1.289 against 1.64 (Hassiotis et al., −21%). The row sits
 0.6 m short of the crest, so every surface that reaches it crosses it within a few

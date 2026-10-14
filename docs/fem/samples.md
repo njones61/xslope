@@ -3,10 +3,7 @@
 These problems apply the shear strength reduction method (SSRM) to a slope with a thin
 weak layer and to a reliability analysis of a two-layer slope. Each one links its
 Excel input file. Open the file in [XSLOPE Studio](../studio/index.md) with
-**File → Open** and run it, or load it in Python with `load_slope_data()`. To run the
-files without installing anything, use the FEM notebook on Google Colab:
-
-<a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_fem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+**File → Open** and run it, or load it in Python with `load_slope_data()`.
 
 The method itself is described in the [FEM Overview](overview.md). Comparisons with
 published solutions are on the [FEM/SSRM verification page](../verification/ssrm.md).

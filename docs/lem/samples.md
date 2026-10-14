@@ -4,10 +4,7 @@ These problems cover common limit equilibrium setups: a slope with a foundation,
 submerged slope, layered soils, an earth dam, a tension crack, saturated unit weights,
 and a pile-stabilized slope. Each one links its Excel input file. Open the file in
 [XSLOPE Studio](../studio/index.md) with **File → Open** and run it, or load it in
-Python with `load_slope_data()`. To run the files without installing anything, use
-the LEM notebook on Google Colab:
-
-<a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_lem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Python with `load_slope_data()`.
 
 Comparisons with published solutions and commercial programs are in
 [Verification and Validation](../verification/index.md).

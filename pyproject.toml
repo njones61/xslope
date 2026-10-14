@@ -56,6 +56,7 @@ Homepage = "https://github.com/njones61/xslope"
 Documentation = "https://xslope.org/en/stable/"
 Source = "https://github.com/njones61/xslope"
 Issues = "https://github.com/njones61/xslope/issues"
+Changelog = "https://github.com/njones61/xslope/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 # Recurse so current AND future subpackages (e.g. studio.ai) always ship.

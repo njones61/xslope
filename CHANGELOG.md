@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.0.3 — 2026-10-14
+
 ### New
 
 - Drop an input workbook (`.xlsx`) or a project package (`.xslz`) onto the Studio
@@ -13,6 +15,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- The assistant in the installed app failed on every request with "Unknown
+  encoding cl100k_base". It works again.
 - The installed Studio no longer rebuilds its font list every time it starts. On
   macOS that held the window back 15 seconds or more.
 - Parametric plots: a back-analysis lists FS = 1 once in its legend, and when a

@@ -53,7 +53,35 @@ def use_bundled_certificates():
         os.environ["SSL_CERT_FILE"] = path
 
 
+def use_persistent_matplotlib_cache():
+    """Give Matplotlib a config folder that outlives the launch.
+
+    PyInstaller's Matplotlib runtime hook points ``MPLCONFIGDIR`` at a new temporary
+    folder on every start and deletes it at exit, so Matplotlib never finds its font
+    list and rebuilds it each time. On macOS that rebuild runs ``system_profiler``
+    over every installed font: 15 s on a warm start and over 40 s on a cold one,
+    all before the window appears. A folder in the user's cache directory keeps the
+    list from one launch to the next. Matplotlib reads the variable at import, so
+    this runs before anything imports it. A source checkout is not touched.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    if sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Caches")
+    elif sys.platform.startswith("win"):
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    else:
+        base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    path = os.path.join(base, "XSLOPE Studio", "matplotlib")
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        return          # unwritable: keep the hook's temporary folder
+    os.environ["MPLCONFIGDIR"] = path
+
+
 use_bundled_certificates()
+use_persistent_matplotlib_cache()
 
 SELF_TEST_SAMPLE = "xslope_simple1.xlsx"
 

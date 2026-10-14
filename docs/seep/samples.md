@@ -5,12 +5,10 @@ with a core and a filter, a levee on a grouted foundation, and a transient reser
 drawdown. Each one links its Excel input file. Open the file in
 [XSLOPE Studio](../studio/index.md) with **File → Open** and run it, or load it in
 Python with `load_slope_data()`. The [seepage tutorials](../tutorials/index.md#seepage)
-build models like these step by step.
-
-These are seepage analyses on their own. To carry a seepage solution into a slope
-stability run, see [Integrated Seepage and Slope Stability Analysis](seep_slope.md).
-Comparisons with analytical solutions and SEEP2D are on the
-[seepage verification page](../verification/seep.md).
+build models like these step by step, and comparisons with analytical solutions and
+SEEP2D are on the [seepage verification page](../verification/seep.md). These are
+seepage analyses on their own; to carry a seepage solution into a slope stability run,
+see [Integrated Seepage and Slope Stability Analysis](seep_slope.md).
 
 ### 1. Sea Trench
 

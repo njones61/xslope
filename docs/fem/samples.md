@@ -3,11 +3,11 @@
 These problems apply the shear strength reduction method (SSRM) to a slope with a thin
 weak layer and to a reliability analysis of a two-layer slope. Each one links its
 Excel input file. Open the file in [XSLOPE Studio](../studio/index.md) with
-**File → Open** and run it, or load it in Python with `load_slope_data()`. The [finite element tutorials](../tutorials/index.md#finite-element)
-build models like these step by step.
-
-The method itself is described in the [FEM Overview](overview.md). Comparisons with
-published solutions are on the [FEM/SSRM verification page](../verification/ssrm.md).
+**File → Open** and run it, or load it in Python with `load_slope_data()`. The
+[finite element tutorials](../tutorials/index.md#finite-element) build models like
+these step by step. The method is described in the [FEM Overview](overview.md), and
+comparisons with published solutions are on the
+[FEM/SSRM verification page](../verification/ssrm.md).
 
 ### 1. Non-Circular Failure Surface with Thin Weak Layer
 

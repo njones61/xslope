@@ -1,13 +1,16 @@
 # Sample Problems - Limit Equilibrium Method
 
-> **Verification benchmarks** (ACADS, Arai & Tagyo, and the vendor-manual corpora) are documented in the [Verification and Validation](../verification/index.md) section — see the [Rocscience Slide2](../verification/rocscience.md) and [GeoStudio SLOPE/W](../verification/geostudio.md) corpus pages.
-
-
-The following examples illustrate how to use XSLOPE to perform limit equilibrium slope stability analysis. Each of the Excel input files below can be uploaded and used with the following Google Colab notebook which has been set up specifically for running slope stability analyses:
+These problems cover common limit equilibrium setups: a slope with a foundation, a
+submerged slope, layered soils, an earth dam, a tension crack, saturated unit weights,
+and a pile-stabilized slope. Each one links its Excel input file. Open the file in
+[XSLOPE Studio](../studio/index.md) with **File → Open** and run it, or load it in
+Python with `load_slope_data()`. To run the files without installing anything, use
+the LEM notebook on Google Colab:
 
 <a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_lem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-The notebook allows the user to select a variety of analysis options using simple form inputs and then runs the analysis using the selected method and plots the results.
+Comparisons with published solutions and commercial programs are in
+[Verification and Validation](../verification/index.md).
 
 For each problem below, the solution figure shows the critical surface and factor of safety for Spencer's method, and most problems carry a **Factor of safety by method** table with the result for every method. On a solution figure, the green bars on the base of each slice are the effective stress there, the red bars are tension, and the red dashed line is the line of thrust computed with Spencer's method. The tables follow these conventions:
 

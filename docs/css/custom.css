@@ -635,3 +635,12 @@ a.vid-watch, a.vid-watch:visited { background: #e8552d; color: #fff; }
     .tut-num { left: 6px; top: 6px; }
     .tut-band { flex-direction: column; gap: 2px; }
 }
+
+/* A "NEW" pill after the Videos entry in the sidebar. The second selector covers
+   the Videos page itself, where the theme renders its own entry as href="#". */
+.wy-menu-vertical a[href$="videos/"]::after,
+body:has(.vid-hero) .wy-menu-vertical li.toctree-l1.current > a.current::after {
+    content: "NEW"; margin-left: 6px; padding: 1px 6px; border-radius: 8px;
+    background: #2980b9; color: #fff; font-size: 0.7em; font-weight: 700;
+    letter-spacing: 0.04em; vertical-align: 1px;
+}

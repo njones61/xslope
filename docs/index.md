@@ -38,6 +38,12 @@ and Windows 10 / 11 · [Install guide](getting_started/install.md) ·
 <div class="stat"><span class="num">&#36;0</span><span class="lbl">per seat, per year, forever</span></div>
 </div>
 
+## Getting started
+
+Short [videos](videos/index.md) build models in XSLOPE Studio step by step. The
+[tutorials](tutorials/index.md) cover the same problems and many more in writing,
+with every input in a table you can copy.
+
 ## Three analysis modes, one model
 
 A defensible slope analysis needs three things: a seepage solution for the pore

@@ -84,7 +84,7 @@ same model and the same factor of safety, 0.964: the slope as drawn is unstable.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem03_solution.png)
+[![](../tutorials/images/lem03_solution.png)](https://youtu.be/mNE2UAJeb4Y)
 <span class="vid-num">3</span>
 </div>
 <div class="vid-body" markdown>
@@ -96,7 +96,9 @@ An embankment on a foundation layer over rigid rock, with a profile line at each
 material boundary and a starting circle at the base of each layer. The search
 result shows why the critical circle settles on the contact between layers.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/mNE2UAJeb4Y">▶ Watch · 8 min</a></p>
+
+**Completed model** — [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx)
 
 **Related tutorial** — [LEM-3. A Layered Slope](../tutorials/lem03_layered_slope.md)
 

@@ -6,6 +6,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Fixed
+
+- The strength plot in the Materials list view draws τ and σ′ at the same
+  scale, so the envelope rises at the friction angle entered. This applies to
+  Mohr-Coulomb, power-curve, and Hoek-Brown materials.
+
 ## 1.0.3 — 2026-10-14
 
 ### New

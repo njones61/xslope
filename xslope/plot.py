@@ -73,6 +73,27 @@ def _material_hint(ax, msg, title=""):
     return ax
 
 
+def _tau_sigma_extent(ax, sigma_span, tau0):
+    """``(σ_max, τ_max)`` for a τ–σ envelope drawn at one scale on both axes.
+
+    An envelope is read for its angle, and only equal scales show φ as φ. The
+    panel's own height-to-width ratio decides how much τ fits beside a given σ, so
+    the σ extent is at least ``sigma_span`` and wide enough that the τ range it
+    buys holds the intercept ``tau0`` with half of it again above."""
+    bb = ax.get_window_extent()
+    ratio = bb.height / bb.width if bb.width > 0 and bb.height > 0 else 0.75
+    s_max = max(float(sigma_span), 1.5 * max(float(tau0), 0.0) / ratio)
+    return s_max, ratio * s_max
+
+
+def _equal_tau_sigma(ax, s_max, tau_max):
+    """Frame a τ–σ plot from the origin at equal scales. The box takes up whatever
+    the final layout leaves of the ratio ``_tau_sigma_extent`` chose."""
+    ax.set_xlim(0, s_max)
+    ax.set_ylim(0, tau_max)
+    ax.set_aspect("equal", adjustable="box")
+
+
 def plot_material_strength(ax, material, n=200, sigma_max=100.0):
     """Draw one material's shear-strength model into ``ax``, EXACTLY as the solver
     evaluates it — no re-derivation. The four ``option`` values each get the plot
@@ -105,14 +126,14 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         c, phi = g("c"), g("phi")
         if c == 0 and phi == 0:
             return _material_hint(ax, "enter c and φ", "Mohr–Coulomb")
-        s = np.linspace(0.0, sigma_max, n)
+        s_max, tau_max = _tau_sigma_extent(ax, sigma_max, c)
+        s = np.linspace(0.0, s_max, n)
         tau = c + s * np.tan(np.radians(phi))
         ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
         ax.set_xlabel("σ′  (effective normal stress)")
         ax.set_ylabel("τ  (shear strength)")
         ax.set_title(f"Mohr–Coulomb   (c={c:g}, φ={phi:g}°)")
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
+        _equal_tau_sigma(ax, s_max, tau_max)
         ax.grid(True, alpha=0.3)
 
     elif option == "cp":
@@ -144,17 +165,19 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         a, b, cp_c, d = g("pow_a"), g("pow_b"), g("pow_c"), g("pow_d")
         if a == 0:
             return _material_hint(ax, "enter pow_a … pow_d", "Power curve")
-        s = np.linspace(0.0, sigma_max, n)
         # Mirror solve._pow_update_strength's evaluation: (σ′+d) floored so a b<1
         # curve stays finite near the origin.
-        s_eff = np.maximum(s + d, 1e-4 * max(1.0, sigma_max))
+        floor = 1e-4 * max(1.0, sigma_max)
+        tau0 = a * np.power(max(d, floor), b) + cp_c
+        s_max, tau_max = _tau_sigma_extent(ax, sigma_max, tau0)
+        s = np.linspace(0.0, s_max, n)
+        s_eff = np.maximum(s + d, floor)
         tau = a * np.power(s_eff, b) + cp_c
         ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
         ax.set_xlabel("σ′  (effective normal stress)")
         ax.set_ylabel("τ  (shear strength)")
         ax.set_title(f"Power curve   τ = {a:g}·(σ′+{d:g})^{b:g} + {cp_c:g}")
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
+        _equal_tau_sigma(ax, s_max, tau_max)
         ax.grid(True, alpha=0.3)
 
     elif option == "hb":
@@ -166,7 +189,8 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         # envelope's curvature; the low-stress end (curvature) is what matters for
         # slopes. Evaluated through the SAME hb_tangent the solver linearizes with:
         # τ(σₙ) = c_i + σₙ·tan(φ_i).
-        smax = max(0.2 * sci, 1.0)
+        c0, _phi0 = hb_tangent(np.array([0.0]), sci, gsi, mi, dfac)
+        smax, tau_max = _tau_sigma_extent(ax, max(0.2 * sci, 1.0), float(c0[0]))
         s = np.linspace(0.0, smax, n)
         c_i, phi_i = hb_tangent(s, sci, gsi, mi, dfac)
         tau = c_i + s * np.tan(np.radians(phi_i))
@@ -189,8 +213,7 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         ax.set_xlabel("σₙ  (normal stress)")
         ax.set_ylabel("τ  (shear strength)")
         ax.set_title(f"Hoek–Brown   (σci={sci:g}, GSI={gsi:g}, mi={mi:g})")
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
+        _equal_tau_sigma(ax, smax, tau_max)
         ax.grid(True, alpha=0.3)
 
     elif option == "elastic":

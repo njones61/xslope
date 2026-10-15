@@ -27,8 +27,10 @@ theme:
   custom_dir: overrides
   navigation_depth: 2
   titles_only: true
+# Change the ?v= date whenever custom.css changes: browsers keep the stylesheet
+# for 4 hours, and a new query string makes them fetch the new one at once.
 extra_css:
-  - css/custom.css
+  - css/custom.css?v=2026-10-15
 plugins:
   - search
   - redirects:

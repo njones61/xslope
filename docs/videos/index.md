@@ -151,6 +151,8 @@ strength, the water adds load without adding pore pressure in the soil.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
+<!-- test: file=files/xslope_video05_submerged.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.154, tolerance=0.005 -->
+
 **Related page** — [LEM sample problem 2](../lem/samples.md#2-submerged-slope)
 
 </div>

@@ -51,7 +51,7 @@ tension and lowers the factor of safety.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../lem/sample_images/simple_foundation_results.png)
+[![](../lem/sample_images/simple_foundation_results.png)](https://youtu.be/mjhU-9LGG4k)
 <span class="vid-num">2</span>
 </div>
 <div class="vid-body" markdown>
@@ -59,12 +59,14 @@ tension and lowers the factor of safety.
 
 ### Building a Model Three Ways {#video-2}
 
-A 30 ft slope of undrained clay over a 10 ft foundation, built three ways: in
-Studio's editors, in the Excel input template, and by Studio's AI assistant from
-the problem sketch. All three routes produce the same file and the same factor of
-safety. The slope as drawn is unstable, with a factor of safety below 1.
+A 20 ft slope of undrained clay, with the soil continuing 10 ft below the toe to
+a rigid base, built three ways: in the Excel input template, in Studio's editors,
+and by Studio's AI assistant from the problem sketch. All three builds give the
+same model and the same factor of safety, 0.964: the slope as drawn is unstable.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/mjhU-9LGG4k">▶ Watch · 17 min</a></p>
+
+**Completed model** — [xslope_simple_foundation.xlsx](../lem/files/xslope_simple_foundation.xlsx)
 
 **Related pages** — [Building Models Three Ways](../tutorials/building_models.md) ·
 [LEM sample problem 1](../lem/samples.md#1-simple-slope-with-foundation)

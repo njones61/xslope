@@ -67,6 +67,7 @@ nav:
     - Analysis Report: studio/reports.md
     - AI Assistant: studio/assistant.md
     - App Management: studio/app_management.md
+  - Videos: videos/index.md
   - Tutorials:
     - Overview: tutorials/index.md
     - Building Models Three Ways: tutorials/building_models.md

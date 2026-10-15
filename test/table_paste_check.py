@@ -750,6 +750,12 @@ def test_lem03_profile_lines_and_circles():
     out = _fail(len(lines) == 2, f"LEM-3 profile lines: pasted {len(lines)} lines")
     for n, (got, printed, want) in enumerate(
             zip(lines, [line1, line2], model["profile_lines"])):
+        # A new line starts on the material of its own number, as the workbook's
+        # profile sheet does, so the reader pastes and never has to pick one.
+        out += _fail(got["mat_id"] == want["mat_id"],
+                     f"LEM-3 line {n + 1}: a new line starts on mat "
+                     f"{got['mat_id'] + 1}; the completed model has mat "
+                     f"{want['mat_id'] + 1}")
         out += _fail(len(got["coords"]) == len(want["coords"]),
                      f"LEM-3 line {n + 1}: {len(got['coords'])} vertices pasted, "
                      f"{len(want['coords'])} in the completed model")

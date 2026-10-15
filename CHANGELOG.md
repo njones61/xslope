@@ -12,6 +12,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   scale, so the envelope rises at the friction angle entered. This applies to
   Mohr-Coulomb, power-curve, and Hoek-Brown materials.
 
+### Changed
+
+- A profile line or polygon added in Studio starts with one vertex row to type
+  or paste into, and on the material of its own number (line 2 on material 2),
+  as the workbook's profile and polygon sheets are laid out.
+
 ## 1.0.3 — 2026-10-14
 
 ### New

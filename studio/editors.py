@@ -7305,8 +7305,15 @@ class MatGeometryDialog(QDialog):
 
     def _add_line(self):
         self._commit_current()
-        self._lines.append({"mat_id": 0, "coords": [], "kind": "material",
-                            "size": None, "label": None, "stray_mat_id": None})
+        # As the workbook's profile and polygon sheets are laid out: item N starts on
+        # material N (the last material once N runs past them), and with one vertex
+        # row ready to type into.
+        n = len(self._lines)
+        mat_id = min(n, len(self._materials) - 1) if self._materials else 0
+        pt = _new_pt()
+        self._lines.append({"mat_id": mat_id, "coords": [(pt["x"], pt["y"])],
+                            "kind": "material", "size": None, "label": None,
+                            "stray_mat_id": None})
         self._refresh_list()
         self.list.setCurrentRow(len(self._lines) - 1)
         self._schedule_preview()

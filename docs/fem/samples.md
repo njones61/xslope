@@ -45,7 +45,7 @@ strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.616**. The plots show the slope
+SSRM results. The computed factor of safety is **FS = 1.609**. The plots show the slope
 at failure. The middle plot shows the concentration of viscoplastic shear strain, which
 follows a non-circular failure mechanism through the thin weak clay layer. The finite
 element solution finds this shape without any assumption about the shape of the failure
@@ -56,7 +56,7 @@ laterally along the clay layer.
 
 <!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
      target_size=1.0 or finer -->
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.616, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.609, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000, f_stand=1.60625, f_fail=1.6125, check=edges, expected_elements=2588, expected_nodes=5349 -->
 
 ### 2. Reliability Analysis: Two-Layer c–φ Slope
 

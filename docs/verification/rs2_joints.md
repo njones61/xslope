@@ -147,7 +147,7 @@ referee within a rounding of the value the manual prints for it.
 |---|---|---|---|---|
 | **1.018** | 1.0000 (+1.8%) | 0.99 vs 1.0000 (−1.0%) | 0.99 (+2.8%) | 0.99 / 0.97 |
 
-<!-- test: file=files/rocscience/joints/rj001a.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1a, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001a.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1a, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges, expected_elements=2864, expected_nodes=6135 -->
 
 **XSLOPE's 1.018 sits 1.8% above the closed form because of one assumption in Goodman & Bray's
 method: where the thrust between two columns acts. They place each thrust at the top corner of
@@ -190,7 +190,7 @@ own measured heights, the block-by-block analysis gives **1.0078**, the bottom o
 |---|---|---|---|---|
 | **1.018** | 1.0000 (+1.8%) | 0.97 vs 1.0000 (−3.0%) | 0.99 (+2.8%) | 0.97 / 0.94 |
 
-<!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001b.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1b, tier=gate, f_stand=1.0078125, f_fail=1.02734375, check=edges, expected_elements=2864, expected_nodes=6135 -->
 
 The force's magnitude and direction match the vendor's model.
 
@@ -208,7 +208,7 @@ is what the closed form's own pair of answers for cases a and c says as well —
 |---|---|---|---|---|
 | **1.037** | 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | 1.01 (+2.7%) | 1.01 / 0.99 |
 
-<!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1c, tier=gate, f_stand=1.02734375, f_fail=1.046875, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001c.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1c, tier=gate, f_stand=1.02734375, f_fail=1.046875, check=edges, expected_elements=2864, expected_nodes=6135 -->
 
 Re-running Goodman & Bray's analysis with the thrust heights taken from XSLOPE's solved state at
 the 10 m block width, instead of the top-corner assumption, gives **1.0469**, the lower edge of
@@ -235,7 +235,7 @@ from where the thrust acts.
 |---|---|---|---|---|
 | **1.252** | 1.2308 (+1.7%) | 1.19 vs 1.2308 (−3.3%) | 1.22 (+2.6%) | 1.19 / 1.16 |
 
-<!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges -->
+<!-- test: file=files/rocscience/joints/rj001d.xlsx, type=fem_ssrm, expected_fs=1.252, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-1d, tier=gate, f_stand=1.2421875, f_fail=1.26171875, check=edges, expected_elements=2864, expected_nodes=6135 -->
 
 The force reaches the same point case b's does.
 
@@ -260,7 +260,7 @@ same method on the same problem.
 |---|---|---|---|---|
 | **0.783** | 0.7734 (+1.2%) | 0.86 vs 0.7734 (+11.2%) | 0.87 (−10.0%) | 0.86 / 0.82 |
 
-<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.7734375, f_fail=0.79296875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj002.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-2, f_stand=0.7734375, f_fail=0.79296875, check=edges, tier=gate, expected_elements=4993, expected_nodes=11537 -->
 
 **RS2 and UDEC give nearly the same factor, and both are above the closed form.** Alejano & Alonso publish
 their own UDEC run at 0.87 beside their Goodman & Bray 0.76, and RS2's two factors are 0.86 and
@@ -293,7 +293,7 @@ computed with the 100 kPa, so they are shown beside the row but are not like for
 |---|---|---|---|
 | **1.115** | 1.13 (−1.3%) | 1.12 vs 1.13 (−0.9%) | 1.12 / 1.09 |
 
-<!-- test: file=files/rocscience/joints/rj003.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3, f_stand=1.10546875, f_fail=1.125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj003.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-3, f_stand=1.10546875, f_fail=1.125, check=edges, tier=gate, expected_elements=6754, expected_nodes=17882 -->
 
 Two other readings of the same problem were run for comparison:
 
@@ -325,7 +325,7 @@ computed with the 100 kPa, so they are shown beside the row but are not like for
 |---|---|---|---|
 | **1.232** | 1.3 (−5.2%) | 1.19 vs 1.3 (−8.5%) | 1.19 / 1.27 |
 
-<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj004.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate, expected_elements=3939, expected_nodes=9993 -->
 
 Two other readings of the same problem were run for comparison:
 
@@ -335,7 +335,7 @@ Two other readings of the same problem were run for comparison:
   φ = 43°), the model is the same as this row's, because the vendor's rock already has the chapter's
   properties; the factor of safety is the row's own 1.232 in XSLOPE, against UDEC's 1.3 (−5.2%).
 
-<!-- test: file=files/rocscience/joints/rj004_chapter.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4c, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj004_chapter.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-4c, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate, expected_elements=3939, expected_nodes=9993 -->
 
 **Input file:** [rj004.xlsx](files/rocscience/joints/rj004.xlsx).
 
@@ -357,7 +357,7 @@ computed with the 100 kPa, so they are shown beside the row but are not like for
 |---|---|---|---|
 | **1.799** | 1.7 (+5.8%) | 1.65 vs 1.7 (−2.9%) | 1.65 / 1.86 |
 
-<!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.799, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.7890625, f_fail=1.80859375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj005.xlsx, type=fem_ssrm, expected_fs=1.799, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5, f_stand=1.7890625, f_fail=1.80859375, check=edges, tier=gate, expected_elements=7378, expected_nodes=21635 -->
 
 Two other readings of the same problem were run for comparison:
 
@@ -366,7 +366,7 @@ Two other readings of the same problem were run for comparison:
 - On the chapter's full printed list (joints friction only, and a rock that can yield, c = 675 kPa,
   φ = 43°), the factor of safety is 1.096 in XSLOPE, against UDEC's 1.7 (−35.5%).
 
-<!-- test: file=files/rocscience/joints/rj005_chapter.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5c, f_stand=1.0859375, f_fail=1.10546875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj005_chapter.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-5c, f_stand=1.0859375, f_fail=1.10546875, check=edges, tier=gate, expected_elements=7378, expected_nodes=21635 -->
 
 With the chapter's yielding rock the mechanism changes: the slabs slide down the joints parallel to
 the face and the rock at the toe yields beneath them, instead of the blocks toppling back into the
@@ -388,7 +388,7 @@ capacity).
 |---|---|---|---|
 | **1.271** | 1.27 (+0.1%) | 1.25 vs 1.27 (−1.6%) | 1.25 / 1.31 |
 
-<!-- test: file=files/rocscience/joints/rj006.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-6, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj006.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-6, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate, expected_elements=4541, expected_nodes=13134 -->
 
 XSLOPE's factor matches UDEC's and lies between RS2's two factors, 1.25 and 1.31.
 
@@ -414,7 +414,7 @@ computed with the 100 kPa, so they are shown beside the row but are not like for
 |---|---|---|---|
 | **1.486** | 1.5 (−0.9%) | 1.57 vs 1.5 (+4.7%) | 1.57 / 1.59 |
 
-<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj007.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate, expected_elements=3944, expected_nodes=9986 -->
 
 Two other readings of the same problem were run for comparison:
 
@@ -424,7 +424,7 @@ Two other readings of the same problem were run for comparison:
   φ = 43°), the model is the same as this row's, because the vendor's rock already has the chapter's
   properties; the factor of safety is the row's own 1.486 in XSLOPE, against UDEC's 1.5 (−0.9%).
 
-<!-- test: file=files/rocscience/joints/rj007_chapter.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7c, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj007_chapter.xlsx, type=fem_ssrm, expected_fs=1.486, element_type=tri6, target_size=12.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-7c, f_stand=1.4765625, f_fail=1.49609375, check=edges, tier=gate, expected_elements=3944, expected_nodes=9986 -->
 
 The manual's table for this problem prints the slope angle as 5°; its figure and the vendor's
 model both have the same 55° slope as problem 6.
@@ -448,7 +448,7 @@ and φ = 39°, and their normal stiffness, 1.5 × 10<sup>7</sup> kPa/m, is below
 |---|---|---|---|
 | **0.764** | 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | 0.75 / 0.75 |
 
-<!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj008.xlsx, type=fem_ssrm, expected_fs=0.764, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-8, f_stand=0.75390625, f_fail=0.7734375, check=edges, tier=gate, expected_elements=2344, expected_nodes=5389 -->
 
 The trials on this row come to rest faster than on any other row on this page.
 
@@ -481,7 +481,7 @@ another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 |---|---|---|---|---|
 | **1.037** | 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | 0.40–1.45 | 1.01 / 1.09 |
 
-<!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj009.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-9, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate, expected_elements=4336, expected_nodes=12620 -->
 
 RS2's two factors, 1.01 without the `Improve Joint Convergence` option and 1.09 with it, lie on
 either side of XSLOPE's factor, as they do on six other problems in this corpus: 3, 4, 5, 6, 10
@@ -511,7 +511,7 @@ see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-anoth
 |---|---|---|---|---|
 | **1.037** | 1.03 (+0.7%) | 0.92 vs 1.03 (−10.7%) | 0.43–1.45 | 0.92 / 1.08 |
 
-<!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj010.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-10, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate, expected_elements=4330, expected_nodes=12608 -->
 
 RS2's two factors, 0.92 without the `Improve Joint Convergence` option and 1.08 with it, lie on
 either side of XSLOPE's 1.037, as they do on problems [3](#rj-3), [4](#rj-4), [5](#rj-5),
@@ -547,7 +547,7 @@ most, and all three sit on that ceiling.
 |---|---|---|---|---|---|
 | **1.213** | 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | 1.21 (+0.2%) | 1.7582 · the paper prints 1.75 | 1.22 / 1.3 |
 
-<!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj011.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-11, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate, expected_elements=4234, expected_nodes=12326 -->
 
 **Input file:** [rj011.xlsx](files/rocscience/joints/rj011.xlsx).
 
@@ -573,7 +573,7 @@ explained under [problem 11](#rj-11); Eq. (7) sits below it, so Eq. (7) is the r
 |---|---|---|---|---|---|
 | **2.033** | 1.9659 (+3.4%) | 1.39 vs 1.9659 (−29.3%) | 2.0324 | 1.78 (+14.2%) · Alejano prints 2.00 | 1.39 / 1.75 |
 
-<!-- test: file=files/rocscience/joints/rj012.xlsx, type=fem_ssrm, expected_fs=2.033, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-12, f_stand=2.0234375, f_fail=2.04296875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj012.xlsx, type=fem_ssrm, expected_fs=2.033, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-12, f_stand=2.0234375, f_fail=2.04296875, check=edges, tier=gate, expected_elements=4161, expected_nodes=12294 -->
 
 The release traces end exactly on the bedding plane they are meant to meet (see
 [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint)).
@@ -609,7 +609,7 @@ Eq. (7) is the referee.
 |---|---|---|---|---|---|
 | **0.998** | 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | 0.9988 | 1.0 (−0.2%) | 1.0 / 1.05 |
 
-<!-- test: file=files/rocscience/joints/rj013.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-13, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj013.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-13, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate, expected_elements=4117, expected_nodes=12141 -->
 
 **Input file:** [rj013.xlsx](files/rocscience/joints/rj013.xlsx).
 
@@ -632,7 +632,7 @@ explained under [problem 11](#rj-11); Eq. (7) sits below it, so Eq. (7) is the r
 |---|---|---|---|---|---|
 | **1.232** | 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | 1.2686 | 0.9 (+36.9%), 0.9994 with the paper's corner rounding corrected · the paper prints 1.00 | 0.89 / 1.09 |
 
-<!-- test: file=files/rocscience/joints/rj014.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-14, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj014.xlsx, type=fem_ssrm, expected_fs=1.232, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-14, f_stand=1.22265625, f_fail=1.2421875, check=edges, tier=gate, expected_elements=4171, expected_nodes=12316 -->
 
 **The 1.00 the paper prints for this example does not follow from the inputs it prints.** Every
 input that Eq. (7) uses matches the vendor's model; the toe block's base, for example, matches to
@@ -674,7 +674,7 @@ RS2's 1.28 sit just above it; the closed form and Alejano's own UDEC run, 1.6, s
 |---|---|---|---|---|---|
 | **1.271** | 1.25 (+1.7%) | 1.28 vs 1.25 (+2.4%) | 1.7985 (single-bed formula; the paper prints 1.72) | 1.6 (−20.6%) | 1.28 / 1.42 |
 
-<!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj015.xlsx, type=fem_ssrm, expected_fs=1.271, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-15, f_stand=1.26171875, f_fail=1.28125, check=edges, tier=gate, expected_elements=5135, expected_nodes=14964 -->
 
 The rock's 1000 kPa
 tensile cap is above the apex of its Mohr-Coulomb envelope and never controls.
@@ -708,7 +708,7 @@ following the corpus's rule of meshing at the joint spacing.
 |---|---|---|---|---|---|
 | **10.24°** | 11° | 9° | 9° | 7.6° | 9° / 7° |
 
-<!-- test: file=files/rocscience/joints/rj016.xlsx, type=fem_tilt, k_stand=0.179846, k_fail=0.181396, expected_tilt=10.24, tolerance=0.1, element_type=tri6, target_size=0.09, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-16 -->
+<!-- test: file=files/rocscience/joints/rj016.xlsx, type=fem_tilt, k_stand=0.179846, k_fail=0.181396, expected_tilt=10.24, tolerance=0.1, element_type=tri6, target_size=0.09, max_iter=250000, tension_srf=false, k0=1, benchmark=RJ-16, expected_elements=524, expected_nodes=1631 -->
 
 The stack stands at k = 0.1798, which is 10.20°, and fails at k = 0.1814, which is 10.28°. It
 stands at every coefficient tried below that and fails at every one above, through 0.25, and the
@@ -756,7 +756,7 @@ UDEC run.
 |---|---|---|---|
 | **1.213** | 1.29 (−6.0%) | 1.24 vs 1.29 (−3.9%) | 1.24 / 1.2 |
 
-<!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj017.xlsx, type=fem_ssrm, expected_fs=1.213, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-17, f_stand=1.203125, f_fail=1.22265625, check=edges, tier=gate, expected_elements=1566, expected_nodes=3284 -->
 
 **The rock bridges control this row.** The rock has no tensile capacity at all, so the bridges
 between the joint segments carry no tension. The strength reduction lowers their 25 kPa cohesion
@@ -785,7 +785,7 @@ reduction.
 |---|---|---|---|
 | **0.998** | 1.01 (−1.2%) | 1.01 vs 1.01 (0.0%) | 1.01 / 1.00 |
 
-<!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-18, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj018.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-18, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate, expected_elements=1628, expected_nodes=3486 -->
 
 **Input file:** [rj018.xlsx](files/rocscience/joints/rj018.xlsx).
 
@@ -818,7 +818,7 @@ some mechanism that the rigid-block analysis does not contain.
 |---|---|---|---|---|
 | **1.623** | 1.5914 (+2.0%) | 1.5 vs 1.5914 (−5.7%) | 1.46 (+11.2%) | 1.5 / 1.41 |
 
-<!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj019.xlsx, type=fem_ssrm, expected_fs=1.623, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=true, k0=1, benchmark=RJ-19, f_stand=1.61328125, f_fail=1.6328125, check=edges, tier=gate, expected_elements=1662, expected_nodes=3485 -->
 
 The joint inclinations are taken from the vendor's model. The manual's table prints 59°, its figure
 is dimensioned at 56° and 28°, and the joint endpoints in the model give 56.3° and 28.4°.
@@ -857,7 +857,7 @@ describe a different model, so they are not used to score this row.
 |---|---|---|---|
 | **2.541** | 2.46 (+3.3%) | 2.21 vs 2.46 (−10.2%) | 2.21 / 2.37 |
 
-<!-- test: file=files/rocscience/joints/rj020.xlsx, type=fem_ssrm, expected_fs=2.541, element_type=tri6, target_size=2.895, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-20, f_stand=2.53125, f_fail=2.55078125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/joints/rj020.xlsx, type=fem_ssrm, expected_fs=2.541, element_type=tri6, target_size=2.895, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, benchmark=RJ-20, f_stand=2.53125, f_fail=2.55078125, check=edges, tier=gate, expected_elements=3567, expected_nodes=10864 -->
 
 The search closed on the bracket 2.531 to 2.551. The trial at 2.531 ran to the limit of one
 million iterations: the section had stopped moving, but three contacts kept opening and closing

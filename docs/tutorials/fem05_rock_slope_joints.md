@@ -207,7 +207,7 @@ Press **Run**. The search takes about **two minutes** on an ordinary desktop —
 nearer three on an install that does not include the
 [compiled kernel](../fem/solver.md#fast-kernel) — and reports
 
-<!-- test: file=files/xslope_rock_joints.xlsx, type=fem_ssrm, expected_fs=1.199, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-slab-ssrm -->
+<!-- test: file=files/xslope_rock_joints.xlsx, type=fem_ssrm, expected_fs=1.199, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-slab-ssrm, expected_elements=344, expected_nodes=768 -->
 
 >>**FS = 1.199**
 
@@ -402,7 +402,7 @@ Part 1: SSRM, the bracket from 1.0 to 2.0, tolerance 0.01, **Max iterations per
 trial** at 100,000, and the failure criterion on Hybrid. Press **Run**. It takes
 about two minutes and reports
 
-<!-- test: file=files/xslope_rock_toppling.xlsx, type=fem_ssrm, expected_fs=1.105, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-topple-ssrm -->
+<!-- test: file=files/xslope_rock_toppling.xlsx, type=fem_ssrm, expected_fs=1.105, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-topple-ssrm, expected_elements=402, expected_nodes=947 -->
 
 >>**FS = 1.105**
 
@@ -476,7 +476,7 @@ Meshed at the same 1.5 m it comes to **1,303 nodes, 531 elements and 82 joint
 elements**, twice the interfaces of the column set, and run at the same settings
 it takes about **five minutes** on the reference solver. The search reports
 
-<!-- test: file=files/xslope_rock_voronoi.xlsx, type=fem_ssrm, expected_fs=1.090, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-voronoi-ssrm -->
+<!-- test: file=files/xslope_rock_voronoi.xlsx, type=fem_ssrm, expected_fs=1.090, element_type=tri6, target_size=1.5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-5-voronoi-ssrm, expected_elements=531, expected_nodes=1303 -->
 
 >>**FS = 1.090**
 

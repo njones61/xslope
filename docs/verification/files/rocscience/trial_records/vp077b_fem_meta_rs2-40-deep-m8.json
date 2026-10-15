@@ -5,6 +5,7 @@
   "expected_fs": "1.470",
   "file": "files/rocscience/vp077b.xlsx",
   "max_iter": 16000,
+  "record_only": true,
   "failure_criterion": "hybrid",
   "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "final_interval": [

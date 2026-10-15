@@ -148,6 +148,22 @@ def _tag_kv(line):
     return kv
 
 
+#: Keys a tag carries as a guard rather than as a published value. On a strength
+#: reduction or tilt lock the mesh counts name the mesh the lock was cut on
+#: (run_tests._check_mesh_counts); the page has no reason to print them, where a
+#: mesh_elements tag's counts are the published figure itself.
+GUARD_KEYS = {"fem_ssrm": ("expected_elements", "expected_nodes"),
+              "fem_tilt": ("expected_elements", "expected_nodes")}
+
+
+def _published(kv, cfg):
+    """The tag's values the page must print: its ``tag_value_keys`` less any
+    guard key of the tag's type."""
+    guard = GUARD_KEYS.get(kv.get("type"), ())
+    return {k: v for k, v in kv.items()
+            if _wanted(k, cfg.tag_value_keys) and k not in guard}
+
+
 def _wanted(key, patterns):
     for p in patterns:
         if p.endswith("*"):
@@ -197,7 +213,7 @@ def forward(path, cfg, report=print):
         if page_level:
             sec = (0, len(lines), "(page-level tag bank)")
         body = body_of(sec)
-        vals = {k: v for k, v in kv.items() if _wanted(k, cfg.tag_value_keys)}
+        vals = _published(kv, cfg)
         for k, v in vals.items():
             if ";" in v:
                 lists += 1
@@ -637,9 +653,7 @@ def reverse(path, cfg, report=print):
         kv = _tag_kv(l)
         if kv is None:
             continue
-        for k, v in kv.items():
-            if not _wanted(k, cfg.tag_value_keys):
-                continue
+        for k, v in _published(kv, cfg).items():
             # a list lock backs each of its elements
             tagvals.update(_elements(v) if ";" in v else [v])
     XV = re.compile(cfg.locked_value_re)

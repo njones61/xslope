@@ -1489,7 +1489,29 @@ def _fem_case_model(test):
             **_refine_kwargs(test)
         )
 
+    _check_mesh_counts(test, mesh)
     return slope_data, mesh
+
+
+def _check_mesh_counts(test, mesh):
+    """Hold an FEM lock to the mesh it was cut on.
+
+    A tag that carries ``expected_elements`` / ``expected_nodes`` names the
+    discretization its locked value came off. Without them a mesher change (a gmsh
+    upgrade, a meshing fix) reaches a lock only as a shift in the factor of safety,
+    which reads exactly like a solver change; with them the row says the mesh moved,
+    before any solve. Counting the mesh the row builds anyway costs nothing.
+    Raises ValueError, which every caller of ``_fem_case_model`` reports as the
+    row's error."""
+    wrong = []
+    for key, got in (('expected_elements', len(mesh['elements'])),
+                     ('expected_nodes', len(mesh['nodes']))):
+        want = test.get(key)
+        if want is not None and int(want) != got:
+            wrong.append(f"{key.split('_')[1]} {got} != {int(want)}")
+    if wrong:
+        raise ValueError("the mesh moved under the lock: " + ', '.join(wrong)
+                         + " — re-cut the lock on the new mesh and update the counts")
 
 
 def build_fem_ssrm_case(test):

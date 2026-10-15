@@ -250,7 +250,7 @@ Press **Run**. The search takes about **seven minutes** on an ordinary desktop �
 nearer twelve on an install that does not include the
 [compiled kernel](../fem/solver.md#fast-kernel) — and reports
 
-<!-- test: file=files/xslope_block_wall.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-blocks-ssrm -->
+<!-- test: file=files/xslope_block_wall.xlsx, type=fem_ssrm, expected_fs=1.137, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-blocks-ssrm, expected_elements=903, expected_nodes=1980 -->
 
 >>**FS = 1.137**
 
@@ -434,7 +434,7 @@ from 1.0 to 2.0, tolerance 0.01, **Max iterations per trial** at 100,000 and the
 failure criterion on Hybrid. Press **Run**. It takes about twice as long as Part 1,
 because the search climbs higher, and reports
 
-<!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.515625, fs_bound=lower, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm -->
+<!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.515625, fs_bound=lower, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm, expected_elements=927, expected_nodes=2139 -->
 
 >>**FS ≥ 1.51**
 
@@ -702,7 +702,7 @@ soil is Adhesion = 5 kPa and Delta = 20°.
 Run it first with `Joint` at `No`, the sheet as a bonded bar,
 [xslope_base_geotextile_bonded.xlsx](files/xslope_base_geotextile_bonded.xlsx):
 
-<!-- test: file=files/xslope_base_geotextile_bonded.xlsx, type=fem_ssrm, expected_fs=1.566, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-bonded-ssrm -->
+<!-- test: file=files/xslope_base_geotextile_bonded.xlsx, type=fem_ssrm, expected_fs=1.566, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-bonded-ssrm, expected_elements=610, expected_nodes=1333 -->
 
 >>**FS = 1.566**
 
@@ -714,7 +714,7 @@ Then `Joint = Yes`,
 the sheet as a slip surface,
 [xslope_base_geotextile_jointed.xlsx](files/xslope_base_geotextile_jointed.xlsx):
 
-<!-- test: file=files/xslope_base_geotextile_jointed.xlsx, type=fem_ssrm, expected_fs=1.566, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-jointed-ssrm -->
+<!-- test: file=files/xslope_base_geotextile_jointed.xlsx, type=fem_ssrm, expected_fs=1.566, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-sheet-jointed-ssrm, expected_elements=610, expected_nodes=1443 -->
 
 >>**FS = 1.566**
 
@@ -752,7 +752,7 @@ that is where the embankment will fail.
 Run it the same two ways. First `Joint` at `No`, the liner as a bonded bar,
 [xslope_liner_bonded.xlsx](files/xslope_liner_bonded.xlsx):
 
-<!-- test: file=files/xslope_liner_bonded.xlsx, type=fem_ssrm, expected_fs=2.167, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-bonded-ssrm -->
+<!-- test: file=files/xslope_liner_bonded.xlsx, type=fem_ssrm, expected_fs=2.167, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-bonded-ssrm, expected_elements=610, expected_nodes=1333 -->
 
 >>**FS = 2.167**
 
@@ -768,7 +768,7 @@ both slope faces at 2.17.
 Then `Joint = Yes`, the liner as a slip surface,
 [xslope_liner_jointed.xlsx](files/xslope_liner_jointed.xlsx):
 
-<!-- test: file=files/xslope_liner_jointed.xlsx, type=fem_ssrm, expected_fs=1.285, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-jointed-ssrm -->
+<!-- test: file=files/xslope_liner_jointed.xlsx, type=fem_ssrm, expected_fs=1.285, element_type=tri6, target_size=1.2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-liner-jointed-ssrm, expected_elements=610, expected_nodes=1443 -->
 
 >>**FS = 1.285**
 

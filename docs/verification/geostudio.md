@@ -1283,5 +1283,5 @@ published curves are printed at the last step, past the example's factor of safe
 
 **Sources:** GeoStudio SIGMA/W example "Slope stabilization with piles" (Seequent).
 
-<!-- test: file=files/geostudio/gs2_wall_none.xlsx, type=fem_ssrm, expected_fs=1.0484, element_type=tri6, tolerance=0.01, f_min=0.95, f_max=1.25, max_iter=16000, benchmark=SIGMAW-SRS-nowall -->
-<!-- test: file=files/geostudio/gs2_wall.xlsx, type=fem_ssrm, expected_fs=1.691, element_type=tri6, tolerance=0.01, f_min=1.15, f_max=1.95, max_iter=16000, benchmark=SIGMAW-SRS-wall, f_stand=1.6875, f_fail=1.69375, check=edges -->
+<!-- test: file=files/geostudio/gs2_wall_none.xlsx, type=fem_ssrm, expected_fs=1.0484, element_type=tri6, tolerance=0.01, f_min=0.95, f_max=1.25, max_iter=16000, benchmark=SIGMAW-SRS-nowall, expected_elements=6484, expected_nodes=13127 -->
+<!-- test: file=files/geostudio/gs2_wall.xlsx, type=fem_ssrm, expected_fs=1.691, element_type=tri6, tolerance=0.01, f_min=1.15, f_max=1.95, max_iter=16000, benchmark=SIGMAW-SRS-wall, f_stand=1.6875, f_fail=1.69375, check=edges, expected_elements=6532, expected_nodes=13223 -->

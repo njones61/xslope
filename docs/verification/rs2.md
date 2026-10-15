@@ -63,13 +63,13 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 |---:|:-:|---|---|---|
 | [1](#rs2-1) | 🟢 | Simple slope stability assessment | SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%) | |
 | [2](#rs2-2) | 🟢 | Non-homogeneous slope | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | |
-| [3](#rs2-3) | 🟢 | Non-homogeneous slope with seismic load (0.15g) | SSRM 0.948 vs RS2 SSRM 0.97 (−2.3%) | |
+| [3](#rs2-3) | 🟢 | Non-homogeneous slope with seismic load (0.15g) | SSRM 0.958 vs RS2 SSRM 0.97 (−1.2%) | |
 | [4](#rs2-4) | 🟢 | Dry Talbingo dam | Unconstrained: SSRM 1.672 vs closed form tan45/tan30.9 = 1.669 (+0.2%) · SSR Exclusion Area: SSRM 1.894 vs RS2 Part IV VP5 SSR 1.9 (−0.3%) | Two mechanisms, both scored; Part I's own 1.88 is the native model's unconstrained number. |
 | [5](#rs2-5) | 🟢 | Water table with weak seam | SSRM 1.286 vs RS2 SSRM 1.26 (+2.1%) | |
 | [6](#rs2-6) | 🟢 | Slope with load and pore pressure by water table (ACADS 4) | SSRM 0.792 vs ACADS referee 0.78 (+1.5%) | (caveat) +14.8% above RS2's own SSRM 0.69, and above Slide2's MC-optimized LEM. |
 | [7](#rs2-7) | 🟢 | Pore pressure by digitized total head grid (ACADS 5) | SSRM 1.483 vs RS2 SSRM 1.48 (+0.2%) | Runs on the FE-seepage model built for Slide2 VP10. |
 | [8](#rs2-8) | <span class="nodata">⊘</span> | Saint-Alban test embankment | | *blocked* — the manual gives the measured pore-pressure grid only as contours drawn on its figure, with no coordinates; RS2 SSRM 0.96 vs Pilot 1.04 recorded. |
-| [9](#rs2-9) | 🟢 | Cubzac-les-Ponts test embankment | SSRM 1.309 vs RS2 SSRM 1.31 (−0.1%) | Pore pressures synthesized from the manual's printed 44-point table and the vendor model's water-table line, 95 points in all; the vendor's elastic face layer carried as `elastic_materials`. Pilot 1.24. |
+| [9](#rs2-9) | 🟢 | Cubzac-les-Ponts test embankment | SSRM 1.320 vs RS2 SSRM 1.31 (+0.8%) | Pore pressures synthesized from the manual's printed 44-point table and the vendor model's water-table line, 95 points in all; the vendor's elastic face layer carried as `elastic_materials`. Pilot 1.24. |
 | [10](#rs2-10) | 🟢 | Simple slope II (Arai & Tagyo ex. 1) | SSRM 1.411 vs RS2 SSRM 1.40 (+0.8%) | |
 | [11](#rs2-11) | 🟢 | Layered slope (Arai & Tagyo ex. 2) | SSRM 0.406 vs RS2 SSRM 0.41 (−1.0%) | Scored against the Part IV VP15 model this file is built from; the input-identical native twin, which differs only in the SRF tensile setting, gives 0.39. The 0.39–0.43 band is stitched from two other programs' searches and is not a referee. |
 | [12](#rs2-12) | 🟢 | Simple slope + water table (Arai & Tagyo ex. 3) | SSRM 1.115 vs RS2 SSRM 1.09 (+2.3%) | |
@@ -88,7 +88,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [25](#rs2-25) | 🟢 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs XSLOPE non-circular Spencer 1.194 (+0.7%) | The strength reduction fails on a scarp through the tailings sand, a flat run along the bottom of the clay-shale band and an exit past the toe, a shape no circle can follow; XSLOPE's non-circular limit equilibrium on the same model finds the same slide. RS2's SSR 1.29 on the same model sits above that minimum and is shown beside. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.294 vs RS2 SSRM 2.29 (+0.2%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | |
-| [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.406 vs RS2 SSR 1.41 (−0.3%) | (three heads) The files derive from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values are the referee. |
+| [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.419 vs RS2 SSR 1.41 (+0.6%) | (three heads) The files derive from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values are the referee. |
 | [29](#rs2-29) | 🟢 | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | (both cases) The sand model runs unconstrained, as both vendor twins did; the clay model states its tension crack as geometry (crest cut at 2c/γ plus the removed weight as surcharge) and is transcribed that way. |
 | [30](#rs2-30) | 🟢 | Homogeneous slope, power-curve strength (Perry 1994) | SSRM 0.898 vs Perry 0.92 (−2.4%) | Perry's own critical factor for the slope, by his method; his charts give 0.90, RS2's unconstrained run 0.91. Under the vendor's three exclusion areas, held elastic: SSRM 0.977 vs RS2 SSR 0.97 (+0.7%). Perry's 0.98 is on one specified surface he does not call critical. |
 | [31](#rs2-31) | 🟢 | M-C vs power curve (Baker 2003 ex. 1) | M-C: SSRM 1.529 vs RS2 SSRM 1.53 (−0.1%) · M-C local-linear: SSRM 0.969 vs RS2 SSRM 0.98 (−1.1%) · power curve: SSRM 0.973 vs Baker 0.97 (+0.3%) · GHB fit: SSRM 1.115 vs RS2 SSRM 1.11 (+0.5%) | (four cases) The power curve is scored against Baker, since RS2's own table labels its 1.11 "SRF (Generalized Hoek-Brown)". |
@@ -115,7 +115,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [43](#rs2-39) | 🟢 | Earth embankment, infinite-slope mechanism (D&W Fig 14.7) | SSRM 1.228 vs RS2 Part IV VP81 case 1 SSR 1.23 (−0.2%) | (caveat) run under the vendor model's own SSR Exclusion Area; unconstrained, the failure runs through the c = 0 skin at 1.116. |
 | [44](#rs2-44) | 🟢 | Seepage analysis for an earth embankment (D&W Fig 14.20-a) | SSRM 1.490 vs RS2 SSRM 1.51 (−1.3%) | |
 | [45](#rs2-45) | 🟢 | Varying undrained shear strength profiles (D&W Fig 14.20-b) | vp083a: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) · vp083b: SSRM 1.330 vs RS2 SSRM 1.32 (+0.8%) | (caveat) |
-| [46](#rs2-46) | 🟢 | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | a: SSRM 0.773 vs RS2 SSRM 0.78 (−0.9%) · b: SSRM 0.929 vs RS2 SSRM 0.93 (−0.1%) · c: SSRM 1.043 vs RS2 SSRM 1.05 (−0.7%) · d: SSRM 1.145 vs RS2 SSRM 1.15 (−0.4%) | |
+| [46](#rs2-46) | 🟢 | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | a: SSRM 0.787 vs RS2 SSRM 0.78 (+0.9%) · b: SSRM 0.929 vs RS2 SSRM 0.93 (−0.1%) · c: SSRM 1.043 vs RS2 SSRM 1.05 (−0.7%) · d: SSRM 1.145 vs RS2 SSRM 1.15 (−0.4%) | |
 | [47](#rs2-47) | 🟢 | Purely cohesive slope, varying thickness (D&W Fig 14.3) | 30 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 46.5 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 60 ft: SSRM 1.045 vs RS2 SSRM 1.07 (−2.3%) | (all 3 thicknesses) scored against the Part IV VP78 case-(a) models these files are built from. |
 | [48](#rs2-48) | 🟡 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 1.037 vs Leshchinsky &amp; Han FDM referee 0.99 (+4.7%) | Modeled as the paper's dry stack — elastic blocks on friction joints, sheets on their own interfaces — at the paper's reinforcement stiffness J = 1000 kN/m. RS2's own SSR 1.05 comes from a facing meshed as one body and is shown beside it, not scored against. |
 | [49](#rs2-49) | 🔴 | Geotextile wall, fill-quality variant | SSRM 1.096 vs L&amp;H FDM referee 0.99 (+10.7%) | RS2 SSR 1.08 beside; both codes sit above the paper, whose wall fails through a facing neither program lets fail that way — see [RS2-48](#rs2-48). |
@@ -159,7 +159,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [1](#rs2-1) | 🟢 | Slope, homogeneous (ACADS 1a) | SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%) | Same build as [RS2-1](#rs2-1). Part IV publishes RS2 SSRM 0.98; ref 1.00 [Giam]. |
 | [2](#p4-vp2) | 🟢 | Slope, homogeneous, tension crack (ACADS 1b) | SSRM 1.656 vs RS2 SSRM 1.63 (+1.6%) | Own SSRM build carrying the vendor's T = 0 crack zone; ref 1.65 [Giam]. |
 | [3](#rs2-2) | 🟢 | Slope, 3 materials (ACADS 1c) | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | Same build as [RS2-2](#rs2-2). Part IV publishes RS2 SSRM 1.34; ref 1.39. |
-| [4](#rs2-3) | 🟢 | Slope, 3 materials, seismic (ACADS 1d) | SSRM 0.948 vs RS2 SSRM 0.97 (−2.3%) | Same build as [RS2-3](#rs2-3). Part IV publishes RS2 SSRM 0.95; ref 1.00. |
+| [4](#rs2-3) | 🟢 | Slope, 3 materials, seismic (ACADS 1d) | SSRM 0.958 vs RS2 SSRM 0.97 (−1.2%) | Same build as [RS2-3](#rs2-3). Part IV publishes RS2 SSRM 0.95; ref 1.00. |
 | [5](#rs2-4) | 🟢 | Dam, 4 materials (ACADS 2a) | Unconstrained: SSRM 1.672 vs closed form 1.669 (+0.2%) · SSR Exclusion Area: SSRM 1.894 vs RS2 SSRM 1.9 (−0.3%) | Scored twice on [RS2-4](#rs2-4), the second under this manual's own SSR Exclusion Area. Slide2 1.948, ref 1.95 [Giam]. |
 | [6](#p4-vp6) | 🟢 | Dam, 4 materials, predefined surface (ACADS 2b) | SSRM 2.188 vs RS2 SSRM 2.15 (+1.8%) | Own SSRM build, constrained to RS2's 37-vertex Search Area from `#006.fez`, which holds the mechanism on ACADS 2(b)'s upstream circle. |
 | [7](#rs2-5) | 🟢 | Slope, 2 materials, weak layer (ACADS 3a) | SSRM 1.286 vs RS2 SSRM 1.26 (+2.1%) | Same build as [RS2-5](#rs2-5). Part IV publishes RS2 SSRM 1.24; ref 1.24–1.27. |
@@ -176,7 +176,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Same build as [RS2-20](#rs2-20); Chen & Shao 1.05. |
 | [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Same build as [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
 | [32](#rs2-24) | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | 1.104 / 0.975 | The same two sections [RS2-24](#rs2-24) builds, scored there against Part I. Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98 under an SSR search polygon and a wider elastic region; Borges 1.25 / 1.19 / 0.99. The limit-equilibrium build of the same problem is Slide2 [VP32](rocscience.md#vp32). |
-| [38](#rs2-28) | 🟢 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.406 vs RS2 SSR 1.41 (−0.3%) | Same build as [RS2-28](#rs2-28), which is built from the native `#028` models; the Part I §28 values are the referee. |
+| [38](#rs2-28) | 🟢 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.419 vs RS2 SSR 1.41 (+0.6%) | Same build as [RS2-28](#rs2-28), which is built from the native `#028` models; the Part I §28 values are the referee. |
 | [39](#rs2-29) | 🟢 | Reinforced embankment, geosynthetic (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | Same build as [RS2-29](#rs2-29), both cases; the clay case pairs with RS2's own Part I model. Part IV publishes RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
 | [40](#rs2-30) | 🟢 | Homogeneous, power curve, sensitivity (Perry 1994) | Under the vendor's exclusion areas: SSRM 0.977 vs RS2 SSR 0.97 (+0.7%) | Same build as [RS2-30](#rs2-30), whose unconstrained run is scored against Perry's critical 0.92. Perry's 0.98 is on his specified surface. |
 | [41](#p4-vp41) | 🟢 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | SSRM 1.656 vs RS2 SSRM 1.64 (+1.0%) | Own SSRM build; Bishop 1.66 / Janbu 1.60–1.67. |
@@ -225,7 +225,7 @@ Slide2 counterpart: [VP1](rocscience.md#vp1) (ACADS 1a).
 |---|---|---|---|---|
 | SSRM | 0.986 | 0.99 (−0.4%) | Bishop 0.987 | 1.00 (−1.4%) |
 
-<!-- test: file=../lem/files/xslope_acads_simple.xlsx, type=fem_ssrm, expected_fs=0.986, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-1, f_stand=0.98125, f_fail=0.990625, check=edges -->
+<!-- test: file=../lem/files/xslope_acads_simple.xlsx, type=fem_ssrm, expected_fs=0.986, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-1, f_stand=0.98125, f_fail=0.990625, check=edges, expected_elements=2873, expected_nodes=5974 -->
 
 ![RS2-1: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-1.png)
 
@@ -239,7 +239,7 @@ Slide2 counterpart: [VP3](rocscience.md#vp3).
 |---|---|---|---|---|
 | SSRM | 1.347 | 1.36 (−1.0%) | Spencer 1.375 | 1.39 (−3.1%) |
 
-<!-- test: file=files/rocscience/vp003.xlsx, type=fem_ssrm, expected_fs=1.347, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-2, f_stand=1.34453125, f_fail=1.35, check=edges -->
+<!-- test: file=files/rocscience/vp003.xlsx, type=fem_ssrm, expected_fs=1.347, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-2, f_stand=1.34453125, f_fail=1.35, check=edges, expected_elements=2868, expected_nodes=5965 -->
 
 ![RS2-2: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-2.png)
 
@@ -251,13 +251,13 @@ Slide2 counterpart: [VP4](rocscience.md#vp4).
 
 | Method | XSLOPE | RS2 SSRM | Slide2 LEM | ACADS referee |
 |---|---|---|---|---|
-| SSRM | 0.948 | 0.97 (−2.3%) | Spencer 0.991 | 1.00 (−5.2%) |
+| SSRM | 0.958 | 0.97 (−1.2%) | Spencer 0.991 | 1.00 (−4.2%) |
 
 k is entered negative per the FEM sign convention — this is a left-facing slope, so the
 pseudo-static force acts in −x, while the LEM takes the magnitude and directs it from the
 failure surface.
 
-<!-- test: file=files/rocscience/vp004.xlsx, type=fem_ssrm, expected_fs=0.948, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-3, f_stand=0.94375, f_fail=0.953125, check=edges -->
+<!-- test: file=files/rocscience/vp004.xlsx, type=fem_ssrm, expected_fs=0.958, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-3, f_stand=0.953125, f_fail=0.9625, check=edges, expected_elements=2868, expected_nodes=5965 -->
 
 ![RS2-3: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-3.png)
 
@@ -287,8 +287,8 @@ ACADS referee 1.95 are limit-equilibrium answers on the gentler upstream face, a
 Both rows are taken at the 6.5 m tri6 mesh, 3,166 elements against the vendor model's 2,204.
 
 <!-- test: file=files/rocscience/vp005.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, benchmark=RS2-4-mesh -->
-<!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.672, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-4 -->
-<!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.894, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, ssr_zone=0;0;315.5;162;319.5;162;321.6;162;327.6;162;386.9;130.6;386.9;0, benchmark=RS2-4-zone, f_stand=1.8875, f_fail=1.9, check=edges -->
+<!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.672, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-4, expected_elements=3166, expected_nodes=6555 -->
+<!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.894, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, ssr_zone=0;0;315.5;162;319.5;162;321.6;162;327.6;162;386.9;130.6;386.9;0, benchmark=RS2-4-zone, f_stand=1.8875, f_fail=1.9, check=edges, expected_elements=3166, expected_nodes=6555 -->
 
 **Unconstrained — the downstream bench skin (vp005)**
 
@@ -313,7 +313,7 @@ statement, "Water Table with Weak Seam", and this file both place the phreatic s
 of the weak seam (y = 26.5). The seam is purely frictional (c = 0, φ = 10°), so the water table is
 what brings the factor down to the published 1.26, and the wet file is the faithful build.
 
-<!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=fem_ssrm, expected_fs=1.286, element_type=tri6, target_size=2.0, tolerance=0.01, f_min=0.9, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-5, f_stand=1.2828125, f_fail=1.28828125, check=edges -->
+<!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=fem_ssrm, expected_fs=1.286, element_type=tri6, target_size=2.0, tolerance=0.01, f_min=0.9, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-5, f_stand=1.2828125, f_fail=1.28828125, check=edges, expected_elements=605, expected_nodes=1296 -->
 
 ![RS2-5: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-5.png)
 
@@ -331,7 +331,7 @@ XSLOPE's SSRM lands on the ACADS referee value but sits +14.8% above RS2's SSRM,
 Slide2's LEM as well — the published values for this thin-weak-seam problem are widely spread,
 as they are at [#16](#rs2-16).
 
-<!-- test: file=files/rocscience/vp009.xlsx, type=fem_ssrm, expected_fs=0.792, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.3, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-6, f_stand=0.784375, f_fail=0.8, check=edges -->
+<!-- test: file=files/rocscience/vp009.xlsx, type=fem_ssrm, expected_fs=0.792, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.3, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-6, f_stand=0.784375, f_fail=0.8, check=edges, expected_elements=1749, expected_nodes=3636 -->
 
 ![RS2-6: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-6.png)
 
@@ -348,7 +348,7 @@ Slide2 counterpart: [VP10](rocscience.md#vp10).
 The SSRM runs on the FE-seepage model XSLOPE built for Slide2 [VP10](rocscience.md#vp10), meshed
 in tri6.
 
-<!-- test: file=files/rocscience/vp010.xlsx, type=fem_ssrm, expected_fs=1.483, tolerance=0.01, f_min=1.0, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-7, f_stand=1.478125, f_fail=1.4875, check=edges -->
+<!-- test: file=files/rocscience/vp010.xlsx, type=fem_ssrm, expected_fs=1.483, tolerance=0.01, f_min=1.0, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-7, f_stand=1.478125, f_fail=1.4875, check=edges, expected_elements=1617, expected_nodes=3376 -->
 
 ![RS2-7: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-7.png)
 
@@ -384,11 +384,11 @@ layer as its own material, run through `elastic_materials` as on [RS2-23](#rs2-2
 
 | Method | XSLOPE | RS2 SSRM | Pilot |
 |---|---|---|---|
-| SSRM (1.0 m mesh) | 1.309 | 1.31 (−0.1%) | Bishop 1.24 recorded |
+| SSRM (1.0 m mesh) | 1.320 | 1.31 (+0.8%) | Bishop 1.24 recorded |
 
-<!-- test: file=files/rocscience/rs2_9.xlsx, type=fem_ssrm, expected_fs=1.309, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Embankment (elastic face skin), benchmark=RS2-9, f_stand=1.303125, f_fail=1.3140625, check=edges -->
+<!-- test: file=files/rocscience/rs2_9.xlsx, type=fem_ssrm, expected_fs=1.320, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Embankment (elastic face skin), benchmark=RS2-9, f_stand=1.3140625, f_fail=1.325, check=edges, expected_elements=1237, expected_nodes=2588 -->
 
-![RS2-9: Cubzac-les-Ponts test embankment, SSRM 1.309 vs RS2 SSR 1.31 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-9.png)
+![RS2-9: Cubzac-les-Ponts test embankment, SSRM 1.320 vs RS2 SSR 1.31 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-9.png)
 
 ### 🟢 RS2-10: Simple slope II (Arai & Tagyo ex. 1) {#rs2-10}
 
@@ -400,7 +400,7 @@ Slide2 counterpart: [VP14](rocscience.md#vp14) (Arai & Tagyo 1).
 |---|---|---|---|---|
 | SSRM | 1.411 | 1.40 (+0.8%) | Bishop 1.404 / Spencer 1.401 | 1.409 / 1.406 |
 
-<!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=fem_ssrm, expected_fs=1.411, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.2, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-10, f_stand=1.403125, f_fail=1.41875, check=edges -->
+<!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=fem_ssrm, expected_fs=1.411, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.2, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-10, f_stand=1.403125, f_fail=1.41875, check=edges, expected_elements=1630, expected_nodes=3407 -->
 
 ![RS2-10: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-10.png)
 
@@ -420,7 +420,7 @@ how the strength reduction treats tension — the native `#011` run drops tensil
 failure, the Part IV `#015` import holds it, as XSLOPE's FEM does — and publishes 0.39 for the
 native one, so XSLOPE sits inside the vendor's own spread on identical inputs.
 
-<!-- test: file=files/rocscience/vp015.xlsx, type=fem_ssrm, expected_fs=0.406, element_type=tri6, target_size=1.9, tolerance=0.02, f_min=0.25, f_max=0.65, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-11, f_stand=0.4, f_fail=0.4125, check=edges -->
+<!-- test: file=files/rocscience/vp015.xlsx, type=fem_ssrm, expected_fs=0.406, element_type=tri6, target_size=1.9, tolerance=0.02, f_min=0.25, f_max=0.65, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-11, f_stand=0.4, f_fail=0.4125, check=edges, expected_elements=1675, expected_nodes=3482 -->
 
 ![RS2-11: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-11.png)
 
@@ -437,7 +437,7 @@ Slide2 counterpart: [VP16](rocscience.md#vp16).
 The FEM piezo pore pressure uses the vertical-distance convention, consistent with the LEM
 slicer and the published analyses.
 
-<!-- test: file=files/rocscience/vp016.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.9, f_max=1.45, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-12, f_stand=1.10625, f_fail=1.1234375, check=edges -->
+<!-- test: file=files/rocscience/vp016.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.9, f_max=1.45, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-12, f_stand=1.10625, f_fail=1.1234375, check=edges, expected_elements=2328, expected_nodes=4803 -->
 
 ![RS2-12: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-12.png)
 
@@ -451,7 +451,7 @@ Slide2 counterpart: [VP17](rocscience.md#vp17).
 |---|---|---|---|---|---|
 | SSRM | 1.332 | 1.33 (+0.2%) | 1.33 | Bishop 1.342 / Spencer 1.340 | 1.348 / 1.339 |
 
-<!-- test: file=files/rocscience/vp017.xlsx, type=fem_ssrm, expected_fs=1.332, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=1.65, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-13, f_stand=1.3234375, f_fail=1.340625, check=edges -->
+<!-- test: file=files/rocscience/vp017.xlsx, type=fem_ssrm, expected_fs=1.332, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=1.65, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-13, f_stand=1.3234375, f_fail=1.340625, check=edges, expected_elements=1935, expected_nodes=4004 -->
 
 ![RS2-13: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-13.png)
 
@@ -471,10 +471,10 @@ r<sub>u</sub> = 0.5 half the overburden is canceled, leaving so little effective
 the failure surface keeps narrowing as the elements shrink; [#27](#rs2-27), at r<sub>u</sub> = 0.2,
 settles instead.
 
-<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.972, element_type=tri6, target_size=2.8, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14-m2.8, f_stand=0.9625, f_fail=0.98125, check=edges -->
-<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.878, element_type=tri6, target_size=1.4, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14-m1.4, f_stand=0.86875, f_fail=0.8875, check=edges -->
-<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.859, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14-m1.0, f_stand=0.85, f_fail=0.86875, check=edges -->
-<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.934, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14, f_stand=0.925, f_fail=0.94375, check=edges -->
+<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.972, element_type=tri6, target_size=2.8, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14-m2.8, f_stand=0.9625, f_fail=0.98125, check=edges, expected_elements=626, expected_nodes=1333 -->
+<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.878, element_type=tri6, target_size=1.4, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14-m1.4, f_stand=0.86875, f_fail=0.8875, check=edges, expected_elements=2451, expected_nodes=5062 -->
+<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.859, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14-m1.0, f_stand=0.85, f_fail=0.86875, check=edges, expected_elements=4686, expected_nodes=9591 -->
+<!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.934, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14, f_stand=0.925, f_fail=0.94375, check=edges, expected_elements=1189, expected_nodes=2488 -->
 
 ![RS2-14: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-14.png)
 
@@ -492,7 +492,7 @@ The file is the Slide2 VP19 model, so its referee is Part IV VP19's SSR 1.38. Th
 constrained by a four-vertex SSR Search Area and the corpus run is not; the two agree anyway, and
 RS2's unconstrained native rebuild (Part I problem 15) publishes 1.39 on the same slope.
 
-<!-- test: file=files/rocscience/vp019.xlsx, type=fem_ssrm, expected_fs=1.372, element_type=tri6, target_size=4.33, tolerance=0.02, f_min=1.1, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-15, f_stand=1.3625, f_fail=1.38125, check=edges -->
+<!-- test: file=files/rocscience/vp019.xlsx, type=fem_ssrm, expected_fs=1.372, element_type=tri6, target_size=4.33, tolerance=0.02, f_min=1.1, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-15, f_stand=1.3625, f_fail=1.38125, check=edges, expected_elements=2484, expected_nodes=5125 -->
 
 ![RS2-15: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-15.png)
 
@@ -511,9 +511,9 @@ beside it at −4.1%. The factor reads 0.997 on a 4.0 m mesh and 0.978 at 3.0 an
 2.2 m. The model's base is an inclined polygon boundary, fixed along its whole length rather than at
 the nodes of the lowest elevation alone (as at [#22](#rs2-22)).
 
-<!-- test: file=files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.997, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-16-m4.0, f_stand=0.9875, f_fail=1.00625, check=edges -->
-<!-- test: file=files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.978, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-16-m2.2, f_stand=0.96875, f_fail=0.9875, check=edges -->
-<!-- test: file=files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.978, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-16, f_stand=0.96875, f_fail=0.9875, check=edges -->
+<!-- test: file=files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.997, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-16-m4.0, f_stand=0.9875, f_fail=1.00625, check=edges, expected_elements=1539, expected_nodes=3228 -->
+<!-- test: file=files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.978, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-16-m2.2, f_stand=0.96875, f_fail=0.9875, check=edges, expected_elements=4766, expected_nodes=9799 -->
+<!-- test: file=files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.978, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-16, f_stand=0.96875, f_fail=0.9875, check=edges, expected_elements=2629, expected_nodes=5456 -->
 
 ![RS2-16: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-16.png)
 
@@ -532,8 +532,8 @@ Slide2 counterpart: [VP21](rocscience.md#vp21).
 Both files are the Slide2 VP21 model, so the referee is Part IV VP21's SSR column; no vendor model
 of this problem carries an SSR polygon. The water-table case (VP21 case 3) is not built.
 
-<!-- test: file=files/rocscience/vp021a.xlsx, type=fem_ssrm, expected_fs=1.987, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.6, f_max=2.5, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-17, f_stand=1.9796875, f_fail=1.99375, check=edges -->
-<!-- test: file=files/rocscience/vp021b.xlsx, type=fem_ssrm, expected_fs=1.692, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-17b, f_stand=1.684375, f_fail=1.7, check=edges -->
+<!-- test: file=files/rocscience/vp021a.xlsx, type=fem_ssrm, expected_fs=1.987, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.6, f_max=2.5, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-17, f_stand=1.9796875, f_fail=1.99375, check=edges, expected_elements=2007, expected_nodes=4166 -->
+<!-- test: file=files/rocscience/vp021b.xlsx, type=fem_ssrm, expected_fs=1.692, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-17b, f_stand=1.684375, f_fail=1.7, check=edges, expected_elements=2007, expected_nodes=4166 -->
 
 **Dry case (vp021a)**
 
@@ -561,9 +561,9 @@ r<sub>u</sub> case the two vendor answers are 6.1% apart. XSLOPE lands within 0.
 model on both cases, and the row is scored against it. The water-table case, the only one whose
 vendor model carries an SSR polygon, is not built.
 
-<!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18-m2.0, f_stand=1.328125, f_fail=1.3390625, check=edges -->
-<!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18, f_stand=1.328125, f_fail=1.3390625, check=edges -->
-<!-- test: file=files/rocscience/vp022b.xlsx, type=fem_ssrm, expected_fs=1.042, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18b, f_stand=1.034375, f_fail=1.05, check=edges -->
+<!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18-m2.0, f_stand=1.328125, f_fail=1.3390625, check=edges, expected_elements=3177, expected_nodes=6566 -->
+<!-- test: file=files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18, f_stand=1.328125, f_fail=1.3390625, check=edges, expected_elements=5382, expected_nodes=11047 -->
+<!-- test: file=files/rocscience/vp022b.xlsx, type=fem_ssrm, expected_fs=1.042, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-18b, f_stand=1.034375, f_fail=1.05, check=edges, expected_elements=5382, expected_nodes=11047 -->
 
 **Dry case (vp022a)**
 
@@ -592,7 +592,7 @@ a strength reduction on this model should land at or under the best circle, 1.43
 ([VP24](rocscience.md#vp24)). The mechanism shears the 3 m of c = 20 clay below the base of the
 cut, and that layer carries a local element size of 0.25 m, about twelve element rows across it.
 
-<!-- test: file=files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.434, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-19, f_stand=1.428125, f_fail=1.4390625, check=edges -->
+<!-- test: file=files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.434, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-19, f_stand=1.428125, f_fail=1.4390625, check=edges, expected_elements=12586, expected_nodes=25439 -->
 
 ![RS2-19: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-19.png)
 
@@ -611,7 +611,7 @@ vendor run was constrained by a ten-vertex SSR Exclusion Area "to ensure the pre
 geometry", where the corpus run is unconstrained; the mechanism is the Prandtl wedge either way, and
 RS2's unconstrained native rebuild (Part I problem 20) publishes 1.0, the closed form's own value.
 
-<!-- test: file=files/rocscience/vp025.xlsx, type=fem_ssrm, expected_fs=1.003, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-20, f_stand=0.9984375, f_fail=1.00703125, check=edges -->
+<!-- test: file=files/rocscience/vp025.xlsx, type=fem_ssrm, expected_fs=1.003, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-20, f_stand=0.9984375, f_fail=1.00703125, check=edges, expected_elements=827, expected_nodes=1740 -->
 
 ![RS2-20: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-20.png)
 
@@ -627,7 +627,7 @@ Slide2 counterpart: [VP26](rocscience.md#vp26).
 
 *The SSRM converges on the theory value from above.*
 
-<!-- test: file=files/rocscience/vp026.xlsx, type=fem_ssrm, expected_fs=1.011, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-21, f_stand=1.00703125, f_fail=1.015625, check=edges -->
+<!-- test: file=files/rocscience/vp026.xlsx, type=fem_ssrm, expected_fs=1.011, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-21, f_stand=1.00703125, f_fail=1.015625, check=edges, expected_elements=1505, expected_nodes=3138 -->
 
 ![RS2-21: FEM inputs, mesh, max shear strain and displacement vectors at the last standing trial below the critical SRF — the loaded strip punching down, the prism heaving out and up on both sides of it](images/RS2-21.png)
 
@@ -652,7 +652,7 @@ factor above the vendor's. Displacements are fixed along the whole bottom polyli
 undulating base requires. The limit-equilibrium rows stand on the as-published
 [vp027.xlsx](files/rocscience/vp027.xlsx), which carries no distributed loads.
 
-<!-- test: file=files/rocscience/vp027_fem.xlsx, type=fem_ssrm, expected_fs=1.523, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.2, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-22, f_stand=1.5171875, f_fail=1.528125, check=edges -->
+<!-- test: file=files/rocscience/vp027_fem.xlsx, type=fem_ssrm, expected_fs=1.523, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.2, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-22, f_stand=1.5171875, f_fail=1.528125, check=edges, expected_elements=2600, expected_nodes=5411 -->
 
 ![RS2-22: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-22.png)
 
@@ -679,8 +679,8 @@ vendor's own 48.9% element-area fraction), holding the two pieces outside it ela
 The second row is what makes the first a comparison: remove the partition from the same model and
 the reduction goes straight to the shallow skin above el. −20.
 
-<!-- test: file=files/rocscience/vp029_split.xlsx, type=fem_ssrm, expected_fs=0.215, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=0.1, f_max=1.5, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-23-nopartition, f_stand=0.209375, f_fail=0.2203125, check=edges -->
-<!-- test: file=files/rocscience/vp029_split.xlsx, type=fem_ssrm, expected_fs=1.112, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=0.8, f_max=1.5, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Bay Mud (elastic outer 1);Bay Mud (elastic outer 2), benchmark=RS2-23, f_stand=1.10625, f_fail=1.1171875, check=edges -->
+<!-- test: file=files/rocscience/vp029_split.xlsx, type=fem_ssrm, expected_fs=0.215, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=0.1, f_max=1.5, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-23-nopartition, f_stand=0.209375, f_fail=0.2203125, check=edges, expected_elements=3311, expected_nodes=6856 -->
+<!-- test: file=files/rocscience/vp029_split.xlsx, type=fem_ssrm, expected_fs=1.112, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=0.8, f_max=1.5, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Bay Mud (elastic outer 1);Bay Mud (elastic outer 2), benchmark=RS2-23, f_stand=1.10625, f_fail=1.1171875, check=edges, expected_elements=3311, expected_nodes=6856 -->
 
 ![RS2-23: LASH terminal underwater slope (Duncan 2000) under RS2's own elastic partition, SSRM 1.112 vs RS2 SSRM 1.12 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-23.png)
 
@@ -719,11 +719,11 @@ A finer mesh, 1.5 m against 2.0 m, raises each case by 0.024 (1.080 → 1.104 an
 larger elastic region, a different constraint on the same problem, so the rows here are scored
 against Part I. The limit-equilibrium side is Slide2 [VP32](rocscience.md#vp32).
 
-<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=1.104, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24a -->
-<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=1.080, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24a-m2.0 -->
-<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=0.822, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-24a-noskin -->
-<!-- test: file=files/rocscience/vp032c_fem.xlsx, type=fem_ssrm, expected_fs=0.975, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24b -->
-<!-- test: file=files/rocscience/vp032c_fem.xlsx, type=fem_ssrm, expected_fs=0.951, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24b-m2.0 -->
+<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=1.104, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24a, expected_elements=2942, expected_nodes=6185 -->
+<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=1.080, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24a-m2.0, expected_elements=1702, expected_nodes=3633 -->
+<!-- test: file=files/rocscience/vp032a_fem.xlsx, type=fem_ssrm, expected_fs=0.822, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-24a-noskin, expected_elements=1702, expected_nodes=3633 -->
+<!-- test: file=files/rocscience/vp032c_fem.xlsx, type=fem_ssrm, expected_fs=0.975, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24b, expected_elements=2990, expected_nodes=6283 -->
+<!-- test: file=files/rocscience/vp032c_fem.xlsx, type=fem_ssrm, expected_fs=0.951, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Upper embankment (elastic face);Lower embankment (elastic face), benchmark=RS2-24b-m2.0, expected_elements=1735, expected_nodes=3700 -->
 
 ![RS2-24a: the 7 m Borges & Cardoso embankment on its basal geotextile, the sheet built as RS2 builds it — the mesh split along it and the two faces sliding on a frictional interface — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states](images/RS2-24a.png)
 
@@ -769,8 +769,8 @@ vendor's model leaves out, does not change the strength reduction at either mesh
 <!-- test: file=files/rocscience/rs2_25_noncirc.xlsx, type=noncircular_search, num_slices=60, fs_spencer=1.194, benchmark=RS2-25-lem -->
 <!-- test: file=files/rocscience/vp033.xlsx, type=mesh_elements, element_type=tri6, target_size=5.0, expected_elements=1457, expected_nodes=3080, benchmark=RS2-25-mesh -->
 <!-- test: file=files/rocscience/vp033.xlsx, type=mesh_elements, element_type=tri6, target_size=2.5, expected_elements=5239, benchmark=RS2-25-mesh-fine -->
-<!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.188, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, k0=1, benchmark=RS2-25-m2.5, f_stand=1.18125, f_fail=1.1953125, check=edges -->
-<!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.202, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, k0=1, benchmark=RS2-25, f_stand=1.1953125, f_fail=1.209375, check=edges -->
+<!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.188, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, k0=1, benchmark=RS2-25-m2.5, f_stand=1.18125, f_fail=1.1953125, check=edges, expected_elements=5239, expected_nodes=10800 -->
+<!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.202, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, k0=1, benchmark=RS2-25, f_stand=1.1953125, f_fail=1.209375, check=edges, expected_elements=1457, expected_nodes=3080 -->
 
 ![RS2-25: SSRM 1.202 vs XSLOPE's non-circular Spencer 1.194 on the same model — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the scarp through the tailings sand, the flat run along the bottom of the clay-shale band and the exit past the toe](images/RS2-25.png)
 
@@ -789,7 +789,7 @@ six-zone section whose extra zones all sit below or outside the governing mechan
 not reproduced. The piezometric line stands above the downstream ground, so the section carries
 that pond's weight as a traction on the downstream face.
 
-<!-- test: file=files/rocscience/vp034.xlsx, type=fem_ssrm, expected_fs=2.294, element_type=tri6, target_size=15.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-26, f_stand=2.2890625, f_fail=2.29921875, check=edges -->
+<!-- test: file=files/rocscience/vp034.xlsx, type=fem_ssrm, expected_fs=2.294, element_type=tri6, target_size=15.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-26, f_stand=2.2890625, f_fail=2.29921875, check=edges, expected_elements=1640, expected_nodes=3435 -->
 
 ![RS2-26: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-26.png)
 
@@ -808,9 +808,9 @@ of the [VP36](rocscience.md#vp36) reliability benchmark. Its r<sub>u</sub> loadi
 [RS2-14](#rs2-14) mesh-dependent, but here the factor settles: 1.373 / 1.342 / 1.342 at 1.5 / 1.0 /
 0.7 m.
 
-<!-- test: file=files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.373, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-27-m1.5, f_stand=1.365625, f_fail=1.38125, check=edges -->
-<!-- test: file=files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.342, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-27-m0.7, f_stand=1.334375, f_fail=1.35, check=edges -->
-<!-- test: file=files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.342, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-27, f_stand=1.334375, f_fail=1.35, check=edges -->
+<!-- test: file=files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.373, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-27-m1.5, f_stand=1.365625, f_fail=1.38125, check=edges, expected_elements=232, expected_nodes=511 -->
+<!-- test: file=files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.342, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-27-m0.7, f_stand=1.334375, f_fail=1.35, check=edges, expected_elements=986, expected_nodes=2069 -->
+<!-- test: file=files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.342, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-27, f_stand=1.334375, f_fail=1.35, check=edges, expected_elements=483, expected_nodes=1032 -->
 
 ![RS2-27: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-27.png)
 
@@ -839,7 +839,7 @@ Mohr-Coulomb apex above it.
 |---|---|---|---|---|
 | 61 m | **1.669** | 1.64 (+1.8%) | 1.616 (+3.3%) | 1.636 (+2.0%) |
 | 62 m | **1.544** | 1.55 (−0.4%) | 1.535 (+0.6%) | 1.527 (+1.1%) |
-| 63 m | **1.406** | 1.41 (−0.3%) | 1.399 (+0.5%) | 1.436 (−2.1%) |
+| 63 m | **1.419** | 1.41 (+0.6%) | 1.399 (+1.4%) | 1.436 (−1.2%) |
 
 *Published values are from the RS2 *Slope Stability Verification Manual, Part 1*, §28
 (Table 2). The manual's §38-derived cross-reference elsewhere quoting "1.56 / 1.46 / 1.32"
@@ -849,17 +849,17 @@ The vendor fixes the model's truncated left edge in both directions, and the fil
 vertical, as that restraint means; drawn 0.13 m off vertical as in the vendor file, it would mesh
 traction-free under pore pressure that no strength can hold.
 
-<!-- test: file=files/rocscience/rs2_28a.xlsx, type=fem_ssrm, expected_fs=1.669, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28a, f_stand=1.6625, f_fail=1.675, check=edges -->
+<!-- test: file=files/rocscience/rs2_28a.xlsx, type=fem_ssrm, expected_fs=1.669, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28a, f_stand=1.6625, f_fail=1.675, check=edges, expected_elements=3688, expected_nodes=7585 -->
 
 ![RS2-28a: H = 61 m, SSRM 1.669 vs RS2 SSR 1.64 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-28a.png)
 
-<!-- test: file=files/rocscience/rs2_28b.xlsx, type=fem_ssrm, expected_fs=1.544, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28b, f_stand=1.5375, f_fail=1.55, check=edges -->
+<!-- test: file=files/rocscience/rs2_28b.xlsx, type=fem_ssrm, expected_fs=1.544, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28b, f_stand=1.5375, f_fail=1.55, check=edges, expected_elements=3688, expected_nodes=7585 -->
 
 ![RS2-28b: H = 62 m, SSRM 1.544 vs RS2 SSR 1.55 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-28b.png)
 
-<!-- test: file=files/rocscience/rs2_28c.xlsx, type=fem_ssrm, expected_fs=1.406, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28c, f_stand=1.4, f_fail=1.4125, check=edges -->
+<!-- test: file=files/rocscience/rs2_28c.xlsx, type=fem_ssrm, expected_fs=1.419, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28c, f_stand=1.4125, f_fail=1.425, check=edges, expected_elements=3688, expected_nodes=7585 -->
 
-![RS2-28c: H = 63 m, SSRM 1.406 vs RS2 SSR 1.41 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-28c.png)
+![RS2-28c: H = 63 m, SSRM 1.419 vs RS2 SSR 1.41 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-28c.png)
 
 ### 🟢 RS2-29: Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) {#rs2-29}
 
@@ -878,7 +878,7 @@ IV VP39 case 3's SSR 1.22. Neither that model nor RS2's native rebuild carries a
 the corpus run is unconstrained too, and the three answers agree within 2.5%; the reduction
 settles on a shallow compound surface through the c = 0 fill face and the soft-clay toe.
 
-<!-- test: file=files/rocscience/vp039c.xlsx, type=fem_ssrm, expected_fs=1.219, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-29, f_stand=1.2125, f_fail=1.225, check=edges -->
+<!-- test: file=files/rocscience/vp039c.xlsx, type=fem_ssrm, expected_fs=1.219, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-29, f_stand=1.2125, f_fail=1.225, check=edges, expected_elements=899, expected_nodes=1908 -->
 
 ![RS2-29: sand case (vp039c), unconstrained SSRM 1.219 vs RS2 Part IV VP39 case 3 SSR 1.22 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-29.png)
 
@@ -901,7 +901,7 @@ tensile strength to zero once it fails in tension, which XSLOPE's constant cap c
 with the crack cut out of the geometry the model reads the same at the peak cap and at the
 residual.
 
-<!-- test: file=files/rocscience/rs2_29clay.xlsx, type=fem_ssrm, expected_fs=0.997, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-29-clay, f_stand=0.9875, f_fail=1.00625, check=edges -->
+<!-- test: file=files/rocscience/rs2_29clay.xlsx, type=fem_ssrm, expected_fs=0.997, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-29-clay, f_stand=0.9875, f_fail=1.00625, check=edges, expected_elements=798, expected_nodes=1703 -->
 
 ![RS2-29-clay: RS2's own clay model (rs2_29clay), SSRM 0.997 vs RS2 Part I SSR 0.99 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-29-clay.png)
 
@@ -937,8 +937,8 @@ material, so the mesh follows their edges as the vendor's does, and under them t
 limit without the slope either settling or running away, so that value is the midpoint of an
 undecided bracket; the row's dot rests on the unconstrained run.
 
-<!-- test: file=files/rocscience/rs2_30.xlsx, type=fem_ssrm, expected_fs=0.898, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=1.5, max_iter=16000, k0=1, benchmark=RS2-30, f_stand=0.890625, f_fail=0.90625, check=edges -->
-<!-- test: file=files/rocscience/rs2_30_split.xlsx, type=fem_ssrm, expected_fs=0.977, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=1.5, max_iter=16000, k0=1, benchmark=RS2-30-split -->
+<!-- test: file=files/rocscience/rs2_30.xlsx, type=fem_ssrm, expected_fs=0.898, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=1.5, max_iter=16000, k0=1, benchmark=RS2-30, f_stand=0.890625, f_fail=0.90625, check=edges, expected_elements=2533, expected_nodes=5228 -->
+<!-- test: file=files/rocscience/rs2_30_split.xlsx, type=fem_ssrm, expected_fs=0.977, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=1.5, max_iter=16000, k0=1, benchmark=RS2-30-split, expected_elements=2548, expected_nodes=5259 -->
 
 **Unconstrained, Perry's toe (rs2_30)**
 
@@ -977,10 +977,10 @@ option, the SSRM returns **1.115** against RS2's 1.11 (+0.5%). Its Hoek-Brown in
 back-derived from the vendor's m<sub>b</sub> / s / a and reproduce all three to six significant
 figures.
 
-<!-- test: file=files/rocscience/vp044b.xlsx, type=fem_ssrm, expected_fs=1.529, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-31a, f_stand=1.521875, f_fail=1.5359375, check=edges -->
-<!-- test: file=files/rocscience/vp044c.xlsx, type=fem_ssrm, expected_fs=0.969, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.6, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-31b, f_stand=0.9625, f_fail=0.975, check=edges -->
-<!-- test: file=files/rocscience/vp044a.xlsx, type=fem_ssrm, expected_fs=0.973, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=1.6, max_iter=16000, k0=1, benchmark=RS2-31c, f_stand=0.9640625, f_fail=0.98125, check=edges -->
-<!-- test: file=files/rocscience/vp044d.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.7, f_max=1.6, max_iter=16000, k0=1, benchmark=RS2-31d, f_stand=1.1078125, f_fail=1.121875, check=edges -->
+<!-- test: file=files/rocscience/vp044b.xlsx, type=fem_ssrm, expected_fs=1.529, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-31a, f_stand=1.521875, f_fail=1.5359375, check=edges, expected_elements=1966, expected_nodes=4071 -->
+<!-- test: file=files/rocscience/vp044c.xlsx, type=fem_ssrm, expected_fs=0.969, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.6, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-31b, f_stand=0.9625, f_fail=0.975, check=edges, expected_elements=1966, expected_nodes=4071 -->
+<!-- test: file=files/rocscience/vp044a.xlsx, type=fem_ssrm, expected_fs=0.973, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=1.6, max_iter=16000, k0=1, benchmark=RS2-31c, f_stand=0.9640625, f_fail=0.98125, check=edges, expected_elements=1966, expected_nodes=4071 -->
+<!-- test: file=files/rocscience/vp044d.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.7, f_max=1.6, max_iter=16000, k0=1, benchmark=RS2-31d, f_stand=1.1078125, f_fail=1.121875, check=edges, expected_elements=1966, expected_nodes=4071 -->
 
 **Mohr-Coulomb case (vp044b)**
 
@@ -1016,8 +1016,8 @@ power law, as vp045b does, and is this half's referee; the native `#032-powercur
 fitted Generalized Hoek-Brown envelope, which runs a few percent stronger over the slope's
 working-stress range and sits above both power-curve answers.
 
-<!-- test: file=files/rocscience/vp045a.xlsx, type=fem_ssrm, expected_fs=2.790, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=2.3, f_max=3.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-32 -->
-<!-- test: file=files/rocscience/vp045b.xlsx, type=fem_ssrm, expected_fs=2.637, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.8, f_max=3.6, max_iter=16000, k0=1, benchmark=RS2-32b, f_stand=2.6296875, f_fail=2.64375, check=edges -->
+<!-- test: file=files/rocscience/vp045a.xlsx, type=fem_ssrm, expected_fs=2.790, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=2.3, f_max=3.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-32, expected_elements=2154, expected_nodes=4523 -->
+<!-- test: file=files/rocscience/vp045b.xlsx, type=fem_ssrm, expected_fs=2.637, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.8, f_max=3.6, max_iter=16000, k0=1, benchmark=RS2-32b, f_stand=2.6296875, f_fail=2.64375, check=edges, expected_elements=2154, expected_nodes=4523 -->
 
 **Mohr-Coulomb case (vp045a)**
 
@@ -1039,7 +1039,7 @@ Slide2 counterpart: [VP56](rocscience.md#vp56). Swapped heading.
 
 The model's dry tension crack has no FEM representation, worth ~2–3% here.
 
-<!-- test: file=files/rocscience/vp056.xlsx, type=fem_ssrm, expected_fs=1.269, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-33, f_stand=1.2625, f_fail=1.275, check=edges -->
+<!-- test: file=files/rocscience/vp056.xlsx, type=fem_ssrm, expected_fs=1.269, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-33, f_stand=1.2625, f_fail=1.275, check=edges, expected_elements=1802, expected_nodes=3755 -->
 
 ![RS2-33: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-33.png)
 
@@ -1055,8 +1055,8 @@ Slide2 counterpart: [VP61](rocscience.md#vp61).
 | SSRM (vp061b, M-C) | 1.373 | 1.38 (−0.5%) | — | — |
 | SSRM (vp061a, power curve) | 1.497 | 1.47 (+1.8%) | 1.47 | 1.48 |
 
-<!-- test: file=files/rocscience/vp061b.xlsx, type=fem_ssrm, expected_fs=1.373, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-34, f_stand=1.365625, f_fail=1.3796875, check=edges -->
-<!-- test: file=files/rocscience/vp061a.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-34b, f_stand=1.4875, f_fail=1.50625, check=edges -->
+<!-- test: file=files/rocscience/vp061b.xlsx, type=fem_ssrm, expected_fs=1.373, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-34, f_stand=1.365625, f_fail=1.3796875, check=edges, expected_elements=1966, expected_nodes=4071 -->
+<!-- test: file=files/rocscience/vp061a.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-34b, f_stand=1.4875, f_fail=1.50625, check=edges, expected_elements=1966, expected_nodes=4071 -->
 
 **Mohr-Coulomb case (vp061b)**
 
@@ -1081,8 +1081,8 @@ Slide2 counterpart: [VP71](rocscience.md#vp71) (= Slide2 VP71, not
 
 The seepage case runs on a tri6 mesh.
 
-<!-- test: file=files/rocscience/vp071a.xlsx, type=fem_ssrm, expected_fs=1.111, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-36a, f_stand=1.1078125, f_fail=1.11484375, check=edges -->
-<!-- test: file=files/rocscience/vp071b.xlsx, type=fem_ssrm, expected_fs=1.111, element_type=tri6, target_size=4.4, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-36b, f_stand=1.1078125, f_fail=1.11484375, check=edges -->
+<!-- test: file=files/rocscience/vp071a.xlsx, type=fem_ssrm, expected_fs=1.111, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-36a, f_stand=1.1078125, f_fail=1.11484375, check=edges, expected_elements=4784, expected_nodes=9835 -->
+<!-- test: file=files/rocscience/vp071b.xlsx, type=fem_ssrm, expected_fs=1.111, element_type=tri6, target_size=4.4, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-36b, f_stand=1.1078125, f_fail=1.11484375, check=edges, expected_elements=3535, expected_nodes=7304 -->
 
 **FE-seepage case (vp071a)**
 
@@ -1122,7 +1122,7 @@ A cohesionless sand embankment (c = 0, φ = 40°) on a saturated clay foundation
 RS2 re-ran this problem between its two manuals, and XSLOPE sits between the two published
 factors.
 
-<!-- test: file=files/rocscience/vp074.xlsx, type=fem_ssrm, expected_fs=1.201, element_type=tri6, target_size=7.0, tolerance=0.02, f_min=0.9, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-38, f_stand=1.1953125, f_fail=1.20625, check=edges -->
+<!-- test: file=files/rocscience/vp074.xlsx, type=fem_ssrm, expected_fs=1.201, element_type=tri6, target_size=7.0, tolerance=0.02, f_min=0.9, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-38, f_stand=1.1953125, f_fail=1.20625, check=edges, expected_elements=3133, expected_nodes=6492 -->
 
 ![RS2-38: cohesionless embankment on saturated clay (D&W Fig 7.12), SSRM 1.201 vs RS2 SSRM 1.17 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-38.png)
 
@@ -1150,8 +1150,8 @@ The 1.19 published for this problem is a different model's number, RS2's native 
 Part II problem 43. Unconstrained, the failure runs through the c = 0 skin on the fine mesh, as on
 [RS2-40](#rs2-40). Both are taken at the 1.5 m mesh.
 
-<!-- test: file=files/rocscience/vp079.xlsx, type=fem_ssrm, expected_fs=1.431, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.1, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-41, f_stand=1.425, f_fail=1.4375, check=edges -->
-<!-- test: file=files/rocscience/vp081.xlsx, type=fem_ssrm, expected_fs=1.228, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.9, f_max=1.5, max_iter=16000, tension_srf=false, ssr_zone=128;34;128;15;128;0;0;0;0;15;35;15;39.1558;15;71.1539;29.9985;73;34;128;34, k0=1, benchmark=RS2-43, f_stand=1.21875, f_fail=1.2375, check=edges -->
+<!-- test: file=files/rocscience/vp079.xlsx, type=fem_ssrm, expected_fs=1.431, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.1, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-41, f_stand=1.425, f_fail=1.4375, check=edges, expected_elements=3887, expected_nodes=7990 -->
+<!-- test: file=files/rocscience/vp081.xlsx, type=fem_ssrm, expected_fs=1.228, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.9, f_max=1.5, max_iter=16000, tension_srf=false, ssr_zone=128;34;128;15;128;0;0;0;0;15;35;15;39.1558;15;71.1539;29.9985;73;34;128;34, k0=1, benchmark=RS2-43, f_stand=1.21875, f_fail=1.2375, check=edges, expected_elements=3563, expected_nodes=7336 -->
 
 **VP79 (RS2-41, D&W Fig 14.4)**
 
@@ -1189,30 +1189,30 @@ returns that band, at **1.521**, −0.6% on RS2's 1.53:
 
 | `min_slip_depth` (ft) | off | 15 | 20 | 30 | 50 | 80 |
 |---|---|---|---|---|---|---|
-| XSLOPE SSRM | 1.109 | 1.229 | 1.452 | **1.521** | 1.521 | 1.583 |
+| XSLOPE SSRM | 1.109 | 1.229 | 1.470 | **1.521** | 1.521 | 1.583 |
 
 The 30 and 50 ft cutoffs return the same 1.521, so the deep answer is the one they agree on; at
 80 ft the cutoff excludes the upper reach of the basal band along with the skin. A finer mesh
-moves the deep value from 1.521 at the 12.4 ft mesh (2,223 tri6) to 1.470 at 8 ft
+moves the deep value from 1.521 at the 12.4 ft mesh (2,223 tri6) to 1.487 at 8 ft
 (5,220 tri6), and the skin drifts as well, so both are reported at the 12.4 ft mesh.
 
 **The finite-element seepage case** runs [vp077a.xlsx](files/rocscience/vp077a.xlsx), the file the
 limit-equilibrium side is scored on ([VP77](rocscience.md#vp77)): it solves the model's own
 boundary set on the 12.4 ft tri6 mesh and reduces the strengths on that mesh and field. It reads
-**1.590**, +4.6% on RS2's 1.52; excluding everything shallower than 30 ft returns **1.607**, one
-step of the search higher, so there is no shallow skin to exclude on this case.
+**1.590**, +4.6% on RS2's 1.52; excluding everything shallower than 30 ft returns the same
+**1.590**, so there is no shallow skin to exclude on this case.
 
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=12.4, expected_elements=2223, benchmark=RS2-40-mesh -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=8.0, expected_elements=5220, benchmark=RS2-40-mesh-fine -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.109, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-40 -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.470, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep-m8, f_stand=1.4609375, f_fail=1.478125, check=edges -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.229, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=15, k0=1, benchmark=RS2-40-d15, f_stand=1.2203125, f_fail=1.2375, check=edges -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.452, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=20, k0=1, benchmark=RS2-40-d20, f_stand=1.44375, f_fail=1.4609375, check=edges -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=50, k0=1, benchmark=RS2-40-d50, f_stand=1.5125, f_fail=1.5296875, check=edges -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.583, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80, f_stand=1.58125, f_fail=1.5984375, check=edges -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep, f_stand=1.5125, f_fail=1.5296875, check=edges -->
-<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, seep=steady, benchmark=RS2-40-seep, f_stand=1.58125, f_fail=1.5984375, check=edges -->
-<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.607, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30, f_stand=1.5984375, f_fail=1.615625, check=edges -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.109, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-40, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.487, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep-m8, f_stand=1.478125, f_fail=1.4953125, check=edges, expected_elements=5220, expected_nodes=10763 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.229, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=15, k0=1, benchmark=RS2-40-d15, f_stand=1.2203125, f_fail=1.2375, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.470, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=20, k0=1, benchmark=RS2-40-d20, f_stand=1.4609375, f_fail=1.478125, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=50, k0=1, benchmark=RS2-40-d50, f_stand=1.5125, f_fail=1.5296875, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.583, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep, f_stand=1.5125, f_fail=1.5296875, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, seep=steady, benchmark=RS2-40-seep, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
 
 **Filter off — the saturated downstream face skin (vp077b)**
 
@@ -1241,7 +1241,7 @@ transcribed from. As on [RS2-11](#rs2-11), RS2 ran this problem twice on input-i
 that differ only in the SRF tensile setting; the Part IV import holds tension as XSLOPE does, on a
 mesh of 3031 elements against the native model's 1080.
 
-<!-- test: file=files/rocscience/vp075.xlsx, type=fem_ssrm, expected_fs=1.214, element_type=tri6, target_size=1.85, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-42, f_stand=1.20625, f_fail=1.221875, check=edges -->
+<!-- test: file=files/rocscience/vp075.xlsx, type=fem_ssrm, expected_fs=1.214, element_type=tri6, target_size=1.85, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-42, f_stand=1.20625, f_fail=1.221875, check=edges, expected_elements=3409, expected_nodes=7054 -->
 
 ![RS2-42: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-42.png)
 
@@ -1256,7 +1256,7 @@ Slide2 counterpart: [VP82](rocscience.md#vp82) (= Slide2 VP82, not
 |---|---|---|---|---|
 | SSRM | 1.490 | 1.51 (−1.3%) | 1.532 / 1.541 | 1.528–1.542 (−2.5%) |
 
-<!-- test: file=files/rocscience/vp082.xlsx, type=fem_ssrm, expected_fs=1.490, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=2.1, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-44, f_stand=1.48125, f_fail=1.4984375, check=edges -->
+<!-- test: file=files/rocscience/vp082.xlsx, type=fem_ssrm, expected_fs=1.490, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=2.1, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-44, f_stand=1.48125, f_fail=1.4984375, check=edges, expected_elements=4755, expected_nodes=9756 -->
 
 ![RS2-44: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-44.png)
 
@@ -1275,8 +1275,8 @@ Slide2 counterpart: [VP83](rocscience.md#vp83).
 Both cases land inside the referee band. [RS2-19](#rs2-19) is the other φ = 0 foundation
 problem.
 
-<!-- test: file=files/rocscience/vp083a.xlsx, type=fem_ssrm, expected_fs=1.314, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-45a, f_stand=1.30625, f_fail=1.321875, check=edges -->
-<!-- test: file=files/rocscience/vp083b.xlsx, type=fem_ssrm, expected_fs=1.330, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-45b, f_stand=1.321875, f_fail=1.3375, check=edges -->
+<!-- test: file=files/rocscience/vp083a.xlsx, type=fem_ssrm, expected_fs=1.314, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-45a, f_stand=1.30625, f_fail=1.321875, check=edges, expected_elements=751, expected_nodes=1594 -->
+<!-- test: file=files/rocscience/vp083b.xlsx, type=fem_ssrm, expected_fs=1.330, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-45b, f_stand=1.321875, f_fail=1.3375, check=edges, expected_elements=751, expected_nodes=1594 -->
 
 **Case a (vp083a)**
 
@@ -1294,21 +1294,21 @@ Slide2 counterpart: [VP84](rocscience.md#vp84).
 
 | Method | XSLOPE | RS2 SSRM | Duncan & Wright |
 |---|---|---|---|
-| SSRM (vp084a) | 0.773 | 0.78 (−0.9%) | 0.75 (+3.1%) |
+| SSRM (vp084a) | 0.787 | 0.78 (+0.9%) | 0.75 (+4.9%) |
 | SSRM (vp084b) | 0.929 | 0.93 (−0.1%) | 0.90 (+3.2%) |
 | SSRM (vp084c) | 1.043 | 1.05 (−0.7%) | 1.03 (+1.3%) |
 | SSRM (vp084d) | 1.145 | 1.15 (−0.4%) | 1.13 (+1.3%) |
 
-*XSLOPE sits +1.3 to +3.2% above the Duncan & Wright column, the φ = 0 pattern.*
+*XSLOPE sits +1.3 to +4.9% above the Duncan & Wright column, the φ = 0 pattern.*
 
-<!-- test: file=files/rocscience/vp084a.xlsx, type=fem_ssrm, expected_fs=0.773, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46a, f_stand=0.765625, f_fail=0.7796875, check=edges -->
-<!-- test: file=files/rocscience/vp084b.xlsx, type=fem_ssrm, expected_fs=0.929, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.5, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46b, f_stand=0.921875, f_fail=0.9359375, check=edges -->
-<!-- test: file=files/rocscience/vp084c.xlsx, type=fem_ssrm, expected_fs=1.043, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.5, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46c, f_stand=1.0359375, f_fail=1.05, check=edges -->
-<!-- test: file=files/rocscience/vp084d.xlsx, type=fem_ssrm, expected_fs=1.145, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.7, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46d, f_stand=1.1375, f_fail=1.153125, check=edges -->
+<!-- test: file=files/rocscience/vp084a.xlsx, type=fem_ssrm, expected_fs=0.787, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46a, f_stand=0.7796875, f_fail=0.79375, check=edges, expected_elements=665, expected_nodes=1418 -->
+<!-- test: file=files/rocscience/vp084b.xlsx, type=fem_ssrm, expected_fs=0.929, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.5, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46b, f_stand=0.921875, f_fail=0.9359375, check=edges, expected_elements=665, expected_nodes=1418 -->
+<!-- test: file=files/rocscience/vp084c.xlsx, type=fem_ssrm, expected_fs=1.043, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.5, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46c, f_stand=1.0359375, f_fail=1.05, check=edges, expected_elements=665, expected_nodes=1418 -->
+<!-- test: file=files/rocscience/vp084d.xlsx, type=fem_ssrm, expected_fs=1.145, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.7, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-46d, f_stand=1.1375, f_fail=1.153125, check=edges, expected_elements=665, expected_nodes=1418 -->
 
 **Case a (vp084a)**
 
-![RS2-46a: vp084a (SSRM 0.773) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-46a.png)
+![RS2-46a: vp084a (SSRM 0.787) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-46a.png)
 
 **Case b (vp084b)**
 
@@ -1346,9 +1346,9 @@ four-vertex SSR Exclusion Area "to force RS2 to iterate for SRF associated with 
 passing through the toe of the slope"; the corpus runs are unconstrained and land on the
 constrained values anyway, at the 4.0 m mesh.
 
-<!-- test: file=files/rocscience/vp078.xlsx, type=fem_ssrm, expected_fs=1.061, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47, f_stand=1.053125, f_fail=1.06875, check=edges -->
-<!-- test: file=files/rocscience/vp078b.xlsx, type=fem_ssrm, expected_fs=1.061, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47b, f_stand=1.053125, f_fail=1.06875, check=edges -->
-<!-- test: file=files/rocscience/vp078c.xlsx, type=fem_ssrm, expected_fs=1.045, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47c, f_stand=1.0375, f_fail=1.053125, check=edges -->
+<!-- test: file=files/rocscience/vp078.xlsx, type=fem_ssrm, expected_fs=1.061, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47, f_stand=1.053125, f_fail=1.06875, check=edges, expected_elements=2037, expected_nodes=4230 -->
+<!-- test: file=files/rocscience/vp078b.xlsx, type=fem_ssrm, expected_fs=1.061, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47b, f_stand=1.053125, f_fail=1.06875, check=edges, expected_elements=2630, expected_nodes=5425 -->
+<!-- test: file=files/rocscience/vp078c.xlsx, type=fem_ssrm, expected_fs=1.045, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47c, f_stand=1.0375, f_fail=1.053125, check=edges, expected_elements=3719, expected_nodes=7628 -->
 
 ![RS2-47: 30-ft case (vp078) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-47.png)
 
@@ -1405,7 +1405,7 @@ The wall as the paper builds it: fill c = 0, φ = 34°, sheets 6.3 m long at 10 
 |---|---|---|
 | **1.037** | 0.99 (+4.7%) | 1.05 |
 
-<!-- test: file=files/rocscience/vp087_fem.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-48, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/vp087_fem.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-48, f_stand=1.02734375, f_fail=1.046875, check=edges, tier=gate, expected_elements=2194, expected_nodes=5544 -->
 
 **Input file:** [vp087_fem.xlsx](files/rocscience/vp087_fem.xlsx).
 
@@ -1421,7 +1421,7 @@ this fill would give about 20.5°.
 |---|---|---|
 | **1.096** | 0.99 (+10.7%) | 1.08 |
 
-<!-- test: file=files/rocscience/vp088_fem.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-49, f_stand=1.0859375, f_fail=1.10546875, check=edges -->
+<!-- test: file=files/rocscience/vp088_fem.xlsx, type=fem_ssrm, expected_fs=1.096, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-49, f_stand=1.0859375, f_fail=1.10546875, check=edges, expected_elements=2194, expected_nodes=5544 -->
 
 The published factors disagree among themselves here: the Slide2 columns for this wall read 0.98 / 0.97 / 0.97 against RS2's own strength-reduction value of 1.08, with the
 paper's 0.99 between them. Giving the facing blocks a cohesion instead of leaving them elastic does not bring
@@ -1445,7 +1445,7 @@ crossing the lower sheets and passing behind the ends of the upper ones, which n
 |---|---|---|
 | **0.998** | 0.98 (+1.8%) | 0.93 |
 
-<!-- test: file=files/rocscience/vp089_fem.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-50, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/vp089_fem.xlsx, type=fem_ssrm, expected_fs=0.998, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-50, f_stand=0.98828125, f_fail=1.0078125, check=edges, tier=gate, expected_elements=2112, expected_nodes=5260 -->
 
 **Input file:** [vp089_fem.xlsx](files/rocscience/vp089_fem.xlsx).
 
@@ -1473,7 +1473,7 @@ The foundation is c = 0, φ = 18°, and this is the lowest factor in the family 
 |---|---|---|
 | **0.783** | 0.86 (−9.0%) | 0.84 |
 
-<!-- test: file=files/rocscience/vp091_fem.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-52, f_stand=0.7734375, f_fail=0.79296875, check=edges -->
+<!-- test: file=files/rocscience/vp091_fem.xlsx, type=fem_ssrm, expected_fs=0.783, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, tension_srf=false, k0=1, ssr_exclude=Blocks, benchmark=RS2-52, f_stand=0.7734375, f_fail=0.79296875, check=edges, expected_elements=2194, expected_nodes=5544 -->
 
 The two codes fail this wall through the foundation, but the surfaces come out in different
 places. The paper's wall fails on a deep wedge that turns under the toe and comes out several
@@ -1531,7 +1531,7 @@ The same 9 m of height in five 1.8 m tiers offset 0.6 m, three sheets per tier.
 |---|---|---|
 | **1.018** | 1.00 (+1.8%) | 1.04 |
 
-<!-- test: file=files/rocscience/vp094_fem.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-55, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate -->
+<!-- test: file=files/rocscience/vp094_fem.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-55, f_stand=1.0078125, f_fail=1.02734375, check=edges, tier=gate, expected_elements=2168, expected_nodes=5496 -->
 
 **Input file:** [vp094_fem.xlsx](files/rocscience/vp094_fem.xlsx).
 
@@ -1580,8 +1580,8 @@ GEO FEM reads 23.2% above Z-Soil on #56 case 4.
 | 4 | 1.05 | 0.95 | 0.99 | 1.17 | 1.02 |
 | 5 | 2.14 | 1.98 | 2.09 | 2.19 | 2.08 |
 
-<!-- test: file=files/rocscience/rs2_56a.xlsx, type=fem_ssrm, expected_fs=0.664, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.32, f_max=1.12, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-56a, f_stand=0.6575, f_fail=0.67, check=edges -->
-<!-- test: file=files/rocscience/rs2_56b.xlsx, type=fem_ssrm, expected_fs=2.096, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.79, f_max=2.59, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-56b, f_stand=2.09, f_fail=2.1025, check=edges -->
+<!-- test: file=files/rocscience/rs2_56a.xlsx, type=fem_ssrm, expected_fs=0.664, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.32, f_max=1.12, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-56a, f_stand=0.6575, f_fail=0.67, check=edges, expected_elements=1715, expected_nodes=3564 -->
+<!-- test: file=files/rocscience/rs2_56b.xlsx, type=fem_ssrm, expected_fs=2.096, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.79, f_max=2.59, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-56b, f_stand=2.09, f_fail=2.1025, check=edges, expected_elements=1715, expected_nodes=3564 -->
 
 **Case 2 — weakest of the five (rs2_56a)**
 
@@ -1619,8 +1619,8 @@ The 10.5 m slope of the same study in six material cases, with the constants of
 | 5 | 0.96 | 0.98 | 0.97 | 1.03 | 0.95 |
 | 6 | 1.42 | 1.52 | 1.45 | 1.54 | 1.40 |
 
-<!-- test: file=files/rocscience/rs2_57a.xlsx, type=fem_ssrm, expected_fs=0.439, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.89, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-57a, f_stand=0.43328125, f_fail=0.445625, check=edges -->
-<!-- test: file=files/rocscience/rs2_57b.xlsx, type=fem_ssrm, expected_fs=1.401, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.07, f_max=1.87, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-57b, f_stand=1.395, f_fail=1.4075, check=edges -->
+<!-- test: file=files/rocscience/rs2_57a.xlsx, type=fem_ssrm, expected_fs=0.439, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.89, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-57a, f_stand=0.43328125, f_fail=0.445625, check=edges, expected_elements=1975, expected_nodes=4092 -->
+<!-- test: file=files/rocscience/rs2_57b.xlsx, type=fem_ssrm, expected_fs=1.401, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.07, f_max=1.87, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-57b, f_stand=1.395, f_fail=1.4075, check=edges, expected_elements=1975, expected_nodes=4092 -->
 
 **Case 1 — weakest of the six (rs2_57a)**
 
@@ -1662,9 +1662,9 @@ steep c = 5, φ = 30 face on the tallest slope, are scored.
 GEO FEM reads 11.3% above PLAXIS on #58 case 3, and RS2's own column is quoted to two
 decimals, so on case 1, which sets this row's dot, one count in the last place is worth 3.0%.
 
-<!-- test: file=files/rocscience/rs2_58a.xlsx, type=fem_ssrm, expected_fs=0.339, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.78, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58a, f_stand=0.33375, f_fail=0.344375, check=edges -->
-<!-- test: file=files/rocscience/rs2_58c5.xlsx, type=fem_ssrm, expected_fs=0.714, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.27, f_max=1.07, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58c5, f_stand=0.7075, f_fail=0.72, check=edges -->
-<!-- test: file=files/rocscience/rs2_58b.xlsx, type=fem_ssrm, expected_fs=1.066, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.71, f_max=1.51, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58b, f_stand=1.06, f_fail=1.0725, check=edges -->
+<!-- test: file=files/rocscience/rs2_58a.xlsx, type=fem_ssrm, expected_fs=0.339, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.78, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58a, f_stand=0.33375, f_fail=0.344375, check=edges, expected_elements=2224, expected_nodes=4597 -->
+<!-- test: file=files/rocscience/rs2_58c5.xlsx, type=fem_ssrm, expected_fs=0.714, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.27, f_max=1.07, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58c5, f_stand=0.7075, f_fail=0.72, check=edges, expected_elements=2224, expected_nodes=4597 -->
+<!-- test: file=files/rocscience/rs2_58b.xlsx, type=fem_ssrm, expected_fs=1.066, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.71, f_max=1.51, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58b, f_stand=1.06, f_fail=1.0725, check=edges, expected_elements=2224, expected_nodes=4597 -->
 
 **Case 1 — weakest of the six (rs2_58a)**
 
@@ -1701,7 +1701,7 @@ strength-reduction factor does not depend on, so it is not a separate XSLOPE cas
 | Case 1 (published moduli), 3 m mesh | 1.572 | 1.57 (+0.1%) | 1.6 (−1.8%) | 1.567 |
 | Case 2 (varying moduli) | — | 1.56 | 1.6 | 1.567 |
 
-<!-- test: file=files/rocscience/rs2_59.xlsx, type=fem_ssrm, expected_fs=1.572, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.3, f_max=1.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-59 -->
+<!-- test: file=files/rocscience/rs2_59.xlsx, type=fem_ssrm, expected_fs=1.572, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.3, f_max=1.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-59, expected_elements=5120, expected_nodes=10557 -->
 
 ![RS2-59: Budapest three-layered soil slope (Görög & Török 2007), critical slip riding a thin weak waste lens (c = 1, φ = 5), SSRM 1.572 at the 3 m mesh — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-59.png)
 
@@ -1791,7 +1791,7 @@ further above RS2's value than case 2, so case 4 is not scored.
 
 <!-- test: file=files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.338, num_slices=40, benchmark=RS2-61a -->
 <!-- test: file=files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.437, num_slices=40, entry_range=42;54, exit_range=23;32, tangent_depth=16;22, benchmark=RS2-61-case3 -->
-<!-- test: file=files/rocscience/rs2_61a.xlsx, type=fem_ssrm, expected_fs=1.383, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.0, max_iter=16000, ssr_zone=8.516;12.255;8.686;6.779;21.55;8.975;28.407;13.412;31.455;18.522;32.3046;20.2236;28.228;21.032;26.57;17.894;22.043;13.995;8.516;12.255, tension_srf=true, k0=1, benchmark=RS2-61-case2, f_stand=1.375, f_fail=1.390625, check=edges -->
+<!-- test: file=files/rocscience/rs2_61a.xlsx, type=fem_ssrm, expected_fs=1.383, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.0, max_iter=16000, ssr_zone=8.516;12.255;8.686;6.779;21.55;8.975;28.407;13.412;31.455;18.522;32.3046;20.2236;28.228;21.032;26.57;17.894;22.043;13.995;8.516;12.255, tension_srf=true, k0=1, benchmark=RS2-61-case2, f_stand=1.375, f_fail=1.390625, check=edges, expected_elements=2399, expected_nodes=4954 -->
 
 **Case 2 — toe to the lower bench, constrained SSRM (rs2_61a)**
 
@@ -1835,9 +1835,9 @@ published values are recorded and no dot rests on them:
 The vendor's own refinement rectangle over the band is not transcribed; the corpus mesh is finer
 than it in the band and coarser in the cap above.
 
-<!-- test: file=files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.769, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, k0=1, benchmark=RS2-62c -->
-<!-- test: file=files/rocscience/rs2_62a.xlsx, type=fem_ssrm, expected_fs=0.781, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, k0=1, benchmark=RS2-62a, f_stand=0.775, f_fail=0.7875, check=edges -->
-<!-- test: file=files/rocscience/rs2_62b.xlsx, type=fem_ssrm, expected_fs=0.769, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, k0=1, benchmark=RS2-62b, f_stand=0.7625, f_fail=0.775, check=edges -->
+<!-- test: file=files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.769, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, k0=1, benchmark=RS2-62c, expected_elements=5495, expected_nodes=11200 -->
+<!-- test: file=files/rocscience/rs2_62a.xlsx, type=fem_ssrm, expected_fs=0.781, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, k0=1, benchmark=RS2-62a, f_stand=0.775, f_fail=0.7875, check=edges, expected_elements=12663, expected_nodes=25602 -->
+<!-- test: file=files/rocscience/rs2_62b.xlsx, type=fem_ssrm, expected_fs=0.769, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, k0=1, benchmark=RS2-62b, f_stand=0.7625, f_fail=0.775, check=edges, expected_elements=8164, expected_nodes=16565 -->
 
 **Analysis III — 12 m boundary, ψ = 0 (rs2_62c)**
 
@@ -1871,7 +1871,7 @@ it, RS2 included, and with its mesh and settings unstated it is recorded here, n
 referee.
 
 <!-- test: file=files/rocscience/rs2_63.xlsx, type=circular_search, method=spencer, expected_fs=1.398, num_slices=40, benchmark=RS2-63-lem -->
-<!-- test: file=files/rocscience/rs2_63.xlsx, type=fem_ssrm, expected_fs=1.391, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-63 -->
+<!-- test: file=files/rocscience/rs2_63.xlsx, type=fem_ssrm, expected_fs=1.391, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-63, expected_elements=1880, expected_nodes=3889 -->
 
 ![RS2-63: homogeneous slope (Cheng et al. 2007), SSRM 1.391 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-63.png)
 
@@ -1928,14 +1928,14 @@ where RS2's own SSR sits below its own Bishop columns (C2 6.10 vs 6.67 / 6.64, �
 agreement is cross-method, so it is shown beside and C4 sets the dot. The vendor's tensile caps,
 which every case carries, account for part of the gap; the rest is unexplained.
 
-<!-- test: file=files/rocscience/rs2_64a.xlsx, type=fem_ssrm, expected_fs=5.189, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.0, f_max=7.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64a, f_stand=5.18359375, f_fail=5.1953125, check=edges -->
-<!-- test: file=files/rocscience/rs2_64c.xlsx, type=fem_ssrm, expected_fs=4.807, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=3.5, f_max=6.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64c, f_stand=4.80078125, f_fail=4.8125, check=edges -->
-<!-- test: file=files/rocscience/rs2_64e.xlsx, type=fem_ssrm, expected_fs=5.620, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.0, f_max=7.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64e, f_stand=5.61328125, f_fail=5.626953125, check=edges -->
-<!-- test: file=files/rocscience/rs2_64b.xlsx, type=fem_ssrm, expected_fs=6.564, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=5.5, f_max=8.0, max_iter=16000, ssr_zone=8.586;8.21;5.834;6.959;6.985;3.006;10.538;-0.747;16.793;-1.748;22.947;-1.097;24.499;1.555;22.797;3.006;20.445;1.305;17.043;1.005;11.939;1.805;9.54718;4.7567;9.637;7.109, tension_srf=true, k0=1, benchmark=RS2-64b, f_stand=6.5546875, f_fail=6.57421875, check=edges -->
-<!-- test: file=files/rocscience/rs2_64d.xlsx, type=fem_ssrm, expected_fs=5.461, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.5, f_max=6.5, max_iter=16000, ssr_zone=4.467;6.136;3.297;3.758;6.455;0.717;11.056;-1.272;17.645;-1.272;18.737;0.795;17.489;1.691;15.345;0.561;10.003;1.418;5.949;4.031;4.467;6.136, tension_srf=true, k0=1, benchmark=RS2-64d, f_stand=5.453125, f_fail=5.46875, check=edges -->
-<!-- test: file=files/rocscience/rs2_64g.xlsx, type=fem_ssrm, expected_fs=1.639, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.5, max_iter=16000, ssr_zone=6.726;7.086;5.442;5.549;6.703;3.353;8.58;0.973;12.299;-1.186;15.538;-1.726;19.497;-1.846;22.991;0.615;19.668;1.926;17.788;0.352;12.322;1.445;9.131;3.675;6.726;7.086, tension_srf=true, k0=1, benchmark=RS2-64g, f_stand=1.6328125, f_fail=1.64453125, check=edges -->
-<!-- test: file=files/rocscience/rs2_64k.xlsx, type=fem_ssrm, expected_fs=1.413, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=2.2, max_iter=16000, ssr_zone=3.413;5.74;2.387;4.091;3.413;2.113;5.538;0.391;9.604;-1.404;12.242;-1.404;14.0932;-0.511713;14.0932;1.014;11.839;1.014;10.593;0.465;8.175;1.454;5.831;2.699;4.45466;4.16031;3.413;5.74, tension_srf=true, k0=1, benchmark=RS2-64k, f_stand=1.4078125, f_fail=1.41796875, check=edges -->
-<!-- test: file=files/rocscience/rs2_64l_split.xlsx, type=fem_ssrm, expected_fs=1.147, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, elastic_materials=rock2a;rock2b, tension_srf=true, k0=1, benchmark=RS2-64l-split -->
+<!-- test: file=files/rocscience/rs2_64a.xlsx, type=fem_ssrm, expected_fs=5.189, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.0, f_max=7.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64a, f_stand=5.18359375, f_fail=5.1953125, check=edges, expected_elements=484, expected_nodes=1041 -->
+<!-- test: file=files/rocscience/rs2_64c.xlsx, type=fem_ssrm, expected_fs=4.807, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=3.5, f_max=6.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64c, f_stand=4.80078125, f_fail=4.8125, check=edges, expected_elements=426, expected_nodes=919 -->
+<!-- test: file=files/rocscience/rs2_64e.xlsx, type=fem_ssrm, expected_fs=5.620, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.0, f_max=7.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64e, f_stand=5.61328125, f_fail=5.626953125, check=edges, expected_elements=282, expected_nodes=617 -->
+<!-- test: file=files/rocscience/rs2_64b.xlsx, type=fem_ssrm, expected_fs=6.564, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=5.5, f_max=8.0, max_iter=16000, ssr_zone=8.586;8.21;5.834;6.959;6.985;3.006;10.538;-0.747;16.793;-1.748;22.947;-1.097;24.499;1.555;22.797;3.006;20.445;1.305;17.043;1.005;11.939;1.805;9.54718;4.7567;9.637;7.109, tension_srf=true, k0=1, benchmark=RS2-64b, f_stand=6.5546875, f_fail=6.57421875, check=edges, expected_elements=579, expected_nodes=1240 -->
+<!-- test: file=files/rocscience/rs2_64d.xlsx, type=fem_ssrm, expected_fs=5.461, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.5, f_max=6.5, max_iter=16000, ssr_zone=4.467;6.136;3.297;3.758;6.455;0.717;11.056;-1.272;17.645;-1.272;18.737;0.795;17.489;1.691;15.345;0.561;10.003;1.418;5.949;4.031;4.467;6.136, tension_srf=true, k0=1, benchmark=RS2-64d, f_stand=5.453125, f_fail=5.46875, check=edges, expected_elements=425, expected_nodes=918 -->
+<!-- test: file=files/rocscience/rs2_64g.xlsx, type=fem_ssrm, expected_fs=1.639, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.5, max_iter=16000, ssr_zone=6.726;7.086;5.442;5.549;6.703;3.353;8.58;0.973;12.299;-1.186;15.538;-1.726;19.497;-1.846;22.991;0.615;19.668;1.926;17.788;0.352;12.322;1.445;9.131;3.675;6.726;7.086, tension_srf=true, k0=1, benchmark=RS2-64g, f_stand=1.6328125, f_fail=1.64453125, check=edges, expected_elements=480, expected_nodes=1033 -->
+<!-- test: file=files/rocscience/rs2_64k.xlsx, type=fem_ssrm, expected_fs=1.413, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=2.2, max_iter=16000, ssr_zone=3.413;5.74;2.387;4.091;3.413;2.113;5.538;0.391;9.604;-1.404;12.242;-1.404;14.0932;-0.511713;14.0932;1.014;11.839;1.014;10.593;0.465;8.175;1.454;5.831;2.699;4.45466;4.16031;3.413;5.74, tension_srf=true, k0=1, benchmark=RS2-64k, f_stand=1.4078125, f_fail=1.41796875, check=edges, expected_elements=276, expected_nodes=605 -->
+<!-- test: file=files/rocscience/rs2_64l_split.xlsx, type=fem_ssrm, expected_fs=1.147, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, elastic_materials=rock2a;rock2b, tension_srf=true, k0=1, benchmark=RS2-64l-split, expected_elements=399, expected_nodes=862 -->
 
 **Case 1 — Slope 1 short-term Original (rs2_64a)**
 
@@ -1987,10 +1987,10 @@ before 1.306 at 2.2 m. The reference FEM 1.41 is the source author's and is show
 referee.
 
 <!-- test: file=files/rocscience/rs2_65.xlsx, type=mesh_elements, element_type=tri6, target_size=3.0, expected_elements=3798, expected_nodes=7803, benchmark=RS2-65-mesh -->
-<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.344, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65-m8 -->
-<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65-m5, f_stand=1.35, f_fail=1.3625, check=edges -->
-<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.294, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65-m3 -->
-<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.306, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65 -->
+<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.344, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65-m8, expected_elements=674, expected_nodes=1433 -->
+<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.356, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65-m5, f_stand=1.35, f_fail=1.3625, check=edges, expected_elements=1491, expected_nodes=3110 -->
+<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.294, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65-m3, expected_elements=3798, expected_nodes=7803 -->
+<!-- test: file=files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.306, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-65, expected_elements=6802, expected_nodes=13877 -->
 
 ![RS2-65: Padina tailings dam (Tzenkov 2008), 8 materials + phreatic surface, SSRM 1.306 at the vendor's own 2.2 m mesh — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-65.png)
 
@@ -2018,7 +2018,7 @@ unfiltered SSRM finds it, and `min_slip_depth` = 4 m excludes it and returns the
 | 2 | 1.044 | 1.169 | 1.13 | 1.05 | 1.21 | 1.24 |
 | 4 | 1.031 | 1.169 | 1.19 | 1.16 | 1.22 | 1.16 |
 | 6 | 1.031 | 1.094 | 1.13 | 1.10 | 1.22 | 1.16 |
-| 8 | 1.031 | 1.069 | 1.08 | 1.13 | 1.10 | 1.10 |
+| 8 | 1.031 | 1.056 | 1.08 | 1.13 | 1.10 | 1.10 |
 | 10 | 1.044 | 1.044 | 1.05 | 1.05 | 1.08 | 1.08 |
 
 The face skin is this row's referee pairing, and its worst case, 1.031 at three thicknesses, is
@@ -2028,16 +2028,16 @@ flow (ψ = φ) where XSLOPE runs ψ = 0. The Slide2 Spencer column reports the f
 10 m and the deeper surface at 4, 6 and 8 m. Both mechanisms run through material with no length
 scale of its own, so every file meshes its soft band at 1.05 m.
 
-<!-- test: file=files/rocscience/rs2_66a.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66a -->
-<!-- test: file=files/rocscience/rs2_66b.xlsx, type=fem_ssrm, expected_fs=1.031, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66b -->
-<!-- test: file=files/rocscience/rs2_66c.xlsx, type=fem_ssrm, expected_fs=1.031, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66c -->
-<!-- test: file=files/rocscience/rs2_66d.xlsx, type=fem_ssrm, expected_fs=1.031, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66d, f_stand=1.025, f_fail=1.0375, check=edges -->
-<!-- test: file=files/rocscience/rs2_66e.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66e, f_stand=1.0375, f_fail=1.05, check=edges -->
-<!-- test: file=files/rocscience/rs2_66a.xlsx, type=fem_ssrm, expected_fs=1.169, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66a-deep, f_stand=1.1625, f_fail=1.175, check=edges -->
-<!-- test: file=files/rocscience/rs2_66b.xlsx, type=fem_ssrm, expected_fs=1.169, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66b-deep, f_stand=1.1625, f_fail=1.175, check=edges -->
-<!-- test: file=files/rocscience/rs2_66c.xlsx, type=fem_ssrm, expected_fs=1.094, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66c-deep, f_stand=1.0875, f_fail=1.1, check=edges -->
-<!-- test: file=files/rocscience/rs2_66d.xlsx, type=fem_ssrm, expected_fs=1.069, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66d-deep, f_stand=1.0625, f_fail=1.075, check=edges -->
-<!-- test: file=files/rocscience/rs2_66e.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66e-deep, f_stand=1.0375, f_fail=1.05, check=edges -->
+<!-- test: file=files/rocscience/rs2_66a.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66a, expected_elements=2177, expected_nodes=4544 -->
+<!-- test: file=files/rocscience/rs2_66b.xlsx, type=fem_ssrm, expected_fs=1.031, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66b, expected_elements=2983, expected_nodes=6160 -->
+<!-- test: file=files/rocscience/rs2_66c.xlsx, type=fem_ssrm, expected_fs=1.031, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66c, expected_elements=3581, expected_nodes=7360 -->
+<!-- test: file=files/rocscience/rs2_66d.xlsx, type=fem_ssrm, expected_fs=1.031, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66d, f_stand=1.025, f_fail=1.0375, check=edges, expected_elements=4155, expected_nodes=8512 -->
+<!-- test: file=files/rocscience/rs2_66e.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-66e, f_stand=1.0375, f_fail=1.05, check=edges, expected_elements=4729, expected_nodes=9664 -->
+<!-- test: file=files/rocscience/rs2_66a.xlsx, type=fem_ssrm, expected_fs=1.169, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66a-deep, f_stand=1.1625, f_fail=1.175, check=edges, expected_elements=2177, expected_nodes=4544 -->
+<!-- test: file=files/rocscience/rs2_66b.xlsx, type=fem_ssrm, expected_fs=1.169, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66b-deep, f_stand=1.1625, f_fail=1.175, check=edges, expected_elements=2983, expected_nodes=6160 -->
+<!-- test: file=files/rocscience/rs2_66c.xlsx, type=fem_ssrm, expected_fs=1.094, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66c-deep, f_stand=1.0875, f_fail=1.1, check=edges, expected_elements=3581, expected_nodes=7360 -->
+<!-- test: file=files/rocscience/rs2_66d.xlsx, type=fem_ssrm, expected_fs=1.056, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66d-deep, f_stand=1.05, f_fail=1.0625, check=edges, expected_elements=4155, expected_nodes=8512 -->
+<!-- test: file=files/rocscience/rs2_66e.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66e-deep, f_stand=1.0375, f_fail=1.05, check=edges, expected_elements=4729, expected_nodes=9664 -->
 
 The first two figures are the filter-off runs at the thinnest and thickest bands; the third is the
 filtered run on the thinnest band.
@@ -2094,12 +2094,12 @@ on the upstream face:
 All six stages land within 1% of RS2's own SSR column. Huang & Jia's own FEM values are shown
 beside it.
 
-<!-- test: file=files/rocscience/rs2_67a.xlsx, type=fem_ssrm, expected_fs=2.502, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.5, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67a, f_stand=2.49609375, f_fail=2.5078125, check=edges -->
-<!-- test: file=files/rocscience/rs2_67c.xlsx, type=fem_ssrm, expected_fs=1.820, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67c, f_stand=1.8125, f_fail=1.828125, check=edges -->
-<!-- test: file=files/rocscience/rs2_67d.xlsx, type=fem_ssrm, expected_fs=2.023, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-6.95691;-29.8799;102.318;-29.8799;102.318;66.9821;-6.95691;66.9821, tension_srf=true, k0=1, benchmark=RS2-67d, f_stand=2.015625, f_fail=2.03125, check=edges -->
-<!-- test: file=files/rocscience/rs2_67b.xlsx, type=fem_ssrm, expected_fs=1.695, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67b, f_stand=1.6875, f_fail=1.703125, check=edges -->
-<!-- test: file=files/rocscience/rs2_67e.xlsx, type=fem_ssrm, expected_fs=2.320, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67e, f_stand=2.3125, f_fail=2.328125, check=edges -->
-<!-- test: file=files/rocscience/rs2_67f.xlsx, type=fem_ssrm, expected_fs=2.742, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-5.89862;-33.6746;102.478;-33.6746;102.478;70.3747;-5.89862;70.3747, tension_srf=true, k0=1, benchmark=RS2-67f -->
+<!-- test: file=files/rocscience/rs2_67a.xlsx, type=fem_ssrm, expected_fs=2.502, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.5, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67a, f_stand=2.49609375, f_fail=2.5078125, check=edges, expected_elements=436, expected_nodes=977 -->
+<!-- test: file=files/rocscience/rs2_67c.xlsx, type=fem_ssrm, expected_fs=1.820, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67c, f_stand=1.8125, f_fail=1.828125, check=edges, expected_elements=696, expected_nodes=1511 -->
+<!-- test: file=files/rocscience/rs2_67d.xlsx, type=fem_ssrm, expected_fs=2.023, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-6.95691;-29.8799;102.318;-29.8799;102.318;66.9821;-6.95691;66.9821, tension_srf=true, k0=1, benchmark=RS2-67d, f_stand=2.015625, f_fail=2.03125, check=edges, expected_elements=865, expected_nodes=1822 -->
+<!-- test: file=files/rocscience/rs2_67b.xlsx, type=fem_ssrm, expected_fs=1.695, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67b, f_stand=1.6875, f_fail=1.703125, check=edges, expected_elements=770, expected_nodes=1681 -->
+<!-- test: file=files/rocscience/rs2_67e.xlsx, type=fem_ssrm, expected_fs=2.320, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67e, f_stand=2.3125, f_fail=2.328125, check=edges, expected_elements=770, expected_nodes=1681 -->
+<!-- test: file=files/rocscience/rs2_67f.xlsx, type=fem_ssrm, expected_fs=2.742, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-5.89862;-33.6746;102.478;-33.6746;102.478;70.3747;-5.89862;70.3747, tension_srf=true, k0=1, benchmark=RS2-67f, expected_elements=770, expected_nodes=1681 -->
 
 **Case 2 — steady full pool, own flow field (rs2_67b)**
 
@@ -2213,10 +2213,10 @@ instead.)
 The factor reads 1.681 / 1.656 / 1.656 / 1.644 at 3 / 1.5 / 1.0 / 0.7 m; at 3 m the zone is about
 one element thick.
 
-<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.681, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m3.0, f_stand=1.675, f_fail=1.6875, check=edges -->
-<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m1.5, f_stand=1.65, f_fail=1.6625, check=edges -->
-<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.644, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m0.7, f_stand=1.6375, f_fail=1.65, check=edges -->
-<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2, f_stand=1.65, f_fail=1.6625, check=edges -->
+<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.681, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m3.0, f_stand=1.675, f_fail=1.6875, check=edges, expected_elements=319, expected_nodes=710 -->
+<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m1.5, f_stand=1.65, f_fail=1.6625, check=edges, expected_elements=1081, expected_nodes=2300 -->
+<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.644, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2-m0.7, f_stand=1.6375, f_fail=1.65, check=edges, expected_elements=4664, expected_nodes=9621 -->
+<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2, f_stand=1.65, f_fail=1.6625, check=edges, expected_elements=2317, expected_nodes=4840 -->
 
 ![RS2 Part IV VP2: ACADS 1(b) homogeneous slope (Giam & Donald 1989), SSRM 1.656 with the vendor's T = 0 crack zone vs RS2 SSRM 1.63 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP2.png)
 
@@ -2243,7 +2243,7 @@ Confinement lifts the factor from 1.672 on the downstream bench to 2.188 on the 
 the split between the two is a choice of mechanism, not a discrepancy. The row is taken at the
 RS2-4 mesh (6.5 m tri6).
 
-<!-- test: file=files/rocscience/vp006.xlsx, type=fem_ssrm, expected_fs=2.188, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.8, f_max=2.5, max_iter=16000, ssr_zone=337.693;156.655;332.733;149.028;321.296;131.643;301.471;106.786;282.104;86.9617;253.282;65.612;218.97;44.5673;191.673;33.2825;160.106;24.1326;129.302;18.6427;106.884;16.5077;82.3323;16.5077;59.6101;20.1677;46.2384;23.742;43.4453;27.1826;26.5181;18.6427;29.4837;15.139;45.1228;9.79785;62.5076;7.05289;90.1096;5.22292;107.647;5.22292;124.269;5.22292;147.754;7.66288;167.883;10.8653;189.996;16.9652;206.923;22.7602;226.464;30.2593;250.08;42.5849;274.937;59.2071;299.184;79.9468;312.146;94.4341;328.442;115.178;340.663;132.406;348.593;150.686;350.477;154.416;339.88;160.039;337.693;156.655, tension_srf=true, k0=1, benchmark=RS2-P4-VP6, f_stand=2.1828125, f_fail=2.19375, check=edges -->
+<!-- test: file=files/rocscience/vp006.xlsx, type=fem_ssrm, expected_fs=2.188, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.8, f_max=2.5, max_iter=16000, ssr_zone=337.693;156.655;332.733;149.028;321.296;131.643;301.471;106.786;282.104;86.9617;253.282;65.612;218.97;44.5673;191.673;33.2825;160.106;24.1326;129.302;18.6427;106.884;16.5077;82.3323;16.5077;59.6101;20.1677;46.2384;23.742;43.4453;27.1826;26.5181;18.6427;29.4837;15.139;45.1228;9.79785;62.5076;7.05289;90.1096;5.22292;107.647;5.22292;124.269;5.22292;147.754;7.66288;167.883;10.8653;189.996;16.9652;206.923;22.7602;226.464;30.2593;250.08;42.5849;274.937;59.2071;299.184;79.9468;312.146;94.4341;328.442;115.178;340.663;132.406;348.593;150.686;350.477;154.416;339.88;160.039;337.693;156.655, tension_srf=true, k0=1, benchmark=RS2-P4-VP6, f_stand=2.1828125, f_fail=2.19375, check=edges, expected_elements=3166, expected_nodes=6555 -->
 
 ![RS2 Part IV VP6: ACADS 2(b) Talbingo dam (Giam & Donald 1989), constrained SSRM 2.188 vs RS2 SSRM 2.15 — the mechanism confined to RS2's upstream SSR-Search-Area polygon read verbatim from the vendor model; FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP6.png)
 
@@ -2266,7 +2266,7 @@ XSLOPE's SSRM lands inside the published LEM cluster and holds between the 2.5 m
 sizes. The vendor model publishes no elastic constants for a power-curve material, so the file
 assigns them by soil type.
 
-<!-- test: file=files/rocscience/vp041.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, k0=1, benchmark=RS2-P4-VP41, f_stand=1.65, f_fail=1.6625, check=edges -->
+<!-- test: file=files/rocscience/vp041.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, k0=1, benchmark=RS2-P4-VP41, f_stand=1.65, f_fail=1.6625, check=edges, expected_elements=1944, expected_nodes=4043 -->
 
 ![RS2 Part IV VP41: Jiang/Baker power-curve slope with r<sub>u</sub> = 0.3, SSRM 1.656 vs RS2 SSRM 1.64 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP41.png)
 
@@ -2325,7 +2325,7 @@ The reduction rides the weak c = 0 seam, the same mechanism that puts RS2's own 
 composite LEM cluster (~1.40). The crest cutoff does nothing here, since the slide never opens the
 crest in tension. ψ = 0.
 
-<!-- test: file=files/rocscience/vp057.xlsx, type=fem_ssrm, expected_fs=1.323, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP57, f_stand=1.3171875, f_fail=1.328125, check=edges -->
+<!-- test: file=files/rocscience/vp057.xlsx, type=fem_ssrm, expected_fs=1.323, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP57, f_stand=1.3171875, f_fail=1.328125, check=edges, expected_elements=2900, expected_nodes=6013 -->
 
 ![RS2 Part IV VP57: layered slope with weak seam (P&D slope 3), SSRM 1.323 vs RS2 SSRM 1.32 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP57.png)
 
@@ -2355,7 +2355,7 @@ also states Slide's inclined tension crack as a T = 0 zone covering the whole up
 which RS2 publishes with the zone in place, so the zone is recorded and the crack is carried
 through `tcrack_depth`.
 
-<!-- test: file=files/rocscience/vp060.xlsx, type=fem_ssrm, expected_fs=1.009, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP60, f_stand=1, f_fail=1.01875, check=edges -->
+<!-- test: file=files/rocscience/vp060.xlsx, type=fem_ssrm, expected_fs=1.009, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP60, f_stand=1, f_fail=1.01875, check=edges, expected_elements=1233, expected_nodes=2570 -->
 
 ![RS2 Part IV VP60: soil-nailed wall (P&D slope 7), SSRM 1.009 vs RS2 SSRM 0.98 — FEM inputs, mesh with the wall-rooted nails conforming into the 2D mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP60.png)
 
@@ -2380,7 +2380,7 @@ is about one element across and cannot form a mechanism, so it is not carried; d
 mechanism, it would give the same answer the unconstrained run gives. The vendor's T = 0 crest
 zone, RS2's import of Slide's 7-ft crack, is carried as the same 7 ft through `tcrack_depth`.
 
-<!-- test: file=files/rocscience/vp064.xlsx, type=fem_ssrm, expected_fs=2.406, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=2.0, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP64, f_stand=2.4, f_fail=2.4125, check=edges -->
+<!-- test: file=files/rocscience/vp064.xlsx, type=fem_ssrm, expected_fs=2.406, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=2.0, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP64, f_stand=2.4, f_fail=2.4125, check=edges, expected_elements=2269, expected_nodes=4710 -->
 
 ![RS2 Part IV VP64: USACE Fig 4-1 end-of-construction dam, SSRM 2.406 vs RS2 SSRM 2.37 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP64.png)
 
@@ -2412,7 +2412,7 @@ carry such a corridor, 6.6 ft wide on VP65 and 9.2 ft on VP66, thinner than the 
 `#065` draws its corridor on a section of its own, so neither is carried and both factors are
 unconstrained runs: on VP66 that still lands within 2.2% of the vendor's constrained value.
 
-<!-- test: file=files/rocscience/vp066.xlsx, type=fem_ssrm, expected_fs=2.172, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP66 -->
+<!-- test: file=files/rocscience/vp066.xlsx, type=fem_ssrm, expected_fs=2.172, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP66, expected_elements=2278, expected_nodes=4729 -->
 
 ![RS2 Part IV VP66: USACE Fig 4-3 dam ponded on both faces, SSRM 2.172 vs RS2 SSRM 2.22 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP66.png)
 
@@ -2445,8 +2445,8 @@ circular LEM search finds the same deep family; the USACE specified circle does 
 vp067c splits the foundation there and excludes the lower zone, and the band moves up onto the toe
 circle at **1.303**.
 
-<!-- test: file=files/rocscience/vp067.xlsx, type=fem_ssrm, expected_fs=1.076, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP67, f_stand=1.06875, f_fail=1.0828125, check=edges -->
-<!-- test: file=files/rocscience/vp067c.xlsx, type=fem_ssrm, expected_fs=1.303, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.2, f_max=1.5, max_iter=16000, ssr_exclude=Foundation lower, tension_srf=true, k0=1, benchmark=RS2-P4-VP67c, f_stand=1.29375, f_fail=1.3125, check=edges -->
+<!-- test: file=files/rocscience/vp067.xlsx, type=fem_ssrm, expected_fs=1.076, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP67, f_stand=1.06875, f_fail=1.0828125, check=edges, expected_elements=2736, expected_nodes=5637 -->
+<!-- test: file=files/rocscience/vp067c.xlsx, type=fem_ssrm, expected_fs=1.303, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.2, f_max=1.5, max_iter=16000, ssr_exclude=Foundation lower, tension_srf=true, k0=1, benchmark=RS2-P4-VP67c, f_stand=1.29375, f_fail=1.3125, check=edges, expected_elements=2754, expected_nodes=5675 -->
 
 **Unconstrained critical SRF (vp067)**
 
@@ -2487,9 +2487,9 @@ the `ssr_zone` approximation described on [RS2-64](#rs2-64), so the constrained 
 
 <!-- test: file=files/rocscience/vp068.xlsx, type=mesh_elements, element_type=tri6, target_size=2.0, expected_elements=1499, benchmark=RS2-P4-VP68-mesh -->
 <!-- test: file=files/rocscience/vp068.xlsx, type=mesh_elements, element_type=tri6, target_size=1.2, expected_elements=4132, benchmark=RS2-P4-VP68-mesh-fine -->
-<!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.016, element_type=tri6, target_size=1.2, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP68-m1.2, f_stand=1.00625, f_fail=1.025, check=edges -->
-<!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.016, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP68, f_stand=1.00625, f_fail=1.025, check=edges -->
-<!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.222, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, ssr_zone=92.8636;16;92.1089;13.5678;89.5431;7.89038;87.3049;3.11374;85.0122;-0.270854;82.4464;-3.19143;79.635;-6.76709;76.8782;-9.03258;71.9651;-12.2534;67.6798;-14.6281;60.8833;-16.839;56.5707;-17.6578;52.0124;-18.504;48.7097;-18.8588;45.9256;-18.8588;41.804;-18.4221;37.9281;-17.6851;34.8438;-16.839;30.4766;-15.3377;26.7917;-13.5909;22.3426;-10.9978;19.7496;-9.27823;18.1938;-8;18.1938;-7.12192;16.365;-7.12192;16.365;-20;95.5679;-20;96.3634;16;96.4959;18.5104;93.1817;18.1127, k0=1, benchmark=RS2-P4-VP68-zone, f_stand=1.2125, f_fail=1.23125, check=edges -->
+<!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.016, element_type=tri6, target_size=1.2, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP68-m1.2, f_stand=1.00625, f_fail=1.025, check=edges, expected_elements=4132, expected_nodes=8497 -->
+<!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.016, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP68, f_stand=1.00625, f_fail=1.025, check=edges, expected_elements=1499, expected_nodes=3136 -->
+<!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.222, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, ssr_zone=92.8636;16;92.1089;13.5678;89.5431;7.89038;87.3049;3.11374;85.0122;-0.270854;82.4464;-3.19143;79.635;-6.76709;76.8782;-9.03258;71.9651;-12.2534;67.6798;-14.6281;60.8833;-16.839;56.5707;-17.6578;52.0124;-18.504;48.7097;-18.8588;45.9256;-18.8588;41.804;-18.4221;37.9281;-17.6851;34.8438;-16.839;30.4766;-15.3377;26.7917;-13.5909;22.3426;-10.9978;19.7496;-9.27823;18.1938;-8;18.1938;-7.12192;16.365;-7.12192;16.365;-20;95.5679;-20;96.3634;16;96.4959;18.5104;93.1817;18.1127, k0=1, benchmark=RS2-P4-VP68-zone, f_stand=1.2125, f_fail=1.23125, check=edges, expected_elements=1499, expected_nodes=3136 -->
 
 **Unconstrained — the model's own global minimum (vp068)**
 
@@ -2522,10 +2522,10 @@ every element reduced the mechanism is a shallow cohesionless face skin, as on [
 and this embankment has no `min_slip_depth` plateau, so carrying the vendor's own constraint is the
 closer reproduction.
 
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=2.031, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m8, f_stand=2.025, f_fail=2.0375, check=edges -->
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.981, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m6.5, f_stand=1.975, f_fail=1.9875, check=edges -->
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.931, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m4, f_stand=1.925, f_fail=1.9375, check=edges -->
-<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.944, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69, f_stand=1.9375, f_fail=1.95, check=edges -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=2.031, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m8, f_stand=2.025, f_fail=2.0375, check=edges, expected_elements=2269, expected_nodes=4692 -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.981, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m6.5, f_stand=1.975, f_fail=1.9875, check=edges, expected_elements=3478, expected_nodes=7143 -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.931, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69-m4, f_stand=1.925, f_fail=1.9375, check=edges, expected_elements=8912, expected_nodes=18123 -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.944, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69, f_stand=1.9375, f_fail=1.95, check=edges, expected_elements=5807, expected_nodes=11854 -->
 
 ![RS2 Part IV VP69: USACE F-6 steady-seepage embankment under RS2's own 38-vertex SSR Search Area, SSRM 1.944 vs RS2 SSR 1.94 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP69.png)
 
@@ -2550,7 +2550,7 @@ pressure on the whole submerged surface and pore pressures from the piezometric 
 The pond-load and pore-pressure treatments balance over the submerged surface, the same check the
 [VP70](rocscience.md#vp70) LEM row makes.
 
-<!-- test: file=files/rocscience/vp070a.xlsx, type=fem_ssrm, expected_fs=1.594, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP70, f_stand=1.5875, f_fail=1.6, check=edges -->
+<!-- test: file=files/rocscience/vp070a.xlsx, type=fem_ssrm, expected_fs=1.594, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP70, f_stand=1.5875, f_fail=1.6, check=edges, expected_elements=1130, expected_nodes=2377 -->
 
 ![RS2 Part IV VP70: submerged slope (D&W Fig 6.27), SSRM 1.594 vs RS2 SSRM 1.58 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP70.png)
 
@@ -2583,13 +2583,13 @@ The paper states every input the dry strength reduction needs, so its own finite
 2.50, is the referee. The 2.43 the vendor manuals print as the paper's reference is the paper's
 Bishop value.
 
-<!-- test: file=files/rocscience/vp102a.xlsx, type=fem_ssrm, expected_fs=2.470, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.9, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102, f_stand=2.4625, f_fail=2.4765625, check=edges -->
-<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.713, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2, f_stand=1.7078125, f_fail=1.71875, check=edges -->
-<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.998, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2, f_stand=1.9921875, f_fail=2.003125, check=edges -->
-<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.304, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c2, f_stand=2.2984375, f_fail=2.309375, check=edges -->
-<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.779, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c3, f_stand=1.7734375, f_fail=1.784375, check=edges -->
-<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.173, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c3, f_stand=2.1671875, f_fail=2.178125, check=edges -->
-<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.687, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c3, f_stand=2.68125, f_fail=2.6921875, check=edges -->
+<!-- test: file=files/rocscience/vp102a.xlsx, type=fem_ssrm, expected_fs=2.470, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.9, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102, f_stand=2.4625, f_fail=2.4765625, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.724, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2, f_stand=1.71875, f_fail=1.7296875, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.998, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2, f_stand=1.9921875, f_fail=2.003125, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.304, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c2, f_stand=2.2984375, f_fail=2.309375, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.779, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c3, f_stand=1.7734375, f_fail=1.784375, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.173, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c3, f_stand=2.1671875, f_fail=2.178125, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.687, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c3, f_stand=2.68125, f_fail=2.6921875, check=edges, expected_elements=1118, expected_nodes=2403 -->
 
 ![RS2 Part IV VP102: dry homogeneous earth dam (Huang & Jia 2008), SSRM 2.470 vs Huang & Jia FEM 2.50 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP102.png)
 
@@ -2600,7 +2600,7 @@ s·tan φ<sup>b</sup>.
 
 | Stage | Case 2 XSLOPE (φ<sup>b</sup> = 0°) | Case 2 RS2 SSR | Case 3 XSLOPE (φ<sup>b</sup> = 37°) | Case 3 RS2 SSR |
 |---|---|---|---|---|
-| 60 h | 1.713 | 1.77 | 1.779 | 1.82 |
+| 60 h | 1.724 | 1.77 | 1.779 | 1.82 |
 | 300 h | 1.998 | 2.06 | 2.173 | 2.14 |
 | 1500 h | 2.304 | 2.29 | 2.687 | 2.48 |
 

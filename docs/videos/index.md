@@ -119,6 +119,10 @@ show what the water costs.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
+**Starting model** — [xslope_video04_water_start.xlsx](files/xslope_video04_water_start.xlsx)
+
+<!-- test: file=files/xslope_video04_water_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.667, tolerance=0.005 -->
+
 **Related tutorial** — [LEM-4. Water in the Slope](../tutorials/lem04_water_in_the_slope.md)
 
 </div>

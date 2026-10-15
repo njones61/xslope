@@ -233,9 +233,16 @@ installed, and the [API](api/solve.md) section documents every function.
 
 ## Getting started
 
-Short [videos](videos/index.md) build models in XSLOPE Studio step by step. The
-[tutorials](tutorials/index.md) cover the same problems and many more in writing,
-with every input in a table you can copy.
+The quickest way in is the [videos](videos/index.md). Each one builds a model in
+XSLOPE Studio from start to finish: the geometry, the materials, the water, the
+analysis, and what the result means. The model files are posted with each video,
+so you can follow along or check your own build against them.
+
+The [tutorials](tutorials/index.md) cover the same ground in writing and go much
+further: 28 worked problems in limit equilibrium, seepage, finite element strength
+reduction, and analyses that combine them, plus the AI assistant, importing models
+from other programs, and the analysis report. Each one builds a model, runs it, and
+explains its results, with every input in a table you can copy and paste.
 
 ## Citing XSLOPE
 

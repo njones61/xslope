@@ -109,7 +109,7 @@ rock, at a much lower factor of safety.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem04_solution_wet.png)
+[![](../tutorials/images/lem04_solution_wet.png)](https://youtu.be/82QOuQAxOrw)
 <span class="vid-num">4</span>
 </div>
 <div class="vid-body" markdown>
@@ -121,11 +121,13 @@ A piezometric line added to a layered slope, with saturated unit weights below
 it. The same critical surface is solved with the pore pressures on and off to
 show what the water costs.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/82QOuQAxOrw">▶ Watch · 10 min</a></p>
 
 **Starting model** — [xslope_video04_water_start.xlsx](files/xslope_video04_water_start.xlsx)
 
 <!-- test: file=files/xslope_video04_water_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.667, tolerance=0.005 -->
+
+**Completed model** — [xslope_method_slices_problem.xlsx](../lem/files/xslope_method_slices_problem.xlsx)
 
 **Related tutorial** — [LEM-4. Water in the Slope](../tutorials/lem04_water_in_the_slope.md)
 

@@ -76,7 +76,7 @@ safety. The slope as drawn is unstable, with a factor of safety below 1.
 
 ## Limit equilibrium
 
-<span class="vid-band-sub">Videos 3–7</span>
+<span class="vid-band-sub">Videos 3–8</span>
 
 </div>
 
@@ -185,23 +185,45 @@ vertex is allowed to move during the search.
 </div>
 </div>
 
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+![](../tutorials/images/lem06_solution_composite.png)
+<span class="vid-num">8</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 8 · Limit equilibrium</p>
+
+### Polygon Geometry {#video-8}
+
+An embankment on bedrock that dips across the section, entered as one closed
+polygon per material zone instead of profile lines. The dipping base limits the
+circles a search can try, and the composite-surface option lets a circle run
+along the bedrock instead of being refused.
+
+<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+
+**Related tutorial** — [LEM-6. Polygon Geometry](../tutorials/lem06_polygon_geometry.md)
+
+</div>
+</div>
+
 <div class="vid-band" markdown>
 
 ## Seepage
 
-<span class="vid-band-sub">Videos 8–10</span>
+<span class="vid-band-sub">Videos 9–11</span>
 
 </div>
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/seep01_solution_filled.png)
-<span class="vid-num">8</span>
+<span class="vid-num">9</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 8 · Seepage</p>
+<p class="vid-kicker">Video 9 · Seepage</p>
 
-### Confined Seepage Under a Sheetpile {#video-8}
+### Confined Seepage Under a Sheetpile {#video-9}
 
 A sheetpile in a silt foundation behind an impervious clay blanket, built from a
 blank model: the geometry, the three boundary condition types and the no-flow
@@ -217,12 +239,12 @@ default, the mesh, the solution, the discharge, and the flow net.
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/seep02_solution.png)
-<span class="vid-num">9</span>
+<span class="vid-num">10</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 9 · Seepage</p>
+<p class="vid-kicker">Video 10 · Seepage</p>
 
-### Unconfined Seepage Through a Zoned Dam {#video-9}
+### Unconfined Seepage Through a Zoned Dam {#video-10}
 
 An earth dam with a shell and a clay core, built from a blank model, with the
 reservoir head on the upstream face and a seepage face downstream. The solution
@@ -238,14 +260,14 @@ locates the phreatic surface.
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/combo01_lem_solution.png)
-<span class="vid-num">10</span>
+<span class="vid-num">11</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 10 · Seepage + limit equilibrium</p>
+<p class="vid-kicker">Video 11 · Seepage + limit equilibrium</p>
 
-### Seepage Pore Pressures in a Stability Run {#video-10}
+### Seepage Pore Pressures in a Stability Run {#video-11}
 
-The Video 9 dam searched with Spencer's method on the pore pressures from its
+The Video 10 dam searched with Spencer's method on the pore pressures from its
 seepage solution, by setting `u` to `seep` in the materials table.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
@@ -259,19 +281,19 @@ seepage solution, by setting `u` to `seep` in the materials table.
 
 ## Finite element
 
-<span class="vid-band-sub">Videos 11–12</span>
+<span class="vid-band-sub">Videos 12–13</span>
 
 </div>
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/fem01_shear_strain.png)
-<span class="vid-num">11</span>
+<span class="vid-num">12</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 11 · Finite element</p>
+<p class="vid-kicker">Video 12 · Finite element</p>
 
-### Strength Reduction on an Embankment {#video-11}
+### Strength Reduction on an Embankment {#video-12}
 
 An embankment solved by the shear strength reduction method: the elastic
 properties the run needs, a quadratic mesh, the run, and the deformed mesh and
@@ -287,14 +309,14 @@ shear strain at failure, compared with Spencer's method on the same slope.
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
 ![](../tutorials/images/combo01_fem_shear.png)
-<span class="vid-num">12</span>
+<span class="vid-num">13</span>
 </div>
 <div class="vid-body" markdown>
-<p class="vid-kicker">Video 12 · Seepage + LEM + FEM</p>
+<p class="vid-kicker">Video 13 · Seepage + LEM + FEM</p>
 
-### Seepage, LEM, and FEM on One Mesh {#video-12}
+### Seepage, LEM, and FEM on One Mesh {#video-13}
 
-The Video 9 dam run through all three engines on one quadratic mesh: the seepage
+The Video 10 dam run through all three engines on one quadratic mesh: the seepage
 solution, a Spencer search on its pore pressures, and a strength reduction run.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>

@@ -95,6 +95,8 @@ same model and the same factor of safety, 0.964: the slope as drawn is unstable.
 An embankment on a foundation layer over rigid rock, with a profile line at each
 material boundary and a starting circle at the base of each layer. The search
 result shows why the critical circle settles on the contact between layers.
+With a weaker foundation, the same search finds a deeper circle that reaches the
+rock, at a much lower factor of safety.
 
 <p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/mNE2UAJeb4Y">▶ Watch · 8 min</a></p>
 

@@ -271,6 +271,72 @@ def test_paste_notifies_once():
                  f"a 3-row paste fired {len(fired)} change notifications, not 1")
 
 
+def _press(widget, key):
+    """A real key press on ``widget``, through the key handling a user's goes
+    through."""
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtWidgets import QApplication
+    QApplication.sendEvent(widget, QKeyEvent(QEvent.KeyPress, key, Qt.NoModifier))
+
+
+def test_delete_empties_the_selected_cells():
+    """Delete (and a Mac keyboard's delete, Backspace) on selected cells empties
+    them, as a spreadsheet does, with no double-click into the cell first. The
+    emptied cells read back as erased ones, a choice cell keeps its entry, a grayed
+    cell keeps its value, and the lot is one change."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QTableWidgetSelectionRange
+    from studio.editors import MaterialsEditor, _mat_dim_keys
+
+    fields = MaterialsEditor.FIELDS
+    keys = [f.key for f in fields]
+    row = {f.key: f.default for f in fields}
+    row.update(name="clay", option="mc", gamma=120.0, c=400.0, phi=20.0,
+               u="none", phi_b=None, s_cap=None)
+    out = []
+    for key in (Qt.Key_Delete, Qt.Key_Backspace):
+        fired = []
+        t = _new_table(fields, [row], dim_rule=_mat_dim_keys,
+                       on_change=lambda: fired.append(1))
+        t.table.clearSelection()
+        lo, hi = keys.index("option"), keys.index("phi")
+        t.table.setRangeSelected(QTableWidgetSelectionRange(0, lo, 0, hi), True)
+        _press(t.table, key)
+        got = t.result_rows()[0]
+        blank = {k: fields[keys.index(k)].from_text("") for k in ("c", "phi")}
+        out += _fail((got["c"], got["phi"]) == (blank["c"], blank["phi"]),
+                     f"{key.name}: c and phi read {got['c']!r}, {got['phi']!r}, "
+                     f"not the erased {blank['c']!r}, {blank['phi']!r}")
+        out += _fail(got["option"] == "mc",
+                     f"{key.name}: the Option choice became {got['option']!r}")
+        out += _fail(got["gamma"] == 120.0 and got["name"] == "clay",
+                     f"{key.name}: an unselected cell changed")
+        out += _fail(len(fired) == 1,
+                     f"{key.name}: clearing fired {len(fired)} notifications, not 1")
+    return out
+
+
+def test_delete_on_a_plain_grid():
+    """The transient-seepage tables are plain grids with the same manners: Delete
+    empties their selected cells too."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem,
+                                   QTableWidgetSelectionRange)
+    from studio.editors import _spreadsheet_manners
+
+    grid = QTableWidget(2, 2)
+    _spreadsheet_manners(grid)
+    for i in range(2):
+        for j in range(2):
+            grid.setItem(i, j, QTableWidgetItem(str(10 * i + j + 1)))
+    grid.setRangeSelected(QTableWidgetSelectionRange(0, 0, 1, 0), True)
+    _press(grid, Qt.Key_Delete)
+    texts = [[grid.item(i, j).text() for j in range(2)] for i in range(2)]
+    return _fail(texts == [["", "2"], ["", "12"]],
+                 f"after Delete on the first column the grid reads {texts}")
+
+
 def test_copy_round_trips():
     """Copy is the natural other half: a selection out as the same tab-separated
     block, which this table's own paste reads back into identical rows."""
@@ -1462,6 +1528,8 @@ CHECKS = [
      test_a_pasted_rounding_keeps_the_stored_value),
     ("a paste is one edit", test_paste_notifies_once),
     ("copy round-trips through paste", test_copy_round_trips),
+    ("Delete empties the selected cells", test_delete_empties_the_selected_cells),
+    ("Delete on a plain grid", test_delete_on_a_plain_grid),
     ("cancel discards a paste", test_cancel_discards_a_paste),
     ("the reinforcement two-block paste", test_the_reinforcement_two_block_paste),
     ("the support editors' columns are the sheets'",

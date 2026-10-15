@@ -31,7 +31,9 @@ open its editor:
 | **Transient** | The transient-seepage run controls and time series (see [Transient seepage](#transient-seepage)); the row reads *on* or *off*. |
 
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
-you add, remove, and reorder rows.
+you add, remove, and reorder rows. Typing into a selected cell replaces its
+value, and `Delete` (`delete` on a Mac keyboard) empties the selected cells; a
+column of choices keeps its entry.
 
 **Every table takes a block from the clipboard.** Click the cell the block starts
 at and press `Ctrl+V` (`⌘V` on macOS). Columns are separated by tabs and

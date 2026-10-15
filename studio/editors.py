@@ -13,7 +13,7 @@ from __future__ import annotations
 import copy
 import math
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
@@ -421,11 +421,50 @@ def _plural(n, noun):
 def _spreadsheet_manners(table):
     """Cell-level selection and type-to-edit on a QTableWidget: typing into the
     current cell starts the edit, a second click opens it, Tab moves along the
-    row. Single click never opens an editor, so block paste stays on the grid."""
+    row, and Delete empties the selected cells. Single click never opens an
+    editor, so block paste stays on the grid."""
     table.setSelectionBehavior(QAbstractItemView.SelectItems)
     table.setEditTriggers(
         QAbstractItemView.AnyKeyPressed | QAbstractItemView.EditKeyPressed
         | QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
+    table.installEventFilter(_ClearKeyFilter(table))
+
+
+def _is_clear_key(event):
+    """Delete, or the delete key of a Mac keyboard (Backspace), pressed alone."""
+    return (event.key() in (Qt.Key_Delete, Qt.Key_Backspace)
+            and event.modifiers() in (Qt.NoModifier, Qt.KeypadModifier))
+
+
+def _blank_selected_cells(table):
+    """Empty every selected cell that takes typing, as Delete does in a
+    spreadsheet, and return how many were emptied. The cell reads afterwards as
+    one erased by hand would. A choice cell keeps its entry (a blank is not one of
+    its choices), and a read-only or hidden cell keeps its value."""
+    n = 0
+    for ix in table.selectedIndexes():
+        i, j = ix.row(), ix.column()
+        if table.isColumnHidden(j) or table.cellWidget(i, j) is not None:
+            continue
+        it = table.item(i, j)
+        if it is None or not (it.flags() & Qt.ItemIsEditable) or not it.text():
+            continue
+        it.setText("")
+        n += 1
+    return n
+
+
+class _ClearKeyFilter(QObject):
+    """Delete on a plain grid (one with no owner to tell): its own itemChanged
+    handlers hear each emptied cell. Key events reach an open cell editor first,
+    so Delete inside a cell being typed in still deletes characters."""
+
+    def eventFilter(self, obj, event):
+        if (event.type() == QEvent.KeyPress and _is_clear_key(event)
+                and isinstance(obj, QTableWidget)):
+            _blank_selected_cells(obj)
+            return True
+        return super().eventFilter(obj, event)
 
 
 class _ClipboardTable(QTableWidget):
@@ -451,6 +490,10 @@ class _ClipboardTable(QTableWidget):
             return
         if event.matches(QKeySequence.Paste):
             self._owner.paste_clipboard()
+            event.accept()
+            return
+        if _is_clear_key(event):
+            self._owner.clear_selection()
             event.accept()
             return
         super().keyPressEvent(event)
@@ -750,6 +793,21 @@ class _EditableTable(QWidget):
             self._suppress_notify = prev
         self._show_paste_summary(len(block), width, skipped)
         self._emit_change()
+
+    def clear_selection(self):
+        """Delete on the grid: empty the selected cells (``_blank_selected_cells``),
+        re-derive the rows' graying, and announce one change for the lot, as a
+        paste does."""
+        prev = self._suppress_notify
+        self._suppress_notify = True
+        try:
+            n = _blank_selected_cells(self.table)
+            if n:
+                self._apply_dim_all()
+        finally:
+            self._suppress_notify = prev
+        if n:
+            self._emit_change()
 
     def _set_cell_text(self, i, j, text):
         """Write one pasted cell. Returns "" when it landed, else the reason it did

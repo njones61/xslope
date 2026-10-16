@@ -18,8 +18,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - **Generate starting circles…** no longer makes the circles editor taller. The
   window keeps its size, the table scrolls to any circles past what it shows, and
   the generator's note takes its room from the section preview.
-- The Polygons editor opens with an empty, dimmed vertex table when there is no
-  polygon yet. Before, the middle pane was blank.
+- The Polygons and Profile lines editors open with an empty, dimmed vertex table
+  when there is no polygon or line yet. Before, the middle pane was blank.
 
 ### Changed
 

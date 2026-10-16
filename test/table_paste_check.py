@@ -449,8 +449,8 @@ def test_the_material_form_waits_for_a_material():
 def test_the_polygon_window_matches_the_profile_window():
     """The Polygons editor is laid out as the Profile lines editor is: the same
     window, the same middle pane width, and Material and Size on one row, with the
-    polygon's Type on a row of its own above them. With no polygon yet, its middle
-    pane still shows an empty table, dimmed until Add makes one.
+    polygon's Type on a row of its own above them. With no item yet, either
+    editor's middle pane still shows an empty table, dimmed until Add makes one.
 
     The list pane is not compared: it is as wide as its two buttons need, and
     'Remove polygon' is a longer label than 'Remove line'."""
@@ -472,19 +472,33 @@ def test_the_polygon_window_matches_the_profile_window():
     poly.close()
     prof.close()
 
-    model = _load(os.path.join(_MODELS, "xslope_sloping_bottom.xlsx"))
-    blank = dict(model, polygons=[], ssr_zones=[], refine_zones=[], joint_zones=[])
-    dlg = PolygonEditor().build(blank, None)
-    out += _fail(dlg.table is not None and dlg.table.table.rowCount() == 0,
-                 "with no polygons the middle pane has no vertex table")
+    out += _empty_geometry_pane(
+        "Polygons", PolygonEditor(),
+        dict(_load(os.path.join(_MODELS, "xslope_sloping_bottom.xlsx")),
+             polygons=[], ssr_zones=[], refine_zones=[], joint_zones=[]))
+    out += _empty_geometry_pane(
+        "Profile lines", ProfileEditor(),
+        dict(_load(os.path.join(_MODELS, "xslope_simple_mult_layers.xlsx")),
+             profile_lines=[]))
+    return out
+
+
+def _empty_geometry_pane(name, editor, blank):
+    """With no item yet, the geometry editor's middle pane shows an empty vertex
+    table, dimmed until Add makes an item and dimmed again once the last one is
+    removed."""
+    dlg = editor.build(blank, None)
+    out = _fail(dlg.table is not None and dlg.table.table.rowCount() == 0,
+                f"{name}: with no items the middle pane has no vertex table")
     out += _fail(not dlg._item_pane.isEnabled() and dlg.list.isEnabled(),
-                 "with no polygons the middle pane is not dimmed (or the list is)")
+                 f"{name}: with no items the middle pane is not dimmed (or the "
+                 f"list is)")
     dlg._add_line()
     out += _fail(dlg._item_pane.isEnabled(),
-                 "after Add the new polygon's pane is still dimmed")
+                 f"{name}: after Add the new item's pane is still dimmed")
     dlg._remove_line()
     out += _fail(not dlg._item_pane.isEnabled() and dlg.table is not None,
-                 "after removing the last polygon the pane is live or blank")
+                 f"{name}: after removing the last item the pane is live or blank")
     return out
 
 

@@ -7240,7 +7240,7 @@ class MatGeometryDialog(QDialog):
             row = select if (select is not None and 0 <= select < len(self._lines)) else 0
             self.list.setCurrentRow(row)
         else:
-            self._load(-1)                 # the polygon editor's empty, dimmed table
+            self._load(-1)                 # the empty, dimmed table
             self._sync_type_enabled()      # empty list: still show a coherent form
         if self._preview is not None:
             self._preview.refresh_now()
@@ -7375,13 +7375,10 @@ class MatGeometryDialog(QDialog):
             self.table.setParent(None)
             self.table = None
         valid = 0 <= idx < len(self._lines)
-        if self._poly_types:
-            # With no polygon the pane still holds a table, empty, and is dimmed
-            # until Add makes one, as the Materials list view's form is: never a
-            # blank pane that looks as if the dialog failed to draw.
-            self._item_pane.setEnabled(valid)
-        elif not valid:
-            return
+        # With no item the pane still holds a table, empty, and is dimmed until Add
+        # makes one, as the Materials list view's form is: never a blank pane that
+        # looks as if the dialog failed to draw.
+        self._item_pane.setEnabled(valid)
         ln = self._lines[idx] if valid else {"coords": []}
         rows = [{"x": x, "y": y} for (x, y) in ln["coords"]]
         self.table = _EditableTable(self.XY, rows, _new_pt,

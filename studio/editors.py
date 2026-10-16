@@ -422,7 +422,8 @@ def _spreadsheet_manners(table):
     """Cell-level selection and type-to-edit on a QTableWidget: typing into the
     current cell starts the edit, a second click opens it, Tab moves along the
     row, and Delete empties the selected cells. Single click never opens an
-    editor, so block paste stays on the grid."""
+    editor, so block paste stays on the grid. (Tab past the last cell adds a row
+    on a :class:`_TabGrowsTable`.)"""
     table.setSelectionBehavior(QAbstractItemView.SelectItems)
     table.setEditTriggers(
         QAbstractItemView.AnyKeyPressed | QAbstractItemView.EditKeyPressed
@@ -467,7 +468,36 @@ class _ClearKeyFilter(QObject):
         return super().eventFilter(obj, event)
 
 
-class _ClipboardTable(QTableWidget):
+class _TabGrowsTable(QTableWidget):
+    """A grid where Tab from the last column of the last row adds a row and moves
+    into its first cell, as Tab does at the end of a word-processor table. Qt's own
+    Tab wraps back to the top-left cell instead.
+
+    Done in moveCursor because both Tabs end there: the table's own (a cell
+    selected) and the cell editor's (a value being typed, which the delegate
+    commits before asking the view for the next cell). In the second case the new
+    cell opens for typing, as any cell Tab reaches mid-edit does."""
+
+    def moveCursor(self, action, modifiers):
+        if action == QAbstractItemView.MoveNext:
+            cols = self._tab_columns()
+            if (cols and self.currentRow() == self.rowCount() - 1
+                    and self.currentColumn() == cols[-1]):
+                self._append_row()
+                return self.model().index(self.rowCount() - 1, cols[0])
+        return super().moveCursor(action, modifiers)
+
+    def _tab_columns(self):
+        """The columns Tab walks, left to right as shown; hidden ones are skipped."""
+        header = self.horizontalHeader()
+        return sorted((j for j in range(self.columnCount())
+                       if not self.isColumnHidden(j)), key=header.visualIndex)
+
+    def _append_row(self):
+        self.insertRow(self.rowCount())
+
+
+class _ClipboardTable(_TabGrowsTable):
     """The editors' table widget, with Copy and Paste over a block of cells.
 
     Subclassed rather than wired to a QShortcut on purpose: a key event reaches the
@@ -497,6 +527,16 @@ class _ClipboardTable(QTableWidget):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def _tab_columns(self):
+        # The data columns only: the Materials swatch is a display color, not a
+        # cell to type in.
+        return self._owner._clipboard_columns()
+
+    def _append_row(self):
+        # The editor's own Add row: the new record's defaults, swatch, graying,
+        # and change notice, exactly as the button makes it.
+        self._owner._add_row()
 
 
 def _add_action_buttons(bar, actions):
@@ -586,7 +626,8 @@ class _EditableTable(QWidget):
         # Spreadsheet manners: click selects the CELL (not the row — a row-header
         # click still selects whole rows for Remove), typing into the current cell
         # starts the edit, a second click on the current cell opens it, and Tab
-        # commits and moves along the row. Block paste stays on the table itself:
+        # commits and moves along the row (past the last cell, into a new row —
+        # _TabGrowsTable). Block paste stays on the table itself:
         # a single click never opens an editor, so Ctrl+V lands on the grid.
         self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.table.setEditTriggers(
@@ -2584,9 +2625,11 @@ class TableEditorDialog(QDialog):
                 want += max(widget.minimumSizeHint().height(), widget.minimumHeight())
         return want
 
-    def _fit_minimums_to_screen(self, width=None):
+    def _fit_minimums_to_screen(self, width=None, height=None):
         """Give the two panes minimum heights that leave the dialog shrinkable to the
-        screen, and return the preview's.
+        screen, and return the preview's. With ``height``, the budget is that window
+        height instead (never more than the screen's): how a strip that appears later
+        finds its room inside the window as it stands (:meth:`_keep_size`).
 
         A minimum is a promise the layout keeps at the user's expense: a dialog whose
         minimum is taller than the desktop cannot be resized to fit it, so the window
@@ -2608,6 +2651,8 @@ class TableEditorDialog(QDialog):
                    + self._caption_reserve)
         table = self._table_pane_height(rows_shown=0)
         avail = self._available_size()[1]
+        if height is not None:
+            avail = height if avail is None else min(avail, height)
         if avail is not None:
             budget = (avail - self._chrome_minimum(width)
                       - self._split.handleWidth())
@@ -2625,9 +2670,10 @@ class TableEditorDialog(QDialog):
         self._editable.setMinimumHeight(table)
         # A QSplitter does not carry its children's minimums into its own, so a strip
         # that appears later (the generator's summary) is free to squeeze the split
-        # rather than grow the dialog -- and what gets cut is the bottom of the
-        # preview's caption. Stating the minimum here puts the panes into the layout's
-        # own minimum, so the dialog grows for the new strip instead.
+        # past them -- and what gets cut is the bottom of the preview's caption.
+        # Stating the minimum here puts the panes into the layout's own minimum, so
+        # the strip's room comes out of what the panes can spare (:meth:`_keep_size`)
+        # and the dialog grows only for what they cannot.
         self._split.setMinimumHeight(table + preview + self._split.handleWidth())
         # A resize is clamped by the layout's minimum as the layout last computed it,
         # so the relaxed minimums have to reach it before anyone resizes to them --
@@ -2649,7 +2695,6 @@ class TableEditorDialog(QDialog):
         way it would only be overwriting the user's own arrangement."""
         if not getattr(self, "_content_sized", False):
             return
-        self._grow_to_layout_minimum()
         needed = self._content_width()
         if needed > self.width():
             self._grow(needed)
@@ -2659,9 +2704,10 @@ class TableEditorDialog(QDialog):
         """Grow tall enough for everything the layout now holds, measured at the
         width the dialog actually has.
 
-        A strip that appears after the dialog was sized — the generator's summary
-        line — needs room that nothing gave it, and what pays for it is the bottom of
-        the preview's caption. ``minimumSizeHint`` is no help: it measures every
+        A wrapped strip measured before the window had its real width — the help
+        paragraph, the search window's caption — can need a line more than the dialog
+        was sized for, and what pays for it is the bottom of the preview's caption.
+        ``minimumSizeHint`` is no help: it measures every
         wrapped label at the dialog's own MINIMUM width, where the same text takes
         more lines than it does at the width on screen, so it answers a question
         nobody asked. Summing the rows at the real width is the measurement that
@@ -2827,18 +2873,21 @@ class TableEditorDialog(QDialog):
     def _show_generate_summary(self, message, n, how):
         """Write the generator's own summary into the dialog, under the button.
 
-        The summary is a strip that was not there a moment ago, and a dialog whose
-        height does not change has to find its room somewhere: the somewhere is the
-        preview, which is the only thing in the dialog that stretches. So the dialog
-        grows by exactly what the layout says it now needs more of -- measured as the
-        difference in the layout's own total hint across the label appearing, which
-        counts the label's wrapped height and the spacing around it and needs no
-        pixel figure of its own. The preview keeps the area it had."""
+        The summary is a strip that was not there a moment ago, so it has to find its
+        room somewhere. In a dialog sized from its content (the circles editor) the
+        window keeps its size and the room comes out of the preview
+        (:meth:`_keep_size`). Anywhere else the dialog grows by exactly what the
+        layout says it now needs more of -- measured as the difference in the
+        layout's own total hint across the label appearing, which counts the label's
+        wrapped height and the spacing around it and needs no pixel figure of its
+        own -- and the preview keeps the area it had."""
         lead = {"append": "Added", "replace": "Replaced the table with"}.get(how,
                                                                             "Generated")
         label = self.generate_summary
         layout = self.layout()
         before = layout.totalSizeHint().height()
+        height = self.height()
+        pane = self._split.sizes()[0] if self._preview is not None else 0
         label.setText(f"{lead} {self._generate_unit(n)}: {message}".rstrip(". ") + ".")
         label.setVisible(True)
         # A wrapped label's height is only knowable once its width is: reserve it, or
@@ -2851,12 +2900,39 @@ class TableEditorDialog(QDialog):
         layout.invalidate()
         grown = layout.totalSizeHint().height() - before
         if getattr(self, "_content_sized", False):
-            self._size_to_content()        # re-fit around the strip that just appeared
+            self._keep_size(height, pane)
         elif grown > 0:
             screen = self.screen() or QApplication.primaryScreen()
             avail = (screen.availableGeometry().height() if screen is not None
                      else self.height() + grown)
             self.resize(self.width(), min(self.height() + grown, avail))
+
+    def _keep_size(self, height, pane):
+        """Make room for a strip that just appeared without resizing the window.
+
+        The pane minimums are budgeted again against ``height``, the height the
+        window had before the strip (:meth:`_fit_minimums_to_screen`), and the
+        window is held at it: the layout may already have grown it to the old
+        minimums the moment the strip appeared, before anything was painted. The
+        strip's room comes out of the preview, down to its floor: the table pane
+        keeps the height it had, ``pane``, and generated rows past what it shows are
+        reached with its scroll bar. Only a preview already at its floor hands the
+        rest over to the table. A window that resized itself while being worked in
+        would undo whatever size the user had given it."""
+        self._fit_minimums_to_screen(height=height)
+        if self.height() != height:
+            self.resize(self.width(), height)
+            self.layout().activate()
+        total = sum(self._split.sizes())
+        floor = (_PREVIEW_FLOOR_LINES * self.fontMetrics().height()
+                 + self._caption_reserve)
+        preview = max(min(floor, total - self._editable.minimumHeight()),
+                      total - pane)
+        if self._preview.minimumHeight() > preview:
+            self._preview.setMinimumHeight(preview)
+            self._split.setMinimumHeight(self._editable.minimumHeight() + preview
+                                         + self._split.handleWidth())
+        self._split.setSizes([total - preview, preview])
 
     def _schedule_preview(self, *_):
         if self._preview is not None:
@@ -3651,7 +3727,8 @@ class _MaterialListView(QWidget):
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self._build_list_pane())
-        splitter.addWidget(self._build_form_pane())
+        self._form_pane = self._build_form_pane()
+        splitter.addWidget(self._form_pane)
         splitter.addWidget(self._build_plots_pane())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
@@ -3989,7 +4066,9 @@ class _MaterialListView(QWidget):
                 w.setText(self._field_by_key[key].to_text(val))
                 w.blockSignals(False)
         ok = 0 <= idx < len(self._rows)
-        self.setEnabled(True)
+        # With no material selected (an empty list) the form has nothing to edit:
+        # it is dimmed until Add makes one. The list pane, Add with it, stays live.
+        self._form_pane.setEnabled(ok)
         self._loading = True
         self._color_btn.blockSignals(True)
         if ok:
@@ -7053,16 +7132,21 @@ class MatGeometryDialog(QDialog):
         left.addLayout(lbtns)
 
         right_w = QWidget()
+        self._item_pane = right_w
         right = QVBoxLayout(right_w)
         right.setContentsMargins(0, 0, 0, 0)
-        matrow = QHBoxLayout()
+        # Material and Size share a row. The polygon sheet's Type takes a row of its
+        # own above them, its combo over Material's, so the polygon editor's middle
+        # pane is no wider than the profile editor's.
+        fields = QGridLayout()
+        fields.setContentsMargins(0, 0, 0, 0)
+        mat_row = 0
 
         # v21 Type (polygon sheet only). The words are the template's, and picking a
         # non-material one greys the Mat ID + material name exactly as the sheet's
         # row-7 echo formula does — an overlay has no material.
         self.type_combo = None
         if self._poly_types:
-            matrow.addWidget(QLabel("Type:"))
             self.type_combo = QComboBox()
             for word, _kind in POLYGON_TYPE_ITEMS:
                 self.type_combo.addItem(word)
@@ -7070,20 +7154,23 @@ class MatGeometryDialog(QDialog):
             if _type_help:
                 self.type_combo.setToolTip(_type_help)
             self.type_combo.currentIndexChanged.connect(self._on_type_changed)
-            matrow.addWidget(self.type_combo)
+            fields.addWidget(QLabel("Type:"), 0, 0)
+            fields.addWidget(self.type_combo, 0, 1)
+            mat_row = 1
 
         self._mat_label = QLabel("Material:")
-        matrow.addWidget(self._mat_label)
+        fields.addWidget(self._mat_label, mat_row, 0)
         self.mat_combo = QComboBox()
         for mid in self._mat_ids:
             m = materials[mid] if mid < len(materials) else {}
             self.mat_combo.addItem(f"{mid + 1}: {m.get('name', '')}")
         self.mat_combo.currentIndexChanged.connect(self._on_mat_changed)
-        matrow.addWidget(self.mat_combo, 1)
+        fields.addWidget(self.mat_combo, mat_row, 1)
+        fields.setColumnStretch(1, 1)
 
         # v21 local mesh Size. Optional on every item; blank = the global target size.
         _size_help = (self._field_help or {}).get("size", "")
-        matrow.addWidget(QLabel("Size:"))
+        fields.addWidget(QLabel("Size:"), mat_row, 2)
         self.size_edit = QLineEdit()
         self.size_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.size_edit.setPlaceholderText("global")
@@ -7094,8 +7181,8 @@ class MatGeometryDialog(QDialog):
         if _size_help:
             self.size_edit.setToolTip(_size_help)
         self.size_edit.textChanged.connect(self._on_size_changed)
-        matrow.addWidget(self.size_edit)
-        right.addLayout(matrow)
+        fields.addWidget(self.size_edit, mat_row, 3)
+        right.addLayout(fields)
 
         # A joint-network region's name (polygon sheet only, and only for that Type):
         # the network builder's Within list offers the region by it, and the file
@@ -7153,6 +7240,7 @@ class MatGeometryDialog(QDialog):
             row = select if (select is not None and 0 <= select < len(self._lines)) else 0
             self.list.setCurrentRow(row)
         else:
+            self._load(-1)                 # the empty, dimmed table
             self._sync_type_enabled()      # empty list: still show a coherent form
         if self._preview is not None:
             self._preview.refresh_now()
@@ -7286,14 +7374,19 @@ class MatGeometryDialog(QDialog):
         if self.table is not None:
             self.table.setParent(None)
             self.table = None
-        if not (0 <= idx < len(self._lines)):
-            return
-        ln = self._lines[idx]
+        valid = 0 <= idx < len(self._lines)
+        # With no item the pane still holds a table, empty, and is dimmed until Add
+        # makes one, as the Materials list view's form is: never a blank pane that
+        # looks as if the dialog failed to draw.
+        self._item_pane.setEnabled(valid)
+        ln = self._lines[idx] if valid else {"coords": []}
         rows = [{"x": x, "y": y} for (x, y) in ln["coords"]]
         self.table = _EditableTable(self.XY, rows, _new_pt,
                                     on_change=self._schedule_preview)
         self._holder.addWidget(self.table)
         self._wire_help()
+        if not valid:
+            return
         self.mat_combo.blockSignals(True)
         self.mat_combo.setCurrentIndex(self._combo_index(ln["mat_id"]))
         self.mat_combo.blockSignals(False)
@@ -8150,7 +8243,7 @@ class TransientDialog(QDialog):
         times = list(tseep.get("times") or [])
         series_vals = tseep.get("series") or {}
         n_rows = max(len(times) + 2, 8)
-        self._series_table = QTableWidget(n_rows, 1 + _TSEEP_N_SERIES)
+        self._series_table = _TabGrowsTable(n_rows, 1 + _TSEEP_N_SERIES)
         _spreadsheet_manners(self._series_table)
         self._series_table.setMinimumHeight(220)   # show several breakpoints at once
         self._sync_series_headers()
@@ -8179,7 +8272,7 @@ class TransientDialog(QDialog):
         save_group.setMaximumWidth(170)
         svl = QVBoxLayout(save_group)
         save_times = list(tseep.get("save_times") or [])
-        self._save_table = QTableWidget(max(len(save_times) + 1, 8), 1)
+        self._save_table = _TabGrowsTable(max(len(save_times) + 1, 8), 1)
         _spreadsheet_manners(self._save_table)
         self._save_table.setHorizontalHeaderLabels(["save time"])
         self._save_table.horizontalHeaderItem(0).setToolTip(TSEEP_HELP["save_times"])

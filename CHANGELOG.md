@@ -13,6 +13,13 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   Mohr-Coulomb, power-curve, and Hoek-Brown materials.
 - In Studio's tables, `Delete` (`delete` on a Mac keyboard) empties the selected
   cells. Before, a cell had to be opened with a double-click first.
+- The Materials list view dims its property fields until a material exists.
+  Before, an empty list left the fields open to typing with nothing to hold it.
+- **Generate starting circles…** no longer makes the circles editor taller. The
+  window keeps its size, the table scrolls to any circles past what it shows, and
+  the generator's note takes its room from the section preview.
+- The Polygons and Profile lines editors open with an empty, dimmed vertex table
+  when there is no polygon or line yet. Before, the middle pane was blank.
 
 ### Changed
 
@@ -22,6 +29,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - A profile line or polygon added in Studio starts with one vertex row to type
   or paste into, and on the material of its own number (line 2 on material 2),
   as the workbook's profile and polygon sheets are laid out.
+- In Studio's tables, `Tab` from the last cell of the last row adds a row and
+  moves into it, so a table can be typed row after row without reaching for
+  **Add row**.
+- The Polygons editor puts Type on a row of its own above Material and Size, so
+  its middle pane is as wide as the Profile lines editor's and the section
+  preview gets the width that Type took.
 
 ## 1.0.3 — 2026-10-14
 

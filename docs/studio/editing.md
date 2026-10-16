@@ -33,7 +33,8 @@ open its editor:
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
 you add, remove, and reorder rows. Typing into a selected cell replaces its
 value, and `Delete` (`delete` on a Mac keyboard) empties the selected cells; a
-column of choices keeps its entry.
+column of choices keeps its entry. `Tab` moves along the row, and from the last
+cell of the last row it adds a row and moves into its first cell.
 
 **Every table takes a block from the clipboard.** Click the cell the block starts
 at and press `Ctrl+V` (`⌘V` on macOS). Columns are separated by tabs and

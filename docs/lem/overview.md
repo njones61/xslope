@@ -197,7 +197,7 @@ base normal forces and interslice forces are computed as before; only the cohesi
 extra term. $\phi^b$ is off unless a material is given a value, and with it off the strength is the ordinary
 Mohr-Coulomb strength.
 
-**Setting it up.** The **mat** sheet carries this per material as of template version 17 — see
+**Setting it up.** The **mat** sheet carries this per material — see
 [phi_b / s_cap](../usage/input_template.md#worksheet-mat) in the input template docs for the columns, the
 dependency on strength option and pore-pressure source, and the caution about capping suction on a piezometric
 line. When a file with `phi_b` set is loaded, every solve includes the suction credit; no extra code is needed.
@@ -221,7 +221,7 @@ An explicit `suction_phi_b` always **overrides** the file — the same precedenc
 turn the credit on for a file with no `phi_b` column, force it off with `suction_phi_b={}` on a file that does
 carry one, or override a template value for a sensitivity study, all without touching the input file. Passing
 `suction_phi_b=None` (the default) takes the values in the mat sheet's `phi_b`/`s_cap` columns,
-which is `None` (off) on a file older than template version 17.
+which are `None` (off) when the columns are blank.
 
 ## Developed Shear Strength
 
@@ -352,8 +352,8 @@ the engine derives the ponded-water load at solve time from the model's own stat
 where the water stands: the seepage boundary conditions wherever a seepage analysis is
 defined, otherwise the piezometric line. The dloads sheets then carry non-water loads
 only, and the derived load is drawn on every plot in its own color so that a load that was
-not entered by hand is visible. On `manual`, the setting a file written before template
-version 22 loads with, the water load is whatever is on the dloads sheets. See
+not entered by hand is visible. On `manual`, the water load is whatever is on the dloads
+sheets. See
 [Automatic water loads](../usage/preflight.md#automatic-water-loads).
 
 The derived load does not depend on the materials' pore-pressure option: a piezometric line

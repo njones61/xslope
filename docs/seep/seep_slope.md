@@ -88,7 +88,7 @@ solutions must use the same mesh, since one mesh file serves both.
     under [Stability time](transient.md#stability-time).
 
 !!! note "The seepage boundary conditions also place the water load"
-    With **Water loads** set to `auto` (the default from template version 22), the engine
+    With **Water loads** set to `auto` (the default), the engine
     derives the weight of water standing on the slope from the seepage boundary conditions at
     solve time — so the same definition of where the pool stands drives both the pore-pressure
     field and the surface load, and the dloads sheets carry non-water loads only. See

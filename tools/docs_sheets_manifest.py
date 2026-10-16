@@ -74,7 +74,8 @@ SHEETS = [
 
     # profile / polygon / dloads carry many blank table slots; select the filled
     # tables and let the renderer keep their full (bordered) height.
-    {"out": "sheet_profile.png", "src": RAPID, "sheet": "profile", "cols": "A:N"},
+    {"out": "sheet_profile.png", "src": RAPID, "sheet": "profile", "cols": "A:N",
+     "rows": (1, 14)},
     # polygon: the levee's four material zones followed by one block of every other
     # v21 Type — the three SSR overlays and a mesh refine region — so the image shows
     # the whole Type vocabulary, the optional Size row filled on some blocks and
@@ -83,34 +84,39 @@ SHEETS = [
     # this window MUST cover every block the sample builds, or the last one is
     # silently cropped out of the image.
     {"out": "sheet_polygon.png", "src": POLY, "sheet": "polygon", "cols": "A:X"},
-    {"out": "sheet_piezo.png", "src": RAPID, "sheet": "piezo"},
+    {"out": "sheet_piezo.png", "src": RAPID, "sheet": "piezo", "rows": (1, 12)},
     {"out": "sheet_circles.png", "src": RAPID, "sheet": "circles"},
     {"out": "sheet_noncirc.png", "src": "docs/lem/files/xslope_noncircular.xlsx",
-     "sheet": "non-circ"},
-    {"out": "sheet_dloads.png", "src": RAPID, "sheet": "dloads", "cols": "A:P"},
-    {"out": "sheet_dloads2.png", "src": RAPID, "sheet": "dloads (2)", "cols": "A:P"},
+     "sheet": "non-circ", "rows": (1, 8)},
+    {"out": "sheet_dloads.png", "src": RAPID, "sheet": "dloads", "cols": "A:P",
+     "rows": (1, 9)},
+    {"out": "sheet_dloads2.png", "src": RAPID, "sheet": "dloads (2)", "cols": "A:P",
+     "rows": (1, 9)},
     # reinforce/piles: stop at the real table edge — the columns beyond hold hidden
     # dropdown-list source data (AB:AD). piles keeps its LEM/FEM colour key (to T).
     # A:T is the v24 reinforce sheet's own table edge: Adhesion and Delta sit
     # between Lp2 and Tend1, so the table that used to end at Area in column R
     # ends at Area in column T.
     {"out": "sheet_reinforce.png", "src": "docs/lem/files/xslope_reinforce.xlsx",
-     "sheet": "reinforce", "cols": "A:T"},
+     "sheet": "reinforce", "cols": "A:T", "rows": (1, 10)},
     # joints (v27): the whole table, A:O -- the residual pair and the dilation
     # angle sit between phi and t_cut, so the table that ended at Jred in column L
     # ends at Jred in column O. There is no hidden lookup block behind it, and the
     # Yes/No list on Jred is a validation list rather than in-sheet data.
-    {"out": "sheet_joints.png", "src": JOINTS, "sheet": "joints", "cols": "A:O"},
+    # Rows on this and the other table sheets stop a few past the sample data;
+    # otherwise every pre-bordered empty row of the template is drawn.
+    {"out": "sheet_joints.png", "src": JOINTS, "sheet": "joints", "cols": "A:O",
+     "rows": (1, 10)},
     {"out": "sheet_piles.png", "src": "docs/lem/files/xslope_piles.xlsx",
      "sheet": "piles", "cols": "A:T"},
     {"out": "sheet_lloads.png", "src": "docs/inputs/slope/xslope_nail_axial.xlsx",
-     "sheet": "lloads"},
+     "sheet": "lloads", "rows": (1, 6)},
     # exit face + three BC blocks (one flux, two head) + the BC-option legend;
     # the two empty BC slots (M:S) are skipped so the legend is not pushed off-image.
     {"out": "sheet_seepbc.png", "src": SEEPBC, "sheet": "seep bc",
-     "cols": "A:L,T:Z"},
+     "cols": "A:L,T:Z", "rows": (1, 9)},
     {"out": "sheet_seepbc2.png", "src": SEEPBC, "sheet": "seep bc (2)",
-     "cols": "A:L,T:Z"},
+     "cols": "A:L,T:Z", "rows": (1, 9)},
     # tseep (v18) — the transient-seepage time-series table (time axis in column B,
     # named series across C..) plus the run-controls block in columns I/J. Rendered
     # from a filled sample so the layout and an example drawdown series both read. The

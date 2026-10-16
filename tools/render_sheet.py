@@ -605,6 +605,34 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             for c in cols_in:
                 col_px[c] += per
 
+    # ----- right-aligned text spilling leftward ----------------------------- #
+    # Excel lets right-aligned text spill left over empty neighbours. Our font is
+    # wider than Excel's, so a label that fits in Excel can run on into a table to
+    # its left (the circles sheet's search-window labels did). Widen the run of
+    # wholly empty columns just left of the cell -- or the cell's own column when
+    # there is none -- until the text fits inside them.
+    def _col_empty(cc):
+        return all(value_at(rr, cc) in (None, "") for rr in row_list)
+    for r in row_list:
+        for c in base_cols:
+            if (r, c) in merged_covered or (r, c) in merged_anchor:
+                continue
+            val = value_at(r, c)
+            if val in (None, "") or (isinstance(val, (int, float)) and not isinstance(val, bool)):
+                continue
+            cell = ws.cell(row=r, column=c)
+            if _is_wrapped(cell) or align_of(cell, val, False) != "right":
+                continue
+            empties = []
+            for nc in reversed([b for b in base_cols if b < c]):
+                if not _col_empty(nc):
+                    break
+                empties.append(nc)
+            need = _runs_width(_cell_runs(cell, val, theme), fs_px) + 2 * pad
+            have = col_px[c] + sum(col_px[e] for e in empties)
+            if need > have:
+                col_px[empties[0] if empties else c] += int(need - have) + 1
+
     # ----- Excel-style horizontal overflow: complete every legend string ---- #
     # Gather left-aligned, non-wrapped text cells whose right neighbour is empty
     # (so Excel would let the text flow rightward). Record the first non-empty cell

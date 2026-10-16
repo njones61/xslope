@@ -136,7 +136,7 @@ show what the water costs.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../lem/sample_images/submerged_slope_results.png)
+[![](../lem/sample_images/submerged_slope_results.png)](https://youtu.be/21n3zhrO1XE)
 <span class="vid-num">5</span>
 </div>
 <div class="vid-body" markdown>
@@ -149,7 +149,11 @@ piezometric line above the ground, and Studio converts it into the load the wate
 applies to the slope surface. Because the clay is analyzed with its undrained
 strength, the water adds load without adding pore pressure in the soil.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/21n3zhrO1XE">▶ Watch · 9 min</a></p>
+
+**Completed model** — [xslope_video05_submerged.xlsx](files/xslope_video05_submerged.xlsx)
+
+<!-- test: file=files/xslope_video05_submerged.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.154, tolerance=0.005 -->
 
 **Related page** — [LEM sample problem 2](../lem/samples.md#2-submerged-slope)
 
@@ -158,7 +162,7 @@ strength, the water adds load without adding pore pressure in the soil.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem02_solution_load.png)
+[![](../tutorials/images/lem02_solution_load.png)](https://youtu.be/bru3hkAFsX8)
 <span class="vid-num">6</span>
 </div>
 <div class="vid-body" markdown>
@@ -166,10 +170,17 @@ strength, the water adds load without adding pore pressure in the soil.
 
 ### Loads and Earthquake {#video-6}
 
-A surcharge on the Video 1 embankment, entered as a distributed load and as a line
-load, followed by a seismic coefficient.
+A stockpile on the crest of the Video 1 embankment, entered first as a distributed
+load and then as a line load carrying the same force, followed by a seismic
+coefficient. Each load moves the critical circle, so each case gets its own search.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/bru3hkAFsX8">▶ Watch · 10 min</a></p>
+
+**Starting model** — [xslope_video01_simple_embankment.xlsx](files/xslope_video01_simple_embankment.xlsx), the Video 1 completed model
+
+**Completed model** — [xslope_video06_loads.xlsx](files/xslope_video06_loads.xlsx)
+
+<!-- test: file=files/xslope_video06_loads.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.890, tolerance=0.005 -->
 
 **Related tutorial** — [LEM-2. Loads on the Crest](../tutorials/lem02_loads_on_the_crest.md)
 
@@ -178,7 +189,7 @@ load, followed by a seismic coefficient.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem05_solution.png)
+[![](../tutorials/images/lem05_solution.png)](https://youtu.be/yhR6sioGTek)
 <span class="vid-num">7</span>
 </div>
 <div class="vid-body" markdown>
@@ -186,11 +197,16 @@ load, followed by a seismic coefficient.
 
 ### A Non-Circular Surface Through a Weak Layer {#video-7}
 
-A sand slope over a thin seam of soft clay, with the failure surface entered as
-a table of vertices and then searched. The Movement column controls how each
-vertex is allowed to move during the search.
+A sand slope over a thin seam of soft clay. The weak-zone generator builds a
+failure surface that runs along the seam, and a search moves its vertices to the
+critical surface. The Movement column controls how each vertex is allowed to move
+during the search.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/yhR6sioGTek">▶ Watch · 12 min</a></p>
+
+**Starting model** — [xslope_video07_weak_layer_start.xlsx](files/xslope_video07_weak_layer_start.xlsx)
+
+**Completed model** — [xslope_noncircular.xlsx](../lem/files/xslope_noncircular.xlsx)
 
 **Related tutorial** — [LEM-5. A Weak Layer, Non-Circular](../tutorials/lem05_weak_layer_noncircular.md)
 
@@ -199,7 +215,7 @@ vertex is allowed to move during the search.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem06_solution_composite.png)
+[![](../tutorials/images/lem06_solution_composite.png)](https://youtu.be/dljDgesNJjQ)
 <span class="vid-num">8</span>
 </div>
 <div class="vid-body" markdown>
@@ -212,7 +228,9 @@ polygon per material zone instead of profile lines. The dipping base limits the
 circles a search can try, and the composite-surface option lets a circle run
 along the bedrock instead of being refused.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/dljDgesNJjQ">▶ Watch · 11 min</a></p>
+
+**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx)
 
 **Related tutorial** — [LEM-6. Polygon Geometry](../tutorials/lem06_polygon_geometry.md)
 

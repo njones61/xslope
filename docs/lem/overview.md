@@ -352,8 +352,8 @@ the engine derives the ponded-water load at solve time from the model's own stat
 where the water stands: the seepage boundary conditions wherever a seepage analysis is
 defined, otherwise the piezometric line. The dloads sheets then carry non-water loads
 only, and the derived load is drawn on every plot in its own color so that a load that was
-not entered by hand is visible. On `manual`, the setting a file written before template
-version 22 loads with, the water load is whatever is on the dloads sheets. See
+not entered by hand is visible. On `manual`, the water load is whatever is on the dloads
+sheets. See
 [Automatic water loads](../usage/preflight.md#automatic-water-loads).
 
 The derived load does not depend on the materials' pore-pressure option: a piezometric line

@@ -465,10 +465,6 @@ main sheet's **Water loads** cell decides:
 | `auto` | The engine, derived from the water definition each time the model is solved. The dloads sheets carry **non-water** loads only — a surcharge, a footing, traffic |
 | `manual` | You, on the dloads sheets |
 
-The default follows the template version, and that is a correctness requirement rather
-than a preference: an older file already carries its water load typed in, and deriving a
-second one under it would count the reservoir twice.
-
 Which rules apply follows the mode, because the two modes have opposite failure
 conditions. In `manual` mode the risk is water with no load, so the ponded-water
 warnings and the stage-2 load rules apply. In `auto` mode those cannot arise, and three

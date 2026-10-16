@@ -357,9 +357,6 @@ which part of the model to weaken.
 Any other word is rejected at load time rather than ignored, so a typo can never quietly run the
 model unconstrained.
 
-Files from template version 20 store these three as **negative Material IDs** (−1, −2, −3) with no
-Type row; such files load with the same meaning.
-
 **Overlays.** An SSR zone is never meshed, never becomes a material region and
 never generates slices. It changes nothing about the model except which elements the strength reduction
 touches, and it is classified element by element, by where each element's center falls. A zone can
@@ -936,7 +933,7 @@ repeating a time on two consecutive rows with different values.
   changing it, and the stepper is forced to land on it. **Leave it blank and a stability
   run reads the last saved frame** — usually the drained end state. A run started from Studio can
   name a different instant for that run alone; storing it here makes a scripted or headless
-  re-run read the same frame. (Version 22 and later.)
+  re-run read the same frame.
 
 A tseep sheet requires the **Time** unit on the [main](#worksheet-main) sheet to be set, and every
 material to carry a specific storage `Ss` (with `Sy` as well on unconfined models) — see

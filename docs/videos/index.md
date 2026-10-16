@@ -247,7 +247,7 @@ along the bedrock instead of being refused.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/seep01_solution_filled.png)
+[![](../tutorials/images/seep01_solution_filled.png)](https://youtu.be/wxmpjUXc80s)
 <span class="vid-num">9</span>
 </div>
 <div class="vid-body" markdown>
@@ -255,11 +255,14 @@ along the bedrock instead of being refused.
 
 ### Confined Seepage Under a Sheetpile {#video-9}
 
-A sheetpile in a silt foundation behind an impervious clay blanket, built from a
-blank model: the geometry, the three boundary condition types and the no-flow
-default, the mesh, the solution, the discharge, and the flow net.
+A sheetpile wall in a silt layer behind an impervious clay blanket, built from a
+blank model: the boundary conditions and the no-flow default, the mesh, the
+discharge, a flow net checked by hand, and where the hydraulic gradient is
+highest.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/wxmpjUXc80s">▶ Watch · 15 min</a></p>
+
+**Completed model** — [xslope_clay_blanket.xlsx](../seep/files/xslope_clay_blanket.xlsx)
 
 **Related tutorial** — [SEEP-1. Confined Seepage Under a Sheetpile](../tutorials/seep01_sheetpile.md)
 

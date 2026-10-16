@@ -100,7 +100,10 @@ SHEETS = [
     # angle sit between phi and t_cut, so the table that ended at Jred in column L
     # ends at Jred in column O. There is no hidden lookup block behind it, and the
     # Yes/No list on Jred is a validation list rather than in-sheet data.
-    {"out": "sheet_joints.png", "src": JOINTS, "sheet": "joints", "cols": "A:O"},
+    # Rows stop a few past the four sample joints; the sheet's 50 numbered rows
+    # are otherwise all shown, empty.
+    {"out": "sheet_joints.png", "src": JOINTS, "sheet": "joints", "cols": "A:O",
+     "rows": (1, 10)},
     {"out": "sheet_piles.png", "src": "docs/lem/files/xslope_piles.xlsx",
      "sheet": "piles", "cols": "A:T"},
     {"out": "sheet_lloads.png", "src": "docs/inputs/slope/xslope_nail_axial.xlsx",

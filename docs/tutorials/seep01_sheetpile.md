@@ -133,15 +133,15 @@ ground level.
 permeability and the permeability at right angles to it — and `alpha` is the
 angle of the `k1` direction above horizontal, in degrees. An isotropic soil
 has `k1` = `k2`, which makes `alpha` irrelevant; it is entered here as 0.
-`mat` and `name` are the worksheet's first two columns, and the four after
-them are the first four of its seepage band, in the band's order; the seven
-band columns beyond `unsat` belong to the unsaturated and transient models
+The columns are the first five of the Materials table with **Seepage** alone
+showing, in its order, so the row pastes straight into it; the seven columns
+beyond `unsat` belong to the unsaturated and transient models
 this problem does not use. The row has no strength properties: this
 model is analyzed for flow only.
 
-| mat | name | k1 | k2 | alpha | unsat |
-| :---: | --- | :---: | :---: | :---: | --- |
-| 1 | `soil` | 30 | 30 | 0 | `lf` |
+| name | k1 | k2 | alpha | unsat |
+| --- | :---: | :---: | :---: | --- |
+| `soil` | 30 | 30 | 0 | `lf` |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row, with
 Maximum depth = `0`. The drawing shows the dimensions the line follows — the

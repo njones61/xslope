@@ -210,11 +210,11 @@ profile lines will use, top of the section first — and fill the three rows:
 
 ![The three zones with the seepage columns showing](images/seep02_studio_materials.png)
 
-| mat | name | k1 (ft/day) | k2 (ft/day) | alpha | unsat | kr0 | h0 (ft) | vg_a | vg_n |
-| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
-| 1 | `shell` | 1 | 1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
-| 2 | `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
-| 3 | `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
+| name | k1 (ft/day) | k2 (ft/day) | alpha | unsat | kr0 | h0 (ft) | vg_a | vg_n |
+| --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
+| `shell` | 1 | 1 | 0 | `lf` | 0.01 | -1 | 0 | 0 |
+| `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | -1 | 0 | 0 |
+| `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | -1 | 0 | 0 |
 
 All three zones are isotropic — `k1` equals `k2`, so `alpha` means nothing and
 stays at 0 — and the whole of the zoning is in the conductivities, as the problem

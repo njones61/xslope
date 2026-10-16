@@ -122,9 +122,9 @@ Click **Materials**, and on **Table view** set the **Show parameters for:** togg
 to **Seepage** alone. One row, with the seepage band of the `mat` worksheet
 across it:
 
-| mat | name | k1 (m/sec) | k2 (m/sec) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
-| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
-| 1 | `Dam fill` | 1 × 10<sup>−7</sup> | 1 × 10<sup>−7</sup> | 0 | `vg` | 0 | 0 | 0.2452 | 2.5739 |
+| name | k1 (m/sec) | k2 (m/sec) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
+| --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
+| `Dam fill` | 1e-7 | 1e-7 | 0 | `vg` | 0 | 0 | 0.2452 | 2.5739 |
 
 The soil is **isotropic**: `k1` and `k2` are equal, so the direction `alpha` would
 orient the major conductivity in makes no difference and it is left at 0.
@@ -619,9 +619,9 @@ tables of representative values.
 Click **Materials**, keep the **Show parameters for:** toggles on **Seepage**, and
 fill the two columns at the right of the row:
 
-| mat | name | Ss (1/m) | Sy |
-| :---: | --- | :---: | :---: |
-| 1 | `Dam fill` | 0.0003 | 0.15 |
+| name | Ss (1/m) | Sy |
+| --- | :---: | :---: |
+| `Dam fill` | 0.0003 | 0.15 |
 
 These are the compacted-silt entries from those tables — a stiff, fine-grained
 fill of the kind this dam's conductivity and retention curve describe. They are

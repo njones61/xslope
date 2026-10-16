@@ -2123,9 +2123,11 @@ def plot_derived_water_lines(ax, slope_data, style=None):
             ax.plot(rx, ry, color=color, linewidth=2, linestyle='-',
                     label=label, gid='WATER_LINE')
             label = None                       # one legend key per stage
-            mid = len(run) // 2
-            draw_water_level_symbol(ax, run[mid][0], run[mid][1], color=color,
-                                    markersize=8, extra_gap_points=2.0)
+            # Midway along the pool, not on its middle sample: a pool cut off at
+            # its boundary's end has three samples, the middle one at that end.
+            mid_x = 0.5 * (rx[0] + rx[-1])
+            draw_water_level_symbol(ax, mid_x, float(np.interp(mid_x, rx, ry)),
+                                    color=color, markersize=8, extra_gap_points=2.0)
             drawn.append(list(run))
     return drawn
 

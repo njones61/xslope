@@ -136,7 +136,7 @@ show what the water costs.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../lem/sample_images/submerged_slope_results.png)
+[![](../lem/sample_images/submerged_slope_results.png)](https://youtu.be/21n3zhrO1XE)
 <span class="vid-num">5</span>
 </div>
 <div class="vid-body" markdown>
@@ -149,7 +149,9 @@ piezometric line above the ground, and Studio converts it into the load the wate
 applies to the slope surface. Because the clay is analyzed with its undrained
 strength, the water adds load without adding pore pressure in the soil.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/21n3zhrO1XE">▶ Watch · 9 min</a></p>
+
+**Completed model** — [xslope_video05_submerged.xlsx](files/xslope_video05_submerged.xlsx)
 
 <!-- test: file=files/xslope_video05_submerged.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.154, tolerance=0.005 -->
 

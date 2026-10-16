@@ -28,6 +28,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   filled with water. This affects the water drawn in LEM and FEM modes and the
   automatic water loads. A head boundary up a model side is no longer read as a
   pool.
+- With **Water levels** on in the seepage solution view, the plot's frame includes
+  every level and its water symbol. Before, the frame ended just above the mesh, so
+  a pool standing above the ground, such as the upstream pool on a sheetpile
+  section, was drawn outside the plot.
 
 ### Changed
 

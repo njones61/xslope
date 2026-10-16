@@ -1775,6 +1775,17 @@ def seep_bc_level_color(style, set_no, kind):
     return _SEEP_BC_SET2_HEAD[1]
 
 
+def water_level_symbol_height(markersize=8, extra_gap_points=2.0):
+    """How far above its waterline :func:`draw_water_level_symbol` reaches, in
+    points: the gap under its tip plus its own height. A frame that must show the
+    symbol leaves this much room above the highest level it draws."""
+    from matplotlib.markers import MarkerStyle
+    ms = MarkerStyle("v")
+    verts = np.asarray(ms.get_path().transformed(ms.get_transform()).vertices)
+    return (float(verts[:, 1].max() - verts[:, 1].min()) * float(markersize)
+            + float(extra_gap_points))
+
+
 def draw_water_level_symbol(ax, x, y, color, markersize=8, extra_gap_points=2.0):
     """Place an inverted-triangle water-surface marker so its TIP visually sits on the
     waterline at (x, y). Positioned in display (point) units via an offset transform,

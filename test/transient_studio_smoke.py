@@ -77,6 +77,7 @@ from studio.display_panels import SeepDisplayPanel
 # so early frames have through-flow (real flow nets) and the drawdown exercises the
 # save schedule + stage times.
 DAM = os.path.join(_REPO, "docs/seep/files/xslope_earth_dam_tseep.xlsx")
+SEEP01 = os.path.join(_REPO, "docs/seep/files/xslope_clay_blanket.xlsx")
 NO_TSEEP = os.path.join(_REPO, "docs/inputs/slope/xslope_dam.xlsx")
 
 _SHARED = {}
@@ -528,6 +529,41 @@ def test_water_levels():
     return fails
 
 
+def test_water_levels_in_frame():
+    """A level above the mesh is inside the frame, its symbol with it. SEEP-1's
+    upstream pool stands at 13 on a section whose ground is at 10, and the frame
+    stopped at the mesh's top plus its margin (10.5): the downstream level showed
+    and the upstream one was drawn outside the plot."""
+    import matplotlib.pyplot as plt
+    from xslope.plot_seep import plot_seep_solution
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import build_seep_data, run_seepage_analysis
+    d = _quiet(load_slope_data, SEEP01)
+    mesh = _quiet(build_mesh_from_polygons, get_material_polygons(d), 1.0, "tri6")
+    seep = _quiet(build_seep_data, mesh, d)
+    sol = _quiet(run_seepage_analysis, seep, tol=1e-4)
+    fig = plt.figure(figsize=(9, 4.5))
+    _quiet(plot_seep_solution, seep, sol, fig=fig, mesh=False, show_bc_levels=True)
+    ax = _main_ax(fig)
+    fig.canvas.draw()
+    fails = []
+    levels = sorted(float(np.max(ln.get_ydata())) for ln in ax.lines
+                    if ln.get_gid() == "BC_LEVEL")
+    if levels != [10.0, 13.0]:
+        fails.append(f"SEEP-1 drew water levels at {levels}, not 10 and 13")
+    y0, y1 = ax.get_ylim()
+    if not y1 > 13.0:
+        fails.append(f"the frame stops at y = {y1:.3g}, below the upstream level of 13")
+    frame_top = ax.get_window_extent().y1
+    renderer = fig.canvas.get_renderer()
+    for ln in ax.lines:
+        if ln.get_marker() == "v" and ln.get_window_extent(renderer).y1 > frame_top + 0.5:
+            fails.append("a water-level symbol is cut off at the top of the frame")
+            break
+    plt.close(fig)
+    return fails
+
+
 @studio_settings.isolated
 def main():
     print("transient seepage studio smoke:")
@@ -537,7 +573,9 @@ def main():
               ("transient inputs editor + live plot", test_editor),
               ("mainwindow integration + sidecar", test_mainwindow),
               ("seep display panel (transient omits flow-net controls)", test_display_panel),
-              ("transient water-level overlay", test_water_levels)]
+              ("transient water-level overlay", test_water_levels),
+              ("water levels above the mesh are in the frame",
+               test_water_levels_in_frame)]
     failures = []
     for name, fn in checks:
         try:

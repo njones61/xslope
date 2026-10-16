@@ -189,6 +189,30 @@ def seep_bc_levels(seep_data, solution):
     return out
 
 
+def _seep_bc_level_top(seep_data):
+    """The highest water level any head or reservoir boundary reaches over the
+    whole run: a constant level as itself, a series at its highest value. With the
+    water levels shown, the solution frame opens to it, so a level above the mesh
+    is in view, and a transient playback keeps one frame while its pool falls."""
+    seepage_bc = (seep_data or {}).get("seepage_bc") or {}
+    series = ((seep_data or {}).get("tseep") or {}).get("series") or {}
+    tops = []
+    for h in seepage_bc.get("specified_heads") or []:
+        if len(h.get("coords") or []) < 2:
+            continue
+        val = h.get("head")
+        if isinstance(val, str):
+            vals = [float(v) for v in (series.get(val) or []) if v is not None]
+            if vals:
+                tops.append(max(vals))
+        else:
+            try:
+                tops.append(float(val))
+            except (TypeError, ValueError):
+                pass
+    return max(tops) if tops else None
+
+
 def seep_has_bc_levels(seep_data, solution):
     """Whether the ``show_bc_levels`` overlay draws any water level for this frame.
 
@@ -966,9 +990,14 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     except Exception as e:
         print(f"Warning: Could not plot mesh boundary: {e}")
 
-    # Add cushion around the mesh
+    # Add cushion around the mesh -- and, with the water levels shown, around the
+    # highest of them too: a pool stands above the ground, so above the mesh.
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
     y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
+    if show_bc_levels:
+        top = _seep_bc_level_top(seep_data)
+        if top is not None and top > y_max:
+            y_max = top
     x_pad = (x_max - x_min) * pad_frac
     y_pad = (y_max - y_min) * pad_frac
     ax.set_xlim(x_min - x_pad, x_max + x_pad)
@@ -1100,6 +1129,30 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     except Exception:
         pass
     _legend_below(ax, fig, handles=leg_handles, legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
+
+    # The water symbol stands above its level by a fixed number of points, so the
+    # room it needs in data units is known only once the axes are laid out. Open
+    # the top of the frame by that much over the highest level the run reaches;
+    # with a box-adjusted equal aspect a taller frame can rescale the box, so the
+    # measure is repeated until it holds.
+    if bc_level_handles:
+        from .plot import water_level_symbol_height
+        top = _seep_bc_level_top(seep_data)
+        room = water_level_symbol_height(8, 2.0) + 2.0
+        for _ in range(3):
+            try:
+                fig.canvas.draw()
+                ax.apply_aspect()
+            except Exception:
+                break
+            y0, y1 = ax.get_ylim()
+            px = ax.get_window_extent().height
+            if top is None or px <= 0 or y1 <= y0:
+                break
+            need = top + room * fig.dpi / 72.0 * (y1 - y0) / px
+            if need <= y1:
+                break
+            ax.set_ylim(y0, need)
 
     # Colorbar last: a manual axes to the right of the (now laid-out) plot, its
     # height cbar_shrink × the plot height and centered on it. Manual placement (vs

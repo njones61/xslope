@@ -283,8 +283,8 @@ is rejected rather than approximated.
 
 A `.gsz` still cannot carry everything XSLOPE models. An **elastic** material *is* written
 — as GeoStudio's impenetrable **Bedrock** — but failure surfaces, piles, other
-non-Mohr-Coulomb strengths (c/φ, power curve, Hoek-Brown), and the v16/v17 material
-features `t_cut`, `phi_b` and `s_cap` are **not written**: SLOPE/W has no material
+non-Mohr-Coulomb strengths (c/φ, power curve, Hoek-Brown), and the material
+properties `t_cut`, `phi_b` and `s_cap` are **not written**: SLOPE/W has no material
 encoding for them, and inventing one would corrupt the file. Each omission is reported as
 a caveat so you know what to re-create on the GeoStudio side.
 

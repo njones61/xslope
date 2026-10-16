@@ -311,14 +311,14 @@ def _leg_region_name(failures, results):
                             "joints region; FEM-5 tells the reader to name it "
                             f"{FEM05_REGION_NAME!r}")
             return
-        if not dlg._name_row.isHidden():
+        if not name_edit.isHidden():
             failures.append("region: the Name field is shown on a material polygon, "
                             "which has no name to give")
         dlg._add_line()
         joints = next(i for i, (_w, k) in enumerate(POLYGON_TYPE_ITEMS)
                       if k == 'joints')
         dlg.type_combo.setCurrentIndex(joints)
-        if dlg._name_row.isHidden():
+        if name_edit.isHidden():
             failures.append("region: the Name field stays hidden on a joints region")
         name_edit.setText(FEM05_REGION_NAME)
         dlg.table.replace_rows([{'x': x, 'y': y} for x, y in FEM05_REGION])

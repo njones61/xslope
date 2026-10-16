@@ -446,6 +446,45 @@ def test_the_material_form_waits_for_a_material():
     return out
 
 
+def test_the_geometry_pane_is_as_wide_as_its_contents():
+    """The Polygons and Profile lines editors: the selected item's pane (its fields
+    above its vertex table) opens at the width its widest part needs, and the
+    preview takes the rest. With no item yet the pane still shows an empty table,
+    dimmed until Add makes one, rather than a blank space."""
+    from studio.editors import PolygonEditor, ProfileEditor
+
+    model = _load(os.path.join(_MODELS, "xslope_sloping_bottom.xlsx"))
+    out = []
+    for name, editor in (("Polygons", PolygonEditor()), ("Profile lines", ProfileEditor())):
+        dlg = _shown(editor.build(model, None))
+        pane = dlg._item_pane
+        need = max(dlg._item_form.sizeHint().width(), dlg.table.columns_width(),
+                   dlg.table.minimumSizeHint().width())
+        split = pane.parentWidget()
+        sizes = split.sizes()
+        out += _fail(sizes[1] == need,
+                     f"{name}: the item pane opened {sizes[1]} px wide; its form, "
+                     f"table, and buttons need {need}")
+        out += _fail(sizes[2] > sizes[0] + sizes[1],
+                     f"{name}: the preview is {sizes[2]} px against {sizes[0]} + "
+                     f"{sizes[1]} for the list and the item pane")
+        dlg.close()
+
+    blank = dict(model, polygons=[], ssr_zones=[], refine_zones=[], joint_zones=[])
+    dlg = PolygonEditor().build(blank, None)
+    out += _fail(dlg.table is not None and dlg.table.table.rowCount() == 0,
+                 "with no polygons the item pane has no vertex table")
+    out += _fail(not dlg._item_pane.isEnabled() and dlg.list.isEnabled(),
+                 "with no polygons the item pane is not dimmed (or the list is)")
+    dlg._add_line()
+    out += _fail(dlg._item_pane.isEnabled(),
+                 "after Add the new polygon's pane is still dimmed")
+    dlg._remove_line()
+    out += _fail(not dlg._item_pane.isEnabled() and dlg.table is not None,
+                 "after removing the last polygon the pane is live or blank")
+    return out
+
+
 def test_copy_round_trips():
     """Copy is the natural other half: a selection out as the same tab-separated
     block, which this table's own paste reads back into identical rows."""
@@ -1644,6 +1683,8 @@ CHECKS = [
      test_tab_past_the_last_cell_of_a_plain_grid),
     ("the material form waits for a material",
      test_the_material_form_waits_for_a_material),
+    ("the geometry pane is as wide as its contents",
+     test_the_geometry_pane_is_as_wide_as_its_contents),
     ("cancel discards a paste", test_cancel_discards_a_paste),
     ("the reinforcement two-block paste", test_the_reinforcement_two_block_paste),
     ("the support editors' columns are the sheets'",

@@ -219,6 +219,18 @@ def build_rapid(out_path):
     # a set and an unset cell rather than a column of identical values.
     if sd.get("profile_lines"):
         sd["profile_lines"][0]["size"] = 2.0
+    # The dam's water loads are derived (water_loads = auto), so its dloads sheets
+    # are empty. Two sample surcharges give the images something to show: a strip on
+    # the crest and a strip on the ground past the downstream toe. A surcharge stays
+    # in place through a drawdown, so both stages carry it.
+    _crest = [{"X": 280.0, "Y": 317.0, "Normal": 500.0},
+              {"X": 310.0, "Y": 317.0, "Normal": 500.0}]
+    _toe = [{"X": 620.0, "Y": 227.0, "Normal": 300.0},
+            {"X": 700.0, "Y": 227.0, "Normal": 300.0}]
+    sd["dloads"] = [list(_crest), list(_toe)]
+    sd["dloads2"] = [list(_crest), list(_toe)]
+    sd["dload_dirs"] = ["normal", "normal"]
+    sd["dload2_dirs"] = ["normal", "normal"]
     # v21 dload Direction on the FIRST block of each sheet, left blank on the rest,
     # so the image shows the dropdown filled beside the default it replaces. This
     # file is a sample for the sheet layout only — nothing solves it — so the

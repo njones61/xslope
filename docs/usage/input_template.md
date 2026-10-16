@@ -76,7 +76,7 @@ reinforcement, and boundary conditions to scale.
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks the template format for compatibility. The current version is **26**. xslope rejects a file whose version is newer than the installed version supports, so an older install cannot misread a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
+- **Template version**: Tracks the template format for compatibility. The current version is **27**. xslope rejects a file whose version is newer than the installed version supports, so an older install cannot misread a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial).
 - **Time** (`sec`, `min`, `hr`, `day`, or `yr`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type takes precedence (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
@@ -614,7 +614,7 @@ to represent the force of the water on the slope. During limit equilibrium analy
 
 ![sheet_dloads2.png](images/sheet_dloads2.png)
 
-Each worksheet is formatted for 6 distributed loads, but additional loads can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, but additional rows can be added below the end of table if necessary.
+Each worksheet is formatted for 4 distributed loads, but additional loads can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, but additional rows can be added below the end of table if necessary.
 
 Each distributed load is defined by a **Direction** and a series of points with:
 
@@ -651,7 +651,7 @@ overhang, or a small backstep at a toe) has no increasing-X form and is kept exa
 
 The forces are defined using a unit width perpendicular to the plane of the slope. For the water load, 
 the force at each point would be the unit weight of water multiplied by the height of water above the point in 
-question. For the example shown above, there distributed load would consist of three points, the first two points 
+question. For the example shown above, the distributed load would consist of three points, the first two points 
 having the normal force and the last point having a normal force of zero. The surcharge load on the right would be 
 defined by two points with a normal force for each.
 

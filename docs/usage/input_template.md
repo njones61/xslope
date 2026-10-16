@@ -288,153 +288,73 @@ During analysis, xslope uses these lines to:
 
 ## Worksheet: polygon
 
-The **polygon** worksheet is an **alternative to the profile worksheet** for defining slope
-geometry. Instead of describing each soil layer as a left-to-right line, each material zone is
-described as a **closed polygon** — a self-contained region with an assigned material. Use whichever
-method best fits the geometry; do **not** fill in both the **profile** and **polygon** worksheets in
-the same file.
+The **polygon** worksheet is the alternative to the **profile** worksheet. Each material zone is
+drawn as a closed polygon instead of a left-to-right line. Use one sheet or the other for the
+geometry, never both.
 
 ![sheet_polygon.png](images/sheet_polygon.png)
 
-Polygons are well suited to geometries that are awkward to express as stacked profile lines, such as:
+Polygons suit geometry that stacked profile lines can't draw: dipping or irregular bedrock, a lens
+of one soil inside another, a zoned dam, or a section drawn in CAD as closed regions.
 
-- Irregular or dipping bedrock surfaces
-- Lenticular deposits (lens-shaped inclusions) embedded within another material
-- Complex fill geometries such as zoned dam cross-sections
-- Geometry imported from CAD software, which is typically drawn as closed regions
+Each polygon has its own block, side by side across the sheet:
 
-Each polygon is defined in its own table, organized horizontally just like the profile tables. For
-each polygon you provide:
+| Cell | What it is |
+| --- | --- |
+| **Type** | `material` (blank means this), `ssr reduce`, `ssr hold`, `ssr elastic`, `refine`, or `joints`. Only `material` is soil; the others are described below |
+| **Mat ID** | The material, from the **mat** sheet. The name below it fills in automatically. Grayed out unless Type is `material` |
+| **Size** | Optional target mesh element size **[L]** inside the polygon. Blank uses the global size |
+| **x, y** | Vertices **[L]**, one per row, at least three |
 
-- A **Type**, which says what kind of region the polygon is. `material` (the default, and what a
-  blank cell means) is a soil zone; the three `ssr` values are [SSR zone](#ssr-zones) analysis
-  overlays; `refine` is a [mesh refinement region](#refine-regions); `joints` is a
-  [joint region](#joint-regions). An unrecognized word is rejected at load time, never read as a
-  material zone.
-- A **Material ID**, which references one of the materials in the **mat** worksheet. As with the
-  profile sheet, the name below it is filled in automatically. Both cells gray out for any Type
-  other than `material`, because an overlay has no material.
-- An optional **Size** — a target finite-element size **[L]** inside the polygon, used only when a
-  mesh is generated. Blank means the global target size. Size is available on **every** polygon and
-  layers on top of the Type rather than replacing it: a material zone may carry one, an SSR zone may
-  carry one, and a `refine` polygon carries nothing else. See
-  [Local mesh sizes](#refine-regions).
-- The polygon **vertices** as XY coordinates **[L]**, one vertex per row.
-
-A few rules govern how the vertices are interpreted:
-
-- **Winding order does not matter** — vertices may be listed clockwise or counter-clockwise.
-- **Polygons are closed automatically** — the last vertex is connected back to the first, so you do
-  not need to repeat the starting point.
-- **Nesting is detected from the geometry** — if one polygon lies entirely inside another (for example
-  a sand lens within a clay deposit), the inner polygon overrides the outer one in the overlap region.
-  No parent/child bookkeeping is required.
-- Each polygon must have at least three vertices, and the polygons together should tile the cross
-  section without overlaps or gaps.
-
-The template includes tables for 15 polygons, organized horizontally, and you can copy additional
-tables to the right as needed. Each table includes room for many vertices, and you can add as many
-rows as required.
-
-Unlike the profile worksheet, the **polygon** worksheet does **not** use a Max Depth parameter. The
-overall extent of the model — including the ground surface and the bottom boundary — is derived from
-the **union of all polygons** (the domain polygon). The ground surface is taken from the upper edge of
-that union, and during an automated limit equilibrium search the failure surface is constrained to
-stay within the domain polygon, which can therefore represent an irregular bedrock surface directly.
+- List the vertices clockwise or counterclockwise, and don't repeat the first one at the end; the
+  polygon closes itself.
+- The material polygons should fill the section with no gaps or overlaps. One polygon entirely
+  inside another (a sand lens in clay) overrides it where they overlap.
+- There is no Max Depth. The model's extent is the union of the material polygons: its top edge is
+  the ground surface, and an LEM search keeps the failure surface inside it, so a dipping base
+  limits the search directly.
 
 ### SSR zones {#ssr-zones}
 
-A polygon whose **Type** begins with `ssr` is not a material zone at all. It is an **SSR zone** — an
-analysis overlay that tells the finite-element [strength reduction method](../fem/solver.md#ssr-exclusion-zones)
-which part of the model to weaken.
+An `ssr` polygon tells the finite-element [strength reduction](../fem/solver.md#ssr-exclusion-zones)
+which part of the model to weaken. It isn't meshed and doesn't change the model otherwise, and the
+LEM ignores it.
 
-| Type | Meaning |
+| Type | Effect inside the polygon |
 |:-----|:--------|
-| **`ssr reduce`** | **Search area.** Strength reduction applies **only inside** this polygon. |
-| **`ssr hold`** | **Exclusion, full strength.** Inside is never reduced, but it can still yield. |
-| **`ssr elastic`** | **Exclusion, elastic.** Inside is linear elastic and cannot yield at all. |
+| `ssr reduce` | Strength is reduced only inside these polygons |
+| `ssr hold` | Never reduced, but can still yield |
+| `ssr elastic` | Never reduced, and linear elastic: can't yield |
 
-Any other word is rejected at load time rather than ignored, so a typo can never quietly run the
-model unconstrained.
+The reduced region is the `ssr reduce` polygons (or the whole model, if there are none) minus the
+`ssr hold` and `ssr elastic` polygons. SSR zones may overlap each other and cross material
+boundaries. Use them when a competing mechanism would otherwise control, for example to hold a
+stiff foundation at full strength so the failure forms in the fill. They are RS2's SSR Search Area
+and Exclusion Area.
 
-**Overlays.** An SSR zone is never meshed, never becomes a material region and
-never generates slices. It changes nothing about the model except which elements the strength reduction
-touches, and it is classified element by element, by where each element's center falls. A zone can
-therefore be added to a finished model safely: the mesh and the factor of safety are untouched unless the
-zone actually constrains something. Zones may overlap each other and may cross material boundaries
-freely — the no-overlap rule above applies to material zones only. The limit-equilibrium solvers ignore
-them entirely.
-
-**How several zones combine.** There is one rule:
-
-> The reduced region is the union of the `ssr reduce` zones, minus the union of the `ssr hold` and
-> `ssr elastic` zones. With no `ssr reduce` zone drawn, it is the **whole model** minus those exclusions.
-
-So exclusions always carve out — of a search area they sit inside, or of the model as a whole — and an
-interior hole in a search area is drawn simply by putting an `ssr hold` (or `ssr elastic`) polygon on
-top of it. An `ssr elastic` zone additionally makes its elements linear elastic, the same treatment as a
-material whose strength option is `elastic`, but addressed by outline instead of by material.
-
-**When to use one.** Use a search area when the mechanism you want to measure is confined to part of the
-model and a competing one elsewhere would otherwise take over — a stiff foundation held at full strength
-forces the failure up into the fill above it. This is RS2's "SSR Search Area" and "SSR Exclusion Area",
-and both senses are drawn directly: mark the region you want reduced `ssr reduce`, or mark the region you
-want held `ssr hold`. Both forms, and when each is the natural one to use, are covered under
-[SSR search areas and exclusion zones](../fem/solver.md#ssr-exclusion-zones).
-
-A zone drawn on the polygon sheet applies to every run of the model. A search-area polygon passed
-explicitly to a run takes precedence over the file's zones (XSLOPE warns when both are present, rather
-than quietly intersecting the two).
-
-**Zones on a profile-sheet model.** Because zones are not geometry, the "do not fill in both sheets"
-rule does not apply to them: a model whose geometry lives on the **profile** sheet may still carry SSR
-zone rows on the **polygon** sheet.
+A model whose geometry is on the **profile** sheet can still have SSR zones on the **polygon**
+sheet.
 
 ### Local mesh sizes and refine regions {#refine-regions}
 
-The **Size** cell on a polygon (and the matching cell on a [profile line](#worksheet-profile)) sets a
-target finite-element size **[L]** inside that region. Blank means the global target size — the value
-in the Build Mesh dialog, or **Mesh target size** on the [main](#worksheet-main) sheet. Set it and the
-elements inside the region are driven down to the value given, growing smoothly back to the global size
-outside it so there is no abrupt jump in element size at the boundary.
+A **Size** on a polygon or a [profile line](#worksheet-profile) makes the mesh finer inside it,
+growing back to the global size outside. A `refine` polygon does only that: it has no material and
+no effect on any solver. Use it for something the geometry doesn't outline, such as the ground
+under a footing or the tip of a cutoff wall. A `refine` polygon needs a Size.
 
-Size is **independent of Type**. A material zone with a Size is that soil zone, meshed finer. An SSR
-zone with a Size is the same analysis overlay, with the elements it selects resolved more finely. And a
-polygon whose Type is **`refine`** is nothing but a Size: it carries no material, never becomes a mesh
-region, never generates slices and is invisible to every solver — the only thing it does is make the
-mesh finer where it is drawn. A `refine` polygon must therefore carry a Size; one without does nothing,
-and the [preflight check](preflight.md) reports this before a mesh-based analysis runs.
-
-Use a refine region to resolve something the geometry does not mark out on its own — the ground under a
-footing, the zone a slip surface is expected to pass through, or the tip of a cutoff wall. Use a
-material or profile-line Size when the thing to resolve *is* a layer. Neither affects a
-limit-equilibrium run, which does not mesh, and neither changes the mesh at all when left blank.
-
-A Size only ever **refines**. A value at or above the global target size cannot make the mesh coarser
-there; xslope warns at mesh time rather than leaving a setting with no effect to pass unnoticed.
-
-Refine regions may overlap anything, including each other and material boundaries; where several apply,
-the smallest size applies.
+A Size only refines; a value at or above the global size has no effect, and XSLOPE warns about it.
+Where refine regions overlap, the smallest size applies. The LEM doesn't mesh, so sizes don't
+affect it.
 
 ### Joint regions {#joint-regions}
 
-A polygon whose **Type** is `joints` is an **authoring region**: it marks where a generated joint network exists.
-Like a refine region it carries no material, is never meshed as a region, never generates slices and is invisible
-to every solver — and unlike one it does not change the mesh either. The only thing that reads it is a
-[generated joint set](#joint-sets) that names it as its region, and a region no set names has no effect.
+A `joints` polygon marks where a [generated joint set](#joint-sets) exists, for ground that isn't a
+material zone, such as one block of an outcrop. It isn't meshed and does nothing unless a joint set
+names it. A set names it by the block header (`poly:North block`, after typing over the
+`Polygon #3` header) or by its number among the joint regions (`poly:1`). A set confined to one
+material can name the material instead and needs no polygon.
 
-Draw one when the ground a set exists in is not a material zone: one block of an outcrop, the rock behind a wall,
-the part of a unit above a bench. A set that *is* confined to a material needs no polygon at all — it can name the
-material directly.
-
-The region's **name** is the block header over its column — the `Polygon #3` cell, which you can type over. A set
-refers to it by that name (`poly:North block`) or by its number among the joint regions (`poly:1`). A header left
-as the template wrote it is the block's number rather than a name, so such a region is referred to by number.
-
-Two cells on a joint region do nothing, and the [model checks](preflight.md) report both rather than letting either
-pass unnoticed: a **Material ID**, because the region is not a soil zone (if the polygon was meant to *be* that zone, its
-Type is the cell to change), and a **Size**, because nothing about the region is meshed — draw a `refine` polygon
-over the same ground to refine the mesh there.
+Leave its Mat ID and Size blank; the [model checks](preflight.md) flag either one.
 
 ---
 

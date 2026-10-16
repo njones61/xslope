@@ -215,7 +215,7 @@ during the search.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem06_solution_composite.png)
+[![](../tutorials/images/lem06_solution_composite.png)](https://youtu.be/dljDgesNJjQ)
 <span class="vid-num">8</span>
 </div>
 <div class="vid-body" markdown>
@@ -228,7 +228,9 @@ polygon per material zone instead of profile lines. The dipping base limits the
 circles a search can try, and the composite-surface option lets a circle run
 along the bedrock instead of being refused.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/dljDgesNJjQ">▶ Watch · 11 min</a></p>
+
+**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx)
 
 **Related tutorial** — [LEM-6. Polygon Geometry](../tutorials/lem06_polygon_geometry.md)
 

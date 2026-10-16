@@ -19,8 +19,8 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-    QScrollArea, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QTabWidget, QVBoxLayout, QWidget,
+    QScrollArea, QSplitter, QStackedWidget, QStyledItemDelegate, QTableWidget,
+    QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
 # Point-to-polyline distance shared with the Inputs-canvas hit-tester — reused by the
@@ -468,15 +468,34 @@ class _ClearKeyFilter(QObject):
         return super().eventFilter(obj, event)
 
 
+class _AlignedEditDelegate(QStyledItemDelegate):
+    """Opens a cell's editor with the cell's own alignment. Qt's default editor is
+    a line edit aligned left whatever the cell says, so a right-aligned number
+    jumped to the left edge when its cell was opened and back when it closed."""
+
+    def createEditor(self, parent, option, index):
+        editor = super().createEditor(parent, option, index)
+        align = index.data(Qt.TextAlignmentRole)
+        if isinstance(editor, QLineEdit) and align is not None:
+            editor.setAlignment(align if isinstance(align, Qt.AlignmentFlag)
+                                else Qt.AlignmentFlag(align))
+        return editor
+
+
 class _TabGrowsTable(QTableWidget):
     """A grid where Tab from the last column of the last row adds a row and moves
     into its first cell, as Tab does at the end of a word-processor table. Qt's own
-    Tab wraps back to the top-left cell instead.
+    Tab wraps back to the top-left cell instead. A cell opened for typing keeps its
+    alignment (_AlignedEditDelegate).
 
     Done in moveCursor because both Tabs end there: the table's own (a cell
     selected) and the cell editor's (a value being typed, which the delegate
     commits before asking the view for the next cell). In the second case the new
     cell opens for typing, as any cell Tab reaches mid-edit does."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setItemDelegate(_AlignedEditDelegate(self))
 
     def moveCursor(self, action, modifiers):
         if action == QAbstractItemView.MoveNext:

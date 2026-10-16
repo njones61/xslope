@@ -20,6 +20,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   the generator's note takes its room from the section preview.
 - The Polygons and Profile lines editors open with an empty, dimmed vertex table
   when there is no polygon or line yet. Before, the middle pane was blank.
+- A number opened for typing in a Studio table stays right-justified. Before, it
+  jumped to the left edge of the cell while being edited.
 
 ### Changed
 

@@ -352,6 +352,30 @@ def _cell_editor(table):
     return table.viewport().findChild(QLineEdit)
 
 
+def test_a_cell_editor_keeps_the_cell_alignment():
+    """A cell opened for typing keeps the cell's alignment: a number stays at the
+    right edge rather than jumping left as its editor opens (Qt's default editor is
+    left-aligned whatever the cell says), and a cell aligned left stays left."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QTableWidgetItem
+    from studio.editors import MatGeometryDialog, _TabGrowsTable, _new_pt
+
+    t = _shown(_new_table(MatGeometryDialog.XY, [{"x": 20.0, "y": 10.0}], _new_pt))
+    t.table.setCurrentCell(0, 0)
+    t.table.editItem(t.table.item(0, 0))
+    ed = _cell_editor(t.table)
+    out = _fail(ed is not None and bool(ed.alignment() & Qt.AlignRight),
+                "a number's cell editor opens aligned left")
+
+    grid = _shown(_TabGrowsTable(1, 1))
+    grid.setItem(0, 0, QTableWidgetItem("label"))
+    grid.editItem(grid.item(0, 0))
+    ed = _cell_editor(grid)
+    out += _fail(ed is not None and not (ed.alignment() & Qt.AlignRight),
+                 "a left-aligned cell's editor opens aligned right")
+    return out
+
+
 def test_tab_past_the_last_cell_adds_a_row():
     """Tab from the last column of the last row adds a row and moves into its first
     cell, as Tab does at the end of a word-processor table (Qt's own Tab wraps to
@@ -1695,6 +1719,8 @@ CHECKS = [
     ("copy round-trips through paste", test_copy_round_trips),
     ("Delete empties the selected cells", test_delete_empties_the_selected_cells),
     ("Delete on a plain grid", test_delete_on_a_plain_grid),
+    ("a cell editor keeps the cell's alignment",
+     test_a_cell_editor_keeps_the_cell_alignment),
     ("Tab past the last cell adds a row", test_tab_past_the_last_cell_adds_a_row),
     ("Tab past the last cell of a plain grid",
      test_tab_past_the_last_cell_of_a_plain_grid),

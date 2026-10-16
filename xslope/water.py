@@ -108,6 +108,15 @@ def _y_on(line, x):
     return None
 
 
+def _y_foot(coords, x):
+    """The lowest elevation a left-to-right polyline reaches at x: the foot of a
+    vertical face standing there, where :func:`_y_on` may read its top. None if x
+    is off its ends."""
+    ys = [min(y1, y2) if x2 == x1 else y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+          for (x1, y1), (x2, y2) in zip(coords, coords[1:]) if x1 <= x <= x2]
+    return min(ys) if ys else None
+
+
 def _ground_walk(ground_surface, upper_line):
     """The ground's own vertices in order, with the upper line's vertices spliced in.
 
@@ -251,6 +260,14 @@ def ponded_water_dload(ground_surface, piezo_line, gamma_water):
 #: keeps a deep aquifer head boundary from being read as a reservoir.
 _ON_GROUND_FRAC = 1e-6
 
+#: Where a pool's boundary ends with the ground beyond it still under the pool's
+#: level, the water surface drops to the ground over this fraction of the model's
+#: width, just inside the boundary's end. It is a step rather than a vertical edge
+#: because the line is a function of x. A hundred times the on-ground tolerance, so
+#: the step stays a segment of its own in every later measurement; the sliver of
+#: pool it tapers is a ten-thousandth of the width.
+_POOL_EDGE_FRAC = 1e-4
+
 
 def _as_coords(obj):
     """``[(x, y), ...]`` from a shapely geometry, a list of pairs, or ``None``."""
@@ -333,6 +350,17 @@ def bc_pool_levels(bc, ground_surface, slope_data=None, time=0.0):
 
     Flux boundaries and exit faces never describe standing water and are not read.
     """
+    return [(level, anchors, label) for level, anchors, label, _reach
+            in _bc_pools(bc, ground_surface, slope_data, time)]
+
+
+def _bc_pools(bc, ground_surface, slope_data=None, time=0.0):
+    """:func:`bc_pool_levels` with each pool's **reach** as a fourth item: the x
+    extent of the block's vertices that lie on or above the ground. That is the
+    stretch of ground the boundary is drawn along. A vertex below the ground is on
+    a model side or base, which bounds no pool, and a vertex a hair above the
+    ground is still the pool's edge (a face traced to its waterline, transcribed
+    to the nearest 0.1)."""
     ground = _as_coords(ground_surface)
     if len(ground) < 2:
         return []
@@ -362,7 +390,11 @@ def bc_pool_levels(bc, ground_surface, slope_data=None, time=0.0):
                  f" at elevation {level:g}")
         if named:
             label += f" (from {named})"
-        out.append((float(level), sorted(anchors), label))
+        wet = [float(x) for x, y in (blk.get("coords") or [])
+               if (_y_on(line, float(x)) is not None
+                   and float(y) >= _y_on(line, float(x)) - tol)]
+        reach = (min(wet + anchors), max(wet + anchors))
+        out.append((float(level), sorted(anchors), label, reach))
     return out
 
 
@@ -376,10 +408,20 @@ def seep_bc_water_line(ground_surface, bc, slope_data=None, time=0.0):
     over the reach of ground the pool actually covers, and lying on the ground
     everywhere else.
 
-    The covered reach is found by walking outward from the boundary's own vertices
-    for as long as the ground stays below the level, so the pool ends where the
-    ground rises out of it rather than at the boundary's last vertex. Two blocks
-    that overlap take the higher level.
+    **A pool covers the ground its boundary is drawn along, and no more**: the reach
+    from the block's first vertex on or above the ground to its last
+    (:func:`_bc_pools`). Within that reach it
+    stands wherever the ground is below the level. Past the boundary's end it does
+    not spread, even over ground that is still lower: a pool's boundary is drawn to
+    its shoreline, and the ground beyond is either another boundary's (the
+    tailwater behind a sheetpile, at its own level) or none (a dewatered trench).
+    Where the ground beyond the end is still under the level, the surface meets the
+    ground at the end, dropping to it over the last sliver of the reach
+    (:data:`_POOL_EDGE_FRAC`), rather than sloping down to whichever ground vertex
+    comes next; at a vertical face it drops to the face's foot, so the face stays
+    dry. A block that touches the ground at a single point, a
+    head boundary up a model side, has no reach and states no pool. Two blocks that
+    overlap take the higher level.
 
     **The shoreline is a sample of its own.** The line is sampled at every ground
     vertex, at the boundary's own vertices, and at every point where the ground
@@ -395,39 +437,68 @@ def seep_bc_water_line(ground_surface, bc, slope_data=None, time=0.0):
     ground = _as_coords(ground_surface)
     if len(ground) < 2 or not _ascending(ground):
         return []
-    pools = bc_pool_levels(bc, ground_surface, slope_data, time)
+    width = ground[-1][0] - ground[0][0]
+    tol = max(1e-12, _ON_GROUND_FRAC * width)
+    pools = [(level, anchors, label, reach) for level, anchors, label, reach
+             in _bc_pools(bc, ground_surface, slope_data, time)
+             if reach[1] - reach[0] > tol]
     if not pools:
         return []
 
+    line = LineString(ground)
     shore = set()
-    for level, _anchors, _label in pools:
+    for level, _anchors, _label, _reach in pools:
         for (x1, y1), (x2, y2) in zip(ground, ground[1:]):
             if (y1 - level) * (y2 - level) < 0 and y2 != y1:
                 shore.add(x1 + (level - y1) / (y2 - y1) * (x2 - x1))
-    xs = sorted({p[0] for p in ground} | shore
-                | {x for _, anchors, _ in pools for x in anchors})
-    line = LineString(ground)
-    yg = [_y_on(line, x) for x in xs]
+    # A boundary that ends with the ground beyond it still under its level: the
+    # water meets the ground AT the end, dropping to it over the last sliver of the
+    # reach. Inside rather than past the end, and down to the foot of any vertical
+    # face standing there, so that where the ground falls away down a face (a
+    # trench wall) the dry face carries no water: the line has one elevation at
+    # each x, and the face's whole height is measured against it.
+    drop = _POOL_EDGE_FRAC * width
+    edges, feet, bounds = set(), {}, []
+    for level, _anchors, _label, reach in pools:
+        lo, hi = reach[0] - tol, reach[1] + tol
+        for end, side in ((reach[0], -1), (reach[1], 1)):
+            y_end, y_past = _y_on(line, end), _y_on(line, end + side * drop)
+            if (y_end is not None and y_past is not None
+                    and y_end <= level + tol and y_past < level - tol):
+                inner = end - side * drop
+                edges.add(inner)
+                feet[end] = _y_foot(ground, end)
+                if side < 0:
+                    lo = inner - tol
+                else:
+                    hi = inner + tol
+        bounds.append((lo, hi))
+    xs = sorted({p[0] for p in ground} | shore | edges | set(feet)
+                | {x for _, anchors, _, _ in pools for x in anchors})
+    yg = [feet[x] if x in feet else _y_on(line, x) for x in xs]
     if any(y is None for y in yg):
         xs = [x for x, y in zip(xs, yg) if y is not None]
         yg = [y for y in yg if y is not None]
     if len(xs) < 2:
         return []
-    span = max(xs) - min(xs)
-    tol = max(1e-12, _ON_GROUND_FRAC * span)
 
     level_at = [None] * len(xs)
-    for level, anchors, _label in pools:
+    for (level, anchors, _label, _reach), (lo, hi) in zip(pools, bounds):
+        inside = [k for k in range(len(xs)) if lo <= xs[k] <= hi]
+        if not inside:
+            continue
         covered = set()
         for xa in anchors:
-            # nearest sample to the anchor, then walk both ways while submerged
-            i = min(range(len(xs)), key=lambda k: abs(xs[k] - xa))
+            # nearest sample to the anchor within the pool's reach, then walk both
+            # ways while submerged, never past the reach
+            i = min(inside, key=lambda k: abs(xs[k] - xa))
             if yg[i] > level + tol:
                 continue
             covered.add(i)
             for step in (-1, 1):
                 j = i + step
-                while 0 <= j < len(xs) and yg[j] <= level + tol:
+                while (0 <= j < len(xs) and lo <= xs[j] <= hi
+                       and yg[j] <= level + tol):
                     covered.add(j)
                     j += step
         for i in covered:

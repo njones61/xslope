@@ -2027,6 +2027,18 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                          flux_color="seagreen")
 
 
+def _meets_ground(ground, wet, dry):
+    """Where the segment from a wet water-line sample to the dry one past it first
+    meets the ground: the dry sample itself, unless the ground is crossed sooner."""
+    from shapely.geometry import LineString, Point
+    hit = LineString([wet, dry]).intersection(ground)
+    pts = [p for g in getattr(hit, "geoms", [hit]) if not g.is_empty
+           for p in g.coords]
+    if not pts:
+        return dry
+    return min(pts, key=lambda p: Point(p).distance(Point(wet)))
+
+
 def plot_derived_water_lines(ax, slope_data, style=None):
     """Plot the water surface a model's seepage head/reservoir boundaries imply.
 
@@ -2078,7 +2090,15 @@ def plot_derived_water_lines(ax, slope_data, style=None):
             j = i
             while j + 1 < len(pts) and wet[j + 1]:
                 j += 1
-            runs.append(pts[max(0, i - 1):min(len(pts), j + 2)])
+            run = pts[max(0, i - 1):min(len(pts), j + 2)]
+            # The carried sample is on the ground, but where a pool ends above a
+            # vertical face (a trench wall) it is the face's foot; the edge stops
+            # where it first meets the ground, not down the wall.
+            if i > 0:
+                run[0] = _meets_ground(ground, run[1], run[0])
+            if j + 1 < len(pts):
+                run[-1] = _meets_ground(ground, run[-2], run[-1])
+            runs.append(run)
             i = j + 1
         if not runs:
             continue

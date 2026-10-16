@@ -420,6 +420,11 @@ along a deep aquifer or a model side is a groundwater condition, and reading its
 level as a water surface would put a reservoir on the section that the model does not
 contain.
 
+A pool covers the stretch of ground its boundary is drawn along, and stops at the
+boundary's end even where the ground beyond is lower. Draw a pool's boundary to its
+shoreline. Ground past the end belongs to another boundary at its own level, such as
+the tailwater beyond a sheetpile, or to no water at all, such as a dewatered trench.
+
 The load itself is the weight of the water between that surface and the ground,
 tapering to zero where the two meet, which is the same operation the vendor
 importers use to recover a reservoir the source program stored implicitly. On a

@@ -7969,6 +7969,11 @@ def _auto_water_geometry(problems):
     * **A vertical face between two pools is reported.** The water surface is a
       function of x and cannot hold two elevations at one station, so the derivation
       says so instead of quietly loading the face to the higher one.
+    * **A pool covers its own boundary's reach, and no more.** Past the end of the
+      boundary it does not spread over ground that is still lower: not over a
+      sheetpile's tailwater side, whose boundary states its own level, and not into
+      a dewatered trench between two seabed boundaries. A boundary up a model side
+      touches the ground at one point and states no pool at all.
     """
     from shapely.geometry import LineString
     from xslope import water
@@ -8016,7 +8021,7 @@ def _auto_water_geometry(problems):
     d, _got = res(model([(0, 10), (10, 10), (10, 2), (20, 2)],
                         seepage_bc={'specified_heads': [
                             {'head': 10.0, 'coords': [(0, 10), (10, 10)]},
-                            {'head': 4.0, 'coords': [(20, 2)]}]}))
+                            {'head': 4.0, 'coords': [(10, 2), (20, 2)]}]}))
     if not d['ambiguous']:
         problems.append("a vertical face between two pools at different elevations "
                         "was loaded without saying which pool was used")
@@ -8024,6 +8029,38 @@ def _auto_water_geometry(problems):
                         piezo_line=[(-1, 10), (21, 10)]))
     if d['ambiguous']:
         problems.append("a section with one pool reported a two-pool ambiguity")
+
+    # -- a pool ends where its boundary ends ------------------------------
+    # SEEP-1's sheetpile section: 3 m of water over the upstream 20 m, and a
+    # tailwater boundary at ground level past the pile. 3 x 10 x 20 = 600, less
+    # the sliver over which the surface drops to the ground at x = 20.
+    d, got = res(model([(0, 10), (20, 10), (29.9, 10), (30, 7), (30.1, 10), (50, 10)],
+                       seepage_bc={'specified_heads': [
+                           {'head': 13.0, 'coords': [(0, 10), (20, 10)]},
+                           {'head': 10.0, 'coords': [(30.1, 10), (50, 10)]}]}))
+    if abs(got - 600.0) > 0.1 or not d['reach'] or abs(d['reach'][1] - 20.0) > 0.01:
+        problems.append(f"a pool spread past the end of its boundary: expected 600 "
+                        f"over x = 0 to 20, derived {got:.6g} over {d['reach']}")
+    # A dewatered trench between two seabed boundaries at the same level: the sea
+    # loads the two beds (16 x 10 x 43 each, less the sliver at each wall where the
+    # surface drops to the ground) and neither trench wall.
+    d, got = res(model([(0, 40), (43, 40), (43, 22), (43.2, 26), (66.8, 26),
+                        (67, 22), (67, 40), (110, 40)],
+                       seepage_bc={'specified_heads': [
+                           {'head': 56.0, 'coords': [(0, 40), (43, 40)]},
+                           {'head': 26.0, 'coords': [(43.2, 26), (66.8, 26)]},
+                           {'head': 56.0, 'coords': [(67, 40), (110, 40)]}]}))
+    if abs(got - 13760.0) > 5.0 or d['ambiguous']:
+        problems.append(f"a dewatered trench was flooded: expected 13760 on the two "
+                        f"beds alone, derived {got:.6g}"
+                        + (" and reported a face between two pools" if d['ambiguous']
+                           else ""))
+    # A head boundary up the model's left side meets the ground at one point.
+    d, got = res(model([(0, 5), (100, 5)], seepage_bc={'specified_heads': [
+        {'head': 100.0, 'coords': [(0, 0), (0, 5)]}]}))
+    if d['blocks']:
+        problems.append(f"a boundary up a model side was read as a pool over the "
+                        f"whole section ({got:.6g})")
 
     # -- the block carries its shape, not its sampling ---------------------
     # A water surface that bends over a straight reach of ground leaves a point

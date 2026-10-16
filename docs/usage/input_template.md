@@ -83,6 +83,16 @@ The **main** worksheet provides global parameters that apply to all analyses and
 - **Tension crack parameters**: Depth **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
 
+**Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
+brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
+forms the page uses: stress **[F/L²]**, unit weight **[F/L³]**, strength gradient **[F/L²/L]** (stress per
+unit change in depth — dimensionally the same as [F/L³], written this way because it means something
+different), hydraulic conductivity and flux **[L/t]**, specific storage **[1/L]**, moment **[F·L]**,
+angle **[deg]**, and dimensionless **[–]**. XSLOPE never
+converts, so a bracket means the same in either system; under a declaration it resolves to concrete units —
+SI with **Time = day** gives [L] = m, [F/L²] = kPa, [F/L³] = kN/m³, [L/t] = m/day, while Imperial gives ft,
+psf, pcf, ft/day.
+
 ### Run options
 
 The cells below the seismic coefficient record **how this model is meant to be
@@ -102,16 +112,6 @@ precedence over the value in the file.
 - **Water loads** (`auto` or `manual`) — **[–]**: who supplies the weight of water standing on the slope. With `auto`, the default, XSLOPE derives it from the piezometric line, or from the seepage boundary conditions when the model has a seepage analysis, and draws it on the plots in its own color. The dloads sheets then hold only other loads, such as a surcharge or a footing. With `manual`, you enter the water load on the dloads sheets yourself; use it to reproduce another program's input exactly. See [Automatic water loads](preflight.md#automatic-water-loads).
 - **Surface family** (`circular` or `non-circular`) — **[–]**: which failure-surface family a model that defines **both** a circular surface (the [circles](#worksheet-circles) sheet) and a non-circular one (the [non-circ](#worksheet-non-circ) sheet) actually means. Blank — what the template ships, and the normal state — means "whichever family the model defines", which is unambiguous for all but the rare file carrying both; there the circular surface is used and the non-circular one is ignored, and the [model checks](preflight.md) report this. Fill the cell (or answer the **Surface** selector in Studio's Run LEM dialog, which writes your choice here) and that answer travels with the file: the run, the plots and the next session all read the same one. A family named here is only honored when the model actually defines it, so a value left behind by a surface you later deleted can never select a surface that is not there.
 - **Side BC** (`rollers` or `fixed`) — **[–]**: how the FEM restrains the left and right truncation boundaries of the model. `rollers` (the default, and what every file that leaves this blank gets) fixes horizontal movement and leaves the face free to settle vertically. `fixed` clamps both directions. Rollers are the usual choice: a truncation boundary is an artificial cut through ground that continues, and the ground on the other side of it does not hold the face up. `fixed` adds shear restraint that ground does not have, and stiffens a domain truncated close to the slope; use it to reproduce a program that fixes its side boundaries. The bottom boundary is fully fixed either way.
-
-**Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
-brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
-forms the page uses: stress **[F/L²]**, unit weight **[F/L³]**, strength gradient **[F/L²/L]** (stress per
-unit change in depth — dimensionally the same as [F/L³], written this way because it means something
-different), hydraulic conductivity and flux **[L/t]**, specific storage **[1/L]**, moment **[F·L]**,
-angle **[deg]**, and dimensionless **[–]**. XSLOPE never
-converts, so a bracket means the same in either system; under a declaration it resolves to concrete units —
-SI with **Time = day** gives [L] = m, [F/L²] = kPa, [F/L³] = kN/m³, [L/t] = m/day, while Imperial gives ft,
-psf, pcf, ft/day.
 
 These global parameters are accessed throughout the analysis. For example, the unit weight of water is used in 
 computing pore pressures from piezometric lines, and the seismic coefficient is used to add horizontal inertial 

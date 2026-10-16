@@ -463,7 +463,7 @@ main sheet's **Water loads** cell decides:
 | Mode | Who supplies the weight of standing water |
 |------|-------------------------------------------|
 | `auto` | The engine, derived from the water definition each time the model is solved. The dloads sheets carry **non-water** loads only — a surcharge, a footing, traffic |
-| `manual` | You, on the dloads sheets. This is the mode for every file written before template version 22, whether or not the file states it |
+| `manual` | You, on the dloads sheets |
 
 The default follows the template version, and that is a correctness requirement rather
 than a preference: an older file already carries its water load typed in, and deriving a

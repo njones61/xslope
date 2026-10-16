@@ -337,6 +337,115 @@ def test_delete_on_a_plain_grid():
                  f"after Delete on the first column the grid reads {texts}")
 
 
+def _shown(widget):
+    """Show ``widget`` (offscreen here): Qt gives Tab to a table's own navigation
+    only while the table is on screen."""
+    from PySide6.QtWidgets import QApplication
+    widget.show()
+    QApplication.processEvents()
+    return widget
+
+
+def _cell_editor(table):
+    """The line edit open in ``table``'s current cell."""
+    from PySide6.QtWidgets import QLineEdit
+    return table.viewport().findChild(QLineEdit)
+
+
+def test_tab_past_the_last_cell_adds_a_row():
+    """Tab from the last column of the last row adds a row and moves into its first
+    cell, as Tab does at the end of a word-processor table (Qt's own Tab wraps to
+    the top-left cell). With a value being typed, the value lands first and the new
+    cell opens for typing. Tab anywhere else still moves along the row, and the
+    Materials swatch, which is not a cell to type in, is never where Tab lands."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QAbstractItemView
+    from studio.editors import CirclesEditor, MaterialsEditor, _MaterialColorState
+
+    fields = CirclesEditor.FIELDS
+    last = len(fields) - 1
+    fired = []
+    t = _shown(_new_table(fields, [{"Xo": 10.0, "Yo": 40.0, "Option": "Depth",
+                                    "Depth": 0.0}],
+                          on_change=lambda: fired.append(1)))
+    tbl = t.table
+    tbl.setFocus()
+    tbl.setCurrentCell(0, last - 1)
+    _press(tbl, Qt.Key_Tab)
+    out = _fail((tbl.rowCount(), tbl.currentRow(), tbl.currentColumn())
+                == (1, 0, last),
+                f"Tab short of the last column went to row {tbl.currentRow()}, "
+                f"column {tbl.currentColumn()} of {tbl.rowCount()} rows")
+    _press(tbl, Qt.Key_Tab)
+    out += _fail((tbl.rowCount(), tbl.currentRow(), tbl.currentColumn())
+                 == (2, 1, 0),
+                 f"Tab from the last cell left {tbl.rowCount()} rows with the "
+                 f"cursor at row {tbl.currentRow()}, column {tbl.currentColumn()}")
+    out += _fail(bool(fired), "the added row was never announced to the preview")
+    # Mid-edit: the typed value is kept and the new row's first cell opens.
+    tbl.setCurrentCell(1, last)
+    tbl.editItem(tbl.item(1, last))
+    _cell_editor(tbl).setText("25")
+    _press(_cell_editor(tbl), Qt.Key_Tab)
+    rows = t.result_rows()
+    out += _fail(len(rows) == 3 and rows[1]["R"] == 25.0,
+                 f"Tab while typing left {len(rows)} rows, row 2 R = "
+                 f"{rows[1].get('R') if len(rows) > 1 else None!r}")
+    out += _fail((tbl.currentRow(), tbl.currentColumn()) == (2, 0)
+                 and tbl.state() == QAbstractItemView.EditingState,
+                 f"Tab while typing moved to row {tbl.currentRow()}, column "
+                 f"{tbl.currentColumn()} (editing: "
+                 f"{tbl.state() == QAbstractItemView.EditingState})")
+    # Materials: the swatch is shown first, but the new row starts at the name.
+    mfields = MaterialsEditor.FIELDS
+    m = _shown(_new_table(mfields, [{"name": "clay"}],
+                          swatch_state=_MaterialColorState({})))
+    m.table.setFocus()
+    m.table.setCurrentCell(0, m._clipboard_columns()[-1])
+    _press(m.table, Qt.Key_Tab)
+    out += _fail((m.table.rowCount(), m.table.currentColumn())
+                 == (2, [f.key for f in mfields].index("name")),
+                 f"Tab from the last material column left {m.table.rowCount()} "
+                 f"rows with the cursor in column {m.table.currentColumn()}")
+    return out
+
+
+def test_tab_past_the_last_cell_of_a_plain_grid():
+    """The transient-seepage grids add a row on that Tab too."""
+    from PySide6.QtCore import Qt
+    from studio.editors import _spreadsheet_manners, _TabGrowsTable
+
+    grid = _shown(_TabGrowsTable(2, 2))
+    _spreadsheet_manners(grid)
+    grid.setFocus()
+    grid.setCurrentCell(1, 1)
+    _press(grid, Qt.Key_Tab)
+    return _fail((grid.rowCount(), grid.currentRow(), grid.currentColumn())
+                 == (3, 2, 0),
+                 f"Tab from the last cell left {grid.rowCount()} rows with the "
+                 f"cursor at row {grid.currentRow()}, column {grid.currentColumn()}")
+
+
+def test_the_material_form_waits_for_a_material():
+    """With no materials, the list view's form has nothing to edit: it is dimmed
+    until Add makes one, and dimmed again when the last one is removed. Add itself
+    stays live."""
+    from studio.editors import MaterialsEditor, _MaterialListView, _new_material
+
+    lv = _MaterialListView(MaterialsEditor.FIELDS, [], _new_material, False)
+    out = _fail(not lv._edits["name"].isEnabled() and not lv._edits["c"].isEnabled(),
+                "with no materials the Name and c fields take typing")
+    out += _fail(lv.isEnabled() and lv.list.isEnabled(),
+                 "with no materials the list pane (and Add) is dimmed too")
+    lv._add()
+    out += _fail(lv._edits["name"].isEnabled(),
+                 "after Add the new material's Name field is still dimmed")
+    lv._remove()
+    out += _fail(not lv._edits["name"].isEnabled(),
+                 "after removing the last material its form still takes typing")
+    return out
+
+
 def test_copy_round_trips():
     """Copy is the natural other half: a selection out as the same tab-separated
     block, which this table's own paste reads back into identical rows."""
@@ -1530,6 +1639,11 @@ CHECKS = [
     ("copy round-trips through paste", test_copy_round_trips),
     ("Delete empties the selected cells", test_delete_empties_the_selected_cells),
     ("Delete on a plain grid", test_delete_on_a_plain_grid),
+    ("Tab past the last cell adds a row", test_tab_past_the_last_cell_adds_a_row),
+    ("Tab past the last cell of a plain grid",
+     test_tab_past_the_last_cell_of_a_plain_grid),
+    ("the material form waits for a material",
+     test_the_material_form_waits_for_a_material),
     ("cancel discards a paste", test_cancel_discards_a_paste),
     ("the reinforcement two-block paste", test_the_reinforcement_two_block_paste),
     ("the support editors' columns are the sheets'",

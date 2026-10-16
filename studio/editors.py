@@ -422,7 +422,8 @@ def _spreadsheet_manners(table):
     """Cell-level selection and type-to-edit on a QTableWidget: typing into the
     current cell starts the edit, a second click opens it, Tab moves along the
     row, and Delete empties the selected cells. Single click never opens an
-    editor, so block paste stays on the grid."""
+    editor, so block paste stays on the grid. (Tab past the last cell adds a row
+    on a :class:`_TabGrowsTable`.)"""
     table.setSelectionBehavior(QAbstractItemView.SelectItems)
     table.setEditTriggers(
         QAbstractItemView.AnyKeyPressed | QAbstractItemView.EditKeyPressed
@@ -467,7 +468,36 @@ class _ClearKeyFilter(QObject):
         return super().eventFilter(obj, event)
 
 
-class _ClipboardTable(QTableWidget):
+class _TabGrowsTable(QTableWidget):
+    """A grid where Tab from the last column of the last row adds a row and moves
+    into its first cell, as Tab does at the end of a word-processor table. Qt's own
+    Tab wraps back to the top-left cell instead.
+
+    Done in moveCursor because both Tabs end there: the table's own (a cell
+    selected) and the cell editor's (a value being typed, which the delegate
+    commits before asking the view for the next cell). In the second case the new
+    cell opens for typing, as any cell Tab reaches mid-edit does."""
+
+    def moveCursor(self, action, modifiers):
+        if action == QAbstractItemView.MoveNext:
+            cols = self._tab_columns()
+            if (cols and self.currentRow() == self.rowCount() - 1
+                    and self.currentColumn() == cols[-1]):
+                self._append_row()
+                return self.model().index(self.rowCount() - 1, cols[0])
+        return super().moveCursor(action, modifiers)
+
+    def _tab_columns(self):
+        """The columns Tab walks, left to right as shown; hidden ones are skipped."""
+        header = self.horizontalHeader()
+        return sorted((j for j in range(self.columnCount())
+                       if not self.isColumnHidden(j)), key=header.visualIndex)
+
+    def _append_row(self):
+        self.insertRow(self.rowCount())
+
+
+class _ClipboardTable(_TabGrowsTable):
     """The editors' table widget, with Copy and Paste over a block of cells.
 
     Subclassed rather than wired to a QShortcut on purpose: a key event reaches the
@@ -497,6 +527,16 @@ class _ClipboardTable(QTableWidget):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def _tab_columns(self):
+        # The data columns only: the Materials swatch is a display color, not a
+        # cell to type in.
+        return self._owner._clipboard_columns()
+
+    def _append_row(self):
+        # The editor's own Add row: the new record's defaults, swatch, graying,
+        # and change notice, exactly as the button makes it.
+        self._owner._add_row()
 
 
 def _add_action_buttons(bar, actions):
@@ -586,7 +626,8 @@ class _EditableTable(QWidget):
         # Spreadsheet manners: click selects the CELL (not the row — a row-header
         # click still selects whole rows for Remove), typing into the current cell
         # starts the edit, a second click on the current cell opens it, and Tab
-        # commits and moves along the row. Block paste stays on the table itself:
+        # commits and moves along the row (past the last cell, into a new row —
+        # _TabGrowsTable). Block paste stays on the table itself:
         # a single click never opens an editor, so Ctrl+V lands on the grid.
         self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.table.setEditTriggers(
@@ -3651,7 +3692,8 @@ class _MaterialListView(QWidget):
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self._build_list_pane())
-        splitter.addWidget(self._build_form_pane())
+        self._form_pane = self._build_form_pane()
+        splitter.addWidget(self._form_pane)
         splitter.addWidget(self._build_plots_pane())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
@@ -3989,7 +4031,9 @@ class _MaterialListView(QWidget):
                 w.setText(self._field_by_key[key].to_text(val))
                 w.blockSignals(False)
         ok = 0 <= idx < len(self._rows)
-        self.setEnabled(True)
+        # With no material selected (an empty list) the form has nothing to edit:
+        # it is dimmed until Add makes one. The list pane, Add with it, stays live.
+        self._form_pane.setEnabled(ok)
         self._loading = True
         self._color_btn.blockSignals(True)
         if ok:
@@ -8150,7 +8194,7 @@ class TransientDialog(QDialog):
         times = list(tseep.get("times") or [])
         series_vals = tseep.get("series") or {}
         n_rows = max(len(times) + 2, 8)
-        self._series_table = QTableWidget(n_rows, 1 + _TSEEP_N_SERIES)
+        self._series_table = _TabGrowsTable(n_rows, 1 + _TSEEP_N_SERIES)
         _spreadsheet_manners(self._series_table)
         self._series_table.setMinimumHeight(220)   # show several breakpoints at once
         self._sync_series_headers()
@@ -8179,7 +8223,7 @@ class TransientDialog(QDialog):
         save_group.setMaximumWidth(170)
         svl = QVBoxLayout(save_group)
         save_times = list(tseep.get("save_times") or [])
-        self._save_table = QTableWidget(max(len(save_times) + 1, 8), 1)
+        self._save_table = _TabGrowsTable(max(len(save_times) + 1, 8), 1)
         _spreadsheet_manners(self._save_table)
         self._save_table.setHorizontalHeaderLabels(["save time"])
         self._save_table.horizontalHeaderItem(0).setToolTip(TSEEP_HELP["save_times"])

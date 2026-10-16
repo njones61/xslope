@@ -18,8 +18,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - **Generate starting circles…** no longer makes the circles editor taller. The
   window keeps its size, the table scrolls to any circles past what it shows, and
   the generator's note takes its room from the section preview.
-- The Polygons and Profile lines editors open with an empty, dimmed vertex table
-  when there is no polygon or line yet. Before, the middle pane was blank.
+- The Polygons editor opens with an empty, dimmed vertex table when there is no
+  polygon yet. Before, the middle pane was blank.
 
 ### Changed
 
@@ -32,9 +32,9 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - In Studio's tables, `Tab` from the last cell of the last row adds a row and
   moves into it, so a table can be typed row after row without reaching for
   **Add row**.
-- The Polygons and Profile lines editors stack Type, Material, and Size above
-  the vertex table, so the middle pane is only as wide as the table and the
-  section preview gets the rest of the window.
+- The Polygons editor puts Type on a row of its own above Material and Size, so
+  its middle pane is as wide as the Profile lines editor's and the section
+  preview gets the width that Type took.
 
 ## 1.0.3 — 2026-10-14
 

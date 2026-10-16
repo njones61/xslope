@@ -7131,19 +7131,16 @@ class MatGeometryDialog(QDialog):
         lbtns.addWidget(b_rem)
         left.addLayout(lbtns)
 
-        # The selected item's pane: its fields one per row, then its vertex table. The
-        # fields are stacked rather than set in one row because the table under them
-        # is two narrow columns, and a row of three fields made the pane twice the
-        # table's width — width the preview beside it needs more. The whole pane is
-        # dimmed while there is no item to edit (see _load).
-        self._item_pane = QWidget()
-        right = QVBoxLayout(self._item_pane)
+        right_w = QWidget()
+        self._item_pane = right_w
+        right = QVBoxLayout(right_w)
         right.setContentsMargins(0, 0, 0, 0)
-        self._item_form = QFormLayout()
-        self._item_form.setContentsMargins(0, 0, 0, 0)
-        # Stated, not left to the style: macOS keeps form fields at their size hint,
-        # which would leave each one a different width down the pane.
-        self._item_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        # Material and Size share a row. The polygon sheet's Type takes a row of its
+        # own above them, its combo over Material's, so the polygon editor's middle
+        # pane is no wider than the profile editor's.
+        fields = QGridLayout()
+        fields.setContentsMargins(0, 0, 0, 0)
+        mat_row = 0
 
         # v21 Type (polygon sheet only). The words are the template's, and picking a
         # non-material one greys the Mat ID + material name exactly as the sheet's
@@ -7157,46 +7154,60 @@ class MatGeometryDialog(QDialog):
             if _type_help:
                 self.type_combo.setToolTip(_type_help)
             self.type_combo.currentIndexChanged.connect(self._on_type_changed)
-            self._item_form.addRow("Type:", self.type_combo)
+            fields.addWidget(QLabel("Type:"), 0, 0)
+            fields.addWidget(self.type_combo, 0, 1)
+            mat_row = 1
 
         self._mat_label = QLabel("Material:")
+        fields.addWidget(self._mat_label, mat_row, 0)
         self.mat_combo = QComboBox()
         for mid in self._mat_ids:
             m = materials[mid] if mid < len(materials) else {}
             self.mat_combo.addItem(f"{mid + 1}: {m.get('name', '')}")
         self.mat_combo.currentIndexChanged.connect(self._on_mat_changed)
-        self._item_form.addRow(self._mat_label, self.mat_combo)
+        fields.addWidget(self.mat_combo, mat_row, 1)
+        fields.setColumnStretch(1, 1)
 
         # v21 local mesh Size. Optional on every item; blank = the global target size.
         _size_help = (self._field_help or {}).get("size", "")
+        fields.addWidget(QLabel("Size:"), mat_row, 2)
         self.size_edit = QLineEdit()
         self.size_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.size_edit.setPlaceholderText("global")
+        # Fixed, not just capped: the material combo takes the row's stretch, and a
+        # merely-capped Size edit collapses under it and scrolls its own value out of
+        # sight — a declared refinement has to stay readable.
+        self.size_edit.setFixedWidth(76)
         if _size_help:
             self.size_edit.setToolTip(_size_help)
         self.size_edit.textChanged.connect(self._on_size_changed)
-        self._item_form.addRow("Size:", self.size_edit)
+        fields.addWidget(self.size_edit, mat_row, 3)
+        right.addLayout(fields)
 
         # A joint-network region's name (polygon sheet only, and only for that Type):
         # the network builder's Within list offers the region by it, and the file
-        # keeps it as the block header. No other Type has a name to give, so the row
-        # is shown for that Type only (_sync_type_enabled).
+        # keeps it as the block header. No other Type has a name to give.
         self.name_edit = None
+        self._name_row = None
         if self._poly_types:
+            self._name_row = QWidget()
+            namerow = QHBoxLayout(self._name_row)
+            namerow.setContentsMargins(0, 0, 0, 0)
+            namerow.addWidget(QLabel("Name:"))
             self.name_edit = QLineEdit()
             self.name_edit.setPlaceholderText("unnamed (listed by its number)")
             _name_help = (self._field_help or {}).get("name", "")
             if _name_help:
                 self.name_edit.setToolTip(_name_help)
             self.name_edit.textChanged.connect(self._on_name_changed)
-            self._item_form.addRow("Name:", self.name_edit)
-        right.addLayout(self._item_form)
+            namerow.addWidget(self.name_edit, 1)
+            right.addWidget(self._name_row)
         self._holder = QVBoxLayout()
         right.addLayout(self._holder, 1)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(left_w)
-        splitter.addWidget(self._item_pane)
+        splitter.addWidget(right_w)
         if preview_draw is not None:
             from .canvas import PreviewPane
             self._preview = PreviewPane(
@@ -7209,6 +7220,7 @@ class MatGeometryDialog(QDialog):
             splitter.setStretchFactor(0, 0)
             splitter.setStretchFactor(1, 0)
             splitter.setStretchFactor(2, 1)
+            splitter.setSizes([190, 320, 470])
             self.resize(1060, 560)
         else:
             splitter.setStretchFactor(0, 0)
@@ -7228,13 +7240,9 @@ class MatGeometryDialog(QDialog):
             row = select if (select is not None and 0 <= select < len(self._lines)) else 0
             self.list.setCurrentRow(row)
         else:
-            self._load(-1)                 # empty list: the dimmed form and table
+            self._load(-1)                 # the polygon editor's empty, dimmed table
+            self._sync_type_enabled()      # empty list: still show a coherent form
         if self._preview is not None:
-            # The item pane opens at the width its contents need (_fit_item_pane) and
-            # the preview takes the rest; the remainder handed over here is nominal,
-            # since the splitter gives any difference to its one stretching pane.
-            mid = self._item_pane.minimumWidth()
-            splitter.setSizes([190, mid, max(1, self.width() - 190 - mid)])
             self._preview.refresh_now()
 
     def _help_key_for(self, widget):
@@ -7366,20 +7374,21 @@ class MatGeometryDialog(QDialog):
         if self.table is not None:
             self.table.setParent(None)
             self.table = None
-        # With no item there is still a table, empty, and the whole pane is dimmed
-        # until Add makes one — the same as the Materials list view's form, and never
-        # a blank pane that looks as if the dialog failed to draw.
         valid = 0 <= idx < len(self._lines)
-        ln = self._lines[idx] if valid else {}
-        rows = [{"x": x, "y": y} for (x, y) in ln.get("coords", [])]
+        if self._poly_types:
+            # With no polygon the pane still holds a table, empty, and is dimmed
+            # until Add makes one, as the Materials list view's form is: never a
+            # blank pane that looks as if the dialog failed to draw.
+            self._item_pane.setEnabled(valid)
+        elif not valid:
+            return
+        ln = self._lines[idx] if valid else {"coords": []}
+        rows = [{"x": x, "y": y} for (x, y) in ln["coords"]]
         self.table = _EditableTable(self.XY, rows, _new_pt,
                                     on_change=self._schedule_preview)
         self._holder.addWidget(self.table)
         self._wire_help()
-        self._item_pane.setEnabled(valid)
-        self._fit_item_pane()
         if not valid:
-            self._sync_type_enabled()
             return
         self.mat_combo.blockSignals(True)
         self.mat_combo.setCurrentIndex(self._combo_index(ln["mat_id"]))
@@ -7398,16 +7407,6 @@ class MatGeometryDialog(QDialog):
             self.name_edit.blockSignals(False)
         self._sync_type_enabled()
 
-    def _fit_item_pane(self):
-        """Hold the item pane at the width its contents need: the field form, the
-        vertex table's fitted columns, and the table's buttons. A drag cannot clip
-        the coordinates, and the preview, the pane that stretches, gets the rest.
-        Refit on every load, because a table with a hundred vertices has a wider row
-        gutter than one with nine."""
-        self._item_pane.setMinimumWidth(max(self._item_form.sizeHint().width(),
-                                            self.table.columns_width(),
-                                            self.table.minimumSizeHint().width()))
-
     def _sync_type_enabled(self):
         """Grey the Mat ID + material name for any Type other than 'material',
         mirroring the polygon sheet (its row-7 name echo blanks on the same test):
@@ -7415,10 +7414,9 @@ class MatGeometryDialog(QDialog):
         is_mat = self._kind_at() == "material"
         self.mat_combo.setEnabled(is_mat)
         self._mat_label.setEnabled(is_mat)
-        if self.name_edit is not None:
-            self._item_form.setRowVisible(self.name_edit,
-                                          self._kind_at() == "joints"
-                                          and 0 <= self._cur < len(self._lines))
+        if self._name_row is not None:
+            self._name_row.setVisible(self._kind_at() == "joints"
+                                      and 0 <= self._cur < len(self._lines))
 
     def _on_select(self, new_idx):
         self._commit_current()
@@ -7484,7 +7482,8 @@ class MatGeometryDialog(QDialog):
         if self._lines:
             self.list.setCurrentRow(min(idx, len(self._lines) - 1))
         else:
-            self._load(-1)                 # no item left: the dimmed, empty pane
+            self._load(-1)
+            self._sync_type_enabled()      # no item left: no name to edit either
         self._schedule_preview()
 
     def result_lines(self):

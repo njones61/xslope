@@ -446,36 +446,39 @@ def test_the_material_form_waits_for_a_material():
     return out
 
 
-def test_the_geometry_pane_is_as_wide_as_its_contents():
-    """The Polygons and Profile lines editors: the selected item's pane (its fields
-    above its vertex table) opens at the width its widest part needs, and the
-    preview takes the rest. With no item yet the pane still shows an empty table,
-    dimmed until Add makes one, rather than a blank space."""
+def test_the_polygon_window_matches_the_profile_window():
+    """The Polygons editor is laid out as the Profile lines editor is: the same
+    window, the same middle pane width, and Material and Size on one row, with the
+    polygon's Type on a row of its own above them. With no polygon yet, its middle
+    pane still shows an empty table, dimmed until Add makes one.
+
+    The list pane is not compared: it is as wide as its two buttons need, and
+    'Remove polygon' is a longer label than 'Remove line'."""
     from studio.editors import PolygonEditor, ProfileEditor
 
-    model = _load(os.path.join(_MODELS, "xslope_sloping_bottom.xlsx"))
-    out = []
-    for name, editor in (("Polygons", PolygonEditor()), ("Profile lines", ProfileEditor())):
-        dlg = _shown(editor.build(model, None))
-        pane = dlg._item_pane
-        need = max(dlg._item_form.sizeHint().width(), dlg.table.columns_width(),
-                   dlg.table.minimumSizeHint().width())
-        split = pane.parentWidget()
-        sizes = split.sizes()
-        out += _fail(sizes[1] == need,
-                     f"{name}: the item pane opened {sizes[1]} px wide; its form, "
-                     f"table, and buttons need {need}")
-        out += _fail(sizes[2] > sizes[0] + sizes[1],
-                     f"{name}: the preview is {sizes[2]} px against {sizes[0]} + "
-                     f"{sizes[1]} for the list and the item pane")
-        dlg.close()
+    poly = _shown(PolygonEditor().build(
+        _load(os.path.join(_MODELS, "xslope_sloping_bottom.xlsx")), None))
+    prof = _shown(ProfileEditor().build(
+        _load(os.path.join(_MODELS, "xslope_simple_mult_layers.xlsx")), None))
+    panes = [d._item_pane.parentWidget().sizes() for d in (poly, prof)]
+    out = _fail(poly.size() == prof.size() and panes[0][1] == panes[1][1],
+                f"the Polygons window is {poly.width()} x {poly.height()} with a "
+                f"{panes[0][1]} px middle pane; the Profile lines window is "
+                f"{prof.width()} x {prof.height()} with {panes[1][1]} px")
+    t, m, z = (w.geometry() for w in (poly.type_combo, poly.mat_combo, poly.size_edit))
+    out += _fail(t.bottom() < m.top() and z.top() < m.bottom() and m.top() < z.bottom(),
+                 f"Type, Material, and Size are not Type above Material and Size: "
+                 f"tops at {t.top()}, {m.top()}, {z.top()}")
+    poly.close()
+    prof.close()
 
+    model = _load(os.path.join(_MODELS, "xslope_sloping_bottom.xlsx"))
     blank = dict(model, polygons=[], ssr_zones=[], refine_zones=[], joint_zones=[])
     dlg = PolygonEditor().build(blank, None)
     out += _fail(dlg.table is not None and dlg.table.table.rowCount() == 0,
-                 "with no polygons the item pane has no vertex table")
+                 "with no polygons the middle pane has no vertex table")
     out += _fail(not dlg._item_pane.isEnabled() and dlg.list.isEnabled(),
-                 "with no polygons the item pane is not dimmed (or the list is)")
+                 "with no polygons the middle pane is not dimmed (or the list is)")
     dlg._add_line()
     out += _fail(dlg._item_pane.isEnabled(),
                  "after Add the new polygon's pane is still dimmed")
@@ -1683,8 +1686,8 @@ CHECKS = [
      test_tab_past_the_last_cell_of_a_plain_grid),
     ("the material form waits for a material",
      test_the_material_form_waits_for_a_material),
-    ("the geometry pane is as wide as its contents",
-     test_the_geometry_pane_is_as_wide_as_its_contents),
+    ("the Polygons window matches the Profile lines window",
+     test_the_polygon_window_matches_the_profile_window),
     ("cancel discards a paste", test_cancel_discards_a_paste),
     ("the reinforcement two-block paste", test_the_reinforcement_two_block_paste),
     ("the support editors' columns are the sheets'",

@@ -110,10 +110,9 @@ in the title bar), and re-render the affected layers. Records preserve fields th
 aren't shown in a given editor, so editing one column never drops the others.
 
 The geometry editors (profile lines and polygons) use a master/detail layout — pick
-a line on the left, and edit its material, size, and vertices in the pane beside it.
-Until the first line is added, that pane is dimmed. A **live preview** pane on the
-right redraws the section as you type, with the selected line highlighted, so a
-mistyped vertex is visible before you commit:
+a line on the left, edit its vertices on the right. A **live preview** pane redraws
+the section as you type, with the selected line highlighted, so a mistyped vertex
+is visible before you commit:
 
 ![Profile lines editor](images/editing_geometry_dialog.png)
 

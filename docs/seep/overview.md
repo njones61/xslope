@@ -451,7 +451,7 @@ either sheet may name a [tseep series](transient.md#time-series) instead of a nu
 what makes the run transient.
 
 !!! note "The boundary conditions also place the water load"
-    From template version 22, with **Water loads** set to `auto`, the engine derives the weight
+    With **Water loads** set to `auto`, the engine derives the weight
     of water standing on the slope from the model's own water definition at solve time — the
     seepage boundary conditions wherever a seepage analysis is defined, otherwise the
     piezometric line. The dloads sheets then carry non-water loads only. One definition of

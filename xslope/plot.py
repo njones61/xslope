@@ -2038,18 +2038,6 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                          flux_color="seagreen")
 
 
-def _meets_ground(ground, wet, dry):
-    """Where the segment from a wet water-line sample to the dry one past it first
-    meets the ground: the dry sample itself, unless the ground is crossed sooner."""
-    from shapely.geometry import LineString, Point
-    hit = LineString([wet, dry]).intersection(ground)
-    pts = [p for g in getattr(hit, "geoms", [hit]) if not g.is_empty
-           for p in g.coords]
-    if not pts:
-        return dry
-    return min(pts, key=lambda p: Point(p).distance(Point(wet)))
-
-
 def plot_derived_water_lines(ax, slope_data, style=None):
     """Plot the water surface a model's seepage head/reservoir boundaries imply.
 
@@ -2058,22 +2046,21 @@ def plot_derived_water_lines(ax, slope_data, style=None):
     ponded-water distributed load it applies. A plot that draws the loads must
     therefore draw their source, or the reader sees a water load with no water.
 
-    The line comes from :func:`xslope.water.water_line_for_stage` — the one
+    The pools come from :func:`xslope.water.water_line_for_stage` -- the one
     derivation the solver's automatic water loads, the vendor importers and the
-    preflight remedy all read — so the drawn pool and the applied load can never
-    be different pools. Only the runs that stand ABOVE the ground are drawn: the
-    derived line lies on the ground everywhere else, and tracing that would draw a
-    second ground surface. Each run is carried one sample past its ends so it
-    meets the ground at the shoreline, and marked with the package's one
+    preflight remedy all read -- so the drawn pool and the applied load can never
+    be different pools. Each pool is drawn flat at its level from where its water
+    starts to where it ends (:func:`xslope.water.seep_bc_pool_runs`): a shoreline,
+    or the end of its boundary. It is marked midway with the package's one
     water-level symbol.
 
     Piezometric lines are :func:`plot_piezo_line`'s; this layer covers only the
     boundary-condition source.
 
-    Returns the runs it drew, as ``[[(x, y), ...], ...]`` (empty when the model
-    states no pool).
+    Returns the surfaces it drew, as ``[[(x, y), (x, y)], ...]`` (empty when the
+    model states no pool).
     """
-    from .water import water_line_for_stage, _y_on
+    from .water import water_line_for_stage
 
     ground = slope_data.get('ground_surface')
     if ground is None or ground.is_empty:
@@ -2087,48 +2074,26 @@ def plot_derived_water_lines(ax, slope_data, style=None):
         heads = bc.get('specified_heads') or []
         if not heads:
             continue
-        pts = water_line_for_stage(slope_data, stage=stage).get('points') or []
-        if len(pts) < 2:
-            continue
-
-        wet = [(_y_on(ground, float(x)) is not None
-                and y - _y_on(ground, float(x)) > tol) for x, y in pts]
-        runs, i = [], 0
-        while i < len(pts):
-            if not wet[i]:
-                i += 1
-                continue
-            j = i
-            while j + 1 < len(pts) and wet[j + 1]:
-                j += 1
-            run = pts[max(0, i - 1):min(len(pts), j + 2)]
-            # The carried sample is on the ground, but where a pool ends above a
-            # vertical face (a trench wall) it is the face's foot; the edge stops
-            # where it first meets the ground, not down the wall.
-            if i > 0:
-                run[0] = _meets_ground(ground, run[1], run[0])
-            if j + 1 < len(pts):
-                run[-1] = _meets_ground(ground, run[-2], run[-1])
-            runs.append(run)
-            i = j + 1
-        if not runs:
+        runs = water_line_for_stage(slope_data, stage=stage).get('runs') or []
+        surfaces = []
+        for run in runs:
+            xs = [x for x, _y in run['ground']]
+            if max(xs) - min(xs) > tol:
+                surfaces.append([(min(xs), run['level']), (max(xs), run['level'])])
+        if not surfaces:
             continue
 
         kinds = {str(b.get('kind') or 'head').strip().lower() for b in heads}
         color = seep_bc_level_color(style, stage,
                                     'reservoir' if 'reservoir' in kinds else 'head')
         label = "Water Surface" if stage == 1 else "Water Surface 2"
-        for run in runs:
-            rx, ry = zip(*run)
-            ax.plot(rx, ry, color=color, linewidth=2, linestyle='-',
-                    label=label, gid='WATER_LINE')
+        for (x0, level), (x1, _level) in surfaces:
+            ax.plot([x0, x1], [level, level], color=color, linewidth=2,
+                    linestyle='-', label=label, gid='WATER_LINE')
             label = None                       # one legend key per stage
-            # Midway along the pool, not on its middle sample: a pool cut off at
-            # its boundary's end has three samples, the middle one at that end.
-            mid_x = 0.5 * (rx[0] + rx[-1])
-            draw_water_level_symbol(ax, mid_x, float(np.interp(mid_x, rx, ry)),
-                                    color=color, markersize=8, extra_gap_points=2.0)
-            drawn.append(list(run))
+            draw_water_level_symbol(ax, 0.5 * (x0 + x1), level, color=color,
+                                    markersize=8, extra_gap_points=2.0)
+            drawn.append([(x0, level), (x1, level)])
     return drawn
 
 

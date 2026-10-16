@@ -767,12 +767,12 @@ def slide2_to_slope_data(d, scenario=None):
             f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
             f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
             f"written to the dloads sheet, and nothing should be added there by hand")
-    for note in derived["ambiguous"]:
+    for note in derived["cut"]:
         caveats.append(
-            f"the derived water load is not trustworthy here: {note}. Check it "
-            f"against the Slide2 model, and set the main sheet's Water loads cell "
-            f"({main_sheet_cell('water_loads')}) to manual with the load typed in if "
-            f"the two pools have to be told apart")
+            f"the derived water load stops where a boundary ends: {note}. Check it "
+            f"against the Slide2 model, and if the water goes on past that point, "
+            f"set the main sheet's Water loads cell "
+            f"({main_sheet_cell('water_loads')}) to manual with the load typed in")
 
     # Unit sanity cross-checks as caveats -- warnings, never errors (units plan phase 2).
     caveats.extend(units_check(slope_data))

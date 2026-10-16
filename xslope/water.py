@@ -47,16 +47,18 @@ The blocks above need a water *surface* to measure down from, and a model can
 state where the water stands in two ways: with a piezometric line, or with the
 seepage boundary conditions. The second half of this module reads either one:
 
-  - :func:`seep_bc_water_line` turns a reservoir or head boundary block drawn on
-    the ground surface into the water line it implies. This is the one piece of
-    geometry the package did not already have.
+  - :func:`seep_bc_pool_runs` turns each reservoir or head boundary block drawn on
+    the ground surface into the pool it states: the water over the ground the
+    block is drawn along, ending where the block ends. :func:`seep_bc_water_line`
+    is the same water as one line, for readers that want a line.
   - :func:`water_line_for_stage` applies the precedence between the two sources —
     seepage boundary conditions where a seepage analysis is defined, otherwise the
     stage's piezometric line — and returns the line with the sheet it came from.
-  - :func:`derive_water_loads` measures the load: the water line against the ground
-    surface, through :func:`material_above_ground_dload`, with the peak pressure
-    and reach reported alongside the blocks so a caller can say what it is about
-    to add before it adds it.
+  - :func:`derive_water_loads` measures the load: pool by pool under the boundary
+    conditions, or the piezometric line against the ground surface through
+    :func:`material_above_ground_dload`, with the peak pressure and reach reported
+    alongside the blocks so a caller can say what it is about to add before it
+    adds it.
 
 All three are pure: they read a model and return a description, and nothing here
 writes to a model or to a file. Three callers consume them. The preflight remedy
@@ -106,15 +108,6 @@ def _y_on(line, x):
                 return max(y1, y2)
             return y1 + (y2 - y1) * (x - x1) / (x2 - x1)
     return None
-
-
-def _y_foot(coords, x):
-    """The lowest elevation a left-to-right polyline reaches at x: the foot of a
-    vertical face standing there, where :func:`_y_on` may read its top. None if x
-    is off its ends."""
-    ys = [min(y1, y2) if x2 == x1 else y1 + (y2 - y1) * (x - x1) / (x2 - x1)
-          for (x1, y1), (x2, y2) in zip(coords, coords[1:]) if x1 <= x <= x2]
-    return min(ys) if ys else None
 
 
 def _ground_walk(ground_surface, upper_line):
@@ -260,14 +253,6 @@ def ponded_water_dload(ground_surface, piezo_line, gamma_water):
 #: keeps a deep aquifer head boundary from being read as a reservoir.
 _ON_GROUND_FRAC = 1e-6
 
-#: Where a pool's boundary ends with the ground beyond it still under the pool's
-#: level, the water surface drops to the ground over this fraction of the model's
-#: width, just inside the boundary's end. It is a step rather than a vertical edge
-#: because the line is a function of x. A hundred times the on-ground tolerance, so
-#: the step stays a segment of its own in every later measurement; the sliver of
-#: pool it tapers is a ten-thousandth of the width.
-_POOL_EDGE_FRAC = 1e-4
-
 
 def _as_coords(obj):
     """``[(x, y), ...]`` from a shapely geometry, a list of pairs, or ``None``."""
@@ -355,12 +340,14 @@ def bc_pool_levels(bc, ground_surface, slope_data=None, time=0.0):
 
 
 def _bc_pools(bc, ground_surface, slope_data=None, time=0.0):
-    """:func:`bc_pool_levels` with each pool's **reach** as a fourth item: the x
-    extent of the block's vertices that lie on or above the ground. That is the
-    stretch of ground the boundary is drawn along. A vertex below the ground is on
-    a model side or base, which bounds no pool, and a vertex a hair above the
-    ground is still the pool's edge (a face traced to its waterline, transcribed
-    to the nearest 0.1)."""
+    """:func:`bc_pool_levels` with each pool's **stretch** as a fourth item: where
+    the block's vertices on or above the ground fall along the ground line, as
+    ``(s_first, s_last)`` distances measured along it. That is the stretch of
+    ground the boundary is drawn along. Measured along the line rather than in x,
+    so the two sides of a vertical face are different places. A vertex below the
+    ground is on a model side or base, which bounds no pool; a vertex a hair above
+    the ground is still the pool's edge (a face traced to its waterline,
+    transcribed to the nearest 0.1)."""
     ground = _as_coords(ground_surface)
     if len(ground) < 2:
         return []
@@ -390,124 +377,158 @@ def _bc_pools(bc, ground_surface, slope_data=None, time=0.0):
                  f" at elevation {level:g}")
         if named:
             label += f" (from {named})"
-        wet = [float(x) for x, y in (blk.get("coords") or [])
-               if (_y_on(line, float(x)) is not None
-                   and float(y) >= _y_on(line, float(x)) - tol)]
-        reach = (min(wet + anchors), max(wet + anchors))
-        out.append((float(level), sorted(anchors), label, reach))
+        stretch = []
+        for x, y in (blk.get("coords") or []):
+            pt = Point(float(x), float(y))
+            yg = _y_on(line, float(x))
+            if line.distance(pt) <= tol or (yg is not None and float(y) >= yg - tol):
+                stretch.append(line.project(pt))
+        out.append((float(level), sorted(anchors), label,
+                    (min(stretch), max(stretch))))
+    return out
+
+
+def seep_bc_pool_runs(ground_surface, bc, slope_data=None, time=0.0):
+    """The standing water a seepage boundary set states, one run per pool.
+
+    The boundary conditions are the authority on where water stands: a reservoir or
+    head block traced along the ground states the pool elevation directly, and no
+    seepage solution is needed to read it.
+
+    **A pool covers the stretch of ground its boundary is drawn along, and ends
+    where the boundary ends** (:func:`_bc_pools`). Within the stretch it stands
+    wherever the ground is below its level, ending at a shoreline where the ground
+    rises out of it. Where the boundary ends with the ground beyond still below the
+    level, the water ends there too, at full depth. The inputs say nothing about
+    water past a boundary's end. A block that touches the ground at a single point
+    (a head boundary up a model side) covers no stretch and states no pool. Where
+    two blocks' stretches overlap, the higher level governs the overlap.
+
+    Returns ``[{"level", "label", "ground", "cut"}, ...]`` -- each run's level, the
+    block that states it, the ground under the water in order along the ground line
+    (from where the water starts to where it ends, shorelines included), and
+    ``cut``, the ends ("start", "end") where the water stops at full depth with the
+    ground beyond still under its level (deeper there than
+    :data:`POOL_MIN_DEPTH_FRAC` of the section's height). Empty when no block puts
+    water above the ground.
+    """
+    import math
+    ground = _as_coords(ground_surface)
+    if len(ground) < 2 or not _ascending(ground):
+        return []
+    line = LineString(ground)
+    width = ground[-1][0] - ground[0][0]
+    tol = max(1e-12, _ON_GROUND_FRAC * width)
+    pools = [(level, label, stretch) for level, _a, label, stretch
+             in _bc_pools(bc, ground_surface, slope_data, time)
+             if stretch[1] - stretch[0] > tol]
+    if not pools:
+        return []
+
+    arc = [0.0]
+    for (x1, y1), (x2, y2) in zip(ground, ground[1:]):
+        arc.append(arc[-1] + math.hypot(x2 - x1, y2 - y1))
+    marks = set(arc)
+    for level, _label, (s0, s1) in pools:
+        marks.update((s0, s1))
+        for k, ((x1, y1), (x2, y2)) in enumerate(zip(ground, ground[1:])):
+            if (y1 - level) * (y2 - level) < 0:           # a shoreline
+                marks.add(arc[k] + (level - y1) / (y2 - y1) * (arc[k + 1] - arc[k]))
+    samples = []
+    for m in sorted(marks):
+        if not samples or m - samples[-1] > tol:
+            samples.append(m)
+    ys = [y for _x, y in ground]
+    dtol = 1e-9 * max(1.0, max(ys) - min(ys))
+
+    def covers(k, m):
+        s0, s1 = pools[k][2]
+        return s0 - tol <= m <= s1 + tol
+
+    runs, cur, prev = [], None, None
+    for m in samples:
+        pt = line.interpolate(m)
+        x, y = float(pt.x), float(pt.y)
+        over = [k for k in range(len(pools)) if covers(k, m)]
+        k = max(over, key=lambda i: pools[i][0]) if over else None
+        wet = k is not None and pools[k][0] - y > dtol
+        if cur is not None and (not wet or k != cur["pool"]):
+            # Closing: the run keeps this point too when it is still the run's own
+            # ground -- a shoreline, or a stretch handed over to a higher pool.
+            if covers(cur["pool"], m) and pools[cur["pool"]][0] - y >= -dtol:
+                cur["ground"].append((x, y))
+            runs.append(cur)
+            cur = None
+        if wet and cur is None:
+            cur = {"pool": k, "ground": []}
+            if (prev is not None and covers(k, prev[0])
+                    and pools[k][0] - prev[2] >= -dtol):
+                cur["ground"].append((prev[1], prev[2]))
+        if wet:
+            cur["ground"].append((x, y))
+        prev = (m, x, y)
+    if cur is not None:
+        runs.append(cur)
+
+    # A cut end is water standing at a real depth where its boundary ends; a few
+    # hundredths left by a vertex transcribed just short of the shoreline is the
+    # coordinates' precision, judged by the same fence the load derivation uses.
+    fence = POOL_MIN_DEPTH_FRAC * (max(ys) - min(ys))
+    out = []
+    for run in runs:
+        level, label, _stretch = pools[run["pool"]]
+        pts = run["ground"]
+        if len(pts) < 2:
+            continue
+        cut = []
+        for name, (x, y), outward in (("start", pts[0], -1), ("end", pts[-1], 1)):
+            m = line.project(Point(x, y))
+            past = m + outward * max(tol, 1e-6 * arc[-1])
+            if level - y > fence and 0.0 < past < arc[-1]:
+                beyond = line.interpolate(past)
+                if level - float(beyond.y) > dtol:
+                    cut.append(name)
+        out.append({"level": level, "label": label, "ground": pts, "cut": cut})
     return out
 
 
 def seep_bc_water_line(ground_surface, bc, slope_data=None, time=0.0):
-    """The water surface a seepage boundary set implies, as ``[(x, y), ...]``.
+    """The water surface a seepage boundary set implies, as one ``[(x, y), ...]``
+    line: at each pool's level over the ground it covers
+    (:func:`seep_bc_pool_runs`), and lying on the ground everywhere else. Where a
+    pool ends at full depth the line steps straight down to the ground, two points
+    at one x.
 
-    The boundary conditions are the authority on where water stands: a reservoir or
-    head block traced along the upstream face states the pool elevation directly,
-    and no seepage solution is needed to read it. This turns that statement into a
-    line the load derivation can measure against -- flat at the boundary's level
-    over the reach of ground the pool actually covers, and lying on the ground
-    everywhere else.
-
-    **A pool covers the ground its boundary is drawn along, and no more**: the reach
-    from the block's first vertex on or above the ground to its last
-    (:func:`_bc_pools`). Within that reach it
-    stands wherever the ground is below the level. Past the boundary's end it does
-    not spread, even over ground that is still lower: a pool's boundary is drawn to
-    its shoreline, and the ground beyond is either another boundary's (the
-    tailwater behind a sheetpile, at its own level) or none (a dewatered trench).
-    Where the ground beyond the end is still under the level, the surface meets the
-    ground at the end, dropping to it over the last sliver of the reach
-    (:data:`_POOL_EDGE_FRAC`), rather than sloping down to whichever ground vertex
-    comes next; at a vertical face it drops to the face's foot, so the face stays
-    dry. A block that touches the ground at a single point, a
-    head boundary up a model side, has no reach and states no pool. Two blocks that
-    overlap take the higher level.
-
-    **The shoreline is a sample of its own.** The line is sampled at every ground
-    vertex, at the boundary's own vertices, and at every point where the ground
-    crosses a pool's level -- the last of those because otherwise the pool's edge
-    lands on the next ground vertex instead of the waterline, and the load runs up
-    the face above the water. Where a modeller happens to trace the boundary block
-    to the shoreline the two agree; where the level is time-varying, or the block is
-    drawn up the whole face as RS2 draws it, they do not, and the pool was
-    over-measured by the height of the face above the water.
+    For readers that want a single line -- comparing against a piezometric line,
+    finding the pool's elevation. The load and the drawing are built from the runs
+    themselves.
 
     Returns ``[]`` when no block describes standing water above the ground.
     """
     ground = _as_coords(ground_surface)
-    if len(ground) < 2 or not _ascending(ground):
+    runs = seep_bc_pool_runs(ground_surface, bc, slope_data, time)
+    if not runs:
         return []
-    width = ground[-1][0] - ground[0][0]
-    tol = max(1e-12, _ON_GROUND_FRAC * width)
-    pools = [(level, anchors, label, reach) for level, anchors, label, reach
-             in _bc_pools(bc, ground_surface, slope_data, time)
-             if reach[1] - reach[0] > tol]
-    if not pools:
-        return []
-
     line = LineString(ground)
-    shore = set()
-    for level, _anchors, _label, _reach in pools:
-        for (x1, y1), (x2, y2) in zip(ground, ground[1:]):
-            if (y1 - level) * (y2 - level) < 0 and y2 != y1:
-                shore.add(x1 + (level - y1) / (y2 - y1) * (x2 - x1))
-    # A boundary that ends with the ground beyond it still under its level: the
-    # water meets the ground AT the end, dropping to it over the last sliver of the
-    # reach. Inside rather than past the end, and down to the foot of any vertical
-    # face standing there, so that where the ground falls away down a face (a
-    # trench wall) the dry face carries no water: the line has one elevation at
-    # each x, and the face's whole height is measured against it.
-    drop = _POOL_EDGE_FRAC * width
-    edges, feet, bounds = set(), {}, []
-    for level, _anchors, _label, reach in pools:
-        lo, hi = reach[0] - tol, reach[1] + tol
-        for end, side in ((reach[0], -1), (reach[1], 1)):
-            y_end, y_past = _y_on(line, end), _y_on(line, end + side * drop)
-            if (y_end is not None and y_past is not None
-                    and y_end <= level + tol and y_past < level - tol):
-                inner = end - side * drop
-                edges.add(inner)
-                feet[end] = _y_foot(ground, end)
-                if side < 0:
-                    lo = inner - tol
-                else:
-                    hi = inner + tol
-        bounds.append((lo, hi))
-    xs = sorted({p[0] for p in ground} | shore | edges | set(feet)
-                | {x for _, anchors, _, _ in pools for x in anchors})
-    yg = [feet[x] if x in feet else _y_on(line, x) for x in xs]
-    if any(y is None for y in yg):
-        xs = [x for x, y in zip(xs, yg) if y is not None]
-        yg = [y for y in yg if y is not None]
-    if len(xs) < 2:
-        return []
-
-    level_at = [None] * len(xs)
-    for (level, anchors, _label, _reach), (lo, hi) in zip(pools, bounds):
-        inside = [k for k in range(len(xs)) if lo <= xs[k] <= hi]
-        if not inside:
-            continue
-        covered = set()
-        for xa in anchors:
-            # nearest sample to the anchor within the pool's reach, then walk both
-            # ways while submerged, never past the reach
-            i = min(inside, key=lambda k: abs(xs[k] - xa))
-            if yg[i] > level + tol:
-                continue
-            covered.add(i)
-            for step in (-1, 1):
-                j = i + step
-                while (0 <= j < len(xs) and lo <= xs[j] <= hi
-                       and yg[j] <= level + tol):
-                    covered.add(j)
-                    j += step
-        for i in covered:
-            if level_at[i] is None or level > level_at[i]:
-                level_at[i] = level
-
-    if not any(l is not None and l - g > tol for l, g in zip(level_at, yg)):
-        return []
-    return [(x, g if l is None else max(l, g)) for x, g, l in zip(xs, yg, level_at)]
+    spans = []
+    items = []
+    for run in runs:
+        pts, level = run["ground"], run["level"]
+        m0 = line.project(Point(*pts[0]))
+        m1 = line.project(Point(*pts[-1]))
+        spans.append((m0, m1))
+        if "start" in run["cut"]:
+            items.append((m0, 0, pts[0][0], pts[0][1]))
+        for x, y in pts:
+            items.append((line.project(Point(x, y)), 1, x, level))
+        if "end" in run["cut"]:
+            items.append((m1, 2, pts[-1][0], pts[-1][1]))
+    for (x, y) in ground:
+        m = line.project(Point(x, y))
+        if not any(a <= m <= b for a, b in spans):
+            items.append((m, 1, x, y))
+    items.sort(key=lambda it: (it[0], it[1]))
+    return [(float(x), float(y)) for _m, _o, x, y in items]
 
 
 #: The moment the stage-2 pore-pressure field belongs to, written by
@@ -586,7 +607,9 @@ def water_line_for_stage(slope_data, stage=1, time=None):
 
     Returns a dict with ``points`` (the water line, possibly empty), ``source``
     (where it came from, named the way the interface labels it) and ``reason`` (why
-    there is no line, when there is none).
+    there is no line, when there is none). When the boundary conditions are the
+    source it also carries ``runs``, the pools themselves
+    (:func:`seep_bc_pool_runs`), which the load and the drawing are built from.
     """
     sd = slope_data or {}
     ground = _as_coords(sd.get("ground_surface"))
@@ -598,12 +621,14 @@ def water_line_for_stage(slope_data, stage=1, time=None):
 
     bc, time, which = stage_water_source(sd, stage=stage, time=time)
     if bc.get("specified_heads"):
+        runs = seep_bc_pool_runs(sd.get("ground_surface"), bc, sd, time)
         pts = seep_bc_water_line(sd.get("ground_surface"), bc, sd, time)
         levels = bc_pool_levels(bc, sd.get("ground_surface"), sd, time)
         if pts:
             names = ", ".join(label for _l, _a, label in levels)
-            return {"points": pts, "source": f"{which} ({names})", "reason": ""}
-        return {"points": [], "source": which,
+            return {"points": pts, "runs": runs, "source": f"{which} ({names})",
+                    "reason": ""}
+        return {"points": [], "runs": [], "source": which,
                 "reason": f"{which} do not put water above the ground surface"}
 
     key = "piezo_line" if stage == 1 else "piezo_line2"
@@ -636,35 +661,19 @@ def water_line_for_stage(slope_data, stage=1, time=None):
 POOL_MIN_DEPTH_FRAC = 1e-3
 
 
-def _vertical_face_ambiguity(ground, blocks, levels):
-    """Vertical ground faces the derivation loaded while two pools were in play.
-
-    A water surface is a function of x, and a **vertical face is the one place two
-    pools can meet at the same x**: a dam's stepped apron with the reservoir behind
-    and the tailrace in front, a dewatered trench cut into a seabed. On either side
-    of such a face the water stands at a different elevation, the single-valued
-    water line can only carry one of them, and the derivation loads the face to the
-    higher -- flooding the dry side.
-
-    Reported rather than guessed at. Where a section has one pool the question does
-    not arise and this is empty; where it has two and the ground has a vertical face
-    between them, the derived load on that face is not trustworthy and the model
-    should keep its water loads typed in.
-    """
-    if len({round(float(v), 9) for v in levels}) < 2:
-        return []
-    loaded = {(round(float(p["X"]), 9), round(float(p["Y"]), 9))
-              for blk in blocks for p in blk}
+def _cut_notes(runs):
+    """One description per place a pool's water stops at full depth because its
+    boundary ends there, with the ground beyond still below its level. The inputs
+    say nothing about water past a boundary's end, so the load stops there; if the
+    pool goes on (over an impervious blanket the boundary skips, say), the model
+    has to say so."""
     out = []
-    for (x1, y1), (x2, y2) in zip(ground, ground[1:]):
-        if x2 != x1 or y2 == y1:
-            continue
-        if (round(x1, 9), round(y1, 9)) in loaded or (round(x2, 9), round(y2, 9)) in loaded:
-            out.append(
-                f"the vertical face at x = {x1:.6g}, from elevation {min(y1, y2):.6g} "
-                f"to {max(y1, y2):.6g}, was loaded from a water surface that stands "
-                f"at more than one elevation on this section -- the water line cannot "
-                f"say which pool wets the face, so it used the one above it")
+    for run in runs:
+        for end in run["cut"]:
+            x, y = run["ground"][0 if end == "start" else -1]
+            out.append(f"{run['label']} ends at x = {x:.6g} with the ground beyond "
+                       f"still below its level, so its water stops there, "
+                       f"{run['level'] - y:.4g} deep")
     return out
 
 
@@ -672,8 +681,10 @@ def derive_water_loads(slope_data, stage=1, time=None):
     """The distributed load the standing water applies, derived from the model.
 
     The whole derivation in one call: find where the water stands
-    (:func:`water_line_for_stage`), measure it against the ground surface
-    (:func:`material_above_ground_dload`), and report the result with enough
+    (:func:`water_line_for_stage`), measure it against the ground surface (pool by
+    pool where the boundary conditions state it, :func:`seep_bc_pool_runs`;
+    :func:`material_above_ground_dload` under a piezometric line), and report the
+    result with enough
     detail to describe it before anything is changed -- which is what lets a
     remedy state *"1 block, 262 peak, over x = 346.7 to 594"* while the user is
     still deciding.
@@ -692,13 +703,13 @@ def derive_water_loads(slope_data, stage=1, time=None):
     ``resultant``   the total load per unit width, for comparing against a
                     transcribed block
     ``negligible``  one description per block dropped as too shallow to be a pool
-    ``ambiguous``   one description per vertical ground face loaded while the
-                    section carried water at more than one elevation
+    ``cut``         one description per place a pool's water stops at full depth
+                    because its boundary ends there (:func:`_cut_notes`)
     ``reason``      why nothing was derived, when nothing was
     """
     sd = slope_data or {}
     empty = {"blocks": [], "dirs": [], "source": "", "peak": 0.0, "reach": None,
-             "resultant": 0.0, "negligible": [], "ambiguous": [], "reason": ""}
+             "resultant": 0.0, "negligible": [], "cut": [], "reason": ""}
     try:
         gamma_w = float(sd.get("gamma_water"))
     except (TypeError, ValueError):
@@ -713,17 +724,24 @@ def derive_water_loads(slope_data, stage=1, time=None):
         return dict(empty, source=found["source"], reason=found["reason"])
 
     ground = _as_coords(sd.get("ground_surface"))
-    blocks = material_above_ground_dload(LineString(ground), found["points"], gamma_w)
+    runs = found.get("runs")
+    if runs is not None:
+        # Pool by pool: each block is the water over its own stretch of ground, so
+        # it ends where its boundary ends, at full depth, the way a typed block does.
+        blocks = [_drop_redundant([{"X": x, "Y": y,
+                                    "Normal": gamma_w * max(0.0, run["level"] - y)}
+                                   for x, y in run["ground"]])
+                  for run in runs]
+        cut = _cut_notes(runs)
+    else:
+        blocks = material_above_ground_dload(LineString(ground), found["points"],
+                                             gamma_w)
+        cut = []
     if not blocks:
         return dict(empty, source=found["source"],
                     reason=(f"{found['source']} does not stand above the ground "
                             f"surface anywhere, so there is no water load to add"))
 
-    bc, bc_time, _which = stage_water_source(sd, stage=stage, time=time)
-    ambiguous = _vertical_face_ambiguity(
-        ground, blocks,
-        [lvl for lvl, _a, _lab in bc_pool_levels(
-            bc, sd.get("ground_surface"), sd, bc_time)])
     ys = [y for _x, y in ground] + [y for _x, y in found["points"]]
     extent = max(ys) - min(ys)
     fence = gamma_w * POOL_MIN_DEPTH_FRAC * extent
@@ -740,8 +758,7 @@ def derive_water_loads(slope_data, stage=1, time=None):
                 f"height, so it is where the water line meets the ground rather than "
                 f"a pool standing on it")
     if not kept:
-        return dict(empty, source=found["source"], negligible=negligible,
-                    ambiguous=ambiguous,
+        return dict(empty, source=found["source"], negligible=negligible, cut=cut,
                     reason=(f"{found['source']} stands above the ground surface only "
                             f"by less than {POOL_MIN_DEPTH_FRAC:g} of the section's "
                             f"height, which is coordinate round-off rather than a pool"))
@@ -752,7 +769,7 @@ def derive_water_loads(slope_data, stage=1, time=None):
     return {"blocks": kept, "dirs": ["normal"] * len(kept),
             "source": found["source"], "peak": peak, "reach": (min(xs), max(xs)),
             "resultant": resultant, "negligible": negligible,
-            "ambiguous": ambiguous, "reason": ""}
+            "cut": cut, "reason": ""}
 
 
 # ===========================================================================
@@ -839,7 +856,7 @@ def with_water_loads(slope_data, time=None):
         out[DERIVED_KEYS[stage]] = found["blocks"]
         meta[stage] = {k: found[k] for k in
                        ("source", "peak", "reach", "resultant", "negligible",
-                        "ambiguous", "reason")}
+                        "cut", "reason")}
     out[DERIVED_META_KEY] = meta
     return out
 

@@ -22,12 +22,15 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   when there is no polygon or line yet. Before, the middle pane was blank.
 - A number opened for typing in a Studio table stays right-justified. Before, it
   jumped to the left edge of the cell while being edited.
-- A pool read from seepage head boundaries stops at the end of its boundary. Before,
-  it spread on over any lower ground, so on a sheetpile section the upstream pool
-  flooded the tailwater side, and a dewatered trench between two seabed boundaries
-  filled with water. This affects the water drawn in LEM and FEM modes and the
-  automatic water loads. A head boundary up a model side is no longer read as a
-  pool.
+- A pool read from seepage head boundaries covers the ground its boundary is drawn
+  along and ends where the boundary ends, at full depth. Before, it spread on over
+  any lower ground, so on a sheetpile section the upstream pool flooded the
+  tailwater side, and a dewatered trench between two seabed boundaries filled with
+  water. This affects the water drawn in LEM and FEM modes and the automatic water
+  loads. A head boundary up a model side is no longer read as a pool. A new
+  preflight warning, `water.pool_cut_short`, reports water that stops at the end of
+  its boundary with lower ground beyond, since the inputs do not say whether it goes
+  on.
 - With **Water levels** on in the seepage solution view, the plot's frame includes
   every level and its water symbol. Before, the frame ended just above the mesh, so
   a pool standing above the ground, such as the upstream pool on a sheetpile

@@ -2116,6 +2116,22 @@ def _auto_double_count(ctx):
                    f"explicitly (the main sheet's Water loads row).")
 
 
+@rule("water.pool_cut_short", WARNING, ("lem", "rapid"),
+      "In auto mode, water that stops where its boundary ends, with lower ground "
+      "beyond, is reported.")
+def _pool_cut_short(ctx):
+    if ctx.water_loads_mode != "auto":
+        return None
+    for stage in (1, 2):
+        for note in _derived(ctx, stage)["cut"]:
+            yield (f"Water loads is set to auto, and {note}. The inputs do not say "
+                   f"whether the water goes on past that point: a sheetpile or a wall "
+                   f"is not part of the ground line, and an impervious blanket under "
+                   f"the pool carries no head boundary. If it does, set Water loads "
+                   f"to manual and type the load in (the main sheet's Water loads "
+                   f"row; Distributed loads, dloads sheet).")
+
+
 @rule("water.auto_derivation_empty", WARNING, ("lem", "rapid"),
       "In auto mode, water standing above the ground must actually derive a load.")
 def _auto_derivation_empty(ctx):

@@ -1443,12 +1443,12 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
             f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
             f"written to the dloads sheet, and nothing should be added there by hand")
-        for note in derived["ambiguous"]:
+        for note in derived["cut"]:
             caveats.append(
-                f"the derived water load is not trustworthy here: {note}. Check it "
-                f"against the GeoStudio model, and set the main sheet's "
-                f"{_water_loads_cell()} to manual with the load typed in if the two "
-                f"pools have to be told apart")
+                f"the derived water load stops where a boundary ends: {note}. Check "
+                f"it against the GeoStudio model, and if the water goes on past that "
+                f"point, set the main sheet's {_water_loads_cell()} to manual with "
+                f"the load typed in")
     elif seep:
         ponded = seep_ponded_dload(ground_surface, seep[0], seep[1], gamma_water)
         if ponded:

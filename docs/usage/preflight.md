@@ -420,10 +420,12 @@ along a deep aquifer or a model side is a groundwater condition, and reading its
 level as a water surface would put a reservoir on the section that the model does not
 contain.
 
-A pool covers the stretch of ground its boundary is drawn along, and stops at the
-boundary's end even where the ground beyond is lower. Draw a pool's boundary to its
-shoreline. Ground past the end belongs to another boundary at its own level, such as
-the tailwater beyond a sheetpile, or to no water at all, such as a dewatered trench.
+A pool covers the stretch of ground its boundary is drawn along. It ends at a
+shoreline where the ground rises out of it, or at the boundary's end, at full depth,
+where the ground beyond is still lower. The inputs say nothing about water past a
+boundary's end. Where water does stand there, as it does over the impervious clay
+blanket in [SEEP-1](../tutorials/seep01_sheetpile.md), whose boundary stops at the
+blanket's edge, `water.pool_cut_short` says so.
 
 The load itself is the weight of the water between that surface and the ground,
 tapering to zero where the two meet, which is the same operation the vendor
@@ -472,7 +474,7 @@ main sheet's **Water loads** cell decides:
 
 Which rules apply follows the mode, because the two modes have opposite failure
 conditions. In `manual` mode the risk is water with no load, so the ponded-water
-warnings and the stage-2 load rules apply. In `auto` mode those cannot arise, and three
+warnings and the stage-2 load rules apply. In `auto` mode those cannot arise, and four
 rules take their place:
 
 | Rule | What it catches |
@@ -480,6 +482,7 @@ rules take their place:
 | `water.auto_dload_double_count` | A block on a dloads sheet that **is** the derived water — the same load entered twice, once by you and once by the engine. Detected by the derivation itself: the block is compared against the derived load over the same reach |
 | `water.auto_derivation_empty` | Water standing above the ground surface from which the engine derived nothing, and why — a line entered right to left, a blank unit weight of water. In automatic mode this is how a reservoir can go missing without notice |
 | `water.sources_disagree` | Seepage head boundaries and a piezometric line that describe **different** pools. They should describe the same pool, so one of them is stale — and the boundary conditions are the one the run uses |
+| `water.pool_cut_short` | Water that stops where its head boundary ends, with the ground beyond still below its level. The derived load stops there too. If the water goes on (over an impervious blanket, up to a sheetpile or a wall that is not part of the ground line), set Water loads to manual and type the load in |
 
 Switching a model over is the `switch_to_auto_water` remedy, and it is the better of the
 two water remedies wherever it applies, because blocks written into a sheet do not follow a

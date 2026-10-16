@@ -173,6 +173,8 @@ load, followed by a seismic coefficient.
 
 <p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
 
+<!-- test: file=files/xslope_video06_loads.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.890, tolerance=0.005 -->
+
 **Related tutorial** — [LEM-2. Loads on the Crest](../tutorials/lem02_loads_on_the_crest.md)
 
 </div>

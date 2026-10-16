@@ -47,20 +47,20 @@ The template consists of 14 worksheets, each serving a specific purpose. Differe
 
 | Sheet Name | Description | LEM | SEEP | FEM |
 |------------|-------------|:---:|:----:|:---:|
-| **main** | Global parameters and instructions | X   | X    | X   |
-| **mat** | Material properties including strength, permeability, and stiffness | X   | X    | X   |
-| **profile** | XY coordinates of profile lines defining slope geometry | X   | X    | X   |
-| **polygon** | Material zones defined as closed polygons (alternative to **profile**) | X   | X    | X   |
-| **piezo** | Piezometric lines for pore pressure calculations | X   |      | X   |
-| **circles** | Circular failure surface definitions | X   |      |     |
-| **non-circ** | Non-circular failure surface coordinates | X   |      |     |
-| **dloads** | Distributed surface loads | X   |      | X   |
-| **reinforce** | Soil reinforcement elements (anchors, nails, geosynthetics) | X   |      | X   |
-| **joints** | Slip surfaces with no reinforcement in them (rock joints, block contacts) |     |      | X   |
-| **piles** | Pile and concrete pier support elements | X   |      | X   |
-| **lloads** | Line loads (concentrated forces on the ground surface) | X   |      |     |
-| **seep bc** | Seepage analysis boundary conditions |     | X    |     |
-| **tseep** | Transient seepage time series and run controls |     | X    |     |
+| [**main**](#worksheet-main) | Global parameters and instructions | X   | X    | X   |
+| [**mat**](#worksheet-mat) | Material properties including strength, permeability, and stiffness | X   | X    | X   |
+| [**profile**](#worksheet-profile) | XY coordinates of profile lines defining slope geometry | X   | X    | X   |
+| [**polygon**](#worksheet-polygon) | Material zones defined as closed polygons (alternative to **profile**) | X   | X    | X   |
+| [**piezo**](#worksheet-piezo) | Piezometric lines for pore pressure calculations | X   |      | X   |
+| [**circles**](#worksheet-circles) | Circular failure surface definitions | X   |      |     |
+| [**non-circ**](#worksheet-non-circ) | Non-circular failure surface coordinates | X   |      |     |
+| [**dloads**](#worksheet-dloads) | Distributed surface loads | X   |      | X   |
+| [**reinforce**](#worksheet-reinforce) | Soil reinforcement elements (anchors, nails, geosynthetics) | X   |      | X   |
+| [**joints**](#worksheet-joints) | Slip surfaces with no reinforcement in them (rock joints, block contacts) |     |      | X   |
+| [**piles**](#worksheet-piles) | Pile and concrete pier support elements | X   |      | X   |
+| [**lloads**](#worksheet-lloads) | Line loads (concentrated forces on the ground surface) | X   |      |     |
+| [**seep bc**](#worksheet-seep-bc) | Seepage analysis boundary conditions |     | X    |     |
+| [**tseep**](#worksheet-tseep) | Transient seepage time series and run controls |     | X    |     |
 
 The following sections describe each worksheet in detail, including the data structure and how it is used in analysis.
 

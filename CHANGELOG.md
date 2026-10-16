@@ -15,6 +15,9 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   cells. Before, a cell had to be opened with a double-click first.
 - The Materials list view dims its property fields until a material exists.
   Before, an empty list left the fields open to typing with nothing to hold it.
+- **Generate starting circles…** no longer makes the circles editor taller. The
+  window keeps its size, the table scrolls to any circles past what it shows, and
+  the generator's note takes its room from the section preview.
 
 ### Changed
 

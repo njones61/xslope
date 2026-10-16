@@ -2625,9 +2625,11 @@ class TableEditorDialog(QDialog):
                 want += max(widget.minimumSizeHint().height(), widget.minimumHeight())
         return want
 
-    def _fit_minimums_to_screen(self, width=None):
+    def _fit_minimums_to_screen(self, width=None, height=None):
         """Give the two panes minimum heights that leave the dialog shrinkable to the
-        screen, and return the preview's.
+        screen, and return the preview's. With ``height``, the budget is that window
+        height instead (never more than the screen's): how a strip that appears later
+        finds its room inside the window as it stands (:meth:`_keep_size`).
 
         A minimum is a promise the layout keeps at the user's expense: a dialog whose
         minimum is taller than the desktop cannot be resized to fit it, so the window
@@ -2649,6 +2651,8 @@ class TableEditorDialog(QDialog):
                    + self._caption_reserve)
         table = self._table_pane_height(rows_shown=0)
         avail = self._available_size()[1]
+        if height is not None:
+            avail = height if avail is None else min(avail, height)
         if avail is not None:
             budget = (avail - self._chrome_minimum(width)
                       - self._split.handleWidth())
@@ -2666,9 +2670,10 @@ class TableEditorDialog(QDialog):
         self._editable.setMinimumHeight(table)
         # A QSplitter does not carry its children's minimums into its own, so a strip
         # that appears later (the generator's summary) is free to squeeze the split
-        # rather than grow the dialog -- and what gets cut is the bottom of the
-        # preview's caption. Stating the minimum here puts the panes into the layout's
-        # own minimum, so the dialog grows for the new strip instead.
+        # past them -- and what gets cut is the bottom of the preview's caption.
+        # Stating the minimum here puts the panes into the layout's own minimum, so
+        # the strip's room comes out of what the panes can spare (:meth:`_keep_size`)
+        # and the dialog grows only for what they cannot.
         self._split.setMinimumHeight(table + preview + self._split.handleWidth())
         # A resize is clamped by the layout's minimum as the layout last computed it,
         # so the relaxed minimums have to reach it before anyone resizes to them --
@@ -2690,7 +2695,6 @@ class TableEditorDialog(QDialog):
         way it would only be overwriting the user's own arrangement."""
         if not getattr(self, "_content_sized", False):
             return
-        self._grow_to_layout_minimum()
         needed = self._content_width()
         if needed > self.width():
             self._grow(needed)
@@ -2700,9 +2704,10 @@ class TableEditorDialog(QDialog):
         """Grow tall enough for everything the layout now holds, measured at the
         width the dialog actually has.
 
-        A strip that appears after the dialog was sized — the generator's summary
-        line — needs room that nothing gave it, and what pays for it is the bottom of
-        the preview's caption. ``minimumSizeHint`` is no help: it measures every
+        A wrapped strip measured before the window had its real width — the help
+        paragraph, the search window's caption — can need a line more than the dialog
+        was sized for, and what pays for it is the bottom of the preview's caption.
+        ``minimumSizeHint`` is no help: it measures every
         wrapped label at the dialog's own MINIMUM width, where the same text takes
         more lines than it does at the width on screen, so it answers a question
         nobody asked. Summing the rows at the real width is the measurement that
@@ -2868,18 +2873,21 @@ class TableEditorDialog(QDialog):
     def _show_generate_summary(self, message, n, how):
         """Write the generator's own summary into the dialog, under the button.
 
-        The summary is a strip that was not there a moment ago, and a dialog whose
-        height does not change has to find its room somewhere: the somewhere is the
-        preview, which is the only thing in the dialog that stretches. So the dialog
-        grows by exactly what the layout says it now needs more of -- measured as the
-        difference in the layout's own total hint across the label appearing, which
-        counts the label's wrapped height and the spacing around it and needs no
-        pixel figure of its own. The preview keeps the area it had."""
+        The summary is a strip that was not there a moment ago, so it has to find its
+        room somewhere. In a dialog sized from its content (the circles editor) the
+        window keeps its size and the room comes out of the preview
+        (:meth:`_keep_size`). Anywhere else the dialog grows by exactly what the
+        layout says it now needs more of -- measured as the difference in the
+        layout's own total hint across the label appearing, which counts the label's
+        wrapped height and the spacing around it and needs no pixel figure of its
+        own -- and the preview keeps the area it had."""
         lead = {"append": "Added", "replace": "Replaced the table with"}.get(how,
                                                                             "Generated")
         label = self.generate_summary
         layout = self.layout()
         before = layout.totalSizeHint().height()
+        height = self.height()
+        pane = self._split.sizes()[0] if self._preview is not None else 0
         label.setText(f"{lead} {self._generate_unit(n)}: {message}".rstrip(". ") + ".")
         label.setVisible(True)
         # A wrapped label's height is only knowable once its width is: reserve it, or
@@ -2892,12 +2900,39 @@ class TableEditorDialog(QDialog):
         layout.invalidate()
         grown = layout.totalSizeHint().height() - before
         if getattr(self, "_content_sized", False):
-            self._size_to_content()        # re-fit around the strip that just appeared
+            self._keep_size(height, pane)
         elif grown > 0:
             screen = self.screen() or QApplication.primaryScreen()
             avail = (screen.availableGeometry().height() if screen is not None
                      else self.height() + grown)
             self.resize(self.width(), min(self.height() + grown, avail))
+
+    def _keep_size(self, height, pane):
+        """Make room for a strip that just appeared without resizing the window.
+
+        The pane minimums are budgeted again against ``height``, the height the
+        window had before the strip (:meth:`_fit_minimums_to_screen`), and the
+        window is held at it: the layout may already have grown it to the old
+        minimums the moment the strip appeared, before anything was painted. The
+        strip's room comes out of the preview, down to its floor: the table pane
+        keeps the height it had, ``pane``, and generated rows past what it shows are
+        reached with its scroll bar. Only a preview already at its floor hands the
+        rest over to the table. A window that resized itself while being worked in
+        would undo whatever size the user had given it."""
+        self._fit_minimums_to_screen(height=height)
+        if self.height() != height:
+            self.resize(self.width(), height)
+            self.layout().activate()
+        total = sum(self._split.sizes())
+        floor = (_PREVIEW_FLOOR_LINES * self.fontMetrics().height()
+                 + self._caption_reserve)
+        preview = max(min(floor, total - self._editable.minimumHeight()),
+                      total - pane)
+        if self._preview.minimumHeight() > preview:
+            self._preview.setMinimumHeight(preview)
+            self._split.setMinimumHeight(self._editable.minimumHeight() + preview
+                                         + self._split.handleWidth())
+        self._split.setSizes([total - preview, preview])
 
     def _schedule_preview(self, *_):
         if self._preview is not None:

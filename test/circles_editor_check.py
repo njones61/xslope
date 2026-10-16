@@ -51,6 +51,10 @@ LEM01 = os.path.join(_REPO, "docs/lem/files/xslope_simple_embankment.xlsx")
 #: one that shows whether the shared generate path reaches past its own dialog.
 ACADS = os.path.join(_REPO, "docs/lem/files/xslope_acads_weak_layer.xlsx")
 
+#: A section with two faces, whose generator makes eight circles: more than the
+#: table shows at the height the dialog opens at.
+DAM = os.path.join(_REPO, "docs/inputs/slope/xslope_dam.xlsx")
+
 #: The button's label, quoted verbatim by the tutorial ("press **Generate starting
 #: circles…**"). A rewording here is a tutorial that no longer matches the app.
 GENERATE_LABEL = "Generate starting circles…"
@@ -333,41 +337,44 @@ def test_fits_the_reported_screen():
     in a child process with the offscreen platform configured to that screen. If the
     platform will not take the screen size, the leg reports that rather than passing
     on a screen nobody asked for."""
+    out = []
+    for width, height in ((1536, 864), (1536, 824)):     # with and without a taskbar
+        out += _on_screen(width, height, "fit")
+    return out
+
+
+def _on_screen(width, height, leg):
+    """Run the ``leg`` checks (a key of :data:`_LEGS`) in a child process whose
+    offscreen screen is ``width`` x ``height``, and return their failures."""
     import json
     import subprocess
     import tempfile
 
-    out = []
-    for width, height in ((1536, 864), (1536, 824)):     # with and without a taskbar
-        with tempfile.TemporaryDirectory() as tmp:
-            cfg = os.path.join(tmp, "screen.json")
-            with open(cfg, "w") as fh:
-                json.dump({"screens": [{"name": "reported", "x": 0, "y": 0,
-                                        "width": width, "height": height,
-                                        "logicalDpi": 96, "logicalBaseDpi": 96,
-                                        "dpr": 1}]}, fh)
-            env = dict(os.environ,
-                       QT_QPA_PLATFORM=f"offscreen:configfile={cfg}",
-                       MPLBACKEND="Agg")
-            proc = subprocess.run([sys.executable, os.path.abspath(__file__),
-                                   "--screen-leg", f"{width}x{height}"],
-                                  env=env, capture_output=True, text=True)
-        tag = f"{width}x{height}"
-        marker = "SCREEN-LEG "
-        line = next((l for l in proc.stdout.splitlines() if l.startswith(marker)), None)
-        if line is None:
-            out.append(f"the {tag} leg produced no result: "
-                       f"{proc.stdout[-400:]}{proc.stderr[-400:]}")
-            continue
-        payload = json.loads(line[len(marker):])
-        if payload.get("skipped"):
-            out.append(f"the {tag} leg ran on a "
-                       f"{payload['screen']} screen instead — the offscreen platform "
-                       f"would not take the configured size, so the reported desktop "
-                       f"went unchecked")
-            continue
-        out += payload["failures"]
-    return out
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = os.path.join(tmp, "screen.json")
+        with open(cfg, "w") as fh:
+            json.dump({"screens": [{"name": "reported", "x": 0, "y": 0,
+                                    "width": width, "height": height,
+                                    "logicalDpi": 96, "logicalBaseDpi": 96,
+                                    "dpr": 1}]}, fh)
+        env = dict(os.environ,
+                   QT_QPA_PLATFORM=f"offscreen:configfile={cfg}",
+                   MPLBACKEND="Agg")
+        proc = subprocess.run([sys.executable, os.path.abspath(__file__),
+                               "--screen-leg", f"{width}x{height}", leg],
+                              env=env, capture_output=True, text=True)
+    tag = f"{width}x{height}"
+    marker = "SCREEN-LEG "
+    line = next((l for l in proc.stdout.splitlines() if l.startswith(marker)), None)
+    if line is None:
+        return [f"the {tag} leg produced no result: "
+                f"{proc.stdout[-400:]}{proc.stderr[-400:]}"]
+    payload = json.loads(line[len(marker):])
+    if payload.get("skipped"):
+        return [f"the {tag} leg ran on a {payload['screen']} screen instead — the "
+                f"offscreen platform would not take the configured size, so that "
+                f"desktop went unchecked"]
+    return payload["failures"]
 
 
 def _show_event():
@@ -654,6 +661,46 @@ def test_generate_is_the_remedys_generator():
     return out
 
 
+def _keep_size_failures():
+    """Generate does not resize the window. The table pane keeps its height and the
+    circles past what it shows are reached with its scroll bar; the summary's room
+    comes out of the preview, whose caption stays whole."""
+    from PySide6.QtWidgets import QApplication, QMessageBox
+    from studio.editors import CATEGORY_EDITORS
+
+    dlg = _shown(CATEGORY_EDITORS["circles"].build(_load(DAM), None))
+    height, pane = dlg.height(), dlg._split.sizes()[0]
+    avail = QApplication.primaryScreen().availableGeometry().height()
+    if height >= avail - 100:
+        return [f"the dialog opened {height} px tall on a {avail} px screen, with no "
+                f"room to grow, so this check cannot tell whether Generate grows it"]
+    _generate(dlg, QMessageBox.Apply)
+    _settle()
+    table = dlg._editable.table
+    out = _fail(dlg.height() == height,
+                f"Generate resized the window from {height} to {dlg.height()} px tall")
+    out += _fail(dlg._split.sizes()[0] == pane,
+                 f"Generate moved the table pane from {pane} to "
+                 f"{dlg._split.sizes()[0]} px")
+    out += _fail(table.rowCount() > 2 and table.verticalScrollBar().maximum() > 0,
+                 f"the {table.rowCount()} generated circles all fit, so this check "
+                 f"cannot tell whether the table scrolls to the rest")
+    caption = dlg._preview._caption
+    out += _fail(caption is not None
+                 and caption.geometry().bottom() <= dlg._preview.rect().bottom(),
+                 "after Generate the preview caption is clipped by its pane")
+    out += _fail(dlg.generate_summary.isVisible(),
+                 "the generator's summary line is not visible")
+    dlg.deleteLater()
+    return out
+
+
+def test_generate_keeps_the_window_size():
+    """:func:`_keep_size_failures` on a desktop tall enough for the dialog to grow,
+    2560x1440, so a window that grew would be seen to."""
+    return _on_screen(2560, 1440, "keep")
+
+
 def test_generate_leaves_the_other_editors_alone():
     """The shared Generate path must not re-lay-out a dialog it did not size.
 
@@ -919,6 +966,7 @@ CHECKS = [
     ("the preview sits below the table", test_preview_is_below_the_table),
     ("the dialog fits the screen it opens on", test_fits_the_screen),
     ("it fits the reported 1536x864 desktop", test_fits_the_reported_screen),
+    ("generate keeps the window size", test_generate_keeps_the_window_size),
     ("generate leaves other editors' layout alone",
      test_generate_leaves_the_other_editors_alone),
     ("display rounds, storage does not", test_display_rounds_but_stores_the_truth),
@@ -967,9 +1015,9 @@ def main():
     print("\nAll circles editor checks passed.")
 
 
-def _screen_leg(requested):
-    """Child-process entry point for :func:`test_fits_the_reported_screen`: run the
-    fit assertions here and print them on one line the parent can read back."""
+def _screen_leg(requested, leg="fit"):
+    """Child-process entry point for :func:`_on_screen`: run the ``leg`` assertions
+    here and print them on one line the parent can read back."""
     import json
 
     from PySide6.QtWidgets import QApplication
@@ -979,8 +1027,12 @@ def _screen_leg(requested):
         payload = {"skipped": True, "screen": got}
     else:
         payload = {"skipped": False, "screen": got,
-                   "failures": studio_settings.isolated(_screen_failures)()}
+                   "failures": studio_settings.isolated(_LEGS[leg])()}
     print("SCREEN-LEG " + json.dumps(payload))
+
+
+#: The checks :func:`_on_screen` can run on a screen of its choosing.
+_LEGS = {"fit": _screen_failures, "keep": _keep_size_failures}
 
 
 if __name__ == "__main__":
@@ -992,6 +1044,6 @@ if __name__ == "__main__":
     except Exception:
         pass
     if "--screen-leg" in sys.argv:
-        _screen_leg(sys.argv[sys.argv.index("--screen-leg") + 1])
+        _screen_leg(*sys.argv[sys.argv.index("--screen-leg") + 1:][:2])
     else:
         main()

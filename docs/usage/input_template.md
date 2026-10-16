@@ -133,296 +133,111 @@ files. When nothing is declared, those labels and the provenance line are omitte
 
 ## Worksheet: mat
 
+The **mat** worksheet has one row per material, starting in row 11. The number in
+the **mat** column is the material ID that the **profile** and **polygon** sheets
+refer to. Add rows below the last one for more materials.
+
+The columns fall into three bands, each shown below. A color legend on the sheet
+marks each column **LEM only**, **LEM & FEM**, or **FEM only**, and the cells a
+material's options don't use are grayed out.
+
+### Shear strength and stiffness
+
 ![sheet_mat1.png](images/sheet_mat1.png)
 
-The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
+| Column | Units | What it is |
+| --- | --- | --- |
+| **γ** | F/L³ | Unit weight above the water table |
+| **γsat** | F/L³ | Unit weight below the water table. Blank uses γ everywhere |
+| **option** | | Strength model: `mc`, `cp`, `pow`, `hb`, or `elastic` (table below) |
+| **c**, **φ** | F/L², deg | Cohesion and friction angle |
+| **c/p**, **r-elev** | F/L²/L, L | Strength gain per unit depth, and the elevation it starts from (`cp`) |
+| **d**, **psi** | F/L², deg | Kc = 1 envelope for [rapid drawdown](../lem/rapid.md) |
+| **t_cut** | F/L² | Tensile strength cap (FEM only) |
+| **E**, **nu** | F/L², – | Young's modulus and Poisson's ratio (FEM only) |
+| **u** | | Pore pressure source: `piezo`, `seep`, `ru`, or `none` |
+| **ru** | – | Pore pressure ratio, read when **u** = `ru` |
+| **phi_b**, **s_cap** | deg, F/L² | Strength from suction above the water table, and its cap |
+| **pow_a** … **pow_d** | | Power-curve envelope (`pow`) |
+| **hb_sci** … **hb_d** | F/L², –, –, – | Hoek-Brown inputs (`hb`) |
 
-The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the tensile cutoff, the FEM properties E and ν, the pore-pressure option, and the matric-suction pair phi_b/s_cap, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability, the unsaturated-flow model, and the transient-storage pair Ss/Sy, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically grayed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
+**Unit weights.** Enter total unit weights, never buoyant ones. XSLOPE takes the
+water off through the pore pressure, so a buoyant weight removes it twice. The
+model has one water table, from the seepage solution if there is one and from the
+piezometric line otherwise. Below it, a material with a γsat weighs γsat,
+whatever its **u** option.
 
-**Strength Properties** (for LEM and FEM analysis):
+**Strength options.** Each option reads its own columns:
 
-- **$\gamma$** — **[F/L³]**: Unit weight of the soil above the water table. It is a *total* (moist) unit
-  weight, never a buoyant or submerged one: XSLOPE weighs the soil and takes the water off as pore
-  pressure separately, so a buoyant weight entered here removes the water twice. Both engines weigh
-  the soil with it — the LEM to build each slice's weight, the FEM to build the body-force load,
-  the overburden behind the K0 initial stress, and the soil column the `ru` option reads.
-- **$\gamma_{sat}$** — **[F/L³]**: Saturated unit weight, applied to the soil below the water table. In
-  the LEM it splits each slice's weight at the water table; in the FEM it is applied Gauss point by
-  Gauss point, so an element the water table cuts through carries part saturated and part moist weight.
-  It is a total unit weight too, and $\gamma_{sat} \geq \gamma$ is required.
-  Leave it blank to weigh the material $\gamma$ everywhere.
+| option | Strength | Columns read |
+| --- | --- | --- |
+| `mc` | Mohr-Coulomb: τ = c + σ′ tan φ | c, φ |
+| `cp` | Undrained strength increasing below an elevation: S<sub>u</sub> = c + c/p × (r-elev − y) | c, c/p, r-elev |
+| `pow` | Power curve: τ = pow_a (σ′ + pow_d)<sup>pow_b</sup> + pow_c | pow_a, pow_b, pow_c, pow_d |
+| `hb` | Generalized Hoek-Brown, for rock | hb_sci, hb_gsi, hb_mi, hb_d |
+| `elastic` | Can't fail. Search surfaces may run along it but not through it | none |
 
-  The water table both engines split at belongs to the **problem**, not to the material: one per
-  model, read from the seepage solution's $u = 0$ contour when the model carries one and from the
-  piezometric line otherwise. It is independent of the **u** option below, so a total-stress material
-  (`u = none`) below the water table still weighs $\gamma_{sat}$, and a piezometric line drawn purely
-  to locate the water table does its job without any material reading pore pressure from it. A model
-  with $\gamma_{sat}$ but no water table has no elevation to split at and is weighed $\gamma$
-  throughout.
-- **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
-  with depth below a reference elevation; `pow` = nonlinear power-curve envelope; `hb` = generalized Hoek-Brown
-  (rock); `elastic` = elastic / infinite strength — the material cannot fail (see
-  below).
-- **c** (cohesion **[F/L²]**) and **φ** (friction angle **[deg]**): Mohr-Coulomb shear strength parameters (option = `mc`).
-- **c** **[F/L²]**, **cp** **[F/L²/L]** (a strength gradient — stress per unit change in depth, e.g. psf/ft), and **r-elev** **[L]** (option = `cp`): undrained strength that increases linearly below a reference
-  elevation — see the formula below.
-- **d** — **[F/L²]**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
-- **$\psi$** — **[deg]**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
-- **t_cut** — **[F/L²]**: tensile-strength cutoff — see below.
-- **E** — **[F/L²]**: Young's modulus (FEM only).
-- **ν** — **[–]**: Poisson's ratio, dimensionless (FEM only).
+`mc` with φ = 0 is a constant undrained strength. Enter **hb_sci** in the
+model's stress units, not MPa (30 MPa is 30,000 kPa). The
+[LEM overview](../lem/overview.md) explains each envelope, including
+[Hoek-Brown](../lem/overview.md#hoek-brown-strength).
 
-Building the FEM data requires $E > 0$ and $0 \le \nu < 0.5$ for every material; a missing
-property or an out-of-range value stops the build rather than being defaulted.
-- **u**: pore pressure option (a selector, not a numeric value)
-- **$r_u$** — **[–]**: pore pressure ratio, dimensionless (u = `ru`) — see below.
-- **phi_b** ($\phi^b$) — **[deg]**: Fredlund unsaturated (matric-suction) friction angle — see
-  below.
-- **s_cap** — **[F/L²]**: maximum credited suction (stress units) — see below.
-- **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — $pow_c$ and $pow_d$ are **[F/L²]**
-  (added to a stress), $pow_b$ is **[–]** (an exponent), and $pow_a$'s units follow from $pow_b$ so that the
-  product is a stress — see the formula below.
-- **hb_sci** **[F/L²]**, **hb_gsi** **[–]**, **hb_mi** **[–]**, **hb_d** **[–]** (option = `hb`): generalized Hoek-Brown parameters (only $\sigma_{ci}$ carries units; GSI, $m_i$, and $D$ are dimensionless) — see the
-  formula below.
+**Pore pressure (u).**
 
-For the **mc** strength option — the Mohr-Coulomb envelope, and the option you will use most of the time — the
-shear strength is a straight line in terms of the effective normal stress $\sigma'_n$ on the failure surface:
+- `piezo`: from the line on the **piezo** sheet.
+- `seep`: from a seepage solution; see
+  [Seepage and slope stability](../seep/seep_slope.md).
+- `ru`: u = ru × the vertical stress of the soil column.
+- `none`: no pore pressure. Use it with undrained (total-stress) strengths.
 
->>$\tau = c + \sigma'_n \tan\phi = c + (\sigma_n - u)\tan\phi   \qquad (1)$
+Any other entry is rejected when the file loads. A model imported from RS2 gets
+its **u** values from RS2's water settings; a pore-pressure grid or a groundwater
+solution has no counterpart and arrives as zero pore pressure, flagged in the
+import notes.
 
-where **c** is the cohesion (the intercept), **φ** is the effective friction angle (the slope of the line), and $u$
-is the pore pressure from the selected **u** option. Setting $\phi = 0$ gives a constant undrained strength
-$\tau = c = S_u$; setting $c = 0$ gives a purely frictional material. Every other strength option below is
-ultimately reduced to this same form — the curved envelopes are linearized into an equivalent local $(c, \phi)$
-before they are solved.
+**Tensile cap (t_cut).** Only the FEM reads it; the LEM uses a
+[tension crack](#worksheet-main) instead. `0` means no tension. Blank lets an `mc`
+material carry the tension its envelope implies, c / tan φ, and leaves a `cp`
+material with no limit at all, which can hold a steep crest together in a
+strength reduction and raise the factor of safety. Set it for cohesive soils, and
+always when matching an RS2 or Plaxis model. See
+[Tensile strength in the SSRM](../fem/solver.md#tensile-strength-in-ssrm).
 
-For the **cp** strength option, the undrained shear strength at elevation $y$ is:
+**Suction (phi_b, s_cap).** A positive **phi_b** adds strength s × tan φ<sup>b</sup>
+from the suction s above the water table. It is read only for `mc`, `pow`, and
+`hb` materials with **u** = `piezo` or `seep`. With `piezo`, the suction grows
+without limit above the line, so **always set s_cap**. See
+[Matric suction](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table).
 
->>$S_u = c + c_p \cdot \max(0,\; r_{elev} - y)   \qquad (2)$
+**Stiffness.** The FEM needs E > 0 and 0 ≤ ν < 0.5 for every material.
 
-where **c** is the strength at the reference elevation **r-elev** and **cp** is the *rate* of strength increase per
-unit elevation below it (e.g. psf/ft). At or above **r-elev** the strength equals **c**. This behaves like a
-$S_u/\sigma'_v$ (c/p) ratio but is referenced to elevation rather than depth, giving more precise control for
-slope-stability problems. The rate is normally **positive** — undrained strength increasing with depth, the
-familiar c/p behavior. A negative rate is accepted for one special case: a stronger consolidated crust over
-softer clay, as in the Borges & Cardoso embankment ([VP30](../verification/rocscience.md#vp30)), where the top
-meter of the foundation gained strength under construction loading and the profile decreases into the layer
-beneath.
-
-For the **pow** strength option, the shear strength is a curved envelope in terms of the effective normal stress
-$\sigma'_n$ on the failure surface:
-
->>$\tau = pow_a \cdot (\sigma'_n + pow_d)^{pow_b} + pow_c   \qquad (3)$
-
-With $pow_b = 1$ this collapses to Mohr-Coulomb. Curved envelopes are appropriate for rockfill, waste rock,
-weathered rock, and heavily overconsolidated clays, where a straight-line fit over a wide stress range
-overestimates strength at one end and underestimates it at the other.
-
-For the **hb** strength option, strength follows the generalized Hoek-Brown criterion (Hoek, Carranza-Torres &
-Corkum, 2002), written in principal stresses:
-
->>$\sigma'_1 = \sigma'_3 + \sigma_{ci}\left(m_b \dfrac{\sigma'_3}{\sigma_{ci}} + s\right)^{a}   \qquad (4)$
-
-The four inputs are the ones a geologist actually records; the rock-mass constants $m_b$, $s$ and $a$ are
-*derived* from them and are never entered directly:
-
-- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock, **[F/L²]**. Enter it in
-  the model's own stress units, not the MPa the rock-mechanics literature quotes: 30 MPa is 30,000 kPa or
-  626,000 psf. A $\sigma_{ci}$ small enough to have been carried over in MPa is [reported before a
-  run](preflight.md#what-is-checked).
-- **hb_gsi** — GSI, the Geological Strength Index, from 0 (completely broken) to 100 (intact). Must be in (0, 100].
-- **hb_mi** — $m_i$, the intact Hoek-Brown constant, a rock-type property (≈ 4 for claystone, ≈ 10 for sandstone,
-  ≈ 25 for granite).
-- **hb_d** — $D$, the disturbance factor, from 0 (undisturbed) to 1 (heavily blast-damaged). Must be in [0, 1].
-
->>$m_b = m_i \exp\!\left(\dfrac{GSI - 100}{28 - 14D}\right), \quad
-   s = \exp\!\left(\dfrac{GSI - 100}{9 - 3D}\right), \quad
-   a = \tfrac12 + \tfrac16\!\left(e^{-GSI/15} - e^{-20/3}\right)   \qquad (5)$
-
-Slope stability needs shear strength as a function of the normal stress on the failure plane, not a relationship
-between principal stresses, so XSLOPE converts Eq. (3) to an equivalent Mohr envelope using Balmer's (1952)
-transformation and linearizes it at the operative normal stress into an instantaneous $(c_i, \phi_i)$ tangent.
-This happens automatically and iteratively — see [Hoek-Brown strength](../lem/overview.md#hoek-brown-strength).
-
-For the **elastic** strength option, the material is treated as linear-elastic with infinite strength — it cannot
-fail, regardless of stress state. In the FEM its elements are never checked against a yield criterion, so no
-plasticity ever develops in them (see [Elastic-only materials](../fem/overview.md#mohr-coulomb-failure-criterion)
-in the FEM overview). In the LEM, a trial failure surface may not cross into the material's interior — it may
-still ride along its boundary (e.g. a slide daylighting on top of bedrock), but a surface that cuts through it is
-rejected. This mirrors the "impenetrable" or "plasticity: none" material other slope-stability packages offer for
-bedrock or a structural foundation that is not itself part of the stability question. Only **$\gamma$**,
-**$\gamma_{sat}$**, **E**, and **ν** are read for an elastic material — the strength columns (**c** … **hb_d**,
-including **t_cut**) and the standard-deviation columns are ignored and grayed out automatically. The pore-pressure
-option is accepted but has no effect (leave it `none`).
-
-**Tensile-strength cutoff (t_cut).** **t_cut** is a Rankine cap on the major
-principal stress, **[F/L²]**, honored by the **FEM only** — the LEM ignores it (use the
-[tension crack](#worksheet-main) global parameters instead if that is the effect wanted in LEM). It layers on top
-of whichever shear envelope the material's `option` defines and never changes the envelope itself:
-
-- **Blank**: the material's own envelope decides, and the engine enforces it. On `mc` that is the
-  apex $c/\tan\phi$ — the most tension Mohr-Coulomb admits — so a **cohesionless** material carries
-  no tension whether the cell is blank or `0`, while a cohesive one is allowed a tensile strength
-  that may be far above anything it really has. On `cp` ($\phi = 0$) there is no apex and nothing
-  bounds the tension. A material added in Studio starts at **0**, and the
-  [model checks](preflight.md) warn whenever a cohesive material leaves the cell blank.
-- **0**: the material carries no tension at all.
-- **A positive value**: the major principal stress is capped at that value.
-
-| option | `t_cut` read? | Blank `t_cut` = native tensile behavior |
-|--------|:---:|---|
-| `mc` | Yes — the primary use case | Tension permitted up to the envelope's own apex, $\sigma' = -c/\tan\phi$ |
-| `cp` | Yes — physically the most important case | Unlimited: a $\phi = 0$ envelope has no tensile limit of its own |
-| `pow` | Yes, rarely needed | The envelope's own $pow_d$ intercept already terminates tension at a finite value |
-| `hb` | Yes, rarely needed | The native Hoek-Brown tensile strength already applies; `t_cut` adds a further cap |
-| `elastic` | No — ignored (a warning is issued if strength values, including `t_cut`, are present) | Not applicable — the material cannot fail |
-
-The `cp` row is why **t_cut = 0** is a common setting for a soft, undrained clay: without it, the $\phi = 0$
-envelope carries tension without limit, which is rarely realistic for a layer prone to cracking.
-
-**When to set it.** The `mc` row is the one to watch: leaving **t_cut** blank does not mean "no tension" — it means
-the material is allowed the full implicit tensile strength $c/\tan\phi$ of its own extended envelope (28 kPa for
-$c = 20$, $\phi = 35°$), which the strength-reduction factor never reduces. In SSRM that fictitious tension can hold
-a steep crest cut shut and push the factor of safety up. Set **t_cut** whenever the mechanism has to open a tension
-zone. A **cohesionless** (c = 0) `mc`
-material needs nothing: its envelope's own apex sits at zero, so blank and **0** are the same entry
-and the material carries no tension either way.
-And set **t_cut** always when the target is an **RS2 or Plaxis** comparison: those codes cap tension by default, so the
-vendor model carries a tensile strength that must be transcribed for the two answers to mean the same thing. Once
-set, the cap is reduced along with $c$ and $\tan\phi$ during strength reduction — XSLOPE's default, and RS2's and
-Plaxis' — so the factor of safety is the factor by which the whole envelope, shear and tensile, is reduced. An
-RS2 model imported with `xslope.rs2.read_fez` (or Studio's
-[File → Import RS2](../studio/analysis.md#geostudio-slopew-import-and-export)) brings its caps across
-automatically. See
-[Tensile Strength in SSRM](../fem/solver.md#tensile-strength-in-ssrm) for the mechanics and a worked case.
-
-See [Tension cutoff](../fem/solver.md#elastic-plastic-behavior-viscoplastic-algorithm) on the Solver page for
-how the FEM applies the cutoff during the viscoplastic solve.
-
-**Pore Pressure Options** (column labeled **u**):
-
-- **piezo**: Use piezometric line from **piezo** worksheet
-- **seep**: Interpolate from seepage analysis solution (requires mesh and solution files - see [Using Seepage Results for Pore Pressures](../seep/seep_slope.md))
-- **ru**: Pore pressure as a constant fraction of vertical overburden stress, $u = r_u \cdot \sigma_v$, with the
-  ratio given in the **r_u** column. $\sigma_v$ is the soil-column stress only — distributed loads and tension-crack
-  water are *not* included.
-- **none**: No pore pressure
-
-The cell carries a drop-down list of these four values. Any other entry — a misspelling, or a value typed into a
-file built outside Excel — is rejected when the file is loaded, naming the material and the unrecognized string, so
-a typo can never quietly become "no pore pressure".
-
-**Water on an imported model.** Both the **u** option and the **r_u** ratio are filled in automatically when a
-model is imported from a vendor file, and the importers read the water source **per material**, because the vendor
-formats define it that way — one model can take pore pressure from a piezometric line in one zone and from a ratio
-in another. `xslope.rs2.read_fez` (Studio's **File → Import RS2**) maps RS2's per-material water source onto the
-**u** column: a **piezometric line** becomes `piezo` and its points become the model's piezo line; a **pore-pressure
-ratio** becomes `ru` with the vendor's ratio; and RS2's two remaining sources — a **pore-pressure / total-head grid**
-and a **finite-element (or transient) groundwater solve** — have no counterpart to import into and arrive as
-**zero pore pressure**. Those two, along with an out-of-range ratio, an unrecognized source and a material pointing
-at a piezometric line the file never defines, are each reported in the import notes as a loud caveat that names the
-factor of safety as wrong until the water is set, because dropping $u$ is not conservative — it removes the pore
-pressure that was holding the vendor's answer down. When you see one, re-solve the seepage in XSLOPE (material
-**u** = `seep`) or fit a piezometric line before running the model.
-
-**Matric-suction apparent cohesion (phi_b / s_cap).** These two columns let a
-material credit extra shear strength from negative pore pressure (matric suction) above the water table, using
-the Fredlund extended Mohr-Coulomb criterion:
-
->>$\tau = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b   \qquad (6)$
-
-With the pore-air pressure $u_a = 0$ (the standard slope-stability idealization), the last term reduces to
-$s\tan\phi^b$, where $s = \max(0,\, -u_w)$ is the suction at the point being evaluated (the slice base in the LEM,
-a Gauss point in the FEM) — an **apparent cohesion** added to the resisting side of the effective-stress envelope.
-Below the water table $u_w \geq 0$, so $s = 0$ and the term vanishes, leaving the ordinary effective-stress strength.
-
-- **phi_b** ($\phi^b$): the unsaturated friction angle. **Blank** (the default): no suction strength. A positive
-  value turns the credit on.
-- **s_cap** — **[F/L²]**: the maximum suction credited (stress) — a cap on $s$ before it is multiplied by
-  $\tan\phi^b$. **Blank**: uncapped.
-
-Both columns are read only where the material's envelope is an effective-stress one *and* its **u** option can
-actually go negative:
-
-| option | `u = piezo` or `seep` | `u = none` or `ru` |
-|--------|:---:|:---:|
-| `mc`, `pow`, `hb` | active | inert (grayed) |
-| `cp`, `elastic` | inert (grayed) | inert (grayed) |
-
-`cp` is a total-stress ($\phi = 0$) undrained model — the field suction its strength already embodies is not a
-separate effective-stress term to layer on top. `elastic` cannot fail, so no strength term applies at all. `none`
-and `ru` supply no signed pore pressure to draw the suction from (`ru` is a positive fraction of overburden by
-construction), so the columns stay inert there even on an `mc`/`pow`/`hb` material.
-
-!!! warning "s_cap is essential with u = piezo"
-    A piezometric line's hydrostatic head goes negative without bound above the line — the higher above it a
-    slice base sits, the larger the (unphysical) suction and the larger the credited strength. Leaving **s_cap**
-    blank on a `u = piezo` material can inflate the factor of safety for slices far above the line. **Always set
-    s_cap** when using `phi_b` with `u = piezo`. With `u = seep`, the finite-element field is self-bounded by the
-    unsaturated flow physics, so a cap there is a useful backstop rather than a hard requirement.
-
-Both the limit-equilibrium and the finite-element solvers read `phi_b`/`s_cap` and credit the same apparent
-cohesion — the red header marks the pair **LEM & FEM**. See
-[Matric suction](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table) in the LEM overview for
-the effective-cohesion form and the `generate_slices` run-option (kwarg) path these columns feed,
-[Matric suction](../fem/overview.md#matric-suction-apparent-cohesion-above-the-water-table) in the FEM overview for
-how the finite-element solve credits it (reducing the term by the strength-reduction factor $F$ alongside $c'$ and
-$\tan\phi'$ in an SSRM run), and [VP38](../verification/rocscience.md#vp38) for a worked seepage-to-suction example.
-
-**Variability** (for reliability analysis):
-
-- **σ(γ)**, **σ(c)**, **σ(φ)**, etc.: Standard deviations for probabilistic analysis — each carries the **same units as its parameter** (σ(γ) in [F/L³], σ(c) in [F/L²], σ(φ) in [deg], …)
+### Standard deviations
 
 ![sheet_mat2.png](images/sheet_mat2.png)
 
-The remaining columns hold the seepage properties, shown in the third view below.
+**σ(γ)**, **σ(c)**, **σ(φ)**, **σ(c/p)**, **σ(d)**, and **σ(ψ)** are the standard
+deviations used by the reliability analysis, each in the units of its property.
+
+### Seepage
 
 ![sheet_mat3.png](images/sheet_mat3.png)
 
-**Permeability** (for seepage analysis):
+| Column | Units | What it is |
+| --- | --- | --- |
+| **k1**, **k2** | L/t | Major and minor hydraulic conductivity. Equal values are isotropic |
+| **alpha** | deg | Angle of the k1 direction from horizontal, usually 0 |
+| **unsat** | | Unsaturated model: `lf` (default), `vg`, or `gard` |
+| **kr0**, **h0** | –, L | Linear-front parameters (`lf`) |
+| **a**, **n** | | van Genuchten α and n (`vg`), or the Gardner parameters (`gard`) |
+| **l** | – | van Genuchten pore-connectivity exponent. Blank is 0.5 |
+| **Ss** | 1/L | Specific storage (transient only) |
+| **Sy** | – | Specific yield (transient, unconfined only) |
 
-- **k1**, **k2** — **[L/t]**: Major and minor hydraulic conductivity (can be anisotropic)
-- **alpha** — **[deg]**: Orientation angle of permeability tensor
-- **unsat**: Unsaturated relative-permeability model — `lf` (linear front, the default), `vg` (van Genuchten), or
-  `gard` (Gardner power form). Selects which parameter pair below applies.
-- **kr0** **[–]**, **h0** **[L]**: Linear-front (`unsat = lf`) parameters — relative conductivity (dimensionless) and suction head at which K = kr0.
-- **a**, **n**: the curve parameters for the *other two* models. Their meaning depends on **unsat**:
-    - `vg` (van Genuchten): $a = \alpha$ **[1/L]** and $n$ **[–]**. (For steady-state flow only α and n are needed;
-      residual/saturated water contents are not required.)
-    - `gard` (Gardner): $a$ and $n$ **[–]** of the power form $k_r = 1/(1 + a\,\psi^{\,n})$, with $\psi$ the suction
-      head **[L]**; $a$'s units follow from $n$ so that $a\,\psi^{\,n}$ is dimensionless.
-
-  The same two columns serve both models rather than two near-duplicate pairs.
-
-- **l** **[–]**: the Mualem pore-connectivity exponent of the van Genuchten conductivity curve,
-  $k_r = S_e^{\,l}\left[1 - (1 - S_e^{1/m})^m\right]^2$. Mualem derived $l = 1/2$ from a bundle of
-  capillary tubes, and a blank cell means exactly that. A curve fitted to measured conductivity
-  carries its own exponent instead — published fits run from about $-6$ to $3$, so a negative value
-  is admissible — and entering it lets one $(\alpha, n)$ pair reproduce a measured retention curve
-  and a measured conductivity curve at the same time. The column is read only for `unsat = vg`;
-  the Gardner form has no such term.
-
-**Transient storage (Ss / Sy).** These two columns supply the
-storage properties that a **transient** (time-dependent) seepage analysis needs — the analysis
-driven by the [**tseep** sheet](#worksheet-tseep). They are read only when the model has a tseep
-sheet; for a steady-state analysis leave both blank. The role each storage term plays in the
-transient flow equation is set out under [Storage](../seep/transient.md#storage).
-
-- **Ss** — **[1/L]**: specific storage — the volume of water released from storage per unit volume
-  of soil per unit drop in head, arising from the compressibility of the water and the soil
-  skeleton. **Required for every material** when a tseep sheet is present.
-- **Sy** — **[–]**: specific yield (dimensionless) — the drainable/fillable porosity that governs storage
-  as the phreatic surface rises and falls. **Required only when the model is unconfined** (an
-  exit-face boundary is present, so parts of the domain can desaturate). A confined or
-  always-saturated transient problem needs only Ss and may leave Sy blank.
-
-Typically, alpha = 0 and K1 = Kx and K2 = Ky. Leave **unsat** blank or `lf` to use the
-linear-front model (the established default); set it to `vg` or `gard` only when those
-properties are wanted (e.g. imported from another package). Typical `a`/`n`
-values by soil texture, and the unit convention for α, are tabulated in the
-[seepage overview](../seep/overview.md#van-genuchten-model).
-
-These parameters are defined in more detail in the [seepage analysis](../seep/overview.md) section.
+Leave **Ss** and **Sy** blank for steady-state flow. With a
+[**tseep** sheet](#worksheet-tseep), every material needs **Ss**, and **Sy** is
+needed when the model has an exit face. The
+[seepage overview](../seep/overview.md) defines all of these, with typical
+[van Genuchten values](../seep/overview.md#van-genuchten-model) by soil type.
 
 ---
 

@@ -1,5 +1,13 @@
 # xslope
 
+<h2 align="center">
+  Documentation, tutorials, and videos: <a href="https://xslope.org"><b>xslope.org</b></a>
+</h2>
+
+<p align="center">
+  <a href="https://xslope.org"><img src="https://img.shields.io/badge/Docs-xslope.org-2b6cb0?style=for-the-badge" alt="Documentation at xslope.org"></a>
+</p>
+
 **xslope** is an open-source Python package for geotechnical slope stability and
 seepage analysis. It answers the question a slope engineer has to answer on every
 embankment, cut, dam, and levee — *is this slope stable, and by how much?* — with

@@ -189,7 +189,7 @@ coefficient. Each load moves the critical circle, so each case gets its own sear
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem05_solution.png)
+[![](../tutorials/images/lem05_solution.png)](https://youtu.be/yhR6sioGTek)
 <span class="vid-num">7</span>
 </div>
 <div class="vid-body" markdown>
@@ -197,11 +197,16 @@ coefficient. Each load moves the critical circle, so each case gets its own sear
 
 ### A Non-Circular Surface Through a Weak Layer {#video-7}
 
-A sand slope over a thin seam of soft clay, with the failure surface entered as
-a table of vertices and then searched. The Movement column controls how each
-vertex is allowed to move during the search.
+A sand slope over a thin seam of soft clay. The weak-zone generator builds a
+failure surface that runs along the seam, and a search moves its vertices to the
+critical surface. The Movement column controls how each vertex is allowed to move
+during the search.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/yhR6sioGTek">▶ Watch · 12 min</a></p>
+
+**Starting model** — [xslope_video07_weak_layer_start.xlsx](files/xslope_video07_weak_layer_start.xlsx)
+
+**Completed model** — [xslope_noncircular.xlsx](../lem/files/xslope_noncircular.xlsx)
 
 **Related tutorial** — [LEM-5. A Weak Layer, Non-Circular](../tutorials/lem05_weak_layer_noncircular.md)
 

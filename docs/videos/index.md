@@ -160,7 +160,7 @@ strength, the water adds load without adding pore pressure in the soil.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/lem02_solution_load.png)
+[![](../tutorials/images/lem02_solution_load.png)](https://youtu.be/bru3hkAFsX8)
 <span class="vid-num">6</span>
 </div>
 <div class="vid-body" markdown>
@@ -168,10 +168,15 @@ strength, the water adds load without adding pore pressure in the soil.
 
 ### Loads and Earthquake {#video-6}
 
-A surcharge on the Video 1 embankment, entered as a distributed load and as a line
-load, followed by a seismic coefficient.
+A stockpile on the crest of the Video 1 embankment, entered first as a distributed
+load and then as a line load carrying the same force, followed by a seismic
+coefficient. Each load moves the critical circle, so each case gets its own search.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/bru3hkAFsX8">▶ Watch · 10 min</a></p>
+
+**Starting model** — [xslope_video01_simple_embankment.xlsx](files/xslope_video01_simple_embankment.xlsx), the Video 1 completed model
+
+**Completed model** — [xslope_video06_loads.xlsx](files/xslope_video06_loads.xlsx)
 
 <!-- test: file=files/xslope_video06_loads.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.890, tolerance=0.005 -->
 

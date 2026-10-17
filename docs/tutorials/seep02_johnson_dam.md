@@ -210,11 +210,11 @@ profile lines will use, top of the section first — and fill the three rows:
 
 ![The three zones with the seepage columns showing](images/seep02_studio_materials.png)
 
-| mat | name | k1 (ft/day) | k2 (ft/day) | alpha | unsat | kr0 | h0 (ft) | vg_a | vg_n |
-| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
-| 1 | `shell` | 1 | 1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
-| 2 | `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
-| 3 | `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
+| name | k1 (ft/day) | k2 (ft/day) | alpha | unsat | kr0 | h0 (ft) |
+| --- | :---: | :---: | :---: | --- | :---: | :---: |
+| `shell` | 1 | 1 | 0 | `lf` | 0.01 | -1 |
+| `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | -1 |
+| `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | -1 |
 
 All three zones are isotropic — `k1` equals `k2`, so `alpha` means nothing and
 stays at 0 — and the whole of the zoning is in the conductivities, as the problem
@@ -223,8 +223,7 @@ two parameters after it are entered here rather than left blank: they are read a
 the phreatic surface, and an unconfined problem has one. Set **unsat** to `lf`,
 **kr0** to `0.01` and **h0** to `-1` on every row — what those numbers mean, and
 what the other two models in the selector would do instead, is the subject of
-[a later section](#the-three-unsaturated-models). `vg_a` and `vg_n` stay at 0
-because the `lf` model does not read them.
+[a later section](#the-three-unsaturated-models).
 
 (The completed download also carries strength properties — unit weights,
 cohesions, friction angles — because the same workbook feeds the limit

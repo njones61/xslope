@@ -393,10 +393,15 @@ def _parse_clipboard_block(text):
     dropped rather than read as an empty last row. Rows are left RAGGED: a row with
     fewer cells than its neighbours fills fewer columns rather than blanking the
     rest, so a block whose last column is empty on some rows leaves those cells
-    alone."""
+    alone.
+
+    The typographic minus (U+2212) that a table copied out of a web page carries is
+    read as a hyphen-minus, since ``float`` refuses it and the cell would otherwise
+    save as 0 or blank."""
     if not text:
         return []
-    body = text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+    body = text.replace("−", "-")
+    body = body.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
     if body == "":
         return []
     return [line.split("\t") for line in body.split("\n")]

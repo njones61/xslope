@@ -247,7 +247,7 @@ along the bedrock instead of being refused.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/seep01_solution_filled.png)
+[![](../tutorials/images/seep01_solution_filled.png)](https://youtu.be/wxmpjUXc80s)
 <span class="vid-num">9</span>
 </div>
 <div class="vid-body" markdown>
@@ -255,11 +255,14 @@ along the bedrock instead of being refused.
 
 ### Confined Seepage Under a Sheetpile {#video-9}
 
-A sheetpile in a silt foundation behind an impervious clay blanket, built from a
-blank model: the geometry, the three boundary condition types and the no-flow
-default, the mesh, the solution, the discharge, and the flow net.
+A sheetpile wall in a silt layer behind an impervious clay blanket, built from a
+blank model: the boundary conditions and the no-flow default, the mesh, the
+discharge, a flow net checked by hand, and where the hydraulic gradient is
+highest.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/wxmpjUXc80s">▶ Watch · 15 min</a></p>
+
+**Completed model** — [xslope_clay_blanket.xlsx](../seep/files/xslope_clay_blanket.xlsx)
 
 **Related tutorial** — [SEEP-1. Confined Seepage Under a Sheetpile](../tutorials/seep01_sheetpile.md)
 
@@ -268,7 +271,7 @@ default, the mesh, the solution, the discharge, and the flow net.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/seep02_solution.png)
+[![](../tutorials/images/seep02_solution.png)](https://youtu.be/JRlGONbFQeM)
 <span class="vid-num">10</span>
 </div>
 <div class="vid-body" markdown>
@@ -276,11 +279,15 @@ default, the mesh, the solution, the discharge, and the flow net.
 
 ### Unconfined Seepage Through a Zoned Dam {#video-10}
 
-An earth dam with a shell and a clay core, built from a blank model, with the
-reservoir head on the upstream face and a seepage face downstream. The solution
-locates the phreatic surface.
+An earth dam with a sand shell, a clay core, and a cutoff key, built from a
+blank model: three zones from a stack of profile lines, the reservoir and
+tailwater heads, and an exit face down the downstream slope. The solution finds
+the phreatic surface, and raising the core's conductivity moves where the water
+comes out.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/JRlGONbFQeM">▶ Watch · 18 min</a></p>
+
+**Completed model** — [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx), which also holds the strengths used in Video 11
 
 **Related tutorial** — [SEEP-2. Unconfined Seepage Through a Zoned Dam](../tutorials/seep02_johnson_dam.md)
 
@@ -289,7 +296,7 @@ locates the phreatic surface.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/combo01_lem_solution.png)
+[![](../tutorials/images/combo01_lem_solution.png)](https://youtu.be/An-PtHu2cfc)
 <span class="vid-num">11</span>
 </div>
 <div class="vid-body" markdown>
@@ -297,10 +304,16 @@ locates the phreatic surface.
 
 ### Seepage Pore Pressures in a Stability Run {#video-11}
 
-The Video 10 dam searched with Spencer's method on the pore pressures from its
-seepage solution, by setting `u` to `seep` in the materials table.
+The Video 10 dam with unit weights and strengths added, run in two steps: a
+seepage solution, then a Spencer search that reads its pore pressures through
+the materials' `u` column. Setting `u` to `none` shows the factor of safety a
+stability run gets when it ignores the seepage.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/An-PtHu2cfc">▶ Watch · 7 min</a></p>
+
+**Model** — [xslope_video11_seep_to_lem.xlsx](files/xslope_video11_seep_to_lem.xlsx)
+
+<!-- test: file=files/xslope_video11_seep_to_lem.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.272, tolerance=0.005 -->
 
 **Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
 

@@ -164,10 +164,10 @@ Click **Materials**. On **Table view** — the view the editor opens on — set 
 alone, and the table shows the seepage band of the `mat` worksheet — eleven
 columns, the rightmost of which need a scroll to the right to reach:
 
-| mat | name | k1 (m/day) | k2 (m/day) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n | l | Ss (1/m) | Sy |
-| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1 | `shell` | 1.5 | 0.5 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 0.5 | 3 × 10<sup>−4</sup> | 0.22 |
-| 2 | `core` | 0.012 | 0.005 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 0.5 | 3 × 10<sup>−3</sup> | 0.03 |
+| name | k1 (m/day) | k2 (m/day) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n | l | Ss (1/m) | Sy |
+| --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `shell` | 1.5 | 0.5 | 0 | `lf` | 0.01 | -0.3 | 0 | 0 | 0.5 | 0.0003 | 0.22 |
+| `core` | 0.012 | 0.005 | 0 | `lf` | 0.01 | -0.3 | 0 | 0 | 0.5 | 0.003 | 0.03 |
 
 Both zones are **anisotropic** — `k1` is three times `k2` on the shell and about
 2.4 times on the core, which is what compacted horizontal lifts produce. `alpha`

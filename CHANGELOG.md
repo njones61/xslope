@@ -22,6 +22,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   when there is no polygon or line yet. Before, the middle pane was blank.
 - A number opened for typing in a Studio table stays right-justified. Before, it
   jumped to the left edge of the cell while being edited.
+- A Studio table opened with no rows has room for the first row added: the
+  Materials color swatch fits its column, and each choice column shows its choice.
+  Before, the swatch spilled over the name column, and choices such as the
+  Materials `u` were cut off.
 - A pool read from seepage head boundaries covers the ground its boundary is drawn
   along and ends where the boundary ends, at full depth. Before, it spread on over
   any lower ground, so on a sheetpile section the upstream pool flooded the

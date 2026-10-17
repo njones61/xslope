@@ -722,13 +722,27 @@ class _EditableTable(QWidget):
         VISIBLE columns need in the table's viewport.
 
         The field kinds are what tell a numeric column (floored at the widest
-        ordinary number, so an empty table is as wide as a full one) from a text or
-        choice column (floored at its header). A display column that is not a field
-        — the Materials swatch — is not numeric either, and floors on its own
-        header glyph."""
+        ordinary number, so an empty table is as wide as a full one) from a text
+        column (floored at its header). A column of widgets floors on the widget
+        (:meth:`_sample_widgets`), for the same reason as a numeric one."""
         numeric = {j for j, f in enumerate(self._fields)
                    if f.kind in Field.NUMERIC_KINDS}
-        return _fit_columns(self.table, numeric)
+        return _fit_columns(self.table, numeric, self._sample_widgets())
+
+    def _sample_widgets(self):
+        """A sample of the widget each widget column puts in a row: a choice box
+        holding the field's choices, and the Materials swatch's button. Built here
+        rather than read off a row, so a table opened with no rows has room for the
+        first one added."""
+        out = {}
+        for j, f in enumerate(self._fields):
+            if f.kind in Field.COMBO_KINDS:
+                out[j] = QComboBox()
+                out[j].addItems(f.choices)
+        if self._swatch is not None:
+            from .styles_dialog import ColorButton
+            out[len(self._fields)] = ColorButton(self._swatch.default_hex(0))
+        return out
 
     def columns_width(self):
         """The width this pane needs to show every visible column: the fitted
@@ -2275,13 +2289,19 @@ _NUMBER_SAMPLE = "-" + "0" * _DISPLAY_SIG_DIGITS + "."
 _TEXT_SAMPLE = "0" * 12
 
 
-def _column_widths(table, numeric):
+def _column_widths(table, numeric, widgets=None):
     """The width each column needs to show its own widest content, header included.
 
     ``numeric`` is the set of column indexes holding numbers; those are the ones
-    floored at :data:`_NUMBER_SAMPLE`."""
+    floored at :data:`_NUMBER_SAMPLE`. ``widgets`` maps a column whose cells are
+    widgets to a sample of that widget, measured as a row's own widget would be
+    (Qt's column hint reads a cell widget's sizeHint held within its minimum and
+    maximum width). It floors the column the same way: with no rows there is no
+    widget to measure, and a column sized to its header alone is overrun by the
+    first row added."""
     from PySide6.QtWidgets import QComboBox, QStyle
 
+    widgets = widgets or {}
     header = table.horizontalHeader()
     fm = table.fontMetrics()
     cushion = fm.horizontalAdvance("00")                    # one em-ish, both sides
@@ -2291,8 +2311,13 @@ def _column_widths(table, numeric):
     text_floor = fm.horizontalAdvance(_TEXT_SAMPLE) + cushion
     widths = []
     for c in range(table.columnCount()):
-        w = max(table.sizeHintForColumn(c), header.sectionSizeHint(c))
-        free_text = combo = False
+        sample = widgets.get(c)
+        w = max(table.sizeHintForColumn(c), header.sectionSizeHint(c),
+                0 if sample is None else
+                min(max(sample.sizeHint().width(), sample.minimumWidth()),
+                    sample.maximumWidth()))
+        free_text = False
+        combo = isinstance(sample, QComboBox)
         for r in range(table.rowCount()):
             cell = table.cellWidget(r, c)
             if isinstance(cell, QComboBox):
@@ -2325,7 +2350,7 @@ def _column_widths(table, numeric):
     return widths
 
 
-def _fit_columns(table, numeric):
+def _fit_columns(table, numeric, widgets=None):
     """Size each column to its own content (:func:`_column_widths`). Returns the
     viewport width the VISIBLE columns need.
 
@@ -2343,7 +2368,7 @@ def _fit_columns(table, numeric):
     header.setMinimumSectionSize(-1)
     header.setSectionResizeMode(QHeaderView.Interactive)
     header.setStretchLastSection(False)
-    widths = _column_widths(table, numeric)
+    widths = _column_widths(table, numeric, widgets)
     for c, w in enumerate(widths):
         header.resizeSection(c, w)
     return sum(w for c, w in enumerate(widths) if not table.isColumnHidden(c))

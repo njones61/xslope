@@ -376,6 +376,41 @@ def test_a_cell_editor_keeps_the_cell_alignment():
     return out
 
 
+def test_an_empty_table_has_room_for_its_first_row():
+    """A table opened with no rows sizes each column of widgets (the Materials
+    color swatch, every choice column) to the widget a row puts there, so the first
+    row added fits: the swatch does not spill over the name column, and each of
+    those columns is as wide as it is when the table opens with that row already in
+    it (within the pixel of grid line Qt adds to a measured row)."""
+    from PySide6.QtWidgets import QApplication
+    from studio.editors import MaterialsEditor
+
+    model = _load(os.path.join(_MODELS, "xslope_simple_mult_layers.xlsx"))
+    dlg = _shown(MaterialsEditor().build(dict(model, materials=[]), None))
+    dlg.set_view_mode("table")
+    dlg._table._add_row()
+    QApplication.processEvents()
+    tbl = dlg._table.table
+    sc = tbl.horizontalHeader().logicalIndex(0)
+    swatch = tbl.cellWidget(0, sc)
+    out = _fail(swatch is not None and swatch.width() <= tbl.columnWidth(sc),
+                f"the {swatch.width() if swatch else '?'} px color swatch sits in a "
+                f"{tbl.columnWidth(sc)} px column")
+
+    full = MaterialsEditor().build(dict(model, materials=dlg._table.result_rows()),
+                                   None)
+    full.set_view_mode("table")
+    ft = full._table.table
+    off = [(tbl.horizontalHeaderItem(c).text(), tbl.columnWidth(c), ft.columnWidth(c))
+           for c in range(tbl.columnCount()) if tbl.cellWidget(0, c) is not None
+           and abs(tbl.columnWidth(c) - ft.columnWidth(c)) > 1]
+    out += _fail(not off, "columns opened empty are not as wide as opened with the "
+                          f"row (column, empty, full): {off}")
+    dlg.close()
+    full.close()
+    return out
+
+
 def test_tab_past_the_last_cell_adds_a_row():
     """Tab from the last column of the last row adds a row and moves into its first
     cell, as Tab does at the end of a word-processor table (Qt's own Tab wraps to
@@ -1721,6 +1756,8 @@ CHECKS = [
     ("Delete on a plain grid", test_delete_on_a_plain_grid),
     ("a cell editor keeps the cell's alignment",
      test_a_cell_editor_keeps_the_cell_alignment),
+    ("an empty table has room for its first row",
+     test_an_empty_table_has_room_for_its_first_row),
     ("Tab past the last cell adds a row", test_tab_past_the_last_cell_adds_a_row),
     ("Tab past the last cell of a plain grid",
      test_tab_past_the_last_cell_of_a_plain_grid),

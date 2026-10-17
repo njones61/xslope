@@ -805,13 +805,33 @@ def test_the_fs_summary_says_where_its_numbers_came_from():
 
     # Where every method searched, the paragraph says what the rows ARE: each
     # method's own critical value. That is the summary the owner asked for, and
-    # the wording is what makes the column readable as one.
+    # the wording is what makes the column readable as one. Whether the searches
+    # landed on one surface or several is read off the bundles, never assumed:
+    # this sample solves every method on one circle, so its surfaces coincide.
     said = _fs_prose(built(set(methods)))
     for phrase in ("critical factor of safety", "its own critical surface",
-                   "the surfaces differ from method to method"):
+                   "the searches settled on the same surface"):
         if phrase not in said:
-            fails.append(f"every method searched: the paragraph does not say "
-                         f"{phrase!r}: {said!r}")
+            fails.append(f"every method searched, one surface: the paragraph "
+                         f"does not say {phrase!r}: {said!r}")
+    if "differ" in said:
+        fails.append(f"every method searched on one surface and the paragraph "
+                     f"says the surfaces differ: {said!r}")
+
+    # The same report with one method's surface moved off the others'.
+    from shapely.affinity import translate
+    moved = [dict(b) for b in _searched_bundles(bundles, set(methods))]
+    moved[-1]["failure_surface"] = translate(moved[-1]["failure_surface"], xoff=1.0)
+    with tempfile.TemporaryDirectory() as tmp:
+        said = _fs_prose(build_report(
+            slope_data, {"lem": moved},
+            {"pd_figure": False, "lem_search_figure": False,
+             "lem_solution_figure": False, "lem_slice_key": False,
+             "lem_slice_table": False, "lem_calculations": False,
+             "method": methods}, tmp))
+    if "the surfaces differ from method to method" not in said:
+        fails.append(f"every method searched, surfaces apart: the paragraph does "
+                     f"not say the surfaces differ: {said!r}")
 
     # And where only some did, the ones that did are named.
     said = _fs_prose(built({methods[0]}))

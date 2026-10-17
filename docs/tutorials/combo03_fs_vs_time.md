@@ -506,7 +506,7 @@ no $d$ / $\psi$ pair, so it cannot be used for that.
 
 The Johnson Reservoir dam from COMBO-2 can. Its core has a $K_c = 1$
 envelope, and in COMBO-2 we ran the three-stage procedure on it three times, once
-per statement of where the water is, reading 1.181, 1.195 and 1.016 — the last
+per statement of where the water is, reading 1.196, 1.206, and 1.034 — the last
 from a transient run, stage 1 at t = 0 and stage 2 at t = 50. Here we will run it
 at **every** saved instant, and then run Part 1's kind of curve on the same
 twenty-one frames for comparison.
@@ -520,7 +520,7 @@ The section is 750 ft long, a 100 ft foundation on rock at elevation 0 with an
 **core** carried 40 ft into the foundation as a cutoff key. The reservoir stands
 at elevation 160 and the tailwater at 100, and the drawdown lowers the pool 50 ft
 to 110. That geometry is [SEEP-2](seep02_johnson_dam.md)'s, and in COMBO-2 we put
-the seepage boundary sets, the pool schedule and the stage times on it.
+the seepage boundary sets, the pool schedule, and the stage times on it.
 
 ### Opening the model
 
@@ -545,11 +545,11 @@ $d = 250$ psf and $\psi = 14°$, under its drained $c' = 400$ psf and
 $\phi' = 18°$ — and the zeros on the shell and the foundation declare them
 free-draining through the drawdown.
 
-| mat | name | γ (pcf) | c′ (psf) | φ′ (deg) | d (psf) | ψ (deg) | u |
-| :---: | --- | :---: | :---: | :---: | :---: | :---: | --- |
-| 1 | `shell` | 130 | 100 | 35 | 0 | 0 | `seep` |
-| 2 | `core` | 125 | 400 | 18 | 250 | 14 | `seep` |
-| 3 | `foundation` | 127 | 100 | 27 | 0 | 0 | `seep` |
+| mat | name | γ (pcf) | γsat (pcf) | c′ (psf) | φ′ (deg) | d (psf) | ψ (deg) | u |
+| :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
+| 1 | `shell` | 130 | 135 | 100 | 35 | 0 | 0 | `seep` |
+| 2 | `core` | 125 | 130 | 400 | 18 | 250 | 14 | `seep` |
+| 3 | `foundation` | 127 | 132 | 100 | 27 | 0 | 0 | `seep` |
 
 We cover the procedure itself
 [in COMBO-2](combo02_rapid_drawdown.md#the-three-stage-procedure) — what each
@@ -583,7 +583,7 @@ stays at t = 0 for the whole sweep; what moves is stage 2.
 
 **The mesh and the transient solution.** Still in **Seepage**, click the **Seep · Transient**
 tab. The play bar steps through **twenty-one** instants — t = 0, 5, 10, 15, 20,
-25, 30, 35, 40, 45, 50, 60, 70, 80, 100, 130, 170, 220, 300, 400 and 500 — and
+25, 30, 35, 40, 45, 50, 60, 70, 80, 100, 130, 170, 220, 300, 400, and 500 — and
 every pore pressure the runs below read comes from one of them.
 
 Those fields were solved on **2,080 nodes and 3,923 triangles**, linear triangles
@@ -630,27 +630,27 @@ table appears when the last search finishes:
 Rapid drawdown vs time (lem): 20 instant(s) of the transient solution, spencer, re-searching at each…
 Rapid drawdown versus time (stage 1 at t = 0)
 t (day)  stage 1  stage 2       stage 3      FS  governs      Xo      Yo       R
-      5   1.5109   1.4563  not required  1.4563        2  242.74  256.34  165.90
-     10   1.5142   1.3496  not required  1.3496        2  244.06  253.05  164.14
-     15   1.5248   1.2704  not required  1.2704        2  246.78  250.47  163.54
-     20   1.5352   1.2036  not required  1.2036        2  249.59  244.90  159.60
-     25   1.5414   1.1489  not required  1.1489        2  249.59  243.48  159.38
-     30   1.5440   1.1051  not required  1.1051        2  249.59  243.48  159.76
-     35   1.5453   1.0712  not required  1.0712        2  248.17  244.19  161.02
-     40   1.5465   1.0458  not required  1.0458        2  247.47  244.90  162.02
-     45   1.5525   1.0279        1.0278  1.0278        3  244.64  244.19  162.68
-     50   1.5545   1.0163        1.0157  1.0157        3  243.93  244.90  163.64
-     60   1.5518   1.0524        1.0522  1.0522        3  245.35  242.07  160.48
-     70   1.5506   1.0743  not required  1.0743        2  245.31  246.38  164.30
-     80   1.5512   1.0903  not required  1.0903        2  245.31  244.96  163.08
-    100   1.5514   1.1159  not required  1.1159        2  245.31  243.53  161.82
-    130   1.5514   1.1414  not required  1.1414        2  245.31  243.53  161.82
-    170   1.5514   1.1612  not required  1.1612        2  245.31  243.53  161.82
-    220   1.5514   1.1743  not required  1.1743        2  245.31  243.53  161.82
-    300   1.5514   1.1848  not required  1.1848        2  245.31  243.53  161.82
-    400   1.5514   1.1893  not required  1.1893        2  245.31  243.53  161.82
-    500   1.5514   1.1912  not required  1.1912        2  245.31  243.53  161.82
-Lowest factor of safety 1.0157 at t = 50 day (20 instant(s), 0 without a result).
+      5   1.5121   1.4590  not required  1.4590        2  242.74  256.34  166.00
+     10   1.5150   1.3572  not required  1.3572        2  244.06  253.05  164.18
+     15   1.5246   1.2810  not required  1.2810        2  246.78  249.06  162.25
+     20   1.5349   1.2167  not required  1.2167        2  249.59  244.90  159.53
+     25   1.5409   1.1637  not required  1.1637        2  249.59  243.48  159.33
+     30   1.5439   1.1211  not required  1.1211        2  249.59  243.48  159.76
+     35   1.5452   1.0879  not required  1.0879        2  248.17  244.90  161.65
+     40   1.5463   1.0628  not required  1.0628        2  247.47  244.90  162.02
+     45   1.5504   1.0455  not required  1.0455        2  245.35  245.60  163.61
+     50   1.5540   1.0339        1.0336  1.0336        3  243.93  244.90  163.64
+     60   1.5512   1.0685        1.0684  1.0684        3  245.35  242.07  160.48
+     70   1.5502   1.0896  not required  1.0896        2  245.31  246.38  164.30
+     80   1.5502   1.1051  not required  1.1051        2  245.31  246.38  164.30
+    100   1.5508   1.1297  not required  1.1297        2  245.31  244.96  163.08
+    130   1.5509   1.1544  not required  1.1544        2  245.31  243.53  161.82
+    170   1.5509   1.1735  not required  1.1735        2  245.31  243.53  161.82
+    220   1.5509   1.1862  not required  1.1862        2  245.31  243.53  161.82
+    300   1.5509   1.1963  not required  1.1963        2  245.31  243.53  161.82
+    400   1.5509   1.2006  not required  1.2006        2  245.31  243.53  161.82
+    500   1.5509   1.2024  not required  1.2024        2  245.31  243.53  161.82
+Lowest factor of safety 1.0336 at t = 50 day (20 instant(s), 0 without a result).
 ```
 
 ### The rapid drawdown curve
@@ -664,10 +664,10 @@ One curve is drawn, showing the rapid drawdown factor of safety at each instant,
 the lower of stages 2 and 3; the three stages are in the table below, where the
 governing one is named per row. Behind it, on the right axis, runs the pool
 schedule, with the forty-five days it falls over shaded and the pre-drawdown
-1.456 drawn across as a dashed full-pool reference. The lowest instant is
+1.459 drawn across as a dashed full-pool reference. The lowest instant is
 ringed and labeled, and the red guide marks FS = 1. Each point is colored by the stage that governs it —
 orange where stage 2's undrained strength gave the lower factor of safety, green
-where stage 3's drained strength did — so the three drained instants at the
+where stage 3's drained strength did — so the two drained instants at the
 bottom of the dip stand out on the curve.
 
 The same twenty instants, read from the tab's **Table** sub-tab — the three
@@ -675,48 +675,48 @@ stage factors of safety, the one that governs, and the critical circle at each:
 
 | t (day) | stage 1 | stage 2 | stage 3 | FS | governs | center | R (ft) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 5 | 1.5109 | 1.4563 | — | 1.4563 | 2 | (242.74, 256.34) | 165.90 |
-| 10 | 1.5142 | 1.3496 | — | 1.3496 | 2 | (244.06, 253.05) | 164.14 |
-| 15 | 1.5248 | 1.2704 | — | 1.2704 | 2 | (246.78, 250.47) | 163.54 |
-| 20 | 1.5352 | 1.2036 | — | 1.2036 | 2 | (249.59, 244.90) | 159.60 |
-| 25 | 1.5414 | 1.1489 | — | 1.1489 | 2 | (249.59, 243.48) | 159.38 |
-| 30 | 1.5440 | 1.1051 | — | 1.1051 | 2 | (249.59, 243.48) | 159.76 |
-| 35 | 1.5453 | 1.0712 | — | 1.0712 | 2 | (248.17, 244.19) | 161.02 |
-| 40 | 1.5465 | 1.0458 | — | 1.0458 | 2 | (247.47, 244.90) | 162.02 |
-| 45 | 1.5525 | 1.0279 | 1.0278 | 1.0278 | 3 | (244.64, 244.19) | 162.68 |
-| 50 | 1.5545 | 1.0163 | 1.0157 | **1.0157** | 3 | (243.93, 244.90) | 163.64 |
-| 60 | 1.5518 | 1.0524 | 1.0522 | 1.0522 | 3 | (245.35, 242.07) | 160.48 |
-| 70 | 1.5506 | 1.0743 | — | 1.0743 | 2 | (245.31, 246.38) | 164.30 |
-| 80 | 1.5512 | 1.0903 | — | 1.0903 | 2 | (245.31, 244.96) | 163.08 |
-| 100 | 1.5514 | 1.1159 | — | 1.1159 | 2 | (245.31, 243.53) | 161.82 |
-| 130 | 1.5514 | 1.1414 | — | 1.1414 | 2 | (245.31, 243.53) | 161.82 |
-| 170 | 1.5514 | 1.1612 | — | 1.1612 | 2 | (245.31, 243.53) | 161.82 |
-| 220 | 1.5514 | 1.1743 | — | 1.1743 | 2 | (245.31, 243.53) | 161.82 |
-| 300 | 1.5514 | 1.1848 | — | 1.1848 | 2 | (245.31, 243.53) | 161.82 |
-| 400 | 1.5514 | 1.1893 | — | 1.1893 | 2 | (245.31, 243.53) | 161.82 |
-| 500 | 1.5514 | 1.1912 | — | 1.1912 | 2 | (245.31, 243.53) | 161.82 |
+| 5 | 1.5121 | 1.4590 | — | 1.4590 | 2 | (242.74, 256.34) | 166.00 |
+| 10 | 1.5150 | 1.3572 | — | 1.3572 | 2 | (244.06, 253.05) | 164.18 |
+| 15 | 1.5246 | 1.2810 | — | 1.2810 | 2 | (246.78, 249.06) | 162.25 |
+| 20 | 1.5349 | 1.2167 | — | 1.2167 | 2 | (249.59, 244.90) | 159.53 |
+| 25 | 1.5409 | 1.1637 | — | 1.1637 | 2 | (249.59, 243.48) | 159.33 |
+| 30 | 1.5439 | 1.1211 | — | 1.1211 | 2 | (249.59, 243.48) | 159.76 |
+| 35 | 1.5452 | 1.0879 | — | 1.0879 | 2 | (248.17, 244.90) | 161.65 |
+| 40 | 1.5463 | 1.0628 | — | 1.0628 | 2 | (247.47, 244.90) | 162.02 |
+| 45 | 1.5504 | 1.0455 | — | 1.0455 | 2 | (245.35, 245.60) | 163.61 |
+| 50 | 1.5540 | 1.0339 | 1.0336 | **1.0336** | 3 | (243.93, 244.90) | 163.64 |
+| 60 | 1.5512 | 1.0685 | 1.0684 | 1.0684 | 3 | (245.35, 242.07) | 160.48 |
+| 70 | 1.5502 | 1.0896 | — | 1.0896 | 2 | (245.31, 246.38) | 164.30 |
+| 80 | 1.5502 | 1.1051 | — | 1.1051 | 2 | (245.31, 246.38) | 164.30 |
+| 100 | 1.5508 | 1.1297 | — | 1.1297 | 2 | (245.31, 244.96) | 163.08 |
+| 130 | 1.5509 | 1.1544 | — | 1.1544 | 2 | (245.31, 243.53) | 161.82 |
+| 170 | 1.5509 | 1.1735 | — | 1.1735 | 2 | (245.31, 243.53) | 161.82 |
+| 220 | 1.5509 | 1.1862 | — | 1.1862 | 2 | (245.31, 243.53) | 161.82 |
+| 300 | 1.5509 | 1.1963 | — | 1.1963 | 2 | (245.31, 243.53) | 161.82 |
+| 400 | 1.5509 | 1.2006 | — | 1.2006 | 2 | (245.31, 243.53) | 161.82 |
+| 500 | 1.5509 | 1.2024 | — | 1.2024 | 2 | (245.31, 243.53) | 161.82 |
 
-**Day 50 reads 1.0157, the answer we got in COMBO-2.** The transient route there
-reports **1.0158** on a circle at (243.93, 244.90) with a radius of 163.64 ft,
-and the day-50 row lands on that circle at 1.0157. At t = 50 this sweep poses the
+**Day 50 reads 1.0336, the answer we got in COMBO-2.** The transient route there
+reports **1.0336** on a circle at (243.93, 244.90) with a radius of 163.64 ft,
+and the day-50 row lands on that circle at 1.0336. At t = 50 this sweep poses the
 drawdown we posed in COMBO-2 — stage 1 at 0, stage 2 at 50, the same transient run and
 the same starting circle — so the curve passes through that answer.
 
-<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4563, critical_time=50, min_fs=1.0157, tolerance=0.005, benchmark=COMBO-3-rapid -->
+<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4590, critical_time=50, min_fs=1.0336, tolerance=0.005, benchmark=COMBO-3-rapid -->
 
-**Stage 3 runs on three rows, all of them at the bottom of the dip.** Days 45, 50
-and 60 read 3 in the **governs** column, by a single ten-thousandth on day 45, two
-on day 60 and six on day 50 — 1.0279 / 1.0278, 1.0163 / 1.0157, 1.0524 / 1.0522.
+**Stage 3 runs on two rows, both of them at the bottom of the dip.** Days 50 and
+60 read 3 in the **governs** column, by three ten-thousandths on day 50 and a
+single one on day 60 — 1.0339 / 1.0336, 1.0685 / 1.0684.
 Every other row reads `not required`, meaning no core slice came out weaker
 drained than undrained. The margins are thin because the governing stage changes
-at $d = 223$ psf, 27 psf under the 250 psf this core has.
+at $d = 231$ psf, 19 psf under the 250 psf this core has.
 
 **Day 5 costs 0.05 with no drawdown in it.** The pool holds at elevation 160
 until day 5, so stage 2's water is stage 1's water. The reported
-1.4563 still sits 0.055 below the 1.5109 stage 1 reads on the same circle, and
+1.4590 still sits 0.053 below the 1.5121 stage 1 reads on the same circle, and
 that gap is the undrained envelope alone, measured with the water held still.
 
-**The minimum, 1.0157, falls on day 50, the instant the pool stops falling.**
+**The minimum, 1.0336, falls on day 50, the instant the pool stops falling.**
 That is not a rule. Two effects compete while the pool drops: the reservoir's
 support keeps falling until the pool stops, and the core's pore pressures start
 dissipating from the moment the drop begins. On this dam the drawdown is fast
@@ -725,18 +725,18 @@ instant is the one with the least load. Part 1's dam drained fast enough for
 dissipation to overtake the load loss mid-fall, and its minimum came 12 days
 *before* its drawdown ended.
 
-Day 45 reads 1.0278 and day 60 reads 1.0522, so the saved times bracket that
+Day 45 reads 1.0455 and day 60 reads 1.0684, so the saved times bracket that
 minimum and the curve turns at a frame rather than between two.
 
-**The recovery climbs toward COMBO-2's two-steady answer.** From 1.0157 the curve
-rises to 1.0903 by day 80 and 1.1414 by day 130, then slows to 1.1612, 1.1743,
-1.1848, 1.1893 and 1.1912 through day 500, the last two frames together moving it
+**The recovery climbs toward COMBO-2's two-steady answer.** From 1.0336 the curve
+rises to 1.1051 by day 80 and 1.1544 by day 130, then slows to 1.1735, 1.1862,
+1.1963, 1.2006, and 1.2024 through day 500, the last two frames together moving it
 by 0.0019. COMBO-2's **two-steady-solution**
-answer is **1.195**, and the curve is still 0.004 under it at day 500, because by
+answer is **1.206**, and the curve is still 0.004 under it at day 500, because by
 then the core has not quite finished draining.
 
 **The stage 1 column is not constant, even though stage 1 is the same full-pool
-state on every row.** It ranges from 1.5109 on day 5 to 1.5545 on day 50 because
+state on every row.** It ranges from 1.5121 on day 5 to 1.5540 on day 50 because
 each row searches for the circle that gives the lowest *drawdown* factor of
 safety at that time step, and then reports the stage 1 factor of safety on that
 circle. The circle moves from row to row, so the stage 1 value on it moves too.
@@ -756,40 +756,40 @@ were timed on:
 Factor of safety vs time (lem): 21 instant(s) of the transient solution, spencer, re-searching at each…
 Factor of safety versus time
 t (day)      FS      Xo      Yo       R
-      0  1.5097  240.00  261.13  169.97
-      5  1.5097  240.00  261.13  169.97
-     10  1.3944  242.71  254.34  164.71
-     15  1.3093  244.00  250.40  162.76
-     20  1.2374  248.18  242.77  157.49
-     25  1.1779  249.59  242.07  157.77
-     30  1.1302  249.59  239.24  155.60
-     35  1.0931  248.88  239.24  156.31
-     40  1.0656  246.76  241.36  159.20
-     45  1.0469  246.76  241.01  158.89
-     50  1.0350  243.89  244.96  163.73
-     60  1.0766  245.31  242.11  160.55
-     70  1.1037  245.31  244.96  163.08
-     80  1.1245  245.31  243.53  161.82
-    100  1.1587  245.31  243.53  161.82
-    130  1.1949  245.31  243.53  161.82
-    170  1.2252  245.31  243.53  161.82
-    220  1.2475  244.60  244.60  163.07
-    300  1.2683  245.67  243.18  161.32
-    400  1.2801  244.60  242.82  161.51
-    500  1.2870  244.60  244.25  162.76
+      0  1.5110  240.00  259.76  169.06
+      5  1.5110  240.00  259.76  169.06
+     10  1.4014  242.69  254.38  164.83
+     15  1.3203  243.99  250.42  162.77
+     20  1.2517  247.47  244.17  158.64
+     25  1.1946  249.59  242.07  157.63
+     30  1.1483  249.59  239.24  155.60
+     35  1.1120  248.88  239.24  156.30
+     40  1.0848  248.88  239.59  156.66
+     45  1.0663  245.35  242.77  161.11
+     50  1.0544  245.31  242.11  160.55
+     60  1.0944  245.31  246.38  164.30
+     70  1.1202  245.31  246.38  164.30
+     80  1.1401  245.31  244.96  163.08
+    100  1.1729  246.73  244.96  162.43
+    130  1.2078  245.31  244.96  163.08
+    170  1.2371  245.31  244.96  163.08
+    220  1.2591  245.31  244.96  163.06
+    300  1.2793  245.31  244.96  163.06
+    400  1.2912  245.31  243.53  161.82
+    500  1.2984  245.31  243.53  161.82
 ```
 
 Every instant produces a result here, including t = 0, an ordinary full-pool
-analysis rather than a fall from itself. **Day 0 and day 5 read 1.5097 on the
+analysis rather than a fall from itself. **Day 0 and day 5 read 1.5110 on the
 same circle**, the pool not having moved between them.
 
 Two of these rows repeat the drained bracket runs from COMBO-2: **day 0's
-1.5097** is the full-pool drained figure of **1.510** there, and **day 50's
-1.0350** the day-50 figure of **1.035**. The third of those, the long-term
-**1.311**, is not on this curve — day 500 reads 1.2870 and is still climbing,
+1.5110** is the full-pool drained figure of **1.511** there, and **day 50's
+1.0544** the day-50 figure of **1.054**. The third of those, the long-term
+**1.326**, is not on this curve — day 500 reads 1.2984 and is still climbing,
 because a run of this length leaves the core part drained.
 
-<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5097;1.0350;1.2870, tolerance=0.005, benchmark=COMBO-3-single -->
+<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5110;1.0544;1.2984, tolerance=0.005, benchmark=COMBO-3-single -->
 
 Studio's result tab holds one curve at a time, so the figure below adds the
 single-stage curve (blue) to the rapid drawdown figure above, on the same axes:
@@ -801,30 +801,30 @@ and the distance between them is not constant:
 
 | t (day) | drawdown | single-stage | difference |
 | :---: | :---: | :---: | :---: |
-| 5 | 1.4563 | 1.5097 | 0.0535 |
-| 10 | 1.3496 | 1.3944 | 0.0448 |
-| 15 | 1.2704 | 1.3093 | 0.0389 |
-| 20 | 1.2036 | 1.2374 | 0.0338 |
-| 25 | 1.1489 | 1.1779 | 0.0290 |
-| 30 | 1.1051 | 1.1302 | 0.0250 |
-| 35 | 1.0712 | 1.0931 | 0.0219 |
-| 40 | 1.0458 | 1.0656 | 0.0199 |
-| 45 | 1.0278 | 1.0469 | 0.0191 |
-| 50 | **1.0157** | **1.0350** | **0.0193** |
-| 60 | 1.0522 | 1.0766 | 0.0244 |
-| 70 | 1.0743 | 1.1037 | 0.0294 |
-| 80 | 1.0903 | 1.1245 | 0.0342 |
-| 100 | 1.1159 | 1.1587 | 0.0429 |
-| 130 | 1.1414 | 1.1949 | 0.0536 |
-| 170 | 1.1612 | 1.2252 | 0.0641 |
-| 220 | 1.1743 | 1.2475 | 0.0731 |
-| 300 | 1.1848 | 1.2683 | 0.0835 |
-| 400 | 1.1893 | 1.2801 | 0.0909 |
-| 500 | 1.1912 | 1.2870 | 0.0958 |
+| 5 | 1.4590 | 1.5110 | 0.0519 |
+| 10 | 1.3572 | 1.4014 | 0.0442 |
+| 15 | 1.2810 | 1.3203 | 0.0393 |
+| 20 | 1.2167 | 1.2517 | 0.0350 |
+| 25 | 1.1637 | 1.1946 | 0.0309 |
+| 30 | 1.1211 | 1.1483 | 0.0272 |
+| 35 | 1.0879 | 1.1120 | 0.0241 |
+| 40 | 1.0628 | 1.0848 | 0.0219 |
+| 45 | 1.0455 | 1.0663 | 0.0208 |
+| 50 | **1.0336** | **1.0544** | **0.0208** |
+| 60 | 1.0684 | 1.0944 | 0.0259 |
+| 70 | 1.0896 | 1.1202 | 0.0306 |
+| 80 | 1.1051 | 1.1401 | 0.0350 |
+| 100 | 1.1297 | 1.1729 | 0.0431 |
+| 130 | 1.1544 | 1.2078 | 0.0535 |
+| 170 | 1.1735 | 1.2371 | 0.0636 |
+| 220 | 1.1862 | 1.2591 | 0.0730 |
+| 300 | 1.1963 | 1.2793 | 0.0830 |
+| 400 | 1.2006 | 1.2912 | 0.0906 |
+| 500 | 1.2024 | 1.2984 | 0.0959 |
 
 **The gap is narrowest where the slope is weakest.** Across the bottom of the dip
-— days 40 to 50 — the two analyses run 0.019 apart, about 1.9% of the rapid
-drawdown answer; by day 500 they are 0.096 apart, 8.0% of it.
+— days 40 to 50 — the two analyses run 0.021 to 0.022 apart, about 2% of the
+rapid drawdown answer; by day 500 they are 0.096 apart, 8.0% of it.
 
 The pore pressure in the core explains both halves. At day 50 the core still
 holds the head the full reservoir put into it, so the *drained* strength there is
@@ -834,8 +834,8 @@ already cut by that pore pressure and lands close to the undrained strength stag
 from its bracket table, where the same envelope moves one field by 0.12 and the
 other by 0.02. Afterward the two separate: the drained strength recovers as the
 core drains, and the undrained one cannot, because stage 2 computes it from
-stage-1 consolidation stresses that never change. One curve climbs to 1.29 and
-the other levels off near 1.19.
+stage-1 consolidation stresses that never change. One curve climbs to 1.30 and
+the other levels off near 1.20.
 
 ### Which curve to use
 
@@ -843,17 +843,17 @@ The two curves answer two questions, and neither is the other's conservative
 version.
 
 **Through the fall and just after it, read the rapid drawdown curve.** Its number
-for this dam is **1.016, on day 50**. During those 45 days the core cannot shed
+for this dam is **1.034, on day 50**. During those 45 days the core cannot shed
 the reservoir's head, so the strength it can mobilize is the undrained one, and a
 single-stage drained analysis credits it with strength it does not have. That the
-single-stage curve reads only 0.019 higher is a property of this dam — on this
+single-stage curve reads only 0.021 higher is a property of this dam — on this
 core the two strengths sit close together at the stresses the surface sees. A
 more contractive core or a faster drawdown would open that gap well beyond
 0.02.
 
 **Long after the fall, read the single-stage curve.** By day 500 the core has
-largely drained and 1.2870 is what the slope actually has. The rapid drawdown
-curve's 1.1912 at that instant still answers "what if the pool fell from full to
+largely drained and 1.2984 is what the slope actually has. The rapid drawdown
+curve's 1.2024 at that instant still answers "what if the pool fell from full to
 here", the long-term drawdown state COMBO-2's two steady solutions compute, which
 applies only if the reservoir is filled and drawn down again.
 

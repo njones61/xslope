@@ -112,9 +112,9 @@ blank:
 
 | name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `embankment` | 125 |  | `mc` | 250 | 28 |  |  |  |  |  |  |  | `piezo` |
-| `silty clay` | 118 |  | `mc` | 700 | 0 |  |  |  |  |  |  |  | `piezo` |
-| `dense sand` | 132 |  | `mc` | 0 | 36 |  |  |  |  |  |  |  | `piezo` |
+| `embankment` | 125 | 130 | `mc` | 250 | 28 |  |  |  |  |  |  |  | `piezo` |
+| `silty clay` | 118 | 123 | `mc` | 700 | 0 |  |  |  |  |  |  |  | `piezo` |
+| `dense sand` | 132 | 137 | `mc` | 0 | 36 |  |  |  |  |  |  |  | `piezo` |
 
 Then we open the distributed loads editor and set the surcharge to 600 psf at both
 of its points. That model is available as
@@ -122,10 +122,10 @@ of its points. That model is available as
 
 With the properties in, the model is complete. Click **Run LEM**, choose
 **Spencer** and **Auto search**, leave **Number of slices** at 40, and click
-**Run**. The search returns **FS = 1.185** on a circle tangent to the top of the
+**Run**. The search returns **FS = 1.184** on a circle tangent to the top of the
 dense sand — through the foundation clay rather than the fill.
 
-<!-- test: file=files/w02_section_imported.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.185, tolerance=0.005, benchmark=W-2-dxf -->
+<!-- test: file=files/w02_section_imported.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.184, tolerance=0.005, benchmark=W-2-dxf -->
 
 ### Check its work
 
@@ -273,7 +273,7 @@ circle and reaches lower than a circular search can.
 This tutorial covered:
 
 - A DXF drawing imported layer by layer, then given the properties no CAD file
-  holds: Spencer 1.185.
+  holds: Spencer 1.184.
 - A GeoStudio model imported whole, its solved circle putting both programs on one
   surface: 1.939 against 1.934.
 - A Slide2 scenario arriving with no failure surface, because Slide2 stores a

@@ -941,8 +941,8 @@ against the 1.9546 of the linear tri3 mesh built above.
 
 [Seepage and Slope Stability](../seep/seep_slope.md#worked-example) carries this
 same dam through the rest of the workflow: a Spencer search on the seepage-derived
-pore pressures at **FS = 1.26**, and a finite element strength-reduction analysis on
-the same mesh and the same field at **FS = 1.26** as well.
+pore pressures at **FS = 1.27**, and a finite element strength-reduction analysis on
+the same mesh and the same field at **FS = 1.28**.
 
 ---
 

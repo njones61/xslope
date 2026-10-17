@@ -2919,7 +2919,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -4573,7 +4573,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -4654,7 +4654,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -4788,7 +4788,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -4855,7 +4855,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -5057,7 +5057,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -6136,7 +6136,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -6206,7 +6206,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -6279,7 +6279,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -6347,7 +6347,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -6429,7 +6429,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 26,
+        "template_version": 27,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -27898,11 +27898,347 @@
         "seepage-coupled",
         "homogeneous"
       ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": true,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/videos/files/xslope_video01_simple_embankment.xlsx",
+      "references": [
+        {
+          "anchor": "video-1",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "videos/",
+          "resolution": "input-link",
+          "source_md": "docs/videos/index.md",
+          "title": "A Simple Embankment from Scratch",
+          "url": "https://xslope.org/en/stable/videos/#video-1"
+        }
+      ],
+      "topics": [
+        "tension-cracks",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/videos/files/xslope_video04_water_start.xlsx",
+      "references": [
+        {
+          "anchor": "video-4",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "videos/",
+          "resolution": "input-link",
+          "source_md": "docs/videos/index.md",
+          "title": "Water in the Slope",
+          "url": "https://xslope.org/en/stable/videos/#video-4"
+        }
+      ],
+      "topics": []
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/videos/files/xslope_video05_submerged.xlsx",
+      "references": [
+        {
+          "anchor": "video-5",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "videos/",
+          "resolution": "input-link",
+          "source_md": "docs/videos/index.md",
+          "title": "A Submerged Slope",
+          "url": "https://xslope.org/en/stable/videos/#video-5"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": true,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/videos/files/xslope_video06_loads.xlsx",
+      "references": [
+        {
+          "anchor": "video-6",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "videos/",
+          "resolution": "input-link",
+          "source_md": "docs/videos/index.md",
+          "title": "Loads and Earthquake",
+          "url": "https://xslope.org/en/stable/videos/#video-6"
+        }
+      ],
+      "topics": [
+        "tension-cracks",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 26,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/videos/files/xslope_video11_seep_to_lem.xlsx",
+      "references": [
+        {
+          "anchor": "video-11",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "videos/",
+          "resolution": "input-link",
+          "source_md": "docs/videos/index.md",
+          "title": "Seepage Pore Pressures in a Stability Run",
+          "url": "https://xslope.org/en/stable/videos/#video-11"
+        }
+      ],
+      "topics": [
+        "seepage-coupled",
+        "zoned-dams"
+      ]
     }
   ],
   "schema": 1,
   "stats": {
-    "models": 395,
+    "models": 400,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -27944,24 +28280,25 @@
       "verification/rs2/",
       "verification/rs2_joints/",
       "verification/seep/",
-      "verification/ssrm/"
+      "verification/ssrm/",
+      "videos/"
     ],
-    "tags": 663,
+    "tags": 668,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 189,
+      "homogeneous": 192,
       "non-circular": 33,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
       "reinforcement": 35,
-      "seepage-coupled": 74,
+      "seepage-coupled": 75,
       "seismic": 11,
       "soil-nails": 5,
-      "tension-cracks": 19,
+      "tension-cracks": 21,
       "transient-seepage": 25,
-      "zoned-dams": 47
+      "zoned-dams": 48
     },
     "unloadable": 0
   },
@@ -28183,7 +28520,10 @@
       "docs/verification/files/rocscience_gw/gw016a.xlsx",
       "docs/verification/files/rocscience_gw/gw018.xlsx",
       "docs/verification/files/rocscience_gw/gw021a.xlsx",
-      "docs/verification/files/rocscience_gw/gw021b.xlsx"
+      "docs/verification/files/rocscience_gw/gw021b.xlsx",
+      "docs/videos/files/xslope_video01_simple_embankment.xlsx",
+      "docs/videos/files/xslope_video05_submerged.xlsx",
+      "docs/videos/files/xslope_video06_loads.xlsx"
     ],
     "non-circular": [
       "docs/fem/files/xslope_griffiths3_r0p2.xlsx",
@@ -28376,7 +28716,8 @@
       "docs/verification/files/rocscience_gw/gw019.xlsx",
       "docs/verification/files/rocscience_gw/gw020.xlsx",
       "docs/verification/files/rocscience_gw/gw021a.xlsx",
-      "docs/verification/files/rocscience_gw/gw021b.xlsx"
+      "docs/verification/files/rocscience_gw/gw021b.xlsx",
+      "docs/videos/files/xslope_video11_seep_to_lem.xlsx"
     ],
     "seismic": [
       "docs/verification/files/published/fhwa_e7.xlsx",
@@ -28417,7 +28758,9 @@
       "docs/verification/files/rocscience/vp057.xlsx",
       "docs/verification/files/rocscience/vp060.xlsx",
       "docs/verification/files/rocscience/vp064.xlsx",
-      "docs/verification/files/rocscience/vp073.xlsx"
+      "docs/verification/files/rocscience/vp073.xlsx",
+      "docs/videos/files/xslope_video01_simple_embankment.xlsx",
+      "docs/videos/files/xslope_video06_loads.xlsx"
     ],
     "transient-seepage": [
       "docs/seep/files/xslope_earth_dam_tseep.xlsx",
@@ -28493,7 +28836,8 @@
       "docs/verification/files/rocscience/vp098.xlsx",
       "docs/verification/files/rocscience/vp099.xlsx",
       "docs/verification/files/rocscience/vp107a.xlsx",
-      "docs/verification/files/rocscience/vp107b.xlsx"
+      "docs/verification/files/rocscience/vp107b.xlsx",
+      "docs/videos/files/xslope_video11_seep_to_lem.xlsx"
     ]
   },
   "unloadable": []

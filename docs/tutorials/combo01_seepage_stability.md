@@ -62,8 +62,10 @@ core a thousand times lower at 0.001, the foundation between them at 0.1 — and
 strengths and stiffnesses are what the two stability runs read: the shell at
 c = 100 psf and φ = 35°, the core at 400 psf and 18°, the foundation at 100 psf
 and 27°, with Young's modulus E and Poisson's ratio ν beside them for the finite
-element run. The geometry and the boundary conditions are covered in full in
-[SEEP-2](seep02_johnson_dam.md).
+element run. Both stability runs weigh the shell, core, and foundation at moist
+unit weights of 130, 125, and 127 pcf, and at saturated unit weights of 135, 130,
+and 132 pcf below the water table. The geometry and the boundary conditions are
+covered in full in [SEEP-2](seep02_johnson_dam.md).
 
 We open the file with **File → Open…**. The toolbar's mode strip reads
 LEM | Seepage | FEM, and we make the three runs below in that strip's three
@@ -72,7 +74,7 @@ Inputs plot draws what the file contains for that mode:
 
 ![The model as the file carries it](images/combo01_inputs.png){width=1000}
 
-Three profile lines carve the section into shell, core and foundation; the dark
+Three profile lines carve the section into shell, core, and foundation; the dark
 dashed segments are the two specified-head boundaries with the water levels they
 stand for above them, 160 ft upstream and 100 ft downstream; the heavy red dashed
 line down the whole downstream slope is the exit face; and the hatched line at
@@ -195,11 +197,12 @@ seepage run produced, and it has no effect on the seepage run itself.
 Leaving a material on anything else changes the answer measurably, and the
 seepage run computes the same field either way without reporting whether any
 material uses it. With all three materials set to `none` instead, on this same
-mesh and this same solved field, the Spencer search below returns **FS = 1.618**
-against the 1.257 it returns at `seep` — 28.7% higher, on a shallower circle that
-becomes critical once the water is removed. The seepage analysis still ran, converged and
-reported its discharge; the stability run never read it, and every slice base
-took zero pore pressure.
+mesh and this same solved field, the Spencer search below returns **FS = 1.622**
+against the 1.272 it returns at `seep` — 27.5% higher, on a shallower circle that
+becomes critical once the pore pressure is removed. The seepage analysis still ran,
+converged, and reported its discharge; every slice base took zero pore pressure,
+and the solved field only set the water table below which the soil is weighed
+at its saturated unit weight.
 
 The model checks catch the omission both ways. A material set to `seep` on a
 model that has no solved field is an **error** that blocks the run — *"takes
@@ -211,7 +214,7 @@ is allowed, because a total stress analysis on a wet section is a legitimate
 thing to ask for. Setting the column is the modeler's decision; the warning
 ensures it is made deliberately.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, u_option=none, num_slices=40, expected_fs=1.618, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, u_option=none, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.622, tolerance=0.005 -->
 
 ---
 
@@ -235,33 +238,33 @@ The Log pane follows the search. Its last two refinement steps and its closing
 lines read:
 
 ```text
-[↻ iteration 11] center=(508.96, 262.80), FS=1.2572, grid=1.4927
-[↻ iteration 12] center=(508.96, 262.80), FS=1.2572, grid=0.7463
-[✓ converged] Iter=12, FS=1.2572 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28), elapsed time=5.18 seconds
-Critical FS = 1.257
-Sliding mass = 1,284,328.7 lb/ft over 290.62 ft of failure surface
+[↻ iteration 9] center=(505.97, 258.32), FS=1.2716, grid=2.9854
+[↻ iteration 10] center=(505.97, 258.32), FS=1.2716, grid=1.4927
+[✓ converged] Iter=10, FS=1.2716 (ΔFS<0.0005) at (x=505.97, y=258.32, depth=78.17), elapsed time=4.75 seconds
+Critical FS = 1.272
+Sliding mass = 1,282,637.6 lb/ft over 284.17 ft of failure surface
 ```
 
 ![Spencer's critical circle](images/combo01_lem_solution.png){width=1000}
 
-**Spencer's method gives FS = 1.257** on a circle centered at (508.96, 262.80)
-with a radius of 185.52 ft. It enters the upstream face at x = 346.5, elevation
-173.2 — above the reservoir and 6.8 ft below the crest — cuts down through the
+**Spencer's method gives FS = 1.272** on a circle centered at (505.97, 258.32)
+with a radius of 180.15 ft. It enters the upstream face at x = 347.0, elevation
+173.5 — above the reservoir and 6.5 ft below the crest — cuts down through the
 core, crosses into the foundation where the core pinches out at x = 420, bottoms
-at elevation 77.3, and comes out on the foundation surface at x = 597.9, about
-48 ft beyond the downstream toe. The search evaluated 71 candidate circles over
-the 12 refinement steps the log counts.
+at elevation 78.2, and comes out on the foundation surface at x = 591.9, about
+42 ft beyond the downstream toe. The search evaluated 62 candidate circles over
+the 10 refinement steps the log counts.
 
 The seepage solution appears twice on this figure. The thin gray contours
 behind the section are the solved total head, and the pale blue band under the
 failure surface is the **pore pressure on each slice base**, interpolated from
-that field: read off the slice table's `u` column it runs from 0 to 2,002 psf
-across the 40 slices, largest where the surface is deepest and zero on the one
+that field: read off the slice table's `u` column it runs from 0 to 1,961 psf
+across the 41 slices, largest where the surface is deepest and zero on the one
 slice that lies above the phreatic surface. The green hatched band above it is the
 effective normal stress the strength was computed from, which is that base's
 total normal stress less the blue.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.257, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.272, tolerance=0.005 -->
 
 ---
 
@@ -289,7 +292,7 @@ solve and the search before it.
 
 ![Shear strain at failure](images/combo01_fem_shear.png){width=1000}
 
-**Strength reduction gives FS = 1.246**. The shear strain field above is the
+**Strength reduction gives FS = 1.262**. The shear strain field above is the
 mechanism the run found. No surface was assumed; the band of straining soil is
 located by the solution.
 
@@ -298,7 +301,7 @@ the core and the downstream shell into the foundation, and comes out beyond the
 toe — the mechanism the Spencer search found, arrived at without a surface being
 prescribed.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.246, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm, f_stand=1.2421875, f_fail=1.25, check=edges, expected_elements=3923, expected_nodes=8082 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.262, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=COMBO-1-ssrm, f_stand=1.2578125, f_fail=1.265625, check=edges, expected_elements=3923, expected_nodes=8082 -->
 
 The pore pressures reached this run the same way they reached the search: off the
 materials' `u` column, interpolated from the same mesh nodes into each element, where they reduce the effective mean stress and with it the strength available.
@@ -325,7 +328,7 @@ will read it again. [Stale results and the mesh](../studio/editing.md#stale-resu
 states the rule in full. The practical effect is that the three answers on this
 page cannot silently belong to three different models.
 
-The two factors of safety are 1.257 and 1.246, 0.9% apart, on the same
+The two factors of safety are 1.272 and 1.262, 0.8% apart, on the same
 mechanism: a deep surface from the upstream face just below the crest, down
 through the core and the downstream shell, into the foundation and out beyond the
 toe. They are independent routes to it — the search prescribes a circular surface
@@ -343,8 +346,8 @@ This tutorial covered:
 - One quadratic mesh for all three analyses, chosen for the strictest of them.
 - A seepage run that leaves a pore pressure at every mesh node.
 - The materials table's `u` column: `seep` reads that field, `none` ignores it
-  (Spencer 1.618 instead of 1.257).
-- Spencer 1.257 and strength reduction 1.246 from the same model and field,
+  (Spencer 1.622 instead of 1.272).
+- Spencer 1.272 and strength reduction 1.262 from the same model and field,
   with nothing exported or retyped.
 - Results go stale when the inputs they depend on change.
 

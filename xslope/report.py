@@ -1433,6 +1433,31 @@ def method_searched(solutions, method):
                for b in lem_bundles(solutions))
 
 
+def _searched_surfaces_coincide(solutions, methods):
+    """Whether every method in ``methods`` settled on one and the same failure
+    surface: ``True``, ``False``, or ``None`` when a method's own bundle carries
+    no surface to compare.
+
+    Each method's OWN bundle, as in :func:`method_searched`. Two surfaces are the
+    same when no point of one lies farther from the other than round-off of the
+    surface's own size; two searches that converge on one circle produce exactly
+    that circle.
+    """
+    surfaces = []
+    for m in methods:
+        want = str(m or "").lower()
+        own = [b for b in lem_bundles(solutions) if bundle_method(b) == want]
+        surface = own[0].get("failure_surface") if own else None
+        if surface is None or not hasattr(surface, "hausdorff_distance"):
+            return None
+        surfaces.append(surface)
+    if len(surfaces) < 2:
+        return None
+    ref = surfaces[0]
+    tol = 1e-9 * max(ref.length, 1.0)
+    return all(ref.hausdorff_distance(s) <= tol for s in surfaces[1:])
+
+
 def surface_family(slope_data, solutions=None):
     """``"circular"`` or ``"noncircular"`` for the surface a report documents.
 
@@ -6721,8 +6746,8 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # --- every method's answer, once, ahead of the detail ---
     #
     # The search does NOT belong here. It finds the critical surface for one
-    # METHOD, and two methods searched separately settle on different surfaces;
-    # each method's block carries its own search.
+    # METHOD, and two methods searched separately generally settle on different
+    # surfaces; each method's block carries its own search.
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
         sub_fs = Section("Factors of Safety")
@@ -6733,10 +6758,19 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         # performed said both at once, on a report where the second was the true
         # one.
         if searched and len(searched) == len(methods):
+            # Separate searches usually settle on different surfaces, but not
+            # always: on some models two methods land on the same circle, and the
+            # sentence has to say which happened.
+            same = _searched_surfaces_coincide(solutions, methods)
             text = (f"The critical factor of safety reported by each method is "
                     f"listed in {where}. Each method searched for its own "
-                    f"critical surface; the surfaces differ from method to "
-                    f"method.")
+                    f"critical surface")
+            if same is True:
+                text += "; the searches settled on the same surface."
+            elif same is False:
+                text += "; the surfaces differ from method to method."
+            else:
+                text += "."
         elif searched:
             text = (f"The factor of safety reported by each method is listed in "
                     f"{where}. "

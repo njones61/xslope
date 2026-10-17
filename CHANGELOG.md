@@ -8,6 +8,22 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- The Johnson Reservoir dam models carry saturated unit weights of 135, 130, and
+  132 pcf for the shell, core, and foundation. Before, the soil below the water
+  table was weighed at its moist unit weight. The published factors of safety on
+  them rise: COMBO-1's Spencer search from 1.257 to 1.272 and its strength
+  reduction from 1.246 to 1.262; COMBO-2's three rapid-drawdown answers from
+  1.181, 1.195, and 1.016 to 1.196, 1.206, and 1.034; COMBO-3's Johnson curve
+  minimum from 1.016 to 1.034; W-3's Bishop and Spencer from 1.231 and 1.257 to
+  1.245 and 1.272; the rapid-drawdown worked example's from 1.31 to 1.34; and the
+  seepage-to-stability example's from 1.258 to 1.273 (Spencer) and 1.277
+  (strength reduction). The piezometric-line and seepage
+  comparison models of that page and W-2's DXF section carry saturated weights
+  too.
+- A report on a model where every method searched for its own surface says
+  whether the searches settled on the same surface. Before, it always said the
+  surfaces differ.
+
 - The strength plot in the Materials list view draws τ and σ′ at the same
   scale, so the envelope rises at the friction angle entered. This applies to
   Mohr-Coulomb, power-curve, and Hoek-Brown materials.

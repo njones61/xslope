@@ -68,7 +68,7 @@ the report will run whatever methods we tick. Still, a quick run confirms the
 model arrived intact. Switch the mode strip to **LEM** (`Ctrl+1`) and click
 **Run → Run LEM…**. Leave **Method** on **Spencer**, **Analysis** on
 **Auto search** and **Number of slices** at 40, and click **Run**. The search
-returns **FS = 1.257**, COMBO-1's own answer on this model.
+returns **FS = 1.272**, COMBO-1's own answer on this model.
 
 ---
 
@@ -94,8 +94,8 @@ method XSLOPE offers, ticked on the one the
 results view is showing — Spencer, which we just ran. Tick **Bishop's Simplified
 Method** as well. A method that has not been run is run by the report, exactly as
 ticking it in the Run dialog would have run it: its own search for its own
-critical surface. So Bishop costs a search here, and the two settle on different
-surfaces.
+critical surface. So Bishop costs a search here, and on this model the two
+searches settle on the same circle.
 
 **Title page.** These four fields become Word document properties, which the
 title page, the running head and a company template all read. Fill in **Project
@@ -133,11 +133,11 @@ records that each searched for a surface of its own.
 | Analysis | Where the answer came from | Result |
 | --- | --- | :---: |
 | Seepage | attached to the file | 1.948 ft³/day per ft |
-| Bishop's Simplified Method | searched by the report | 1.231 |
-| Spencer's method | the search we ran | 1.257 |
-| Strength reduction | attached to the file | 1.246 |
+| Bishop's Simplified Method | searched by the report | 1.245 |
+| Spencer's method | the search we ran | 1.272 |
+| Strength reduction | attached to the file | 1.262 |
 
-<!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, num_slices=40, fs_bishop=1.231, fs_spencer=1.257, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, num_slices=40, fs_bishop=1.245, fs_spencer=1.272, tolerance=0.005 -->
 
 The seepage section states the conductivities and the mesh it was solved on, then
 the four fields the solution contains: the flow net, pore pressure, velocity
@@ -156,11 +156,11 @@ in it.
 Spencer's method solves for a pair — a factor of safety and an interslice
 inclination θ — at which both the force sum and the moment sum vanish, so it
 prints both sums rather than a single quotient. In the linked report they are on
-the page after the one shown above, and they close at F = 1.257 and θ = −16.28°,
-with residuals of −3.729e-11 and 9.080e-09 against terms coming to 371411 and
-84335269. Every number is printed at a precision the factor of safety can be
-rebuilt from: Bishop divides its own two sums, 485415 and 394283, and prints the
-1.231 they give. A report generated on another computer closes at the same F and
+the page after the one shown above, and they close at F = 1.272 and θ = −16.62°,
+with residuals of 1.314e-08 and −8.285e-07 against terms coming to 379721 and
+87087357. Every number is printed at a precision the factor of safety can be
+rebuilt from: Bishop divides its own two sums, 492064 and 395191, and prints the
+1.245 they give. A report generated on another computer closes at the same F and
 θ; its residuals, which sit at the level of rounding, can differ in their digits.
 
 ### Check its work
@@ -168,11 +168,11 @@ rebuilt from: Bishop divides its own two sums, 485415 and 394283, and prints the
 - **Open the document.** Its contents page lists the sections with a page number
   against each; headings without them mean the finishing step did not run, and
   Word rebuilds them with F9.
-- **Section 4 contains both methods** — §4.5 Bishop at 1.231 and §4.6 Spencer at
-  1.257, with §4.4 *Factors of Safety* comparing them. A method missing means its
+- **Section 4 contains both methods** — §4.5 Bishop at 1.245 and §4.6 Spencer at
+  1.272, with §4.4 *Factors of Safety* comparing them. A method missing means its
   box was never ticked.
 - **The seepage and finite element sections state the attached solutions'
-  numbers**, 1.948 ft³/day per ft and 1.246. Numbers that differ mean something
+  numbers**, 1.948 ft³/day per ft and 1.262. Numbers that differ mean something
   was solved again.
 - **The traceability stamp names the file the numbers came from**, with its
   SHA-256 digest. A digest that does not match the workbook means the report

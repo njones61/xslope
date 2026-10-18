@@ -123,6 +123,6 @@ with the sign its own inclination gives it, so reservoir water standing against
 an upstream face resists the slide rather than driving it — the same way the
 complete-equilibrium methods treat it. On the upstream face of the
 [earth dam sample](samples.md#4-earth-dam) Janbu gives 1.752 against Spencer's
-1.818 and Bishop's 1.833, the few-percent conservatism expected of an approximate
+1.812 and Bishop's 1.828, the few-percent conservatism expected of an approximate
 method.
 

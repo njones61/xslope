@@ -73,27 +73,26 @@ Phase-5 lock (plan §8.4 — the feature's headline integration test):
      residual: a quasi-steady drawdown only approaches the low-pool steady state
      asymptotically. The tolerance is derived, not guessed — the same slow run is
      tagged at three growing post-drawdown equilibration times and the FS gap is
-     shown to shrink and plateau:
+     shown to shrink:
 
-         equilibration (t units)      |FS_transient - FS_steady|
-             2                              ~1.2e-4
-             8                              ~8e-5
-            32                              ~9e-6   (demonstrated plateau)
+         equilibration (units of DD_T)   |FS_transient - FS_steady|
+             2                              ~6.3e-5
+             8                              ~2.9e-5
+            32                              ~1.5e-5   (longest window)
 
      The holds are 2 / 8 / 32 rather than 2 / 4 / 8 because the window has to
-     outlast the model's own drainage, and that time is set by the mesh: on the
-     ~80-node mesh the size field builds, the receding seepage face is resolved a
-     row finer than it was on ~60 nodes and the low-pool state is reached later in
-     model time. Over 2/4/8 the gap on this mesh only falls from 1.2e-4 to 8.4e-5
-     — still shrinking, nowhere near its floor — which reads as a failure to
-     converge when it is a window that ends too early. Over 2/8/32 it reaches
-     9e-6. What the leg asserts is unchanged.
+     outlast the model's own drainage, and that time is set by the mesh as well as
+     the section: the receding seepage face is resolved row by row, and the finer
+     the mesh, the later in model time the low-pool state is reached. On the
+     ~90-node mesh the size field builds, 2/4/8 takes the gap only from 6.3e-5 to
+     2.9e-5, still shrinking; 2/8/32 takes it to 1.5e-5. What the leg asserts is
+     unchanged.
 
      The longest-equilibration agreement is locked at 5e-4 — well above the
-     demonstrated ~9e-6 residual (absorbing mesh/step jitter) and ~14x below the
+     demonstrated ~1.5e-5 residual (absorbing mesh/step jitter) and ~12x below the
      discriminator: a FAST drawdown (short drop, no hold) leaves stage-2 far from
-     steady and misses the steady FS by ~6.8e-3, proving the lock is not
-     vacuously satisfied. Kept fast with a coarse tri3 mesh (~80 nodes, linear per
+     steady and misses the steady FS by ~5.9e-3, proving the lock is not
+     vacuously satisfied. Kept fast with a coarse tri3 mesh (~90 nodes, linear per
      the exit-face caveat) and serial solves.
 
 Run directly:  PYTHONPATH=. python3 test/transient_seep_check.py
@@ -348,6 +347,14 @@ def check_steady_limit_unconfined_tri6():
     return _check_unconfined_relax("tri6", 10.0)
 
 
+#: The unit of time the drawdown marches on the earth-dam model (locks 2c and 6)
+#: are stated in, in the model's own minutes. Each march is a multiple of it (a
+#: 3-unit drawdown, an 8-unit hold, ...) sized against how fast this dam drains,
+#: and the drainage time scales as 1/k: at the book's ft/min permeabilities,
+#: 86,400 minutes gives every march the same k·t it was sized at.
+DD_T = 86_400.0
+
+
 # ---------------------------------------------------------------------------
 # Lock 2c — linear-vs-quadratic drawdown consistency
 #
@@ -397,14 +404,15 @@ def check_drawdown_linear_vs_quadratic():
         return seep_data, list(d["ground_surface"].coords)
 
     def _drawdown(seep_data):
-        t_pre, t_dd, hold = 0.3, 3.0, 8.0     # hold long enough to equilibrate
+        # hold long enough to equilibrate
+        t_pre, t_dd, hold = 0.3 * DD_T, 3.0 * DD_T, 8.0 * DD_T
         t_end, dur = t_pre + t_dd, t_pre + t_dd + hold
         ta = np.array([0.0, t_pre, t_end, dur])
         tseep = dict(times=ta, series={"res": (ta, np.array([H1, H1, H2, H2]))},
                      duration=dur, save_interval=dur, save_times=[dur],
                      stage_1=0.0, stage_2=dur, breakpoints=list(ta))
         sol = _quiet(run_transient_seepage, seep_data, tseep, theta=1.0,
-                     dt_max=0.5, max_head_change_frac=0.15, verbose=False)
+                     dt_max=0.5 * DD_T, max_head_change_frac=0.15, verbose=False)
         h = np.asarray(sol["frames"][transient_frame_index(sol, dur)]["head"])
         return sol, h
 
@@ -827,7 +835,7 @@ def check_drawdown_consistency():
     for m in d["materials"]:
         m["Ss"], m["Sy"] = 1e-4, 0.2
 
-    # Coarse LINEAR mesh (~80 nodes) — the transient exit-face active set is
+    # Coarse LINEAR mesh (~90 nodes) — the transient exit-face active set is
     # resolved per corner, so tri3 keeps the receding seepage face exact and fast.
     polys = get_material_polygons(d)
     xs = [x for x, _ in d["ground_surface"].coords]
@@ -862,7 +870,7 @@ def check_drawdown_consistency():
         # of a constant-series run is exactly the independent steady solution at that
         # pool level (same submerged-Dirichlet + seepage-face treatment as the
         # drawdown run, so the comparison isolates the time-marching residual).
-        sol = _run([0.0], [level], 1.0, [], dt_max=1.0)
+        sol = _run([0.0], [level], DD_T, [], dt_max=DD_T)
         return np.asarray(sol["frames"][0]["u"], dtype=float)
 
     def _fs(u1, u2):
@@ -884,11 +892,12 @@ def check_drawdown_consistency():
     # Slow drawdown: hold high, ramp to low over t_dd, hold low. Save the low-pool
     # state at three growing equilibration times so the FS gap vs equilibration can
     # be shown to plateau from ONE solve.
-    t_pre, t_dd, holds = 0.5, 5.0, [2.0, 8.0, 32.0]
+    t_pre, t_dd, holds = 0.5 * DD_T, 5.0 * DD_T, [2.0 * DD_T, 8.0 * DD_T, 32.0 * DD_T]
     t_end_dd = t_pre + t_dd
     save_ts = [t_end_dd + h for h in holds]
     dur = save_ts[-1]
-    sol = _run([0.0, t_pre, t_end_dd, dur], [H1, H1, H2, H2], dur, save_ts, dt_max=0.25)
+    sol = _run([0.0, t_pre, t_end_dd, dur], [H1, H1, H2, H2], dur, save_ts,
+               dt_max=0.25 * DD_T)
     if not sol["converged"]:
         fails.append("slow-drawdown transient reported non-convergence")
 
@@ -906,16 +915,16 @@ def check_drawdown_consistency():
     if not (dfs[-1] < dfs[0] and dfs[-1] < 0.6 * dfs[0]):
         fails.append(f"slow drawdown did not converge toward the steady FS as "
                      f"equilibration grew: gaps {[f'{x:.2e}' for x in dfs]}")
-    # (b) plateau agreement: locked an order of magnitude above the demonstrated ~5e-5.
+    # (b) agreement: locked over an order of magnitude above the demonstrated ~1.5e-5.
     TOL = 5e-4
     if dfs[-1] > TOL:
         fails.append(f"slow-drawdown FS gap {dfs[-1]:.2e} at the longest "
                      f"equilibration exceeds the {TOL:.0e} lock")
 
     # (c) discriminator: a FAST drawdown leaves stage-2 far from steady and misses.
-    dur_f = t_pre + 0.4 + 0.1
-    solf = _run([0.0, t_pre, t_pre + 0.4, dur_f], [H1, H1, H2, H2], dur_f, [],
-                dt_max=0.05)
+    dur_f = t_pre + 0.4 * DD_T + 0.1 * DD_T
+    solf = _run([0.0, t_pre, t_pre + 0.4 * DD_T, dur_f], [H1, H1, H2, H2], dur_f, [],
+                dt_max=0.05 * DD_T)
     dfs_fast = abs(_fs(_frame_u_at(solf, 0.0), _frame_u_at(solf, dur_f)) - FS_classic)
     if not (dfs_fast > 5e-3 and dfs_fast > 20.0 * dfs[-1]):
         fails.append(f"fast drawdown failed to discriminate: gap {dfs_fast:.2e} is "

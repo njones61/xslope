@@ -60,8 +60,8 @@ show, hide, or restyle.
 
 A real example, exported from the [Earth Dam sample](../lem/samples.md#4-earth-dam):
 [xslope_earth_dam_up.dxf](files/xslope_earth_dam_up.dxf) — material zones
-(`SHELL`, `CORE`, `CLAY`, `SAND`), the profile lines, the piezometric line, the
-distributed load, and the search circles, each on its own layer.
+(`SHELL`, `CORE`, `CLAY`, `SAND`), the profile lines, the piezometric line, and the
+search circles, each on its own layer.
 
 Excel input file: [xslope_earth_dam_up.xlsx](../lem/files/xslope_earth_dam_up.xlsx)
 

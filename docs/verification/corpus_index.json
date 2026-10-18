@@ -2087,6 +2087,74 @@
         ],
         "n_materials": 4,
         "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/lem/files/xslope_earth_dam_down_seep.xlsx",
+      "references": [
+        {
+          "anchor": "4-earth-dam",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "lem/samples/",
+          "resolution": "input-link",
+          "source_md": "docs/lem/samples.md",
+          "title": "4. Earth Dam",
+          "url": "https://xslope.org/en/stable/lem/samples/#4-earth-dam"
+        }
+      ],
+      "topics": [
+        "seepage-coupled",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 4,
+        "non_circular": false,
         "piezo_line": true,
         "pile_fixities": [],
         "piles": 0,
@@ -28238,7 +28306,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 400,
+    "models": 401,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -28283,7 +28351,7 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 668,
+    "tags": 671,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
@@ -28293,12 +28361,12 @@
       "probabilistic": 16,
       "rapid-drawdown": 8,
       "reinforcement": 35,
-      "seepage-coupled": 75,
+      "seepage-coupled": 76,
       "seismic": 11,
       "soil-nails": 5,
       "tension-cracks": 21,
       "transient-seepage": 25,
-      "zoned-dams": 48
+      "zoned-dams": 49
     },
     "unloadable": 0
   },
@@ -28643,6 +28711,7 @@
       "docs/verification/files/rocscience/vp108b.xlsx"
     ],
     "seepage-coupled": [
+      "docs/lem/files/xslope_earth_dam_down_seep.xlsx",
       "docs/lem/files/xslope_gsat_seep.xlsx",
       "docs/lem/files/xslope_johnson_rapid_KEY.xlsx",
       "docs/seep/files/xslope_confined_radial.xlsx",
@@ -28792,6 +28861,7 @@
     "zoned-dams": [
       "docs/fem/files/xslope_noncircular_fem.xlsx",
       "docs/lem/files/xslope_earth_dam_down.xlsx",
+      "docs/lem/files/xslope_earth_dam_down_seep.xlsx",
       "docs/lem/files/xslope_earth_dam_up.xlsx",
       "docs/lem/files/xslope_eight_layers.xlsx",
       "docs/lem/files/xslope_gsat_rapid.xlsx",

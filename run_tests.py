@@ -182,7 +182,7 @@ AXIAL_MIRROR_LEFT = _repo('docs/inputs/slope/xslope_nail_axial.xlsx')
 AXIAL_MIRROR_RIGHT = _repo('docs/inputs/slope/xslope_nail_axial_rface.xlsx')
 MP_SPENCER_LEFT = _repo('docs/inputs/slope/xslope_simple1.xlsx')
 MP_SPENCER_RIGHT = _repo('docs/inputs/slope/xslope_rface.xlsx')
-# Stage-1 FS 1.94 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
+# Stage-1 FS 1.96 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
 DRAWDOWN_GUARD_FILE = _repo('docs/inputs/slope/xslope_rapid.xlsx')
 # --- backward-compatibility fixtures: SYNTHESIZED, never sample files ------
 #
@@ -10058,7 +10058,7 @@ def run_seep_cycle_test(test):
     escape at a lowered gate instead, where the orbit is still reachable, and requires
     it to land on the answer the ungated solve reaches.
 
-    The check itself lives in test/seep_cycle_check.py, which re-solves the three
+    The check itself lives in test/seep_cycle_check.py, which re-solves the four
     rescued models and eight that converge without help on their COMMITTED meshes, at
     the settings their companions are recorded under. Inertness is locked on the sweep
     count as well as the flow rate: a trajectory that has been nudged shows there
@@ -13210,17 +13210,19 @@ def run_gsz_import_test(test):
                 problems.append("the reloaded piezo-surface model derives no water "
                                 "load — the reservoir did not survive the file")
 
-        # A pre-v22 template has no D23, so an automatic-water model cannot be
-        # written into one: the file would come back manual with an empty dloads
-        # sheet and no water at all. Refused, and the refusal names the cell.
+        # A pre-v22 template has no Water loads cell, so an automatic-water model
+        # cannot be written into one: the file would come back manual with an empty
+        # dloads sheet and no water at all. Refused, and the refusal names the
+        # current template's cell, which the lookup gives (D24 from v25).
         v21 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'docs', 'inputs', 'input_template_v21.xlsx')
         if os.path.exists(v21):
+            from xslope.fileio import main_sheet_cell
             old_out = os.path.join(td, "old_template.xlsx")
             try:
                 save_slope_data_to_xlsx(sd2, old_out, template=v21)
             except ValueError as e:
-                if 'D23' not in str(e):
+                if main_sheet_cell('water_loads') not in str(e):
                     problems.append(f"saving an automatic-water model into a v21 "
                                     f"template was refused without naming the cell: "
                                     f"{str(e)[:90]}")
@@ -16242,7 +16244,7 @@ def main():
                       'method': '-', 'source': 'seep_exit_collapse'})
         # The two limit-cycle escapes in the unconfined solver: the four corpus
         # models that used to run to their ceiling converge, and every model that
-        # converged without them is unchanged sweep for sweep. It re-solves eleven
+        # converged without them is unchanged sweep for sweep. It re-solves twelve
         # committed models, so it rides --seep with the rest of the seepage suite.
         tests.append({'type': 'seep_cycle',
                       'file': 'limit-cycle escapes (steady exit face)',

@@ -2731,9 +2731,9 @@ def _circle_below_domain_floor(ctx):
     #   A SEARCH survives it. The circles sheet is a set of SEEDS, and the
     #   refinement moves the center and the tangent depth away from them -- so a
     #   deck whose every circle is 200 below the floor still converges on the same
-    #   critical surface as the sound deck (xslope_dam.xlsx, bishop: 1.8334 either
-    #   way). Refusing that run would refuse a run that works, so a search keeps the
-    #   WARNING: the seed is lost, the answer is not.
+    #   critical surface as the sound deck (xslope_dam.xlsx, bishop: 1.8276 sound,
+    #   1.8277 seeded 200 below). Refusing that run would refuse a run that works,
+    #   so a search keeps the WARNING: the seed is lost, the answer is not.
     #
     #   A SINGLE-SURFACE run does not survive it. That path takes circles[0] and
     #   nothing else (search.run_lem_analysis), so a dead first circle is the whole

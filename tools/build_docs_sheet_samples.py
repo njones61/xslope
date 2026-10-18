@@ -225,8 +225,8 @@ def build_rapid(out_path):
     # in place through a drawdown, so both stages carry it.
     _crest = [{"X": 280.0, "Y": 317.0, "Normal": 500.0},
               {"X": 310.0, "Y": 317.0, "Normal": 500.0}]
-    _toe = [{"X": 620.0, "Y": 227.0, "Normal": 300.0},
-            {"X": 700.0, "Y": 227.0, "Normal": 300.0}]
+    _toe = [{"X": 590.0, "Y": 227.0, "Normal": 300.0},
+            {"X": 630.0, "Y": 227.0, "Normal": 300.0}]
     sd["dloads"] = [list(_crest), list(_toe)]
     sd["dloads2"] = [list(_crest), list(_toe)]
     sd["dload_dirs"] = ["normal", "normal"]

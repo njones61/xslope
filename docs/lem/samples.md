@@ -123,28 +123,37 @@ grid-seeded search reports 1.240, the same as the table above.
 
 ### 4. Earth Dam
 
-This problem features a dam with a shell and a clay core on top of a foundation with a clay layer and a sand layer. 
-This problem was featured on page 121 of Shear Strength and Slope Stability - Second Edition by Duncan, Wright, and 
-Brandon. 
+This problem is Example 2 in Section 6.13.6 of *Soil Strength and Slope Stability*,
+2nd edition, by Duncan, Wright, and Brandon (2014), pages 121–123: an embankment dam
+with a shell and a clay core, on a foundation of clay over sand. The book gives the
+elevations, the face slopes, the material properties, and the permeabilities. The other
+dimensions are scaled from its Figures 6.41 and 6.42.
+[Slide2's verification problem 72](../verification/rocscience.md#vp72) is the same
+example, on Slide's own drawing of the section.
 
 ![Earth dam with a clay core](sample_images/earth_dam_problem_sketch.png){width=1000}
 
-The material properties are as follows. The book gives one unit weight per zone,
-γ. The water conditions are this example's own, and each zone also carries a
-saturated unit weight γ_sat, 5 pcf above γ, for the part of the zone below the
-piezometric line.
+The material properties are as follows. The book gives one unit weight per zone, γ, and
+the downstream analyses below use it as the book does. The upstream analysis, which the
+book does not include, adds a saturated unit weight γ_sat, 5 pcf above γ, for the part of
+each zone below the piezometric line. Only the seepage solution uses the permeabilities, k.
 
-|  Mat   | c' (psf) | $\phi$' (degrees) | γ (pcf) | γ_sat (pcf) |
-|:------:|:--------:|:-----------------:|:-------:|:-----------:|
-| Shell  |    0     |        34         |   125   |     130     |
-|  Core  |   100    |        26         |   122   |     127     |
-|  Clay  |    0     |        24         |   123   |     128     |
-|  Sand  |    0     |        32         |   127   |     132     |
+|  Mat   | c' (psf) | $\phi$' (degrees) | γ (pcf) | γ_sat (pcf) | k (ft/min) |
+|:------:|:--------:|:-----------------:|:-------:|:-----------:|:----------:|
+| Shell  |    0     |        34         |   125   |     130     |  1 × 10⁻²  |
+|  Core  |   100    |        26         |   122   |     127     |  1 × 10⁻⁶  |
+|  Clay  |    0     |        24         |   123   |     128     |  1 × 10⁻⁵  |
+|  Sand  |    0     |        32         |   127   |     132     |  1 × 10⁻³  |
+
+The piezometric line is the book's: the zero-pressure line of its seepage solution
+(its Figure 6.42), traced from the figure. It stays at the reservoir level up to the core,
+drops through the core, and meets the downstream face 1.5 ft above the toe.
 
 **Upstream side of the dam**
 
-First, we will analyze the upstream side. This is accomplished by defining starting circles on the upstream side of the 
-dam. The following Excel input file illustrates the problem.
+The book analyzes only the downstream slope. The upstream slope is analyzed here under
+the full reservoir, with the same piezometric line and starting circles on the upstream
+side of the dam.
 
 Excel input file: [xslope_earth_dam_up.xlsx](files/xslope_earth_dam_up.xlsx)
 
@@ -165,17 +174,31 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| n/a\* | 1.833 | 1.752 | 2.081 | 2.026 | 1.818 | 1.813 |
+| n/a\* | 1.828 | 1.752 | 2.076 | 2.025 | 1.812 | 1.807 |
 
 \* OMS is not reported for this problem. Its base normal force is the Fellenius value $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, which under a full reservoir goes negative on the deepest slices — a quarter of them on the surface it settles on here — so the shear resistance it computes there is meaningless and the factor of safety it reports (0.897) sits far below every other method's. See the [OMS method note](oms.md).
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.833, fs_janbu=1.752, fs_corps=2.081, fs_lowe=2.026, fs_spencer=1.818, fs_mprice=1.813 -->
+<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.828, fs_janbu=1.752, fs_corps=2.076, fs_lowe=2.025, fs_spencer=1.812, fs_mprice=1.807 -->
 
 **Downstream side of the dam**
 
-Next, we will analyze the other side of the dam by defining starting circles on the downstream 
-side of the dam. 
+Water flows under the dam through the sand and rises through the clay beneath the
+downstream half. The book uses this slope to compare two ways of supplying the pore
+pressures: interpolated from a finite-element seepage solution, and from a piezometric
+line taken as that solution's zero-pressure line. For each, it reports two minimum
+factors of safety. The overall minimum falls on very shallow circles near the toe. The
+book also reports the minimum for circles tangent to El. 197, the bottom of the clay,
+because "deeper slip surfaces are likely to be of interest as well" (p. 121). Both are
+analyzed here, with each method running its own search:
+
+- the toe circle, from a grid of starting circles, with the circle leaving the ground
+  downstream of x = 500 ft:
+  `circular_search(slope_data, method, seed='grid', exit_range=(500, 638))`
+- the circle tangent to El. 197:
+  `circular_search(slope_data, method, tangent_depth=(197, 197))`
+
+*Pore pressures from the piezometric line*
 
 Excel input file: [xslope_earth_dam_down.xlsx](files/xslope_earth_dam_down.xlsx)
 
@@ -183,23 +206,99 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![earth_dam_down_inputs.png](sample_images/earth_dam_down_inputs.png){width=1000}
 
-Search results:
+Toe circle, shown close up:
 
-![earth_dam_down_search_results.png](sample_images/earth_dam_down_search_results.png){width=1000}
-
-Solution (critical surface and factor of safety):
-
-![earth_dam_down_results.png](sample_images/earth_dam_down_results.png){width=1000}
+![earth_dam_down_toe_results.png](sample_images/earth_dam_down_toe_results.png){width=1000}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.400 | 1.579 | 1.546 | 1.616 | 1.587 | 1.576 | 1.577 |
+| n/a\* | 1.327 | 1.224 | 1.381 | 1.327 | 1.323 | 1.324 |
+
+\* OMS is not reported for this problem's toe circle. The circle is small, and its last slices, where it rises steeply to the ground beyond the toe, have bases inclined up to 57°. There the Fellenius base normal force, $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, goes negative, on 6 of the 40 slices of the surface it settles on, so the shear resistance it computes there is meaningless and the factor of safety it reports (0.845) sits far below every other method's. See the [OMS method note](oms.md).
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, fs_oms=1.400, fs_bishop=1.579, fs_janbu=1.546, fs_corps=1.616, fs_lowe=1.587, fs_spencer=1.576, fs_mprice=1.577 -->
+<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, seed=grid, exit_range=500;638, na=oms, fs_bishop=1.327, fs_janbu=1.224, fs_corps=1.381, fs_lowe=1.327, fs_spencer=1.323, fs_mprice=1.324 -->
+
+Circle tangent to El. 197:
+
+![earth_dam_down_deep_results.png](sample_images/earth_dam_down_deep_results.png){width=1000}
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.394 | 1.572 | 1.537 | 1.609 | 1.579 | 1.568 | 1.570 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, tangent_depth=197;197, fs_oms=1.394, fs_bishop=1.572, fs_janbu=1.537, fs_corps=1.609, fs_lowe=1.579, fs_spencer=1.568, fs_mprice=1.570 -->
+
+*Pore pressures from the seepage solution*
+
+The seepage solution uses the permeabilities above, with the reservoir at El. 302
+upstream, and the downstream face and the ground beyond the toe free to discharge. The
+vertical ends of the section and its base are impermeable, so the water that flows
+through the sand has to rise through the clay. The mesh has 3.5 ft triangles.
+
+Excel input file: [xslope_earth_dam_down_seep.xlsx](files/xslope_earth_dam_down_seep.xlsx)
+(the seepage mesh and solution are bundled alongside it).
+
+Toe circle, shown close up, with the seepage head contours:
+
+![earth_dam_down_seep_toe_results.png](sample_images/earth_dam_down_seep_toe_results.png){width=1000}
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| n/a\* | 0.938 | 0.849 | 1.044 | 0.942 | 0.967 | 0.966 |
+
+\* OMS is not reported for this problem's toe circle. The circle is small, and its last slices, where it rises steeply to the ground beyond the toe, have bases inclined up to 58°. There the Fellenius base normal force, $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, goes negative, on 10 of the 40 slices of the surface it settles on, so the shear resistance it computes there is meaningless and the factor of safety it reports (0.355) sits far below every other method's. See the [OMS method note](oms.md).
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, seed=grid, exit_range=500;638, na=oms, fs_bishop=0.938, fs_janbu=0.849, fs_corps=1.044, fs_lowe=0.942, fs_spencer=0.967, fs_mprice=0.966 -->
+
+Circle tangent to El. 197:
+
+![earth_dam_down_seep_deep_results.png](sample_images/earth_dam_down_seep_deep_results.png){width=1000}
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.250 | 1.406 | 1.391 | 1.431 | 1.412 | 1.405 | 1.405 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, tangent_depth=197;197, fs_oms=1.250, fs_bishop=1.406, fs_janbu=1.391, fs_corps=1.431, fs_lowe=1.412, fs_spencer=1.405, fs_mprice=1.405 -->
+
+**Comparison with the book**
+
+Spencer's factors of safety from the tables above, beside the book's Table 6.8. The book
+does not say which method it used.
+
+| Pore pressures | Toe circle, book | Toe circle, XSLOPE | Tangent to El. 197, book | Tangent to El. 197, XSLOPE |
+|:--|--:|--:|--:|--:|
+| Piezometric line | 1.30 | 1.323 | 1.57 | 1.568 |
+| Seepage solution | 1.11 | 0.967 | 1.37 | 1.405 |
+
+With the piezometric line, both circles agree with the book. With the seepage solution,
+the circle tangent to El. 197 is within 3 percent of the book's, and the toe circle is
+lower. That circle is small, about 11 ft in radius, and sits where the upward flow
+concentrates at the toe, so its factor of safety depends on how finely the mesh resolves
+the toe. It falls as the mesh is refined and settles at about the 3.5 ft element size
+used here.
+
+Both comparisons make the book's point. The toe circle is critical with either source of
+pore pressure, and the seepage solution gives the lower factor of safety on both circles.
+The difference comes from the upward flow through the clay foundation, which a single
+piezometric line cannot represent (p. 122), and it is on the unsafe side. The book
+concludes that where the flow is not predominantly horizontal, the pore pressures should
+come from a seepage analysis.
 
 ### 5. Tension Crack
 
@@ -303,7 +402,7 @@ Solution (critical surface and factor of safety, with the seepage head contours)
 
 ![gsat_seep_results.png](sample_images/gsat_seep_results.png){width=1000}
 
-<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.933, fs_spencer=1.912 -->
+<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.925, fs_spencer=1.906 -->
 
 The same dam analyzed for [rapid drawdown](rapid.md), with the reservoir at
 El. 302 ft before drawdown and El. 250 ft after. The premise of *rapid* drawdown is
@@ -318,7 +417,7 @@ Solution (governing rapid-drawdown surface and factor of safety):
 
 ![gsat_rapid_results.png](sample_images/gsat_rapid_results.png){width=1000}
 
-<!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.100, fs_spencer=1.099 -->
+<!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.095, fs_spencer=1.094 -->
 
 ### 7. Pile-Stabilized Slope (Hassiotis et al. 1997)
 

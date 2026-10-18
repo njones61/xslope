@@ -106,6 +106,10 @@ MODELS = [
     # solution that records nothing about its solve moved off it.
     ("docs/lem/files/xslope_earth_dam_rapid",         (1, 2), DOCS),
     ("docs/lem/files/xslope_gsat_seep",                  (1,), DOCS),
+    # The book's downstream analysis (Duncan, Wright & Brandon Example 2). Same
+    # section, mesh and first boundary-condition set as the two above, so the same
+    # field; benchmarks/build_lem_samples.py --meshes writes the shared mesh.
+    ("docs/lem/files/xslope_earth_dam_down_seep",        (1,), DOCS),
     ("docs/lem/files/xslope_johnson_rapid_KEY",       (1, 2), DOCS),
     ("docs/seep/files/xslope_clay_blanket",              (1,), DOCS),
     ("docs/seep/files/xslope_double_sheetpile",          (1,), DOCS),
@@ -241,13 +245,22 @@ def run(stem_rel, bcs, settings, check):
         suffix = "_seep.csv" if bc == 1 else "_seep2.csv"
         path = f"{stem}{suffix}"
         seep_data, solution = solve(stem, bc, settings)
+        name = os.path.basename(path)
+        if not os.path.exists(path):
+            # a model's first solve on a new mesh: nothing shipped to compare with
+            print(f"{name:<40} new: q={solution['flowrate']:.6f}  "
+                  f"unconfined={solution.get('unconfined')} "
+                  f"converged={solution.get('converged')} "
+                  f"closure={solution.get('closure_error'):.3e}")
+            if not check:
+                _quiet(export_seep_solution, seep_data, solution, path)
+            continue
         df, flowrate = _shipped(path)
         if len(df) != len(seep_data["nodes"]):
             raise SystemExit(f"{path}: {len(df)} rows against a "
                              f"{len(seep_data['nodes'])}-node mesh")
         du = float(np.max(np.abs(solution["u"] - df["u"].to_numpy())))
         dh = float(np.max(np.abs(solution["head"] - df["head"].to_numpy())))
-        name = os.path.basename(path)
         print(f"{name:<40} d_u={du:.3e} d_head={dh:.3e} "
               f"q={solution['flowrate']:.6f} (was {flowrate:.6f})  "
               f"unconfined={solution.get('unconfined')} "

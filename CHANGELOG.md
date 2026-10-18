@@ -20,12 +20,26 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   (strength reduction). The piezometric-line and seepage
   comparison models of that page and W-2's DXF section carry saturated weights
   too.
-- The earth dam sample models (the LEM samples' earth dam, upstream and
-  downstream, its rapid-drawdown model, and the `xslope_dam.xlsx` and
-  `xslope_rapid.xlsx` inputs) carry saturated unit weights of 130, 127, 128, and
-  132 pcf for the shell, core, clay, and sand. The earth dam's published factors
-  of safety rise: upstream, Spencer from 1.800 to 1.818 and Bishop from 1.815 to
-  1.833; downstream, Spencer from 1.558 to 1.576 and Bishop from 1.561 to 1.579.
+- The LEM samples' earth dam follows its source, Example 2 of Section 6.13.6 of
+  Duncan, Wright, and Brandon's *Soil Strength and Slope Stability* (2nd ed.).
+  Its section and piezometric line are scaled from the book's figures, and its
+  seepage model uses the book's permeabilities in ft/min. Before, the section
+  was a looser reading of the figure: a 590 ft base, a 50 ft crest, the core top
+  at El. 307, and the foundation running 150 ft past each toe. The downstream
+  slope is now analyzed the way the book does it, with the piezometric line and
+  with a seepage solution, each for the toe circle and for circles tangent to
+  El. 197, beside the book's Table 6.8. Before, it had one search with the
+  piezometric line. The downstream models keep the book's one unit weight per
+  zone. The upstream and rapid-drawdown models, and the `xslope_dam.xlsx` and
+  `xslope_rapid.xlsx` inputs built from the same dam, carry saturated unit
+  weights of 130, 127, 128, and 132 pcf. Upstream, Spencer moves from 1.800 to
+  1.812 and Bishop from 1.815 to 1.828. Downstream, Spencer with the
+  piezometric line gives 1.323 on the toe circle and 1.568 tangent to El. 197
+  (1.558 before, on one search), and with the seepage solution 0.967 and 1.405.
+  The saturated-unit-weight examples on the same dam move from 1.912 to 1.906
+  (seepage) and from 1.099 to 1.094 (rapid drawdown).
+- The input template's two piezometric-line tables center the numbers on every
+  row. Before, a line with more than eight points showed the rest right-aligned.
 - A report on a model where every method searched for its own surface says
   whether the searches settled on the same surface. Before, it always said the
   surfaces differ.

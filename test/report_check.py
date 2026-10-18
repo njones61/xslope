@@ -2033,15 +2033,19 @@ def test_fs_summary_reaches_the_document():
 #:
 #: The numbers stand at the mid-height of their own slices and come down in size
 #: together until they clear, so on any ordinary section none of them touch. The
-#: dam is not an ordinary section: cut into forty, its crest carries slice 38 at
-#: a foot and a half wide between two slices eight and a half feet wide, and no
-#: size a reader could read separates a number in that slice from the numbers
-#: either side of it. That pair, and only that pair, is what the key gives up —
-#: pinned here, so a change that starts printing numbers over each other anywhere
-#: else is a failure rather than one more entry on a list.
+#: dam is not an ordinary section: asked for forty slices it is cut into
+#: forty-one, the downstream crest corner leaves slice 39 at 4.2 ft wide between
+#: slices 7.0 and 10.0 ft wide, and on the upstream face the pool's edge
+#: (x = 225) and the base's crossings of the foundation surface and the core
+#: face (x = 231.5 and 238.9) leave slices 29 and 30 at 6.4 and 7.4 ft against
+#: the 9 ft slices beside them. No size a reader could read separates the
+#: numbers in those slices from their neighbors'. Those pairs, and only those,
+#: are what the key gives up — pinned here, so a change that starts printing
+#: numbers over each other anywhere else is a failure rather than one more entry
+#: on a list.
 _SLICE_KEY_TOUCHING = {
     "the sample": [],
-    "the dam": [("37", "38"), ("38", "39")],
+    "the dam": [("29", "30"), ("38", "39"), ("39", "40")],
 }
 
 
@@ -2180,8 +2184,8 @@ def test_slice_key_figure():
     # width rule. The sample's fifteen slices are sparse and are printed well
     # inside the text width. The nail model's fifteen stand on a mass as tall as
     # it is wide, which leaves the numbers a narrow band and asks for more width
-    # than the page has. The dam's forty ask for more still, and its crest
-    # carries a sliver a sixth the width of the slices either side of it. The
+    # than the page has. The dam's forty-one ask for more still, and its crest
+    # corner leaves a slice 4.2 ft wide between slices of 7.0 and 10.0 ft. The
     # last two are the case the width rule CLAMPS, which is where the size on
     # the page is smallest and the only place the legibility floor is really
     # tested.
@@ -2282,9 +2286,9 @@ def test_slice_key_figure():
         #
         # The size comes down until they clear, and it comes down for all of them
         # at once. Where even the floor is not small enough the floor is what is
-        # kept: a slice a sixth the width of the ones either side has no room at
+        # kept: a slice under half the width of its neighbor has no room at
         # its own mid-height for a number anybody could read, and a key set at
-        # four points to separate that one pair keys nothing at all. So an
+        # four points to separate those pairs keys nothing at all. So an
         # overlap is allowed only at the floor, and only against a slice narrower
         # than the label printed on it.
         boxes = [t.get_window_extent(renderer) for t in marks]
@@ -12147,9 +12151,9 @@ def test_seep_dual_section():
 
     # The velocity ARROWS are on one scale too. An arrow is a length standing for a
     # speed, and each panel scaled to its own maximum drew its longest arrow the
-    # same length in both sets — the same mark meaning 109 ft/day before drawdown
-    # and 269 after. Measured off the arrows as drawn: their lengths are in the
-    # ratio of the speeds they stand for.
+    # same length in both sets — the same mark meaning 0.0017 ft/min before
+    # drawdown and 0.00043 after. Measured off the arrows as drawn: their lengths
+    # are in the ratio of the speeds they stand for.
     arrows = [(kw, sd, sol) for kw, sd, sol in calls if kw.get("vectors")]
     if len(arrows) != 2:
         fails.append(f"the pair drew {len(arrows)} panels with velocity arrows, "

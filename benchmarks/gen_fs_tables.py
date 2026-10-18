@@ -11,7 +11,8 @@ applicable method and rewrites two things in place:
     and stay untouched; and
   * the ``fs_<method>=`` values inside the test tag, so run_tests.py checks
     every method. Every other key in the tag (``rapid``, ``benchmark``, the
-    search-window keys, anything added later) is round-tripped verbatim.
+    search-window keys, ``seed``, anything added later) is round-tripped
+    verbatim, and the search runs with the window and the seed.
 
 Everything else on the page is passed through byte for byte: a tag with no table
 above it is not a managed problem and is never touched, which is how the γ_sat
@@ -103,6 +104,12 @@ EXCLUDED_NOTE = (
     "[OMS method note](oms.md)."
 )
 EXCLUDED_NOTE_MARK = "OMS is not reported for this problem"
+#: A tag can also name the methods it does not report, as ``na=oms`` (several
+#: separated by ";"). It is for a model that carries two tags where a method
+#: fails on one of them only: the earth dam's downstream models report OMS on
+#: their circles tangent to El. 197 but not on their small toe circles. A table
+#: under such a tag carries its own footnote, starting with EXCLUDED_NOTE_MARK
+#: so the note above is not added to it.
 
 TEST_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 TABLE_RE = re.compile(r'[ \t]*<!--\s*fs-table\s*-->.*?<!--\s*/fs-table\s*-->\n?', re.DOTALL)
@@ -134,6 +141,9 @@ def compute_fs(params):
     # rapid=true -> 3-stage rapid-drawdown analysis (works with any test type).
     rapid = str(params.get("rapid", "false")).strip().lower() in ("true", "1", "yes")
     path = os.path.join(os.path.dirname(SAMPLES_MD), file_rel)
+    # seed=grid starts the search from a grid-and-tangent sweep (run_tests.py
+    # reads the same key), for a slope where a shallow and a deep family compete.
+    seed = str(params.get("seed", "circles")).strip().lower()
 
     slope_data = load_slope_data(path)
     # The tag's own window wins; anything it leaves open comes from the model's
@@ -146,9 +156,10 @@ def compute_fs(params):
         vals = tuple(float(v) for v in str(raw).split(';') if v.strip() != '')
         win[key] = vals if len(vals) > 1 else vals[0]
     win.update(file_search_window(slope_data, already=win))
+    na = {v.strip() for v in str(params.get("na", "")).split(";") if v.strip()}
     results = {}
     for short, solver, _ in METHODS:
-        if (file_rel, short) in EXCLUDED:
+        if (file_rel, short) in EXCLUDED or short in na:
             results[short] = NA
             continue
         if not applicable(short, test_type):
@@ -171,7 +182,7 @@ def compute_fs(params):
                     results[short] = fs_cache[0]["FS"] if fs_cache and fs_cache[0]["FS"] < 9999 else None
                 else:  # circular_search
                     fs_cache, _, _, _ = circular_search(slope_data, solver, num_slices=num_slices, rapid=rapid,
-                                                        **win)
+                                                        seed=seed, **win)
                     results[short] = fs_cache[0]["FS"] if fs_cache and fs_cache[0]["FS"] < 9999 else None
         except Exception as e:
             print(f"    ! {solver} failed on {file_rel}: {e}", file=sys.stderr)

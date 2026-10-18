@@ -183,11 +183,26 @@ Solution (critical surface and factor of safety):
 
 **Downstream side of the dam**
 
-Water flows under the dam through the sand and rises through the clay beneath the
-downstream half. The book uses this slope to compare two ways of supplying the pore
-pressures: interpolated from a finite-element seepage solution, and from a piezometric
-line taken as that solution's zero-pressure line. For each, it reports two minimum
-factors of safety. The overall minimum falls on very shallow circles near the toe. The
+The point of the book's example is in the foundation. The sand at the bottom is a hundred
+times more permeable than the clay above it, so water from the reservoir travels through
+the sand beneath the whole dam and arrives under the downstream toe still at a high head.
+From there its only way out is up through the clay to the ground. Water flowing upward
+pushes up on the soil it passes through (a seepage force): the pore pressure is higher than in still water
+at the same depth, so the effective stress is lower, and so is the strength of the shell
+and the clay, which have no cohesion.
+
+A piezometric line cannot represent that. It sets the pore pressure to the depth below
+the line times the unit weight of water, which puts the total head at the line's
+elevation at every depth beneath it, as in water that is not flowing vertically. Where
+the water flows upward, the line gives too little pressure. The book puts the
+differences between its results down to "the upward flow of water through the clay
+foundation, which is not represented well by either a phreatic surface or a single
+piezometric line" (p. 122).
+
+The book compares the two ways of supplying the pore pressures on this slope:
+interpolated from a finite-element seepage solution, and from a piezometric line taken
+as that solution's zero-pressure line. For each, it reports two minimum factors of
+safety. The overall minimum falls on very shallow circles near the toe. The
 book also reports the minimum for circles tangent to El. 197, the bottom of the clay,
 because "deeper slip surfaces are likely to be of interest as well" (p. 121). Both are
 analyzed here, with each method running its own search:
@@ -262,6 +277,24 @@ Toe circle, shown close up, with the seepage head contours:
 
 <!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, seed=grid, exit_range=500;638, na=oms, fs_bishop=0.938, fs_janbu=0.849, fs_corps=1.044, fs_lowe=0.942, fs_spencer=0.967, fs_mprice=0.966 -->
 
+Spencer's factor of safety for the toe circle falls from 1.323 with the piezometric line
+to 0.967 here, and the seepage solution shows why. Beneath the downstream toe the head
+at the top of the sand is 245 ft, 18 ft above the ground. That head is lost on the way up
+through the 30 ft of clay: from x = 450 ft to the end of the section, the flow in the
+clay is within 5° of vertical, at an upward gradient of 0.54 to 0.62. The gradient at
+which upward flow would carry the clay's whole buoyant weight is
+$(\gamma - \gamma_w)/\gamma_w = (123 - 62.4)/62.4 = 0.97$. The head contours in the
+close-up run nearly level beneath the toe because the flow there crosses them going
+straight up.
+
+The piezometric line lies on the ground beyond the toe, so there it gives the pressure of
+still water standing at El. 227. Along the base of the circle beyond the toe, the
+seepage pore pressures are 1.65 to 1.74 times that. Over the whole base, the water force
+pushing up on the slide mass is 4,400 lb/ft from the seepage solution and 3,160 lb/ft
+from the piezometric line, against 6,920 lb/ft for the weight of the soil above it. Beyond the toe, where only the
+clay lies over the base, the seepage pressure leaves an effective vertical stress of a
+quarter to a third of what the line gives.
+
 Circle tangent to El. 197:
 
 ![earth_dam_down_seep_deep_results.png](sample_images/earth_dam_down_seep_deep_results.png){width=1000}
@@ -275,6 +308,12 @@ Circle tangent to El. 197:
 <!-- /fs-table -->
 
 <!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, tangent_depth=197;197, fs_oms=1.250, fs_bishop=1.406, fs_janbu=1.391, fs_corps=1.431, fs_lowe=1.412, fs_spencer=1.405, fs_mprice=1.405 -->
+
+This circle crosses the same upward flow, but most of its base lies under the
+embankment, where the weight of the fill holds the effective stress near the line's
+value: at 78 percent or more wherever at least 27 ft of fill lies above the foundation. The share falls as the fill thins toward the toe, to about 40 percent beyond
+it. Its factor of safety (Spencer) falls by about a tenth, from 1.568 with the
+piezometric line to 1.405, while the toe circle's falls by more than a quarter.
 
 **Comparison with the book**
 
@@ -293,12 +332,9 @@ concentrates at the toe, so its factor of safety depends on how finely the mesh 
 the toe. It falls as the mesh is refined and settles at about the 3.5 ft element size
 used here.
 
-Both comparisons make the book's point. The toe circle is critical with either source of
-pore pressure, and the seepage solution gives the lower factor of safety on both circles.
-The difference comes from the upward flow through the clay foundation, which a single
-piezometric line cannot represent (p. 122), and it is on the unsafe side. The book
-concludes that where the flow is not predominantly horizontal, the pore pressures should
-come from a seepage analysis.
+On both circles the seepage solution gives the lower factor of safety, so the
+piezometric line errs on the unsafe side. The book concludes that where the flow is not
+predominantly horizontal, the pore pressures should come from a seepage analysis.
 
 ### 5. Tension Crack
 

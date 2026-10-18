@@ -798,14 +798,21 @@ def _require_runtime_dirichlet(dir_mask):
 #: from the start rather than on detection johnson_rapid_KEY loses convergence at 3e-4
 #: and at 1e-4. 1e-3 is the coarsest floor that carries every one of them.
 _CYCLE_LOOKBACK = 25      # how many sweeps back a repeat is looked for
-_CYCLE_TOL = 1e-6         # repeat tolerance, x domain height
+#: The repeat tolerance sets how soon an orbit is SEEN, not whether it is one: the
+#: orbit's return distance shrinks by about half every 65 sweeps, and detection waits
+#: for it to fall under the tolerance. At 1e-6 the earth dam's orbit (earth_dam_rapid
+#: on its 3.5 ft mesh) is seen at sweep 491, past the 400 sweeps Studio allows a
+#: steady solve; at 1e-5 it is seen at 261 and the solve closes at 525, its field
+#: within 0.003 ft of head of the 1e-6 answer. The eight models that converge without
+#: the escape (test/seep_cycle_check.py) are untouched at either value, sweep for sweep.
+_CYCLE_TOL = 1e-5         # repeat tolerance, x domain height
 _CYCLE_PERSIST = 30       # consecutive sweeps the repeat must hold before acting
 _CYCLE_RELAX_FLOOR = 1e-3
 #: Sweeps granted beyond ``max_iter``, once, on the sweep the floor drops and never
 #: otherwise. A solve stepping at a thousandth needs the room, and the sweep it
 #: detects its orbit on is not something the caller can budget for: earth_dam_rapid
-#: detects at 396 and closes at 463, so at the library's own 400-sweep default it
-#: would otherwise stop four sweeps after diagnosing itself. The extension is granted
+#: detects at 261 and closes at 525, so at the library's own 400-sweep default it
+#: would otherwise stop with its orbit diagnosed and not yet damped. The extension is granted
 #: from that sweep and is not renewed; a solve that has not closed by then stops.
 _CYCLE_EXTRA_SWEEPS = 600
 

@@ -792,19 +792,22 @@ def _require_runtime_dirichlet(dir_mask):
 #: converging solve passes through (johnson_res holds one for 7 sweeps).
 #:
 #: THE FLOOR DROPS ONCE, TO 1e-3, AND NO FURTHER — it is a window, not a ladder.
-#: Measured over the three models that cycle: at 3e-3 earth_dam_rapid still does not
-#: converge in 2000 sweeps; at 1e-3 all three converge; at 3e-4 all three still
-#: converge, to fields within 0.04 psf of the 1e-3 answer, and under a floor applied
-#: from the start rather than on detection johnson_rapid_KEY loses convergence at 3e-4
-#: and at 1e-4. 1e-3 is the coarsest floor that carries every one of them.
+#: Measured over the two fields that cycle (earth_dam_rapid, whose section, mesh and
+#: first boundary set gsat_seep and earth_dam_down_seep share, and johnson_rapid_KEY),
+#: each given 2000 sweeps: at 3e-3 they close in 348 and 459 sweeps, at 1e-3 in 525 and
+#: 472, and at 3e-4 in 1142 and 525, every field within 6e-4 ft of head (0.04 psf) of
+#: the 1e-3 answer. Under a floor applied from the start rather than on detection,
+#: johnson_rapid_KEY does not converge at 1e-3, 3e-4 or 1e-4, so the floor has to wait
+#: for the detection; once it has, 1e-3 sits inside the window on both fields.
 _CYCLE_LOOKBACK = 25      # how many sweeps back a repeat is looked for
 #: The repeat tolerance sets how soon an orbit is SEEN, not whether it is one: the
 #: orbit's return distance shrinks by about half every 65 sweeps, and detection waits
 #: for it to fall under the tolerance. At 1e-6 the earth dam's orbit (earth_dam_rapid
 #: on its 3.5 ft mesh) is seen at sweep 491, past the 400 sweeps Studio allows a
 #: steady solve; at 1e-5 it is seen at 261 and the solve closes at 525, its field
-#: within 0.003 ft of head of the 1e-6 answer. The eight models that converge without
-#: the escape (test/seep_cycle_check.py) are untouched at either value, sweep for sweep.
+#: within 0.003 ft of head of the 1e-6 answer. Every other steady companion in the
+#: corpus (tools/make_seep_sidecars.py, 29 more solves) is bit for bit the same at
+#: either value.
 _CYCLE_TOL = 1e-5         # repeat tolerance, x domain height
 _CYCLE_PERSIST = 30       # consecutive sweeps the repeat must hold before acting
 _CYCLE_RELAX_FLOOR = 1e-3
@@ -812,8 +815,8 @@ _CYCLE_RELAX_FLOOR = 1e-3
 #: otherwise. A solve stepping at a thousandth needs the room, and the sweep it
 #: detects its orbit on is not something the caller can budget for: earth_dam_rapid
 #: detects at 261 and closes at 525, so at the library's own 400-sweep default it
-#: would otherwise stop with its orbit diagnosed and not yet damped. The extension is granted
-#: from that sweep and is not renewed; a solve that has not closed by then stops.
+#: would otherwise stop with its orbit diagnosed and not yet damped. The extension is
+#: granted from that sweep and is not renewed; a solve that has not closed by then stops.
 _CYCLE_EXTRA_SWEEPS = 600
 
 #: Set-revisit escape for a cycling quadratic exit-face edge.

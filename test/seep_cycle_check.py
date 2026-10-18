@@ -10,7 +10,7 @@ high-conductivity-contrast interface oscillate with a period of 8 to 12 sweeps. 
 relaxed iterate barely moves, so the head-change test is satisfied, while the
 un-relaxed step the closure gate is measured on lands far away, so the closure test
 never is. ``solve_unsaturated`` detects the orbit -- a RETURN to a sweep 2 to 25 back,
-within 1e-6 of the head range, having been further away at every shorter lag, with the
+within 1e-5 of the head range, having been further away at every shorter lag, with the
 exit-face set unchanged, held for 30 consecutive sweeps -- and lowers the relaxation
 floor once, to 1e-3, granting a bounded extension of the sweep budget from that sweep.
 Three models are rescued this way, and all three still are; a fourth, earth_dam_down_seep,
@@ -79,14 +79,15 @@ WHAT THIS CHECK LOCKS
 MEASURED DURING THE ROUND, NOT LOCKED HERE
 
 On johnson_rapid_KEY the rescued flow rate is the model's and not the settings':
-re-solved at relaxation floors of 1e-3 and 3e-4 the fields agree to 5.2e-04 ft of head,
+re-solved at relaxation floors of 1e-3 and 3e-4 the fields agree to 5.9e-04 ft of head,
 and tightening the head tolerance from 1e-4 to 1e-6 changes neither field nor sweep
 count -- the closure test, not the head test, is what closes that solve. The earth dam
 (earth_dam_rapid, gsat_seep and earth_dam_down_seep, one field) is not that case: at a
-3e-4 floor it has not closed when its 1091-sweep budget runs out (its field then
-3.7e-02 ft from the 1e-3 answer), and at a head tolerance of 1e-6 it closes in 1053
-sweeps rather than 770, its field moving 1.1e-02 ft and its flow rate 1.1e-07 of
-itself, so the head test is what closes it at 1e-4. No leg re-solves either at a
+3e-4 floor it has not closed when its 1000-sweep budget runs out (its field then
+8.8e-03 ft from the 1e-3 answer; given 2000 sweeps it closes at 1142, within 1.7e-04 ft
+of it), and at a head tolerance of 1e-6 it closes in 903 sweeps rather than 525, its
+field moving 1.2e-02 ft and its flow rate 3.4e-07 of itself, so the head test is what
+closes it at 1e-4. No leg re-solves either at a
 second setting: that would double the runtime for a property the trajectory pins above
 already constrain, since a solve whose answer had become a function of its settings
 would have to reach it along a different path, and the escape sweeps and sweep counts
@@ -100,19 +101,19 @@ stands, and each mutable in one line if a reader wants to see the other side of 
   detection with a blanket ``relax = min(relax, 1e-3)`` on the ladder's bottom rung and
   two of the four models the class A gate touches lose their convergence: vp077a runs
   its 1000 sweeps without closing where it took 393, and johnson_rapid_KEY its 1000
-  where the escape closes it at 826. A third, earth_dam_rapid, closes without the escape
-  in 634 sweeps but on 2.0495640e-03 rather than 2.0495633e-03. vp046b and
+  where the escape closes it at 472. A third, earth_dam_rapid, closes without the escape
+  in 634 sweeps but on 2.0495640e-03 rather than 2.0495627e-03. vp046b and
   earth_dam1_vg are untouched, because the progress-fed ladder no longer drives either
   of them to the bottom rung at all.
 * Neither is a repeat that never left -- a solve creeping monotonically sits inside
   the repeat tolerance at every lag and reads as an orbit unless the iterate is
   required to have gone somewhere in between. That false positive is the ``_cyc_away``
-  term's whole job, and vp077a witnesses it: delete the term and vp077a's creep reads
-  as an orbit at sweep 344, the escape floors its relaxation, and it takes 805 sweeps to
-  reach 8.2210996e-06 where it took 393 to reach 8.2210891e-06. earth_dam2 and
-  earth_dam1_vg come back bit for bit (195 sweeps at 1.2734362, 163 at 37.716990),
-  because the exit-face fix closes earth_dam2 before its creep gets fine enough to be
-  mistaken for a period-2 orbit.
+  term's whole job, and three of the inert models witness it: delete the term and
+  vp077a's creep reads as an orbit at sweep 274, the escape floors its relaxation, and
+  it runs its 1000 sweeps without closing where it took 393; earth_dam2 reads as one at
+  sweep 204 and closes in 257 sweeps on 1.2734304 rather than 195 on 1.2734362; and
+  earth_dam1_vg at sweep 170, closing in 336 on 37.716779 rather than 163 on
+  37.716990.
 * Revisiting sets is normal EARLY. Every converging model in the corpus revisits
   exit-face sets while its seepage face is still finding its extent, and all of them
   are done by sweep 41 (vp077a, the latest). Set ``_SET_REVISIT_SWEEP = 0`` and
@@ -153,10 +154,10 @@ VENDOR = dict(tol=1e-5, max_iter=600)
 # of the sweep number. The escapes are unchanged and every row still fires one.
 # The three earth-dam rows are one section, one mesh and one boundary set, so one field.
 RESCUED = [
-    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 2.0495633e-03, 770, "A"),
-    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 2.0495633e-03, 770, "A"),
-    ("docs/lem/files/xslope_earth_dam_down_seep", 1, DOCS, 2.0495633e-03, 770, "A"),
-    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8718996, 826, "A"),
+    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 2.0495627e-03, 525, "A"),
+    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 2.0495627e-03, 525, "A"),
+    ("docs/lem/files/xslope_earth_dam_down_seep", 1, DOCS, 2.0495627e-03, 525, "A"),
+    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8718997, 472, "A"),
 ]
 
 #: Converging without either escape, and required to stay that way, sweep for sweep.

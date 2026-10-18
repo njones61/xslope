@@ -10052,7 +10052,7 @@ def run_seep_cycle_test(test):
     its own must be untouched by both.
 
     The fourth model, earth_dam2, no longer cycles: the exit-face fix in seep.py gave
-    its seepage face the edge that runs to the toe, and it now converges in 600 sweeps
+    its seepage face the edge that runs to the toe, and it now converges in 195 sweeps
     with neither escape firing. The exit-face escape therefore rescues nothing anywhere
     in the corpus, and the check records that rather than hiding it — it drives the
     escape at a lowered gate instead, where the orbit is still reachable, and requires

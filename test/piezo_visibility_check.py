@@ -149,14 +149,18 @@ def check_used_pore_pressure(failures):
 
 
 def check_used_water_load(failures):
-    """With no material reading the line, the pool it states still does."""
-    sd = _model(POOL, u='seep', drop_bc=True)
+    """With no material reading the line, the pool it states still does.
+
+    The dam's saturated unit weights are removed throughout: with no seepage
+    solution loaded they would read the line for the weight split, and this
+    check is about the water load alone."""
+    sd = _model(POOL, u='seep', drop_bc=True, drop_gamma_sat=True)
     if not piezo_line_used(sd, 1):
         failures.append("a piezometric line that is the model's only water-load "
                         "source is not marked as read")
     # The same model with its head boundaries back: they are the source, by the
     # precedence in water_line_for_stage, and the line is inert.
-    sd = _model(POOL, u='seep')
+    sd = _model(POOL, u='seep', drop_gamma_sat=True)
     if piezo_line_used(sd, 1):
         failures.append("a piezometric line is marked as read while the seepage "
                         "head boundaries are the water-load source")
@@ -212,10 +216,11 @@ def check_inputs_plot(failures):
             _drawn_on_inputs(_model(SEEPED)), set())
     _expect(failures, "inputs, u = seep with no boundary set (line is the load "
                       "source)",
-            _drawn_on_inputs(_model(POOL, u='seep', drop_bc=True)), {LABEL[1]})
+            _drawn_on_inputs(_model(POOL, u='seep', drop_bc=True,
+                                    drop_gamma_sat=True)), {LABEL[1]})
     _expect(failures, "inputs, u = seep with head boundaries (they are the load "
                       "source)",
-            _drawn_on_inputs(_model(POOL, u='seep')), set())
+            _drawn_on_inputs(_model(POOL, u='seep', drop_gamma_sat=True)), set())
     _expect(failures, "inputs, u = none with one unit weight and no water load",
             _drawn_on_inputs(_model(PIEZO, u='none', drop_gamma_sat=True)), set())
     _expect(failures, "inputs, gamma_sat weight split",

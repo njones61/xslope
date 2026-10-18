@@ -182,7 +182,7 @@ AXIAL_MIRROR_LEFT = _repo('docs/inputs/slope/xslope_nail_axial.xlsx')
 AXIAL_MIRROR_RIGHT = _repo('docs/inputs/slope/xslope_nail_axial_rface.xlsx')
 MP_SPENCER_LEFT = _repo('docs/inputs/slope/xslope_simple1.xlsx')
 MP_SPENCER_RIGHT = _repo('docs/inputs/slope/xslope_rface.xlsx')
-# Stage-1 FS 1.91 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
+# Stage-1 FS 1.94 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
 DRAWDOWN_GUARD_FILE = _repo('docs/inputs/slope/xslope_rapid.xlsx')
 # --- backward-compatibility fixtures: SYNTHESIZED, never sample files ------
 #
@@ -5105,12 +5105,12 @@ _V16_BACKCOMPAT_EXPECTED = {
         {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 137000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 8000.0, 'nu': 0.45, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
-    # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; blank gsat -> None)
+    # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; saturated weights carried)
     _repo('docs/inputs/slope/xslope_dam.xlsx'): [
-        {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Core', 'gamma': 122.0, 'gamma_sat': None, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': 130.0, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Core', 'gamma': 122.0, 'gamma_sat': 127.0, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': 128.0, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': 132.0, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
     # docs/verification/files/rocscience/vp042.xlsx — read at v16 (t_cut column
     # present, all blank; no phi_b/s_cap columns). Captured pre-v17. Proves inserting
@@ -5710,9 +5710,11 @@ PREFLIGHT_RULE_SPECS = [
     # manual_water: the template ships Water loads = auto and the rule stands
     # down in auto mode (the line then IS the reservoir definition), so the
     # round-tripped file must be pinned to manual for the mutation to reach it.
+    # The saturated unit weights go too: they are the line's other consumer (it
+    # splits moist from saturated weight), and the rule stands down for them.
     dict(rule='piezo.no_consumer', base=PREFLIGHT_BASE_LEM, mode='excel',
          manual_water=True,
-         mutation=lambda sd: _pf_mats(sd, u='none'),
+         mutation=lambda sd: _pf_mats(sd, u='none', gamma_sat=None),
          expect='no material uses u = piezo'),
     dict(rule='water.ponded_no_dload', base=PREFLIGHT_BASE_LEM, mode='excel',
          manual_water=True,

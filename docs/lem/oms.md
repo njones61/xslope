@@ -231,7 +231,7 @@ The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** b
     a **fully-submerged slope**, for example the upstream face of a dam under a full
     reservoir — $N'$ goes negative, and the shear resistance computed from it is
     meaningless. On the `earth_dam_up` sample this happens on a quarter of the slices
-    and lowers the factor of safety to 0.886 against Bishop's 1.815, which is why that
+    and lowers the factor of safety to 0.897 against Bishop's 1.833, which is why that
     problem reports OMS as *n/a*. Use a method whose base normal comes from vertical
     equilibrium — Bishop, Janbu, or a complete-equilibrium method such as Spencer — for
     such cases.

@@ -99,7 +99,7 @@ EXCLUDED_NOTE = (
     "which under a full reservoir goes negative on the deepest slices — a "
     "quarter of them on the surface it settles on here — so the shear "
     "resistance it computes there is meaningless and the factor of safety it "
-    "reports (0.886) sits far below every other method's. See the "
+    "reports (0.897) sits far below every other method's. See the "
     "[OMS method note](oms.md)."
 )
 EXCLUDED_NOTE_MARK = "OMS is not reported for this problem"

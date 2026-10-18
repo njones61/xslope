@@ -20,6 +20,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   (strength reduction). The piezometric-line and seepage
   comparison models of that page and W-2's DXF section carry saturated weights
   too.
+- The earth dam sample models (the LEM samples' earth dam, upstream and
+  downstream, its rapid-drawdown model, and the `xslope_dam.xlsx` and
+  `xslope_rapid.xlsx` inputs) carry saturated unit weights of 130, 127, 128, and
+  132 pcf for the shell, core, clay, and sand. The earth dam's published factors
+  of safety rise: upstream, Spencer from 1.800 to 1.818 and Bishop from 1.815 to
+  1.833; downstream, Spencer from 1.558 to 1.576 and Bishop from 1.561 to 1.579.
 - A report on a model where every method searched for its own surface says
   whether the searches settled on the same surface. Before, it always said the
   surfaces differ.

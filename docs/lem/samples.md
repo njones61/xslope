@@ -129,14 +129,17 @@ Brandon.
 
 ![Earth dam with a clay core](sample_images/earth_dam_problem_sketch.png){width=1000}
 
-The material properties are as follows:
+The material properties are as follows. The book gives one unit weight per zone,
+γ. The water conditions are this example's own, and each zone also carries a
+saturated unit weight γ_sat, 5 pcf above γ, for the part of the zone below the
+piezometric line.
 
-|  Mat   | c' (psf) | $\phi$' (degrees) | γ (pcf) |
-|:------:|:--------:|:-----------------:|:-------:|
-| Shell  |    0     |        34         |   125   |
-|  Core  |   100    |        26         |   122   |
-|  Clay  |    0     |        24         |   123   |
-|  Sand  |    0     |        32         |   127   |
+|  Mat   | c' (psf) | $\phi$' (degrees) | γ (pcf) | γ_sat (pcf) |
+|:------:|:--------:|:-----------------:|:-------:|:-----------:|
+| Shell  |    0     |        34         |   125   |     130     |
+|  Core  |   100    |        26         |   122   |     127     |
+|  Clay  |    0     |        24         |   123   |     128     |
+|  Sand  |    0     |        32         |   127   |     132     |
 
 **Upstream side of the dam**
 
@@ -162,12 +165,12 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| n/a\* | 1.815 | 1.736 | 2.072 | 2.018 | 1.800 | 1.795 |
+| n/a\* | 1.833 | 1.752 | 2.081 | 2.026 | 1.818 | 1.813 |
 
-\* OMS is not reported for this problem. Its base normal force is the Fellenius value $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, which under a full reservoir goes negative on the deepest slices — a quarter of them on the surface it settles on here — so the shear resistance it computes there is meaningless and the factor of safety it reports (0.886) sits far below every other method's. See the [OMS method note](oms.md).
+\* OMS is not reported for this problem. Its base normal force is the Fellenius value $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, which under a full reservoir goes negative on the deepest slices — a quarter of them on the surface it settles on here — so the shear resistance it computes there is meaningless and the factor of safety it reports (0.897) sits far below every other method's. See the [OMS method note](oms.md).
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.815, fs_janbu=1.736, fs_corps=2.072, fs_lowe=2.018, fs_spencer=1.800, fs_mprice=1.795 -->
+<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.833, fs_janbu=1.752, fs_corps=2.081, fs_lowe=2.026, fs_spencer=1.818, fs_mprice=1.813 -->
 
 **Downstream side of the dam**
 
@@ -193,10 +196,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.386 | 1.561 | 1.470 | 1.595 | 1.568 | 1.558 | 1.559 |
+| 1.400 | 1.579 | 1.546 | 1.616 | 1.587 | 1.576 | 1.577 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, fs_oms=1.386, fs_bishop=1.561, fs_janbu=1.470, fs_corps=1.595, fs_lowe=1.568, fs_spencer=1.558, fs_mprice=1.559 -->
+<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, fs_oms=1.400, fs_bishop=1.579, fs_janbu=1.546, fs_corps=1.616, fs_lowe=1.587, fs_spencer=1.576, fs_mprice=1.577 -->
 
 ### 5. Tension Crack
 
@@ -286,8 +289,8 @@ Solution (critical surface and factor of safety, Spencer's method):
 <!-- test: file=files/xslope_gsat_piezo.xlsx, type=circular_search, num_slices=40, fs_bishop=1.538, fs_spencer=1.539, fs_janbu=1.503 -->
 
 The water table can also come from a seepage solution. This is the upstream slope
-of the earth dam of [Problem 4](#4-earth-dam) with a saturated unit weight for each
-zone and `u = seep`: pore pressures are interpolated from the finite-element
+of the earth dam of [Problem 4](#4-earth-dam), with the same saturated unit weights
+and `u = seep`: pore pressures are interpolated from the finite-element
 seepage solution, and the phreatic surface of that same solution — the heavy
 contour carrying the water-table marker in the figure below — is the water table
 that splits the weights. When a model carries both a seepage solution and a

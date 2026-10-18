@@ -7,7 +7,8 @@ of the dam.
   xslope_gsat_seep          docs/lem/samples.md, problem 6 (gamma_sat with the
                             water table from a steady seepage solution)
   xslope_gsat_rapid         docs/lem/samples.md, problem 6 (gamma_sat under
-                            rapid drawdown, staged piezometric lines)
+                            rapid drawdown, staged piezometric lines; the same
+                            model as xslope_rapid below)
   xslope_earth_dam_rapid    the rapid-drawdown model with two seepage stages
                             (seep-bc and seep-bc (2)); a fixture of the seepage
                             and report checks and of the Studio screenshots
@@ -18,6 +19,12 @@ the regression suite and of Studio's screenshots and checks):
   xslope_dam                the steady upstream model (problem 8's, same name
                             set as the driver scripts use)
   xslope_rapid              the staged-piezometric-line rapid-drawdown model
+
+Every one of them carries water and pore pressures, so every zone carries a
+saturated unit weight, its moist unit weight plus 5 pcf, for the part of it
+below the water table. The source gives one unit weight per zone; the water
+conditions are ours, and no page compares these models with the source's
+factors of safety.
 
 The dam is Duncan, Wright & Brandon's earth dam (Shear Strength and Slope
 Stability, 2nd ed., p. 121): a shell and a clay core on a clay layer over sand,
@@ -43,8 +50,9 @@ they depend on (section, permeabilities, boundary conditions).
 Every value below is the value the shipped workbooks carried on 2026-10-01
 except: the base of xslope_gsat_rapid and xslope_rapid (Max depth 0 -> El. 182,
 problem 8's base); the clay's psi in xslope_gsat_rapid and xslope_rapid
-(19 -> 18, the course problem's value); and d and psi on the steady runs
-(removed). Each model is
+(19 -> 18, the course problem's value); d and psi on the steady runs
+(removed); and, from 2026-10-17, the saturated unit weights on every model,
+where before only the two problem 6 models carried them. Each model is
 written through :func:`xslope.fileio.save_slope_data_to_xlsx`, which copies the
 current template and never writes a formula cell.
 
@@ -131,12 +139,11 @@ def _material(name, gamma, c, phi, gamma_sat, k, *, u, rapid, seep_props,
     }
 
 
-def _dam(*, u, rapid, gsat, seep_props, xo=_XO_UP, **mat_extra):
+def _dam(*, u, rapid, seep_props, xo=_XO_UP, **mat_extra):
     """The dam with the water and analysis options of one run.
 
     u           the pore-pressure option of every material ('piezo' or 'seep')
     rapid       write the rapid-drawdown d and psi (only a rapid run reads them)
-    gsat        give each zone its saturated unit weight
     seep_props  write the permeabilities and the linear-front unsaturated law
                 (the runs that solve their own seepage)
     """
@@ -147,7 +154,7 @@ def _dam(*, u, rapid, gsat, seep_props, xo=_XO_UP, **mat_extra):
         'tcrack_water': 0.0,
         'k_seismic': 0.0,
         'water_loads': 'auto',
-        'materials': [_material(n, g, c, f, gs if gsat else None, k, u=u,
+        'materials': [_material(n, g, c, f, gs, k, u=u,
                                 rapid=rapid, seep_props=seep_props, **mat_extra)
                       for n, g, c, f, gs, k in _MATERIALS],
         'profile_lines': [{'coords': list(c), 'mat_id': m, 'size': None}
@@ -179,13 +186,13 @@ def _write(sd, name, out=None):
 # docs/lem/samples.md, problem 4: steady piezometric line, both slopes
 # =============================================================================
 def build_earth_dam_up():
-    sd = _dam(u='piezo', rapid=False, gsat=False, seep_props=False)
+    sd = _dam(u='piezo', rapid=False, seep_props=False)
     sd['piezo_line'] = list(_PIEZO_FULL)
     return _write(sd, 'xslope_earth_dam_up.xlsx')
 
 
 def build_earth_dam_down():
-    sd = _dam(u='piezo', rapid=False, gsat=False, seep_props=False, xo=_XO_DOWN)
+    sd = _dam(u='piezo', rapid=False, seep_props=False, xo=_XO_DOWN)
     sd['piezo_line'] = list(_PIEZO_FULL)
     return _write(sd, 'xslope_earth_dam_down.xlsx')
 
@@ -194,7 +201,7 @@ def build_earth_dam_down():
 # docs/lem/samples.md, problem 6: gamma_sat with a seepage water table
 # =============================================================================
 def build_gsat_seep():
-    sd = _dam(u='seep', rapid=False, gsat=True, seep_props=True)
+    sd = _dam(u='seep', rapid=False, seep_props=True)
     sd['time_unit'] = 'day'
     return _write(sd, 'xslope_gsat_seep.xlsx')
 
@@ -206,7 +213,7 @@ def build_gsat_rapid():
     """Staged piezometric lines (pool at El. 302, then El. 250). E and nu are
     entered as 0 and t_cut is blank, as the shipped file has them: this file is
     solved by limit equilibrium only, which reads none of the three."""
-    sd = _dam(u='piezo', rapid=True, gsat=True, seep_props=False,
+    sd = _dam(u='piezo', rapid=True, seep_props=False,
               E=0.0, nu=0.0, t_cut=None)
     sd['piezo_line'] = list(_PIEZO_FULL)
     sd['piezo_line2'] = list(_PIEZO_DRAWN)
@@ -217,7 +224,7 @@ def build_gsat_rapid():
 # Rapid drawdown from two seepage stages
 # =============================================================================
 def build_earth_dam_rapid():
-    sd = _dam(u='seep', rapid=True, gsat=False, seep_props=True)
+    sd = _dam(u='seep', rapid=True, seep_props=True)
     sd['seepage_bc2'] = {
         'specified_heads': [dict(h, coords=list(h['coords']))
                             for h in _SEEP_BC_DRAWN['specified_heads']],
@@ -235,7 +242,7 @@ def build_input_dam():
     download set's name. As shipped, the sand row's E and nu are entered as 0
     where every other row carries 700,000 and 0.3; kept as found and reported,
     since only limit equilibrium is run on this file."""
-    sd = _dam(u='piezo', rapid=False, gsat=False, seep_props=False)
+    sd = _dam(u='piezo', rapid=False, seep_props=False)
     sd['piezo_line'] = list(_PIEZO_FULL)
     sand = sd['materials'][3]
     sand['E'], sand['nu'] = 0.0, 0.0
@@ -243,10 +250,10 @@ def build_input_dam():
 
 
 def build_input_rapid():
-    """The staged-piezometric-line rapid-drawdown model: problem 16's rapid run
-    without the saturated unit weights. E and nu entered as 0 and t_cut blank,
-    as shipped."""
-    sd = _dam(u='piezo', rapid=True, gsat=False, seep_props=False,
+    """The staged-piezometric-line rapid-drawdown model, the same model as
+    problem 6's rapid run (xslope_gsat_rapid). E and nu entered as 0 and t_cut
+    blank, as shipped."""
+    sd = _dam(u='piezo', rapid=True, seep_props=False,
               E=0.0, nu=0.0, t_cut=None)
     sd['piezo_line'] = list(_PIEZO_FULL)
     sd['piezo_line2'] = list(_PIEZO_DRAWN)

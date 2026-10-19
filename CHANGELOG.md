@@ -8,6 +8,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- In **Build Mesh**, unticking **Auto-size from geometry** puts the cursor in
+  **Target element size**. Before, it jumped past it to the 1D element size.
 - A finite element run in Studio no longer stalls for seconds at a time while
   other programs are busy. Studio now runs the math library NumPy uses on one
   thread, so its idle threads no longer compete with the solver for the

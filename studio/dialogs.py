@@ -1316,9 +1316,19 @@ class BuildMeshDialog(QDialog):
         layout.addWidget(bb)
 
         self.auto_size.toggled.connect(self._sync_enabled)
+        self.auto_size.toggled.connect(self._focus_live_size)
         self.refine_near_features.toggled.connect(self._sync_enabled)
         self.element_type.currentIndexChanged.connect(self._sync_enabled)
         self._sync_enabled()
+
+    def _focus_live_size(self, auto):
+        """Put the cursor in whichever size box the Auto-size toggle just enabled:
+        Target element size when it goes off, Size divisions when it comes back on.
+        Without this, focus left the box that was disabled and skipped past the
+        still-disabled one to the 1D element size below it."""
+        box = self.size_divisions if auto else self.target_size
+        box.setFocus(Qt.TabFocusReason)
+        box.selectAll()
 
     def quad_style(self):
         """The selected quadrilateral style, ``'free'`` or ``'structured'``."""
@@ -1329,8 +1339,14 @@ class BuildMeshDialog(QDialog):
 
     def _sync_enabled(self):
         auto = self.auto_size.isChecked()
-        self.size_divisions.setEnabled(auto)
-        self.target_size.setEnabled(not auto)
+        # Enable the newly live size box before disabling the other, so focus that
+        # leaves a box being disabled has the live one to land on.
+        if auto:
+            self.size_divisions.setEnabled(True)
+            self.target_size.setEnabled(False)
+        else:
+            self.target_size.setEnabled(True)
+            self.size_divisions.setEnabled(False)
         self.refine_factor.setEnabled(self.refine_near_features.isChecked())
         # Quad styles mean nothing to a triangular mesh: dim them and say why.
         quads = str(self.element_type.currentData() or "").startswith("quad")

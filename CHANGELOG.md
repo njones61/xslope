@@ -8,6 +8,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- A finite element run in Studio no longer stalls for seconds at a time while
+  other programs are busy. Studio now runs the math library NumPy uses on one
+  thread, so its idle threads no longer compete with the solver for the
+  processor.
 - The strength plot in the Materials list view draws τ and σ′ at the same
   scale, so the envelope rises at the friction angle entered, and it shows the
   whole envelope, ending inside the frame. This applies to Mohr-Coulomb,

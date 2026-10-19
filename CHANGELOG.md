@@ -9,8 +9,9 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 ### Fixed
 
 - The strength plot in the Materials list view draws τ and σ′ at the same
-  scale, so the envelope rises at the friction angle entered. This applies to
-  Mohr-Coulomb, power-curve, and Hoek-Brown materials.
+  scale, so the envelope rises at the friction angle entered, and it shows the
+  whole envelope, ending inside the frame. This applies to Mohr-Coulomb,
+  power-curve, and Hoek-Brown materials.
 - In Studio's tables, `Delete` (`delete` on a Mac keyboard) empties the selected
   cells. Before, a cell had to be opened with a double-click first.
 - The Materials list view dims its property fields until a material exists.

@@ -241,6 +241,16 @@ condition, so it is no-flow rather than held at the reservoir level. Preflight r
 a [warning](../usage/preflight.md#what-is-checked): draw the line over all the ground the pool
 can reach, unless a no-flow barrier there is intended.
 
+A `head` line drawn along the ground surface that the water leaves partly dry is reported too.
+Its dry part is held at the water level in suction, which draws water out of the slope. A pool
+or reservoir face takes the `reservoir` type; any other head line ends at the water level. The
+warning reads only the part of a line that lies along the ground surface, and leaves out the
+near-vertical segments (steeper than 1H:20V) at the two ends of the ground line, which are model
+sides. A model side held at a uniform head down through the soil is therefore not reported, and
+neither is a line that stays entirely above every level (a specified-suction boundary), a line
+that stays entirely under water, or a confined steady model with no exit face and no reservoir
+boundary. A near-vertical face inside the ground line is an exposed face and is read.
+
 ### Exit face (seepage face)
 
 An exit face is a boundary where water may discharge to the atmosphere — a downstream slope,

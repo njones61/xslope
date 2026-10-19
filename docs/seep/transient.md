@@ -236,7 +236,9 @@ own **type** — `head`, `reservoir` or `flux` — decides whether its numbers a
 Dirichlet head, a reservoir level, or a specified flux.
 
 A series-bound value does not rule out a **steady** run: the series is read at its **t = 0
-value**, and the Log states each reading (`Series 'pool' read at t = 0 for the steady solve`).
+value** — for a step anchored at t = 0, the value before the step, as the transient run's
+initial condition reads it — and the Log states each reading
+(`Series 'pool' read at t = 0 for the steady solve`).
 That steady solution is the initial-condition snapshot — the same field a transient run
 starts from, and its first saved frame — so a quick steady run is the natural check on a model
 before committing to a long one.
@@ -267,7 +269,13 @@ below the level they are identical.
 A **head** boundary is a plain Dirichlet: every node of the polyline is held at the value —
 constant or series $h(t)$ — at **all times**. It can hold a negative-pressure (suction) head
 and never converts to an exit face. This is the type for a drained face, a specified-suction
-laboratory boundary, or any imposed head that should be enforced regardless of elevation.
+laboratory boundary, or any imposed head that should be enforced regardless of elevation. On a
+line along the ground surface that the water leaves partly dry at some time in the run, the dry
+part is held at the water level in suction, which draws water out of the slope; preflight
+warns about such a line, since a pool face belongs to the `reservoir` type and any other head
+line ends at the water level. A model side is not such a line, including a near-vertical side
+that starts or ends the ground line
+([what preflight reads](overview.md#specified-head-dirichlet)).
 
 A **reservoir** boundary is the free-water level used for a pool or tailwater whose level
 rises and falls. Each node of the polyline is in one of three states, decided by the level

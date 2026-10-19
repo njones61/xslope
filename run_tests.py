@@ -5344,6 +5344,13 @@ PREFLIGHT_BASE_THIN = _repo('docs/fem/files/xslope_griffiths3_r0p2_thin.xlsx')
 # A solved seepage field on a tri6 mesh whose exit face drains at atmospheric
 # pressure: the negative control for the free-surface pressure rule.
 PREFLIGHT_BASE_SEEP_FIELD = _repo('docs/verification/files/rocscience/vp046b.xlsx')
+# A cut slope whose model sides are vertical head lines through the soil, and a
+# plan-view radial flow model whose head lines are arcs in a confined solve.
+PREFLIGHT_BASE_SIDES = _repo('docs/verification/files/rocscience/rs2_28a.xlsx')
+PREFLIGHT_BASE_CONFINED = _repo('docs/seep/files/xslope_confined_radial.xlsx')
+# The same cut slope with its toe-side model side folded into the ground line:
+# the line starts at the foot of a side 0.13 off vertical over 30.66.
+PREFLIGHT_BASE_SIDE_IN_GROUND = _repo('docs/verification/files/rocscience/vp038a.xlsx')
 
 
 def _pf_set(d, **kw):
@@ -5412,6 +5419,20 @@ def _pf_bc_reservoir(sd, i, **kw):
     """Make specified-head block ``i`` of set 1 a reservoir, updated with ``kw``
     (a level, a series name, coordinates)."""
     sd['seepage_bc']['specified_heads'][i].update(kind='reservoir', **kw)
+    return sd
+
+
+def _pf_bc_set(sd, i, **kw):
+    """Update specified-head block ``i`` of set 1 with ``kw`` (a kind, a level or
+    series name, coordinates)."""
+    sd['seepage_bc']['specified_heads'][i].update(**kw)
+    return sd
+
+
+def _pf_ground(sd, pts):
+    """Replace the ground surface with the polyline ``pts``."""
+    from shapely.geometry import LineString
+    sd['ground_surface'] = LineString(pts)
     return sd
 
 
@@ -6265,6 +6286,79 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_bc_reservoir(sd, 0, head=20.0),
          control=lambda sd: _pf_bc_reservoir(sd, 0, head=18.0),
          expect='Extend the reservoir line over it'),
+    # A plain head line along the ground that the water leaves partly dry. The
+    # must-hits are the earth dam's upstream face (y 0 to 18) held as a plain head
+    # under the falling pool series (18 to 2), and the same face under a constant
+    # level of 10. Each near-miss is a control that differs in the one respect the
+    # rule turns on: the shipped reservoir type; a series that never uncovers the
+    # face (a submerged floor); a level entirely below the line (a suction
+    # boundary); a level 0.01 under the top of the line, inside the 1e-3-of-height
+    # round-off fence, against 0.1 under it outside the fence; model sides that run
+    # down through the soil, against the same head on a stretch of the ground; and
+    # a confined (plan-view) model, against the same model given an exit face.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_TSEEP,
+         mode='dict', analysis='tseep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, kind='head'),
+         expect='held at the water level, in suction'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_TSEEP,
+         mode='dict', analysis='tseep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, kind='head'),
+         control=lambda sd: _pf_tseep(_pf_bc_set(sd, 0, kind='head'),
+                                      series={'pool': [20.0, 20.0, 19.0]}),
+         expect='give it the reservoir type'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, head=10.0),
+         control=lambda sd: _pf_bc_set(sd, 0, head=-5.0),
+         expect='end the line at the water level'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, head=17.9),
+         control=lambda sd: _pf_bc_set(sd, 0, head=17.99),
+         expect='above its level (17.9)'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SIDES,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(sd, 1, head=30.0,
+                                        coords=[(0.13, 19.15), (26.536, 33.098)]),
+         expect='plain head line on the ground surface'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_CONFINED,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'], exit_face=_pf_pts(sd['ground_surface'])[:2])),
+         expect='in suction'),
+    # Near-vertical segments at the two ENDS of the ground line are model sides and
+    # are not read; the same steepness inside the line is an exposed face. The
+    # near-miss is vp038's toe-side head (6 m on a side 0.13 off vertical that
+    # starts the ground line); the mutation puts a stretch of ground in front of
+    # that side, so the side is an interior face and its dry part is reported.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SIDE_IN_GROUND,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_ground(
+             sd, [(-10.0, -11.51)] + _pf_pts(sd['ground_surface'])),
+         expect='rises to y = 19.15, above its level (6)'),
+    # An interior near-vertical face (0.1 over 18) under a level of 10 is read,
+    # against the same face with the line ended at the water level.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(0.0, 0.0), (30.0, 0.0), (30.1, 18.0), (51.0, 22.0),
+                             (59.0, 22.0), (105.0, 2.0), (110.0, 0.0)]),
+             0, head=10.0, coords=[(30.0, 0.0), (30.1, 18.0)]),
+         control=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(0.0, 0.0), (30.0, 0.0), (30.1, 18.0), (51.0, 22.0),
+                             (59.0, 22.0), (105.0, 2.0), (110.0, 0.0)]),
+             0, head=10.0, coords=[(30.0, 0.0), (30.0 + 0.1 * 10.0 / 18.0, 10.0)]),
+         expect='rises to y = 18, above its level (10)'),
+    # A 1H:1V face that STARTS the ground line is a face, not a model side: read.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(24.0, 0.0)] + _pf_pts(sd['ground_surface'])[1:]),
+             0, head=10.0, coords=[(24.0, 0.0), (42.0, 18.0)]),
+         control=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(24.0, 0.0)] + _pf_pts(sd['ground_surface'])[1:]),
+             0, head=18.0, coords=[(24.0, 0.0), (42.0, 18.0)]),
+         expect='rises to y = 18, above its level (10)'),
 
     # --- rapid drawdown ----------------------------------------------------
     dict(rule='rapid.stage2_water_missing', base=PREFLIGHT_BASE_RAPID, mode='excel',

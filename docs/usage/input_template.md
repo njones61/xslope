@@ -739,7 +739,11 @@ to a node of the line that stands above the water: a `head` holds it at the leve
 a `reservoir` leaves it no-flow until the water reaches it, and makes it an exit face once the
 water has covered it and fallen back below it. Use `reservoir` for a free-water face that rises
 or falls (dam pool, tailwater, pond) and `head` for a drained face or an imposed head that must
-be enforced regardless of elevation.
+be enforced regardless of elevation. Preflight warns about a `head` line along the ground
+surface that the water leaves partly dry at some time in the run, because that dry part is held
+in suction and draws water out of the slope: give a pool face the `reservoir` type, and end any
+other head line at the water level. A model side held at a uniform head is not reported,
+including a near-vertical side that starts or ends the ground line.
 
 A **specified flux** (Neumann) boundary prescribes the *rate* at which water crosses the
 boundary instead of the head on it. The usual use is rainfall infiltration or recharge applied

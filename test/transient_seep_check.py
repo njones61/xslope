@@ -541,6 +541,64 @@ def check_series_eval():
     return fails
 
 
+def check_steady_reads_initial_level():
+    """Every reading of a series "at t = 0" is the transient run's initial level.
+
+    A step anchored at t = 0 (two rows at time 0) is the case that can split them:
+    the march's evaluator takes the value BEFORE the step at t = 0, and a plain
+    linear interpolation over the anchors takes the value after it. The steady run
+    is documented as the transient run's starting snapshot, so the steady read
+    (the ``value_t0`` each series binding carries), preflight's t = 0 reading, the
+    inputs plot's t = 0 waterline and the derived water load must all equal the
+    march's own initial level. GW19's lagoon steps from 5 to 11 at t = 0."""
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import resolve_transient_bc, _series_high_water
+    from xslope.preflight import preflight
+    from xslope.plot import _eval_bc_series_at
+    from xslope.water import series_value
+
+    fails = []
+    path = os.path.join(_REPO_ROOT,
+                        "docs/verification/files/rocscience_gw/gw019.xlsx")
+    sd = _quiet(load_slope_data, path)
+    td = build_tseep_data(sd)
+    name = "pond"
+    ta, va = td["series"][name]
+    if not (len(ta) >= 2 and ta[0] == ta[1] == 0.0 and va[0] != va[1]):
+        return [f"fixture no longer steps at t = 0: {list(zip(ta, va))}"]
+    level0 = _eval_series(td["series"][name], 0.0)
+    if level0 != va[0]:
+        fails.append(f"the march's t = 0 level is {level0}, not the value before "
+                     f"the step ({va[0]})")
+    mesh = _quiet(build_mesh_from_polygons, get_material_polygons(sd), 2.0, "tri3")
+    seep = _quiet(build_seep_data, mesh, sd, check_inputs=False)
+    for b in seep["head_series_bindings"]:
+        if b["value_t0"] != level0:
+            fails.append(f"steady read of '{b['series']}' is {b['value_t0']}, the "
+                         f"march starts at {level0}")
+    rep = preflight(sd, "seep", ids=["seep.steady_reads_series_at_t0"])
+    if not any(f"'{name}' = {level0:g}" in f.message for f in rep.findings):
+        fails.append(f"preflight's t = 0 note does not read '{name}' = {level0:g}: "
+                     f"{[f.message[:120] for f in rep.findings]}")
+    if _eval_bc_series_at(sd["tseep"], name, 0.0) != level0:
+        fails.append("the inputs plot's t = 0 waterline is not the march's level")
+    if series_value(sd, name, 0.0) != level0:
+        fails.append("the derived water load's t = 0 pool is not the march's level")
+    if _series_high_water(td["series"][name], 0.0) != level0:
+        fails.append("the t = 0 high water is not the t = 0 level")
+    # The steady t = 0 configuration and the march's initial one hold the same
+    # nodes at the same heads.
+    bt0, bv0, _ = resolve_transient_bc(seep, td, 0.0)
+    held = bt0 == 1
+    mask = seep["head_series_bindings"][0]["mask"]
+    y = np.asarray(seep["nodes"])[:, 1]
+    if not np.array_equal(held & mask, mask & (y <= level0)):
+        fails.append("the march's t = 0 boundary does not hold exactly the nodes "
+                     "under the t = 0 level")
+    return fails
+
+
 def check_build_tseep_data():
     fails = []
     # steady model (no tseep) -> None
@@ -938,6 +996,7 @@ def check_drawdown_consistency():
 CHECKS = [
     ("series evaluator", check_series_eval),
     ("build_tseep_data", check_build_tseep_data),
+    ("steady reads the initial level", check_steady_reads_initial_level),
     ("storage functions", check_storage_functions),
     ("steady untouched", check_steady_untouched),
     ("analytical erfc", check_analytical_erfc),

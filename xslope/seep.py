@@ -187,6 +187,20 @@ def _flux_inflow(flux_nodal, free_mask):
     return float(np.sum(f[np.asarray(free_mask) & (f > 0)]))
 
 
+def bc_node_tolerance(nodes):
+    """How close a mesh node must lie to a boundary polyline to belong to it.
+
+    A tenth of a typical element size, taken as the smaller of the mesh's x and y
+    ranges over the square root of its node count. :func:`build_seep_data` binds
+    every boundary condition with it, and preflight reads boundary lines against
+    the ground surface with the same number."""
+    nodes = np.asarray(nodes, dtype=float)
+    x_range = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
+    y_range = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+    typical_element_size = min(x_range, y_range) / np.sqrt(len(nodes))
+    return typical_element_size * 0.1
+
+
 def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     """
     Build a seep_data dictionary from a mesh and data dictionary.
@@ -315,12 +329,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     else:
         seepage_bc = slope_data.get("seepage_bc", {})
     
-    # Calculate appropriate tolerance based on mesh size
-    # Use a fraction of the typical element size
-    x_range = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
-    y_range = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-    typical_element_size = min(x_range, y_range) / np.sqrt(len(nodes))  # Approximate element size
-    tolerance = typical_element_size * 0.1  # 10% of typical element size
+    # How close a node must lie to a boundary polyline to belong to it.
+    tolerance = bc_node_tolerance(nodes)
     
     logger.debug("Mesh tolerance for boundary conditions: %.6f", tolerance)
     
@@ -340,7 +350,10 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     # here where the tseep sheet is in reach. A STEADY solve on a series-bound
     # model reads every series at t = 0 — the same values the transient march's
     # own initial condition uses — so the steady run is the initial-condition
-    # snapshot, cheap, without the march behind it.
+    # snapshot, cheap, without the march behind it. It is read by the march's own
+    # evaluator (_eval_series on the anchors build_tseep_data makes), so a step
+    # anchored at t = 0 reads its value BEFORE the step, exactly as the march's
+    # initial condition does.
     _series_t0 = {}
     _ts = (slope_data or {}).get("tseep") or {}
     for _name, _vals in (_ts.get("series") or {}).items():
@@ -348,9 +361,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
                   if v is not None]
         if _pairs:
             _ta, _va = zip(*_pairs)
-            # np.interp clamps to the first value before the first breakpoint,
-            # matching the march's held-before-first rule.
-            _series_t0[_name] = float(np.interp(0.0, _ta, _va))
+            _series_t0[_name] = float(_eval_series(
+                (np.asarray(_ta, dtype=float), np.asarray(_va, dtype=float)), 0.0))
 
     # Process specified head boundary conditions
     # Vectorized: compute distance from all nodes to each BC line at once

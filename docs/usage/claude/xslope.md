@@ -1236,6 +1236,15 @@ rather than held at the reservoir level; preflight warns
 onto such ground. Leave it short only when a no-flow barrier there is intended (a liner, a
 berm).
 
+Never draw a `'head'` line along the ground surface above the water: a plain head holds its dry
+part at the water level, in suction, which draws water out of the slope. Preflight warns
+(`seep.head_line_above_water`) when the part of a head line along the ground is under water at
+some time in the run and dry at another. A pool or reservoir face takes `'reservoir'`; any other
+head line ends at the water level. A model side held at a uniform head down through the soil is
+fine, including one folded into the ground line as its near-vertical first or last segment
+(steeper than 1H:20V), and so is a specified-suction boundary that stays entirely above every
+level.
+
 ```python
 slope_data['seepage_bc'] = {
     'exit_face': [(59, 22), (105, 2)],          # seepage-face polyline (optional)

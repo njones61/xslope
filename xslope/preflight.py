@@ -1257,12 +1257,21 @@ class _Ctx:
         return _num((self.tseep or {}).get("stage_1"))
 
     def series_at_start(self, name):
-        """The first value of a named tseep series, or ``None`` when it has none."""
+        """The value a named tseep series holds at t = 0, or ``None`` when it has
+        no value at its first time.
+
+        Read the way the transient march reads its initial condition and a steady
+        run reads the series (:func:`xslope.seep._eval_series` on the series' own
+        anchors), so a step anchored at t = 0 gives the value BEFORE the step."""
         ts = self.tseep or {}
         vals = (ts.get("series") or {}).get(name)
-        if not vals:
+        if not vals or _num(vals[0]) is None:
             return None
-        return _num(vals[0])
+        anchors = _series_anchors(self, name)
+        if anchors is None:
+            return None
+        from .seep import _eval_series
+        return float(_eval_series(anchors, 0.0))
 
     # -- structural elements -----------------------------------------------
     @property
@@ -4512,6 +4521,181 @@ def _reservoir_level_above_line(ctx):
                    f"Extend the reservoir line over it, unless a no-flow barrier "
                    f"there is intended {_AT_SEEPBC}.")
     return out
+
+
+def _bc_node_tolerance(ctx):
+    """The distance within which a mesh node belongs to a boundary polyline, as
+    :func:`xslope.seep.build_seep_data` binds it, or ``None``.
+
+    Read off the mesh this run will use when one is attached. Without a mesh the
+    same formula is applied to the mesh the model's target element size would
+    produce: a node count of the domain area over the area a node carries in an
+    equilateral triangulation (about 0.866 t^2), or a thousand nodes where the
+    model states no target size."""
+    import numpy as np
+    from .seep import bc_node_tolerance
+    mesh = ctx.mesh
+    nodes = mesh.get("nodes") if isinstance(mesh, dict) else None
+    if nodes is not None:
+        try:
+            nodes = np.asarray(nodes, dtype=float)
+            if nodes.ndim == 2 and len(nodes) >= 3:
+                return float(bc_node_tolerance(nodes))
+        except (TypeError, ValueError):
+            pass
+    dom = ctx.domain
+    try:
+        x0, y0, x1, y1 = (float(v) for v in dom.bounds)
+        area = float(dom.area)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if min(x1 - x0, y1 - y0) <= 0.0 or area <= 0.0:
+        return None
+    target = _num(ctx.sd.get("target_size"))
+    n = (area / (0.866 * target * target)) if target and target > 0 else 1000.0
+    return 0.1 * min(x1 - x0, y1 - y0) / math.sqrt(max(n, 4.0))
+
+
+@rule("seep.head_line_above_water", WARNING, ("seep",),
+      "A plain head line along the ground that is partly dry holds the dry part "
+      "in suction.")
+def _head_line_above_water(ctx):
+    """A plain ``head`` line on the ground surface that the water leaves partly dry.
+
+    A ``head`` boundary holds every node of its line at the level, at all times.
+    Where part of the line along the ground surface stands above the water, those
+    nodes are held at the water level in suction, which draws water out of the
+    slope. The rule reads only the part of each line that lies along the ground --
+    within the distance at which build_seep_data binds a node to a line, and
+    without the near-vertical segments at the two ends of the ground line, which
+    are model sides -- so a model side running down through the soil, held at a
+    uniform head as the still water condition, is left alone. It fires when that
+    part is under water at some time in the run (a point below the highest level)
+    and dry at some time (a point above the lowest level); "level" is the constant,
+    or the series over the whole run. A line entirely above every level (a
+    specified-suction boundary), a line entirely under water at every level (a
+    reservoir floor), and a confined set (a steady set with no exit face and no
+    reservoir boundary, so the solve is saturated throughout and y need not be
+    elevation) are not reported. Differences within 1e-3 of the model height are
+    coordinate round-off -- the fence the water-load derivation applies to pool
+    depths (``water.POOL_MIN_DEPTH_FRAC``) -- and are ignored."""
+    from .water import POOL_MIN_DEPTH_FRAC
+    ground = _coords(ctx.sd.get("ground_surface"))
+    if len(ground) < 2:
+        return None
+    tol = _bc_node_tolerance(ctx)
+    if tol is None:
+        return None
+    gys = [p[1] for p in ground]
+    # A run of near-vertical segments at either END of the ground line is a model
+    # side -- the soil continues beyond it -- folded into the ground line, so a
+    # uniform head down it is still water, not a face. Near-vertical means steeper
+    # than 1H:20V (|dx| <= 0.05 |dy|): a side drawn vertical, or off vertical by a
+    # transcription offset such as 0.13 over 30.66, is left out, while any real
+    # cut or embankment face (1H:1V, or even a 1H:10V rock cut) is read. The same
+    # segments in the interior of the line are exposed faces and are read.
+    def _steep(a, b):
+        return abs(b[0] - a[0]) <= 0.05 * abs(b[1] - a[1])
+
+    while len(ground) >= 2 and _steep(ground[0], ground[1]):
+        ground = ground[1:]
+    while len(ground) >= 2 and _steep(ground[-2], ground[-1]):
+        ground = ground[:-1]
+    if len(ground) < 2:
+        return None
+    dom = ctx.domain
+    try:
+        height = max(float(dom.bounds[3]) - float(dom.bounds[1]), max(gys) - min(gys))
+    except (AttributeError, TypeError, ValueError, IndexError):
+        height = max(gys) - min(gys)
+    eps = POOL_MIN_DEPTH_FRAC * height if height > 0 else 0.0
+
+    def _dist(pt):
+        best = math.inf
+        for (x1, y1), (x2, y2) in zip(ground, ground[1:]):
+            dx, dy = x2 - x1, y2 - y1
+            L2 = dx * dx + dy * dy
+            u = 0.0 if L2 == 0.0 else max(0.0, min(1.0, ((pt[0] - x1) * dx
+                                                        + (pt[1] - y1) * dy) / L2))
+            best = min(best, math.hypot(pt[0] - x1 - u * dx, pt[1] - y1 - u * dy))
+        return best
+
+    def _on_ground(line, levels):
+        """The points of a polyline that lie along the ground surface, in runs
+        longer than a touch (a line that only meets the ground at a corner). The
+        places the line crosses each of ``levels`` are among them, so the dry
+        stretch is reported from where the water meets the line."""
+        pts = []
+        for (x1, y1), (x2, y2) in zip(line, line[1:]):
+            fs = {k / 50.0 for k in range(50)}
+            for lv in levels:
+                if y1 != y2 and min(y1, y2) < lv < max(y1, y2):
+                    fs.add((lv - y1) / (y2 - y1))
+            for f in sorted(fs):
+                pts.append((x1 + f * (x2 - x1), y1 + f * (y2 - y1)))
+        pts.append(line[-1])
+        near = [_dist(p) <= tol for p in pts]
+        kept, run = [], []
+        for p, on in zip(pts + [None], near + [False]):
+            if on:
+                run.append(p)
+                continue
+            if len(run) >= 2:
+                length = sum(math.hypot(b[0] - a[0], b[1] - a[1])
+                             for a, b in zip(run, run[1:]))
+                if length > 2.0 * tol:
+                    kept += run
+            run = []
+        return kept
+
+    for which, at in ((1, _AT_SEEPBC), (2, _AT_SEEPBC2)):
+        bc = ctx.sd.get("seepage_bc" if which == 1 else "seepage_bc2") or {}
+        heads = bc.get("specified_heads") or []
+        # A steady solve is saturated throughout unless the set carries an exit
+        # face (or a reservoir, whose face can become one); a transient march
+        # (set 1 of a model with a tseep sheet) is variably saturated always.
+        unconfined = (len(bc.get("exit_face") or []) >= 2
+                      or any(str(h.get("kind") or "").strip().lower() == "reservoir"
+                             for h in heads)
+                      or (which == 1 and ctx.tseep is not None))
+        if not unconfined:
+            continue
+        for n, b in enumerate(heads):
+            if str(b.get("kind") or "head").strip().lower() == "reservoir":
+                continue
+            line = _coords(b.get("coords"))
+            if len(line) < 2:
+                continue
+            rng = _head_level_range(ctx, b)
+            if rng is None:
+                continue
+            low, high = rng
+            pts = _on_ground(line, (low, high))
+            if not pts:
+                continue
+            ys = [p[1] for p in pts]
+            if not (min(ys) < high - eps and max(ys) > low + eps):
+                continue
+            dry = [p for p in pts if p[1] >= low]
+            x_lo, x_hi = min(p[0] for p in dry), max(p[0] for p in dry)
+            head = b.get("head")
+            if isinstance(head, str):
+                level = (f"the lowest level of series '{head.strip()}' over the "
+                         f"run ({low:g})")
+            else:
+                level = f"its level ({low:g})"
+            label = (f"Specified head #{n + 1}" if which == 1
+                     else f"Specified head #{n + 1} of set 2")
+            yield (f"{label} is a plain head line on the ground surface, and from "
+                   f"x = {x_lo:.6g} to x = {x_hi:.6g} it rises to y = {max(ys):g}, "
+                   f"above {level}. A head boundary holds every node of its line "
+                   f"at the level at all times, so that dry part is held at the "
+                   f"water level, in suction, which draws water out of the slope. "
+                   f"If the line is a reservoir or pool face, give it the "
+                   f"reservoir type: the face above the water is then no-flow "
+                   f"until the water has covered it, and an exit face once the "
+                   f"water falls back below it. Otherwise end the line at the "
+                   f"water level {at}.")
 
 
 # ---------------------------------------------------------------------------

@@ -23,12 +23,12 @@
 
 {#- xslope override (mkdocs 1.6.1, themes/readthedocs/nav.html). Everything
     above this comment is the stock partial, verbatim. The block below is the
-    only addition: on a samples page (src_path ending in samples.md) the
-    page's problem headings (the children of its h1, i.e. the "### N. Title"
-    headings) are listed under its own sidebar entry, one level, linking to
-    their anchors. titles_only stays on, so no other page changes; every tag
+    only addition: on a samples page (src_path ending in samples.md) and on
+    the Videos page (videos/index.md) the children of the page's h1 (a samples
+    page's "### N. Title" problems, the Videos page's four sections) are listed
+    under its own sidebar entry, one level, linking to their anchors. titles_only stays on, so no other page changes; every tag
     here trims whitespace, so other pages render byte-for-byte as before. #}
-{%- if nav_item == page and page.file.src_path.endswith('samples.md') and nav_item.toc.items and nav_item.toc.items[0].children %}
+{%- if nav_item == page and (page.file.src_path.endswith('samples.md') or page.file.src_path == 'videos/index.md') and nav_item.toc.items and nav_item.toc.items[0].children %}
     <ul class="current samples-toc">
         {%- for toc_item in nav_item.toc.items[0].children %}
             <li class="toctree-l{{ navlevel + 1 }}"><a class="reference internal" href="{{ toc_item.url }}">{{ toc_item.title }}</a></li>

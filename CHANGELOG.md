@@ -47,6 +47,9 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Changed
 
+- **Refine thin zones** in Build Mesh leaves alone any zone that has its own
+  Size on its profile line or polygon, and still refines the other thin zones.
+  Before, it refined a zone past the Size you gave it.
 - The RS2 verification page and the FEM samples page give ten strength
   reduction results as the current solver computes them; each moved by 0.4 to
   1.8%, and every comparison keeps its rating.

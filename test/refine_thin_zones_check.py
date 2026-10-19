@@ -11,8 +11,8 @@ why the toggle is ON by default. What is guarded here:
      reopens on the choice the user last made rather than reverting to the default.
   B. THE DERIVATION — the sizing rule finds a thin band and asks for one quarter of
      its width; it returns nothing at all on a section with no thin zone, which is
-     what makes the option free there; and a Size the user declared is never
-     coarsened by it, because the size field composes the two by taking the minimum.
+     what makes the option free there; and a zone with a Size the user declared is
+     meshed at that Size, finer or coarser, because the option skips it.
   C. THE WIRE — the toggle reaches ``build_mesh_from_polygons`` as ``thin_zones`` in
      ``refine_features``, the SAME argument for both element families. Off sends
      nothing. The builder is replaced by a recorder, so this leg is about the
@@ -206,13 +206,12 @@ def test_derivation():
             if len(r.get("polygon") or []) < 3:
                 fails.append("a derived region carries no usable ring")
 
-    # A Size the user declared is never COARSENED. The derived size and a declared
-    # one now reach the mesher as two size sources that compose by taking the
-    # minimum, so a declaration finer than the derivation is what the zone is meshed
-    # at. (A declaration COARSER than the zone needs does not switch the toggle off;
-    # that is what the toggle itself is for, and honouring 1.25 on this seam — 2.4
-    # element rows — would leave exactly the under-resolution the option exists to
-    # prevent.)
+    # A Size the user declared is the zone's size, either way. The automatic
+    # refinement skips a zone that declares one (Norm, 2026-10-19: it must not
+    # override user-defined zones), so a declaration finer than the derivation is
+    # what the zone is meshed at, and so is one COARSER than it. A coarse declaration
+    # that leaves the zone under-resolved is preflight's mesh.thin_zone_unresolved to
+    # report, not the toggle's to overrule.
     sd2 = _thin_model()
     finer = min(r["size"] for r in regions) / 2.0 if regions else 0.3
     for p in sd2["polygons"]:
@@ -228,6 +227,18 @@ def test_derivation():
                      f"{rows:.1f} rows across {width2:.3g}, not the "
                      f"{want_rows:.1f} that Size asks for — the automatic "
                      f"refinement coarsened an explicit input")
+
+    coarser = width2 / 2.0          # two rows: coarser than the four the toggle asks
+    for p in sd2["polygons"]:
+        p["size"] = coarser
+    m = _quiet(build_mesh_from_polygons, get_material_polygons(sd2),
+               target_size=TARGET, element_type="tri6", refine_factor=3.0,
+               refine_features=["thin_zones"])
+    rows = _rows_across(m, seam2, width2)
+    if rows > 3.0:
+        fails.append(f"a zone declaring Size = {coarser:.4g} (2 rows across "
+                     f"{width2:.3g}) was meshed at {rows:.1f} rows — the automatic "
+                     f"refinement overrode an explicit input")
 
     # Nothing to do on a section with no thin zone: this is what makes the option
     # free to leave on.

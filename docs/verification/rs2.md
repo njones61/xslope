@@ -60,7 +60,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#rs2-1) | 🟢 | Simple slope stability assessment | SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%) | |
 | [2](#rs2-2) | 🟢 | Non-homogeneous slope | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | |
 | [3](#rs2-3) | 🟢 | Non-homogeneous slope with seismic load (0.15g) | SSRM 0.958 vs RS2 SSRM 0.97 (−1.2%) | |
@@ -103,7 +103,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [35](#p4-vp70) | 🟢 | Submerged slope (D&W Fig 6.27) | SSRM 1.594 vs D&W referee 1.60 (−0.4%) | *covered* by the Part IV build [P4-VP70](#p4-vp70) on the Slide2 [VP70](rocscience.md#vp70) file; Part II's RS2 SSRM 1.64 and Part IV's 1.58 lie either side of it. |
 | [36](#rs2-36) | 🟢 | Seepage analysis, homogeneous slope (D&W Fig 6.37) | FE seepage: SSRM 1.111 vs RS2 SSRM 1.12 (−0.8%) · piezo approximation: SSRM 1.111 vs RS2 SSRM 1.12 (−0.8%) | (both cases) |
 | [37](#rs2-37) | <span class="nodata">⊘</span> | Embankment with layered foundation (D&W Fig 6.39) | | *unconfirmed* — the two programs find different mechanisms: RS2's is the artesian downstream-toe slide, XSLOPE's a deeper surface. |
@@ -136,7 +136,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [59](#rs2-59) | 🟢 | Three-layered soil slope | SSRM 1.572 vs RS2 SSRM 1.57 (+0.1%) | Görög & Török (2007) Budapest landslide; the critical mechanism is non-circular, so a circular search finds a deeper surface and this is an SSRM problem. |
 | [60](#rs2-60) | 🟢 | Generalized Hoek–Brown, homogeneous slope | β = 15°: Spencer 1.009 vs Slide2 1.011 (−0.2%) · β = 30°: Spencer 0.989 vs Slide2 0.992 (−0.3%) · β = 45°: Spencer 1.035 vs Slide2 1.035 (0.0%) | (LEM) three slope angles at GSI = 70 with the vendor σ<sub>ci</sub>. SSRM is not scored on this problem. |
 | [61](#rs2-61) | 🟢 | Local and global minima, homogeneous slope | Case 1: Spencer 1.338 vs Slide2 1.336 (+0.1%) · Case 3: Spencer 1.437 vs Slide2 1.397 (+2.9%) · Case 2: constrained SSRM 1.383 vs RS2 SSRM 1.36 (+1.7%) | (cases 1, 3, 2) one geometry, four search regions; case 2 uses RS2's own Search-Area polygon. Case 3's search window finds the bench-to-crest surface of the paper's Fig. 13d and is compared with the numbers for that surface. Case 4's constrained run reads further above RS2 than case 2 does and is not scored. |
@@ -155,7 +155,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#rs2-1) | 🟢 | Slope, homogeneous (ACADS 1a) | SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%) | Same build as [RS2-1](#rs2-1). Part IV publishes RS2 SSRM 0.98; ref 1.00 [Giam]. |
 | [2](#p4-vp2) | 🟢 | Slope, homogeneous, tension crack (ACADS 1b) | SSRM 1.656 vs RS2 SSRM 1.63 (+1.6%) | Own SSRM build carrying the vendor's T = 0 crack zone; ref 1.65 [Giam]. |
 | [3](#rs2-2) | 🟢 | Slope, 3 materials (ACADS 1c) | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | Same build as [RS2-2](#rs2-2). Part IV publishes RS2 SSRM 1.34; ref 1.39. |
@@ -1724,7 +1724,7 @@ case takes it from the RS2 vendor model, which matches Li's Table 1 ratio on cas
 and c:
 
 | case | β | published σci (vendor `.fez`) | ratio implied by the published σci | Li (2008) Table 1 ratio | agree? |
-|---|---:|---:|---:|---:|:--:|
+|---|:---:|:---:|:---:|:---:|:--:|
 | a | 15° | 0.598 kPa | 0.026 | 0.026 | yes |
 | b | 30° | 1.61 kPa | 0.070 | 0.075 | no |
 | c | 45° | 4.37 kPa | 0.190 | 0.176 | no |

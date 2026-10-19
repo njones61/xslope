@@ -35,7 +35,7 @@ Solution (critical surface and factor of safety):
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 0.964 | 0.964 | 1.029 | 1.120 | 1.041 | 0.964 | 0.964 |
 <!-- /fs-table -->
 
@@ -64,7 +64,7 @@ Solution (critical surface and factor of safety):
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.154 | 1.154 | 1.248 | 2.011 | 1.861 | 1.154 | 1.154 |
 <!-- /fs-table -->
 
@@ -105,7 +105,7 @@ Solution (critical surface and factor of safety):
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 0.805 | 1.154 | 1.160 | 1.240 | 1.060 | 1.189 | 1.170 |
 <!-- /fs-table -->
 
@@ -173,7 +173,7 @@ Solution (critical surface and factor of safety):
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | n/a\* | 1.828 | 1.752 | 2.076 | 2.025 | 1.812 | 1.807 |
 
 \* OMS is not reported for this problem. Its base normal force is the Fellenius value $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, which under a full reservoir goes negative on the deepest slices — a quarter of them on the surface it settles on here — so the shear resistance it computes there is meaningless and the factor of safety it reports (0.897) sits far below every other method's. See the [OMS method note](oms.md).
@@ -229,7 +229,7 @@ Toe circle, shown close up:
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | n/a\* | 1.327 | 1.224 | 1.381 | 1.327 | 1.323 | 1.324 |
 
 \* OMS is not reported for this problem's toe circle. The circle is small, and its last slices, where it rises steeply to the ground beyond the toe, have bases inclined up to 57°. There the Fellenius base normal force, $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, goes negative, on 6 of the 40 slices of the surface it settles on, so the shear resistance it computes there is meaningless and the factor of safety it reports (0.845) sits far below every other method's. See the [OMS method note](oms.md).
@@ -245,7 +245,7 @@ Circle tangent to El. 197:
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.394 | 1.572 | 1.537 | 1.609 | 1.579 | 1.568 | 1.570 |
 <!-- /fs-table -->
 
@@ -269,7 +269,7 @@ Toe circle, shown close up, with the seepage head contours:
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | n/a\* | 0.938 | 0.849 | 1.044 | 0.942 | 0.967 | 0.966 |
 
 \* OMS is not reported for this problem's toe circle. The circle is small, and its last slices, where it rises steeply to the ground beyond the toe, have bases inclined up to 58°. There the Fellenius base normal force, $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, goes negative, on 10 of the 40 slices of the surface it settles on, so the shear resistance it computes there is meaningless and the factor of safety it reports (0.355) sits far below every other method's. See the [OMS method note](oms.md).
@@ -303,7 +303,7 @@ Circle tangent to El. 197:
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.250 | 1.406 | 1.391 | 1.431 | 1.412 | 1.405 | 1.405 |
 <!-- /fs-table -->
 
@@ -321,7 +321,7 @@ Spencer's factors of safety from the tables above, beside the book's Table 6.8. 
 does not say which method it used.
 
 | Pore pressures | Toe circle, book | Toe circle, XSLOPE | Tangent to El. 197, book | Tangent to El. 197, XSLOPE |
-|:--|--:|--:|--:|--:|
+|:--|:---:|:---:|:---:|:---:|
 | Piezometric line | 1.30 | 1.323 | 1.57 | 1.568 |
 | Seepage solution | 1.11 | 0.967 | 1.37 | 1.405 |
 
@@ -365,7 +365,7 @@ Solution (critical surface with the tension crack, Spencer's method):
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.413 | 1.414 | 1.448 | 1.673 | 1.544 | 1.414 | 1.414 |
 <!-- /fs-table -->
 
@@ -566,7 +566,7 @@ show the range of published results.
 **Factor of safety by method** (each method's own critical surface, 13.7 m row):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.822 | 1.859 | 1.788 | 1.885 | 1.871 | 1.855 | 1.855 |
 <!-- /fs-table -->
 

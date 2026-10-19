@@ -32,7 +32,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [2.1](#gs-2-1) | 🟢 | ACADS Simple Slope | Bishop 0.985 vs ACADS 1.00 (−1.5%) · vs Slide 0.987 (−0.2%) | |
 | [2.2](#gs-2-2) | 🟢 | ACADS Tension Crack | Bishop 1.589 vs Slide 1.596 (−0.4%) · M-P 1.586 vs Slide 1.592 (−0.4%) | SLOPE/W reads higher and sits closer to the ACADS band — tension-crack water handling and search |
 | [2.3](#gs-2-3) | 🟢 | ACADS Non-Homogeneous | Bishop 1.403 vs SLOPE/W 1.414 (−0.8%) · M-P 1.371 vs SLOPE/W 1.382 (−0.8%) | |
@@ -226,7 +226,7 @@ sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | — | — | 1.278 | 1.336 | 1.296 | 1.258 | 1.248 |
 <!-- /fs-table -->
 
@@ -416,7 +416,7 @@ Mohr-Coulomb materials with no piezometric line, taken from the Slide2 manual's 
 ![gs2_22: inputs and the Figure 7 surface A solution](images/gs2_22.png)
 
 | Surface | XSLOPE M-P | SLOPE/W M-P | XSLOPE Bishop | Slide2 Bishop (Table 35.2) | Hassan & Wolff |
-|---|---:|---:|---:|---:|---:|
+|---|:---:|:---:|:---:|:---:|:---:|
 | Fig. 7 A | 2.560 | 2.560 (0.0%) | 2.549 | 2.551 (−0.1%) | 2.753 |
 | Fig. 7 B | 2.803 | 2.806 (−0.1%) | 2.815 | 2.820 (−0.2%) | 2.352 |
 | Fig. 7 C | 2.769 | 2.771 (−0.1%) | 2.779 | 2.777 (+0.1%) | 2.523 |
@@ -925,7 +925,7 @@ datum offset, as in the [GW15–21](rocscience_groundwater.md) consolidation pro
 ![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png){width=800px}
 
 | t (s) | U (Terzaghi) | XSLOPE center | Terzaghi center $u_e$ | SEEP/W center |
-|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|
 | 150 | 25% | 9.96 kPa | 9.97 kPa (−0.01) | 9.86 kPa (+0.10) |
 | 604 | 50% | 7.78 kPa | 7.78 kPa (0.00) | 7.86 kPa (−0.08) |
 | 1460 | 75% | 3.95 kPa | 3.93 kPa (+0.02) | 4.77 kPa (−0.82) |
@@ -962,7 +962,7 @@ semi-analytical profile. XSLOPE reproduces the **wetted zone** behind the front 
 0.028 m of head:
 
 | y (m) | XSLOPE ψ | SEEP/W ψ (Δ = XSLOPE − SEEP/W) |
-|---:|---:|---:|
+|:---:|:---:|:---:|
 | 0.6 | −0.194 m | −0.166 m (−0.028 m) |
 | 0.7 | −0.074 m | −0.064 m (−0.010 m) |
 | 0.8 | −0.021 m | −0.020 m (−0.001 m) |
@@ -1000,7 +1000,7 @@ factor-of-safety-vs-time curve the vendor publishes from it. Each SEEP/W head be
 vendor's own solved `node.csv` field, read with the same probe as XSLOPE's:
 
 | station (x, y) | state | XSLOPE h | SEEP/W h (Δ head) |
-|---|---|---:|---:|
+|---|---|:---:|:---:|
 | (20, 5) | IC (full reservoir) | 7.147 m | 7.280 m (−0.13 m) |
 | (25, 5) | IC (full reservoir) | 6.056 m | 6.258 m (−0.20 m) |
 | (30, 3) | IC (full reservoir) | 4.826 m | 5.008 m (−0.18 m) |
@@ -1027,7 +1027,7 @@ Each SLOPE/W value below is the vendor's own solved minimum at that step.
 **Instantaneous drawdown** (reservoir removed at t = 0):
 
 | step | t (days) | XSLOPE FS | SLOPE/W FS (Δ) |
-|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|
 | 0 | 0 | 1.686 | 1.672 (+0.014) |
 | 1 | 0.25 | 0.941 | 0.829 (+0.112) |
 | 2 | 0.63 | 0.998 | 0.965 (+0.033) |
@@ -1043,7 +1043,7 @@ Each SLOPE/W value below is the vendor's own solved minimum at that step.
 **Slow drawdown** (reservoir falls 8 → 0 m over 5 days):
 
 | step | t (days) | XSLOPE FS | SLOPE/W FS (Δ) |
-|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|
 | 0 | 0 | 1.686 | 1.672 (+0.014) |
 | 1 | 0.25 | 1.585 | 1.579 (+0.006) |
 | 2 | 0.63 | 1.488 | 1.480 (+0.008) |
@@ -1098,7 +1098,7 @@ The published answer is a water-table-rise-vs-time graph with no closed form, so
 comparison is SEEP/W's own solved `node.csv`, read with the same probe as on [T03](#seepw-t03):
 
 | station (x, y) | state | XSLOPE h | SEEP/W h (Δ head) |
-|---|---|---:|---:|
+|---|---|:---:|:---:|
 | (5, 2) | IC (pre-fill) | 4.000 m | 4.000 m (0.00 m) |
 | (5, 2) | t = 24 d (filling) | 4.055 m | 4.133 m (−0.08 m) |
 | (3, 5) | t = 24 d (filling) | 4.112 m | 4.251 m (−0.14 m) |
@@ -1239,7 +1239,7 @@ implements. It is the reference behind the applicability of XSLOPE's
 zones, all γ = 20 kN/m³ and ν′ = 0.4:
 
 | Zone | Elevation | E′ (kPa) | c′ (kPa) | φ′ (°) | Stress model |
-|---|---|---:|---:|---:|---|
+|---|---|:---:|:---:|:---:|---|
 | Sandy Clay | 6 → ground surface | 10,000 | 20 | 30 | Mohr-Coulomb, tensile strength 0 |
 | Weak Clay | 5 → 6 | 5,000 | 0 | 10 | Mohr-Coulomb, tensile strength 0 |
 | OC Soil | −4 → 5 | 500,000 | — | — | isotropic elastic — it carries no strength because it cannot fail |

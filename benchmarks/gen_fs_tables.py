@@ -252,7 +252,7 @@ def build_table(display):
         "**Factor of safety by method** (each method's own critical surface):",
         "",
         "| " + " | ".join(headers) + " |",
-        "|" + "---:|" * len(headers),
+        "|" + ":---:|" * len(headers),
         data_row(display),
     ]
     if any(display.get(s) == NA for s, _, _ in METHODS):

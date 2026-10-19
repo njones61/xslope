@@ -250,7 +250,7 @@ Spencer's method gives **FS = 2.10**.
 the slope than the flow field does, and slightly less near the toe.*
 
 | Pore-pressure model | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:--|--:|--:|--:|--:|--:|--:|--:|
+|:--|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Piezometric line | 1.334 | 1.964 | 1.747 | 2.694 | 2.146 | 1.978 | 1.979 |
 | Seepage | 1.495 | 2.090 | 1.880 | 2.819 | 2.280 | 2.100 | 2.102 |
 

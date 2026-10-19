@@ -53,7 +53,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | Displacement-vs-$F$ upturn $F \approx 1.40$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.37 vs their FE 1.4 (−2.1%) | criterion-matched FE-vs-FE reading is the basis of the dot |
 | [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | Upturn $F \approx 1.4$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.35 vs their FE 1.4 (−3.6%, within the paper's one-decimal precision: 1.35 rounds to 1.4) · Spencer toe circle 1.37 vs the paper's "correct" 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
 | [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.244 vs the paper's stated ≈1.3 (−4.3%) | scored at the source's own 0.05 read-off resolution |

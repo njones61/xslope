@@ -197,7 +197,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#vp1) | 🟢 | Slope, homogenous | Spencer/M-P 0.984 vs ACADS 1.00 (−1.6%) · Bishop 0.985 vs Slide 0.987 (−0.2%) | ACADS consensus names no method |
 | [2](#vp2) | 🟢 | Slope, homogenous, tension crack | Spencer 1.585 vs Slide 1.592 (−0.4%) · Bishop 1.589 vs Slide 1.596 (−0.4%) |  |
 | [3](#vp3) | 🟢 | Slope, (3) materials | Spencer 1.372 vs Slide 1.375 (−0.2%) · Bishop 1.403 vs Slide 1.405 (−0.1%) |  |
@@ -353,7 +353,7 @@ usual conservative bias on this class of problem.
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 0.942 | 0.985 | 0.986 | 0.990 | 0.987 | 0.984 | 0.984 |
 <!-- /fs-table -->
 
@@ -582,7 +582,7 @@ are tabulated at [SLOPE/W §2.11](geostudio.md#gs-2-11).
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.344 | 1.404 | 1.411 | 1.476 | 1.438 | 1.401 | 1.400 |
 <!-- /fs-table -->
 

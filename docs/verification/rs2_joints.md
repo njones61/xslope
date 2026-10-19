@@ -92,7 +92,7 @@ joint model whose output is a stress-displacement curve.
 <div class="corpus-summary match match8" markdown>
 
 | # | Match | Problem | Referee | RS2 vs referee | Also published | RS2 without / with improvement | Notes |
-|---:|:-:|---|---|---|---|---|---|
+|:---:|:-:|---|---|---|---|---|---|
 | [1a](#rj-1a) | 🟢 | Goodman & Bray block toppling, case 1a | SSRM 1.018 vs Goodman & Bray 1.0000 (+1.8%) | 0.99 vs 1.0000 (−1.0%) | UDEC 0.99 (+2.8%) | 0.99 / 0.97 | |
 | [1b](#rj-1b) | 🟢 | Goodman & Bray block toppling, case 1b | SSRM 1.018 vs Goodman & Bray 1.0000 (+1.8%) | 0.97 vs 1.0000 (−3.0%) | UDEC 0.99 (+2.8%) | 0.97 / 0.94 | |
 | [1c](#rj-1c) | 🟢 | Goodman & Bray block toppling, case 1c | SSRM 1.037 vs Goodman & Bray 1.0185 (+1.8%) | 1.01 vs 1.0185 (−0.8%) | UDEC 1.01 (+2.7%) | 1.01 / 0.99 | |

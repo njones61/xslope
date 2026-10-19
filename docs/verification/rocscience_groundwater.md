@@ -69,7 +69,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#gw1) | 🟢 | Shallow unconfined flow with rainfall | Crest x_a ≈ 4.1 vs Slide2 4.06 (~0.05 m) · h_max 4.61 vs Slide2 4.49 (~0.12 m), inside the 0.16 m Slide2 and RS2 differ by · Q = P·L = 2.5×10⁻⁵, exact by construction | slightly-high free-surface family, above Haar's Dupuit closed form (SEEP2D cross-check) |
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide2 at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide2 chart everywhere | |

@@ -217,7 +217,7 @@ them separately.
 **The submerged slope, both engines, Spencer's method:**
 
 | | Monte Carlo | Response surface |
-|---|---:|---:|
+|---|:---:|:---:|
 | Real limit-equilibrium solves | 2,000 | 710 |
 | Realizations counted | 2,000 | 10,000,000 |
 | Wall time | 6.3 s | 4.9 s |

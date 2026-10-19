@@ -466,7 +466,7 @@ Both sets solve on one mesh, so we build that first. Click
 lock up on, and no strength reduction runs on this page — the
 [quadratic requirement met in COMBO-1](combo01_seepage_stability.md#one-mesh-for-all-three-analyses)
 comes from the finite element stability engine, not from seepage. Element order
-also sets the cost of the transient run below, which takes thousands of steps
+also sets the cost of the transient run below, which takes hundreds of steps
 on whatever mesh it is given.
 
 Leave **Auto-size from geometry** ticked at **100** size divisions, which makes
@@ -687,25 +687,24 @@ The run solves its initial condition first — the same unconfined iteration as
 the steady run — and then prints a line per saved frame:
 
 ```text
-  t=5: frame saved (steps so far=6, mass-balance closure=1.06e-05)
-  t=35: frame saved (steps so far=272, mass-balance closure=7.28e-02)
-  t=50: frame saved (steps so far=440, mass-balance closure=6.80e-02)
-  t=80: frame saved (steps so far=792, mass-balance closure=6.83e-02)
-  t=150: frame saved (steps so far=1288, mass-balance closure=2.02e-02)
-  t=200: frame saved (steps so far=1359, mass-balance closure=1.99e-02)
-  t=300: frame saved (steps so far=1480, mass-balance closure=5.69e-02)
-  t=400: frame saved (steps so far=1550, mass-balance closure=5.41e-02)
-  t=600: frame saved (steps so far=1624, mass-balance closure=3.42e-02)
-  t=800: frame saved (steps so far=1681, mass-balance closure=2.82e-02)
-  t=1000: frame saved (steps so far=1727, mass-balance closure=2.40e-02)
+  t=5: frame saved (steps so far=6, mass-balance closure=3.90e-08)
+  t=35: frame saved (steps so far=41, mass-balance closure=1.93e-04)
+  t=50: frame saved (steps so far=57, mass-balance closure=1.45e-04)
+  t=80: frame saved (steps so far=78, mass-balance closure=1.47e-04)
+  t=150: frame saved (steps so far=100, mass-balance closure=1.36e-04)
+  t=200: frame saved (steps so far=113, mass-balance closure=1.31e-04)
+  t=300: frame saved (steps so far=121, mass-balance closure=1.25e-04)
+  t=400: frame saved (steps so far=134, mass-balance closure=1.20e-04)
+  t=600: frame saved (steps so far=165, mass-balance closure=1.16e-04)
+  t=800: frame saved (steps so far=198, mass-balance closure=1.14e-04)
+  t=1000: frame saved (steps so far=224, mass-balance closure=1.13e-04)
 ```
 
-This is the long run of the page, taking far longer than any other on it.
-**Twelve frames** come out of it, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
+**Twelve frames** come out of the run, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
 600, 800 and 1000: the union of the save-interval grid, the extra
 save times, the schedule's own breakpoints, and the two stage times. The run
-took **1,727 steps**, and their distribution shows where the field changes:
-**440 of them, 25%, are inside the first 50 days**, which are 5% of the run's
+took **224 steps**, and their distribution shows where the field changes:
+**57 of them, 25%, are inside the first 50 days**, which are 5% of the run's
 duration. The field moves while the pool is falling and barely at all afterward.
 
 The two frames the drawdown will read are the first and the fourth. The
@@ -729,7 +728,7 @@ At **stage 1**, t = 0, the reservoir is full and the frame reproduces the steady
 solution above: inflow and outflow both read 1.957 ft³/day per ft, Set 1's
 discharge. At **stage 2**, t = 50, the pool has reached elevation 110 — the
 upstream water level marker has dropped 50 ft — and inflow has fallen to zero
-while 15.243 ft³/day per ft still leaves the section, every bit of it drained
+while 15.454 ft³/day per ft still leaves the section, every bit of it drained
 storage. The upstream shell has followed the pool partway down, with the
 foundation beneath the upstream slope beginning to unload. The core has barely
 moved. It still holds a pocket of head near 150 ft, in the middle of the section,
@@ -763,26 +762,26 @@ pool the schedule has reached at t = 50 — elevation 110, 624 psf at its deepes
 | Stage | | FS |
 | :---: | --- | :---: |
 | 1 | full pool, drained | 1.5540 |
-| 2 | drawn down, undrained core | 1.0340 |
-| 3 | drawn down, drained | **1.0336** |
+| 2 | drawn down, undrained core | 1.0330 |
+| 3 | drawn down, drained | **1.0327** |
 
 ![The three-stage answer from the transient frames](images/combo02_solution_transient.png){width=1000}
 
-**The rapid-drawdown factor of safety is 1.034**, on a circle at (243.93, 244.90)
+**The rapid-drawdown factor of safety is 1.033**, on a circle at (243.93, 244.90)
 with a radius of 163.64 ft — 2 ft again from the two-steady route's. Stage 1
 reads 1.5540 against that route's 1.5509, on the same field: the frame at t = 0
 *is* the steady solution of Set 1, and the three thousandths between the two
 numbers are the two searches settling on two circles.
 
 The gap between the two answers opens at stage 2, where the peak pore pressure on
-the slice bases reaches **2692 psf** on the slice table's `u` column against the
+the slice bases reaches **2698 psf** on the slice table's `u` column against the
 two-steady route's 1727 — the core's undissipated head, read straight off the
 frame.
 
 **Stage 3 ran here, and it governs.** Three of the 12 core slices the same table
 counts came out stronger undrained than drained at these stresses, so the drained
-strength was substituted on them and the reported answer is stage 3's 1.0336 rather than
-stage 2's 1.0340. Four ten-thousandths separate the two. In the
+strength was substituted on them and the reported answer is stage 3's 1.0327 rather than
+stage 2's 1.0330. Three ten-thousandths separate the two. In the
 [sweep below](#the-governing-stage-flip) we find why they are this close: the
 core's own $d$ of 250 psf sits 19 psf above the value at which the first slice
 crosses over.
@@ -801,11 +800,11 @@ each run searched from that circle for the surface its own water made critical:
 | :---: | --- | :---: | :---: | :---: | :---: | :---: |
 | 1 | Piezometric Lines 1 and 2 | (246.4, 242.8) R 160.7 | 1.4967 | 1.1956 | not required | **1.196** |
 | 2 | Two steady seepage solutions | (245.3, 243.5) R 161.8 | 1.5509 | 1.2060 | not required | **1.206** |
-| 3 | Two frames of a transient run | (243.9, 244.9) R 163.6 | 1.5540 | 1.0340 | 1.0336 | **1.034** |
+| 3 | Two frames of a transient run | (243.9, 244.9) R 163.6 | 1.5540 | 1.0330 | 1.0327 | **1.033** |
 
 The three centers span 3 ft and the three radii 3 ft; all three surfaces daylight
 just past the crest at x = 392 and toe on the upstream foreshore between x = 168 and
-x = 173. So the spread across the answers — 0.172, 17% of the lowest — comes from
+x = 173. So the spread across the answers — 0.173, 17% of the lowest — comes from
 the water and not from the geometry, and almost all of it separates the transient
 route from the other two. Ordinary drained searches at each end of the drawdown
 put that spread in context:
@@ -815,8 +814,8 @@ put that spread in context:
 | Full pool | drained | full-pool field | 1.511 |
 | Drawn down, long term | drained | re-equilibrated field | 1.326 |
 | Drawn down, long term | **undrained** | re-equilibrated field | **1.206** |
-| Drawn down, day 50 | drained | transient frame | 1.054 |
-| Drawn down, day 50 | **undrained** | transient frame | **1.034** |
+| Drawn down, day 50 | drained | transient frame | 1.053 |
+| Drawn down, day 50 | **undrained** | transient frame | **1.033** |
 
 The two bold rows are the two-steady and transient drawdown answers; the other
 three are ordinary drained runs from the same starting circle, each reporting a
@@ -836,7 +835,7 @@ is the long-term condition the dam settles into months after the drawdown.
 
 **The core's retained water costs a further 0.27.** Holding the day-50 pore
 pressures instead of the re-equilibrated ones, still at drained strength, moves
-1.326 to 1.054. Nothing about the strengths differs between those two runs.
+1.326 to 1.053. Nothing about the strengths differs between those two runs.
 
 **The undrained strength costs 0.12 on one field and 0.02 on the other.** A
 drawdown hurts a clay core in two ways. The core keeps the pore pressure the full
@@ -846,7 +845,7 @@ generates more pore pressure when it is sheared without draining — the
 re-equilibrated field the pore pressures include neither, so the envelope supplies
 both and the answer moves 1.326 to 1.206. On the day-50 transient field the
 retained pressure is already in the pore pressures, so the envelope adds only the
-shear-induced part, and the answer moves 1.054 to 1.034. On this core that part is
+shear-induced part, and the answer moves 1.053 to 1.033. On this core that part is
 small — its undrained strength sits close to its drained strength at these
 stresses, which is the same fact the [sweep](#the-governing-stage-flip)
 below measures; a more contractive core would show a larger step even on the
@@ -886,7 +885,7 @@ The three answers on this dam are not equally reliable.
 **The transient frames are the most faithful statement of a drawdown.** They carry
 the actual lowering rate and the actual elapsed time, so the stage-2 field is how
 far dissipation has genuinely progressed by day 50 rather than an assumption about
-it. On this dam that reads **1.034**.
+it. On this dam that reads **1.033**.
 
 **Two steady solutions state a limiting case, and on this model it is the
 optimistic one.** Set 2 describes the dam after the pore pressures have fully
@@ -929,7 +928,7 @@ This tutorial covered:
   a second statement of where the water is, and **Water loads** on `auto`.
 - Three sources for that second statement on one dam — a piezometric pair, two
   steady seepage solutions, two frames of a transient run — reading 1.196, 1.206,
-  and 1.034, the first two governed by stage 2 and the third by stage 3.
+  and 1.033, the first two governed by stage 2 and the third by stage 3.
 - What the spread is made of: 0.19 for the load removal alone, a further 0.27 for
   the head the core has not released by day 50, and 0.12 or 0.02 for the undrained
   strength depending on which field it is applied to.

@@ -10686,8 +10686,8 @@ def run_transient_seep_test(test):
     storage terms, the saved-frame schedule — checked directly rather than through
     a verification page's head stations.
 
-    The check itself lives in test/transient_seep_check.py (12 locks, ~60 s: the
-    heaviest row in the --tseep group, because it solves several short marches).
+    The check itself lives in test/transient_seep_check.py (13 locks, ~30 s,
+    because it solves several short marches).
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test.
     """
@@ -16383,11 +16383,11 @@ def main():
         tests.append({'type': 'tseep_exit_cycle',
                       'file': 'tri6 exit-edge limit cycle (transient)',
                       'method': '-', 'source': 'tseep_exit_cycle'})
-        # The transient solver's own lock set (test/transient_seep_check.py): 12
+        # The transient solver's own lock set (test/transient_seep_check.py): 13
         # locks on the stepper and the storage terms. It solves several short
-        # marches, which makes it the heaviest single row in this group (~60 s).
+        # marches (~30 s).
         tests.append({'type': 'transient_seep',
-                      'file': 'transient seepage solver (12 locks)',
+                      'file': 'transient seepage solver (13 locks)',
                       'method': '-', 'source': 'transient_seep'})
         # The same solver driven through the Studio panels, headless: the run
         # dialog, the runner and its cancel, the transient view and its playback,

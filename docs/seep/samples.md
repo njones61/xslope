@@ -189,8 +189,8 @@ The figure shows the following:
   core desaturates only at its edges and its relative conductivity drops sharply, so its pore
   pressure dissipates far more slowly than in the material around it. The shells and foundation
   equilibrate to the drawn-down pool (essentially uniform at el 100–105 by t = 400), while the core
-  still has a distinct zone of high total head straddling the crest, peaking near el 149 at t = 400
-  and still el 131 at t = 1000. Rapid drawdown is dangerous in a zoned dam because of this
+  still has a distinct zone of high total head straddling the crest, peaking near el 146 at t = 400
+  and still el 137 at t = 1000. Rapid drawdown is dangerous in a zoned dam because of this
   pressure retained in the core.
 - The shells drain within days, and the phreatic surface lags behind the falling pool. At the end
   of the 45-day drawdown (t = 50) the pool is already at el 100, while the water table inside the

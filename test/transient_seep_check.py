@@ -399,7 +399,8 @@ def check_drawdown_linear_vs_quadratic():
         mesh = _quiet(build_mesh_from_polygons, polys, width / target_div, element_type)
         d_ts = copy.deepcopy(d)
         for sh in d_ts["seepage_bc"]["specified_heads"]:
-            sh["head"] = "res"
+            # A falling pool: the face above the water becomes an exit face.
+            sh["head"], sh["kind"] = "res", "reservoir"
         seep_data = _quiet(build_seep_data, mesh, d_ts)
         return seep_data, list(d["ground_surface"].coords)
 

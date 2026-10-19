@@ -141,9 +141,9 @@ def seep_bc_levels(seep_data, solution):
     One reading of the boundary conditions, so what the overlay draws and what a
     caller says it draws cannot come apart. A level is read the way the inputs plot
     reads it: a series value evaluated at this frame's time (``solution['time']``, or
-    0 for a steady solution), a constant value taken as itself. A reservoir
-    (submerged-only) face is clipped to where the level meets the face; a plain head
-    spans its boundary's x-extent. A boundary with no level to read, or one whose
+    0 for a steady solution), a constant value taken as itself. A reservoir face is
+    clipped to where the level meets the face; a plain head spans its boundary's
+    x-extent. A boundary with no level to read, or one whose
     level meets a corner so the clip is degenerate, is not in the list.
 
     Empty where the seep_data carries no boundary geometry — e.g. a solution
@@ -1223,15 +1223,16 @@ _HISTORY_COLORS = {
 
 
 def reservoir_face_mask(seep_data):
-    """The mesh nodes on a submerged-only reservoir face whose level is a series,
-    as a boolean mask — or ``None`` where the model has no such boundary.
+    """The mesh nodes on a reservoir face whose level is a series, as a boolean
+    mask — or ``None`` where the model has no such boundary.
 
     A reservoir face is the only boundary a seepage face can appear on as a level
-    falls: its nodes are held at the level while submerged and become free-draining
-    exit-face nodes above the water line (:func:`~xslope.seep.run_transient_seepage`
-    resolves that per step). A plain ``head`` binding is a Dirichlet at every node
-    at all times and never converts, so it carries no exit point and is not part of
-    the mask.
+    falls: its nodes are held at the level while submerged, become free-draining
+    exit-face nodes once the level falls back below them, and are no-flow until the
+    water first reaches them (:func:`~xslope.seep.resolve_transient_bc` resolves
+    that per step). A plain ``head`` binding is a Dirichlet at every node at all
+    times and never converts, so it carries no exit point and is not part of the
+    mask.
     """
     masks = [np.asarray(b["mask"], dtype=bool)
              for b in ((seep_data or {}).get("head_series_bindings") or [])
@@ -1245,8 +1246,7 @@ def reservoir_face_mask(seep_data):
 
 
 def _reservoir_level(seep_data, t):
-    """The level a submerged-only reservoir boundary holds at time ``t``, or
-    ``None``.
+    """The level a reservoir boundary holds at time ``t``, or ``None``.
 
     Read through :func:`seep_bc_levels`, so the level a history trace plots and the
     waterline the frame figures draw over the section are one number evaluated one
@@ -1256,6 +1256,44 @@ def _reservoir_level(seep_data, t):
     for kind, _x_up, _x_face, level in seep_bc_levels(seep_data, {"time": t}):
         if kind == "reservoir":
             return float(level)
+    return None
+
+
+def _reservoir_high_water(seep_data, t):
+    """The highest level the boundary :func:`_reservoir_level` traces has reached
+    over [0, t], or ``None``.
+
+    Read the way the solver reads it (:func:`~xslope.seep.resolve_transient_bc`): a
+    face node above the current level is an exit face only at or below this
+    elevation. Above it the water has never been, and the node is no-flow. A
+    constant level is its own high water. The boundary is picked by the rule
+    :func:`seep_bc_levels` applies -- the first reservoir block whose level resolves
+    and meets its face -- so the two always describe the same boundary.
+    """
+    from .plot import (_eval_bc_series_at, _bc_series_high_water_at,
+                       _reservoir_surface_x)
+    seepage_bc = (seep_data or {}).get("seepage_bc") or {}
+    tseep = (seep_data or {}).get("tseep")
+    for h in seepage_bc.get("specified_heads") or []:
+        coords = h.get("coords") or []
+        if (len(coords) < 2
+                or str(h.get("kind", "head")).strip().lower() != "reservoir"):
+            continue
+        val = h.get("head")
+        if isinstance(val, str):
+            level = _eval_bc_series_at(tseep, val, t)
+            high = _bc_series_high_water_at(tseep, val, t)
+        else:
+            try:
+                level = high = float(val)
+            except (TypeError, ValueError):
+                level = high = None
+        if level is None or high is None:
+            continue
+        x_up, x_face = _reservoir_surface_x(coords, float(level))
+        if x_face <= x_up:
+            continue
+        return float(high)
     return None
 
 
@@ -1303,10 +1341,12 @@ def transient_history(seep_data, transient_solution, station=None,
         resolution the mesh has there.
     ``exit_point``
         The top of the seepage face: the highest node of the reservoir face that
-        stands above the current level and is still saturated. Where no exposed
+        the water has uncovered -- above the current level, at or below the highest
+        level reached so far -- and that is still saturated. Where no uncovered
         face node is saturated the face is not seeping and the trace holds at the
         level itself, because below the water line the face is submerged and
-        nothing leaves the section there.
+        nothing leaves the section there, and above the high water the face is
+        no-flow.
     ``inflow`` / ``outflow``
         The boundary rates each saved frame recorded. Under transient storage
         exchange the two differ, and their difference is the water the section is
@@ -1375,9 +1415,10 @@ def transient_history(seep_data, transient_solution, station=None,
 
     exit_point = None
     if face is not None and level is not None:
+        highs = [_reservoir_high_water(seep_data, t) for t in times]
         exit_point = np.array([
-            _exit_point(face, h, y, lvl, sat_tol)
-            for h, lvl in zip(heads, level)])
+            _exit_point(face, h, y, lvl, sat_tol, high)
+            for h, lvl, high in zip(heads, level, highs)])
 
     def _rates(key):
         vals = [fr.get(key) for fr in frames]
@@ -1399,13 +1440,18 @@ def transient_history(seep_data, transient_solution, station=None,
     }
 
 
-def _exit_point(face, head, y, level, sat_tol):
+def _exit_point(face, head, y, level, sat_tol, high=None):
     """The top of the seepage face at one instant: the highest exposed face node
-    still draining. Holds at the water level where no exposed node is saturated —
-    the face is submerged below the line, so no water leaves the section there and
-    a point reported below it would be one the boundary condition forbids."""
+    still draining. A node is exposed when it stands above the current ``level``
+    and at or below ``high``, the highest level reached so far: those are the exit
+    faces, and a node above ``high`` has never been under water and is no-flow.
+    Holds at the water level where no exposed node is saturated — the face is
+    submerged below the line, so no water leaves the section there and a point
+    reported below it would be one the boundary condition forbids."""
     idx = np.where(face)[0]
     exposed = idx[y[idx] > level + 1e-9]
+    if high is not None:
+        exposed = exposed[y[exposed] <= high]
     seeping = exposed[head[exposed] - y[exposed] >= -sat_tol]
     if not seeping.size:
         return float(level)

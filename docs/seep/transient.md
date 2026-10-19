@@ -233,7 +233,7 @@ of a series defined on the [**tseep** sheet](../usage/input_template.md#workshee
 tseep sheet holds a single shared time column and up to **five named series** (default headers
 `t1`…`t5`, renamable). One series can drive several boundaries, and each referencing block's
 own **type** — `head`, `reservoir` or `flux` — decides whether its numbers are read as a plain
-Dirichlet head, a submerged-only reservoir level, or a specified flux.
+Dirichlet head, a reservoir level, or a specified flux.
 
 A series-bound value does not rule out a **steady** run: the series is read at its **t = 0
 value**, and the Log states each reading (`Series 'pool' read at t = 0 for the steady solve`).
@@ -269,27 +269,46 @@ constant or series $h(t)$ — at **all times**. It can hold a negative-pressure 
 and never converts to an exit face. This is the type for a drained face, a specified-suction
 laboratory boundary, or any imposed head that should be enforced regardless of elevation.
 
-A **reservoir** boundary is the submerged-only Dirichlet used for a pool or tailwater whose
-level rises and falls. A node is held at the level $h(t)$ only while its elevation is at or
-below it; a node the falling water has left above the line becomes an **exit-face** node, free
-to seep. The physical motivation is that a freshly exposed face does not become a no-flow
-boundary — the soil behind it is still saturated, and that water can seep back out. Pinning
-such nodes to the now-lower level, or sealing them, would both misstate the physics. As the
-level moves, nodes cross between the two regimes and the exit point migrates up and down the
-face, as a drawdown requires. (A constant numeric reservoir level behaves
-the same way, so draw the face only up to the level unless that migration is intended.)
+A **reservoir** boundary is the free-water level used for a pool or tailwater whose level
+rises and falls. Each node of the polyline is in one of three states, decided by the level
+$h(t)$ and by the highest level the run has reached so far, $h_{max}(t)$, the running maximum
+of $h$ over $[0, t]$:
+
+| Node elevation $y$ | State |
+|---|---|
+| $y \le h(t)$ | Submerged: held at the level $h(t)$ |
+| $h(t) < y \le h_{max}(t)$ | Uncovered: an **exit-face** node, free to seep |
+| $y > h_{max}(t)$ | Not yet reached: no-flow, unless another boundary governs the node |
+
+A face the falling water has uncovered is an exit face because the soil behind it is still
+saturated, and that water seeps back out. Pinning such nodes to the now-lower level, or
+sealing them, would both misstate the physics. A face the water has never reached is no-flow
+until the level first rises to it; from then on it is held while submerged and becomes an exit
+face when the level falls back below it. As the level
+moves, nodes cross between the states and the exit point migrates up and down the face, as a
+drawdown requires. Because the series is linear between its breakpoints, $h_{max}(t)$ is the
+largest of $h(0)$, $h(t)$, and every breakpoint value at a time between 0 and $t$.
+
+At $t = 0$ the run has no history, so $h_{max}(0) = h(0)$ and every node above the starting
+level is no-flow. The same holds for a steady run, which reads the series at $t = 0$, and for a
+constant level, which never moves: no part of the face becomes an exit face. To model a rising
+pool, draw the polyline over the full face the water will reach. The part above the starting
+level is no-flow until the water arrives, and preflight notes that the line stands above its
+starting level. If the level rises above the **top** of the line, the ground beyond the line
+that the water covers has no boundary condition and stays no-flow, which preflight reports as
+a warning.
 
 ![transient_reservoir_bc.png](images/transient_reservoir_bc.png){width=860px}
 
-*As the reservoir level falls from $h(t_1)$ to $h(t_2)$, face nodes the water leaves above the
-line switch from held reservoir head to exit face, and the still-saturated soil drains back out
-through the newly exposed surface.*
+*As the reservoir level falls from $h(t_1)$ to $h(t_2)$, face nodes the water uncovers switch
+from held reservoir head to exit face, and the still-saturated soil drains back out through the
+newly exposed surface.*
 
 ### Exit-face behavior {#exit-face-behavior}
 
 The exit face — present statically as a downstream seepage face, or appearing dynamically as a
-reservoir level falls below a node — is resolved each step with the same SEEP2D-style
-active-set rule the steady solver uses: a boundary node is held saturated at atmospheric
+reservoir level falls below a node it has submerged — is resolved each step with the same
+SEEP2D-style active-set rule the steady solver uses: a boundary node is held saturated at atmospheric
 pressure unless the head would fall below its elevation or the boundary reaction would have to
 push water *into* the domain, in which case it is released to no-flow. On quadratic meshes each
 seepage-face edge is tracked all-or-nothing across its corner and midside nodes — the same edge

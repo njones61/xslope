@@ -226,12 +226,20 @@ the system rather than solved for. Two **types** are available per block:
 | Type | Behavior |
 |------|-----------|
 | `head` | A plain Dirichlet: every node of the polyline is held at the value at all times. It can hold a negative-pressure (suction) head and never converts to an exit face |
-| `reservoir` | A **submerged-only** Dirichlet: a node is held at the level only while it is submerged (elevation at or below the level). A node the water line leaves above it becomes an **exit face** node, free to seep |
+| `reservoir` | A free-water level: a node is held at the level only while it is submerged (elevation at or below the level). A node the water has covered and then uncovered by falling becomes an **exit face** node, free to seep. A node the water has not reached is no-flow |
 
-For a level drawn at or above the whole polyline the two are identical, which is the usual
-steady case. They differ when part of the boundary stands above the water — the situation a
-[transient drawdown](transient.md#head-types-head-and-reservoir) creates, and one a constant
-`reservoir` level reproduces too if the polyline is drawn above the level.
+For a level at or above the whole polyline the two are identical, which is the usual steady
+case. They differ only where part of the boundary stands above the water. A `head` holds those
+nodes at the level, in suction. A `reservoir` leaves them no-flow until the water reaches them.
+A constant level never moves, so in a steady run the part of a `reservoir` line above it stays
+no-flow throughout, and an exit face appears only in a
+[transient run](transient.md#head-types-head-and-reservoir) whose level falls.
+
+A `reservoir` boundary governs only the nodes on its own line. Where the level rises above the
+top of the line, any ground beyond the line that lies under the water carries no boundary
+condition, so it is no-flow rather than held at the reservoir level. Preflight reports this as
+a [warning](../usage/preflight.md#what-is-checked): draw the line over all the ground the pool
+can reach, unless a no-flow barrier there is intended.
 
 ### Exit face (seepage face)
 

@@ -5408,6 +5408,13 @@ def _pf_bc_head(sd, i, value, which=1):
     return sd
 
 
+def _pf_bc_reservoir(sd, i, **kw):
+    """Make specified-head block ``i`` of set 1 a reservoir, updated with ``kw``
+    (a level, a series name, coordinates)."""
+    sd['seepage_bc']['specified_heads'][i].update(kind='reservoir', **kw)
+    return sd
+
+
 def _pf_pts(obj):
     """(x, y) pairs from a shapely line or a plain coordinate list."""
     return [(float(x), float(y)) for x, y in getattr(obj, 'coords', obj)]
@@ -6231,7 +6238,33 @@ PREFLIGHT_RULE_SPECS = [
          mode='dict', analysis='tseep',
          mutation=lambda sd: _pf_tseep(sd, series={
              k: [1.0] + list(v[1:]) for k, v in sd['tseep']['series'].items()}),
-         expect='reservoir face rising'),
+         expect='no-flow until the water reaches them'),
+    # The same face under a constant level drawn below its top: the water never
+    # reaches the nodes above it. The control is the shipped level, at the top.
+    dict(rule='tseep.reservoir_face_above_level', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_reservoir(sd, 0, head=10.0),
+         control=lambda sd: _pf_bc_reservoir(sd, 0, head=18.0),
+         expect='no-flow throughout the run'),
+    # A pool that starts below the top of its face (y = 18), rises past it to 20,
+    # then falls: the upstream face from the line's end at x = 42 toward the crest
+    # is under water with no boundary on it. The near-miss is the same schedule on
+    # a reservoir line drawn over the whole ground surface, which leaves no ground
+    # under the water uncovered however high the level stands.
+    dict(rule='tseep.reservoir_level_above_line', base=PREFLIGHT_BASE_TSEEP,
+         mode='dict', analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, series={'pool': [16.0, 20.0, 2.0]}),
+         control=lambda sd: _pf_bc_reservoir(
+             _pf_tseep(sd, series={'pool': [16.0, 25.0, 2.0]}), 0,
+             coords=_pf_pts(sd['ground_surface'])),
+         expect='stays no-flow'),
+    # A constant level above the top of its line, against the shipped level that
+    # stands exactly at the top.
+    dict(rule='tseep.reservoir_level_above_line', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_reservoir(sd, 0, head=20.0),
+         control=lambda sd: _pf_bc_reservoir(sd, 0, head=18.0),
+         expect='Extend the reservoir line over it'),
 
     # --- rapid drawdown ----------------------------------------------------
     dict(rule='rapid.stage2_water_missing', base=PREFLIGHT_BASE_RAPID, mode='excel',

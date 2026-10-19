@@ -1220,18 +1220,27 @@ specified-flux segments. `seepage_bc2` is the second BC set for rapid drawdown.
 
 A specified-head segment carries an optional `kind`: `'head'` (default) is a plain
 Dirichlet held at the value at every node, at all times (constant or a transient series;
-may be a suction/negative-pressure head). `'reservoir'` is the submerged-only level — nodes
-at or below the level are held at it, nodes above become seepage (exit) faces. Use
-`'reservoir'` for a free-water face that rises or falls (dam pool, tailwater, pond),
-especially a transient drawdown; use `'head'` for a drained face or an imposed head that
-must hold regardless of elevation. For a level drawn at or below its value the two behave
-identically.
+may be a suction/negative-pressure head). `'reservoir'` is a free-water level — nodes at or
+below the level are held at it; a node the water has covered and then uncovered by falling
+becomes a seepage (exit) face; a node the water has not reached is no-flow. A constant level
+or a steady run (a series read at t = 0) therefore leaves the part of the line above the water
+no-flow, and an exit face appears only where a transient level falls. Use `'reservoir'` for a
+free-water face that rises or falls (dam pool, tailwater, pond), especially a transient
+drawdown; use `'head'` for a drained face or an imposed head that must hold regardless of
+elevation. For a line drawn at or below its value the two behave identically.
+
+Draw a `'reservoir'` line over ALL the ground the pool can reach at its highest level. Ground
+under the water that no head line covers carries no boundary condition, so it is no-flow
+rather than held at the reservoir level; preflight warns
+(`tseep.reservoir_level_above_line`) when the level rises above the top of a reservoir line
+onto such ground. Leave it short only when a no-flow barrier there is intended (a liner, a
+berm).
 
 ```python
 slope_data['seepage_bc'] = {
     'exit_face': [(59, 22), (105, 2)],          # seepage-face polyline (optional)
     'specified_heads': [
-        # upstream reservoir pool (submerged-only): draw the full face it can cover
+        # upstream reservoir pool: draw the full face the water can reach
         {'head': 18, 'kind': 'reservoir', 'coords': [(0, 0), (42, 18)]},
         {'head': 2,  'coords': [(105, 2), (110, 0)]},  # downstream: plain head = 2
     ],

@@ -328,8 +328,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     # string names a `tseep` series (fileio validated it). These stay OUT of the
     # baked scalar arrays: build_seep_data leaves the nodes free, and
     # run_transient_seepage resolves them per time step (by the head binding's kind:
-    # submerged-only reservoir Dirichlet, or plain time-varying head; scaled unit
-    # flux loads for fluxes). Empty on every steady file, so the steady solve is
+    # the reservoir rule, or a plain time-varying head; scaled unit flux loads for
+    # fluxes). Empty on every steady file, so the steady solve is
     # bit-identical — and run_seepage_analysis refuses to solve while bindings
     # exist, so a series-bound node can never be silently left free in a steady
     # solution.
@@ -360,11 +360,12 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         coords = bc["coords"]
         # v18: two Dirichlet head types. "head" = a plain Dirichlet held at the
         # value/series at every node of the polyline, at all times. "reservoir" =
-        # the submerged-only face: a node is held at the level only while submerged
-        # (elevation <= level) and becomes a seepage-exit face above the water line.
-        # For a CONSTANT numeric value with a polyline drawn at or below the level
-        # (the usual case) the two are identical — every node is submerged, so no
-        # exit face is created and both bake the same plain Dirichlet.
+        # a node is held at the level while submerged (elevation <= level); a node
+        # the water has reached and then uncovered is a seepage-exit face; a node
+        # the water has never reached is no-flow. A CONSTANT level has no history,
+        # so its nodes above the level are no-flow and it never makes an exit face.
+        # With the polyline drawn at or below the level (the usual case) the two
+        # types bake the same plain Dirichlet.
         kind = str(bc.get("kind", "head")).strip().lower()
 
         if len(coords) < 2:
@@ -375,23 +376,21 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         dists = _min_distance_to_polyline(nodes, seg_coords)
         mask = dists <= tolerance
         if isinstance(head_value, str):
-            # Time-varying head: resolved per step by run_transient_seepage, which
-            # applies the submerged-only reservoir rule or the plain head rule by
-            # the binding's kind. It stays OUT of the baked scalar arrays here.
+            # Time-varying head: resolved per step by run_transient_seepage (see
+            # resolve_transient_bc), which applies the reservoir rule or the plain
+            # head rule by the binding's kind. It stays OUT of the baked scalar
+            # arrays here.
             head_series_bindings.append({"mask": mask, "series": head_value,
                                          "kind": kind,
                                          "value_t0": _series_t0.get(head_value)})
             continue
         if kind == "reservoir":
-            # Submerged-only against the constant level: hold submerged nodes,
-            # convert above-level nodes to seepage-exit faces (bc_type 2).
-            submerged = mask & (nodes[:, 1] <= head_value)
-            above = mask & (nodes[:, 1] > head_value)
-            bc_type[submerged] = 1
-            bc_values[submerged] = head_value
-            new_exit = above & (bc_type != 1)
-            bc_type[new_exit] = 2
-            bc_values[new_exit] = nodes[new_exit, 1]
+            # A constant level: hold the submerged nodes at it. The nodes above it
+            # have never been under water, so they stay no-flow (or whatever
+            # another boundary makes them).
+            _apply_reservoir_level(bc_type, bc_values, mask,
+                                   np.asarray(nodes[:, 1], dtype=float),
+                                   float(head_value))
         else:
             bc_type[mask] = 1
             bc_values[mask] = head_value
@@ -3038,15 +3037,11 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             print(f"Series '{_b['series']}' read at t = 0 for the steady solve: "
                   f"{_b.get('kind', 'head')} value {_v:g}")
             if str(_b.get("kind", "head")).strip().lower() == "reservoir":
-                # Submerged-only at the t = 0 level, exactly as a constant
-                # reservoir bakes: hold submerged nodes, let above-level nodes
-                # seep (Dirichlet from another boundary still wins there).
-                _sub = _mask & (_nodes_y <= _v)
-                _bt[_sub] = 1
-                _bv[_sub] = _v
-                _above = _mask & (_nodes_y > _v) & (_bt != 1)
-                _bt[_above] = 2
-                _bv[_above] = _nodes_y[_above]
+                # At the t = 0 level, exactly as a constant reservoir bakes: hold
+                # the submerged nodes. A series read at t = 0 has no history, so
+                # the nodes above the level stay no-flow (or whatever another
+                # boundary makes them).
+                _apply_reservoir_level(_bt, _bv, _mask, _nodes_y, _v)
             else:
                 _bt[_mask] = 1
                 _bv[_mask] = _v
@@ -3292,6 +3287,104 @@ def _eval_series(anchors, t):
     return float(va[i] + (va[i + 1] - va[i]) * (t - t0) / (t1 - t0))
 
 
+def _series_high_water(anchors, t):
+    """The highest value a series has reached over the run so far, [0, t].
+
+    The series is piecewise linear on its anchors (:func:`_eval_series`), so its
+    running maximum is the largest of the value at t = 0, the value at t, and every
+    anchor value at an anchor time in [0, t]. At t = 0 the run has no history, and
+    the high water is the t = 0 value itself, so a step anchored at t = 0 (two
+    anchors at the same time) counts only once the run has moved past it."""
+    ta, va = anchors
+    high = max(_eval_series(anchors, 0.0), _eval_series(anchors, t))
+    if t > 0.0:
+        for tt, vv in zip(ta, va):
+            if 0.0 <= tt <= t and vv > high:
+                high = float(vv)
+    return float(high)
+
+
+def _apply_reservoir_level(bc_type, bc_values, mask, y, level, high_water=None):
+    """Resolve one reservoir boundary in place, at a water level and the highest
+    level it has reached so far in the run.
+
+    A node of the boundary (``mask``) at or below ``level`` is submerged and held at
+    the level (``bc_type`` 1). A node above the level that the water has reached
+    (``y <= high_water``) is a seepage-exit face (``bc_type`` 2, value = its own
+    elevation), unless another boundary already holds it at a head. A node above
+    ``high_water`` has never been under water and is left as it stands: no-flow,
+    or whatever another boundary makes it. ``high_water`` defaults to ``level``,
+    which is the steady case (a constant level, or a series read at t = 0, has no
+    history), and there no exit face arises."""
+    if high_water is None:
+        high_water = level
+    submerged = mask & (y <= level)
+    bc_type[submerged] = 1
+    bc_values[submerged] = level
+    uncovered = mask & (y > level) & (y <= high_water) & (bc_type != 1)
+    bc_type[uncovered] = 2
+    bc_values[uncovered] = y[uncovered]
+
+
+def resolve_transient_bc(seep_data, tseep_data, t):
+    """The boundary configuration a transient run applies at time ``t``.
+
+    Returns ``(bc_type, bc_values, flux_nodal)`` as new arrays; ``seep_data`` is not
+    modified. Constant (numeric) heads, exit faces and fluxes carry through from the
+    baked arrays. Each time-varying head series is resolved by its kind:
+
+    * ``"head"``: a plain Dirichlet at the series value h(t) at every node of the
+      polyline, at all times.
+    * ``"reservoir"``: a node at or below h(t) is held at h(t). A node above h(t)
+      that the water has reached at some time in [0, t] (its elevation is at or
+      below the running maximum of the series) is a seepage-exit face. A node above
+      that maximum has never been under water and is no-flow, unless another
+      boundary governs it.
+
+    Each time-varying flux adds its unit load scaled by the series value at t.
+    This is the resolution :func:`run_transient_seepage` applies at its initial
+    condition and at every time step."""
+    nodes = np.asarray(seep_data["nodes"], dtype=float)
+    base_flux = seep_data.get("flux_nodal")
+    base_flux = (np.zeros(len(nodes)) if base_flux is None
+                 else np.asarray(base_flux, dtype=float))
+    return _resolve_series_bc(
+        nodes[:, 1], np.asarray(seep_data["bc_type"]),
+        np.asarray(seep_data["bc_values"], dtype=float), base_flux,
+        seep_data.get("head_series_bindings", []) or [],
+        seep_data.get("flux_series_bindings", []) or [],
+        tseep_data["series"], t)
+
+
+def _resolve_series_bc(y, base_bc_type, base_bc_values, base_flux, head_bindings,
+                       flux_bindings, series, t):
+    """:func:`resolve_transient_bc` on the unpacked arrays (the form the march
+    holds them in)."""
+    def _anchors(name):
+        if name not in series:
+            raise SeepInputError(
+                f"BC references tseep series {name!r}, not found in tseep_data. "
+                f"Available: {', '.join(sorted(series)) or '(none)'}.")
+        return series[name]
+
+    bt = np.asarray(base_bc_type).copy()
+    bv = np.asarray(base_bc_values, dtype=float).copy()
+    for b in head_bindings:
+        anchors = _anchors(b["series"])
+        ht = _eval_series(anchors, t)
+        mask = b["mask"]
+        if str(b.get("kind", "reservoir")).strip().lower() == "head":
+            # plain Dirichlet at h(t) everywhere on the polyline
+            bt[mask] = 1
+            bv[mask] = ht
+            continue
+        _apply_reservoir_level(bt, bv, mask, y, ht, _series_high_water(anchors, t))
+    flux = np.asarray(base_flux, dtype=float).copy()
+    for b in flux_bindings:
+        flux = flux + _eval_series(_anchors(b["series"]), t) * b["unit_flux_nodal"]
+    return bt, bv, flux
+
+
 def build_tseep_data(slope_data):
     """Build the transient-seepage control/series bundle from ``slope_data['tseep']``.
 
@@ -3531,12 +3624,13 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     saturated-only convention RS2 and SEEP/W use. The lumped mass matrix is scaled by
     the element-average S each iteration, exactly as kr scales the stiffness.
     Time-varying BCs come from the ``tseep`` series bound
-    in ``seep_data``, resolved per step by the head binding's kind: a "reservoir"
-    series is a submerged-only Dirichlet (a boundary node is held at h(t) only while
-    submerged, and becomes an exit-face node above the water line), while a "head"
-    series is a plain Dirichlet at h(t) at every node of the polyline at all times
-    (it can hold a suction/negative-pressure head and never converts to an exit
-    face). Adaptive dt clamps to the saved-frame schedule so every saved frame is a
+    in ``seep_data``, resolved per step by the head binding's kind
+    (:func:`resolve_transient_bc`): a "reservoir" series holds a boundary node at
+    h(t) while it is submerged, makes it an exit-face node once the level falls
+    back below it, and leaves it no-flow until the water first reaches it, while a
+    "head" series is a plain Dirichlet at h(t) at every node of the polyline at all
+    times (it can hold a suction/negative-pressure head and never converts to an
+    exit face). Adaptive dt clamps to the saved-frame schedule so every saved frame is a
     computed state.
 
     Parameters
@@ -3622,15 +3716,17 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     series = tseep_data["series"]
 
     # An exit face can be present statically (a downstream seepage face) or appear
-    # dynamically as a series-bound reservoir head falls below a node. The per-step
-    # active-set update (in ``attempt``) resolves the exit face at any element order:
+    # dynamically as a series-bound reservoir level falls below a node it has
+    # submerged. The per-step active-set update (in ``attempt``) resolves the exit
+    # face at any element order:
     # corners use the per-corner SEEP2D h/q test and quadratic (tri6/quad8/quad9)
     # exit edges are tracked all-or-nothing via ``_exit_face_topology`` — the same
     # edge logic the steady solver uses — so the seepage-face transition lands on a
     # corner rather than mid-edge.
-    # Only a "reservoir" head series can dynamically raise an exit face as the
-    # water level falls; a plain "head" series is a Dirichlet at every node at all
-    # times and never converts. Static exit faces (bc_type 2) always count.
+    # Only a "reservoir" head series can dynamically raise an exit face, as its
+    # level falls back below nodes it has submerged; a plain "head" series is a
+    # Dirichlet at every node at all times and never converts. Static exit faces
+    # (bc_type 2) always count.
     _reservoir_binding = any(
         str(b.get("kind", "reservoir")).strip().lower() != "head"
         for b in head_bindings)
@@ -3644,35 +3740,16 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         return series[name]
 
     def resolve_bc(t):
-        """BC configuration at time t: (bc_type, bc_values, flux_nodal). Constant
-        (numeric) heads/exit faces carry through. A time-varying head series is
-        resolved by its kind: a "reservoir" series is Dirichlet at h(t) on submerged
-        nodes (elevation <= h(t)) and an exit-face node above the water line; a
-        "head" series is a plain Dirichlet at h(t) at every node of the polyline,
-        at all times (it can hold a negative-pressure/suction head and never
-        converts to an exit face)."""
-        bt = base_bc_type.copy()
-        bv = base_bc_values.copy()
-        for b in head_bindings:
-            ht = _eval_series(_series(b["series"]), t)
-            mask = b["mask"]
-            if str(b.get("kind", "reservoir")).strip().lower() == "head":
-                # plain Dirichlet at h(t) everywhere on the polyline
-                bt[mask] = 1
-                bv[mask] = ht
-                continue
-            submerged = mask & (y <= ht)
-            above = mask & (y > ht)
-            bt[submerged] = 1
-            bv[submerged] = ht
-            # nodes above the water line become potential seepage-exit faces
-            new_exit = above & (bt != 1)
-            bt[new_exit] = 2
-            bv[new_exit] = y[new_exit]
-        flux = base_flux.copy()
-        for b in flux_bindings:
-            flux = flux + _eval_series(_series(b["series"]), t) * b["unit_flux_nodal"]
-        return bt, bv, flux
+        """BC configuration at time t: (bc_type, bc_values, flux_nodal), as
+        :func:`resolve_transient_bc` states it. A "reservoir" series holds its
+        submerged nodes (elevation <= h(t)) at h(t), makes an exit face of each node
+        the water has reached and since uncovered (h(t) < elevation <= the series'
+        running maximum over [0, t]), and leaves a node the water has never reached
+        no-flow. A "head" series is a plain Dirichlet at h(t) at every node of the
+        polyline, at all times (it can hold a negative-pressure/suction head and
+        never converts to an exit face)."""
+        return _resolve_series_bc(y, base_bc_type, base_bc_values, base_flux,
+                                  head_bindings, flux_bindings, series, t)
 
     # Build-once assembly (stiffness + mass).
     asm = _build_assembly(nodes, elements, element_types, k1, k2, angle)
@@ -3766,8 +3843,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     # relaxation with ~zero NET storage change does not produce a 0/0 ratio.
     stored_scale = float(np.sum(node_lump)) * max(float(np.max(ss)), 1e-30) * char_h
 
-    # IC flow net: submerged exit-face nodes (elevation <= head) are the active
-    # (saturated) exit set at t=0; confined problems have no exit nodes so this is moot.
+    # IC flow net: the exit-face nodes the initial head field saturates (h >= y)
+    # are the active exit set at t=0. A reservoir series contributes none there: at
+    # t = 0 it has no history, so each of its nodes is held (submerged) or no-flow.
+    # Confined problems have no exit nodes, so this is moot.
     _act0 = (bt0 == 2) & (h >= y)
     _in0, _out0 = _frame_flows(h, bt0, bv0, flux0, _act0)
     frames = [{"time": 0.0, "head": h.copy(), "u": gamma_w * (h - y),
@@ -4124,9 +4203,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         "lumped": lumped,
         "duration": duration,
         "unit_weight": gamma_w,
-        # An exit face (static seepage face or a falling series-head reservoir) can
-        # appear; kr scales velocity on load exactly as in the steady unconfined
-        # branch. Recorded so the frame loader derives velocities the same way.
+        # An exit face (static seepage face, or a series-head reservoir uncovering
+        # a face it has submerged) can appear; kr scales velocity on load exactly
+        # as in the steady unconfined branch. Recorded so the frame loader derives
+        # velocities the same way.
         "unconfined": bool(_may_have_exit),
         # Rapid-drawdown stage times carried through for the meta ledger and the
         # in-memory drawdown staging (§6); None when the model sets no stages.

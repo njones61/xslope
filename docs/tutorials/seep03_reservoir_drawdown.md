@@ -245,7 +245,7 @@ the heel and up the submerged part of the upstream face:
 The upper end is the point where the reservoir surface meets the slope. Every
 node on that polyline is under 18 m of water or at its surface, so holding the
 total head at 18 along it is exact. The **Type:** list also offers `reservoir` —
-the submerged-only kind built for a moving pool, which this boundary will be
+the kind built for a moving pool, which this boundary will be
 switched to when the drawdown is added. On a standing pool with the polyline
 fully submerged the two behave identically, so the steady build keeps the plain
 `head`.
@@ -483,7 +483,8 @@ what an upstream face becomes once the pool has dropped past it. [Head types](..
 describes both. On a steady problem the choice makes no difference as long as the
 polyline is drawn no higher than the level, as it is here: every node on it is
 submerged either way. Drawn above its own level, a constant-value reservoir face
-turns the nodes standing above it into an exit face even in a steady run.
+leaves the nodes standing above it no-flow: a level that never moves never covers
+them, so it never uncovers them either.
 
 Then clear the **Head value (m):** field and type `pool` in place of the number
 18. That is all it takes to make a boundary condition time-varying: a value

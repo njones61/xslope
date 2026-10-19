@@ -7541,13 +7541,21 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     # How many nodes it has is stated with the mesh figure, which is where it is
     # read against the boundary types that figure does mark; here it is what the
     # march is driven by, so what is stated is what the level does to it.
-    from .plot_seep import reservoir_face_mask
+    from .plot_seep import reservoir_face_mask, _reservoir_level
     face = reservoir_face_mask(seep_data)
     if face is not None and face.any():
-        sub.blocks.append(Prose(
-            "The reservoir face follows the level the schedule sets: each "
-            "of its nodes is held at that level while it is submerged, and drains "
-            "freely once the level falls below it."))
+        text = ("The reservoir face follows the level the schedule sets: each "
+                "of its nodes is held at that level while it is submerged, and "
+                "drains freely once the level falls below it.")
+        # Where the face stands above the starting level, its upper nodes wait
+        # for the water: they are no-flow until the level first reaches them.
+        import numpy as np
+        level0 = _reservoir_level(seep_data, 0.0)
+        y_face = np.asarray(seep_data["nodes"], dtype=float)[face, 1]
+        if level0 is not None and np.any(y_face > level0):
+            text += (" A node the water has not yet reached is no-flow, and "
+                     "becomes a seepage face only after it has been submerged.")
+        sub.blocks.append(Prose(text))
 
     # Whether the march closed. The closure is the disagreement between the water
     # the section took in or let out at its boundary and the water its storage

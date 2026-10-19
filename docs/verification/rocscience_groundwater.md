@@ -864,9 +864,9 @@ through the dam and daylights on the downstream slope. Storage is
 $S_s=\gamma_w m_v = 9.81\times0.002=0.0196\ \text{m}^{-1}$ (the vendor RS2 model carries
 $m_v=0.002$ where the manual *text* prints 0.003; the model value is what produced RS2's own
 Fig 20.5 result), and saturated conductivity $k_s=10^{-7}$ m/s. The reservoir raise is a
-**submerged-only Dirichlet series** on the upstream face: the $t=0$ steady solve at reservoir
-4 sets the initial condition, then every upstream node with $y\le h(t)$ is held at $h(t)$ and
-the nodes above become exit-face nodes.
+**reservoir series** on the upstream face: the $t=0$ steady solve at reservoir 4 sets the
+initial condition, then every upstream node with $y\le h(t)$ is held at $h(t)$, and the face
+above the 10 m pool, which the water never reaches, is no-flow.
 
 **The two unsaturated curves are transcribed independently**, because the vendor ships them
 that way and they live on completely different scales: `groundwater #020`'s conductivity table

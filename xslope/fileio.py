@@ -982,9 +982,11 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
     starts with "flux" — every older file therefore still loads as a head BC.
 
     Head type (v18): a head block carries a ``kind`` — "reservoir" when the type
-    cell text starts with "reservoir" (the submerged-only face), else "head" (a
-    plain Dirichlet held at the value at every node of the polyline, at all
-    times). A blank or legacy "Head:" type cell reads as "head".
+    cell text starts with "reservoir" (a node is held at the level while
+    submerged, is a seepage-exit face once the level falls back below it, and is
+    no-flow until the water first reaches it), else "head" (a plain Dirichlet held
+    at the value at every node of the polyline, at all times). A blank or legacy
+    "Head:" type cell reads as "head".
 
     Value cells (v18): a block's VALUE cell may hold either a number (a constant
     head/flux, as always) or a string naming a ``tseep`` time series (a
@@ -1035,11 +1037,12 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
         type_cell = seep_df.iloc[type_row, col]
         type_text = str(type_cell).strip().lower() if pd.notna(type_cell) else ""
         is_flux = type_text.startswith("flux")
-        # v18: two Dirichlet head types share the head block layout. "reservoir" is
-        # the submerged-only face (a node is held at the level only while submerged;
-        # nodes above the water line become seepage-exit faces). Anything else that
-        # is not a flux — "head", the legacy "Head:" label, or a blank type cell —
-        # is a plain Dirichlet head held at the value at every node of the polyline.
+        # v18: two Dirichlet head types share the head block layout. "reservoir": a
+        # node is held at the level while submerged, becomes a seepage-exit face
+        # once the level falls back below it, and is no-flow until the water first
+        # reaches it. Anything else that is not a flux — "head", the legacy "Head:"
+        # label, or a blank type cell — is a plain Dirichlet head held at the value
+        # at every node of the polyline.
         is_reservoir = type_text.startswith("reservoir")
 
         coords = _read_coords(col, col + 1)

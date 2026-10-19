@@ -153,7 +153,7 @@ The transient model adds two things to the steady Johnson model:
   its own unconfined rate `k/Sy`. Because the core's `k` is a thousandfold smaller than the shell's
   while its `Sy` is smaller by less than a factor of ten, the core drains far more slowly than the shell.
 - A **tseep sheet** carrying the drawdown schedule and run controls. The upstream boundary is retyped
-  from a fixed head to a submerged-only **`reservoir`** boundary (see
+  from a fixed head to a **`reservoir`** boundary (see
   [head types](transient.md#head-types-head-and-reservoir)) bound to a `pool` series: the pool is
   held at full pool (el 160) briefly, drawn down to the tailwater datum (el 100) over **45 days**,
   then held. The run lasts **1000 days** because the low-permeability core drains slowly, so the
@@ -169,7 +169,7 @@ storage columns and the `tseep` sheet are new.
 [xslope_johnson_res_tseep.xlsx](files/xslope_johnson_res_tseep.xlsx)
 
 Inputs plotted with the XSLOPE `plot_inputs()` function. The upstream **reservoir**
-boundary (submerged-only) is drawn distinctly from the downstream fixed-head boundary and the exit
+boundary is drawn distinctly from the downstream fixed-head boundary and the exit
 face, and its `tseep`-series level shows as two waterlines — the full-pool level at `t = 0` and the
 drawn-down level at `t = end` — each carrying the standard apex-down water symbol:
 
@@ -196,7 +196,7 @@ The figure shows the following:
   of the 45-day drawdown (t = 50) the pool is already at el 100, while the water table inside the
   dam is still well above it. A rapid-drawdown analysis has to include the pore pressure from this
   higher water table.
-- The exit point moves down the upstream face. As the level falls, the face nodes above the pool
+- The exit point moves down the upstream face. As the level falls, the face nodes it uncovers
   change from reservoir head to a free-draining exit face, and the point where the phreatic surface
   meets the face moves down the slope from el 160 to the tailwater datum, staying above the falling
   pool.

@@ -1,10 +1,10 @@
 {
  "_comment": "Content hash of each verification page as last certified by tools/verification_checks. A page whose hash differs is re-checked in full; see README.md.",
  "pages": {
-  "geostudio": "89486b9197d0fcf99073fa7fa54724148ccaef6352d7da614e4faac8e75b8c9c",
+  "geostudio": "be9311abe16ffb9469d9dae1012644ed1823487908051982c57c733a707a4e00",
   "published": "d4cb59f94f5bd635932c94dffb0e2a8872bc1a39f1e7975f9ab0cb5df0410274",
   "rocscience": "ddc235a7f10bba2806f83f0d87083ff1235d625a8510e6a6ed73a1043433ba32",
-  "rocscience_groundwater": "bb66163b4a92eccce971fafa1b8482888fdd03f617e45eda0ff90fae7aeb912a",
+  "rocscience_groundwater": "e527a89b8ea990b0633a1804f7b8257d2f473efa7a9219211742dbf37d8cd8a0",
   "rs2": "31e989c72e84a7ee5ed21182e5e4f7c517ac6f8c7f81beee5ec950843f90e34f",
   "rs2_joints": "13c7d576936b5557cbb52e2ca43b81c088b9a88cab819567ac5d222b12c6f73d",
   "seep": "1df89942f8403e9a8ce91b50565cf61673cd2a89f016ebb321a6347e5ad01b14",

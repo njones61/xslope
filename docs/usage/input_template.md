@@ -730,15 +730,16 @@ directly to its right is interpreted:
 | type | value is | units |
 |---|---|---|
 | `head` | specified head — a **plain Dirichlet** total head held at every node of the polyline, at all times (may be a suction/negative-pressure head) | **[L]** |
-| `reservoir` | a reservoir/tailwater **level** — a **submerged-only** Dirichlet: nodes at or below the level are held at it, nodes above it become seepage (exit) faces | **[L]** |
+| `reservoir` | a reservoir/tailwater **level**: nodes at or below the level are held at it; a node the water has covered and then uncovered by falling becomes a seepage (exit) face; a node the water has not reached is no-flow | **[L]** |
 | `flux` | specified flux — the **normal Darcy velocity**, **positive into the domain** | **[L/t]** |
 
 Both `head` and `reservoir` are total heads (height of water above the datum) and, for a
-level drawn at or below the applied value, behave identically; they differ only in what
-happens to a node the water level leaves above the line (a `head` holds it; a `reservoir`
-releases it to an exit face). Use `reservoir` for a free-water face that rises or falls
-(dam pool, tailwater, pond) and `head` for a drained face or an imposed head that must be
-enforced regardless of elevation.
+line drawn at or below the applied value, behave identically. They differ only in what happens
+to a node of the line that stands above the water: a `head` holds it at the level, in suction;
+a `reservoir` leaves it no-flow until the water reaches it, and makes it an exit face once the
+water has covered it and fallen back below it. Use `reservoir` for a free-water face that rises
+or falls (dam pool, tailwater, pond) and `head` for a drained face or an imposed head that must
+be enforced regardless of elevation.
 
 A **specified flux** (Neumann) boundary prescribes the *rate* at which water crosses the
 boundary instead of the head on it. The usual use is rainfall infiltration or recharge applied
@@ -768,10 +769,13 @@ xslope reports an error listing the available series names if it does not — an
 valid when a tseep sheet is present. A constant boundary takes a plain number. A series on a `head` block is a plain Dirichlet held at $h(t)$ at every node of the
 polyline at all times; a series on a `reservoir` block is the rising/falling level. For a
 series-driven **reservoir** boundary, draw the polyline over the *full* face the water can ever
-cover: at each time step only the currently submerged nodes are held at the series level, while
-nodes above the waterline automatically become seepage-face (exit face) nodes so the
-still-saturated soil behind a freshly exposed face can drain through it — see
-[head types](../seep/transient.md#head-types-head-and-reservoir).
+cover: at each time step only the currently submerged nodes are held at the series level; nodes
+the water has covered and then uncovered become seepage-face (exit face) nodes, so the
+still-saturated soil behind a freshly exposed face can drain through it; and nodes the water
+has not yet reached are no-flow — see
+[head types](../seep/transient.md#head-types-head-and-reservoir). Ground under the water that the
+line does not cover has no boundary condition and is no-flow, and preflight warns when the
+level rises above the top of the line onto such ground.
 
 For a typical unconfined problem, there is one upstream specified head boundary condition and a single downstream 
 exit face. For confined problems, there is typically one upstream and one downstream specified head boundary 

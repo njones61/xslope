@@ -1078,7 +1078,7 @@ A storage-driven **water-table rise** through an exit face. A clay-lined pond on
 (a symmetric half-model) is filled to a constant level, water leaks through the liner into the
 embankment, and over 240 days the water table rises from its far-field position at el. 4 to a
 near-steady leaking state that drains out the downstream seepage face. The pond is the same
-submerged-only reservoir series as [T03](#seepw-t03), run in the filling direction, stepping to
+reservoir series as [T03](#seepw-t03), run in the filling direction, stepping to
 head 10.5 m at t = 0. The fill is Ksat = 1.157×10⁻⁶ m/s and the liner about 12× less permeable,
 9.259×10⁻⁸ m/s.
 
@@ -1191,8 +1191,9 @@ ceramic plate two orders of magnitude less permeable, which meters the outflow, 
 **suction** stepped more negative in five stages over ~61 hours. It exercises the unsaturated
 storage term C(ψ) under a stepped specified-pressure-head boundary. The base head is negative at
 every stage (−0.073 m initially, then −0.093 … −0.175 m) and is carried by a time-varying
-**head** (plain-Dirichlet) series held at every node at all times, since the submerged-only
-*reservoir* series would turn an unsubmerged node into an exit face and drop the suction.
+**head** (plain-Dirichlet) series held at every node at all times, since a *reservoir* series
+holds a node only while the water stands over it and would leave the base, which the water
+never covers, no-flow, dropping the suction.
 
 The vendor's 80-point retention and conductivity splines are PEST-calibrated closed forms, so the
 three parameters behind them are read back out of the tables: **α = 8.893966 /m, n = 10.190410,

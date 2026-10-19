@@ -514,7 +514,7 @@ shows a **Run type** selector with a **Transient (time-dependent)** choice
 alongside **Steady**. A transient solve marches the variably-saturated flow
 equation through time and saves a sequence of frames, each a full seepage
 solution at one instant. The theory — the storage formulation, time-stepping, the
-submerged-only boundary rule, and the initial condition — is on the
+reservoir boundary rule, and the initial condition — is on the
 [Transient Seepage](../seep/transient.md) page, whose
 [Studio](../seep/transient.md#studio) section describes the same workflow from the
 theory side.

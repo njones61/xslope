@@ -366,12 +366,12 @@ DD_T = 86_400.0
 # the SAME reservoir series (hold high -> ramp to low -> hold), and the equilibrated
 # low-pool frame is compared.
 #
-# Achieved on the coarse pair used here (tri3 ~55 nodes / tri6 ~105 nodes, ~10 s):
+# Achieved on the pair used here (tri3 311 nodes / tri6 508 nodes, ~20 s):
 #   * downstream exit-point elevation:  identical to 0.00 ft (both land on 227.00,
 #     the tailwater/toe elevation) — the seepage face terminates at the same place;
-#   * saturated-zone head field:  RMS ~1.9% of the head range, max ~9% (the max sits
-#     on the phreatic surface, where a small head error moves the h=y crossing the
-#     most and where the two meshes differ by genuine refinement).
+#   * saturated-zone head field:  RMS ~0.7% of the head range, max ~5.5% (the max
+#     sits on the phreatic surface, where a small head error moves the h=y crossing
+#     the most and where the two meshes differ by genuine refinement).
 # The head field is compared only where BOTH solutions are saturated (pressure head
 # >= 0): that is where the pore pressures driving stability live, and it excludes the
 # unsaturated cap where head is legitimately mesh-sensitive. Tolerances carry real
@@ -417,8 +417,13 @@ def check_drawdown_linear_vs_quadratic():
         h = np.asarray(sol["frames"][transient_frame_index(sol, dur)]["head"])
         return sol, h
 
-    sd3, ground = _build("tri3", 14.0)       # linear: per-corner rule
-    sd6, _ = _build("tri6", 8.0)             # quadratic: ported edge rule
+    # Meshes fine enough that the comparison measures the two exit-face rules rather
+    # than the meshes: each leg is within 5% (max) of the finest mesh of the other
+    # element type (tri3 56, tri6 32), and a finer pair only shrinks the measures.
+    # The tri6 meshes between 9 and 16 divisions start from a steady solve that does
+    # not close, so their runs report converged=False.
+    sd3, ground = _build("tri3", 40.0)       # linear: per-corner rule
+    sd6, _ = _build("tri6", 22.0)            # quadratic: ported edge rule
     if not sd6.get("head_series_bindings"):
         return ["reservoir head binding was not created (check seepage_bc mapping)"]
 

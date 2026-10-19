@@ -1764,42 +1764,134 @@ def storage_capacity_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
     return out
 
 
-def storage_potential_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
-    """Storage potential Phi(psi) = integral_0^psi S(psi') dpsi' [-], vectorized.
+def _storage_law(Ss, Sy, h0, vg_a=None, vg_n=None):
+    """Per-material constants of the storage law ``storage_capacity_vec`` evaluates,
+    in the form its integral needs. All arguments broadcast together.
 
-    Phi is the (reference-shifted) water content: ``Phi(psi_new) - Phi(psi_old)``
-    is the change in stored water per unit volume, used for the SECANT (Celia
-    mixed-form) mass-balance ledger rather than the tangent capacity that scales
-    the mass matrix.  For a saturated linear problem ``Phi = Ss*psi`` so the secant
-    ledger and the tangent solve agree to machine precision.  It integrates the
-    SAME zone-split S as ``storage_capacity_vec`` (elastic Ss below the phreatic
-    surface, retention capacity above it), so the ledger tracks the solve.
-    """
+    Linear front / Gardner: the capacity is piecewise constant, ``Ss`` above
+    ``psi = 0``, ``s_band`` in the band ``h0 < psi < 0`` and the residual floor
+    ``floor_lf`` below it. van Genuchten: ``Ss`` above ``psi = 0`` and
+    ``max(Sy dSe/dpsi, floor_vg)`` below it. ``Sy dSe/dpsi`` rises from zero at
+    saturation to a peak and decays again, so it crosses the floor twice, at
+    ``p1`` (near saturation) and ``p2`` (deep in the dry range); between them the
+    retention curve holds the water, outside them the floor. The crossings are
+    found once per material by bisection on ``log(alpha|psi|)``. A curve whose
+    peak never clears the floor (or a non-positive alpha) carries the floor alone,
+    flagged by ``vg_has_band`` False."""
     Ss = np.asarray(Ss, dtype=float)
     Sy = np.asarray(Sy, dtype=float)
     h0 = np.asarray(h0, dtype=float)
     safe_h0 = np.where(h0 == 0.0, -1.0, h0)
-    ah0 = np.abs(safe_h0)
-    # Linear-front / Gardner piecewise integral of the zone-split S:
-    #   psi >= 0      : Ss*psi
-    #   h0 < psi < 0  : (Sy/|h0|)*psi
-    #   psi <= h0     : -Sy            (the band is fully drained)
-    lf = np.where(
-        p >= 0.0, Ss * p,
-        np.where(p > h0, (Sy / ah0) * p, -Sy))
+    band_C = Sy / np.abs(safe_h0)
+    floor_lf = S_FLOOR_FRAC * np.maximum(Ss, band_C)
+    law = {'Ss': Ss, 'Sy': Sy, 'h0': h0, 'floor_lf': floor_lf,
+           's_band': np.maximum(band_C, floor_lf)}
+    if vg_a is None or vg_n is None:
+        return law
+    a = np.asarray(vg_a, dtype=float)
+    n = np.maximum(np.asarray(vg_n, dtype=float), 1.0 + 1e-6)
+    m = 1.0 - 1.0 / n
+    floor_vg = S_FLOOR_FRAC * np.maximum(Ss, Sy * np.abs(a))
+    Sy_b, a_b, n_b, m_b, f_b = np.broadcast_arrays(Sy, a, n, m, floor_vg)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        log_c = np.log(Sy_b * m_b * n_b * a_b)
+
+        def log_g(ls):                     # log of Sy dSe/dpsi at s = exp(ls)
+            return log_c + (n_b - 1.0) * ls - (m_b + 1.0) * np.logaddexp(0.0, n_b * ls)
+        log_f = np.log(f_b)
+        ls_pk = np.log(m_b) / n_b          # the capacity peaks at s^n = m
+        has = (a_b > 0) & (Sy_b > 0) & np.isfinite(log_c) & (log_g(ls_pk) > log_f)
+        lo1 = np.full(a_b.shape, -700.0)
+        hi1 = np.where(has, ls_pk, 0.0)
+        lo2 = np.where(has, ls_pk, 0.0)
+        hi2 = np.where(has, ls_pk + 700.0 / n_b, 1.0)
+        low_edge = has & (log_g(lo1) >= log_f)   # crossing below s = e^-700: s1 = 0
+        for _ in range(100):
+            mid = 0.5 * (lo1 + hi1)
+            up = log_g(mid) >= log_f
+            hi1 = np.where(up, mid, hi1)
+            lo1 = np.where(up, lo1, mid)
+            mid = 0.5 * (lo2 + hi2)
+            up = log_g(mid) >= log_f
+            lo2 = np.where(up, mid, lo2)
+            hi2 = np.where(up, hi2, mid)
+        s1 = np.where(low_edge, 0.0, np.exp(0.5 * (lo1 + hi1)))
+        s2 = np.exp(0.5 * (lo2 + hi2))
+        a_safe = np.where(a_b > 0, a_b, 1.0)
+        p1 = np.where(has, -s1 / a_safe, 0.0)
+        p2 = np.where(has, -s2 / a_safe, 0.0)
+        Se1 = (1.0 + s1 ** n_b) ** (-m_b)
+        Se2 = np.exp(-m_b * np.logaddexp(0.0, n_b * np.log(np.maximum(s2, 1e-300))))
+    law.update({'vg_a': a, 'vg_n': n, 'vg_m': m, 'floor_vg': floor_vg,
+                'vg_has_band': has, 'vg_p1': p1, 'vg_p2': p2,
+                'vg_Se1': np.where(has, Se1, 1.0), 'vg_Se2': np.where(has, Se2, 1.0)})
+    return law
+
+
+def _vg_point(p, law, want_cap=True):
+    """Phi and (``want_cap``) the capacity of the van Genuchten law at pressure head
+    p, both with the residual floor, from one evaluation of (alpha |psi|)^n."""
+    a, n, m, Sy = law['vg_a'], law['vg_n'], law['vg_m'], law['Sy']
+    s = a * np.maximum(-p, 0.0)                    # alpha |psi| (0 where saturated)
+    with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
+        sn = s ** n
+        base = 1.0 + sn
+        Se = base ** (-m)
+    fl, p1, p2 = law['floor_vg'], law['vg_p1'], law['vg_p2']
+    off = fl * p1
+    band = off + Sy * (Se - law['vg_Se1'])
+    dry = off + Sy * (law['vg_Se2'] - law['vg_Se1']) + fl * (p - p2)
+    uns = np.where(p >= p1, fl * p, np.where(p >= p2, band, dry))
+    uns = np.where(law['vg_has_band'], uns, fl * p)
+    phi = np.where(p >= 0.0, law['Ss'] * p, uns)
+    if not want_cap:
+        return phi, None
+    # Sy dSe/dpsi = Sy m n alpha s^(n-1) (1 + s^n)^(-m-1) = Sy m n alpha (s^n/s) Se/base
+    with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
+        dSe = m * n * a * (sn / np.where(s > 0.0, s, 1.0)) * Se / base
+    dSe = np.where(s > 0.0, np.nan_to_num(dSe, nan=0.0, posinf=0.0), 0.0)
+    cap = np.where(p >= 0.0, law['Ss'], np.maximum(Sy * dSe, fl))
+    return phi, cap
+
+
+def _phi_lf(p, law):
+    """Integral from 0 to p of the linear-front / Gardner capacity, floor included."""
+    h0, s_band = law['h0'], law['s_band']
+    return np.where(p >= 0.0, law['Ss'] * p,
+                    np.where(p > h0, s_band * p,
+                             s_band * h0 + law['floor_lf'] * (p - h0)))
+
+
+def _phi_vg(p, law):
+    """Integral from 0 to p of the van Genuchten capacity, floor included."""
+    return _vg_point(p, law, want_cap=False)[0]
+
+
+def _cap_vg(p, law):
+    """The van Genuchten branch of ``storage_capacity_vec`` (floor included)."""
+    return _vg_point(p, law)[1]
+
+
+def storage_potential_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
+    """Storage potential Phi(psi) = integral_0^psi S(psi') dpsi' [-], vectorized.
+
+    ``Phi`` is the stored water per unit volume, measured from saturation:
+    ``Phi(psi_new) - Phi(psi_old)`` is the water a unit volume of soil takes up
+    between the two pressure heads. It is the exact integral of
+    ``storage_capacity_vec`` -- the same zone-split law (elastic Ss below the
+    phreatic surface, the retention capacity above it) with the same residual
+    floor -- so the stored water the transient solver conserves and the capacity
+    it reports are one law. Arguments broadcast as in ``storage_capacity_vec``.
+    """
+    law = _storage_law(Ss, Sy, h0)
+    lf = _phi_lf(p, law)
     if model is None or not np.any(model):
         return lf
-    out = lf
     model = np.asarray(model)
+    out = lf
     if np.any(model == KR_VG):
-        n = np.maximum(vg_n, 1.0 + 1e-6)
-        m = 1.0 - 1.0 / n
-        ah = vg_a * np.abs(np.minimum(p, 0.0))
-        Se = (1.0 + ah ** n) ** (-m)
-        Se = np.where(p >= 0.0, 1.0, Se)
-        # integral of the zone-split S: Ss*psi saturated, Sy*(Se-1) unsaturated
-        vg = np.where(p >= 0.0, Ss * p, Sy * (Se - 1.0))
-        out = np.where(model == KR_VG, vg, out)
+        vlaw = _storage_law(Ss, Sy, h0, vg_a, vg_n)
+        out = np.where(model == KR_VG, _phi_vg(p, vlaw), out)
     return out
 
 
@@ -2087,16 +2179,21 @@ def _coo_matvec(asm, data, x):
 
 
 # =============================================================================
-# Transient mass-matrix assembly (batched, build-once, storage-scaled per step)
+# Transient storage (batched, build-once)
 #
-# Parallels the stiffness path: the unit (density-1) consistent element mass
-# matrices M_e = integral(N_i N_j dOmega) are built ONCE per solve, batched over
-# each element type; each time step scales them by the element-average storage
-# coefficient S (from storage_capacity_vec, sampled at the SAME kr points) exactly
-# as kr scales the stiffness.  The default LUMPED mass uses HRZ diagonal scaling
-# (row-sum lumping is identical to HRZ on linear tri3/quad4, but row-sum gives a
-# zero corner mass on quadratic elements, so HRZ is used to keep the lumped
-# diagonal strictly positive on every element type).
+# The storage term of a time step is the change in each element's stored water,
+# the integral of Phi(psi) (storage_potential_vec) over the element with psi carried
+# linearly across sub-triangles of it, between the head at the start of the step
+# and the head at its end -- the mass-conservative mixed form of Celia, Bouloutas
+# and Zarba (1990). The integral is exact for the linear-front / Gardner law on
+# triangles and a sum over storage points otherwise. The change splits exactly into
+# one term per node, each driven by that node's own head change, so the storage
+# matrix stays diagonal; wherever an element stays on one linear branch of the law
+# it is exactly the HRZ-lumped m_i * S * dpsi_i (see _storage_residual). Everything
+# geometric -- the HRZ lumped weights, the sub-triangles, the storage points and
+# their weights -- is built once per solve. HRZ lumping is used rather than row-sum
+# lumping because row-sum gives a zero corner weight on quadratic elements; the two
+# coincide on tri3/quad4.
 # =============================================================================
 
 
@@ -2190,17 +2287,15 @@ def _batched_me(et, coords):
 
 
 def _build_mass_assembly(nodes, elements, element_types):
-    """Precompute the reusable transient mass data (parallels ``_build_assembly``).
+    """Precompute the HRZ-lumped unit mass of every element (parallels
+    ``_build_assembly``, same group order and connectivity).
 
-    Returns per-element-type groups carrying the unit consistent mass ``me``, the
-    HRZ-lumped unit diagonal ``me_lump`` (n_e, nn), and the kr-sampling operators
-    (so the element-average storage coefficient is averaged at the same points as
-    kr), plus the geometric lumped mass ``node_lump`` (n_nodes,) = integral(N_i
-    dOmega) used by the mass-balance ledger."""
+    Returns per-element-type groups carrying the unit consistent mass ``me`` and
+    its HRZ-lumped diagonal ``me_lump`` (n_e, nn): the weight with which each node
+    of an element carries that element's storage."""
     elements = np.asarray(elements)
     element_types = np.asarray(element_types)
     groups = []
-    node_lump = np.zeros(len(nodes))
     for et in np.unique(element_types):
         idx = np.where(element_types == et)[0]
         nn = int(et)
@@ -2213,44 +2308,427 @@ def _build_mass_assembly(nodes, elements, element_types):
         # row-sum on linear elements, strictly positive on quadratics.
         scale = np.where(dsum > 1e-300, total / np.where(dsum > 1e-300, dsum, 1.0), 0.0)
         me_lump = diag * scale[:, None]                 # (n_e, nn)
-        # geometric row-sum lump (integral of N_i) for the mass-balance ledger
-        geo = me.sum(axis=2)                             # (n_e, nn)
-        np.add.at(node_lump, conn, geo)
-        N_kr, w_kr = _kr_sampling(int(et))
         groups.append({'et': int(et), 'idx': idx, 'conn': conn,
-                       'me': me, 'me_lump': me_lump,
-                       'N_kr': N_kr, 'w_kr': w_kr, 'wsum': w_kr.sum()})
-    return {'groups': groups, 'n_nodes': len(nodes), 'node_lump': node_lump}
+                       'me': me, 'me_lump': me_lump})
+    return {'groups': groups, 'n_nodes': len(nodes)}
 
 
-def _lumped_mass_diag(masm, S_elem_by_group):
-    """Assemble the global LUMPED mass diagonal (n_nodes,) from per-group element
-    storage coefficients.  ``S_elem_by_group`` is a list aligned to
-    ``masm['groups']`` giving the element-average storage S for each element."""
-    n = masm['n_nodes']
-    diag = np.zeros(n)
-    for g, S in zip(masm['groups'], S_elem_by_group):
-        contrib = S[:, None] * g['me_lump']             # (n_e, nn)
-        np.add.at(diag, g['conn'], contrib)
-    return diag
+#: Storage points per sub-triangle where the drainage water is a point sum: each
+#: sub-triangle is cut into k x k equal parts, each sampled by the 7-point rule. The
+#: van Genuchten law is smooth, and one 7-point rule per sub-triangle holds its
+#: water to well inside the iteration tolerance; the linear-front law on a
+#: quadrilateral has kinks, so its sub-triangles are cut finer. (The linear-front
+#: law on triangles is integrated exactly; see ``_lf_tri_water``.)
+STORAGE_SUBDIV_VG = 1
+STORAGE_SUBDIV_LF = 2
+
+# 7-point (degree-5) triangle rule in barycentric coordinates.
+_TRI7_L = np.array([[1/3, 1/3, 1/3],
+                    [0.059715871789770, 0.470142064105115, 0.470142064105115],
+                    [0.470142064105115, 0.059715871789770, 0.470142064105115],
+                    [0.470142064105115, 0.470142064105115, 0.059715871789770],
+                    [0.797426985353087, 0.101286507323456, 0.101286507323456],
+                    [0.101286507323456, 0.797426985353087, 0.101286507323456],
+                    [0.101286507323456, 0.101286507323456, 0.797426985353087]])
+_TRI7_W = np.array([0.225, 0.132394152788506, 0.132394152788506, 0.132394152788506,
+                    0.125939180544827, 0.125939180544827, 0.125939180544827])
+_TRI7_W = _TRI7_W / _TRI7_W.sum()
 
 
-def _mass_storage_by_group(masm, p_nodes, Ss, Sy, h0, vg_a, vg_n, model):
-    """Element-average storage coefficient S per group, sampled at the kr points
-    and quadrature-averaged (mirrors ``_assembly_data``'s kr averaging).  Returns a
-    list aligned to ``masm['groups']``."""
-    out = []
+def _subtri_rule(k):
+    """Barycentric points (n, 3) and weights (n,) summing to 1: the 7-point rule on
+    each of the k*k equal sub-triangles of a triangle."""
+    L, W = [], []
+    for j in range(k):
+        for i in range(k - j):
+            cells = [((i, j), (i + 1, j), (i, j + 1))]
+            if i + j < k - 1:
+                cells.append(((i + 1, j), (i + 1, j + 1), (i, j + 1)))
+            for v in cells:
+                V = np.array([[a / k, b / k, 1.0 - (a + b) / k] for a, b in v])
+                for lam, w in zip(_TRI7_L, _TRI7_W):
+                    L.append(lam @ V)
+                    W.append(w / (k * k))
+    return np.array(L), np.array(W)
+
+
+def _storage_cells(et):
+    """Storage sub-triangles of the parent element, across each of which the
+    pressure head is carried linearly.
+
+    Returns ``(P, tris)``: ``P`` (n_pts, nn) the non-negative weights that give the
+    head at each sub-point from the nodal heads, and ``tris`` (n_tri, 3) the
+    sub-points of each sub-triangle. tri3 is its own single sub-triangle; tri6 is cut
+    at its nodes into three corner triangles and a center one; quadrilaterals are
+    cut on their nodes (quad9) or on the nodes and a center point (quad4: the mean
+    of the corners; quad8: the mean of the midsides)."""
+    if et == 3:
+        return np.eye(3), np.array([[0, 1, 2]])
+    if et == 6:
+        # nodes 0-2 corners, 3 = (0,1), 4 = (1,2), 5 = (2,0) midsides
+        return np.eye(6), np.array([[0, 3, 5], [3, 1, 4], [5, 4, 2], [3, 4, 5]])
+    if et == 4:
+        P = np.vstack([np.eye(4), np.full((1, 4), 0.25)])
+        return P, np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]])
+    if et == 8:
+        c = np.zeros(8)
+        c[4:] = 0.25
+        P = np.vstack([np.eye(8), c[None, :]])
+    else:
+        P = np.eye(9)
+    # corners 0-3, midsides 4 (0-1), 5 (1-2), 6 (2-3), 7 (3-0), center 8
+    tris = np.array([[0, 4, 8], [4, 1, 8], [1, 5, 8], [5, 2, 8],
+                     [2, 6, 8], [6, 3, 8], [3, 7, 8], [7, 0, 8]])
+    return P, tris
+
+
+# Order-averaged (Shapley) split of a sub-triangle's water change among its three
+# vertices: rows are the 8 states with each vertex at its old (bit 0) or new (bit 1)
+# head, columns the vertices; share = W(states) @ _SHAPLEY3.
+_SHAPLEY3 = np.zeros((8, 3))
+for _v in range(3):
+    for _s in range(8):
+        if _s & (1 << _v):
+            continue
+        _k = bin(_s).count('1')
+        _wt = {0: 1.0 / 3.0, 1: 1.0 / 6.0, 2: 1.0 / 3.0}[_k]
+        _SHAPLEY3[_s | (1 << _v), _v] += _wt
+        _SHAPLEY3[_s, _v] -= _wt
+_SUBSET_MASK = np.array([[(s >> v) & 1 for v in range(3)] for s in range(8)], dtype=bool)
+
+
+def _ramp_integral(U, area):
+    """Exact integral of max(u, 0) over triangles on which u is linear.
+
+    ``U`` (..., 3) holds the vertex values and ``area`` (...) the areas. Returns
+    ``(I, G)``: the integral and its derivatives with respect to the three vertex
+    values (continuous in U, so the integral is continuously differentiable)."""
+    order = np.argsort(U, axis=-1)
+    Us = np.take_along_axis(U, order, axis=-1)
+    a, b, c = Us[..., 0], Us[..., 1], Us[..., 2]
+    full = a >= 0.0
+    I = np.where(full, area * (a + b + c) / 3.0, 0.0)
+    Gs = np.where(full[..., None], (area / 3.0)[..., None], 0.0)
+    # one vertex above zero (b <= 0 < c): a small triangle at c
+    up = (c > 0.0) & (b <= 0.0)
+    ca = np.where(up, c - a, 1.0)
+    cb = np.where(up, c - b, 1.0)
+    Ga = area * c ** 3 / (3.0 * ca * ca * cb)
+    Gb = area * c ** 3 / (3.0 * ca * cb * cb)
+    I = np.where(up, area * c ** 3 / (3.0 * ca * cb), I)
+    Gs = np.where(up[..., None],
+                  np.stack([Ga, Gb, area * c * c / (ca * cb) - Ga - Gb], axis=-1), Gs)
+    # one vertex below zero (a < 0 < b): the whole triangle less a small one at a
+    dn = (a < 0.0) & (b > 0.0)
+    ba = np.where(dn, b - a, 1.0)
+    ca2 = np.where(dn, c - a, 1.0)
+    Gb2 = area / 3.0 + area * a ** 3 / (3.0 * ba * ba * ca2)
+    Gc2 = area / 3.0 + area * a ** 3 / (3.0 * ba * ca2 * ca2)
+    I = np.where(dn, area * (a + b + c) / 3.0 - area * a ** 3 / (3.0 * ba * ca2), I)
+    Gs = np.where(dn[..., None],
+                  np.stack([area * (1.0 - a * a / (ba * ca2)) - Gb2 - Gc2, Gb2, Gc2],
+                           axis=-1), Gs)
+    G = np.empty_like(Gs)
+    np.put_along_axis(G, order, Gs, axis=-1)
+    return I, G
+
+
+def _lf_tri_water(U, area, Ss, h0, s_band, s_dry, grad=False):
+    """Exact water of the linear-front / Gardner law over triangles on which psi is
+    linear. Phi is piecewise linear in psi, with kinks at psi = 0 and psi = h0,
+
+        Phi = Ss max(psi, 0) + s_band (psi - max(psi, 0))
+              + (s_dry - s_band) [(psi - h0) - max(psi - h0, 0)],
+
+    so its integral is three ramp integrals; ``Ss`` = 0 gives the drainage water
+    Phi(min(psi, 0)) alone. ``U`` (..., 3) vertex heads, ``area`` and the law constants
+    broadcast against U[..., 0]. Returns the water and, with ``grad``, its
+    derivatives with respect to the vertex heads (..., 3)."""
+    S_int = area * U.mean(axis=-1)
+    I0, G0 = _ramp_integral(U, area)
+    Ih, Gh = _ramp_integral(U - h0[..., None], area)
+    W = (Ss * I0 + s_band * (S_int - I0)
+         + (s_dry - s_band) * (S_int - h0 * area - Ih))
+    if not grad:
+        return W, None
+    a3 = (area / 3.0)[..., None]
+    g = (Ss[..., None] * G0 + s_band[..., None] * (a3 - G0)
+         + (s_dry - s_band)[..., None] * (a3 - Gh))
+    return W, g
+
+
+def _build_storage_assembly(nodes, masm, Ss, Sy, h0, vg_a, vg_n, model):
+    """Precompute the stored-water evaluation of every element: one storage group
+    per element type and law.
+
+    The water an element holds is the integral of Phi(psi) over its storage
+    sub-triangles at their true areas: exact for the linear-front / Gardner law on
+    triangles (the group carries its sub-triangles and their areas), and otherwise a
+    sum over storage points (the group carries their non-negative interpolation
+    weights ``N`` (n_q, nn) and their physical weights ``w`` (n_e, n_q)). On tri3 the
+    true-area thirds are the HRZ weights, so a saturated tri3 stores exactly its
+    lumped mass. On tri6 and quadrilaterals (``split``) they are not, and there the
+    water splits in two: the elastic water of the saturated soil, Ss max(psi, 0), is
+    lumped at the nodes with their HRZ weights ``m`` -- the lumped mass of a
+    saturated element, exactly -- and only the drainage water, Phi(min(psi, 0)), is
+    integrated. ``omega`` (n_e, nn) is the weight with which the integrated part of a
+    field lying on one linear branch falls to each node."""
+    groups = []
+    is_vg_all = (np.zeros(len(Ss), dtype=bool) if model is None
+                 else np.asarray(model) == KR_VG)
     for g in masm['groups']:
-        idx = g['idx']
-        p_gp = p_nodes[g['conn']] @ g['N_kr'].T          # (n_e, n_pts)
-        S_gp = storage_capacity_vec(
-            p_gp, Ss[idx][:, None], Sy[idx][:, None], h0[idx][:, None],
-            None if vg_a is None else vg_a[idx][:, None],
-            None if vg_n is None else vg_n[idx][:, None],
-            None if model is None else model[idx][:, None])
-        out.append((S_gp @ g['w_kr']) / g['wsum'])
+        et, gidx, gconn = g['et'], g['idx'], g['conn']
+        P, tris = _storage_cells(et)
+        xy = np.einsum('pj,ejd->epd', P, nodes[gconn])
+        v = xy[:, tris]
+        area_all = 0.5 * np.abs(
+            (v[..., 1, 0] - v[..., 0, 0]) * (v[..., 2, 1] - v[..., 0, 1])
+            - (v[..., 2, 0] - v[..., 0, 0]) * (v[..., 1, 1] - v[..., 0, 1]))
+        omega_all = np.repeat(area_all / 3.0, 3, axis=1) @ P[tris.ravel()]  # (n_e, nn)
+        vg_rows = is_vg_all[gidx]
+        for vg in (False, True):
+            rows = np.where(vg_rows == vg)[0]
+            if len(rows) == 0:
+                continue
+            idx = gidx[rows]
+            law = _storage_law(Ss[idx], Sy[idx], h0[idx],
+                               None if (vg_a is None or not vg) else vg_a[idx],
+                               None if (vg_n is None or not vg) else vg_n[idx])
+            sg = {'conn': gconn[rows], 'm': g['me_lump'][rows], 'omega': omega_all[rows],
+                  'A_w': area_all[rows].sum(axis=1), 'is_vg': vg, 'split': et != 3,
+                  'lf': {k: np.broadcast_to(law[k], (len(idx),)).astype(float)[:, None]
+                         for k in ('Ss', 'h0', 'floor_lf', 's_band')},
+                  'vg': ({k: (np.broadcast_to(val, (len(idx),))[:, None]
+                              if np.ndim(val) else val) for k, val in law.items()}
+                         if vg else None)}
+            if not vg and et in (3, 6):
+                sg['exact'] = True
+                sg['tris'] = tris
+                sg['area'] = area_all[rows]
+            else:
+                Lq, Wq = _subtri_rule(STORAGE_SUBDIV_VG if vg else STORAGE_SUBDIV_LF)
+                sg['exact'] = False
+                sg['N'] = np.concatenate([Lq @ P[t] for t in tris])          # (n_q, nn)
+                sg['w'] = (np.repeat(area_all[rows], len(Wq), axis=1)
+                           * np.tile(Wq, len(tris)))                         # (n_e, n_q)
+            groups.append(sg)
+    return {'groups': groups, 'n_nodes': masm['n_nodes']}
+
+
+def _point_drainage(sg, psi_q, rows=None, want_cap=True):
+    """The integrated part of the water at the storage points of a point group,
+    and (``want_cap``) its slope: Phi(psi) and the law's capacity, or, on a ``split``
+    group, the drainage water Phi(min(psi, 0)) and a slope that is zero above
+    psi = 0. ``rows`` restricts the evaluation to those elements."""
+    pu = np.minimum(psi_q, 0.0) if sg['split'] else psi_q
+    if sg['is_vg']:
+        vg = sg['vg'] if rows is None else {k: (v[rows] if np.ndim(v) else v)
+                                            for k, v in sg['vg'].items()}
+        phi, cap = _vg_point(pu, vg, want_cap)
+    else:
+        lf = sg['lf'] if rows is None else {k: v[rows] for k, v in sg['lf'].items()}
+        phi = _phi_lf(pu, lf)
+        cap = (np.where(pu >= 0.0, lf['Ss'],
+                        np.where(pu > lf['h0'], lf['s_band'], lf['floor_lf']))
+               if want_cap else None)
+    if want_cap and sg['split']:
+        cap = np.where(psi_q >= 0.0, 0.0, cap)
+    return phi, cap
+
+
+def _branch(sg, psi_n):
+    """The linear branch of Phi every node of an element lies on -- 2 saturated,
+    1 inside the linear-front band, 0 below it -- or -1 where the element's nodes
+    span more than one (or the law has no linear branch there: an unsaturated van
+    Genuchten element). The storage points interpolate the nodes with non-negative
+    weights, so they lie on the same branch."""
+    lo, hi = psi_n.min(axis=1), psi_n.max(axis=1)
+    if sg['is_vg']:
+        return np.where(lo >= 0.0, 2, -1)
+    h0 = sg['lf']['h0'][:, 0]
+    return np.where(lo >= 0.0, 2, np.where((hi <= 0.0) & (lo >= h0), 1,
+                                           np.where(hi <= h0, 0, -1)))
+
+
+def _storage_state(sasm, p_nodes):
+    """Per group: the nodal pressure heads and the branch of every element, plus,
+    for a point group, the storage-point heads and drainage water of its elements on
+    no single branch. The step's starting state, evaluated once per attempt."""
+    out = []
+    for sg in sasm['groups']:
+        psi_n = p_nodes[sg['conn']]
+        br = _branch(sg, psi_n)
+        pos = psi_q = phi = None
+        if not sg['exact']:
+            ix = np.where(br < 0)[0]
+            pos = np.full(len(br), -1)
+            pos[ix] = np.arange(len(ix))
+            psi_q = psi_n[ix] @ sg['N'].T
+            phi = (_point_drainage(sg, psi_q, ix, want_cap=False)[0] if len(ix)
+                   else psi_q)
+        out.append((psi_n, br, pos, psi_q, phi))
     return out
 
+
+def _drain_slope(sg, br):
+    """Slope of the integrated water on a branch: Ss saturated (0 on a ``split``
+    group, whose elastic water is lumped instead), s_band in the band, the floor
+    below it."""
+    lf = sg['lf']
+    sat = 0.0 if sg['split'] else lf['Ss'][:, 0]
+    return np.where(br == 2, sat, np.where(br == 1, lf['s_band'][:, 0], lf['floor_lf'][:, 0]))
+
+
+def _drain_icpt(sg, br):
+    """Intercept of the drainage water on a branch: only the drained branch of the
+    linear front has one, (s_band - floor) h0."""
+    lf = sg['lf']
+    return np.where(br == 0, (lf['s_band'][:, 0] - lf['floor_lf'][:, 0]) * lf['h0'][:, 0],
+                    0.0)
+
+
+def _lf_rows(sg, rows, extra_dims):
+    """(Ss, h0, s_band, floor) of the given rows, shaped to broadcast; Ss is 0 on a
+    ``split`` group."""
+    lf = sg['lf']
+    shape = (len(rows),) + (1,) * extra_dims
+    Ss = lf['Ss'][rows, 0].reshape(shape) * (0.0 if sg['split'] else 1.0)
+    return (Ss,) + tuple(lf[k][rows, 0].reshape(shape) for k in ('h0', 's_band', 'floor_lf'))
+
+
+def _stored_water(sasm, p_nodes):
+    """Water held in each element (list per group), measured from saturation."""
+    out = []
+    for sg, (psi_n, br, _, _, _) in zip(sasm['groups'], _storage_state(sasm, p_nodes)):
+        elastic = (sg['lf']['Ss'][:, 0] * (sg['m'] * np.maximum(psi_n, 0.0)).sum(axis=1)
+                   if sg['split'] else np.zeros(len(br)))
+        W = (elastic + _drain_slope(sg, br) * (sg['omega'] * psi_n).sum(axis=1)
+             + _drain_icpt(sg, br) * sg['A_w'])
+        ix = np.where(br < 0)[0]
+        if len(ix):
+            W[ix] = elastic[ix]
+            if sg['exact']:
+                Ss, h0, sb, sd = _lf_rows(sg, ix, 1)
+                W[ix] += _lf_tri_water(psi_n[ix][:, sg['tris']], sg['area'][ix],
+                                       Ss, h0, sb, sd)[0].sum(axis=1)
+            else:
+                phi, _ = _point_drainage(sg, psi_n[ix] @ sg['N'].T, ix, want_cap=False)
+                W[ix] += (sg['w'][ix] * phi).sum(axis=1)
+        out.append(W)
+    return out
+
+
+def _storage_residual(sasm, p_nodes, p_old, old_state):
+    """Storage term of one time step, from pressure head ``p_old`` to ``p_nodes``.
+
+    Each element's water change is split exactly into one term per node, each term
+    driven by that node's own head change, so a node whose head does not move
+    stores nothing and the term stays lumped (see ``_build_storage_assembly`` for
+    what the water of an element is):
+
+    * the lumped elastic water of a tri6 or quadrilateral element: node j takes up
+      Ss m_j times the change of max(psi_j, 0), m_j its HRZ weight;
+    * the integrated water of an element whose nodes stay on one linear branch of
+      Phi through the step: node j takes up omega_j S dpsi_j, S the branch's slope
+      and omega_j the node's share of the element's area (its HRZ weight on tri3);
+    * the linear-front / Gardner law on a triangle otherwise: each sub-triangle's
+      water is its exact integral, and its change is split among its three vertices
+      by the average, over the six orders in which the vertices could move from
+      their old head to their new one, of each vertex's own contribution (8 exact
+      evaluations; the shares sum to the change and each has the sign of its own
+      head change);
+    * a sum over storage points otherwise, W = sum_q w_q Phi(psi_q),
+      psi_q = sum_j N_qj psi_j with N_qj >= 0: with each point's own chord C*_q the
+      change splits as sum_j (sum_q w_q N_qj C*_q) dpsi_j.
+
+    A saturated element therefore stores m_j Ss dpsi_j at each node: the lumped
+    mass, exactly, on every element type.
+
+    Returns ``(R, D, W)``: the nodal storage (volume per unit width), the diagonal
+    the iteration linearizes it with (at each node, the larger of its chord
+    capacity over the step and its tangent capacity at p), and the per-group
+    element water at p."""
+    n = sasm['n_nodes']
+    R = np.zeros(n)
+    D = np.zeros(n)
+    W_new = []
+    for sg, (psi_o, br_o, pos_o, psi_qo_c, phi_o_c) in zip(sasm['groups'], old_state):
+        conn = sg['conn']
+        psi_n = p_nodes[conn]
+        dpsi = psi_n - psi_o
+        # elastic water of the saturated soil, lumped at the nodes (split groups)
+        Ssm = sg['lf']['Ss'] * sg['m'] * (1.0 if sg['split'] else 0.0)
+        pos_n, pos_old = np.maximum(psi_n, 0.0), np.maximum(psi_o, 0.0)
+        Re = Ssm * (pos_n - pos_old)
+        small_n = np.abs(dpsi) <= 1e-12 * (1.0 + np.abs(psi_n))
+        frac = np.where(small_n, (psi_n > 0.0).astype(float),
+                        (pos_n - pos_old) / np.where(small_n, 1.0, dpsi))
+        De = Ssm * np.maximum(frac, (psi_n > 0.0).astype(float))
+        W = (Ssm * pos_n).sum(axis=1)
+        # drainage water
+        br = _branch(sg, psi_n)
+        lin = (br >= 0) & (br == br_o)
+        slope = _drain_slope(sg, br)
+        Dl = slope[:, None] * sg['omega']
+        Re = Re + np.where(lin[:, None], Dl * dpsi, 0.0)
+        De = De + np.where(lin[:, None], Dl, 0.0)
+        W = W + np.where(lin, slope * (sg['omega'] * psi_n).sum(axis=1)
+                         + _drain_icpt(sg, br) * sg['A_w'], 0.0)
+        ix = np.where(~lin)[0]
+        if len(ix) and sg['exact']:
+            tris = sg['tris']
+            uo = psi_o[ix][:, tris]                               # (n_k, n_tri, 3)
+            un = psi_n[ix][:, tris]
+            U = np.where(_SUBSET_MASK[None, None], un[:, :, None, :], uo[:, :, None, :])
+            Ss, h0, sb, sd = _lf_rows(sg, ix, 2)
+            area = sg['area'][ix][:, :, None]
+            Ws, _ = _lf_tri_water(U, area, Ss, h0, sb, sd)        # (n_k, n_tri, 8)
+            share = Ws @ _SHAPLEY3                                 # (n_k, n_tri, 3)
+            _, tan = _lf_tri_water(un, area[..., 0], Ss[..., 0], h0[..., 0], sb[..., 0],
+                                   sd[..., 0], grad=True)
+            du = un - uo
+            small = np.abs(du) <= 1e-12 * (1.0 + np.abs(un))
+            chord = np.where(small, tan, share / np.where(small, 1.0, du))
+            dv = np.maximum(chord, tan)
+            Rk = np.zeros((len(ix), conn.shape[1]))
+            Dk = np.zeros((len(ix), conn.shape[1]))
+            for t in range(len(tris)):
+                Rk[:, tris[t]] += share[:, t, :]
+                Dk[:, tris[t]] += dv[:, t, :]
+            Re[ix] += Rk
+            De[ix] += Dk
+            W[ix] += Ws[..., 7].sum(axis=1)
+        elif len(ix):
+            N = sg['N']
+            psi_q = psi_n[ix] @ N.T
+            phi, cap = _point_drainage(sg, psi_q, ix)
+            # starting state: cached where the element was on no single branch, the
+            # branch's own linear drainage water where it was
+            psi_qo = psi_o[ix] @ N.T
+            phi_o = np.empty_like(psi_qo)
+            c = pos_o[ix] >= 0
+            if np.any(c):
+                phi_o[c] = phi_o_c[pos_o[ix][c]]
+                psi_qo[c] = psi_qo_c[pos_o[ix][c]]
+            if np.any(~c):
+                r = ix[~c]
+                phi_o[~c] = (_drain_slope(sg, br_o)[r][:, None] * psi_qo[~c]
+                             + _drain_icpt(sg, br_o)[r][:, None])
+            dq = psi_q - psi_qo
+            small = np.abs(dq) <= 1e-12 * (1.0 + np.abs(psi_q))
+            if np.any(small):
+                cap_mid = _point_drainage(sg, 0.5 * (psi_q + psi_qo), ix)[1]
+            else:
+                cap_mid = cap
+            chord = np.where(small, cap_mid, (phi - phi_o) / np.where(small, 1.0, dq))
+            w = sg['w'][ix]
+            Re[ix] += ((w * chord) @ N) * dpsi[ix]
+            De[ix] += (w * np.maximum(chord, cap)) @ N
+            W[ix] += (w * phi).sum(axis=1)
+        R += np.bincount(conn.ravel(), weights=Re.ravel(), minlength=n)
+        D += np.bincount(conn.ravel(), weights=De.ravel(), minlength=n)
+        W_new.append(W)
+    return R, D, W_new
 
 
 
@@ -3622,19 +4100,30 @@ def _resolve_exit_cycle(act, new_act, corner_candidate, mid_cands,
     return pinned, pinned_state
 
 
+#: Time-error tolerance of the transient stepper, as a fraction of the
+#: characteristic head span: the estimated local error of a backward-Euler step at
+#: any free node is held below it (see ``run_transient_seepage``).
+TSEEP_TIME_ERROR_FRAC = 1e-3
+
+
 def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                           dt_max=None, growth=1.3,
                           max_head_change_frac=0.05, h_init=None, verbose=True,
-                          progress_callback=None, max_iter=2000):
+                          progress_callback=None, max_iter=2000,
+                          time_error_frac=None):
     """Transient variably-saturated seepage solver (plan §1/§3/§5).
 
     Solves ``div(kr K grad h) + Q = S dh/dt`` with the theta-method in time
-    (default backward Euler, ``theta=1``) and Picard iteration within each step,
-    reusing the steady batched assembly. Storage S is the elastic Ss where saturated
-    and the retention curve's specific moisture capacity C(psi) where unsaturated —
-    one or the other, never their sum (``storage_capacity_vec``), the same
-    saturated-only convention RS2 and SEEP/W use. The lumped mass matrix is scaled by
-    the element-average S each iteration, exactly as kr scales the stiffness.
+    (default backward Euler, ``theta=1``), reusing the steady batched assembly.
+    Storage S is the elastic Ss where saturated and the retention curve's specific
+    moisture capacity C(psi) where unsaturated — one or the other, never their sum
+    (``storage_capacity_vec``), the same saturated-only convention RS2 and SEEP/W
+    use. The storage term of a step is the change in each element's stored water
+    between the two heads (``storage_potential_vec`` summed over the element's
+    storage points; see ``_storage_residual``), so the march conserves water
+    whatever the step size. Each step is solved by iteration: kr is taken from the
+    latest iterate and the storage term is linearized on a diagonal, the larger of
+    the chord and the tangent capacity at each storage point.
     Time-varying BCs come from the ``tseep`` series bound
     in ``seep_data``, resolved per step by the head binding's kind
     (:func:`resolve_transient_bc`): a "reservoir" series holds a boundary node at
@@ -3654,6 +4143,12 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     lumped : lumped (HRZ) mass by default; ``False`` is not implemented in v1.
     h_init : optional explicit initial head field; default is a steady solve at the
         t=0 BC configuration (plan IC rule).
+    time_error_frac : time-error tolerance as a fraction of the characteristic head
+        span (default :data:`TSEEP_TIME_ERROR_FRAC`). After each step the local
+        error of backward Euler at every free node is estimated from the change in
+        that node's rate of head change since the step before; a step estimated at
+        more than twice the tolerance is redone shorter, and the next step is sized
+        to land on it.
     max_iter : sweep budget for that initial-condition solve, the same budget the
         steady runners carry and the only convergence parameter of it a caller sets.
         It is spent once, before the march, and has no bearing on the time steps.
@@ -3766,36 +4261,34 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     # Build-once assembly (stiffness + mass).
     asm = _build_assembly(nodes, elements, element_types, k1, k2, angle)
     masm = _build_mass_assembly(nodes, elements, element_types)
-    node_lump = masm["node_lump"]
+    sasm = _build_storage_assembly(nodes, masm, ss, sy, h0, vg_a, vg_n, model)
 
     def kdata(p):
         return _assembly_data(asm, p_nodes=p, kr0=kr0, h0=h0, mode='head',
                               vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
 
-    def mdiag(p, dt):
-        S = _mass_storage_by_group(masm, p, ss, sy, h0, vg_a, vg_n, model)
-        return _lumped_mass_diag(masm, S) / dt
+    def _stored(hh):
+        """Water held in the whole mesh at head hh, measured from saturation."""
+        return float(sum(W.sum() for W in _stored_water(sasm, hh - y)))
 
-    def _frame_flows(h_cur, bt, bv, flux, act):
-        """Boundary inflow/outflow for a saved frame, from the FE nodal reaction
-        (``K·h`` less any applied flux) at this instant. A cheap by-product of the
-        assembly already built for the time step — NOT a dual solve.
+    def _frame_flows(rate, flux, dir_mask):
+        """Boundary inflow and outflow (rates) for a saved frame.
 
-        Under storage exchange the boundary inflow and outflow DIFFER (a steady
-        solve's single "Total Flowrate" no longer applies): the difference is the
-        water going into, or coming out of, storage. Both are carried per frame.
-        No stream function is computed — a transient (storage-release) state is not
-        divergence-free, so it has no flow net; the frame's flow direction is read
-        from velocity vectors instead."""
-        p = h_cur - y
-        unconf = bool(np.any(bt == 2))
-        kd = kdata(p) if unconf else _assembly_data(asm)
-        dir_mask = (bt == 1) | ((bt == 2) & act)
-        f_eff = np.where(dir_mask, 0.0, flux)
-        reaction = _coo_matvec(asm, kd, h_cur) - f_eff
-        pos = reaction > 0
-        inflow = float(np.sum(reaction[dir_mask & pos])) + _flux_inflow(flux, ~dir_mask)
-        outflow = float(-np.sum(reaction[dir_mask & ~pos]))
+        ``rate`` is the boundary flow at each fixed-head and active exit-face node
+        over the step that ended at the frame: the node's flow into the mesh
+        (``theta K h + (1 - theta) K_old h_old`` at that row) plus the water its own
+        storage took up over the step, divided by the step length. For the initial
+        condition, a steady state, it is ``K h``. Positive is inflow. The specified
+        fluxes on the free nodes are counted with the boundary flows, inflow and
+        outflow by sign, so inflow minus outflow is exactly the rate at which the
+        water stored in the mesh changed over that step. A cheap by-product of the
+        step's own assembly, not a dual solve. No stream function is computed — a
+        transient (storage-release) state is not divergence-free, so it has no flow
+        net; the frame's flow direction is read from velocity vectors instead."""
+        r = rate[dir_mask]
+        f_free = np.asarray(flux, dtype=float)[~dir_mask]
+        inflow = float(np.sum(r[r > 0]) + np.sum(f_free[f_free > 0]))
+        outflow = float(-np.sum(r[r < 0]) - np.sum(f_free[f_free < 0]))
         return inflow, outflow
 
     # ---- initial condition ----
@@ -3825,6 +4318,12 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     picard_max = 25                # Picard iterations allowed within a step
     picard_eps = 1e-5 * char_h     # inner-loop tolerance, scaled to the head range
     dh_limit = max_head_change_frac * char_h
+    # Time-error control: the local error of a backward-Euler step at a free node is
+    # dt^2/2 h'', estimated from the change in the node's rate of head change between
+    # the step and the one before it. Held below err_tol; a step estimated at more than
+    # twice that is redone at a shorter step.
+    err_tol = (TSEEP_TIME_ERROR_FRAC if time_error_frac is None
+               else float(time_error_frac)) * char_h
 
     targets, save_interval = _transient_saved_schedule(tseep_data, duration)
     if dt_max is None:
@@ -3833,41 +4332,43 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     dt0 = max(min(first, save_interval) / 10.0, duration * 1e-9)
     dt_min = dt0 * 1e-6
 
-    # Nodal storage parameters for the secant mass-balance ledger (smoothing a
-    # per-element scalar to nodes is exact for a single material and adequate
-    # otherwise — the ledger is a diagnostic, not the solve).
-    ss_nodal = _nodal_from_elem(masm, ss, n_nodes)
-    sy_nodal = _nodal_from_elem(masm, sy, n_nodes)
-    h0_nodal = _nodal_from_elem(masm, h0, n_nodes)
-    vga_nodal = None if vg_a is None else _nodal_from_elem(masm, vg_a, n_nodes)
-    vgn_nodal = None if vg_n is None else _nodal_from_elem(masm, vg_n, n_nodes)
-    model_nodal = None if model is None else _nodal_from_elem(masm, model, n_nodes,
-                                                              mode='max')
+    # Mass-balance ledger. The water held in the mesh is measured with the same
+    # integral the steps conserve (_stored), and the boundary flow is accumulated
+    # step by step from the accepted states themselves (see ``attempt``), so the
+    # two are independent: their difference is the sum, over the accepted steps, of
+    # whatever each state leaves unsolved in its own equations.
+    stored0 = _stored(h)
+    # Physical storage scale (total area x max Ss x head span). The relative
+    # closure is normalized against the LARGER of the actual net cumulative inflow
+    # and a small fraction of this scale, so a symmetric relaxation with ~zero NET
+    # storage change does not produce a 0/0 ratio.
+    stored_scale = (float(sum(sg['A_w'].sum() for sg in sasm['groups']))
+                    * max(float(np.max(ss)), 1e-30) * char_h)
 
-    def _stored(hh):
-        return float(np.sum(node_lump * storage_potential_vec(
-            hh - y, ss_nodal, sy_nodal, h0_nodal, vga_nodal, vgn_nodal, model_nodal)))
-
-    stored0 = _stored(h)   # secant mass-balance baseline
-    # Physical storage scale (total lumped volume x max Ss x head span). The
-    # relative mass-balance closure is normalized against the LARGER of the actual
-    # net cumulative inflow and a small fraction of this scale, so a symmetric
-    # relaxation with ~zero NET storage change does not produce a 0/0 ratio.
-    stored_scale = float(np.sum(node_lump)) * max(float(np.max(ss)), 1e-30) * char_h
-
-    # IC flow net: the exit-face nodes the initial head field saturates (h >= y)
-    # are the active exit set at t=0. A reservoir series contributes none there: at
-    # t = 0 it has no history, so each of its nodes is held (submerged) or no-flow.
-    # Confined problems have no exit nodes, so this is moot.
+    # The initial condition is a steady state: its boundary flow is the nodal
+    # reaction K h at the fixed-head nodes and at the exit-face nodes the initial
+    # head field saturates (h >= y), which are the active exit set at t = 0. A
+    # reservoir series contributes none of the latter: at t = 0 it has no history,
+    # so each of its nodes is held (submerged) or no-flow. Confined problems have
+    # no exit nodes.
     _act0 = (bt0 == 2) & (h >= y)
-    _in0, _out0 = _frame_flows(h, bt0, bv0, flux0, _act0)
+    _dir0 = (bt0 == 1) | _act0
+    _kd0 = kdata(h - y) if bool(np.any(bt0 == 2)) else _assembly_data(asm)
+    _in0, _out0 = _frame_flows(_coo_matvec(asm, _kd0, h), flux0, _dir0)
     frames = [{"time": 0.0, "head": h.copy(), "u": gamma_w * (h - y),
                "inflow": _in0, "outflow": _out0}]
     dt_history = []
     mb_frames = [{"time": 0.0, "stored_change": 0.0, "cumulative_inflow": 0.0,
                   "closure": 0.0}]
-    cum_inflow = 0.0            # tangent storage change accumulated (= net boundary inflow)
+    cum_inflow = 0.0            # net boundary inflow, accumulated over accepted steps
+    last_flow = [None]          # (rate, flux, dir_mask) of the last accepted step
     active = np.zeros(n_nodes, dtype=bool)   # exit-face active set, warm-started
+    # Exit-face nodes of the last accepted step. A node that was already on the
+    # exit face keeps its active/inactive state from that step as the warm start;
+    # only a node that has just joined the face (a reservoir falling past it) is
+    # seeded saturated. Empty before the first step, so the first step seeds the
+    # whole face, as the steady solver starts it.
+    prev_exit = [np.zeros(n_nodes, dtype=bool)]
     all_converged = ic_converged
     #: [cycles detected, edges resolved]. A cycle DETECTED is a sweep in which the
     #: exit-face active set revisited a state it had left; RESOLVED counts the times
@@ -3890,8 +4391,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     max_free_p = [0.0]
 
     def attempt(h_old, dt, t_new, warm_active, force=False, damp=False):
-        """One theta-scheme step with Picard + exit-face active set. Returns
-        (ok, h_new, active, picard_count, tangent_storage_change, cycling).
+        """One theta-scheme step with the iteration + exit-face active set. Returns
+        (ok, h_new, active, picard_count, step_flow, cycling), ``step_flow`` the
+        accepted step's ledger entry ``(boundary_inflow, rate, flux, dir_mask,
+        exit_mask)``.
         ``h_new`` is always the last computed iterate (not h_old), so the caller may
         accept a best-effort step. ``force=True`` accepts that iterate even if Picard
         did not converge or the head-change limiter would reject it — the last resort
@@ -3927,8 +4430,9 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         act = warm_active & (bt == 2)
         # seed newly-exit topology nodes (corners AND quadratic midsides) as active
         # (saturated) so the set can shed them — mirrors the steady solver starting
-        # the whole exit face saturated.
-        act[(bt == 2) & exit_on_edge & ~warm_active] = True
+        # the whole exit face saturated. A node already on the exit face at the last
+        # accepted step keeps that step's state instead.
+        act[(bt == 2) & exit_on_edge & ~warm_active & ~prev_exit[0]] = True
         # Anti-cycling state for the all-or-nothing quadratic exit edge. A tri6/quad8
         # exit edge is either wholly in the active set or wholly out, so a PARTLY WET
         # edge -- exactly what the face carries while the drainage front's exit point
@@ -3940,25 +4444,36 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         # microseconds wide. ``seen_sets`` counts repeats so that cycle can be told from
         # ordinary settling, and ``pinned`` holds the resolution (below).
         seen_sets = {}
+        shed = np.zeros(n_nodes, dtype=bool)    # exit nodes this step has shed
         pinned = np.zeros(n_nodes, dtype=bool)
         pinned_state = np.zeros(n_nodes, dtype=bool)
         cycling = False
         kold_h = None
         if theta < 1.0:
             kold_h = _coo_matvec(asm, kdata(h_old - y), h_old)
+        p_old = h_old - y
+        old_state = _storage_state(sasm, p_old)
         h_it = h_old.copy()
         pic = 0
         ok = False
+        r_prev = None
+        relax = None
         for pic in range(1, picard_max + 1):
             p_it = h_it - y
             kd = kdata(p_it)
-            md = mdiag(p_it, dt)
+            # The step's equations on a free row:
+            #   R_i(h)/dt + theta (K h)_i + (1 - theta) (K_old h_old)_i = f_i,
+            # R the storage term (_storage_residual). Each solve takes K at this
+            # iterate's kr and linearizes R about this iterate on the diagonal D:
+            #   (theta K + D/dt) h_new = (D h_it - R(h_it))/dt + ...
+            R_it, D_it, _ = _storage_residual(sasm, p_it, p_old, old_state)
             dir_mask = (bt == 1) | ((bt == 2) & act)
             if not np.any(dir_mask):
                 # singular (all exit nodes shed, no fixed head): cannot force.
-                return False, h_old, warm_active, pic, 0.0, cycling
+                return False, h_old, warm_active, pic, None, cycling
             dir_values = np.where(bt == 1, bv, y)
-            rhs = md * h_old + theta * flux
+            md = D_it / dt
+            rhs = md * h_it - R_it / dt + theta * flux
             if theta < 1.0:
                 rhs = rhs + (1.0 - theta) * flux - (1.0 - theta) * kold_h
             A, b = _transient_system(asm, theta * kd, md, rhs, dir_mask, dir_values)
@@ -4025,6 +4540,23 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 # pinned there for the rest of the step, the representation a partly
                 # wet quadratic edge needs and the one the cycle breaker below hands
                 # out when it catches the cycle.
+                # The same rule for a node this step has already shed: one that comes
+                # back standing at or above its own elevation joins the face and is
+                # pinned at once, without waiting for a stable set. A step starts from
+                # the face the last step ended with, and a partly wet quadratic edge
+                # carried in wet can show a small inflow at its upper corner: shed for
+                # it, the edge is under pressure; taken back, the inflow sheds it again,
+                # and the set alternates without ever reaching the stable set the first
+                # rule waits for. Measured on the exit-cycle guard's GW18 march (tri6,
+                # target 3.0): 13 cycles detected, 4 damped, without this; 0 with it.
+                if not _TSEEP_NO_WET_FACE_RULE:
+                    _rejoin = (bt == 2) & shed & ~pinned & (h_new >= y + hyst)
+                    if np.any(_rejoin):
+                        new_act[_rejoin] = True
+                        pinned[_rejoin] = True
+                        pinned_state[_rejoin] = True
+                        set_stable = np.array_equal(new_act, act)
+                        n_wet[0] += int(np.count_nonzero(_rejoin))
                 if set_stable and not _TSEEP_NO_WET_FACE_RULE:
                     _wet_free = (bt == 2) & ~new_act & (h_new >= y + hyst) & ~pinned
                     if np.any(_wet_free):
@@ -4065,22 +4597,50 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                         set_stable = np.array_equal(new_act, act)
                         seen_sets.clear()
                         n_damped[0] += 1
+                shed |= act & ~new_act
                 act = new_act
             else:
                 set_stable = True
             change = float(np.max(np.abs(h_new - h_it)))
-            h_it = h_new
-            if change < picard_eps and set_stable:
+            if change < picard_eps and set_stable and pic > 1:
+                # The step keeps the iterate whose own full update is below the
+                # tolerance, so it solves the step's equations to that tolerance;
+                # the update itself need not, where the iteration alternates. On
+                # lock 2c's tri6 leg, keeping the update left 48 of 816 steps
+                # whose next update was up to seven times the tolerance. The first
+                # iterate is the starting head, never kept: a step whose first
+                # update is below the tolerance takes one more.
                 ok = True
                 break
-
-        def _tsc():
-            # tangent storage change over the step (= net boundary inflow, discretely)
-            md_final = mdiag(h_it - y, 1.0)
-            return float(np.sum(md_final * (h_it - h_old)))
+            if set_stable:
+                # Damp a 2-cycle. A node whose update reverses sign without shrinking
+                # by half has its next update halved, again each time it persists,
+                # and restored step by step once it stops. kr changes by orders of
+                # magnitude across a sharp front, and an element straddling the front
+                # can take a different kr at each iterate: on lock 2c's tri6 leg a
+                # dry node (pressure head -16.6 ft; the band ends at -1 ft), its
+                # storage the same at every iterate, saw its conductance swing
+                # fourfold between iterates and its update alternate and grow. Measured on that leg (test/transient_seep_check.py,
+                # tri6 at 22 divisions): 781 steps and 18 s with the damping, 2430
+                # steps and 63 s without. Only the path to the solution changes.
+                r = h_new - h_it
+                if r_prev is not None:
+                    flip = (r * r_prev < 0.0) & (np.abs(r) > 0.5 * np.abs(r_prev))
+                    if np.any(flip):
+                        if relax is None:
+                            relax = np.ones(n_nodes)
+                        relax[flip] *= 0.5
+                    if relax is not None:
+                        relax[~flip] = np.minimum(2.0 * relax[~flip], 1.0)
+                r_prev = r
+                h_it = h_it + r if relax is None else h_it + relax * r
+            else:
+                r_prev = None
+                relax = None
+                h_it = h_new
 
         if not ok and not force:
-            return False, h_it, act, pic, 0.0, cycling
+            return False, h_it, act, pic, None, cycling
         # head-change limiter (resolve sharp fronts even when Picard is happy).
         # Measured on FREE nodes only: a Dirichlet node's change is imposed by the
         # BC (a stepped reservoir head jumps by the full step regardless of dt), so
@@ -4088,17 +4648,31 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         free = ~dir_mask
         if (not force and np.any(free)
                 and float(np.max(np.abs((h_it - h_old)[free]))) > dh_limit):
-            return False, h_it, act, pic, 0.0, cycling
+            return False, h_it, act, pic, None, cycling
         # The pressure this step would deliver on the free part of its exit face.
         # Every accepted step returns through here, force-accepted ones included.
         _free_exit = (bt == 2) & ~act if has_exit else None
         wet_probe[0] = (float(np.max(h_it[_free_exit] - y[_free_exit]))
                         if _free_exit is not None and np.any(_free_exit) else 0.0)
-        return True, h_it, act, pic, _tsc(), cycling
+        # Ledger entry, from the accepted state itself (kr and storage both at the
+        # accepted head): the boundary flow at each fixed row is that row's own
+        # equation -- the water its storage took up plus what it passes into the
+        # mesh -- and the specified flux enters at the free rows. The accepted state
+        # solves the free rows to the iteration tolerance, so this inflow and the
+        # change in stored water differ by exactly what it leaves unsolved there.
+        R_new, _, _ = _storage_residual(sasm, h_it - y, p_old, old_state)
+        rate = R_new / dt + theta * _coo_matvec(asm, kdata(h_it - y), h_it)
+        if theta < 1.0:
+            rate = rate + (1.0 - theta) * kold_h
+        inflow = dt * float(np.sum(rate[dir_mask]) + np.sum(flux[~dir_mask]))
+        return True, h_it, act, pic, (inflow, rate, flux, dir_mask, bt == 2), cycling
 
     t = 0.0
     dt = dt0
     cancelled = False
+    prev_rate = None            # last accepted step's (h_new - h_old)/dt, free nodes
+    prev_free = None
+    dt_prev = None
     for t_target in targets:
         if cancelled:
             break
@@ -4109,21 +4683,21 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 raise RuntimeError("transient stepper exceeded 5e5 sub-steps; "
                                    "check dt_min / convergence")
             dt_try = min(dt, dt_max, t_target - t)
-            ok, h_new, new_active, pic, tsc, cyc = attempt(h, dt_try, t + dt_try, active)
+            ok, h_new, new_active, pic, flow, cyc = attempt(h, dt_try, t + dt_try, active)
             # A step that failed WITH the exit-face set cycling is not a step that
             # needs a smaller dt: no dt closes a set-stability test the all-or-nothing
             # edge rule cannot satisfy, which is why this used to collapse to dt_min
             # and force-accept. Retry it once at the SAME dt with the cycle resolved,
             # and only fall back to halving if that still fails.
             if not ok and cyc:
-                ok, h_new, new_active, pic, tsc, cyc = attempt(
+                ok, h_new, new_active, pic, flow, cyc = attempt(
                     h, dt_try, t + dt_try, active, damp=True)
             while not ok and dt_try > dt_min:
                 dt_try *= 0.5
-                ok, h_new, new_active, pic, tsc, cyc = attempt(
+                ok, h_new, new_active, pic, flow, cyc = attempt(
                     h, dt_try, t + dt_try, active)
                 if not ok and cyc:
-                    ok, h_new, new_active, pic, tsc, cyc = attempt(
+                    ok, h_new, new_active, pic, flow, cyc = attempt(
                         h, dt_try, t + dt_try, active, damp=True)
             if not ok:
                 all_converged = False
@@ -4133,18 +4707,37 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                           f"(dt down to {dt_try:.3g}); force-accepting last iterate")
                 # force-accept the smallest-dt iterate to make progress (flagged
                 # non-converged). A singular system still can't be forced -> break.
-                ok, h_new, new_active, pic, tsc, cyc = attempt(
+                ok, h_new, new_active, pic, flow, cyc = attempt(
                     h, dt_try, t + dt_try, active, force=True, damp=True)
                 if not ok:
                     raise SeepInputError(
                         f"Transient solve became singular at t={t:.6g} (the exit "
                         f"face fully deactivated with no specified head). Add a "
                         f"specified head or check the exit-face definition.")
+                forced = True
+            else:
+                forced = False
+            # Time error of the step just solved (none for the first step, which has
+            # no rate before it).
+            rate = (h_new - h) / dt_try
+            free_now = ~flow[3]
+            err = 0.0
+            if prev_rate is not None:
+                both = free_now & prev_free
+                if np.any(both):
+                    err = (dt_try * dt_try / (dt_try + dt_prev)
+                           * float(np.max(np.abs(rate[both] - prev_rate[both]))))
+            if (not forced and err > 2.0 * err_tol and dt_try > 1e3 * dt_min):
+                dt = dt_try * max(0.25, 0.9 * np.sqrt(err_tol / err))
+                continue
+            prev_rate, prev_free, dt_prev = rate, free_now, dt_try
             t += dt_try
             h = h_new
             active = new_active
             max_free_p[0] = max(max_free_p[0], wet_probe[0])
-            cum_inflow += tsc
+            cum_inflow += flow[0]
+            last_flow[0] = flow[1:4]
+            prev_exit[0] = flow[4]
             dt_history.append(dt_try)
             # Progress + cancellation: report the simulated-time fraction and honor an
             # abort request (a falsy return) after this accepted step. Zero cost when
@@ -4152,21 +4745,23 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             if progress_callback is not None and not progress_callback(t, duration):
                 cancelled = True
                 break
-            # adapt dt for the next sub-step
+            # adapt dt for the next sub-step: by the iteration count, and no larger
+            # than the time error allows
             if pic <= 5:
                 dt = min(dt_try * growth, dt_max)
             elif pic > 0.8 * picard_max:
                 dt = max(dt_try * 0.5, dt_min)
             else:
                 dt = dt_try
+            if err > 0.0:
+                dt = max(min(dt, dt_try * 0.9 * np.sqrt(err_tol / err)), dt_min)
         if cancelled:
             break
-        # landed exactly on t_target -> save frame with its boundary inflow/outflow
-        # at this instant (from the FE reaction — no dual flow-function solve).
+        # landed exactly on t_target -> save frame with the boundary inflow/outflow
+        # of the step that ended here (no dual flow-function solve).
         sc = _stored(h) - stored0
         closure = abs(sc - cum_inflow) / max(abs(cum_inflow), 1e-3 * stored_scale, 1e-30)
-        bt_s, bv_s, flux_s = resolve_bc(t_target)
-        in_s, out_s = _frame_flows(h, bt_s, bv_s, flux_s, active)
+        in_s, out_s = _frame_flows(*last_flow[0])
         frames.append({"time": t_target, "head": h.copy(), "u": gamma_w * (h - y),
                        "inflow": in_s, "outflow": out_s})
         mb_frames.append({"time": t_target, "stored_change": sc,
@@ -4228,26 +4823,6 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         # reason: an exported march records which instant its stability run reads.
         "stability_time": tseep_data.get("stability_time"),
     }
-
-
-def _nodal_from_elem(masm, elem_vals, n_nodes, mode='mean'):
-    """Scatter a per-element scalar to nodes (mean over incident elements, or 'max'
-    for a model code). Used only for the nodal storage-potential ledger, where a
-    smooth nodal parameter field is adequate."""
-    if elem_vals is None:
-        return None
-    acc = np.zeros(n_nodes)
-    cnt = np.zeros(n_nodes)
-    for g in masm['groups']:
-        v = elem_vals[g['idx']]
-        if mode == 'max':
-            np.maximum.at(acc, g['conn'], v[:, None])
-        else:
-            np.add.at(acc, g['conn'], np.broadcast_to(v[:, None], g['conn'].shape))
-        np.add.at(cnt, g['conn'], 1.0)
-    if mode == 'max':
-        return acc
-    return np.where(cnt > 0, acc / np.maximum(cnt, 1.0), 0.0)
 
 
 def _transient_steady_ic(nodes, elements, element_types, bc_type, bc_values,

@@ -669,7 +669,7 @@ three solid traces are the nodes. The table gives the values at four instants:
 | 47 | 2.00 | 9.35 | 6.54 | +0.44 | −2.37 |
 | 120 | 2.00 | 2.92 | 2.71 | −5.98 | −6.21 |
 
-<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=tseep_head, element_type=tri3, size_divisions=64, time=47, points=54.5:8.9:9.347;30.7:8.9:6.543;75.3:6.8:3.176, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=tseep_head, element_type=tri3, size_divisions=64, time=47, points=54.5:8.9:9.344;30.7:8.9:6.593;75.3:6.8:3.155, tolerance=0.05 -->
 
 At full pool the shell node stands at **17.98 m** and the core node at
 **13.56 m** — the shell is **4.42 m higher**, which is just the steady picture
@@ -783,5 +783,5 @@ boundary type, a specified flux.
 
 <!-- Transient regression on the same dam with the stage times set (xslope_earth_dam_tseep.xlsx): total head sampled at interior stations at three saved times (early drawdown / end of drawdown / quasi-equilibrium), re-solved through the run_tests tseep_head path (tri3, target_size=2.0). -->
 <!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.647;40:8:13.970;55:5:10.776, tolerance=0.05 -->
-<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.355;40:8:7.014;55:5:7.272, tolerance=0.05 -->
+<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.455;40:8:7.036;55:5:7.290, tolerance=0.05 -->
 <!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.011;40:8:2.012;55:5:2.027, tolerance=0.05 -->

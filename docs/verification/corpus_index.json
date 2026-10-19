@@ -2056,7 +2056,7 @@
       "model": "docs/lem/files/xslope_earth_dam_down.xlsx",
       "references": [
         {
-          "anchor": "4-earth-dam",
+          "anchor": "4-earth-dam-duncan-wright-and-brandon",
           "checks": [
             "circular_search"
           ],
@@ -2064,8 +2064,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "4. Earth Dam",
-          "url": "https://xslope.org/en/stable/lem/samples/#4-earth-dam"
+          "title": "4. Earth Dam (Duncan, Wright, and Brandon)",
+          "url": "https://xslope.org/en/stable/lem/samples/#4-earth-dam-duncan-wright-and-brandon"
         }
       ],
       "topics": [
@@ -2123,7 +2123,7 @@
       "model": "docs/lem/files/xslope_earth_dam_down_seep.xlsx",
       "references": [
         {
-          "anchor": "4-earth-dam",
+          "anchor": "4-earth-dam-duncan-wright-and-brandon",
           "checks": [
             "circular_search"
           ],
@@ -2131,8 +2131,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "4. Earth Dam",
-          "url": "https://xslope.org/en/stable/lem/samples/#4-earth-dam"
+          "title": "4. Earth Dam (Duncan, Wright, and Brandon)",
+          "url": "https://xslope.org/en/stable/lem/samples/#4-earth-dam-duncan-wright-and-brandon"
         }
       ],
       "topics": [
@@ -2191,7 +2191,7 @@
       "model": "docs/lem/files/xslope_earth_dam_up.xlsx",
       "references": [
         {
-          "anchor": "4-earth-dam",
+          "anchor": "4-earth-dam-duncan-wright-and-brandon",
           "checks": [
             "circular_search"
           ],
@@ -2199,8 +2199,8 @@
           "page": "lem/samples/",
           "resolution": "input-link",
           "source_md": "docs/lem/samples.md",
-          "title": "4. Earth Dam",
-          "url": "https://xslope.org/en/stable/lem/samples/#4-earth-dam"
+          "title": "4. Earth Dam (Duncan, Wright, and Brandon)",
+          "url": "https://xslope.org/en/stable/lem/samples/#4-earth-dam-duncan-wright-and-brandon"
         }
       ],
       "topics": [

@@ -91,11 +91,10 @@ EXTRA_FIGURES = [
 ]
 
 #: Solution figures framed on the sliced mass (frame="slices") rather than the
-#: whole section, with this cushion: a critical surface too small to read at the
-#: section's scale. The earth dam's toe circles are about 20 ft across on a
-#: section 800 ft wide.
-SLICE_FRAMED = {"earth_dam_down_toe_results": 1.2,
-                "earth_dam_down_seep_toe_results": 1.2}
+#: whole section, with plot_solution's own cushion: a critical surface too small to
+#: read at the section's scale. The earth dam's toe circles are about 20 ft across
+#: on a section 800 ft wide.
+SLICE_FRAMED = {"earth_dam_down_toe_results", "earth_dam_down_seep_toe_results"}
 
 
 def embankment_circles(sd):
@@ -229,8 +228,7 @@ def main(only=()):
             n += 1
         for name in results:
             out = f"{IMG_DIR}/sample_images/{name}.png"
-            frame = (dict(frame="slices", pad_frac=SLICE_FRAMED[name])
-                     if name in SLICE_FRAMED else dict(frame="content"))
+            frame = dict(frame="slices" if name in SLICE_FRAMED else "content")
             capture(out, plot_solution, sd, crit["slices"], crit["failure_surface"],
                     crit["solver_result"], **frame)
             n += 1

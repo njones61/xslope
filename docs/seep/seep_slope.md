@@ -188,11 +188,11 @@ and [xslope_johnson_res_seep.csv](files/xslope_johnson_res_seep.csv) — which
 `load_slope_data()` picks up by name.
 
 All three materials use the `seep` option, so every slice base reads the field. A
-critical-circle search with Spencer's method settles at **FS = 1.273**:
+critical-circle search with Spencer's method settles at **FS = 1.272**:
 
 ![seep_slope_lem_results.png](images/seep_slope_lem_results.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.273, num_slices=50, tolerance=0.02 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.272, num_slices=50, tolerance=0.02 -->
 
 The same workbook, mesh and solution then run an SSRM analysis with the default
 failure criterion, at **FS = 1.277**:

@@ -7,7 +7,7 @@ description: "Short video walkthroughs of XSLOPE, each with the model files it s
 
 <div class="vid-hero" markdown>
 
-Short walkthroughs of XSLOPE, each 15 minutes or less, published on the
+Short walkthroughs of XSLOPE, published on the
 **[xslope YouTube channel](https://www.youtube.com/@xslope-org)**. Each video
 below lists the completed model it builds, and the starting model when it doesn't
 begin from a blank one, so you can download the file and follow along.

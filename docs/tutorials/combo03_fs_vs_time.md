@@ -376,7 +376,7 @@ sweep reads the same minimum slip depth and searches from the same two circles a
 the dialog runs. An instant that produces no result comes back as a row with
 its reason rather than as a gap in the curve.
 
-<!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3312, tolerance=0.005, benchmark=COMBO-3-drained -->
+<!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3292, tolerance=0.005, benchmark=COMBO-3-drained -->
 
 ### The factor of safety vs time curve
 
@@ -705,7 +705,7 @@ answer. The ten-thousandth between them comes from the two files' saved times: t
 run steps to every saved time, so this file's frame every five days takes a
 slightly different path to day 50 than COMBO-2's coarser schedule does.
 
-<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4590, critical_time=50, min_fs=1.0336, tolerance=0.005, benchmark=COMBO-3-rapid -->
+<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4590, critical_time=50, min_fs=1.0328, tolerance=0.005, benchmark=COMBO-3-rapid -->
 
 **Stage 3 runs on three rows, all of them at the bottom of the dip.** Days 45, 50
 and 60 read 3 in the **governs** column, by three ten-thousandths on day 50 and by
@@ -794,7 +794,7 @@ The third of those, the long-term
 **1.326**, is not on this curve — day 500 reads 1.2981 and is still climbing,
 because a run of this length leaves the core part drained.
 
-<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5110;1.0544;1.2984, tolerance=0.005, benchmark=COMBO-3-single -->
+<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5110;1.0535;1.2981, tolerance=0.005, benchmark=COMBO-3-single -->
 
 Studio's result tab holds one curve at a time, so the figure below adds the
 single-stage curve (blue) to the rapid drawdown figure above, on the same axes:

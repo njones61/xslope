@@ -786,7 +786,7 @@ stage 2's 1.0330. Three ten-thousandths separate the two. In the
 core's own $d$ of 250 psf sits 19 psf above the value at which the first slice
 crosses over.
 
-<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.034, tolerance=0.005, benchmark=COMBO-2-transient -->
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.033, tolerance=0.005, benchmark=COMBO-2-transient -->
 
 ---
 
@@ -823,7 +823,7 @@ critical surface of its own, and between them they separate the drawdown into it
 parts.
 
 <!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.511, tolerance=0.005, benchmark=COMBO-2-drained-full -->
-<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=transient, seep_time=50, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.054, tolerance=0.005, benchmark=COMBO-2-drained-day50 -->
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=transient, seep_time=50, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.053, tolerance=0.005, benchmark=COMBO-2-drained-day50 -->
 
 **The lowered pool costs 0.19 in the long run.** Taking 50 ft of reservoir off
 the dam and letting its pore pressures fully catch up moves the slope from 1.511

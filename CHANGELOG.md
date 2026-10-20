@@ -13,13 +13,14 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   table was weighed at its moist unit weight. The published factors of safety on
   them rise: COMBO-1's Spencer search from 1.257 to 1.272 and its strength
   reduction from 1.246 to 1.262; COMBO-2's three rapid-drawdown answers from
-  1.181, 1.195, and 1.016 to 1.196, 1.206, and 1.034; COMBO-3's Johnson curve
-  minimum from 1.016 to 1.034; W-3's Bishop and Spencer from 1.231 and 1.257 to
-  1.245 and 1.272; the rapid-drawdown worked example's from 1.31 to 1.34; and the
-  seepage-to-stability example's from 1.258 to 1.273 (Spencer) and 1.277
-  (strength reduction). The piezometric-line and seepage
-  comparison models of that page and W-2's DXF section carry saturated weights
-  too.
+  1.181, 1.195, and 1.016 to 1.196, 1.206, and 1.033, and its drained answer at
+  day 50 from 1.035 to 1.053; COMBO-3's Johnson curve minimum from 1.016 to 1.033;
+  W-3's Bishop and Spencer from 1.231 and 1.257 to 1.245 and 1.272; the
+  rapid-drawdown worked example's from 1.31 to 1.34; and the seepage-to-stability
+  example's from 1.258 to 1.272 (Spencer) and 1.277 (strength reduction). Up to
+  0.001 of the COMBO-2, COMBO-3, and Spencer changes comes from the seepage fixes
+  below. The piezometric-line and seepage comparison models of that page and
+  W-2's DXF section carry saturated weights too.
 - The LEM samples' earth dam follows its source, Example 2 of Section 6.13.6 of
   Duncan, Wright, and Brandon's *Soil Strength and Slope Stability* (2nd ed.).
   Its section and piezometric line are scaled from the book's figures, and its
@@ -43,7 +44,37 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - A report on a model where every method searched for its own surface says
   whether the searches settled on the same surface. Before, it always said the
   surfaces differ.
-
+- Transient seepage conserves water. Each time step stores the change in the
+  water the soil holds between the heads at the step's start and end, so over a
+  run the water that flows in and out matches the change in stored water to
+  about 0.01%. Before, the two could differ by 1 to 26%. Each step's time error is
+  also held under a fraction of the head range (0.001 by default, set by the new
+  `time_error_frac` argument of `run_transient_seepage`). SEEP-3 and COMBO-2 take
+  hundreds of time steps where they took thousands. The heads the transient
+  tutorials and samples check move by up to 0.8 ft. COMBO-3's earth dam curve
+  minimum moves from 1.3312 to 1.3292. On the Rocscience verification page,
+  VP102's four Slide2 comparisons during drawdown move by up to 0.008 (2.045 to
+  2.053 at 300 hours), and on the RS2 page VP102's Case 2 at 300 hours moves from
+  1.998 to 1.987. Every comparison keeps its rating.
+- A steady unconfined seepage solve that keeps flipping one element at the edge
+  of the wet zone between wet and dry, and so reaches its pass limit without
+  converging, gets one more attempt: that element's conductivity is solved for
+  directly at every pass, and the result must pass the usual convergence test.
+  On the earth dam drawdown section meshed with six-node triangles, every mesh
+  size that ended unconverged (11 of the 33 tried) now converges. A solve that
+  already converged is unchanged.
+- A steady unconfined seepage solve caught in a slowly shrinking cycle is
+  recognized in about half the passes (261 rather than 491 on the earth dam
+  samples' seepage), before Studio's default limit of 400 passes, so it converges
+  instead of stopping at the limit.
+- The seepage solutions shipped with 17 sample and verification models are
+  re-solved with the current solver. They were saved before three solver changes
+  in September 2026. Pore pressures change by up to 15 psf, nearly all above the
+  water table, and every published factor of safety on them holds to its printed
+  digits except the seepage-to-stability example's Spencer search, by 0.001.
+- A steady seepage run whose boundary reads a time series that steps at t = 0
+  takes the value before the step, as a transient run starts from. Before, it
+  took the value after the step.
 - The strength plot in the Materials list view draws τ and σ′ at the same
   scale, so the envelope rises at the friction angle entered. This applies to
   Mohr-Coulomb, power-curve, and Hoek-Brown materials.
@@ -78,9 +109,26 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Changed
 
+- A reservoir boundary's face above the water is no-flow until the water reaches
+  it. Once the water has covered a point and fallen back below it, the point is a
+  seepage exit face, as before. Before, the face above the water was an exit face
+  even where the water had not yet reached it. A constant level never reaches the face above it, so that face is
+  no-flow for the whole run. A new preflight warning,
+  `tseep.reservoir_level_above_line`, reports a level that rises above the top of
+  its reservoir line onto ground no boundary covers.
+- A new preflight warning, `seep.head_line_above_water`, reports a plain head
+  line along the ground that the water leaves partly dry. A head line holds every
+  point at the level at all times, so the dry part is held in suction and draws
+  water out of the slope; a pool face should be given the reservoir type.
+- Studio's Help menu, report citations, and the assistant link to the latest
+  documentation, the version xslope.org opens on, instead of the documentation
+  for the last release.
 - The RS2 verification page and the FEM samples page give ten strength
   reduction results as the current solver computes them; each moved by 0.4 to
   1.8%, and every comparison keeps its rating.
+- The Rocscience verification page gives VP38, VP46, and VP71 results as the
+  current solver computes them; each moved by 0.001 or 0.002, and every
+  comparison keeps its rating.
 - A profile line or polygon added in Studio starts with one vertex row to type
   or paste into, and on the material of its own number (line 2 on material 2),
   as the workbook's profile and polygon sheets are laid out.

@@ -496,10 +496,15 @@ def parse_test_tags(md_path):
             if key in params:
                 params[key] = float(params[key])
         for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index',
-                    'refine_slices',
-                    'expected_elements', 'expected_nodes']:
+                    'refine_slices']:
             if key in params:
                 params[key] = int(params[key])
+        # A mesh count is one integer, or a semicolon list of the counts of every
+        # mesh gmsh makes of the model (see _check_mesh_counts).
+        for key in ['expected_elements', 'expected_nodes']:
+            if key in params:
+                counts = tuple(int(v) for v in str(params[key]).split(';'))
+                params[key] = counts[0] if len(counts) == 1 else counts
 
         params['source'] = str(md_path)
 
@@ -1501,14 +1506,23 @@ def _check_mesh_counts(test, mesh):
     upgrade, a meshing fix) reaches a lock only as a shift in the factor of safety,
     which reads exactly like a solver change; with them the row says the mesh moved,
     before any solve. Counting the mesh the row builds anyway costs nothing.
+
+    A count may be a list. gmsh's Blossom pairing of triangles into quads is not
+    repeatable on every shape: the same input gives the Griffiths 3 slope 6880
+    nodes on some runs and 6882 on others. A row whose lock holds on each of those
+    meshes lists both counts, and any other count is still a moved mesh.
     Raises ValueError, which every caller of ``_fem_case_model`` reports as the
     row's error."""
     wrong = []
     for key, got in (('expected_elements', len(mesh['elements'])),
                      ('expected_nodes', len(mesh['nodes']))):
         want = test.get(key)
-        if want is not None and int(want) != got:
-            wrong.append(f"{key.split('_')[1]} {got} != {int(want)}")
+        if want is None:
+            continue
+        allowed = want if isinstance(want, tuple) else (int(want),)
+        if got not in allowed:
+            wrong.append(f"{key.split('_')[1]} {got} != "
+                         + ' or '.join(str(n) for n in allowed))
     if wrong:
         raise ValueError("the mesh moved under the lock: " + ', '.join(wrong)
                          + " — re-cut the lock on the new mesh and update the counts")

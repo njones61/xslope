@@ -33,7 +33,7 @@ sys.path.insert(0, _ROOT)
 
 TYPES = ("fem_ssrm", "fem_tilt")
 _TAG = re.compile(r"<!--\s*test:\s*(.*?)\s*-->")
-_COUNT = re.compile(r",\s*expected_(elements|nodes)=\d+")
+_COUNT = re.compile(r",\s*expected_(elements|nodes)=[\d;]+")
 
 
 def tags(pages):
@@ -113,7 +113,8 @@ def main(argv=None):
             print(f"  ERROR {page}:{line_no}  {err}")
             continue
         old = (test.get("expected_elements"), test.get("expected_nodes"))
-        if old == (el, nd):
+        if all(got in (want if isinstance(want, tuple) else (want,))
+               for got, want in zip((el, nd), old)):
             continue
         changed += 1
         was = "none" if old == (None, None) else f"{old[0]} elements, {old[1]} nodes"

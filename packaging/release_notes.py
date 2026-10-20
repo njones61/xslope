@@ -70,8 +70,10 @@ def main(argv=None):
         text = f.read()
     # The notes are UTF-8 (→, —, σ). A Windows runner's stdout defaults to the
     # cp1252 code page, which cannot encode "→", and the 1.0.3 tag build stopped
-    # here on "File → Open".
-    sys.stdout.reconfigure(encoding="utf-8")
+    # here on "File → Open". A stream that cannot be reconfigured (output
+    # captured in memory) takes the text as it is.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     try:
         print(unwrap(section(text, args.version)))
     except ValueError as exc:

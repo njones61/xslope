@@ -259,8 +259,8 @@ At $c_{u2}/c_{u1} = 0.2$, a narrow slide along the weak layer, their Fig. 8(c):
      on the observed value; the weak ratio (cu2/cu1=0.2, layer-following) figure-read with
      a wide tolerance, since both the ~0.6 published FE point and the schematic band geometry
      are read off the figures. -->
-<!-- test: file=../fem/files/xslope_griffiths3_r1.xlsx, type=fem_ssrm, expected_fs=1.4531, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G3, f_stand=1.45, f_fail=1.45625, check=edges, expected_elements=2233, expected_nodes=6880 -->
-<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.50, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=0.3, f_max=1.0, max_iter=16000, benchmark=SSRM-G3, f_stand=0.475, f_fail=0.51875, check=edges, expected_elements=2233, expected_nodes=6882 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r1.xlsx, type=fem_ssrm, expected_fs=1.4531, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G3, f_stand=1.45, f_fail=1.45625, check=edges, expected_elements=2233, expected_nodes=6880;6882 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.50, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=0.3, f_max=1.0, max_iter=16000, benchmark=SSRM-G3, f_stand=0.475, f_fail=0.51875, check=edges, expected_elements=2233, expected_nodes=6880;6882 -->
 <!-- Coarse tri6 quick SSRM (ungated, wide figure-read tolerance): the Fig. 7 sweep — the
      base-circle plateau (>=0.6), the transition at ~0.6, and the roughly linear fall as the
      weak-layer mechanism takes over. -->

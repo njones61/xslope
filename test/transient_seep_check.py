@@ -420,8 +420,6 @@ def check_drawdown_linear_vs_quadratic():
     # Meshes fine enough that the comparison measures the two exit-face rules rather
     # than the meshes: each leg is within 5% (max) of the finest mesh of the other
     # element type (tri3 56, tri6 32), and a finer pair only shrinks the measures.
-    # The tri6 meshes between 9 and 16 divisions start from a steady solve that does
-    # not close, so their runs report converged=False.
     sd3, ground = _build("tri3", 40.0)       # linear: per-corner rule
     sd6, _ = _build("tri6", 22.0)            # quadratic: ported edge rule
     if not sd6.get("head_series_bindings"):

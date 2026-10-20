@@ -426,8 +426,17 @@ Convergence is a **hybrid** test — all three conditions must hold at once:
    exit nodes are still switching, and a seepage face with pressure on it is not a free
    boundary.
 
-A run that hits `max_iter` (default 400) without satisfying all three returns
-`converged = False` and reports it.
+A run that reaches `max_iter` (default 400) without satisfying all three gets one more
+attempt. The usual cause is a single element at the edge of the wet zone. When it is dry it
+backs water up behind it and wets itself, and when it is wet the water drains away and it
+dries again, so every sweep overshoots its $k_r$ by more than any rung of the ladder can
+damp. The solver picks out that element, the one whose $k_r$ has been swinging most (or,
+when nothing is swinging, the elements a few unrelaxed sweeps would change most, tried one
+at a time). It then solves for that element's $k_r$ directly at every sweep, against the
+current $k_r$ of every other element, until the field stops changing. The settled field
+then has to pass the three tests above on one ordinary, unrelaxed sweep. If it does, the
+run has converged. If no element settles, or the settled field fails the tests, the run
+returns `converged = False`, reports it, and keeps the field the sweep budget left.
 
 ### Input checks
 

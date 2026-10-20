@@ -15,12 +15,12 @@
 import logging
 import time
 import warnings
-from collections import defaultdict
+from collections import defaultdict, deque
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.sparse import lil_matrix, csr_matrix
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, splu
 from shapely.geometry import LineString, Point
 
 from .units import require_gamma_water, infer_system_from_gamma_water
@@ -845,6 +845,141 @@ _CYCLE_EXTRA_SWEEPS = 600
 _SET_REVISIT_SWEEP = 100
 _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joined to the face at set stability
 
+#: Pinned-element escape, for a solve the budget leaves unconverged.
+#:
+#: One element on the wet/dry edge can hold a solve in a loop that no relaxation the
+#: solver uses will close. One of the element's kr sampling points sits at the bend of
+#: the kr curve: a drier element backs the water up behind it and wets it, a wetter
+#: one drains it, and the element's kr comes back from each sweep hundreds to
+#: hundreds of thousands of times further from its fixed point than it went in.
+#: Relaxed Picard is stable on that loop only below 2 / (1 - gain). Measured on the
+#: earth dam of test/transient_seep_check.py (tri6, 9 to 32 divisions across the
+#: section), the gain runs from -210 to -2.7e5, so the factor needed runs from 1e-2
+#: down to 7e-6: under the ladder's last rung on every one of those meshes, and under
+#: the limit-cycle floor on four of them.
+#:
+#: The escape takes that one element out of the Picard iteration. Every sweep solves
+#: for the element's kr EXACTLY against the current kr of every other element: one
+#: factorization of the sweep's matrix and a rank-nn update of it for the element
+#: (Sherman-Morrison-Woodbury) make the element's nodal heads a closed form in its kr,
+#: and the self-consistent kr is then a one-dimensional root, always bracketed by the
+#: element's kr floor and 1 because kr itself lies between them. Every other element
+#: iterates as before. The fixed point reached is the full problem's own, and it is
+#: accepted only by the solver's ordinary gate, on one ordinary sweep at relax 1.
+#:
+#: The candidates, tried in turn: the element whose kr swung most across the last
+#: :data:`_CYCLE_LOOKBACK` sweeps, which is the orbit's own signature, and then the
+#: elements whose kr :data:`_PIN_STEPS` un-relaxed steps from the last iterate move
+#: most, for a solve creeping at the limit-cycle floor rather than orbiting, where
+#: nothing swings. The un-relaxed steps are a coarse reading on their own: each moves
+#: the field far enough to flip the culprit's neighbors too, and on five of the ten
+#: orbiting meshes below the culprit is not their first pick. A wrong element shows
+#: itself: the loop it does not hold keeps cycling, and the sweeps reach the ladder's
+#: last rung and set no new low there, which abandons it.
+#:
+#: Measured on the 11 meshes of that dam the budget leaves unconverged (9 to 17, 20
+#: and 32 divisions), at a budget of 400 sweeps and of 2000: on the ten that orbit the
+#: swing names the element and it closes in 33 to 132 sweeps; on the one that creeps
+#: (14 divisions) nothing swings, the first step candidate is abandoned at sweep 62
+#: and the second closes in 257. No right element needed a rung finer than 0.1, and
+#: every gate sweep came in under 2e-6 of the tolerance. The two budgets land on the
+#: same flow rate to eight digits.
+#:
+#: Read only once the sweep budget is spent unconverged, so a solve that converges
+#: within its budget never reaches it, and a rescue that does not pass the gate leaves
+#: the unconverged answer as the budget left it. It spends at most the budget again.
+_PIN_MIN_SWING = 0.1     # decades of kr: an element that moved less is not the loop
+_PIN_STEPS = 3           # un-relaxed steps read for candidates, and candidates taken from them
+#: The pinned sweeps' head tolerance, as a fraction of the gate's. The gate sweep
+#: carries what is left of the element's error at up to the loop's gain (2.7e5
+#: measured), so the inner tolerance sits that far under the gate.
+_PIN_TOL = 1e-6
+
+
+def _element_kr_avg(asm, p_nodes, kr_kw):
+    """Each element's kr averaged at its sampling points, in element order: the factor
+    :func:`_assembly_data` scales the element's saturated matrix by in head mode."""
+    out = np.empty(sum(len(g['idx']) for g in asm['groups']))
+    for g in asm['groups']:
+        idx = g['idx']
+        p_gp = p_nodes[g['conn']] @ g['N_kr'].T
+        kr = kr_relative_vec(p_gp, **{k: None if v is None else v[idx][:, None]
+                                      for k, v in kr_kw.items()})
+        out[idx] = (kr @ g['w_kr']) / g['wsum']
+    return out
+
+
+def _pinned_element_solve(asm, kr_kw, y, h, e, dir_mask, dir_values, f_ext, tol,
+                          max_sweeps):
+    """Steady sweeps from ``h`` with element ``e``'s kr solved for exactly at every
+    sweep (see :data:`_PIN_MIN_SWING`), on a fixed exit-face set. Returns
+    ``(head, converged, sweeps)``; not converged when the ladder stalls on its last
+    rung, which is how a wrong element shows itself, or the sweeps run out.
+
+    The element's matrix is its kr times its saturated matrix, so changing its kr by
+    ``dk`` adds ``dk`` times the saturated matrix, less the rows the Dirichlet system
+    replaces by identity. With ``Z`` the solved unit columns of the element's nodes,
+    its nodal heads at any kr are a closed form needing no further factorization."""
+    g = next(g for g in asm['groups'] if np.any(g['idx'] == e))
+    j = int(np.flatnonzero(g['idx'] == e)[0])
+    conn = g['conn'][j]
+    nn = len(conn)
+    Kt = np.where(dir_mask[conn][:, None], 0.0, g['ke'][j])
+    one = np.array([e])
+    kw_e = {k: None if v is None else v[one][:, None] for k, v in kr_kw.items()}
+
+    def kr_e(h_e):
+        kr = kr_relative_vec(((h_e - y[conn]) @ g['N_kr'].T)[None, :], **kw_e)[0]
+        return float(kr @ g['w_kr']) / g['wsum']
+
+    log_floor = np.log10(max(kr_e(y[conn] - 1e12), 1e-300))
+    E = np.zeros((len(h), nn))
+    E[conn, np.arange(nn)] = 1.0
+    eye = np.eye(nn)
+    rung, best, stall = 0, float('inf'), 0
+    for sweep in range(1, max_sweeps + 1):
+        data = _assembly_data(asm, p_nodes=h - y, mode='head', **kr_kw)
+        k_now = kr_e(h[conn])
+        A, b = _dirichlet_system(asm, data, dir_mask, dir_values, neumann=f_ext)
+        lu = splu(A.tocsc())
+        h_base = lu.solve(b)
+        Z = lu.solve(E)
+        Ze, he_base = Z[conn], h_base[conn]
+
+        def update(kr):
+            dk = kr - k_now
+            return dk, np.linalg.solve(eye + dk * Kt @ Ze, Kt @ he_base)
+
+        # kr out minus kr in falls across [floor, 1]; bisect it in log kr to the last
+        # bit, each trial a small dense solve.
+        lo, hi = log_floor, 0.0
+        while True:
+            mid = 0.5 * (lo + hi)
+            if not lo < mid < hi:
+                break
+            dk, w = update(10.0 ** mid)
+            if kr_e(he_base - dk * Ze @ w) > 10.0 ** mid:
+                lo = mid
+            else:
+                hi = mid
+        dk, w = update(10.0 ** (0.5 * (lo + hi)))
+        h_solved = h_base - dk * Z @ w
+        step = float(np.max(np.abs(h_solved - h)))
+        if step < tol:
+            return h_solved, True, sweep
+        # The ladder, stepping down only: these sweeps start from a field already
+        # near its answer, and a stall on the last rung is the wrong element.
+        if step < best:
+            best, stall = step, 0
+        else:
+            stall += 1
+            if stall >= _LADDER_PATIENCE:
+                if rung + 1 == len(_RELAX_LADDER):
+                    return h, False, sweep
+                rung, best, stall = rung + 1, float('inf'), 0
+        h = h + _RELAX_LADDER[rung] * (h_solved - h)
+    return h, False, max_sweeps
+
 #: PROGRESS-FED RELAXATION LADDER. The under-relaxation factor walks this ladder, and
 #: it moves on what the head change is DOING, never on the sweep number:
 #:
@@ -933,7 +1068,10 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     Two escapes act on a solve that is caught in a cycle rather than converging; both
     are inert on a solve that is not (see :data:`_CYCLE_PERSIST` and
-    :data:`_SET_REVISIT_SWEEP` for the gates and what was measured on the corpus).
+    :data:`_SET_REVISIT_SWEEP` for the gates and what was measured on the corpus). A
+    third is read only once the sweep budget is spent unconverged: it solves for the
+    kr of the one element holding the solve in a loop at every sweep, and the field it
+    settles on is then held to the ordinary gate (see :data:`_PIN_MIN_SWING`).
 
     Parameters:
         element_types : (n_elements,) array indicating:
@@ -1069,6 +1207,13 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     _free_edges = set()      # quadratic exit-face edges the veto no longer governs
     _wet_forced = np.zeros(n_nodes, dtype=int)   # times a wet inactive node was joined
     _revisit_fired_at = None
+
+    # Pinned-element escape state (see _PIN_MIN_SWING): the last _CYCLE_LOOKBACK
+    # relaxed iterates, whose kr swing names the element, and what the budget left,
+    # which stands if the rescue's gate sweep fails.
+    _tail_h = deque(maxlen=_CYCLE_LOOKBACK)
+    _pin_tried = False
+    _pin_saved = None
 
     budget = max_iter        # raised once, and only where the floor drops
     iteration = 0
@@ -1276,6 +1421,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # would be held to a different real strictness at every datum.
         residual = float(np.max(np.abs(h_new - h)))
         residuals.append(residual)
+        _tail_h.append(h_new.copy())
 
 
         # Flow-closure probe, measured on the UNRELAXED iterate: q_chk =
@@ -1441,6 +1587,54 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         h = h_new.copy()
         h_last = h_new.copy()
 
+        # ESCAPE 3: one element holds the solve in a loop (see _PIN_MIN_SWING). Read
+        # once, when the budget is spent unconverged. The element's kr is solved for
+        # at every sweep until the field settles, and the settled field then gets one
+        # ordinary sweep at relax 1: the gate decides, as for any other solve.
+        if iteration >= budget and not _pin_tried:
+            _pin_tried = True
+            kr_kw = dict(kr0=kr0, h0=h0, vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
+            pin_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
+            dir_values = np.where(bc_type == 1, bc_values, y)
+            log_kr = np.log10(np.maximum(
+                [_element_kr_avg(asm, t - y, kr_kw) for t in _tail_h], 1e-300))
+            swing = log_kr.max(axis=0) - log_kr.min(axis=0)
+            h_try, log_try = h_new, [log_kr[-1]]
+            for _ in range(_PIN_STEPS):
+                d_try = _assembly_data(asm, p_nodes=h_try - y, mode='head', **kr_kw)
+                A_try, b_try = _dirichlet_system(asm, d_try, pin_mask, dir_values,
+                                                 neumann=f_ext)
+                h_try = spsolve(A_try, b_try)
+                log_try.append(np.log10(np.maximum(
+                    _element_kr_avg(asm, h_try - y, kr_kw), 1e-300)))
+            steps = np.ptp(np.array(log_try), axis=0)
+            pinned = [int(e) for e in np.argsort(-swing)[:1] if swing[e] > _PIN_MIN_SWING]
+            pinned += [int(e) for e in np.argsort(-steps)[:_PIN_STEPS]
+                       if steps[e] > _PIN_MIN_SWING and int(e) not in pinned]
+            pin_left = max_iter     # the rescue spends at most the budget it follows
+            for e in pinned:
+                if pin_left <= 0:
+                    break
+                try:
+                    h_pin, pin_ok, n_pin = _pinned_element_solve(
+                        asm, kr_kw, y, h_new, e, pin_mask, dir_values, f_ext,
+                        eps * _PIN_TOL, pin_left)
+                except (np.linalg.LinAlgError, RuntimeError):   # a singular update
+                    pin_ok, n_pin = False, 0
+                pin_left -= n_pin
+                print(f"Iteration {iteration}: element {e + 1}'s kr solved for directly "
+                      f"at every sweep — "
+                      + (f"settled in {n_pin} sweeps; one ordinary sweep tests it"
+                         if pin_ok else f"did not settle ({n_pin} sweeps)"))
+                if pin_ok:
+                    _pin_saved = (A, data, exit_face_active.copy())
+                    h = h_pin.copy()
+                    h_last = h_pin.copy()
+                    data = _assembly_data(asm, p_nodes=h_pin - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
+                    _rung, _cycle_floor = 0, None
+                    budget += 1
+                    break
+
     else:
         # The sweeps actually run, which is max_iter unless an escape extended it.
         print(f"Warning: Did not converge in {budget} iterations")
@@ -1449,6 +1643,10 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             if i % 20 == 0 or i == len(residuals) - 1:
                 print(f"  Iteration {i+1}: residual = {r:.6e}")
 
+
+    if not converged and _pin_saved is not None:
+        # The pinned field failed its gate sweep: the answer is the one the budget left.
+        A, data, exit_face_active = _pin_saved
 
     # Final consistency solve: q was computed before the last exit face update,
     # so inactive nodes retain stale reaction forces. Re-solve with the final

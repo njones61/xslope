@@ -299,7 +299,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [99](#vp99) | 🟢 | Embankment dam, (3) materials, rapid drawdown, water table | Spencer 1.527 vs Slide 1.534 (−0.5%) · Spencer 1.527 vs DWW 1.56 (−2.1%) | geometry re-pinned from the vendor GeoStudio model |
 | [100](#vp100) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.201 vs Morgenstern chart 1.20 (+0.1%) · Bishop 1.201 vs Slide 1.212 (−0.9%) | runs single-stage |
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
-| [102](#vp102) | 🟢 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.731 vs Slide 1.745 (−0.8%) · drawdown at 100 h: Spencer 1.814 vs Slide 1.867 (−2.8%) | the 100 h frame is the widest of the 60–1500 h transient series, which runs from −2.8% to +0.2% against the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause of the early-frame shortfall and is worth a small fraction of it. |
+| [102](#vp102) | 🟢 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.731 vs Slide 1.745 (−0.8%) · drawdown at 100 h: Spencer 1.816 vs Slide 1.867 (−2.7%) | the 100 h frame is the widest of the 60–1500 h transient series, which runs from −2.7% to +0.2% against the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause of the early-frame shortfall and is worth a small fraction of it. |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | 4 files, both mechanisms; the deep→shallow switch lands in Slide2's own interval |
 | [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | 3 of 4 scenarios; the Newmark displacement is reproduced by a benchmark diagnostic (−0.5% at Slide2's K<sub>y</sub>), not an XSLOPE mode |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
@@ -2340,11 +2340,11 @@ Slide #102 / Huang & Jia (2008): a homogeneous earth dam (c' = 13.8 kPa, φ' = 3
 
 | Stage | XSLOPE Spencer | Slide2 Spencer |
 |---|---|---|
-| 60 h | 1.761 | 1.804 (−2.4%) |
-| 100 h | 1.814 | 1.867 (−2.8%) |
-| 300 h | 2.045 | 2.092 (−2.2%) |
+| 60 h | 1.765 | 1.804 (−2.2%) |
+| 100 h | 1.816 | 1.867 (−2.7%) |
+| 300 h | 2.053 | 2.092 (−1.9%) |
 | 600 h | 2.238 | 2.242 (−0.2%) |
-| 1500 h | 2.378 | 2.373 (+0.2%) |
+| 1500 h | 2.377 | 2.373 (+0.2%) |
 
 *The curve is reproduced end to end and every station sits within 3% of the Slide2 Spencer column. The early half runs low and the late half converges onto Slide2, a shortfall that closes as the dam drains — a drainage-rate difference rather than a flow-field error, since a wrong field would not vanish at the end of the series. Its direction matches the substituted retention curve, which holds water more tightly in the unsaturated zone and so drains this dam a little more slowly; priced against the section's own sensitivity to the phreatic surface, the worst station is about 0.4 m of head. Widening the unsaturated band was tested as the cause and is not it. The RS2 strength-reduction counterpart is [P4-VP102](rs2.md#p4-vp102), which rides the same flow solve.*
 
@@ -2352,11 +2352,11 @@ Slide #102 / Huang & Jia (2008): a homogeneous earth dam (c' = 13.8 kPa, φ' = 3
 ![vp102b: inputs and representative solution](images/vp102b.png)
 ![VP102 transient rapid-drawdown: factor of safety vs time, XSLOPE Spencer vs Slide2 Table 102.3](images/vp102t_curve.png){width=800px}
 
-<!-- test: file=files/rocscience/vp102t_60.xlsx, type=circular_search, num_slices=40, fs_spencer=1.761, benchmark=VP102-t-60 -->
-<!-- test: file=files/rocscience/vp102t_100.xlsx, type=circular_search, num_slices=40, fs_spencer=1.814, benchmark=VP102-t-100 -->
-<!-- test: file=files/rocscience/vp102t_300.xlsx, type=circular_search, num_slices=40, fs_spencer=2.045, benchmark=VP102-t-300 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=circular_search, num_slices=40, fs_spencer=1.765, benchmark=VP102-t-60 -->
+<!-- test: file=files/rocscience/vp102t_100.xlsx, type=circular_search, num_slices=40, fs_spencer=1.816, benchmark=VP102-t-100 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=circular_search, num_slices=40, fs_spencer=2.053, benchmark=VP102-t-300 -->
 <!-- test: file=files/rocscience/vp102t_600.xlsx, type=circular_search, num_slices=40, fs_spencer=2.238, benchmark=VP102-t-600 -->
-<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=circular_search, num_slices=40, fs_spencer=2.378, benchmark=VP102-t-1500 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=circular_search, num_slices=40, fs_spencer=2.377, benchmark=VP102-t-1500 -->
 
 ## 🟢 VP103: Two-layer undrained slope — deep vs shallow mechanism {#vp103}
 

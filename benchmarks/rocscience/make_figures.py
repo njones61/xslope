@@ -4,13 +4,17 @@ corpus pages (docs/verification/rocscience.md).
 For every built corpus file this renders plot_inputs (with coordinate labels,
 verification-manual style) and a representative solved surface, then stitches
 the two panels into one PNG in docs/verification/images/. Search problems are
-re-solved here so the figure shows the critical surface, not the stored seed.
+re-solved here so the figure shows the critical surface, not the stored seed,
+with the settings the file's test tag runs it with, so the factor of safety in
+the figure's title is the one the page locks.
 
 Run from the repo root:  python benchmarks/rocscience/make_figures.py [vpNNN ...]
 """
 
+import glob
 import io
 import os
+import re
 import sys
 import warnings
 import contextlib
@@ -204,8 +208,44 @@ SUCTION = {
 }
 
 
-def _solve_case(sd, kind, method, suction_phi_b=None):
+DOCS = os.path.join(os.path.dirname(__file__), '..', '..', 'docs')
+TAG = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
+
+
+def _search_settings(xlsx, kind):
+    """The search settings the docs' test tag runs ``xlsx`` with, as keyword
+    arguments for the search, read the way run_tests.py reads them. A file with
+    no search tag, or with tags that disagree, keeps the 50-slice default."""
+    want = 'noncircular_search' if kind == 'ncsearch' else 'circular_search'
+    target = os.path.realpath(xlsx)
+    found = set()
+    for md in glob.glob(os.path.join(DOCS, '**', '*.md'), recursive=True):
+        with open(md, encoding='utf-8') as f:
+            for line in f:
+                m = TAG.search(line)
+                if not m:
+                    continue
+                kv = {k.strip(): v.strip() for k, v in
+                      (p.split('=', 1) for p in m.group(1).split(',') if '=' in p)}
+                rapid = kv.get('rapid', 'false').lower() in ('true', '1', 'yes')
+                if (kv.get('type') != want or rapid != (kind == 'rapid_csearch')
+                        or os.path.realpath(os.path.join(os.path.dirname(md),
+                                                         kv.get('file', ''))) != target):
+                    continue
+                opts = {'num_slices': int(kv.get('num_slices', 30))}
+                if want == 'circular_search':
+                    opts['seed'] = kv.get('seed', 'circles').lower()
+                    opts['composite'] = kv.get('composite', 'false').lower() in ('true', '1', 'yes')
+                    for key in ('center_box', 'entry_range', 'exit_range', 'tangent_depth'):
+                        if kv.get(key):
+                            opts[key] = tuple(float(v) for v in kv[key].split(';') if v.strip())
+                found.add(tuple(sorted(opts.items())))
+    return dict(found.pop()) if len(found) == 1 else {'num_slices': 50}
+
+
+def _solve_case(sd, kind, method, suction_phi_b=None, search=None):
     """Return (slice_df, failure_surface, results) for the representative surface."""
+    search = search or {'num_slices': 50}
     fn = getattr(solve, method)
     if kind in ('circle', 'rapid_circle'):
         # VP22's circle dips below the model base: it is a composite surface.
@@ -234,13 +274,13 @@ def _solve_case(sd, kind, method, suction_phi_b=None):
         return df, fs, r
     if kind in ('csearch', 'rapid_csearch'):
         from xslope.search import circular_search
-        cache, _, _, _ = circular_search(sd, method, num_slices=50,
-                                         rapid=(kind == 'rapid_csearch'))
+        cache, _, _, _ = circular_search(sd, method, rapid=(kind == 'rapid_csearch'),
+                                         **search)
         best = cache[0]
         return best['slices'], best['failure_surface'], best['solver_result']
     if kind == 'ncsearch':
         from xslope.search import noncircular_search
-        cache, _, _ = noncircular_search(sd, method, num_slices=50)
+        cache, _, _ = noncircular_search(sd, method, **search)
         best = cache[0]
         return best['slices'], best['failure_surface'], best['solver_result']
     raise ValueError(kind)
@@ -248,9 +288,11 @@ def _solve_case(sd, kind, method, suction_phi_b=None):
 
 def make_figure(stem, kind, method, src=None, panel_size=(8.0, 5.0), dpi=150):
     base = SRC if src is None else os.path.join(os.path.dirname(__file__), '..', '..', 'docs', src, 'files')
-    sd = load_slope_data(os.path.join(base, f'{stem}.xlsx'))
+    xlsx = os.path.join(base, f'{stem}.xlsx')
+    sd = load_slope_data(xlsx)
     with contextlib.redirect_stdout(io.StringIO()):
-        df, fs, results = _solve_case(sd, kind, method, suction_phi_b=SUCTION.get(stem))
+        df, fs, results = _solve_case(sd, kind, method, suction_phi_b=SUCTION.get(stem),
+                                      search=_search_settings(xlsx, kind))
 
     paths = []
     for which in ('inputs', 'solution'):

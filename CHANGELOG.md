@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.0.4 — 2026-10-20
+
 ### Fixed
 
 - The Johnson Reservoir dam models carry saturated unit weights of 135, 130, and

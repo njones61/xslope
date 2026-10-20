@@ -153,7 +153,7 @@ The transient model adds two things to the steady Johnson model:
   its own unconfined rate `k/Sy`. Because the core's `k` is a thousandfold smaller than the shell's
   while its `Sy` is smaller by less than a factor of ten, the core drains far more slowly than the shell.
 - A **tseep sheet** carrying the drawdown schedule and run controls. The upstream boundary is retyped
-  from a fixed head to a submerged-only **`reservoir`** boundary (see
+  from a fixed head to a **`reservoir`** boundary (see
   [head types](transient.md#head-types-head-and-reservoir)) bound to a `pool` series: the pool is
   held at full pool (el 160) briefly, drawn down to the tailwater datum (el 100) over **45 days**,
   then held. The run lasts **1000 days** because the low-permeability core drains slowly, so the
@@ -169,7 +169,7 @@ storage columns and the `tseep` sheet are new.
 [xslope_johnson_res_tseep.xlsx](files/xslope_johnson_res_tseep.xlsx)
 
 Inputs plotted with the XSLOPE `plot_inputs()` function. The upstream **reservoir**
-boundary (submerged-only) is drawn distinctly from the downstream fixed-head boundary and the exit
+boundary is drawn distinctly from the downstream fixed-head boundary and the exit
 face, and its `tseep`-series level shows as two waterlines — the full-pool level at `t = 0` and the
 drawn-down level at `t = end` — each carrying the standard apex-down water symbol:
 
@@ -189,14 +189,14 @@ The figure shows the following:
   core desaturates only at its edges and its relative conductivity drops sharply, so its pore
   pressure dissipates far more slowly than in the material around it. The shells and foundation
   equilibrate to the drawn-down pool (essentially uniform at el 100–105 by t = 400), while the core
-  still has a distinct zone of high total head straddling the crest, peaking near el 149 at t = 400
-  and still el 131 at t = 1000. Rapid drawdown is dangerous in a zoned dam because of this
+  still has a distinct zone of high total head straddling the crest, peaking near el 146 at t = 400
+  and still el 137 at t = 1000. Rapid drawdown is dangerous in a zoned dam because of this
   pressure retained in the core.
 - The shells drain within days, and the phreatic surface lags behind the falling pool. At the end
   of the 45-day drawdown (t = 50) the pool is already at el 100, while the water table inside the
   dam is still well above it. A rapid-drawdown analysis has to include the pore pressure from this
   higher water table.
-- The exit point moves down the upstream face. As the level falls, the face nodes above the pool
+- The exit point moves down the upstream face. As the level falls, the face nodes it uncovers
   change from reservoir head to a free-draining exit face, and the point where the phreatic surface
   meets the face moves down the slope from el 160 to the tailwater datum, staying above the falling
   pool.
@@ -216,5 +216,5 @@ change in storage
 ![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=1000px}
 
 <!-- Transient regression: total head sampled at interior stations at end of drawdown and quasi-equilibrium, re-solved through the run_tests tseep_head path (tri3, target_size=15.0). -->
-<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:130.528;350:115:148.797;400:110:122.059, tolerance=0.05 -->
-<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.769;350:115:118.513;400:110:112.545, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:131.345;350:115:148.802;400:110:122.074, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.800;350:115:118.814;400:110:112.533, tolerance=0.05 -->

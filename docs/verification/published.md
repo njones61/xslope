@@ -32,7 +32,7 @@ XSLOPE's own with no published counterpart and takes no dot.
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [E1](#fhwa-e1) | 🟢 | FHWA MSE wall — per-layer geogrid pullout | All eleven layers of Table E1-7.5 reproduced within 0.1% of the manual's nominal pullout resistance | **built**; the example defers global and compound stability, so XSLOPE's searched Spencer 1.477 has no published counterpart |
 | [E3](#fhwa-e3) | 🟢 | FHWA MSE wall — sloping backfill, steel strips | Every one of the twelve levels of Table E3-7.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.404 has no published counterpart |
 | [E4](#fhwa-e4) | 🟢 | FHWA MSE wall — level backfill, steel bar mats | All ten levels of Table E4-7.4 within 0.1% of the manual's per-mat pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.536 has no published counterpart |
@@ -111,7 +111,7 @@ resistance the resisting zone alone develops, which is the quantity Table E1-7.5
 publishes:
 
 | Layer | Z (ft) | L<sub>a</sub> (ft) | L<sub>e</sub> (ft) | Z<sub>P</sub> (ft) | T<sub>al</sub> (lb/ft) | XSLOPE P<sub>r</sub> (lb/ft) | FHWA P<sub>r</sub> (lb/ft) |
-|---:|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1 | 0.67 | 10.28 | 7.72 | 7.74 | 1,085 | 5,378 | 5,378 (0.0%) |
 | 2 | 2.67 | 9.22 | 8.78 | 9.47 | 1,085 | 7,488 | 7,483 (+0.1%) |
 | 3 | 4.67 | 8.16 | 9.84 | 11.21 | 1,085 | 9,928 | 9,928 (0.0%) |
@@ -249,7 +249,7 @@ surface crosses each level gives the resistance the resisting zone alone
 develops, which is the quantity Table E3-7.3 publishes:
 
 | Level | Z (ft) | L<sub>e</sub> (ft) | Z<sub>P</sub> (ft) | F\* | S<sub>h</sub> (ft) | T<sub>n</sub> (lb/ft) | XSLOPE P<sub>r</sub> (lb/ft) | FHWA P<sub>r</sub> (lb/ft) |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1 | 1.25 | 13.41 | 9.90 | 1.917 | 2.50 | 5,200 | 4,173 | 4,174 (0.0%) |
 | 2 | 3.75 | 13.41 | 12.40 | 1.751 | 2.50 | 5,200 | 4,774 | 4,775 (0.0%) |
 | 3 | 6.25 | 13.41 | 14.90 | 1.586 | 2.50 | 5,200 | 5,196 | 5,197 (0.0%) |
@@ -346,7 +346,7 @@ and $L_e = L - 0.6(H - Z)$. Reading XSLOPE's envelope at the station
 L − L<sub>e</sub> gives the resistance Table E4-7.4 publishes:
 
 | Level | Z (ft) | L<sub>e</sub> (ft) | F\* | b (ft) | T<sub>n</sub> (lb/ft) | XSLOPE P<sub>r</sub> (lb/ft) | FHWA P<sub>r</sub> (lb/ft) |
-|---:|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1 | 1.87 | 10.31 | 1.188 | 1.5 | 4,136 | 1,718 | 1,718 (0.0%) |
 | 2 | 4.37 | 10.31 | 1.110 | 1.0 | 3,102 | 2,501 | 2,501 (0.0%) |
 | 3 | 6.87 | 10.31 | 1.033 | 1.5 | 4,136 | 5,488 | 5,488 (0.0%) |
@@ -433,7 +433,7 @@ footing is the one of Figure E5-5: the active length is the footing set-back
 plus its width down to z′ = 6.75 ft, and $L_e = L - 0.6(H - Z)$ below that.
 
 | Level | Z (ft) | L<sub>e</sub> (ft) | z (ft) | F\* | S<sub>h</sub> (ft) | T<sub>n</sub> (lb/ft) | XSLOPE P<sub>r</sub> (lb/ft) | FHWA P<sub>r</sub> (lb/ft) |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1 | 1.12 | 14.75 | 11.47 | 1.240 | 1.7 | 5,882 | 5,060 | 5,060 (0.0%) |
 | 2 | 2.35 | 14.75 | 12.70 | 1.158 | 1.7 | 5,882 | 5,232 | 5,232 (0.0%) |
 | 3 | 4.81 | 14.75 | 15.16 | 0.995 | 1.3 | 7,692 | 7,017 | 7,017 (0.0%) |
@@ -510,7 +510,7 @@ each; the other eight are the same law read at the same station on the same
 wall, and have no published counterpart. Reading XSLOPE's envelope there gives:
 
 | Level | Z (ft) | F\* | b (ft) | T<sub>n</sub> (lb/ft) | XSLOPE P<sub>r</sub> (lb/ft) | FHWA P<sub>r</sub> (lb/ft) |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1 | 1.87 | 1.189 | 1.5 | 4,136 | 6,196 | 6,212 (−0.3%) |
 | 2 | 4.37 | 1.111 | 1.0 | 3,102 | 6,353 | 6,369 (−0.3%) |
 | 3 | 6.87 | 1.033 | 1.5 | 4,136 | 12,339 | — |
@@ -576,7 +576,7 @@ load excluded, so the surcharge stays a distributed load here as it is there.
 surface is unchanged:
 
 | Level | Z (ft) | L<sub>e</sub> (ft) | 0.8F\* | b (ft) | T<sub>n</sub> (lb/ft) | XSLOPE P<sub>r</sub> (lb/ft) | FHWA P<sub>r</sub> (lb/ft) |
-|---:|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1 | 1.87 | 10.31 | 0.950 | 1.5 | 4,136 | 1,374 | 1,374 (0.0%) |
 | 2 | 4.37 | 10.31 | 0.888 | 1.0 | 3,102 | 2,000 | 2,000 (0.0%) |
 | 3 | 6.87 | 10.31 | 0.826 | 1.5 | 4,136 | 4,390 | 4,390 (0.0%) |

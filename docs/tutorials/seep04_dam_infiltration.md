@@ -716,7 +716,7 @@ before, because the file has a `tseep` sheet. Set it to **Transient
 defaults, and click **Run**.
 
 The run reports **28 saved frames** — t = 0, the 24 times on the 25-day grid, and
-the three series breakpoints that do not fall on it — reached in **92 steps**. The
+the three series breakpoints that do not fall on it — reached in **113 steps**. The
 step size is chosen from how fast the field is moving, so the low count shows
 that the dam changes slowly for most of the 600 days.
 
@@ -745,7 +745,7 @@ rather than arriving as a front that saturates the surface.
 ![Day 300: seventy days after the rain stopped](images/seep04_studio_playbar_day300.png)
 
 **Day 300, seventy days after the rain stopped.** The subtitle now reads **Inflow
-2.63 × 10<sup>−7</sup> / Outflow 3.09 × 10<sup>−7</sup>** — more leaving than
+2.63 × 10<sup>−7</sup> / Outflow 3.08 × 10<sup>−7</sup>** — more leaving than
 arriving, which is the mound the storm built draining into the toe drain. The
 phreatic surface has dropped visibly and the velocity vectors under the downstream
 face have swung toward the drain.
@@ -755,8 +755,8 @@ of the rain. The rain reaches full rate on day 60 and the drain is still climbin
 hundred days after that; it stops climbing only because the rain does, so day 200
 is a breakpoint in the schedule rather than a limit the dam reached. The dam's
 response time shows in the rise: measured from the moment the rain starts on day 30,
-the drain takes **102 days** to cover 90% of its climb. The fall is slower still —
-the rain stops on day 230, and two hundred days after that the drain is still 1.7%
+the drain takes **104 days** to cover 90% of its climb. The fall is slower still —
+the rain stops on day 230, and two hundred days after that the drain is still 1.6%
 above its dry-weather discharge. The dam's response lags the rain by months, and
 the lag is asymmetric: the storm pushed the water table up over 170 days and gravity
 alone takes 370 to bring it back down.

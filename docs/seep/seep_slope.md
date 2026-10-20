@@ -188,18 +188,18 @@ and [xslope_johnson_res_seep.csv](files/xslope_johnson_res_seep.csv) — which
 `load_slope_data()` picks up by name.
 
 All three materials use the `seep` option, so every slice base reads the field. A
-critical-circle search with Spencer's method settles at **FS = 1.258**:
+critical-circle search with Spencer's method settles at **FS = 1.272**:
 
 ![seep_slope_lem_results.png](images/seep_slope_lem_results.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.258, num_slices=50, tolerance=0.02 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.272, num_slices=50, tolerance=0.02 -->
 
 The same workbook, mesh and solution then run an SSRM analysis with the default
-failure criterion, at **FS = 1.258**:
+failure criterion, at **FS = 1.277**:
 
 ![seep_slope_fem_results.png](images/seep_slope_fem_results.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.258, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000, f_stand=1.253125, f_fail=1.2625, check=edges, expected_elements=1605, expected_nodes=3362 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.277, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000, f_stand=1.271875, f_fail=1.28125, check=edges, expected_elements=1605, expected_nodes=3362 -->
 
 The critical circle the LEM search found passes deeper, into the foundation, than
 the mechanism the FEM develops through the downstream shell, yet the two factors
@@ -223,9 +223,9 @@ Input file: [xslope_rface_PIEZO_KEY.xlsx](files/xslope_rface_PIEZO_KEY.xlsx)
 
 ![rface_piezo_results.png](images/rface_piezo_results.png){width=900}
 
-Spencer's method gives **FS = 1.94**.
+Spencer's method gives **FS = 1.98**.
 
-<!-- test: file=files/xslope_rface_PIEZO_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.298, fs_bishop=1.928, fs_janbu=1.716, fs_corps=2.649, fs_lowe=2.105, fs_spencer=1.943, fs_mprice=1.943 -->
+<!-- test: file=files/xslope_rface_PIEZO_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.334, fs_bishop=1.964, fs_janbu=1.747, fs_corps=2.694, fs_lowe=2.146, fs_spencer=1.978, fs_mprice=1.979 -->
 
 ### Part b — seepage-derived pore pressures
 
@@ -238,9 +238,9 @@ file: [xslope_rface_SEEP_KEY.xlsx](files/xslope_rface_SEEP_KEY.xlsx)
 
 ![rface_seep_results.png](images/rface_seep_results.png){width=900}
 
-Spencer's method gives **FS = 2.08**.
+Spencer's method gives **FS = 2.10**.
 
-<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.472, fs_bishop=2.067, fs_janbu=1.862, fs_corps=2.797, fs_lowe=2.256, fs_spencer=2.078, fs_mprice=2.080 -->
+<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.495, fs_bishop=2.090, fs_janbu=1.880, fs_corps=2.819, fs_lowe=2.280, fs_spencer=2.100, fs_mprice=2.102 -->
 
 ### Comparison
 
@@ -250,14 +250,14 @@ Spencer's method gives **FS = 2.08**.
 the slope than the flow field does, and slightly less near the toe.*
 
 | Pore-pressure model | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:--|--:|--:|--:|--:|--:|--:|--:|
-| Piezometric line | 1.298 | 1.928 | 1.716 | 2.649 | 2.105 | 1.943 | 1.943 |
-| Seepage | 1.472 | 2.067 | 1.862 | 2.797 | 2.256 | 2.078 | 2.080 |
+|:--|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Piezometric line | 1.334 | 1.964 | 1.747 | 2.694 | 2.146 | 1.978 | 1.979 |
+| Seepage | 1.495 | 2.090 | 1.880 | 2.819 | 2.280 | 2.100 | 2.102 |
 
 For this slope the piezometric line returns a modestly **lower (more conservative)** factor of
-safety. All seven factors move by a similar amount — between 0.136 and 0.174 — so the percentage
-difference tracks the size of the factor rather than the method: 5.6 to 8.5% for the six methods
-that carry interslice forces, and 13.4% for OMS, whose factor is the smallest of the seven.
+safety. All seven factors move by a similar amount — between 0.122 and 0.161 — so the percentage
+difference tracks the size of the factor rather than the method: 4.7 to 7.6% for the six methods
+that carry interslice forces, and 12.1% for OMS, whose factor is the smallest of the seven.
 
 The difference is not always this small nor always in this direction: where seepage is routed
 through the more permeable layers and exits along the downstream face, the computed pore

@@ -73,14 +73,13 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #: ``type=seep`` lock under, and that ``tools/make_seep_sample_figures.py`` draws the
 #: sample flow nets under (tol 1e-4).
 #:
-#: THE 1000-SWEEP CEILING IS EARTH_DAM2'S, AND IT IS THIN. On its committed mesh that
-#: model converges in 927 sweeps — 73 of headroom — so the ceiling is load-bearing for
-#: it and for nothing else: every other companion here closes in 500 or fewer, and the
-#: library's own default of 400 would leave earth_dam2 short by more than twice over.
-#: Its exit face settles at sweep 188 (where the set-revisit escape frees the two edges
-#: it was cycling on) and the remaining 739 sweeps are the nonlinear residual walking
-#: down to closure_tol. A change that slows that walk runs it into the ceiling, where
-#: it reports a flow rate off a field that is still moving, which is the state this
+#: THE 1000-SWEEP CEILING IS JOHNSON_RAPID_KEY'S. Its first boundary set's head field
+#: cycles, and the escape that closes it sees the orbit at sweep 452, so at the
+#: library's own default of 400 the solve stops unconverged before the escape can act;
+#: given 1000 it closes at 472. Every other companion here closes in 400 sweeps or fewer
+#: on its own, or, like the earth dam (escape at 261, closed at 525), inside the sweeps
+#: the escape grants. A change that moves the detection later runs it into the ceiling,
+#: where it reports a flow rate off a field that is still moving, which is the state this
 #: whole registry exists to keep out of the corpus — raise the ceiling with the model,
 #: rather than trimming the model to it.
 #: ``vendor`` — the settings the model's own builder solves it at
@@ -99,13 +98,17 @@ MODELS = [
     # 1000-sweep ceiling without closing, so it had no single field to record, and the
     # second sets had drifted with the same solver evolution. The cause was a limit
     # cycle in the head field, hidden by the relaxation ladder's terminal 0.01; with
-    # the escape in place each converges (463 and 901 sweeps) and each has one answer,
+    # the escape in place each converges (525 and 472 sweeps) and each has one answer,
     # so all four files are solved for it here. gsat_seep is the same model under a
     # second name, and its field is earth_dam_rapid's first set to the last digit; it
     # waited one round longer than the rest, until test/report_check.py's sample of a
     # solution that records nothing about its solve moved off it.
     ("docs/lem/files/xslope_earth_dam_rapid",         (1, 2), DOCS),
     ("docs/lem/files/xslope_gsat_seep",                  (1,), DOCS),
+    # The book's downstream analysis (Duncan, Wright & Brandon Example 2). Same
+    # section, mesh and first boundary-condition set as the two above, so the same
+    # field; benchmarks/build_lem_samples.py --meshes writes the shared mesh.
+    ("docs/lem/files/xslope_earth_dam_down_seep",        (1,), DOCS),
     ("docs/lem/files/xslope_johnson_rapid_KEY",       (1, 2), DOCS),
     ("docs/seep/files/xslope_clay_blanket",              (1,), DOCS),
     ("docs/seep/files/xslope_double_sheetpile",          (1,), DOCS),
@@ -115,7 +118,7 @@ MODELS = [
     # active set cycled, so the field landed 8-23 psf apart depending only on where the
     # sweep count stopped. The cycle was the all-or-nothing quadratic-edge rule
     # forbidding the set the solve was reaching for; with that resolved it converges in
-    # 927 sweeps on 8 of its 97 exit-face nodes, closing to 8e-10 of its own flow, and
+    # 195 sweeps on 8 of its 97 exit-face nodes, closing to 4.4e-09 of its own flow, and
     # has one field to record. Its type=seep lock re-meshes and is unaffected either way.
     ("docs/seep/files/xslope_earth_dam2",                (1,), DOCS),
     ("docs/seep/files/xslope_johnson_res",               (1,), DOCS),
@@ -241,13 +244,22 @@ def run(stem_rel, bcs, settings, check):
         suffix = "_seep.csv" if bc == 1 else "_seep2.csv"
         path = f"{stem}{suffix}"
         seep_data, solution = solve(stem, bc, settings)
+        name = os.path.basename(path)
+        if not os.path.exists(path):
+            # a model's first solve on a new mesh: nothing shipped to compare with
+            print(f"{name:<40} new: q={solution['flowrate']:.6f}  "
+                  f"unconfined={solution.get('unconfined')} "
+                  f"converged={solution.get('converged')} "
+                  f"closure={solution.get('closure_error'):.3e}")
+            if not check:
+                _quiet(export_seep_solution, seep_data, solution, path)
+            continue
         df, flowrate = _shipped(path)
         if len(df) != len(seep_data["nodes"]):
             raise SystemExit(f"{path}: {len(df)} rows against a "
                              f"{len(seep_data['nodes'])}-node mesh")
         du = float(np.max(np.abs(solution["u"] - df["u"].to_numpy())))
         dh = float(np.max(np.abs(solution["head"] - df["head"].to_numpy())))
-        name = os.path.basename(path)
         print(f"{name:<40} d_u={du:.3e} d_head={dh:.3e} "
               f"q={solution['flowrate']:.6f} (was {flowrate:.6f})  "
               f"unconfined={solution.get('unconfined')} "

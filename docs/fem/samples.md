@@ -77,7 +77,7 @@ finite-element solve, and the strengths are lowered to give a **marginally stabl
 whose probability of failure is not negligible:
 
 | Material   | $c$ | $\phi$ | $\gamma$ | $E$     | $\nu$ | $\sigma_c$ (COV) | $\sigma_\phi$ (COV) | $\sigma_\gamma$ (COV) |
-|------------|----:|-------:|---------:|--------:|------:|-----------------:|--------------------:|----------------------:|
+|------------|:----:|:-------:|:---------:|:--------:|:------:|:-----------------:|:--------------------:|:----------------------:|
 | Embankment |  70 |    20° |      130 | 500,000 | 0.35  |  18 (26%)        |  2 (10%)            |  6.5 (5%)             |
 | Foundation | 140 |    20° |      135 | 500,000 | 0.35  |  35 (25%)        |  2 (10%)            |  6.75 (5%)            |
 
@@ -87,7 +87,7 @@ on a **tri6 mesh** (50 divisions across the width, target_size ≈ 2.4, ~2080 no
 gives:
 
 | $F_{MLV}$ | $\sigma_F$ | $COV_F$ | $\beta_{LN}$ | Reliability $R$ | $P_f$ |
-|----------:|-----------:|--------:|-------------:|----------------:|------:|
+|:----------:|:-----------:|:--------:|:-------------:|:----------------:|:------:|
 | 1.143     | 0.122      | 0.107   | 1.196        | **88.4%**       | 11.6% |
 
 The most-likely factor of safety is 1.14, and with the moderate parameter scatter
@@ -97,7 +97,7 @@ above 1.0 does not by itself mean a low probability of failure.
 The per-parameter ΔF table shows how much each parameter changes the factor of safety:
 
 | Parameter        | MLV | σ    | $F^+$ | $F^-$ | ΔF    |
-|------------------|----:|-----:|------:|------:|------:|
+|------------------|:----:|:-----:|:------:|:------:|:------:|
 | Embankment $\phi$ |  20 | 2    | 1.235 | 1.052 | 0.182 |
 | Embankment $c$    |  70 | 18   | 1.220 | 1.059 | 0.160 |
 | Embankment $\gamma$ | 130 | 6.5 | 1.127 | 1.159 | 0.031 |

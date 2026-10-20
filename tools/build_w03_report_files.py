@@ -26,7 +26,7 @@ one, which no sidecar carries:
     w03_report_example_template.docx    Spencer, built on the example template
 
 The Spencer search is checked against COMBO-1's own published number before
-anything is written — 1.248, from the ``<!-- test: -->`` tag on
+anything is written — 1.272, from the ``<!-- test: -->`` tag on
 ``combo01_seepage_stability.md`` — because a report that ships as this model's
 must carry this model's answers.
 
@@ -147,7 +147,8 @@ def spencer_bundle(slope_data):
 
     tag = next(t for t in RT.parse_test_tags(PAGE)
                if t.get("type") == "circular_search"
-               and t.get("seep") == "steady")
+               and t.get("seep") == "steady"
+               and "u_option" not in t)
     bundle = _quiet(run_lem_analysis, slope_data, "spencer",
                     analysis="auto_search", num_slices=NUM_SLICES)
     got = bundle["results"]["FS"]

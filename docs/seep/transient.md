@@ -35,28 +35,94 @@ A transient problem removes that restriction. When the head at a point changes, 
 of the surrounding soil changes with it, and the rate at which water is stored or released
 enters the continuity balance:
 
->>$\nabla \cdot (k_r(\psi)\,[K]\,\nabla h) + Q = S(\psi)\,\dfrac{\partial h}{\partial t}$
+>>$\nabla \cdot (k_r(\psi)\,[K]\,\nabla h) + Q = \dfrac{\partial \Phi(\psi)}{\partial t}
+   = S(\psi)\,\dfrac{\partial h}{\partial t}$
 
-$S(\psi)$ is the storage coefficient — specific storage where the soil is saturated, the
-specific moisture capacity of the retention curve where it is not (see
-[Storage properties](#storage)) — $Q$ is any distributed source, and $\partial h/\partial t$
-the local rate of change of head. Setting $S = 0$ recovers the steady equation, so the
-transient solver is a strict generalization of the steady one.
+$\Phi(\psi)$ is the water a unit volume of soil holds at pressure head $\psi$, measured from
+saturation, and its slope $S(\psi) = d\Phi/d\psi$ is the storage coefficient — specific storage
+where the soil is saturated, the specific moisture capacity of the retention curve where it is
+not (see [Storage properties](#storage)). $Q$ is any distributed source. Because elevation does
+not change with time, $\partial\psi/\partial t = \partial h/\partial t$ and the two right-hand
+sides are equal. Setting $S = 0$ recovers the steady equation, so the transient solver is a
+strict generalization of the steady one.
 
-The standard Galerkin treatment, with the storage term discretized by the same shape
-functions, gives the semi-discrete system
+The two forms stop being equal once time is cut into steps. Over a step the head form stores
+$S$ times the head change, with $S$ taken at one instant, and $S$ changes by orders of magnitude
+where the water table passes: that product is not the water the soil actually takes up, and a
+run built on it gains or loses water step by step. XSLOPE discretizes the first form, the
+mass-conservative "mixed" form of [Celia et al. (1990)](https://doi.org/10.1029/WR026i007p01483):
+each step stores exactly the water the storage law releases between the heads at its two ends.
+Over a step from $t$ to $t + \Delta t$ the finite-element equations are
 
->>$[M]\,\dfrac{d\{h\}}{dt} + [K(\{h\})]\,\{h\} = \{Q\}$
+>>$\dfrac{\{\Delta W\}}{\Delta t} + \theta\,[K]\,\{h\}_{t+\Delta t}
+   + (1-\theta)\,[K]\,\{h\}_{t} = \{Q\}$
 
-where $[K(\{h\})]$ is the head-dependent (through $k_r$) conductivity matrix of the steady
-solve and $[M]$ is the **mass**, or **storage**, matrix,
+where $[K(\{h\})]$ is the head-dependent (through $k_r$) conductivity matrix of the steady solve,
+$\theta$ the time weighting (see [The theta method](#the-theta-method)), and $\{\Delta W\}$ the
+water each node takes up over the step, set out next. The saturated element stiffnesses and the
+$k_r$ sampling operators are formed a single time and reused every step, as are the storage
+sub-triangles and points below.
 
->>$M_{ij} = \displaystyle\int_\Omega S(\psi)\,N_i\,N_j\,d\Omega$
+### The storage term {#storage-term}
 
-Both are assembled build-once: the saturated element stiffnesses and the $k_r$ sampling
-operators are formed a single time and reused every step, and the storage matrix is assembled
-once in unit (density-one) form and rescaled by the current storage coefficient each
-iteration, exactly parallel to the way $k_r$ rescales the stiffness.
+The water an element holds is the integral of $\Phi(\psi)$ over the element, with the pressure
+head carried **linearly across sub-triangles** of it, each at its own area:
+
+| Element | Storage sub-triangles | Linear-front and Gardner | van Genuchten |
+| :---: | :---: | :---: | :---: |
+| tri3 | the element itself | exact | 7 points |
+| tri6 | three corner triangles and a center one, cut at the nodes | exact | 28 points |
+| quad4 | four, fanned from the mean of the corners | 112 points | 28 points |
+| quad8, quad9 | eight, fanned from the center | 224 points | 56 points |
+
+For the linear-front and Gardner laws $\Phi$ is piecewise linear in $\psi$, with kinks at
+$\psi = 0$ and $\psi = h_0$, and its integral over a triangle on which $\psi$ is linear has a closed
+form, so on tri3 and tri6 elements the integral is taken exactly. Elsewhere it is a sum over
+**storage points** $q$ inside the sub-triangles, each sampled by a 7-point rule (cut into four
+first, for the linear front on a quadrilateral):
+
+>>$W_e = \displaystyle\sum_q w_q\,\Phi(\psi_q), \qquad \psi_q = \sum_j N_{qj}\,\psi_j, \quad N_{qj} \ge 0$
+
+On a tri3 a third of the element's area falls to each node, which is its lumped weight $m_j$ (see
+[Lumped storage](#lumped-mass)). On tri6 and quadrilateral elements the areas do not reproduce the
+lumped weights, and there the water is taken in two parts: the elastic water of the saturated
+soil, $S_s\max(\psi, 0)$, is lumped at the nodes with their weights $m_j$, and only the water above
+the water table, $\Phi(\min(\psi, 0))$, is integrated.
+
+The water an element takes up over a step is then split exactly into one term per node, each
+driven by that node's own head change. For a point sum, with $C^*_q$ the **chord** of the storage
+curve at point $q$ over the step,
+
+>>$C^*_q = \dfrac{\Phi(\psi_q^{t+\Delta t}) - \Phi(\psi_q^{t})}{\psi_q^{t+\Delta t} - \psi_q^{t}}$
+
+the change splits as
+
+>>$\Delta W_e = \displaystyle\sum_q w_q\,C^*_q\,\Delta\psi_q = \sum_j G_{ej}\,\Delta\psi_j,
+   \qquad G_{ej} = \sum_q w_q\,N_{qj}\,C^*_q$
+
+so node $j$ takes up $G_{ej}\,\Delta\psi_j$: its own head change times a chord capacity weighted
+toward it by the interpolation. For an exact integral, each sub-triangle's water change is shared
+among its three corners by the average, over the six orders in which the corners could move from
+their old heads to their new ones, of each corner's own contribution, from eight exact
+evaluations of the sub-triangle's water. The shares add up to the change, a corner whose head does
+not move receives nothing, and each share has the sign of its corner's head change.
+
+Three properties follow.
+
+- **Water is conserved.** Summed over the mesh, the nodes take up exactly the change in the water
+  the elements hold, whatever the size of the step.
+- **The storage stays lumped.** Each node's term involves only its own head change, so a node whose
+  head does not move stores nothing, and the storage term is a diagonal matrix, as in
+  [Lumped storage](#lumped-mass).
+- **A saturated element stores its lumped mass.** Where all of an element's nodes stay saturated
+  through the step, node $j$ takes up $m_j\,S_s\,\Delta\psi_j$, on every element type. A confined,
+  always-saturated problem is therefore solved exactly as with a constant lumped mass matrix. The
+  same holds on tri3 for any one linear branch of $\Phi$, such as a linear-front element wholly
+  inside its draining band.
+
+Because the water is integrated over the element rather than taken at its nodes, an element the
+water table crosses holds the water of the part of it that is saturated: the transition is spread
+over the element rather than snapping node by node.
 
 ![transient_isochrones.png](images/transient_isochrones.png){width=720px}
 
@@ -123,11 +189,8 @@ the run several-fold if both were counted. RS2 and SEEP/W both apply their $m_v$
 saturated zone only, so this is also the convention their published transient results are
 computed on (see [GW18](../verification/rocscience_groundwater.md#gw18)).
 
-$S(\psi)$ is evaluated per element at the same Gauss points used for $k_r$ and averaged with
-the quadrature weights, so storage and conductivity are sampled consistently and an element
-straddling the phreatic surface carries a blend of the two branches — the switch is spread
-over one element rather than snapping node by node. Its form follows the material's `unsat`
-model.
+$S(\psi)$ and its integral $\Phi(\psi)$ enter through the water each element holds (see
+[The storage term](#storage-term)). Their form follows the material's `unsat` model.
 
 **Linear-front and Gardner materials.** The drainage capacity is spread uniformly across the
 same pressure-head band the linear front spans (Gardner, being a conductivity curve rather
@@ -153,11 +216,12 @@ saturation is approached.
 
 Because both retention curves decay to zero far from saturation, the unsaturated branch
 carries a **residual floor** at $10^{-4}$ of the material's own capacity scale — the storage
-counterpart of the $k_r$ floor. A node with no storage at all is elliptic: its $[M]/\Delta t$
-term vanishes, so shortening the step no longer restrains its head and the
+counterpart of the $k_r$ floor. A node with no storage at all is elliptic: its storage term
+vanishes, so shortening the step no longer restrains its head and the
 [exit-face](#exit-face-behavior) active set can cycle with no way for the stepper to recover.
 Four orders below the material's own capacity the floor stores no meaningful water; it only
-keeps step reduction effective.
+keeps step reduction effective. It is part of the storage law, so $\Phi(\psi)$, the water a
+step conserves, includes it.
 
 ![transient_storage_models.png](images/transient_storage_models.png){width=720px}
 
@@ -175,30 +239,51 @@ water table is passing through — the only place $S_y$ acts.*
 
 ### The theta method
 
-The semi-discrete system is advanced with the **theta method**. Over a step from $t$ to
-$t + \Delta t$,
+The step equations of the [Formulation](#formulation) are a **theta method** in time:
 
->>$\left(\dfrac{[M]}{\Delta t} + \theta[K]\right)\{h\}_{t+\Delta t}
-   = \dfrac{[M]}{\Delta t}\{h\}_{t} + \{Q\} - (1-\theta)[K]\{h\}_{t}$
+>>$\dfrac{\{\Delta W\}}{\Delta t} + \theta[K]\{h\}_{t+\Delta t}
+   = \{Q\} - (1-\theta)[K]\{h\}_{t}$
 
 **$\theta = 1$ is backward Euler**, the default — unconditionally stable and free of the
 oscillations that affect explicit and centered schemes on sharp infiltration fronts.
 **$\theta = 0.5$ is Crank–Nicolson**, second-order accurate in time but more prone to ringing
 on rapidly switching boundaries. Backward Euler is recommended for slope-stability work.
 
-### Picard iteration
+### Iteration within a step
 
-Because both $[K]$ (through $k_r$) and $[M]$ (through $S$) depend on the head field being
-solved for, each step is nonlinear and is resolved by **Picard iteration**: rebuild $[K]$ from
-the current iterate's $k_r$, rescale $[M]$ by the current $S$, solve, and repeat until the
-maximum nodal head change falls below a tolerance scaled by a characteristic head span. On an
-unconfined problem the exit-face active set must also settle before the step is accepted.
+Both $[K]$ (through $k_r$) and the storage term depend on the head field being solved for, so
+each step is nonlinear and is resolved by iteration. Each iteration rebuilds $[K]$ from the
+current iterate's $k_r$ and linearizes the storage term about the current iterate on a diagonal:
+at each node the larger of its chord capacity over the step and its tangent capacity at the
+iterate (see [The storage term](#storage-term)). The water change itself,
+not its linearization, enters the right-hand side, so a converged step satisfies the
+conservative equations; the linearization only steers the iteration. Taking the larger of the
+two keeps an iterate that has overshot onto a flat branch of the law (the dry floor, or the
+small $S_s$ of the saturated zone) from seeing almost no storage while the step's water change
+is large.
+
+The relative conductivity $k_r$ changes by orders of magnitude across a sharp wetting or drying
+front, and an element straddling the front can take a different $k_r$ at each iteration, so the
+iteration can alternate between two head fields. A node whose update reverses sign without
+shrinking by half therefore has its next update halved, again each time the reversal persists,
+and restored once it stops.
+
+The step is accepted when the largest nodal head change of a full update falls below a
+tolerance scaled by a characteristic head span, and the step keeps the iterate that update was
+taken from. That iterate's own update is below the tolerance, so it solves the step's equations
+to that tolerance, which the update itself need not do where the iteration alternates. The
+starting head is never kept: a step whose first update is already below the tolerance takes one
+more. On an unconfined problem the exit-face active set must also settle before the step is
+accepted.
 
 ### Adaptive time stepping
 
 The step size is chosen adaptively, so the solver takes small steps through rapid transients
 and large ones through quiescent periods:
 
+- **Time-error control.** The estimated time error of each step is held below a tolerance,
+  by default 0.1% of the characteristic head span (`time_error_frac` in
+  `run_transient_seepage`); see [Time error](#time-error) below.
 - **Head-change limiter.** A step is rejected and halved when the largest head change at any
   *free* node exceeds a fraction (default 5%) of the characteristic head span. The change at
   Dirichlet nodes is deliberately excluded — a stepped reservoir level jumps by its full amount
@@ -210,13 +295,28 @@ and large ones through quiescent periods:
 - **Schedule clamping.** The step is always clamped so the stepper lands *exactly* on every
   saved time. Saved frames are therefore computed states, never interpolated between steps.
 
-### Lumped mass
+### Time error {#time-error}
 
-The storage matrix is **lumped** (diagonalized) rather than kept in consistent form. A
-consistent mass matrix couples neighboring nodes and can produce non-physical overshoot ahead
-of a steep wetting front; lumping suppresses this. XSLOPE uses HRZ (special lumping) diagonal
-scaling, which coincides with row-summing on linear elements and stays strictly positive on
-quadratic ones. Lumped mass is the default and only option.
+Over one step, backward Euler misses the head by about $\tfrac12\Delta t^2\,\ddot h$. After each
+step the solver estimates this at every free node from the change in that node's rate of head
+change since the step before:
+
+>>$e \approx \dfrac{\Delta t_n^2}{\Delta t_n + \Delta t_{n-1}}
+   \left|\dfrac{h^{n+1} - h^{n}}{\Delta t_n} - \dfrac{h^{n} - h^{n-1}}{\Delta t_{n-1}}\right|$
+
+A step whose largest estimate exceeds twice the tolerance is redone with a shorter step, and the
+next step is never longer than the estimate allows. The solver therefore shortens its steps
+where the heads change course and lengthens them where the heads change steadily.
+
+### Lumped storage {#lumped-mass}
+
+The storage term is **lumped**: each node's share depends on its own head change only (see
+[The storage term](#storage-term)), so the matrix it contributes to each step's equations is
+diagonal. A consistent storage matrix couples neighboring nodes and can produce non-physical
+overshoot ahead of a steep wetting front; lumping suppresses this. The lumped weights $m_j$ of the
+saturated soil are the HRZ (special lumping) weights, which coincide with row-summing on linear
+elements and stay strictly positive on quadratic ones. Lumped storage is the default and only
+option.
 
 ## Boundary conditions {#boundary-conditions}
 
@@ -233,10 +333,12 @@ of a series defined on the [**tseep** sheet](../usage/input_template.md#workshee
 tseep sheet holds a single shared time column and up to **five named series** (default headers
 `t1`…`t5`, renamable). One series can drive several boundaries, and each referencing block's
 own **type** — `head`, `reservoir` or `flux` — decides whether its numbers are read as a plain
-Dirichlet head, a submerged-only reservoir level, or a specified flux.
+Dirichlet head, a reservoir level, or a specified flux.
 
 A series-bound value does not rule out a **steady** run: the series is read at its **t = 0
-value**, and the Log states each reading (`Series 'pool' read at t = 0 for the steady solve`).
+value** — for a step anchored at t = 0, the value before the step, as the transient run's
+initial condition reads it — and the Log states each reading
+(`Series 'pool' read at t = 0 for the steady solve`).
 That steady solution is the initial-condition snapshot — the same field a transient run
 starts from, and its first saved frame — so a quick steady run is the natural check on a model
 before committing to a long one.
@@ -267,29 +369,54 @@ below the level they are identical.
 A **head** boundary is a plain Dirichlet: every node of the polyline is held at the value —
 constant or series $h(t)$ — at **all times**. It can hold a negative-pressure (suction) head
 and never converts to an exit face. This is the type for a drained face, a specified-suction
-laboratory boundary, or any imposed head that should be enforced regardless of elevation.
+laboratory boundary, or any imposed head that should be enforced regardless of elevation. On a
+line along the ground surface that the water leaves partly dry at some time in the run, the dry
+part is held at the water level in suction, which draws water out of the slope; preflight
+warns about such a line, since a pool face belongs to the `reservoir` type and any other head
+line ends at the water level. A model side is not such a line, including a near-vertical side
+that starts or ends the ground line
+([what preflight reads](overview.md#specified-head-dirichlet)).
 
-A **reservoir** boundary is the submerged-only Dirichlet used for a pool or tailwater whose
-level rises and falls. A node is held at the level $h(t)$ only while its elevation is at or
-below it; a node the falling water has left above the line becomes an **exit-face** node, free
-to seep. The physical motivation is that a freshly exposed face does not become a no-flow
-boundary — the soil behind it is still saturated, and that water can seep back out. Pinning
-such nodes to the now-lower level, or sealing them, would both misstate the physics. As the
-level moves, nodes cross between the two regimes and the exit point migrates up and down the
-face, as a drawdown requires. (A constant numeric reservoir level behaves
-the same way, so draw the face only up to the level unless that migration is intended.)
+A **reservoir** boundary is the free-water level used for a pool or tailwater whose level
+rises and falls. Each node of the polyline is in one of three states, decided by the level
+$h(t)$ and by the highest level the run has reached so far, $h_{max}(t)$, the running maximum
+of $h$ over $[0, t]$:
+
+| Node elevation $y$ | State |
+|---|---|
+| $y \le h(t)$ | Submerged: held at the level $h(t)$ |
+| $h(t) < y \le h_{max}(t)$ | Uncovered: an **exit-face** node, free to seep |
+| $y > h_{max}(t)$ | Not yet reached: no-flow, unless another boundary governs the node |
+
+A face the falling water has uncovered is an exit face because the soil behind it is still
+saturated, and that water seeps back out. Pinning such nodes to the now-lower level, or
+sealing them, would both misstate the physics. A face the water has never reached is no-flow
+until the level first rises to it; from then on it is held while submerged and becomes an exit
+face when the level falls back below it. As the level
+moves, nodes cross between the states and the exit point migrates up and down the face, as a
+drawdown requires. Because the series is linear between its breakpoints, $h_{max}(t)$ is the
+largest of $h(0)$, $h(t)$, and every breakpoint value at a time between 0 and $t$.
+
+At $t = 0$ the run has no history, so $h_{max}(0) = h(0)$ and every node above the starting
+level is no-flow. The same holds for a steady run, which reads the series at $t = 0$, and for a
+constant level, which never moves: no part of the face becomes an exit face. To model a rising
+pool, draw the polyline over the full face the water will reach. The part above the starting
+level is no-flow until the water arrives, and preflight notes that the line stands above its
+starting level. If the level rises above the **top** of the line, the ground beyond the line
+that the water covers has no boundary condition and stays no-flow, which preflight reports as
+a warning.
 
 ![transient_reservoir_bc.png](images/transient_reservoir_bc.png){width=860px}
 
-*As the reservoir level falls from $h(t_1)$ to $h(t_2)$, face nodes the water leaves above the
-line switch from held reservoir head to exit face, and the still-saturated soil drains back out
-through the newly exposed surface.*
+*As the reservoir level falls from $h(t_1)$ to $h(t_2)$, face nodes the water uncovers switch
+from held reservoir head to exit face, and the still-saturated soil drains back out through the
+newly exposed surface.*
 
 ### Exit-face behavior {#exit-face-behavior}
 
 The exit face — present statically as a downstream seepage face, or appearing dynamically as a
-reservoir level falls below a node — is resolved each step with the same SEEP2D-style
-active-set rule the steady solver uses: a boundary node is held saturated at atmospheric
+reservoir level falls below a node it has submerged — is resolved each step with the same
+SEEP2D-style active-set rule the steady solver uses: a boundary node is held saturated at atmospheric
 pressure unless the head would fall below its elevation or the boundary reaction would have to
 push water *into* the domain, in which case it is released to no-flow. On quadratic meshes each
 seepage-face edge is tracked all-or-nothing across its corner and midside nodes — the same edge
@@ -297,7 +424,10 @@ treatment the steady solver applies — so the transition lands cleanly on a cor
 element order of a transient run is unrestricted. The step's set-stability test carries the
 steady solver's rule with it: a set about to be called stable with an inactive exit node
 standing at or above its own elevation is not accepted, and that node joins the face and is
-held there for the rest of the step.
+held there for the rest of the step. Each step starts from the active set the previous step
+ended with. A node that has just joined the exit face, a reservoir falling past it, starts
+saturated, as the steady solver starts its whole face, and so does the whole face on the
+first step.
 
 **Partly wet quadratic edges.** All-or-nothing has one state it cannot express: the edge the
 exit point is passing *through*, wet below and dry above. Both available states are
@@ -378,10 +508,16 @@ solutions is not itself a solution of anything.
 
 ### Per-frame inflow and outflow {#per-frame-outputs-and-why-inflow-outflow}
 
-Each saved frame reports separate **inflow** and **outflow** totals. Under storage exchange
-these **differ** — the difference is exactly the water being stored in, or released from, the
-soil at that instant. A steady solution's single "Total Flowrate" no longer applies; a frame
-reports both rates, and its plot title carries them beneath the frame time.
+Each saved frame reports separate **inflow** and **outflow** totals: the rates at which water
+crossed the boundary over the step that ended at the frame (with backward Euler, the flows of
+the frame's own head field). At each fixed-head node and each active exit-face node the boundary
+flow is the node's flow into the mesh plus the water its own storage took up over the step; at
+the other nodes it is any specified flux. Inflow sums the flows into the mesh and outflow the
+flows out of it, so under storage exchange the two **differ**, and the difference is the rate at
+which the water held in the mesh changed over that step. A steady solution's single "Total
+Flowrate" no longer applies; a frame reports both rates, and its plot title carries them beneath
+the frame time. The initial condition is a steady state, so its frame reports equal inflow and
+outflow.
 
 !!! note "Transient frames have no flow net — read direction with velocity vectors"
 
@@ -404,14 +540,24 @@ pressure keeps the file compact, and each reconstructed frame is a full solution
 
 ### Mass-balance ledger
 
-The meta file records a running **mass-balance ledger**. The cumulative net boundary inflow —
-the discrete storage change the solve actually applied — is compared at each saved frame
-against an independent **secant** estimate of the change in stored water: the integral of a
-storage-potential function $\Phi(\psi)$ over the domain, in the mass-conservative mixed-form
-spirit of [Celia et al. (1990)](https://doi.org/10.1029/WR026i007p01483). Their difference,
-normalized to the storage scale, is the reported **closure**. For a saturated linear problem
-the two agree to machine precision; a growing closure error on a strongly nonlinear run is the
-signal to tighten the step controls.
+The meta file records a running **mass-balance ledger**, the run's check of its own water
+budget. At each saved frame it compares two totals accumulated since $t = 0$:
+
+- the **stored change**: the water held in the mesh at the frame, $\sum_e W_e$ (see
+  [The storage term](#storage-term)), less the water it held at $t = 0$;
+- the **cumulative inflow**: the net boundary inflow, summed step by step from the boundary
+  flows defined under [Per-frame inflow and outflow](#per-frame-outputs-and-why-inflow-outflow),
+  each taken from that step's own head field, conductivity, and storage.
+
+A step that solves its equations exactly adds the same amount to both, so their difference is
+the sum, over all accepted steps, of what each one leaves unsolved: the iteration tolerance on
+every step, and the whole imbalance of any step that had to be force-accepted. The reported
+**closure** is that difference divided by the net cumulative inflow (or by a small fraction of
+the storage scale, when the net inflow is near zero). On a run whose steps all converged it is
+small, the part of the iteration tolerance the steps leave unsolved measured against the water
+the run has moved, and for a saturated linear problem it is at round-off. A step that had to be
+force-accepted adds its whole imbalance, and also leaves `converged` False on the returned
+solution.
 
 ## Stability time {#stability-time}
 

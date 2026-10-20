@@ -84,7 +84,7 @@ SHEETS = [
     # this window MUST cover every block the sample builds, or the last one is
     # silently cropped out of the image.
     {"out": "sheet_polygon.png", "src": POLY, "sheet": "polygon", "cols": "A:X"},
-    {"out": "sheet_piezo.png", "src": RAPID, "sheet": "piezo", "rows": (1, 12)},
+    {"out": "sheet_piezo.png", "src": RAPID, "sheet": "piezo", "rows": (1, 17)},
     {"out": "sheet_circles.png", "src": RAPID, "sheet": "circles"},
     {"out": "sheet_noncirc.png", "src": "docs/lem/files/xslope_noncircular.xlsx",
      "sheet": "non-circ", "rows": (1, 8)},

@@ -226,12 +226,30 @@ the system rather than solved for. Two **types** are available per block:
 | Type | Behavior |
 |------|-----------|
 | `head` | A plain Dirichlet: every node of the polyline is held at the value at all times. It can hold a negative-pressure (suction) head and never converts to an exit face |
-| `reservoir` | A **submerged-only** Dirichlet: a node is held at the level only while it is submerged (elevation at or below the level). A node the water line leaves above it becomes an **exit face** node, free to seep |
+| `reservoir` | A free-water level: a node is held at the level only while it is submerged (elevation at or below the level). A node the water has covered and then uncovered by falling becomes an **exit face** node, free to seep. A node the water has not reached is no-flow |
 
-For a level drawn at or above the whole polyline the two are identical, which is the usual
-steady case. They differ when part of the boundary stands above the water — the situation a
-[transient drawdown](transient.md#head-types-head-and-reservoir) creates, and one a constant
-`reservoir` level reproduces too if the polyline is drawn above the level.
+For a level at or above the whole polyline the two are identical, which is the usual steady
+case. They differ only where part of the boundary stands above the water. A `head` holds those
+nodes at the level, in suction. A `reservoir` leaves them no-flow until the water reaches them.
+A constant level never moves, so in a steady run the part of a `reservoir` line above it stays
+no-flow throughout, and an exit face appears only in a
+[transient run](transient.md#head-types-head-and-reservoir) whose level falls.
+
+A `reservoir` boundary governs only the nodes on its own line. Where the level rises above the
+top of the line, any ground beyond the line that lies under the water carries no boundary
+condition, so it is no-flow rather than held at the reservoir level. Preflight reports this as
+a [warning](../usage/preflight.md#what-is-checked): draw the line over all the ground the pool
+can reach, unless a no-flow barrier there is intended.
+
+A `head` line drawn along the ground surface that the water leaves partly dry is reported too.
+Its dry part is held at the water level in suction, which draws water out of the slope. A pool
+or reservoir face takes the `reservoir` type; any other head line ends at the water level. The
+warning reads only the part of a line that lies along the ground surface, and leaves out the
+near-vertical segments (steeper than 1H:20V) at the two ends of the ground line, which are model
+sides. A model side held at a uniform head down through the soil is therefore not reported, and
+neither is a line that stays entirely above every level (a specified-suction boundary), a line
+that stays entirely under water, or a confined steady model with no exit face and no reservoir
+boundary. A near-vertical face inside the ground line is an exposed face and is read.
 
 ### Exit face (seepage face)
 
@@ -408,8 +426,17 @@ Convergence is a **hybrid** test — all three conditions must hold at once:
    exit nodes are still switching, and a seepage face with pressure on it is not a free
    boundary.
 
-A run that hits `max_iter` (default 400) without satisfying all three returns
-`converged = False` and reports it.
+A run that reaches `max_iter` (default 400) without satisfying all three gets one more
+attempt. The usual cause is a single element at the edge of the wet zone. When it is dry it
+backs water up behind it and wets itself, and when it is wet the water drains away and it
+dries again, so every sweep overshoots its $k_r$ by more than any rung of the ladder can
+damp. The solver picks out that element, the one whose $k_r$ has been swinging most (or,
+when nothing is swinging, the elements a few unrelaxed sweeps would change most, tried one
+at a time). It then solves for that element's $k_r$ directly at every sweep, against the
+current $k_r$ of every other element, until the field stops changing. The settled field
+then has to pass the three tests above on one ordinary, unrelaxed sweep. If it does, the
+run has converged. If no element settles, or the settled field fails the tests, the run
+returns `converged = False`, reports it, and keeps the field the sweep budget left.
 
 ### Input checks
 

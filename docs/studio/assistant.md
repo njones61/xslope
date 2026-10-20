@@ -59,7 +59,7 @@ the answer you will get.*
 > at all.
 >
 > Slice forces and the full derivation:
-> [LEM overview](https://xslope.org/en/stable/lem/overview/)
+> [LEM overview](https://xslope.org/en/latest/lem/overview/)
 
 **Capability** — *"Can I run Bishop on a non-circular surface?"*
 
@@ -70,7 +70,7 @@ the answer you will get.*
 > Spencer is the usual choice on a non-circular surface, since it satisfies force and
 > moment equilibrium both.
 >
-> Theory: [Bishop's method](https://xslope.org/en/stable/lem/bishop/)
+> Theory: [Bishop's method](https://xslope.org/en/latest/lem/bishop/)
 
 **How-to** — *"Where do I set a tension crack?"*
 
@@ -84,7 +84,7 @@ the answer you will get.*
 > applies.
 >
 > Input checks:
-> [preflight](https://xslope.org/en/stable/usage/preflight/)
+> [preflight](https://xslope.org/en/latest/usage/preflight/)
 
 **Worked problems** — *"How do I model a tieback wall?"*
 
@@ -98,11 +98,11 @@ the answer you will get.*
 >
 > The verification corpus has worked tieback problems verified against published
 > results:
-> [VP49 — retaining wall, grouted tiebacks, soldier piles](https://xslope.org/en/stable/verification/rocscience/#vp49),
-> [VP58 — tied-back wall in layered soil](https://xslope.org/en/stable/verification/rocscience/#vp58),
-> [VP59 — tieback wall in sand with a drawdown water table](https://xslope.org/en/stable/verification/rocscience/#vp59).
+> [VP49 — retaining wall, grouted tiebacks, soldier piles](https://xslope.org/en/latest/verification/rocscience/#vp49),
+> [VP58 — tied-back wall in layered soil](https://xslope.org/en/latest/verification/rocscience/#vp58),
+> [VP59 — tieback wall in sand with a drawdown water table](https://xslope.org/en/latest/verification/rocscience/#vp59).
 > Theory:
-> [reinforcement](https://xslope.org/en/stable/reinforcement/lem/)
+> [reinforcement](https://xslope.org/en/latest/reinforcement/lem/)
 
 **Interpretation** — *"Why did my FS drop when the reservoir drew down?"*
 
@@ -117,7 +117,7 @@ the answer you will get.*
 > drawdown applies at all, via the time factor T = c_v·t/D².
 >
 > Procedure and the T rubric:
-> [rapid drawdown](https://xslope.org/en/stable/lem/rapid/)
+> [rapid drawdown](https://xslope.org/en/latest/lem/rapid/)
 
 ---
 

@@ -1,4 +1,4 @@
-"""The unconfined seepage solver's exit-face active set: the two limit-cycle escapes,
+"""The unconfined seepage solver's exit-face active set: the limit-cycle escapes,
 and the threshold the switch measures an apparent inflow against.
 
 Four corpus models used to run to their iteration ceiling and stop, reporting a flow
@@ -10,10 +10,11 @@ high-conductivity-contrast interface oscillate with a period of 8 to 12 sweeps. 
 relaxed iterate barely moves, so the head-change test is satisfied, while the
 un-relaxed step the closure gate is measured on lands far away, so the closure test
 never is. ``solve_unsaturated`` detects the orbit -- a RETURN to a sweep 2 to 25 back,
-within 1e-6 of the head range, having been further away at every shorter lag, with the
+within 1e-5 of the head range, having been further away at every shorter lag, with the
 exit-face set unchanged, held for 30 consecutive sweeps -- and lowers the relaxation
 floor once, to 1e-3, granting a bounded extension of the sweep budget from that sweep.
-Three models are rescued this way, and all three still are.
+Three models are rescued this way, and all three still are; a fourth, earth_dam_down_seep,
+shares earth_dam_rapid's section, mesh and first boundary set, and is rescued the same way.
 
 CLASS B -- the EXIT-FACE ACTIVE SET cycles. earth_dam2 alternated between two sets
 because the all-or-nothing quadratic-edge rule forbids the self-consistent one
@@ -21,13 +22,24 @@ because the all-or-nothing quadratic-edge rule forbids the self-consistent one
 a set it has already visited, after sweep 100. The veto is then lifted from the edges
 carrying the nodes that moved during the orbit, and from nothing else.
 
+CLASS C -- ONE ELEMENT holds the solve in a loop. A kr sampling point of one element on
+the wet/dry edge sits at the bend of the kr curve: dry, the element backs water up and
+wets itself; wet, it drains and dries itself, and its kr comes back from each sweep
+hundreds to hundreds of thousands of times further out than it went in -- a gain no
+relaxation the solver uses is fine enough for. Read only when the sweep budget is spent
+unconverged, the escape solves for that element's kr exactly at every sweep, against
+the current kr of every other element, until the field settles, and the field must
+then pass the ordinary gate on one ordinary sweep. The earth dam's drawdown section on
+the tri6 meshes the transient check builds is the fixture: 11 mesh sizes from 9 to 32
+divisions end their budget unconverged without the escape, and all 11 close with it.
+
 THE CLASS B ESCAPE NOW GUARDS NOTHING IN THE CORPUS, and this file says so rather
 than pretending otherwise. The exit-face fix in ``seep.py`` -- a seepage face runs to
 the toe where a specified head claims the corner, and a set with the head standing
 above the ground is not a stable set -- removed the cycle that produced it. earth_dam2
 now converges in 195 sweeps with NEITHER escape firing, so it has moved to the inert
 table below, and the escape has no rescued model left. Measured over every steady
-seepage model the suite solves (28 tagged models, plus the 11 committed-mesh solves
+seepage model the suite solves (28 tagged models, plus the 12 committed-mesh solves
 this file makes): the revisit line is printed on none of them. On earth_dam2 the
 mechanism is direct -- the wet-face rule joins the last free node to the face at sweep
 15, which populates ``_free_edges``, and the class B gate is written ``not
@@ -55,10 +67,10 @@ boundary invented.
 
 WHAT THIS CHECK LOCKS
 
-1. The three rescued models converge, to the flow rates below, each on its own
+1. The four rescued models converge, to the flow rates below, each on its own
    escape; and the class B escape, which rescues nothing now, still fires and still
    lands on the right answer when its gate is lowered to where it can be reached.
-2. Neither escape fires on a model that converges without it, and every such model's
+2. No escape fires on a model that converges without it, and every such model's
    field, flow rate AND SWEEP COUNT are exactly what they were before the escapes
    existed. The sweep counts are in the table below for that reason: a trajectory
    that has been nudged shows up there before it shows up in a flow rate.
@@ -74,17 +86,29 @@ WHAT THIS CHECK LOCKS
    over a flux boundary: held at p = 0 with its own load discarded, the node draws the
    share of that load the soil can still take. It is 1.9% of the throughput here at
    2.8x rain and 21% at 4x.
+5. Two of the drawdown section's unconverged steady states close on the class C
+   escape: one where the swing names the element (15 divisions), and one creeping
+   rather than orbiting, where the first candidate is abandoned and the second settles
+   (14 divisions). Each pinned element's sweep count, the sweep the gate accepts
+   the field on, and the flow rate are locked; the four rescued models and the inert
+   table never reach the escape.
 
 MEASURED DURING THE ROUND, NOT LOCKED HERE
 
-The rescued flow rates are the MODELs' and not the settings': re-solved at relaxation
-floors of 1e-3 and 3e-4 the fields agree to 5.2e-04 ft of head (2.3e-04 ft on
-earth_dam_rapid), and tightening the head tolerance from 1e-4 to 1e-6 changes neither
-field nor sweep count on any of the three -- the closure test, not the head test, is
-what closes these solves. No leg re-solves them at a second setting to prove it: that would double the
-runtime for a property the trajectory pins above already constrain, since a solve
-whose answer had become a function of its settings would have to reach it along a
-different path, and the escape sweeps and sweep counts locked below are that path.
+On johnson_rapid_KEY the rescued flow rate is the model's and not the settings':
+re-solved at relaxation floors of 1e-3 and 3e-4 the fields agree to 5.9e-04 ft of head,
+and tightening the head tolerance from 1e-4 to 1e-6 changes neither field nor sweep
+count -- the closure test, not the head test, is what closes that solve. The earth dam
+(earth_dam_rapid, gsat_seep and earth_dam_down_seep, one field) is not that case: at a
+3e-4 floor it has not closed when its 1000-sweep budget runs out (its field then
+8.8e-03 ft from the 1e-3 answer; given 2000 sweeps it closes at 1142, within 1.7e-04 ft
+of it), and at a head tolerance of 1e-6 it closes in 903 sweeps rather than 525, its
+field moving 1.2e-02 ft and its flow rate 3.4e-07 of itself, so the head test is what
+closes it at 1e-4. No leg re-solves either at a
+second setting: that would double the runtime for a property the trajectory pins above
+already constrain, since a solve whose answer had become a function of its settings
+would have to reach it along a different path, and the escape sweeps and sweep counts
+locked below are that path.
 
 WHY THE GATES ARE WHERE THEY ARE (each measured over the corpus on the engine as it
 stands, and each mutable in one line if a reader wants to see the other side of it):
@@ -94,19 +118,19 @@ stands, and each mutable in one line if a reader wants to see the other side of 
   detection with a blanket ``relax = min(relax, 1e-3)`` on the ladder's bottom rung and
   two of the four models the class A gate touches lose their convergence: vp077a runs
   its 1000 sweeps without closing where it took 393, and johnson_rapid_KEY its 1000
-  where the escape closes it at 826. A third, earth_dam_rapid, closes without the escape
-  in 285 sweeps but on 183.9589 rather than 183.95867. vp046b and earth_dam1_vg are
-  untouched, because the progress-fed ladder no longer drives either of them to the
-  bottom rung at all.
+  where the escape closes it at 472. A third, earth_dam_rapid, closes without the escape
+  in 634 sweeps but on 2.0495640e-03 rather than 2.0495627e-03. vp046b and
+  earth_dam1_vg are untouched, because the progress-fed ladder no longer drives either
+  of them to the bottom rung at all.
 * Neither is a repeat that never left -- a solve creeping monotonically sits inside
   the repeat tolerance at every lag and reads as an orbit unless the iterate is
   required to have gone somewhere in between. That false positive is the ``_cyc_away``
-  term's whole job, and vp077a witnesses it: delete the term and vp077a's creep reads
-  as an orbit at sweep 344, the escape floors its relaxation, and it takes 805 sweeps to
-  reach 8.2210996e-06 where it took 393 to reach 8.2210891e-06. earth_dam2 and
-  earth_dam1_vg come back bit for bit (195 sweeps at 1.2734362, 163 at 37.716990),
-  because the exit-face fix closes earth_dam2 before its creep gets fine enough to be
-  mistaken for a period-2 orbit.
+  term's whole job, and three of the inert models witness it: delete the term and
+  vp077a's creep reads as an orbit at sweep 274, the escape floors its relaxation, and
+  it runs its 1000 sweeps without closing where it took 393; earth_dam2 reads as one at
+  sweep 204 and closes in 257 sweeps on 1.2734304 rather than 195 on 1.2734362; and
+  earth_dam1_vg at sweep 170, closing in 336 on 37.716779 rather than 163 on
+  37.716990.
 * Revisiting sets is normal EARLY. Every converging model in the corpus revisits
   exit-face sets while its seepage face is still finding its extent, and all of them
   are done by sweep 41 (vp077a, the latest). Set ``_SET_REVISIT_SWEEP = 0`` and
@@ -144,11 +168,13 @@ VENDOR = dict(tol=1e-5, max_iter=600)
 #: INERT below, and leg_class_b_reachable covers the escape it used to exercise.
 # Progress-fed relaxation ladder: every sweep count and flow rate in this table and
 # in INERT below is re-recorded at the ladder that steps on the head change instead
-# of the sweep number. The escapes are unchanged and all three rows still fire one.
+# of the sweep number. The escapes are unchanged and every row still fires one.
+# The three earth-dam rows are one section, one mesh and one boundary set, so one field.
 RESCUED = [
-    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 183.9586689, 474, "A"),
-    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 183.9586689, 474, "A"),
-    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8718996, 826, "A"),
+    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 2.0495627e-03, 525, "A"),
+    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 2.0495627e-03, 525, "A"),
+    ("docs/lem/files/xslope_earth_dam_down_seep", 1, DOCS, 2.0495627e-03, 525, "A"),
+    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8718997, 472, "A"),
 ]
 
 #: Converging without either escape, and required to stay that way, sweep for sweep.
@@ -231,6 +257,24 @@ Q_RTOL = 1e-6
 _CYCLE_LINE = "head field is cycling"
 _REVISIT_LINE = "exit-face set returned to the set"
 _WET_LINE = "joined to the seepage face"
+_PIN_LINE = "solved for directly at every sweep"
+
+#: The pinned-element escape (CLASS C above): the earth dam's drawdown section --
+#: earth_dam_rapid with its pool made a falling reservoir -- on the tri6 meshes
+#: test/transient_seep_check.py builds, solved for the steady state its drawdown run
+#: starts from, at that run's 2000-sweep budget. Two of the 11 mesh sizes that budget
+#: leaves unconverged without the escape: at 15 divisions the head field orbits and
+#: the swing over the last sweeps names the element; at 14 it creeps at the
+#: limit-cycle floor, nothing swings, and the first un-relaxed-step candidate is
+#: abandoned before the second settles. Rows: divisions across the section, the flow
+#: rate, and each pinned element's outcome in the order tried (settled, sweeps).
+PIN_MODEL = "docs/lem/files/xslope_earth_dam_rapid.xlsx"
+PIN_POOL = 302.0
+PIN_MAX_ITER = 2000
+PIN_ROWS = [
+    (15.0, 2.0591051e-03, [(True, 33)]),
+    (14.0, 2.0384776e-03, [(False, 62), (True, 257)]),
+]
 
 
 def _solve(stem_rel, bc, settings):
@@ -278,6 +322,9 @@ def leg_rescued():
         got = _sweeps(log)
         marker = _CYCLE_LINE if which == "A" else _REVISIT_LINE
         fired = _fired(log, marker)
+        if _fired(log, _PIN_LINE) is not None:
+            fails.append(f"{name} bc{bc} reached the pinned-element escape; the class "
+                         f"{which} escape is what closes it")
         if not sol["converged"]:
             fails.append(f"{name} bc{bc} does not converge — the class {which} "
                          f"escape did not rescue it")
@@ -285,13 +332,13 @@ def leg_rescued():
             fails.append(f"{name} bc{bc} converged without the class {which} escape "
                          f"firing, so this row no longer covers it")
         if not _close(float(sol["flowrate"]), q_want):
-            fails.append(f"{name} bc{bc} flow rate {sol['flowrate']:.6f} for "
-                         f"{q_want:.6f}")
+            fails.append(f"{name} bc{bc} flow rate {sol['flowrate']:.7g} for "
+                         f"{q_want:.7g}")
         if got != sweeps_want:
             fails.append(f"{name} bc{bc} converged in {got} sweeps for "
                          f"{sweeps_want}")
         print(f"  {name:<28} bc{bc}  converged {got:>4} sweeps  "
-              f"q={sol['flowrate']:.6f}  class {which} escape at sweep {fired}")
+              f"q={sol['flowrate']:.7g}  class {which} escape at sweep {fired}")
     return fails
 
 
@@ -362,7 +409,7 @@ def leg_class_b_reachable():
 
 def leg_inert():
     """A model that converges on its own is untouched — same answer, same sweeps,
-    neither escape fired."""
+    no escape fired."""
     fails = []
     for stem_rel, bc, settings, q_want, sweeps_want in INERT:
         name = os.path.basename(stem_rel)
@@ -370,6 +417,10 @@ def leg_inert():
         got = _sweeps(log)
         cyc = _fired(log, _CYCLE_LINE)
         rev = _fired(log, _REVISIT_LINE)
+        pin = _fired(log, _PIN_LINE)
+        if pin is not None:
+            fails.append(f"{name} bc{bc} converges on its own, but the pinned-element "
+                         f"escape fired on it at sweep {pin}")
         if cyc is not None:
             fails.append(f"{name} bc{bc} converges on its own, but the head-cycle "
                          f"escape fired on it at sweep {cyc}")
@@ -385,7 +436,7 @@ def leg_inert():
             fails.append(f"{name} bc{bc} took {got} sweeps for {sweeps_want} — its "
                          f"trajectory changed even though its answer did not")
         print(f"  {name:<28} bc{bc}  {got:>4} sweeps  q={sol['flowrate']:.7g}  "
-              f"neither escape fired")
+              f"no escape fired")
     return fails
 
 
@@ -514,12 +565,73 @@ def leg_exit_face_over_flux():
     return fails
 
 
+def _solve_pinned(divisions):
+    """The drawdown section's steady state at its transient run's t = 0, on a tri6
+    mesh of ``divisions`` elements across the section. Returns (solution, log)."""
+    import copy
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import build_seep_data, resolve_transient_bc, solve_unsaturated
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        d = load_slope_data(os.path.join(_REPO, PIN_MODEL))
+        xs = [x for x, _ in d["ground_surface"].coords]
+        mesh = build_mesh_from_polygons(get_material_polygons(d),
+                                        (max(xs) - min(xs)) / divisions, "tri6")
+        d_ts = copy.deepcopy(d)
+        for sh in d_ts["seepage_bc"]["specified_heads"]:
+            sh["head"], sh["kind"] = "res", "reservoir"
+        sd = build_seep_data(mesh, d_ts)
+        ta = np.array([0.0, 1.0])
+        tseep = dict(times=ta, series={"res": (ta, np.full(2, PIN_POOL))}, duration=1.0)
+        bt, bv, flux = resolve_transient_bc(sd, tseep, 0.0)
+        mid = np.asarray(sd["element_materials"]) - 1
+        per = lambda k: None if sd.get(k) is None else np.asarray(sd[k])[mid]  # noqa: E731
+        out = solve_unsaturated(
+            sd["nodes"], np.asarray(sd["elements"]), bt, bv, kr0=per("kr0_by_mat"),
+            h0=per("h0_by_mat"), k1_vals=per("k1_by_mat"), k2_vals=per("k2_by_mat"),
+            angles=per("angle_by_mat"), element_types=np.asarray(sd["element_types"]),
+            vg_a=per("vg_a_by_mat"), vg_n=per("vg_n_by_mat"), vg_l=per("vg_l_by_mat"),
+            model=per("unsat_by_mat"), flux_nodal=flux, max_iter=PIN_MAX_ITER)
+    return out, buf.getvalue()
+
+
+def leg_pinned():
+    """The steady states the budget leaves unconverged close once the one element
+    holding each in its loop is solved for at every sweep, and the ordinary gate
+    accepts the field it settles on."""
+    fails = []
+    for divisions, q_want, outcomes_want in PIN_ROWS:
+        out, log = _solve_pinned(divisions)
+        tag = f"drawdown section, tri6 {divisions:g} divisions"
+        outcomes = []
+        for line in log.splitlines():
+            if _PIN_LINE in line:
+                n = int(line.rsplit("(", 1)[1].split()[0] if "did not settle" in line
+                        else line.split("settled in ")[1].split()[0])
+                outcomes.append(("did not settle" not in line, n))
+        if not out[5]:
+            fails.append(f"{tag}: does not converge")
+        if outcomes != outcomes_want:
+            fails.append(f"{tag}: pinned elements {outcomes} for {outcomes_want}")
+        if _sweeps(log) != PIN_MAX_ITER + 1:
+            fails.append(f"{tag}: converged on sweep {_sweeps(log)}, not on the one "
+                         f"ordinary sweep after the budget ({PIN_MAX_ITER + 1})")
+        if not _close(float(out[3]), q_want):
+            fails.append(f"{tag}: flow rate {out[3]:.7e} for {q_want:.7e}")
+        print(f"  {tag}: pinned {outcomes}, converged {out[5]} on sweep "
+              f"{_sweeps(log)}, q={out[3]:.7e}")
+    return fails
+
+
 LEGS = [
     ("models rescued from a limit cycle", leg_rescued),
     ("earth_dam2's exit face, and the class B escape's reachability",
      leg_class_b_reachable),
-    ("models that converge without either escape", leg_inert),
+    ("models that converge without an escape", leg_inert),
     ("an exit face over a flux boundary", leg_exit_face_over_flux),
+    ("one element holding a steady state in its loop", leg_pinned),
 ]
 
 
@@ -538,10 +650,11 @@ def main():
         for f in failures:
             print(f"  {f}")
         raise SystemExit(1)
-    print("\nPASS: the three cycling models converge to their own answers, the class B "
+    print("\nPASS: the four cycling models converge to their own answers, the class B "
           "escape still reaches that answer where its gate can be reached, every model "
-          "that converged without the escapes is unchanged sweep for sweep, and the "
-          "dam under rain sheds what it cannot take.")
+          "that converged without the escapes is unchanged sweep for sweep, the "
+          "dam under rain sheds what it cannot take, and the drawdown section's "
+          "looping steady states close on the element that holds them.")
 
 
 if __name__ == "__main__":

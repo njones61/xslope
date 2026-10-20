@@ -300,10 +300,11 @@ the canvas re-renders automatically.
   {'specified_heads': [{'head': <value>, 'coords': [(x,y),...], 'kind': 'head'|'reservoir'}],
    'specified_fluxes': [{'flux': <value>, 'coords': [(x,y),...]}],
    'exit_face': [(x,y),...]}.
-  kind 'head' holds every node of the polyline at that head at all times; 'reservoir' is
-  the submerged-only face — a node is held only while it is under the level, and nodes
-  above it become seepage-exit faces. 'exit_face' is the polyline where water may leave
-  at atmospheric pressure. seepage_bc is set 1 (`run_seep(bc=1)`, the field lands on
+  kind 'head' holds every node of the polyline at that head at all times; 'reservoir'
+  holds a node only while it is under the level, makes it a seepage-exit face once the
+  level falls back below it, and leaves it no-flow until the water first reaches it, so
+  draw a reservoir line over all the ground the pool can reach. 'exit_face' is the
+  polyline where water may leave at atmospheric pressure. seepage_bc is set 1 (`run_seep(bc=1)`, the field lands on
   slope_data['seep_u']); seepage_bc2 is set 2 (`run_seep(bc=2)` -> ['seep_u2']), the
   CONSTANT-STEADY second solve of a rapid drawdown — has_seepage_bc2 (bool) says whether
   it carries anything. A 'head'/'flux' value may also be a STRING naming a tseep series,

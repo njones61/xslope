@@ -96,7 +96,7 @@ rows:
 | Type | What it states | Typical use |
 | --- | --- | --- |
 | **Specified head** (`head`) | Total head held at a stated value, every node, all times | Reservoir floor, tailwater, a matched piezometer |
-| **Reservoir** (`reservoir`) | Held only while submerged; nodes above the water line seep freely | A pool that falls; a partly submerged face |
+| **Reservoir** (`reservoir`) | Held only while submerged; a face the water uncovers seeps freely, and a face it has not reached is no-flow | A pool that rises or falls; a partly submerged face |
 | **Exit face** | Water may leave to the atmosphere; where it starts leaving is part of the answer | Downstream face of a dam; a seeping slope |
 | **Specified flux** (`flux`) | Flow rate across the boundary (normal Darcy velocity, positive inward) | Rainfall infiltration, recharge |
 

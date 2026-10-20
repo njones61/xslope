@@ -199,7 +199,7 @@ METHOD_SUMMARIES = {
 #: declares as ``site_url`` and ``tools/make_corpus_index.py`` writes into the
 #: corpus index; that tool is not shipped in the wheel, so the constant is here
 #: too, and the two are checked against ``mkdocs.yml`` by the report checks.
-DOCS_BASE_URL = "https://xslope.org/en/stable/"
+DOCS_BASE_URL = "https://xslope.org/en/latest/"
 
 #: The documentation page each limit-equilibrium method is derived on, as a path
 #: under ``docs/``. The force-equilibrium methods share one page.
@@ -1431,6 +1431,31 @@ def method_searched(solutions, method):
     want = str(method or "").lower()
     return any(bundle_method(b) == want and b.get("search")
                for b in lem_bundles(solutions))
+
+
+def _searched_surfaces_coincide(solutions, methods):
+    """Whether every method in ``methods`` settled on one and the same failure
+    surface: ``True``, ``False``, or ``None`` when a method's own bundle carries
+    no surface to compare.
+
+    Each method's OWN bundle, as in :func:`method_searched`. Two surfaces are the
+    same when no point of one lies farther from the other than round-off of the
+    surface's own size; two searches that converge on one circle produce exactly
+    that circle.
+    """
+    surfaces = []
+    for m in methods:
+        want = str(m or "").lower()
+        own = [b for b in lem_bundles(solutions) if bundle_method(b) == want]
+        surface = own[0].get("failure_surface") if own else None
+        if surface is None or not hasattr(surface, "hausdorff_distance"):
+            return None
+        surfaces.append(surface)
+    if len(surfaces) < 2:
+        return None
+    ref = surfaces[0]
+    tol = 1e-9 * max(ref.length, 1.0)
+    return all(ref.hausdorff_distance(s) <= tol for s in surfaces[1:])
 
 
 def surface_family(slope_data, solutions=None):
@@ -6721,8 +6746,8 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # --- every method's answer, once, ahead of the detail ---
     #
     # The search does NOT belong here. It finds the critical surface for one
-    # METHOD, and two methods searched separately settle on different surfaces;
-    # each method's block carries its own search.
+    # METHOD, and two methods searched separately generally settle on different
+    # surfaces; each method's block carries its own search.
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
         sub_fs = Section("Factors of Safety")
@@ -6733,10 +6758,19 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         # performed said both at once, on a report where the second was the true
         # one.
         if searched and len(searched) == len(methods):
+            # Separate searches usually settle on different surfaces, but not
+            # always: on some models two methods land on the same circle, and the
+            # sentence has to say which happened.
+            same = _searched_surfaces_coincide(solutions, methods)
             text = (f"The critical factor of safety reported by each method is "
                     f"listed in {where}. Each method searched for its own "
-                    f"critical surface; the surfaces differ from method to "
-                    f"method.")
+                    f"critical surface")
+            if same is True:
+                text += "; the searches settled on the same surface."
+            elif same is False:
+                text += "; the surfaces differ from method to method."
+            else:
+                text += "."
         elif searched:
             text = (f"The factor of safety reported by each method is listed in "
                     f"{where}. "
@@ -7507,13 +7541,21 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     # How many nodes it has is stated with the mesh figure, which is where it is
     # read against the boundary types that figure does mark; here it is what the
     # march is driven by, so what is stated is what the level does to it.
-    from .plot_seep import reservoir_face_mask
+    from .plot_seep import reservoir_face_mask, _reservoir_level
     face = reservoir_face_mask(seep_data)
     if face is not None and face.any():
-        sub.blocks.append(Prose(
-            "The reservoir face follows the level the schedule sets: each "
-            "of its nodes is held at that level while it is submerged, and drains "
-            "freely once the level falls below it."))
+        text = ("The reservoir face follows the level the schedule sets: each "
+                "of its nodes is held at that level while it is submerged, and "
+                "drains freely once the level falls below it.")
+        # Where the face stands above the starting level, its upper nodes wait
+        # for the water: they are no-flow until the level first reaches them.
+        import numpy as np
+        level0 = _reservoir_level(seep_data, 0.0)
+        y_face = np.asarray(seep_data["nodes"], dtype=float)[face, 1]
+        if level0 is not None and np.any(y_face > level0):
+            text += (" A node the water has not yet reached is no-flow, and "
+                     "becomes a seepage face only after it has been submerged.")
+        sub.blocks.append(Prose(text))
 
     # Whether the march closed. The closure is the disagreement between the water
     # the section took in or let out at its boundary and the water its storage

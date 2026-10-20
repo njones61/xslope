@@ -68,11 +68,11 @@ XLSX_OUT = os.path.join(OUT_DIR, "w02_section_imported.xlsx")
 # underscores, so these three become layers EMBANKMENT, SILTY_CLAY and DENSE_SAND.
 # --------------------------------------------------------------------------- #
 MATERIALS = [
-    {"name": "embankment", "gamma": 125.0, "option": "mc", "c": 250.0, "phi": 28.0,
+    {"name": "embankment", "gamma": 125.0, "gamma_sat": 130.0, "option": "mc", "c": 250.0, "phi": 28.0,
      "u": "piezo"},
-    {"name": "silty clay", "gamma": 118.0, "option": "mc", "c": 700.0, "phi": 0.0,
+    {"name": "silty clay", "gamma": 118.0, "gamma_sat": 123.0, "option": "mc", "c": 700.0, "phi": 0.0,
      "u": "piezo"},
-    {"name": "dense sand", "gamma": 132.0, "option": "mc", "c": 0.0, "phi": 36.0,
+    {"name": "dense sand", "gamma": 132.0, "gamma_sat": 137.0, "option": "mc", "c": 0.0, "phi": 36.0,
      "u": "piezo"},
 ]
 

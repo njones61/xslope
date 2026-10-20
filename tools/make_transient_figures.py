@@ -4,10 +4,12 @@ None of these figures runs the seepage solver — they are pure matplotlib schem
 and closed-form curves, so they are deterministic and cheap. Five figures land in
 docs/seep/images/:
 
-  transient_reservoir_bc.png    Two-panel drawdown schematic of the submerged-only
-                                Dirichlet ("reservoir") boundary: as the reservoir
-                                level falls, face nodes cross from held reservoir
-                                head (submerged) to exit face (unsubmerged) and the
+  transient_reservoir_bc.png    Two-panel drawdown schematic of the ``reservoir``
+                                boundary: face nodes below the current level are held
+                                at the level, nodes between it and the highest level
+                                so far are an exit face, and nodes above that are
+                                no-flow. As the level falls, face nodes cross from
+                                held reservoir head to exit face and the
                                 still-saturated soil drains back through the exposed
                                 upper face.
   transient_isochrones.png      The dissipation picture: a sudden boundary head
@@ -57,7 +59,7 @@ C_SEEP = "#0f8a86"              # seepage-out arrows (teal)
 
 
 # ===========================================================================
-# Figure 1 — submerged-only reservoir boundary (two-panel drawdown schematic)
+# Figure 1 — the reservoir boundary (two-panel drawdown schematic)
 # ===========================================================================
 
 # Embankment geometry, shared by both panels (upstream face is the key polyline).
@@ -70,6 +72,10 @@ DAM_XY = [US_TOE, US_CREST, DS_CREST, DS_TOE]
 
 # nodes marched up the upstream face (elevations); x = 2 + y on the 45-deg face
 FACE_Y = np.array([0.4, 1.2, 2.0, 2.8, 3.6, 4.4, 5.2, 6.0, 6.8])
+# the highest level the reservoir has reached: the full pool the series starts
+# from (the inset's h(0)). Face nodes above it are no-flow in both panels.
+H_MAX = 6.0
+C_NOFLOW = "#8c8c8c"             # no-flow nodes above the highest level (gray)
 
 
 def _face_x(y):
@@ -147,14 +153,19 @@ def _draw_panel(ax, h, phreatic_ctrl, seepage_band, title, wsym_x, hlabel):
                     ha="center", va="bottom",
                     arrowprops=dict(arrowstyle="-", color=C_SEEP, lw=0.9))
 
-    # nodes on the face: submerged (held head) vs unsubmerged (exit face)
+    # nodes on the face: below the level (held head), between the level and the
+    # highest level so far (exit face), and above that (no-flow)
     fy = FACE_Y
     fx = _face_x(fy)
     sub = fy <= h + 1e-9
+    noflow = fy > H_MAX + 1e-9
+    exit_ = ~sub & ~noflow
     ax.plot(fx[sub], fy[sub], "o", ms=8, mfc=C_SUBMERGED, mec="white",
             mew=1.0, zorder=8)
-    ax.plot(fx[~sub], fy[~sub], "o", ms=8, mfc="white", mec=C_EXIT,
+    ax.plot(fx[exit_], fy[exit_], "o", ms=8, mfc="white", mec=C_EXIT,
             mew=1.8, zorder=8)
+    ax.plot(fx[noflow], fy[noflow], "s", ms=7, mfc=C_NOFLOW, mec="white",
+            mew=1.0, zorder=8)
 
 
 def fig_reservoir_bc():
@@ -184,7 +195,7 @@ def fig_reservoir_bc():
     # y-tick side unclipped
     axi = ax1.inset_axes([0.70, 0.66, 0.28, 0.30])
     tt = np.array([0.0, 1.0, 6.0, 10.0])
-    hh = np.array([6.0, 6.0, 2.0, 2.0])
+    hh = np.array([H_MAX, H_MAX, 2.0, 2.0])
     axi.plot(tt, hh, color=C_WATER_LINE, lw=1.8)
     axi.plot([1.5, 5.5], [5.6, 2.4], "o", ms=5, color="#123",
              mfc=C_WATER_LINE, mec="white", mew=0.8, zorder=5)
@@ -202,9 +213,11 @@ def fig_reservoir_bc():
     # shared legend below both panels
     handles = [
         Line2D([], [], ls="none", marker="o", ms=9, mfc=C_SUBMERGED,
-               mec="white", mew=1.0, label="held at reservoir head $h(t)$  (submerged)"),
+               mec="white", mew=1.0, label="held at reservoir head $h(t)$  (below the level)"),
         Line2D([], [], ls="none", marker="o", ms=9, mfc="white", mec=C_EXIT,
-               mew=1.8, label="exit face — free to drain  (unsubmerged)"),
+               mew=1.8, label="exit face — free to drain  (uncovered)"),
+        Line2D([], [], ls="none", marker="s", ms=8, mfc=C_NOFLOW, mec="white",
+               mew=1.0, label="no-flow  (above the highest level so far)"),
         Line2D([], [], ls=(0, (5, 3)), color=C_PHREATIC, lw=1.8,
                label="interior phreatic surface"),
         FancyArrowPatch((0, 0), (1, 0), arrowstyle="-|>", mutation_scale=12,
@@ -213,8 +226,8 @@ def fig_reservoir_bc():
     fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=10.5,
                frameon=False, bbox_to_anchor=(0.5, 0.005),
                handletextpad=0.5, columnspacing=1.8)
-    fig.suptitle("Submerged-only reservoir boundary: the exit point migrates "
-                 "down the face as the level falls", fontsize=13, y=0.985)
+    fig.suptitle("Reservoir boundary: held below the level, exit face up to the\n"
+                 "highest level so far, no-flow above it", fontsize=13, y=0.985)
     fig.tight_layout(rect=(0, 0.065, 1, 0.955))
     _save(fig, "transient_reservoir_bc.png")
 

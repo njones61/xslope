@@ -69,7 +69,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#gw1) | 🟢 | Shallow unconfined flow with rainfall | Crest x_a ≈ 4.1 vs Slide2 4.06 (~0.05 m) · h_max 4.61 vs Slide2 4.49 (~0.12 m), inside the 0.16 m Slide2 and RS2 differ by · Q = P·L = 2.5×10⁻⁵, exact by construction | slightly-high free-surface family, above Haar's Dupuit closed form (SEEP2D cross-check) |
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide2 at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide2 chart everywhere | |
@@ -864,9 +864,9 @@ through the dam and daylights on the downstream slope. Storage is
 $S_s=\gamma_w m_v = 9.81\times0.002=0.0196\ \text{m}^{-1}$ (the vendor RS2 model carries
 $m_v=0.002$ where the manual *text* prints 0.003; the model value is what produced RS2's own
 Fig 20.5 result), and saturated conductivity $k_s=10^{-7}$ m/s. The reservoir raise is a
-**submerged-only Dirichlet series** on the upstream face: the $t=0$ steady solve at reservoir
-4 sets the initial condition, then every upstream node with $y\le h(t)$ is held at $h(t)$ and
-the nodes above become exit-face nodes.
+**reservoir series** on the upstream face: the $t=0$ steady solve at reservoir 4 sets the
+initial condition, then every upstream node with $y\le h(t)$ is held at $h(t)$, and the face
+above the 10 m pool, which the water never reaches, is no-flow.
 
 **The two unsaturated curves are transcribed independently**, because the vendor ships them
 that way and they live on completely different scales: `groundwater #020`'s conductivity table

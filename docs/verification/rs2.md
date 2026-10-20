@@ -60,7 +60,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#rs2-1) | 🟢 | Simple slope stability assessment | SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%) | |
 | [2](#rs2-2) | 🟢 | Non-homogeneous slope | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | |
 | [3](#rs2-3) | 🟢 | Non-homogeneous slope with seismic load (0.15g) | SSRM 0.958 vs RS2 SSRM 0.97 (−1.2%) | |
@@ -103,7 +103,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [35](#p4-vp70) | 🟢 | Submerged slope (D&W Fig 6.27) | SSRM 1.594 vs D&W referee 1.60 (−0.4%) | *covered* by the Part IV build [P4-VP70](#p4-vp70) on the Slide2 [VP70](rocscience.md#vp70) file; Part II's RS2 SSRM 1.64 and Part IV's 1.58 lie either side of it. |
 | [36](#rs2-36) | 🟢 | Seepage analysis, homogeneous slope (D&W Fig 6.37) | FE seepage: SSRM 1.111 vs RS2 SSRM 1.12 (−0.8%) · piezo approximation: SSRM 1.111 vs RS2 SSRM 1.12 (−0.8%) | (both cases) |
 | [37](#rs2-37) | <span class="nodata">⊘</span> | Embankment with layered foundation (D&W Fig 6.39) | | *unconfirmed* — the two programs find different mechanisms: RS2's is the artesian downstream-toe slide, XSLOPE's a deeper surface. |
@@ -136,7 +136,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [59](#rs2-59) | 🟢 | Three-layered soil slope | SSRM 1.572 vs RS2 SSRM 1.57 (+0.1%) | Görög & Török (2007) Budapest landslide; the critical mechanism is non-circular, so a circular search finds a deeper surface and this is an SSRM problem. |
 | [60](#rs2-60) | 🟢 | Generalized Hoek–Brown, homogeneous slope | β = 15°: Spencer 1.009 vs Slide2 1.011 (−0.2%) · β = 30°: Spencer 0.989 vs Slide2 0.992 (−0.3%) · β = 45°: Spencer 1.035 vs Slide2 1.035 (0.0%) | (LEM) three slope angles at GSI = 70 with the vendor σ<sub>ci</sub>. SSRM is not scored on this problem. |
 | [61](#rs2-61) | 🟢 | Local and global minima, homogeneous slope | Case 1: Spencer 1.338 vs Slide2 1.336 (+0.1%) · Case 3: Spencer 1.437 vs Slide2 1.397 (+2.9%) · Case 2: constrained SSRM 1.383 vs RS2 SSRM 1.36 (+1.7%) | (cases 1, 3, 2) one geometry, four search regions; case 2 uses RS2's own Search-Area polygon. Case 3's search window finds the bench-to-crest surface of the paper's Fig. 13d and is compared with the numbers for that surface. Case 4's constrained run reads further above RS2 than case 2 does and is not scored. |
@@ -155,7 +155,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results | Notes |
-|---:|:-:|---|---|---|
+|:---:|:-:|---|---|---|
 | [1](#rs2-1) | 🟢 | Slope, homogeneous (ACADS 1a) | SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%) | Same build as [RS2-1](#rs2-1). Part IV publishes RS2 SSRM 0.98; ref 1.00 [Giam]. |
 | [2](#p4-vp2) | 🟢 | Slope, homogeneous, tension crack (ACADS 1b) | SSRM 1.656 vs RS2 SSRM 1.63 (+1.6%) | Own SSRM build carrying the vendor's T = 0 crack zone; ref 1.65 [Giam]. |
 | [3](#rs2-2) | 🟢 | Slope, 3 materials (ACADS 1c) | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | Same build as [RS2-2](#rs2-2). Part IV publishes RS2 SSRM 1.34; ref 1.39. |
@@ -1724,7 +1724,7 @@ case takes it from the RS2 vendor model, which matches Li's Table 1 ratio on cas
 and c:
 
 | case | β | published σci (vendor `.fez`) | ratio implied by the published σci | Li (2008) Table 1 ratio | agree? |
-|---|---:|---:|---:|---:|:--:|
+|---|:---:|:---:|:---:|:---:|:--:|
 | a | 15° | 0.598 kPa | 0.026 | 0.026 | yes |
 | b | 30° | 1.61 kPa | 0.070 | 0.075 | no |
 | c | 45° | 4.37 kPa | 0.190 | 0.176 | no |
@@ -2585,7 +2585,7 @@ Bishop value.
 
 <!-- test: file=files/rocscience/vp102a.xlsx, type=fem_ssrm, expected_fs=2.470, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.9, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102, f_stand=2.4625, f_fail=2.4765625, check=edges, expected_elements=1118, expected_nodes=2403 -->
 <!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.724, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2, f_stand=1.71875, f_fail=1.7296875, check=edges, expected_elements=1118, expected_nodes=2403 -->
-<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.998, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2, f_stand=1.9921875, f_fail=2.003125, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.987, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2, f_stand=1.98125, f_fail=1.9921875, check=edges, expected_elements=1118, expected_nodes=2403 -->
 <!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.304, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c2, f_stand=2.2984375, f_fail=2.309375, check=edges, expected_elements=1118, expected_nodes=2403 -->
 <!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.779, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c3, f_stand=1.7734375, f_fail=1.784375, check=edges, expected_elements=1118, expected_nodes=2403 -->
 <!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.173, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c3, f_stand=2.1671875, f_fail=2.178125, check=edges, expected_elements=1118, expected_nodes=2403 -->
@@ -2601,7 +2601,7 @@ s·tan φ<sup>b</sup>.
 | Stage | Case 2 XSLOPE (φ<sup>b</sup> = 0°) | Case 2 RS2 SSR | Case 3 XSLOPE (φ<sup>b</sup> = 37°) | Case 3 RS2 SSR |
 |---|---|---|---|---|
 | 60 h | 1.724 | 1.77 | 1.779 | 1.82 |
-| 300 h | 1.998 | 2.06 | 2.173 | 2.14 |
+| 300 h | 1.987 | 2.06 | 2.173 | 2.14 |
 | 1500 h | 2.304 | 2.29 | 2.687 | 2.48 |
 
 These frames carry no dot: they have *no reference value*. The paper gives no permeability,
@@ -2616,7 +2616,7 @@ One frame of each case is drawn; the mechanism is the same downstream-face wedge
 
 **Case 2 — 300 h after drawdown, φ<sup>b</sup> = 0° (vp102t_300)**
 
-![RS2 Part IV VP102 Case 2 at 300 h, the φ<sup>b</sup> = 0° baseline, SSRM 1.998 beside RS2 SSR 2.06 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the downstream-face wedge on the draining transient field](images/RS2-P4-VP102-t-300-c2.png)
+![RS2 Part IV VP102 Case 2 at 300 h, the φ<sup>b</sup> = 0° baseline, SSRM 1.987 beside RS2 SSR 2.06 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the downstream-face wedge on the draining transient field](images/RS2-P4-VP102-t-300-c2.png)
 
 **Case 3 — 1500 h after drawdown, φ<sup>b</sup> = 37° (vp102t_1500)**
 

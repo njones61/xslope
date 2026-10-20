@@ -317,7 +317,7 @@ the toe at (20.928, 0), up the face to the crest at (14, 12), and back along the
 ground surface to (9, 12) above the tip.
 
 | x | y |
-| ---: | ---: |
+| :---: | :---: |
 | 9.000 | 6.887 |
 | 20.928 | 0.000 |
 | 14.000 | 12.000 |

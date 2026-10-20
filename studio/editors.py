@@ -6249,7 +6249,7 @@ class _SeepBcSetWidget(QWidget):
         bc = bc or {}
         self._unit_labels = unit_labels
         # Set 2 is the constant-steady rapid-drawdown boundary set: it can carry
-        # neither a reservoir (submerged-only, time-varying) type nor a time-series
+        # neither a reservoir (level-history, time-varying) type nor a time-series
         # value (preflight refuses both before a run — there is one transient timeline and
         # it belongs to set 1). When True the Type selector is hidden (every head is a
         # plain Dirichlet) and a non-numeric value entered here is coerced to 0.
@@ -6308,7 +6308,7 @@ class _SeepBcSetWidget(QWidget):
         mid_pane = QWidget()
         right = QVBoxLayout(mid_pane)
         right.setContentsMargins(0, 0, 0, 0)
-        # Head TYPE selector (plain Dirichlet head vs submerged-only reservoir).
+        # Head TYPE selector (plain Dirichlet head vs reservoir).
         # Shown only for head rows; fluxes and the exit face hide it.
         trow = QHBoxLayout()
         self.type_label = QLabel("Type:")
@@ -6319,8 +6319,9 @@ class _SeepBcSetWidget(QWidget):
         self.type_combo.setItemData(
             0, "held at the value/series at all nodes, all times", Qt.ToolTipRole)
         self.type_combo.setItemData(
-            1, "draw the full face; nodes above the water level become seepage "
-               "faces as it falls", Qt.ToolTipRole)
+            1, "draw the full face the water can reach; nodes are held while "
+               "submerged, no-flow until the water reaches them, and seepage "
+               "faces once it falls back below them", Qt.ToolTipRole)
         trow.addWidget(self.type_combo, 1)
         right.addLayout(trow)
         # Set 2 has only plain heads — hide the whole Type row so reservoir can't be

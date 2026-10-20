@@ -67,6 +67,9 @@ Each rule is a name, a scope and a pattern. The groups:
                zones are the story"; "What is in a report" is a label), a
                program voice ("What the other methods say", "What it
                knows"), a rhetorical noun ("the story", "the lesson").
+``alignment``  a table column set right-aligned (``---:``). Number columns
+               are centered (``:---:``) and text columns left; a page of
+               session transcripts (``*transcript*.md``) is printed as it ran.
 
 The rules from ``punchline`` down are docs-only, except ``voice``, which also
 covers program strings; program strings keep the first group. ``SELFTEST`` plants a violation for every rule and a near-miss
@@ -404,9 +407,30 @@ def selftest() -> list[str]:
                   for _ in pat.finditer(text))
         if hit != must:
             fails.append(f"selftest [{rule}] {'missed' if must else 'false hit'}: {text!r}")
+    for text, must in (("|:--|--:|--:|", True), ("| :--- | ---: |", True),
+                       ("|:--|:---:|:---:|", False), ("|---|:-:|", False)):
+        if bool(_SEP_ROW.match(text) and _RIGHT_CELL.search(text)) != must:
+            fails.append(f"selftest [alignment] {'missed' if must else 'false hit'}: {text!r}")
     return fails
 
 _FENCE = re.compile(r"^\s*(```|~~~)")
+_SEP_ROW = re.compile(r"^\s*\|(?:\s*:?-+:?\s*\|)+\s*$")
+_RIGHT_CELL = re.compile(r"\|\s*-+:\s*(?=\|)")
+
+
+def _right_aligned(md: Path):
+    """The table separator rows outside fenced code that set a column right-aligned."""
+    if "transcript" in md.name:
+        return
+    fence = False
+    for n, ln in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
+        if _FENCE.match(ln):
+            fence = not fence
+            continue
+        if not fence and _SEP_ROW.match(ln):
+            m = _RIGHT_CELL.search(ln)
+            if m:
+                yield n, ln.strip(), m
 _COMMENT = re.compile(r"<!--.*?-->", re.S)
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 _LINK_TARGET = re.compile(r"\]\([^)]*\)")
@@ -526,6 +550,8 @@ def scan_page(md: Path):
                 continue
             for m in pat.finditer(text):
                 hits.append((rule, rel, line, m.group(0), text))
+    for line, text, m in _right_aligned(md):
+        hits.append(("alignment", rel, line, m.group(0), text))
     return hits
 
 

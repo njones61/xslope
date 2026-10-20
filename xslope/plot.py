@@ -1763,6 +1763,29 @@ def _eval_bc_series_at(tseep, name, t):
     return va[j] + (va[j + 1] - va[j]) * (t - ta[j]) / (ta[j + 1] - ta[j])
 
 
+def _bc_series_high_water_at(tseep, name, t):
+    """The highest value a reservoir/head series has reached over [0, t], read the
+    way the solver reads it (``seep._series_high_water``): the series' own
+    non-blank breakpoints, the value at t = 0, and the value at t. Returns None
+    when the series is unavailable. It is what separates, on a reservoir face, the
+    nodes the water has uncovered (exit faces) from the nodes it has never reached
+    (no-flow)."""
+    if not tseep:
+        return None
+    times = tseep.get("times") or []
+    vals = (tseep.get("series") or {}).get(name)
+    if not times or vals is None:
+        return None
+    ta, va = [], []
+    for tt, vv in zip(times, vals):
+        if vv is not None:
+            ta.append(float(tt)); va.append(float(vv))
+    if not ta:
+        return None
+    from .seep import _series_high_water
+    return _series_high_water((ta, va), float(t))
+
+
 def _reservoir_surface_x(coords, h):
     """(x_upstream, x_meets_face) for a horizontal water surface at level ``h``
     against a boundary polyline: the surface spans from the polyline's upstream
@@ -1854,7 +1877,9 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
 
         A head block carries a ``kind`` ("head" or "reservoir") and a value that is
         either a constant (a number) or the name of a tseep time series (v18). A
-        reservoir (submerged-only) boundary is drawn distinctly from a fixed head,
+        reservoir boundary is drawn distinctly from a fixed head, as the line it is
+        (no part of it is drawn as an exit face: which of its nodes are held,
+        exit faces, or no-flow is decided during the run by the level's history),
         and a series-bound boundary draws TWO waterlines -- the t = 0 level and the
         t = end level -- each with the standard apex-down water symbol. A constant
         head renders exactly as before.
@@ -1954,7 +1979,7 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                 wl_xs = list(xs)
                 wl_ys = heads
 
-            # A constant reservoir (numeric value on a submerged-only face) still
+            # A constant reservoir (a numeric level on a reservoir face) still
             # belongs to the azure reservoir family: draw its level in reservoir_water_color so a
             # boundary/level pair stays one hue. The common plain-head case is
             # unchanged (water_level_color, "Specified Head Water Level").

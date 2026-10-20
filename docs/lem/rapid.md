@@ -245,11 +245,13 @@ The Johnson Reservoir zoned earth dam is the [transient drawdown seepage sample]
 
 **Undrained core.** Over a 45-day drawdown the sand shell and the silty-sand foundation drain freely — their [time factor $T$](#when-does-rapid-drawdown-apply) is well above 3 — so they are analyzed drained. Only the compacted-clay core cannot dissipate in time, so it is carried undrained into Stage 2 through its $K_c = 1$ envelope $d = 250$ psf, $\psi = 14^\circ$ (below the drained $c' = 400$ psf, $\phi' = 18^\circ$). This is the shell-versus-core split of the [second time-factor example](#when-does-rapid-drawdown-apply) above.
 
-| Material | $\gamma$ (pcf) | $c'$ (psf) | $\phi'$ (deg) | $d$ (psf) | $\psi$ (deg) | Drawdown strength |
-|----------|:---:|:---:|:---:|:---:|:---:|---|
-| Shell (sand)          | 130 | 100 | 35 | — | — | drained |
-| Core (compacted clay) | 125 | 400 | 18 | 250 | 14 | **undrained** |
-| Foundation (silty sand) | 127 | 100 | 27 | — | — | drained |
+| Material | $\gamma$ (pcf) | $\gamma_{sat}$ (pcf) | $c'$ (psf) | $\phi'$ (deg) | $d$ (psf) | $\psi$ (deg) | Drawdown strength |
+|----------|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| Shell (sand)          | 130 | 135 | 100 | 35 | — | — | drained |
+| Core (compacted clay) | 125 | 130 | 400 | 18 | 250 | 14 | **undrained** |
+| Foundation (silty sand) | 127 | 132 | 100 | 27 | — | — | drained |
+
+Soil below the full-pool (Stage 1) phreatic surface weighs $\gamma_{sat}$ in all three stages, since rapid drawdown presumes the soil stays saturated while the pore pressures fall.
 
 **Loads and slip surface.** The full-pool reservoir standing against the upstream face is the Stage 1 distributed load (3744 psf at the toe, tapering to zero at the elevation-160 pool line). At Stage 2 the pool has been drawn all the way down to the elevation-100 datum, so no water remains on the upstream slope. Removing that load is the main cause of the loss of stability in rapid drawdown. The critical surface is a circle on the upstream (reservoir) face, located by a rapid-drawdown circular search: it toes near the upstream base, daylights just past the crest, and cuts twelve slices of core so the undrained zone governs Stage 2.
 
@@ -286,7 +288,7 @@ _, (slice_df, failure_surface) = generate_slices(
 results = solve_selected("spencer", slice_df, rapid=True)
 ```
 
-**Result.** The full-pool slope is comfortably stable (Stage 1 FS = 2.05). Removing the reservoir load while the core holds its undrained strength drops the Stage 2 factor of safety to 1.31, and Stage 3 confirms the drained strength is not lower anywhere on the surface, so it does not reduce the result further. The rapid-drawdown factor of safety is **1.31** (Spencer); Morgenstern–Price agrees at 1.32, and the simpler methods bracket it.
+**Result.** The full-pool slope is comfortably stable (Stage 1 FS = 2.07). Removing the reservoir load while the core holds its undrained strength drops the Stage 2 factor of safety to 1.34, and Stage 3 confirms the drained strength is not lower anywhere on the surface, so it does not reduce the result further. The rapid-drawdown factor of safety is **1.34** (Spencer); Morgenstern–Price agrees at 1.35, and the simpler methods bracket it, from 1.10 (OMS) to 1.50 (Corps of Engineers).
 
 ![johnson_res_rapid_solution.png](rapid_images/johnson_res_rapid_solution.png)
 

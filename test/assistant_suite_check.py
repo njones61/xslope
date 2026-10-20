@@ -245,8 +245,8 @@ def check_scorers():
         _session(prose="Spencer gives FS = 1.587.", output="nothing was printed"))
 
     leg("cites_docs", S.cites_docs(1),
-        _session(prose="See https://xslope.org/en/stable/lem/spencer/"),
-        _session(prose="See https://xslope.org/en/stable/lem/invented/"))
+        _session(prose="See https://xslope.org/en/latest/lem/spencer/"),
+        _session(prose="See https://xslope.org/en/latest/lem/invented/"))
 
     leg("cites_corpus", S.cites_corpus(),
         _session(prose="VP28 is the worked example.",

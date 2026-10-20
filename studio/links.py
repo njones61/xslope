@@ -20,9 +20,10 @@ from __future__ import annotations
 __all__ = ["DOCS_URL", "GETTING_STARTED_URL", "SAMPLES_URL", "VERIFICATION_URL",
            "SUPPORT_EMAIL", "SUPPORT_MAILTO", "ISSUES_URL", "bug_report_url"]
 
-#: The documentation root — ``mkdocs.yml``'s ``site_url``. Read The Docs serves the
-#: current release at ``/en/latest/``, and every URL below extends this one.
-DOCS_URL = "https://xslope.org/en/stable/"
+#: The documentation root — ``mkdocs.yml``'s ``site_url``: the latest docs, the
+#: version xslope.org opens on, so a docs fix reaches Help without waiting for a
+#: release. Every URL below extends this one.
+DOCS_URL = "https://xslope.org/en/latest/"
 
 #: Installing Studio: the downloads, the system requirements, what a first launch
 #: does, where the application's files land, and keeping it up to date.

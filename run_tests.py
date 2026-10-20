@@ -182,7 +182,7 @@ AXIAL_MIRROR_LEFT = _repo('docs/inputs/slope/xslope_nail_axial.xlsx')
 AXIAL_MIRROR_RIGHT = _repo('docs/inputs/slope/xslope_nail_axial_rface.xlsx')
 MP_SPENCER_LEFT = _repo('docs/inputs/slope/xslope_simple1.xlsx')
 MP_SPENCER_RIGHT = _repo('docs/inputs/slope/xslope_rface.xlsx')
-# Stage-1 FS 1.91 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
+# Stage-1 FS 1.96 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
 DRAWDOWN_GUARD_FILE = _repo('docs/inputs/slope/xslope_rapid.xlsx')
 # --- backward-compatibility fixtures: SYNTHESIZED, never sample files ------
 #
@@ -5105,12 +5105,12 @@ _V16_BACKCOMPAT_EXPECTED = {
         {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 137000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 8000.0, 'nu': 0.45, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
-    # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; blank gsat -> None)
+    # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; saturated weights carried)
     _repo('docs/inputs/slope/xslope_dam.xlsx'): [
-        {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Core', 'gamma': 122.0, 'gamma_sat': None, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': 130.0, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Core', 'gamma': 122.0, 'gamma_sat': 127.0, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': 128.0, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': 132.0, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
     # docs/verification/files/rocscience/vp042.xlsx — read at v16 (t_cut column
     # present, all blank; no phi_b/s_cap columns). Captured pre-v17. Proves inserting
@@ -5344,6 +5344,13 @@ PREFLIGHT_BASE_THIN = _repo('docs/fem/files/xslope_griffiths3_r0p2_thin.xlsx')
 # A solved seepage field on a tri6 mesh whose exit face drains at atmospheric
 # pressure: the negative control for the free-surface pressure rule.
 PREFLIGHT_BASE_SEEP_FIELD = _repo('docs/verification/files/rocscience/vp046b.xlsx')
+# A cut slope whose model sides are vertical head lines through the soil, and a
+# plan-view radial flow model whose head lines are arcs in a confined solve.
+PREFLIGHT_BASE_SIDES = _repo('docs/verification/files/rocscience/rs2_28a.xlsx')
+PREFLIGHT_BASE_CONFINED = _repo('docs/seep/files/xslope_confined_radial.xlsx')
+# The same cut slope with its toe-side model side folded into the ground line:
+# the line starts at the foot of a side 0.13 off vertical over 30.66.
+PREFLIGHT_BASE_SIDE_IN_GROUND = _repo('docs/verification/files/rocscience/vp038a.xlsx')
 
 
 def _pf_set(d, **kw):
@@ -5405,6 +5412,27 @@ def _pf_bc_head(sd, i, value, which=1):
     """Set the VALUE of one specified-head block: a number, or a tseep series name."""
     bc = sd['seepage_bc' if which == 1 else 'seepage_bc2']
     bc['specified_heads'][i]['head'] = value
+    return sd
+
+
+def _pf_bc_reservoir(sd, i, **kw):
+    """Make specified-head block ``i`` of set 1 a reservoir, updated with ``kw``
+    (a level, a series name, coordinates)."""
+    sd['seepage_bc']['specified_heads'][i].update(kind='reservoir', **kw)
+    return sd
+
+
+def _pf_bc_set(sd, i, **kw):
+    """Update specified-head block ``i`` of set 1 with ``kw`` (a kind, a level or
+    series name, coordinates)."""
+    sd['seepage_bc']['specified_heads'][i].update(**kw)
+    return sd
+
+
+def _pf_ground(sd, pts):
+    """Replace the ground surface with the polyline ``pts``."""
+    from shapely.geometry import LineString
+    sd['ground_surface'] = LineString(pts)
     return sd
 
 
@@ -5710,9 +5738,11 @@ PREFLIGHT_RULE_SPECS = [
     # manual_water: the template ships Water loads = auto and the rule stands
     # down in auto mode (the line then IS the reservoir definition), so the
     # round-tripped file must be pinned to manual for the mutation to reach it.
+    # The saturated unit weights go too: they are the line's other consumer (it
+    # splits moist from saturated weight), and the rule stands down for them.
     dict(rule='piezo.no_consumer', base=PREFLIGHT_BASE_LEM, mode='excel',
          manual_water=True,
-         mutation=lambda sd: _pf_mats(sd, u='none'),
+         mutation=lambda sd: _pf_mats(sd, u='none', gamma_sat=None),
          expect='no material uses u = piezo'),
     dict(rule='water.ponded_no_dload', base=PREFLIGHT_BASE_LEM, mode='excel',
          manual_water=True,
@@ -6229,7 +6259,106 @@ PREFLIGHT_RULE_SPECS = [
          mode='dict', analysis='tseep',
          mutation=lambda sd: _pf_tseep(sd, series={
              k: [1.0] + list(v[1:]) for k, v in sd['tseep']['series'].items()}),
-         expect='reservoir face rising'),
+         expect='no-flow until the water reaches them'),
+    # The same face under a constant level drawn below its top: the water never
+    # reaches the nodes above it. The control is the shipped level, at the top.
+    dict(rule='tseep.reservoir_face_above_level', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_reservoir(sd, 0, head=10.0),
+         control=lambda sd: _pf_bc_reservoir(sd, 0, head=18.0),
+         expect='no-flow throughout the run'),
+    # A pool that starts below the top of its face (y = 18), rises past it to 20,
+    # then falls: the upstream face from the line's end at x = 42 toward the crest
+    # is under water with no boundary on it. The near-miss is the same schedule on
+    # a reservoir line drawn over the whole ground surface, which leaves no ground
+    # under the water uncovered however high the level stands.
+    dict(rule='tseep.reservoir_level_above_line', base=PREFLIGHT_BASE_TSEEP,
+         mode='dict', analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, series={'pool': [16.0, 20.0, 2.0]}),
+         control=lambda sd: _pf_bc_reservoir(
+             _pf_tseep(sd, series={'pool': [16.0, 25.0, 2.0]}), 0,
+             coords=_pf_pts(sd['ground_surface'])),
+         expect='stays no-flow'),
+    # A constant level above the top of its line, against the shipped level that
+    # stands exactly at the top.
+    dict(rule='tseep.reservoir_level_above_line', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_reservoir(sd, 0, head=20.0),
+         control=lambda sd: _pf_bc_reservoir(sd, 0, head=18.0),
+         expect='Extend the reservoir line over it'),
+    # A plain head line along the ground that the water leaves partly dry. The
+    # must-hits are the earth dam's upstream face (y 0 to 18) held as a plain head
+    # under the falling pool series (18 to 2), and the same face under a constant
+    # level of 10. Each near-miss is a control that differs in the one respect the
+    # rule turns on: the shipped reservoir type; a series that never uncovers the
+    # face (a submerged floor); a level entirely below the line (a suction
+    # boundary); a level 0.01 under the top of the line, inside the 1e-3-of-height
+    # round-off fence, against 0.1 under it outside the fence; model sides that run
+    # down through the soil, against the same head on a stretch of the ground; and
+    # a confined (plan-view) model, against the same model given an exit face.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_TSEEP,
+         mode='dict', analysis='tseep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, kind='head'),
+         expect='held at the water level, in suction'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_TSEEP,
+         mode='dict', analysis='tseep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, kind='head'),
+         control=lambda sd: _pf_tseep(_pf_bc_set(sd, 0, kind='head'),
+                                      series={'pool': [20.0, 20.0, 19.0]}),
+         expect='give it the reservoir type'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, head=10.0),
+         control=lambda sd: _pf_bc_set(sd, 0, head=-5.0),
+         expect='end the line at the water level'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(sd, 0, head=17.9),
+         control=lambda sd: _pf_bc_set(sd, 0, head=17.99),
+         expect='above its level (17.9)'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SIDES,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(sd, 1, head=30.0,
+                                        coords=[(0.13, 19.15), (26.536, 33.098)]),
+         expect='plain head line on the ground surface'),
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_CONFINED,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'], exit_face=_pf_pts(sd['ground_surface'])[:2])),
+         expect='in suction'),
+    # Near-vertical segments at the two ENDS of the ground line are model sides and
+    # are not read; the same steepness inside the line is an exposed face. The
+    # near-miss is vp038's toe-side head (6 m on a side 0.13 off vertical that
+    # starts the ground line); the mutation puts a stretch of ground in front of
+    # that side, so the side is an interior face and its dry part is reported.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SIDE_IN_GROUND,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_ground(
+             sd, [(-10.0, -11.51)] + _pf_pts(sd['ground_surface'])),
+         expect='rises to y = 19.15, above its level (6)'),
+    # An interior near-vertical face (0.1 over 18) under a level of 10 is read,
+    # against the same face with the line ended at the water level.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(0.0, 0.0), (30.0, 0.0), (30.1, 18.0), (51.0, 22.0),
+                             (59.0, 22.0), (105.0, 2.0), (110.0, 0.0)]),
+             0, head=10.0, coords=[(30.0, 0.0), (30.1, 18.0)]),
+         control=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(0.0, 0.0), (30.0, 0.0), (30.1, 18.0), (51.0, 22.0),
+                             (59.0, 22.0), (105.0, 2.0), (110.0, 0.0)]),
+             0, head=10.0, coords=[(30.0, 0.0), (30.0 + 0.1 * 10.0 / 18.0, 10.0)]),
+         expect='rises to y = 18, above its level (10)'),
+    # A 1H:1V face that STARTS the ground line is a face, not a model side: read.
+    dict(rule='seep.head_line_above_water', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(24.0, 0.0)] + _pf_pts(sd['ground_surface'])[1:]),
+             0, head=10.0, coords=[(24.0, 0.0), (42.0, 18.0)]),
+         control=lambda sd: _pf_bc_set(
+             _pf_ground(sd, [(24.0, 0.0)] + _pf_pts(sd['ground_surface'])[1:]),
+             0, head=18.0, coords=[(24.0, 0.0), (42.0, 18.0)]),
+         expect='rises to y = 18, above its level (10)'),
 
     # --- rapid drawdown ----------------------------------------------------
     dict(rule='rapid.stage2_water_missing', base=PREFLIGHT_BASE_RAPID, mode='excel',
@@ -10050,13 +10179,13 @@ def run_seep_cycle_test(test):
     its own must be untouched by both.
 
     The fourth model, earth_dam2, no longer cycles: the exit-face fix in seep.py gave
-    its seepage face the edge that runs to the toe, and it now converges in 600 sweeps
+    its seepage face the edge that runs to the toe, and it now converges in 195 sweeps
     with neither escape firing. The exit-face escape therefore rescues nothing anywhere
     in the corpus, and the check records that rather than hiding it — it drives the
     escape at a lowered gate instead, where the orbit is still reachable, and requires
     it to land on the answer the ungated solve reaches.
 
-    The check itself lives in test/seep_cycle_check.py, which re-solves the three
+    The check itself lives in test/seep_cycle_check.py, which re-solves the four
     rescued models and eight that converge without help on their COMMITTED meshes, at
     the settings their companions are recorded under. Inertness is locked on the sweep
     count as well as the flow rate: a trajectory that has been nudged shows there
@@ -10557,8 +10686,8 @@ def run_transient_seep_test(test):
     storage terms, the saved-frame schedule — checked directly rather than through
     a verification page's head stations.
 
-    The check itself lives in test/transient_seep_check.py (12 locks, ~60 s: the
-    heaviest row in the --tseep group, because it solves several short marches).
+    The check itself lives in test/transient_seep_check.py (13 locks, ~30 s,
+    because it solves several short marches).
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test.
     """
@@ -13208,17 +13337,19 @@ def run_gsz_import_test(test):
                 problems.append("the reloaded piezo-surface model derives no water "
                                 "load — the reservoir did not survive the file")
 
-        # A pre-v22 template has no D23, so an automatic-water model cannot be
-        # written into one: the file would come back manual with an empty dloads
-        # sheet and no water at all. Refused, and the refusal names the cell.
+        # A pre-v22 template has no Water loads cell, so an automatic-water model
+        # cannot be written into one: the file would come back manual with an empty
+        # dloads sheet and no water at all. Refused, and the refusal names the
+        # current template's cell, which the lookup gives (D24 from v25).
         v21 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'docs', 'inputs', 'input_template_v21.xlsx')
         if os.path.exists(v21):
+            from xslope.fileio import main_sheet_cell
             old_out = os.path.join(td, "old_template.xlsx")
             try:
                 save_slope_data_to_xlsx(sd2, old_out, template=v21)
             except ValueError as e:
-                if 'D23' not in str(e):
+                if main_sheet_cell('water_loads') not in str(e):
                     problems.append(f"saving an automatic-water model into a v21 "
                                     f"template was refused without naming the cell: "
                                     f"{str(e)[:90]}")
@@ -16240,7 +16371,7 @@ def main():
                       'method': '-', 'source': 'seep_exit_collapse'})
         # The two limit-cycle escapes in the unconfined solver: the four corpus
         # models that used to run to their ceiling converge, and every model that
-        # converged without them is unchanged sweep for sweep. It re-solves eleven
+        # converged without them is unchanged sweep for sweep. It re-solves twelve
         # committed models, so it rides --seep with the rest of the seepage suite.
         tests.append({'type': 'seep_cycle',
                       'file': 'limit-cycle escapes (steady exit face)',
@@ -16252,11 +16383,11 @@ def main():
         tests.append({'type': 'tseep_exit_cycle',
                       'file': 'tri6 exit-edge limit cycle (transient)',
                       'method': '-', 'source': 'tseep_exit_cycle'})
-        # The transient solver's own lock set (test/transient_seep_check.py): 12
+        # The transient solver's own lock set (test/transient_seep_check.py): 13
         # locks on the stepper and the storage terms. It solves several short
-        # marches, which makes it the heaviest single row in this group (~60 s).
+        # marches (~30 s).
         tests.append({'type': 'transient_seep',
-                      'file': 'transient seepage solver (12 locks)',
+                      'file': 'transient seepage solver (13 locks)',
                       'method': '-', 'source': 'transient_seep'})
         # The same solver driven through the Studio panels, headless: the run
         # dialog, the runner and its cancel, the transient view and its playback,

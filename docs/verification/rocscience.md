@@ -46,9 +46,9 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=files/rocscience/vp037.xlsx, type=single_circle, num_slices=60, fs_bishop=0.764, fs_spencer=0.764, benchmark=VP37 -->
 <!-- test: file=files/rocscience/vp037.xlsx, type=support_force, method=bishop, target_fs=1.5, force_elev=9.0, toe=5;5, center_box=-20;15;12;45, grid=0.5, refine_grid=0.1, min_depth=2.0, num_slices=50, refine_slices=80, expected_force=351.4, tolerance=0.01, benchmark=VP37-force -->
-<!-- test: file=files/rocscience/vp038a.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.612, benchmark=VP38-h61 -->
+<!-- test: file=files/rocscience/vp038a.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.613, benchmark=VP38-h61 -->
 <!-- test: file=files/rocscience/vp038b.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.533, benchmark=VP38-h62 -->
-<!-- test: file=files/rocscience/vp038c.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.413, benchmark=VP38-h63 -->
+<!-- test: file=files/rocscience/vp038c.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.414, benchmark=VP38-h63 -->
 <!-- test: file=files/rocscience/vp028a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.129, benchmark=VP28a -->
 <!-- test: file=files/rocscience/vp028a.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.768, tolerance=0.03, benchmark=VP28a-beta -->
 <!-- test: file=files/rocscience/vp028a.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.774, tolerance=0.02, expected_pf=0.215, pf_tol=0.02, benchmark=VP28a-mc -->
@@ -173,7 +173,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp084b.xlsx, type=circular_search, num_slices=40, fs_bishop=0.905, fs_spencer=0.897, benchmark=VP84-II -->
 <!-- test: file=files/rocscience/vp084c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.042, fs_spencer=1.028, benchmark=VP84-III -->
 <!-- test: file=files/rocscience/vp084d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.151, fs_spencer=1.131, benchmark=VP84-IV -->
-<!-- test: file=files/rocscience/vp071a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-seep -->
+<!-- test: file=files/rocscience/vp071a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.134, fs_spencer=1.134, benchmark=VP71-seep -->
 <!-- test: file=files/rocscience/vp071b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-piezo -->
 <!-- test: file=files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
 <!-- test: file=files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
@@ -235,7 +235,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [35](#vp35) | 🟢 | Dam, (5) materials, probabilistic analysis, reliability index | Bishop critical FS at mean strengths 2.529 vs Slide 2.551 (−0.9%) | reproduced by procedure; β spreads with the estimator at these COVs · the paper's nine fixed surfaces are reproduced at [§2.22](geostudio.md#gs-2-22) |
 | [36](#vp36) | 🟢 | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | Bishop 1.333 vs H&W 1.334 (−0.1%) · Bishop 1.333 vs Slide 1.340 (−0.5%) |  |
 | [37](#vp37) | 🟢 | Slope, homogenous, distributed load, back analysis of required support force and length | Bishop 0.764 vs Slide 0.764 (0.0%) · Bishop 0.764 vs XSTABL 0.734 (+4.1%) · support force 351.4 vs Slide 351 kN/m (+0.1%) | base slope and the required support force; the reinforced-zone length needs a variable-length material zone |
-| [38](#vp38) | 🟢 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | H = 61: Bishop 1.612 vs Slide 1.621 (−0.6%) · H = 62: Bishop 1.533 vs Slide 1.538 (−0.3%) · H = 63: Bishop 1.413 vs Slide 1.407 (+0.4%) |  |
+| [38](#vp38) | 🟢 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | H = 61: Bishop 1.613 vs Slide 1.621 (−0.5%) · H = 62: Bishop 1.533 vs Slide 1.538 (−0.3%) · H = 63: Bishop 1.414 vs Slide 1.407 (+0.5%) |  |
 | [39](#vp39) | 🟢 | Reinforced embankment, (2) materials, tension crack, geosynthetic | clay fill: Spencer 0.968 vs Slide 0.975 (−0.7%) · sand fill: Spencer 1.200 vs Slide 1.209 (−0.7%) | circular cases; the noncircular variants are not compared, because XSLOPE's noncircular search returns seed-dependent minima on this φ = 0 problem |
 | [40](#vp40) | 🟢 | Slope, homogenous, sensitivity analysis | Janbu(corr) 1.003 vs Perry 0.98 (+2.3%) | the A and b sensitivity series track Slide's published curves within about a percent |
 | [41](#vp41) | 🟢 | Slope, homogenous, ru pore pressure | Bishop 1.668 vs Slide 1.656 (+0.7%) · Bishop 1.668 vs Charles & Soares 1.66 (+0.5%) |  |
@@ -243,7 +243,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [43](#vp43) | 🟢 | Slope, homogenous, planar surface, RocPlane comparison | Spencer 1.352 vs RocPlane 1.351 (+0.1%) · Spencer 1.352 vs SLOPE/W 1.352 (0.0%) | the SLOPE/W model pins the crest-offset geometry |
 | [44](#vp44) | 🟢 | Slope, homogenous | power curve: Spencer 0.958 vs Slide 0.960 (−0.2%) · Mohr-Coulomb: Spencer 1.518 vs Slide 1.536 (−1.2%) · LLA converged: Spencer 0.980 vs Slide 0.981 (−0.1%) |  |
 | [45](#vp45) | 🟢 | Slope, homogenous | Mohr-Coulomb: Spencer 2.801 vs Slide 2.794 (+0.3%) · power curve: Spencer 2.649 vs Slide 2.662 (−0.5%) |  |
-| [46](#vp46) | 🟢 | Dam, (2) materials, rapid drawdown, FE seepage, ponded water | Stage 1: 2.50 vs closed form 2.50 (0.0%) · Stage 2: Spencer 7.086 vs Slide 7.003 (+1.2%) | stages 1–2 of 3; stage 3 needs the undrained strength field, which Baker publishes only as a contour figure. Baker's own values: 2.41 / 6.98 / 2.18. |
+| [46](#vp46) | 🟢 | Dam, (2) materials, rapid drawdown, FE seepage, ponded water | Stage 1: 2.50 vs closed form 2.50 (0.0%) · Stage 2: Spencer 7.084 vs Slide 7.003 (+1.2%) | stages 1–2 of 3; stage 3 needs the undrained strength field, which Baker publishes only as a contour figure. Baker's own values: 2.41 / 6.98 / 2.18. |
 | [47](#vp47) | 🟢 | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | Janbu 0.899 vs Slide 0.890 (+1.0%) · Janbu 0.899 vs Sheahan 0.887 (+1.4%) |  |
 | [48](#vp48) | 🟢 | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | 55° plane: Janbu 0.991 vs Slide 0.989 (+0.2%) · 55° plane: Janbu 0.991 vs Sheahan 0.989 (+0.2%) | Janbu/Spencer within 0.3% of Slide on the stored plane |
 | [49](#vp49) | 🟢 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | Janbu(corr) 1.469 vs Slide 1.479 (−0.7%) · Janbu(corr) 1.469 vs SNAILZ 1.52 (−3.4%) |  |
@@ -268,7 +268,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [68](#vp68) | 🟢 | Embankment, (3) materials, ponded water | Bishop 1.234 vs Slide 1.241 (−0.6%) | Spencer's base-tension guard declines this surface |
 | [69](#vp69) | 🟢 | Embankment, (2) materials, water table, ponded water | Spencer 2.013 vs Slide 2.026 (−0.6%) · Bishop 1.999 vs USACE 2.01 (−0.5%) |  |
 | [70](#vp70) | 🟢 | Submerged slope, homogenous, water table, ponded water | pool +30 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) · pool +60 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) | identical FS at both pools — the depth-independence reproduces exactly |
-| [71](#vp71) | 🟢 | Slope, homogenous, finite element groundwater seepage analysis, water table | FE seepage: Spencer 1.132 vs Slide 1.141 (−0.8%) · piezometric line: Spencer 1.132 vs Slide 1.142 (−0.9%) | the two pore-pressure models agree with each other |
+| [71](#vp71) | 🟢 | Slope, homogenous, finite element groundwater seepage analysis, water table | FE seepage: Spencer 1.134 vs Slide 1.141 (−0.6%) · piezometric line: Spencer 1.132 vs Slide 1.142 (−0.9%) | the two pore-pressure models agree with each other |
 | [72](#vp72) | 🟢 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | FE seepage, tangent 197: Spencer 1.341 vs Slide 1.312 (+2.2%) · piezometric line: Spencer 1.563 vs Slide 1.557 (+0.4%) |  |
 | [73](#vp73) | 🟢 | Excavated slope, (4) materials, tension crack | Spencer 1.766 vs Slide 1.758 (+0.5%) · Spencer 1.766 vs D&W 1.76 (+0.3%) |  |
 | [74](#vp74) | 🟢 | Embankment, (2) materials | Spencer 1.194 vs Slide 1.201 (−0.6%) · Spencer 1.194 vs D&W 1.19 (+0.3%) |  |
@@ -1207,11 +1207,11 @@ whose last term is an apparent cohesion from suction. Material (Table 38.1): $c'
 
 | $H$ (m) | XSLOPE | Slide | Ng & Shi (1998) |
 |---|---|---|---|
-| 61 | 1.612 | 1.621 (−0.6%) | 1.636 (−1.5%) |
+| 61 | 1.613 | 1.621 (−0.5%) | 1.636 (−1.4%) |
 | 62 | 1.533 | 1.538 (−0.3%) | 1.527 (+0.4%) |
-| 63 | 1.413 | 1.407 (+0.4%) | 1.436 (−1.6%) |
+| 63 | 1.414 | 1.407 (+0.5%) | 1.436 (−1.5%) |
 
-XSLOPE reproduces Slide's Bishop values within 0.6% and Ng & Shi's own published Bishop values within 1.6%, and tracks the physics: the factor of safety falls as the right-side head rises. Turning the suction credit off drops all three well below the published band, confirming that the apparent cohesion, not the effective-normal pressure, carries the difference. A free search with the credit on lands not on Slide's shallow circle but on a somewhat deeper one a few percent lower, trading suction credit for a longer saturated base; evaluating the specified surface keeps the comparison clear of that difference.
+XSLOPE reproduces Slide's Bishop values within 0.5% and Ng & Shi's own published Bishop values within 1.5%, and tracks the physics: the factor of safety falls as the right-side head rises. Turning the suction credit off drops all three well below the published band, confirming that the apparent cohesion, not the effective-normal pressure, carries the difference. A free search with the credit on lands not on Slide's shallow circle but on a somewhat deeper one a few percent lower, trading suction credit for a longer saturated base; evaluating the specified surface keeps the comparison clear of that difference.
 
 ![vp038a (H = 61 m): inputs and solution on Slide's critical circle](images/vp038a.png)
 
@@ -1408,10 +1408,10 @@ Slide's published Spencer 2.534 is a minimum-depth-5 m noncircular random search
 
 | Method | XSLOPE | Slide | Baker |
 |---|---|---|---|
-| Spencer (circular) | 7.086 | 7.003 (+1.2%) | 6.98 (+1.5%) |
-| Bishop (circular) | 7.093 | — | — |
+| Spencer (circular) | 7.084 | 7.003 (+1.2%) | 6.98 (+1.5%) |
+| Bishop (circular) | 7.091 | — | — |
 
-<!-- test: file=files/rocscience/vp046b.xlsx, type=circular_search, num_slices=40, fs_spencer=7.086, fs_bishop=7.093, benchmark=VP46-steady -->
+<!-- test: file=files/rocscience/vp046b.xlsx, type=circular_search, num_slices=40, fs_spencer=7.084, fs_bishop=7.091, benchmark=VP46-steady -->
 
 ![vp046b: stage 2 inputs and representative solution](images/vp046b.png)
 
@@ -1890,10 +1890,10 @@ Case 1 runs XSLOPE's own FE seepage solver (specified heads of 40 and 75 on the 
 
 | Case | Method | XSLOPE | Slide | D&W |
 |---|---|---|---|---|
-| FE seepage | Bishop / Spencer | 1.132 / 1.132 | 1.141 / 1.141 (−0.8% / −0.8%) | 1.138 (−0.5% / −0.5%) |
+| FE seepage | Bishop / Spencer | 1.134 / 1.134 | 1.141 / 1.141 (−0.6% / −0.6%) | 1.138 (−0.4% / −0.4%) |
 | Piezometric line | Bishop / Spencer | 1.132 / 1.132 | 1.142 / 1.142 (−0.9% / −0.9%) | 1.141 (−0.8% / −0.8%) |
 
-*The two pore-pressure models land within 0.0006 of each other, the same near-identity Slide reports (1.141 vs 1.142): the corpus's end-to-end check that a phreatic surface computed from scratch reproduces the one Duncan & Wright drew.*
+*The two pore-pressure models land within 0.003 of each other, the same near-identity Slide reports (1.141 vs 1.142): the corpus's end-to-end check that a phreatic surface computed from scratch reproduces the one Duncan & Wright drew.*
 
 ![vp071a: inputs and representative solution](images/vp071a.png)
 ![vp071b: inputs and representative solution](images/vp071b.png)

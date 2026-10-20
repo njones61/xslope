@@ -7,7 +7,7 @@ description: "Short video walkthroughs of XSLOPE, each with the model files it s
 
 <div class="vid-hero" markdown>
 
-Short walkthroughs of XSLOPE, each 15 minutes or less, published on the
+Short walkthroughs of XSLOPE, published on the
 **[xslope YouTube channel](https://www.youtube.com/@xslope-org)**. Each video
 below lists the completed model it builds, and the starting model when it doesn't
 begin from a blank one, so you can download the file and follow along.
@@ -324,13 +324,13 @@ stability run gets when it ignores the seepage.
 
 ## Finite element
 
-<span class="vid-band-sub">Videos 12–13</span>
+<span class="vid-band-sub">Videos 12–14</span>
 
 </div>
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/fem01_shear_strain.png)
+[![](../tutorials/images/fem01_shear_strain.png)](https://youtu.be/wrK-weaLUA8)
 <span class="vid-num">12</span>
 </div>
 <div class="vid-body" markdown>
@@ -338,11 +338,17 @@ stability run gets when it ignores the seepage.
 
 ### Strength Reduction on an Embankment {#video-12}
 
-An embankment solved by the shear strength reduction method: the elastic
-properties the run needs, a quadratic mesh, the run, and the deformed mesh and
-shear strain at failure, compared with Spencer's method on the same slope.
+A one-soil embankment solved by the shear strength reduction method: a quadratic
+mesh and why linear elements read too high, the Young's modulus and Poisson's
+ratio the run needs, the search over the reduction factor, and the shear strain
+and deformed mesh at failure. The answer, 1.371, sits within half a percent of
+Spencer's method on the same slope.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/wrK-weaLUA8">▶ Watch · 15 min</a></p>
+
+**Starting model** — [xslope_ssrm_embankment_start.xlsx](../tutorials/files/xslope_ssrm_embankment_start.xlsx)
+
+**Completed model** — [xslope_ssrm_embankment.xlsx](../tutorials/files/xslope_ssrm_embankment.xlsx)
 
 **Related tutorial** — [FEM-1. Strength Reduction Basics](../tutorials/fem01_strength_reduction.md)
 
@@ -351,7 +357,7 @@ shear strain at failure, compared with Spencer's method on the same slope.
 
 <div class="vid-row" markdown>
 <div class="vid-thumb" markdown>
-![](../tutorials/images/combo01_fem_shear.png)
+[![](../tutorials/images/combo01_fem_shear.png)](https://youtu.be/knHukVX7MMw)
 <span class="vid-num">13</span>
 </div>
 <div class="vid-body" markdown>
@@ -359,12 +365,47 @@ shear strain at failure, compared with Spencer's method on the same slope.
 
 ### Seepage, LEM, and FEM on One Mesh {#video-13}
 
-The Video 10 dam run through all three engines on one quadratic mesh: the seepage
-solution, a Spencer search on its pore pressures, and a strength reduction run.
+The Video 11 dam run through all three analyses on one quadratic mesh: the
+seepage solution, a Spencer search on its pore pressures for comparison, and a
+strength reduction that reads the same pore pressures. The two factors of
+safety, 1.272 and 1.262, agree to within 1%.
 
-<p class="vid-meta"><span class="vid-pill vid-soon">Coming soon</span></p>
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/knHukVX7MMw">▶ Watch · 10 min</a></p>
+
+**Model** — [xslope_video11_seep_to_lem.xlsx](files/xslope_video11_seep_to_lem.xlsx), the Video 11 model, meshed at 100 size divisions
+
+<!-- test: file=files/xslope_video11_seep_to_lem.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.262, tolerance=0.01, f_min=1.0, f_max=2.0, f_stand=1.2578125, f_fail=1.265625, check=edges -->
 
 **Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
+
+</div>
+</div>
+
+<div class="vid-row" markdown>
+<div class="vid-thumb" markdown>
+[![](images/video14_shear_strain.png)](https://youtu.be/dsPmON8-Yfk)
+<span class="vid-num">14</span>
+</div>
+<div class="vid-body" markdown>
+<p class="vid-kicker">Video 14 · Finite element</p>
+
+### The FEM Finds the Weak Layer {#video-14}
+
+The Video 7 slope, with its 2 ft seam of soft clay, run as a strength reduction.
+No failure surface is entered: the shear strain gathers along the seam on its
+own. A local element size on the seam's profile line resolves the thin layer
+without refining the whole mesh. The answer, 1.621, is 2% below the
+non-circular Spencer search from Video 7.
+
+<p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/dsPmON8-Yfk">▶ Watch · 7 min</a></p>
+
+**Starting model** — [xslope_noncircular_fem.xlsx](../fem/files/xslope_noncircular_fem.xlsx)
+
+**Completed model** — [xslope_video14_weak_layer_fem.xlsx](files/xslope_video14_weak_layer_fem.xlsx). It stores the 2 ft target size and the seam's Size of 1; untick **Refine thin zones** in Build Mesh to match the video.
+
+<!-- test: file=files/xslope_video14_weak_layer_fem.xlsx, type=fem_ssrm, element_type=tri6, target_size=2, expected_fs=1.621, tolerance=0.01, f_min=1.0, f_max=2.0, f_stand=1.6171875, f_fail=1.625, check=edges -->
+
+**Related** — [FEM sample 1](../fem/samples.md#1-non-circular-failure-surface-with-thin-weak-layer), [Video 7](#video-7)
 
 </div>
 </div>

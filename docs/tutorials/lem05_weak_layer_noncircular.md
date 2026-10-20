@@ -40,7 +40,9 @@ seam.
 **Materials** — four Mohr-Coulomb (`mc`) soils, listed top down. Unit weights are
 pcf and cohesions psf, and the row order is the Mat ID. The columns none of the
 four use are left empty below; a blank cell and the `0` the worksheet figure
-further down shows both reach the solver as zero:
+further down shows both reach the solver as zero. The UTEXASED manual gives one
+unit weight per soil, so γsat is left blank and each soil weighs γ both above and
+below the water table:
 
 | name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |

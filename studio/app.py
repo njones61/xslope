@@ -14,6 +14,13 @@ import os
 # Bind Matplotlib's Qt backend to PySide6 before any backend import.
 os.environ.setdefault("QT_API", "pyside6")
 
+# One OpenBLAS thread, set before NumPy loads. The solvers' work is in the compiled
+# kernel and sparse factorizations, so BLAS threads have nothing to share; left at
+# one per core they spin waiting on each other, and when anything else is busy (a
+# screen recorder, a sync client) the FEM iteration counter stalls for seconds at a
+# time. An environment that sets the variable keeps its own value.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
 import sys
 
 from PySide6.QtCore import QEvent

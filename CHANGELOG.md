@@ -75,9 +75,16 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - A steady seepage run whose boundary reads a time series that steps at t = 0
   takes the value before the step, as a transient run starts from. Before, it
   took the value after the step.
+- In **Build Mesh**, unticking **Auto-size from geometry** puts the cursor in
+  **Target element size**. Before, it jumped past it to the 1D element size.
+- A finite element run in Studio no longer stalls for seconds at a time while
+  other programs are busy. Studio now runs the math library NumPy uses on one
+  thread, so its idle threads no longer compete with the solver for the
+  processor.
 - The strength plot in the Materials list view draws τ and σ′ at the same
-  scale, so the envelope rises at the friction angle entered. This applies to
-  Mohr-Coulomb, power-curve, and Hoek-Brown materials.
+  scale, so the envelope rises at the friction angle entered, and it shows the
+  whole envelope, ending inside the frame. This applies to Mohr-Coulomb,
+  power-curve, and Hoek-Brown materials.
 - In Studio's tables, `Delete` (`delete` on a Mac keyboard) empties the selected
   cells. Before, a cell had to be opened with a double-click first.
 - The Materials list view dims its property fields until a material exists.
@@ -112,10 +119,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - A reservoir boundary's face above the water is no-flow until the water reaches
   it. Once the water has covered a point and fallen back below it, the point is a
   seepage exit face, as before. Before, the face above the water was an exit face
-  even where the water had not yet reached it. A constant level never reaches the face above it, so that face is
-  no-flow for the whole run. A new preflight warning,
-  `tseep.reservoir_level_above_line`, reports a level that rises above the top of
-  its reservoir line onto ground no boundary covers.
+  even where the water had not yet reached it. A constant level never reaches the
+  face above it, so that face is no-flow for the whole run. A new preflight
+  warning, `tseep.reservoir_level_above_line`, reports a level that rises above
+  the top of its reservoir line onto ground no boundary covers.
 - A new preflight warning, `seep.head_line_above_water`, reports a plain head
   line along the ground that the water leaves partly dry. A head line holds every
   point at the level at all times, so the dry part is held in suction and draws
@@ -123,6 +130,9 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - Studio's Help menu, report citations, and the assistant link to the latest
   documentation, the version xslope.org opens on, instead of the documentation
   for the last release.
+- **Refine thin zones** in Build Mesh leaves alone any zone that has its own
+  Size on its profile line or polygon, and still refines the other thin zones.
+  Before, it refined a zone past the Size you gave it.
 - The RS2 verification page and the FEM samples page give ten strength
   reduction results as the current solver computes them; each moved by 0.4 to
   1.8%, and every comparison keeps its rating.

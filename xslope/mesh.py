@@ -683,16 +683,9 @@ def thin_zone_plan(polygon_coords, target_size, group_ids=None, declared_sizes=N
     ``declared_sizes`` (one entry per polygon, ``None`` where the model declares
     nothing) drops a whole-thin zone whose polygons state their own Size: an explicit
     Size is the user saying how finely that zone is to be meshed, and an automatic
-    option must not overrule it.
-
-    Passing it is the QUADRILATERAL path's choice, not a property of the rule. On that
-    path the derived size and a declared Size are the same mechanism — both become a
-    local size region — so an automatic one layered on top would simply overwrite the
-    user's. The triangular path refines through a size field that composes with the
-    declared size by taking the minimum, and it does NOT pass this: the sample
-    Griffiths section declares 1.25 on its seam, which carries 1.6 element rows, and
-    skipping it there would leave the section at the under-resolution the toggle is
-    there to prevent.
+    option must not overrule it (Norm, 2026-10-19). Both element families pass it. A
+    declared Size too coarse to resolve its zone is not refined past; preflight's
+    ``mesh.thin_zone_unresolved`` measures the mesh that was built and says so.
 
     Returns the ``detect_thin_zones`` dicts, each with ``'size'`` replaced by the
     clamped value the mesher uses.
@@ -783,7 +776,7 @@ def _feature_size_fields(gmsh, target_size, refine_factor, refine_set,
                          polygon_coords, line_curve_tags, point_map,
                          surface_tags_by_polygon, debug=False,
                          region_ids=None, material_k=None, edge_map=None,
-                         size_1d=None):
+                         size_1d=None, declared_sizes=None):
     """Build the gmsh size fields for feature-aware refinement and return their tags:
     a Distance+Threshold band per line/crack feature and a banded (or boxed) size per
     thin zone. Nothing is installed here — :func:`_install_background_size_field`
@@ -865,7 +858,8 @@ def _feature_size_fields(gmsh, target_size, refine_factor, refine_set,
     if 'thin_zones' in refine_set:
         trans_of = (lambda s: (target_size - s) / (_REFINE_GROWTH_RATIO - 1.0))
         for zone in thin_zone_plan(polygon_coords, target_size,
-                                   group_ids=region_ids):
+                                   group_ids=region_ids,
+                                   declared_sizes=declared_sizes):
             size = zone['size']
             if zone['kind'] == 'whole':
                 surfs = [surface_tags_by_polygon[i]
@@ -2287,7 +2281,8 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             polygon_coords, all_line_curve_tags, point_map,
             surface_tags_by_polygon, debug=debug,
             region_ids=region_ids, material_k=material_k,
-            edge_map=edge_map, size_1d=element_size_1d)
+            edge_map=edge_map, size_1d=element_size_1d,
+            declared_sizes=polygon_sizes)
     elif element_size_1d is not None:
         all_line_curve_tags = [t for info in line_data for t in info['line_tags']]
         _feature_fields = _feature_size_fields(

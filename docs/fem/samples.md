@@ -18,8 +18,9 @@ software developed by Stephen G. Wright at the University of Texas at Austin.
 
 ![Slope with a weak clay layer](../tutorials/images/lem05_problem_sketch.png){width=1000}
 
-The slope geometry and strength properties are the same as the LEM problem. Young's modulus ($E$) and Poisson's
-ratio ($\nu$) are estimated from typical correlations for each soil type:
+The slope geometry and strength properties are the same as the LEM problem. As in the UTEXASED manual, each soil
+has one unit weight, used both above and below the water table, so γsat is left blank. Young's modulus ($E$) and
+Poisson's ratio ($\nu$) are estimated from typical correlations for each soil type:
 
 | Soil | $c'$ (psf) | $\phi'$ (deg) | $\gamma$ (pcf) | $E$ (psf) | $\nu$ |
 |------|:----------:|:--------------:|:---------------:|:---------:|:-----:|

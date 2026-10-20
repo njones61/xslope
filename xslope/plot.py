@@ -73,17 +73,31 @@ def _material_hint(ax, msg, title=""):
     return ax
 
 
-def _tau_sigma_extent(ax, sigma_span, tau0):
+def _tau_sigma_extent(ax, sigma_span, tau0, tau_of=None):
     """``(σ_max, τ_max)`` for a τ–σ envelope drawn at one scale on both axes.
 
     An envelope is read for its angle, and only equal scales show φ as φ. The
     panel's own height-to-width ratio decides how much τ fits beside a given σ, so
     the σ extent is at least ``sigma_span`` and wide enough that the τ range it
-    buys holds the intercept ``tau0`` with half of it again above."""
+    buys holds the intercept ``tau0`` with half of it again above.
+
+    ``tau_of(σ)`` is the envelope itself. The σ extent then grows until the whole
+    curve ends inside the frame, with a little room above its end. An envelope too
+    steep to do that at the panel's ratio keeps its σ extent and takes the τ range
+    it needs; the equal-scale box then comes out narrower than the panel rather
+    than cutting the line off at the top."""
     bb = ax.get_window_extent()
     ratio = bb.height / bb.width if bb.width > 0 and bb.height > 0 else 0.75
     s_max = max(float(sigma_span), 1.5 * max(float(tau0), 0.0) / ratio)
-    return s_max, ratio * s_max
+    if tau_of is None:
+        return s_max, ratio * s_max
+    head = 1.08
+    s = s_max
+    for _ in range(80):
+        if ratio * s >= head * float(tau_of(s)):
+            return s, ratio * s
+        s *= 1.25
+    return s_max, max(ratio * s_max, head * float(tau_of(s_max)))
 
 
 def _equal_tau_sigma(ax, s_max, tau_max):
@@ -126,7 +140,9 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         c, phi = g("c"), g("phi")
         if c == 0 and phi == 0:
             return _material_hint(ax, "enter c and φ", "Mohr–Coulomb")
-        s_max, tau_max = _tau_sigma_extent(ax, sigma_max, c)
+        tan_phi = np.tan(np.radians(phi))
+        s_max, tau_max = _tau_sigma_extent(ax, sigma_max, c,
+                                           tau_of=lambda x: c + x * tan_phi)
         s = np.linspace(0.0, s_max, n)
         tau = c + s * np.tan(np.radians(phi))
         ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
@@ -169,7 +185,9 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         # curve stays finite near the origin.
         floor = 1e-4 * max(1.0, sigma_max)
         tau0 = a * np.power(max(d, floor), b) + cp_c
-        s_max, tau_max = _tau_sigma_extent(ax, sigma_max, tau0)
+        s_max, tau_max = _tau_sigma_extent(
+            ax, sigma_max, tau0,
+            tau_of=lambda x: a * np.power(max(x + d, floor), b) + cp_c)
         s = np.linspace(0.0, s_max, n)
         s_eff = np.maximum(s + d, floor)
         tau = a * np.power(s_eff, b) + cp_c
@@ -190,7 +208,11 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         # slopes. Evaluated through the SAME hb_tangent the solver linearizes with:
         # τ(σₙ) = c_i + σₙ·tan(φ_i).
         c0, _phi0 = hb_tangent(np.array([0.0]), sci, gsi, mi, dfac)
-        smax, tau_max = _tau_sigma_extent(ax, max(0.2 * sci, 1.0), float(c0[0]))
+        def _hb_tau(x):
+            ci, pi = hb_tangent(np.array([x]), sci, gsi, mi, dfac)
+            return float(ci[0] + x * np.tan(np.radians(pi[0])))
+        smax, tau_max = _tau_sigma_extent(ax, max(0.2 * sci, 1.0), float(c0[0]),
+                                          tau_of=_hb_tau)
         s = np.linspace(0.0, smax, n)
         c_i, phi_i = hb_tangent(s, sci, gsi, mi, dfac)
         tau = c_i + s * np.tan(np.radians(phi_i))

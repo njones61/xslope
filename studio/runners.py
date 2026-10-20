@@ -69,7 +69,7 @@ def _len_unit(slope_data):
         return ""
 
 
-def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=False):
+def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=True):
     """The thin material zones *Refine thin zones* will act on, each with the local
     element size it gets and a name to report it under.
 
@@ -96,12 +96,13 @@ def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=Fa
     30033 on tri6), because the band holds the fine size for two element widths beyond
     the zone before it starts growing back.
 
-    ``skip_declared`` drops a zone whose polygon already declares a Size. It defaults
-    off and no caller sets it: the size field composes with a declared size by taking
-    the minimum rather than replacing it, so an automatic refinement cannot overwrite
-    what the user asked for, and honouring a too-coarse declaration would leave the
-    zone unresolved. (It existed for the size-region route, where the two WERE the same
-    mechanism and the automatic one would have overwritten the declared one.)
+    ``skip_declared`` (on by default) drops a zone whose polygon already declares a
+    Size, which is what the mesher does too: a Size on a profile line or polygon is
+    the user's decision about that zone, and the automatic option leaves it alone
+    (Norm, 2026-10-19). A declared Size too coarse to resolve its zone is reported by
+    preflight's ``mesh.thin_zone_unresolved`` rather than overridden. The Log line
+    and the mesh read the same plan, so the Log never names a zone the mesher
+    skipped.
 
     Returns ``[{'name', 'width', 'size', 'polygon': ring}, ...]``, ordered as the
     mesher takes them. ``'polygon'`` is the zone's ring, in the shape

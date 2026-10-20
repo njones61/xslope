@@ -910,7 +910,7 @@ example (1.434 against the manual's 1.44);
 [VP97](../verification/rocscience.md#vp97), Pilarcitos Dam, which failed in
 drawdown (1.044 against 1.05);
 [VP98](../verification/rocscience.md#vp98), the Walter Bouldin Dam failure
-(1.046 against 1.04); and
+(1.047 against 1.04); and
 [VP99](../verification/rocscience.md#vp99), the pumped-storage dam of Duncan,
 Wright and Wong's own paper (1.527 against 1.56). All four supply their two water
 states as piezometric pairs, which is how their sources published them.

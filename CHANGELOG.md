@@ -139,6 +139,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - The Rocscience verification page gives VP38, VP46, and VP71 results as the
   current solver computes them; each moved by 0.001 or 0.002, and every
   comparison keeps its rating.
+- The Rocscience and GeoStudio verification pages and the limit equilibrium
+  samples page give 16 more factors of safety as the current solver computes
+  them, each 0.001 to 0.003 from the value given before. The VP36 reliability
+  index is 2.282, where the pages gave 2.263. Every comparison keeps its rating.
 - A profile line or polygon added in Studio starts with one vertex row to type
   or paste into, and on the material of its own number (line 2 on material 2),
   as the workbook's profile and polygon sheets are laid out.

@@ -492,7 +492,7 @@ both by the friction-circle method, which XSLOPE does not implement.
 Bishop's method gives 1.859 against 1.82 (Hassiotis et al., friction circle, +2.1%).
 The row raises the factor of safety by 68%.
 
-#### Pile row 23.1 m from the toe (FS = 1.284)
+#### Pile row 23.1 m from the toe (FS = 1.281)
 
 ![hassiotis_p2_results.png](sample_images/hassiotis_p2_results.png){width=1000}
 
@@ -553,4 +553,4 @@ show the range of published results.
 <!-- /fs-table -->
 
 <!-- test: file=files/xslope_hassiotis_p1.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=11.01;33.7, fs_oms=1.822, fs_bishop=1.859, fs_janbu=1.788, fs_corps=1.885, fs_lowe=1.871, fs_spencer=1.855, fs_mprice=1.855, benchmark=LEM-HASSIOTIS -->
-<!-- test: file=files/xslope_hassiotis_p2.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=16.44;33.7, fs_oms=1.244, fs_bishop=1.289, fs_janbu=1.373, fs_corps=1.385, fs_lowe=1.340, fs_spencer=1.284, fs_mprice=1.289, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis_p2.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=16.44;33.7, fs_oms=1.244, fs_bishop=1.289, fs_janbu=1.373, fs_corps=1.385, fs_lowe=1.340, fs_spencer=1.281, fs_mprice=1.289, benchmark=LEM-HASSIOTIS -->

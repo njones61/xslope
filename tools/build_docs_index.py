@@ -412,7 +412,7 @@ def build_index(verbose=True):
 
     return {'schema_version': SCHEMA_VERSION,
             'encoding': 'lzma+base64',
-            'base_url': 'https://xslope.org/en/stable/',
+            'base_url': 'https://xslope.org/en/latest/',
             'bodies': packed,
             'pages': pages,
             'template': {'sheets': sheets},

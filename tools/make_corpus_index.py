@@ -47,7 +47,7 @@ DOCS = REPO_ROOT / 'docs'
 INDEX_PATH = DOCS / 'verification' / 'corpus_index.json'
 SKILL_PATH = DOCS / 'usage' / 'claude' / 'xslope.md'
 BUNDLED_SKILL = REPO_ROOT / 'xslope' / 'resources' / 'xslope_skill.md'
-BASE_URL = 'https://xslope.org/en/stable/'
+BASE_URL = 'https://xslope.org/en/latest/'
 
 BEGIN_MARKER = '<!-- corpus-index:begin -->'
 END_MARKER = '<!-- corpus-index:end -->'

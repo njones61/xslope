@@ -528,8 +528,8 @@ def test_targets():
             "Sample problems": links.SAMPLES_URL,
             "Verification": links.VERIFICATION_URL}
 
-    # The documentation root is the RELEASED docs (/en/stable/) on the domain mkdocs
-    # publishes. site_url names each version's own address when Read the Docs builds
+    # The documentation root is the LATEST docs (/en/latest/), the version
+    # xslope.org opens on, on the domain mkdocs publishes. site_url names each version's own address when Read the Docs builds
     # it, with a fallback for builds elsewhere; the domain is the fallback's.
     with open(os.path.join(_REPO, "mkdocs.yml"), encoding="utf-8") as fh:
         mkdocs = fh.read()
@@ -542,9 +542,9 @@ def test_targets():
         if urlparse(links.DOCS_URL).hostname not in hosts:
             fails.append(f"DOCS_URL is {links.DOCS_URL}, but mkdocs publishes on "
                          f"{sorted(hosts) or site_url.group(1)}")
-        if urlparse(links.DOCS_URL).path != "/en/stable/":
-            fails.append(f"DOCS_URL is {links.DOCS_URL}, not the released docs "
-                         f"(/en/stable/)")
+        if urlparse(links.DOCS_URL).path != "/en/latest/":
+            fails.append(f"DOCS_URL is {links.DOCS_URL}, not the latest docs "
+                         f"(/en/latest/)")
 
     host = urlparse(links.DOCS_URL).hostname
     if host not in urlscheme.ALLOWED_HOSTS:

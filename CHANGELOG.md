@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.0.5 — 2026-10-22
+
 ### Fixed
 
 - Studio's reinforcement editor applies Spacing. Tmax, Tres, Tend1, Tend2, and

@@ -273,6 +273,11 @@ the canvas re-renders automatically.
   'tend1','tend2','spacing','type','dir','appl','adhesion','delta',
   'joint','kn','ks','jred'}
   ('adhesion'+'delta' both set = overburden pullout law; 'lp1'/'lp2' then unused)
+  ('t_max','t_res','tend1','tend2','area' are PER UNIT WIDTH here: the reinforce
+   sheet's per-element values, already divided by 'spacing'. For nails or anchors
+   with a per-element capacity T at spacing S, store t_max = T/S and spacing = S;
+   'spacing' itself divides nothing in the model. A geosynthetic is per unit
+   width already: spacing = 1.)
   ('joint'='Yes' makes the line a slip surface in the FEM: the mesh splits along
    it and interface elements carry 'adhesion'/'delta', which are then required;
    'kn'/'ks' blank = derived from the adjacent soil; 'jred'='No' holds the

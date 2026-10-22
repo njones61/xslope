@@ -6,6 +6,15 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Fixed
+
+- Studio's assistant is told that the reinforcement it edits holds capacities per
+  unit width, so a nail's own capacity is divided by its Spacing before it is
+  stored. Before, nothing told it so, and it could store a per-nail Tmax beside
+  its Spacing and overstate the nails by that Spacing.
+- The report's reinforcement table heads Area per unit width (m²/m or ft²/ft),
+  which is what it prints. Before, it read m² or ft², a bar's own section.
+
 ## 1.0.5 — 2026-10-22
 
 ### Fixed

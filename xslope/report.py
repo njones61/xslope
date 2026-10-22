@@ -2584,7 +2584,10 @@ def _reinforcement_fields(slope_data):
     """Every reinforcement property the report can print, by key."""
     unit = _unit_suffix(slope_data)
     lu, fu, su = unit("length"), unit("force_per_len"), unit("stress")
-    au = f" ({_unit_labels(slope_data)['length']}²)" if unit("length") else ""
+    # Area is divided by Spacing as the file is read, like the forces: a cross
+    # section per unit width of slope (length²/length), not a bar's own section.
+    _l = _unit_labels(slope_data)['length']
+    au = f" ({_l}²/{_l})" if unit("length") else ""
     return {
         "label": ("label", "Label", lambda m: str(m.get("label") or ""), True),
         "start": ("x1", "Start (x, y)", lambda m: _point(m, "x1", "y1"), True),

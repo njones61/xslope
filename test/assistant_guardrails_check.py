@@ -533,6 +533,25 @@ def check_schema_brief_covers_every_loaded_key():
     return out
 
 
+def check_schema_brief_says_reinforcement_is_per_width():
+    """The reinforcement record says its capacities are per unit width.
+
+    The loader divides the reinforce sheet's per-element Tmax, Tres, Tend1, Tend2,
+    and Area by Spacing, so the record the assistant edits is per unit width, and
+    its 'spacing' divides nothing more. A model told only that 'spacing' is one of
+    the fields would store a nail's own capacity beside its spacing and overstate
+    the nails by that spacing: the Studio editor did exactly that (issue #5)."""
+    from studio.ai.assistant import SCHEMA_BRIEF
+    entry = SCHEMA_BRIEF.split("- reinforcement_lines[i]:", 1)[-1].split("\n- ", 1)[0]
+    out = []
+    for phrase in ("PER UNIT WIDTH", "t_max = T/S", "spacing = S"):
+        if phrase not in entry:
+            out.append(f"SCHEMA_BRIEF's reinforcement_lines entry no longer says "
+                       f"{phrase!r}: the record is per unit width and the model "
+                       f"must divide a per-element capacity by the spacing itself")
+    return out
+
+
 # --- C/D. the checks are injected, on the three failure shapes --------------
 
 def check_clean_build():
@@ -3119,6 +3138,8 @@ CHECKS = [
     ("B. modeling brief agrees", check_modeling_brief_agrees),
     ("B. the schema covers every loaded key",
      check_schema_brief_covers_every_loaded_key),
+    ("B. reinforcement capacities are per unit width",
+     check_schema_brief_says_reinforcement_is_per_width),
     ("C/D. sound build comes back clean", check_clean_build),
     ("D. the edit cascade surfaces", check_edit_cascade),
     ("D. ground past the toe surfaces", check_ground_past_the_toe),

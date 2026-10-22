@@ -456,6 +456,30 @@ def _spacing_leg():
     return failures
 
 
+def _report_units_leg():
+    """The report prints reinforcement Area per unit width, as it holds it (the
+    loader divided it by Spacing): m²/m, not a bar's own m². A pile's Area is the
+    pile's own section and keeps m²."""
+    import contextlib
+    import io
+    from xslope.fileio import load_slope_data
+    from xslope.report import _pile_fields, _reinforcement_fields
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(NAIL_FILE)
+    failures = []
+    for system, length in (('si', 'm'), ('imperial', 'ft')):
+        model = dict(sd, unit_system=system)
+        got = _reinforcement_fields(model)['area'][1]
+        if got != f"Area ({length}²/{length})":
+            failures.append(f"report: reinforcement Area is headed {got!r} in {system}, "
+                            f"not 'Area ({length}²/{length})'")
+        got = _pile_fields(model)['area'][1]
+        if got != f"Area ({length}²)":
+            failures.append(f"report: pile Area is headed {got!r} in {system}, "
+                            f"not 'Area ({length}²)'")
+    return failures
+
+
 def run():
     warnings.simplefilter('ignore')
     if not os.path.exists(REINF_FILE):
@@ -467,6 +491,7 @@ def run():
     failures += _unset_fields_leg()
     failures += _cleared_cells_leg()
     failures += _spacing_leg()
+    failures += _report_units_leg()
     return failures
 
 

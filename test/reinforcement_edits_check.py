@@ -27,6 +27,11 @@ each of them silent:
   fully anchored end out of a missing length, and a cleared Spacing was refused
   as zero where a blank means a continuous sheet.
 
+* Spacing in Studio's reinforcement editor (issue #5). The editor showed the per
+  unit width capacities the loader had made, under per-element labels, and
+  divided nothing on OK, so a changed Spacing had no effect and a Tmax typed per
+  nail was analyzed per unit width.
+
 Each leg asserts the fix AND the behavior it must not have disturbed: a blank
 still takes the documented default, a model that carries no source key at all
 still runs the legacy point-list path, and a row whose Dir/Appl are exactly what
@@ -48,6 +53,13 @@ TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 #: Tres = 600 filled, which is what the page's "clear the Tres column" starts from.
 FEM02_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                           'docs', 'tutorials', 'files', 'xslope_reinforced_slope.xlsx')
+
+#: Soil nails entered per nail with Spacing 1.15: the model the Spacing leg edits.
+NAIL_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         'docs', 'inputs', 'slope', 'xslope_nail_axial.xlsx')
+
+#: The reinforce sheet's terms entered per element and divided by Spacing at load.
+PER_ELEMENT = ('t_max', 't_res', 'tend1', 'tend2', 'area')
 
 #: The Dir column's shared-formula group spans H3:H22 (Appl's spans I3:I22), so
 #: rows 9-22 are the ones no reinforcement row of the test file reaches: they are
@@ -356,6 +368,94 @@ def _cleared_cells_leg():
     return failures
 
 
+def _spacing_leg():
+    """Studio's reinforcement editor shows and takes the capacities per element,
+    as the reinforce sheet does, and divides them by Spacing on OK (issue #5).
+    Before, it showed the per-unit-width values the loader had made, labeled per
+    element, and stored what was typed as per unit width: a Tmax of 15 per nail at
+    Spacing 2 was analyzed as 15 per unit width, not 7.5, and saved as 30.
+
+    The same edit made in Studio and made in the workbook must give the same
+    model; an untouched row must come back as it went in."""
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception:                                         # noqa: BLE001
+        return []
+    QApplication.instance() or QApplication([])
+    import contextlib
+    import io
+    import shutil
+    import openpyxl
+    from xslope.fileio import cell_ref, load_slope_data, write_cells_to_xlsx
+    from studio.editors import ReinforcementEditor
+
+    failures = []
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(NAIL_FILE)
+    before = [dict(r) for r in sd['reinforcement_lines']]
+    if not before or before[0].get('spacing') in (None, 1.0):
+        return [f"spacing: {NAIL_FILE} no longer has a Spacing on its first nail"]
+
+    dlg = ReinforcementEditor().build(sd, None)
+    dlg.set_view_mode('table')
+    col = {f.key: j for j, f in enumerate(ReinforcementEditor.FIELDS)}
+    shown = dlg._table._cell_text(0, col['t_max'])
+    want = before[0]['t_max'] * before[0]['spacing']
+    if abs(float(shown) - want) > 1e-9 * want:
+        failures.append(f"spacing: the editor shows Tmax {shown} for a nail the sheet "
+                        f"gives {want:g} per element at Spacing {before[0]['spacing']:g}")
+    typed = {'t_max': 20.0, 't_res': 6.0, 'tend1': 4.0, 'tend2': 3.0, 'area': 0.002,
+             'spacing': 2.0}
+    for key, v in typed.items():
+        dlg._table._set_cell_text(0, col[key], repr(v))
+    ReinforcementEditor().apply(sd, dlg)
+    dlg.deleteLater()
+    in_studio = sd['reinforcement_lines']
+
+    for key in PER_ELEMENT:
+        got, want = in_studio[0][key], typed[key] / typed['spacing']
+        if abs(got - want) > 1e-12 * abs(want):
+            failures.append(f"spacing: {key} typed as {typed[key]:g} per element at "
+                            f"Spacing 2 reads {got!r} in the model, not {want:g}")
+    for key in ('t_max', 'spacing'):
+        if in_studio[1][key] != before[1][key]:
+            failures.append(f"spacing: the untouched second nail's {key} moved from "
+                            f"{before[1][key]!r} to {in_studio[1][key]!r}")
+
+    # The same edit, made in the workbook.
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        shutil.copyfile(NAIL_FILE, tmp)
+        wb = openpyxl.load_workbook(tmp, read_only=True)
+        hdr = {str(c.value).strip().lower(): c.column
+               for c in next(wb['reinforce'].iter_rows(min_row=2, max_row=2)) if c.value}
+        wb.close()
+        sheet_key = {'t_max': 'tmax', 't_res': 'tres', 'tend1': 'tend1',
+                     'tend2': 'tend2', 'area': 'area', 'spacing': 'spacing'}
+        write_cells_to_xlsx(tmp, {'reinforce': {cell_ref(3, hdr[sheet_key[k]]): v
+                                                for k, v in typed.items()}})
+        with contextlib.redirect_stdout(io.StringIO()):
+            in_excel = load_slope_data(tmp)['reinforcement_lines']
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    for key in PER_ELEMENT + ('spacing',):
+        a, b = in_studio[0][key], in_excel[0][key]
+        if abs(a - b) > 1e-12 * max(abs(a), abs(b)):
+            failures.append(f"spacing: {key} is {a!r} after the Studio edit and {b!r} "
+                            f"after the same edit in the workbook")
+
+    # Saved and reopened, the Studio edit is still the same model.
+    with contextlib.redirect_stdout(io.StringIO()):
+        reloaded, _ = _round_trip(sd)
+    got = reloaded['reinforcement_lines'][0]['t_max']
+    if abs(got - in_studio[0]['t_max']) > 1e-12 * got:
+        failures.append(f"spacing: saved and reopened, Tmax reads {got!r}, "
+                        f"not {in_studio[0]['t_max']!r}")
+    return failures
+
+
 def run():
     warnings.simplefilter('ignore')
     if not os.path.exists(REINF_FILE):
@@ -366,6 +466,7 @@ def run():
     failures += _saved_file_leg()
     failures += _unset_fields_leg()
     failures += _cleared_cells_leg()
+    failures += _spacing_leg()
     return failures
 
 

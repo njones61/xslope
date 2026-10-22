@@ -6,6 +6,16 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Fixed
+
+- Studio's reinforcement editor applies Spacing. Tmax, Tres, Tend1, Tend2, and
+  Area are shown and entered per element, as in the reinforce sheet, and divided
+  by Spacing when the editor closes. Before, the editor showed the per unit width
+  values under per-element labels and divided nothing: a changed Spacing had no
+  effect, and a Tmax typed per nail was analyzed as per unit width, overstating
+  the reinforcement by the Spacing (a factor of 2 at a 2 m spacing). Models read
+  from a workbook were not affected until they were edited in Studio.
+
 ## 1.0.4 — 2026-10-20
 
 ### Fixed

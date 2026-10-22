@@ -7939,6 +7939,27 @@ class ReinforcementEditor(CategoryEditor):
                 "t_res": float("nan"), "E": float("nan"), "area": float("nan"),
                 "spacing": 1.0}
 
+    # The terms the loader divides by Spacing (fileio.reinforce_spacing_divisor).
+    # The model holds them per unit width; the editor shows and takes them per
+    # element, as the reinforce sheet does and as the list view's labels say, so
+    # build() multiplies by the row's divisor and apply() divides by it again.
+    # Without that, a Tmax typed per element was analyzed per unit width and a
+    # changed Spacing divided nothing (issue #5).
+    PER_ELEMENT = ("t_max", "t_res", "tend1", "tend2", "area")
+
+    @classmethod
+    def _per_element(cls, row, inverse=False):
+        """``row`` with its PER_ELEMENT terms multiplied by its Spacing divisor, or
+        divided by it when ``inverse``. Blank (None/NaN) terms stay blank."""
+        from xslope.fileio import reinforce_spacing_divisor
+        div = reinforce_spacing_divisor(row.get("spacing"))
+        out = dict(row)
+        for key in cls.PER_ELEMENT:
+            v = out.get(key)
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                out[key] = v / div if inverse else v * div
+        return out
+
     # Which pullout law a line uses is not a stored field — the row says it. A
     # filled Adhesion/Delta pair IS the overburden law, and the development lengths
     # stop being read; anything else is the development-length law, with Adhesion
@@ -8003,7 +8024,8 @@ class ReinforcementEditor(CategoryEditor):
             _draw_reinforcement_preview(ax, rows, selected, slope_data, style)
 
         return _LineEditorDialog(
-            "Reinforcement", self.FIELDS, slope_data.get("reinforcement_lines", []),
+            "Reinforcement", self.FIELDS,
+            [self._per_element(r) for r in slope_data.get("reinforcement_lines", [])],
             _new_reinf, _REINF_FORM_GROUPS, _reinf_item_label, preview,
             lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol),
             view_state="reinforce", parent=parent, unit_labels=_unit_labels_for(slope_data),
@@ -8041,6 +8063,7 @@ class ReinforcementEditor(CategoryEditor):
             for key, blank in self.BLANK_AS.items():
                 if row.get(key) is None:
                     row[key] = blank
+        rows = [self._per_element(row, inverse=True) for row in rows]
         slope_data["reinforcement_lines"] = rows
         # Rebuild the LEM display/analysis format so the canvas reflects the edit.
         slope_data["reinforce_lines"] = build_reinforce_lines(rows)

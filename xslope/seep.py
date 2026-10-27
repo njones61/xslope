@@ -187,18 +187,29 @@ def _flux_inflow(flux_nodal, free_mask):
     return float(np.sum(f[np.asarray(free_mask) & (f > 0)]))
 
 
+#: A node belongs to a boundary polyline when it lies on it to the precision the
+#: coordinates are typed to: this fraction of the model's larger dimension (0.03 m
+#: on a 300 m model, so a line ending at 138.3 binds the face whose corner is at
+#: 138.333, while the faces of a pile 0.1 m thick stay apart).
+BC_NODE_TOL_FRAC = 1e-4
+
+
 def bc_node_tolerance(nodes):
     """How close a mesh node must lie to a boundary polyline to belong to it.
 
-    A tenth of a typical element size, taken as the smaller of the mesh's x and y
-    ranges over the square root of its node count. :func:`build_seep_data` binds
-    every boundary condition with it, and preflight reads boundary lines against
-    the ground surface with the same number."""
+    A fixed fraction of the model's size, BC_NODE_TOL_FRAC of the mesh's larger
+    dimension, never of the element size: the mesher puts the boundary nodes on the
+    boundary, so a node on the line lies on it to the precision of the typed
+    coordinates, and two features closer than an element (the two faces of a thin
+    sheet pile at the ground) keep their own conditions at any mesh density. A line drawn off the
+    model boundary binds nothing along that stretch; preflight
+    (seep.bc_line_off_boundary) reports it. :func:`build_seep_data` binds every
+    boundary condition with this distance, and preflight reads boundary lines
+    against the ground surface with the same number."""
     nodes = np.asarray(nodes, dtype=float)
     x_range = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
     y_range = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-    typical_element_size = min(x_range, y_range) / np.sqrt(len(nodes))
-    return typical_element_size * 0.1
+    return BC_NODE_TOL_FRAC * max(x_range, y_range)
 
 
 def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):

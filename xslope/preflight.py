@@ -4527,11 +4527,8 @@ def _bc_node_tolerance(ctx):
     """The distance within which a mesh node belongs to a boundary polyline, as
     :func:`xslope.seep.build_seep_data` binds it, or ``None``.
 
-    Read off the mesh this run will use when one is attached. Without a mesh the
-    same formula is applied to the mesh the model's target element size would
-    produce: a node count of the domain area over the area a node carries in an
-    equilateral triangulation (about 0.866 t^2), or a thousand nodes where the
-    model states no target size."""
+    Read off the mesh this run will use when one is attached; without a mesh, the
+    same fraction of the domain's larger dimension (the mesh spans the domain)."""
     import numpy as np
     from .seep import bc_node_tolerance
     mesh = ctx.mesh
@@ -4543,17 +4540,72 @@ def _bc_node_tolerance(ctx):
                 return float(bc_node_tolerance(nodes))
         except (TypeError, ValueError):
             pass
+    from .seep import BC_NODE_TOL_FRAC
     dom = ctx.domain
     try:
         x0, y0, x1, y1 = (float(v) for v in dom.bounds)
-        area = float(dom.area)
     except (AttributeError, TypeError, ValueError):
         return None
-    if min(x1 - x0, y1 - y0) <= 0.0 or area <= 0.0:
+    if max(x1 - x0, y1 - y0) <= 0.0:
         return None
-    target = _num(ctx.sd.get("target_size"))
-    n = (area / (0.866 * target * target)) if target and target > 0 else 1000.0
-    return 0.1 * min(x1 - x0, y1 - y0) / math.sqrt(max(n, 4.0))
+    return BC_NODE_TOL_FRAC * max(x1 - x0, y1 - y0)
+
+
+@rule("seep.bc_line_off_boundary", WARNING, ("seep",),
+      "A boundary-condition line that leaves the zone edges binds no nodes where "
+      "it is off them.")
+def _seep_bc_off_boundary(ctx):
+    """A head, exit-face, or flux line with a vertex or segment off the edges of the
+    zones (the model boundary and the boundaries between zones). A mesh node takes a line's condition only where the line passes
+    through it (to coordinate round-off), so the stretch off the boundary binds
+    nothing: a head line ending at 138.3 where the face corner is 138.333 holds
+    only the nodes at its foot. Reported with the largest offset and where it is."""
+    dom = ctx.domain
+    tol = _bc_node_tolerance(ctx)
+    if dom is None or tol is None:
+        return None
+    # every zone's edges, not only the outline: a head line along the top of an
+    # internal drain zone lies on mesh nodes too
+    from shapely.geometry import LineString, Point
+    from shapely.ops import unary_union
+    try:
+        from .mesh import get_material_polygons
+        polys = get_material_polygons(ctx.sd)
+        rings = [LineString(list(p["coords"] if isinstance(p, dict) else p) + [tuple((p["coords"] if isinstance(p, dict) else p)[0])])
+                 for p in polys]
+        edge = unary_union([dom.boundary] + rings)
+    except Exception:
+        try:
+            edge = dom.boundary
+        except AttributeError:
+            return None
+
+    def worst(coords):
+        pts = list(coords) + [((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) for a, b in zip(coords, coords[1:])]
+        d = [(edge.distance(Point(p)), p) for p in pts]
+        return max(d)
+
+    out = []
+    for where, bc in ((_AT_SEEPBC, ctx.seep_bc), (_AT_SEEPBC2, ctx.sd.get("seepage_bc2") or {})):
+        lines = [(f"Specified head #{n + 1} (head {b.get('head')})", _coords(b.get("coords")))
+                 for n, b in enumerate(bc.get("specified_heads") or [])]
+        lines += [(f"Specified flux #{n + 1}", _coords(b.get("coords")))
+                  for n, b in enumerate(bc.get("specified_fluxes") or [])]
+        lines.append(("The exit face", _coords(bc.get("exit_face") or [])))
+        for name, c in lines:
+            if len(c) < 2 or not all(math.isfinite(v) for q in c for v in q):
+                continue   # too short or not numbers: other rules report it
+            try:
+                d, p = worst(c)
+            except Exception:
+                continue
+            if d > tol:
+                out.append(f"{name} runs up to {d:.3g} off the zone edges, near "
+                           f"({p[0]:.6g}, {p[1]:.6g}). A node takes the condition only "
+                           f"where the line passes through it, so the nodes along that "
+                           f"stretch carry none. Put the line's points on the zone "
+                           f"vertices {where}.")
+    return out
 
 
 @rule("seep.head_line_above_water", WARNING, ("seep",),
@@ -6071,8 +6123,8 @@ def _joint_outside_domain(ctx):
         return
     for i, j in enumerate(ctx.joints):
         seg = _joint_seg(j)
-        if seg is None:
-            continue
+        if seg is None or not all(math.isfinite(v) for p in seg for v in p):
+            continue   # a missing endpoint is joint.endpoints_incomplete's to report
         g = LineString(list(seg))
         if g.length <= 0:
             yield (f"{ctx.joint_label(i)} has the same point at both ends. A "

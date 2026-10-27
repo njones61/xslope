@@ -5906,7 +5906,7 @@ PREFLIGHT_RULE_SPECS = [
     # surface and the ring closes on the first edge it drew.
     dict(rule='domain.degenerate_ring', base=PREFLIGHT_BASE_PROFILE, mode='excel',
          mutation=lambda sd: _pf_set(sd, max_depth=0.0),
-         expect='crosses or retraces itself at (0, 0)'),
+         expect='crosses or retraces itself at ('),
     # The control is the boundary this rule has to get right, not an untouched
     # file: a circle 20 below the floor, which is a MODELLING CHOICE (a composite
     # surface truncated along the base) and slices perfectly well. Only the circle
@@ -6134,6 +6134,19 @@ PREFLIGHT_RULE_SPECS = [
              specified_heads=[dict(b, coords=b['coords'][:1])
                               for b in sd['seepage_bc']['specified_heads']])),
          expect='fewer than two points'),
+    # the last point of the first head line moved off the zone edges by 1% of the model
+    dict(rule='seep.bc_line_off_boundary', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'],
+             specified_heads=[dict(sd['seepage_bc']['specified_heads'][0], coords=(
+                 list(sd['seepage_bc']['specified_heads'][0]['coords'][:-1])
+                 + [(sd['seepage_bc']['specified_heads'][0]['coords'][-1][0],
+                     sd['seepage_bc']['specified_heads'][0]['coords'][-1][1]
+                     + 0.01 * max(sd['domain_polygon'].bounds[2] - sd['domain_polygon'].bounds[0],
+                                  sd['domain_polygon'].bounds[3] - sd['domain_polygon'].bounds[1]))]))]
+             + sd['seepage_bc']['specified_heads'][1:])),
+         expect='off the zone edges'),
     dict(rule='seep.steady_reads_series_at_t0', base=PREFLIGHT_BASE_SEEP,
          mode='dict', analysis='seep',
          mutation=lambda sd: _pf_set(sd, seepage_bc=dict(

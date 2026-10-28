@@ -177,7 +177,7 @@ RESCUED = [
     ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8718997, 472, "A"),
 ]
 
-#: Converging without either escape, and required to stay that way, sweep for sweep.
+#: Converging without either escape, and required to stay that way, in about as many sweeps.
 #: Chosen for what each one would catch: vp046b and vp077a are the two models a
 #: blanket relaxation floor breaks, earth_dam1_vg cycles at a period of 2 for 46
 #: sweeps on its way to converging, earth_dam1 and vp077a revisit exit-face sets
@@ -250,9 +250,14 @@ INFIL_NOOP_RTOL = 1e-5
 #: and the reported number is the inflow half. They agree to ~1e-14 of themselves; the
 #: allowance is for summation order, not for a discrepancy.
 INFIL_BALANCE_RTOL = 1e-9
-#: Relative tolerance on a flow rate. The solve is deterministic — these are the
-#: numbers it gives, not numbers it is near — so this is a rounding allowance.
-Q_RTOL = 1e-6
+#: Relative tolerance on a flow rate. The solve is deterministic on one machine, but
+#: the linear algebra rounds differently from one machine to the next, and a cycling
+#: solve amplifies that: on the two desktops vp046b's flow rate differs by 5e-6.
+Q_RTOL = 1e-5
+#: The same rounding moves a sweep count: johnson_rapid_KEY converges in 472 sweeps
+#: at home and 439 at work, vp046b in 82 and 81. A count within 10% (or 2 sweeps) is
+#: the same trajectory; a changed solver moves it by far more.
+SWEEP_RTOL = 0.10
 
 _CYCLE_LINE = "head field is cycling"
 _REVISIT_LINE = "exit-face set returned to the set"
@@ -313,6 +318,10 @@ def _close(got, want):
     return abs(got - want) <= Q_RTOL * max(abs(want), 1e-12)
 
 
+def _sweeps_close(got, want):
+    return abs(got - want) <= max(2, SWEEP_RTOL * want)
+
+
 def leg_rescued():
     """Each cycling model converges, to the flow rate that is its answer."""
     fails = []
@@ -334,7 +343,7 @@ def leg_rescued():
         if not _close(float(sol["flowrate"]), q_want):
             fails.append(f"{name} bc{bc} flow rate {sol['flowrate']:.7g} for "
                          f"{q_want:.7g}")
-        if got != sweeps_want:
+        if not _sweeps_close(got, sweeps_want):
             fails.append(f"{name} bc{bc} converged in {got} sweeps for "
                          f"{sweeps_want}")
         print(f"  {name:<28} bc{bc}  converged {got:>4} sweeps  "
@@ -432,7 +441,7 @@ def leg_inert():
         if not _close(float(sol["flowrate"]), q_want):
             fails.append(f"{name} bc{bc} flow rate moved: {sol['flowrate']:.7g} "
                          f"for {q_want:.7g}")
-        if got != sweeps_want:
+        if not _sweeps_close(got, sweeps_want):
             fails.append(f"{name} bc{bc} took {got} sweeps for {sweeps_want} — its "
                          f"trajectory changed even though its answer did not")
         print(f"  {name:<28} bc{bc}  {got:>4} sweeps  q={sol['flowrate']:.7g}  "
@@ -652,7 +661,7 @@ def main():
         raise SystemExit(1)
     print("\nPASS: the four cycling models converge to their own answers, the class B "
           "escape still reaches that answer where its gate can be reached, every model "
-          "that converged without the escapes is unchanged sweep for sweep, the "
+          "that converged without the escapes takes about the same number of sweeps, the "
           "dam under rain sheds what it cannot take, and the drawdown section's "
           "looping steady states close on the element that holds them.")
 

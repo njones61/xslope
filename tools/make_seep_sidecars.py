@@ -29,6 +29,12 @@ Re-running reproduces every file it writes.
     PYTHONPATH=. python3 tools/make_seep_sidecars.py --check   # compare, write nothing
     PYTHONPATH=. python3 tools/make_seep_sidecars.py           # rewrite the companions
     PYTHONPATH=. python3 tools/make_seep_sidecars.py earth_dam1 johnson_res
+    PYTHONPATH=. python3 tools/make_seep_sidecars.py --phi-only    # rewrite only the phi column
+
+``--phi-only`` is for a change to the stream function alone (the flow-net
+boundary values): it replaces the last column, phi, with the fresh solve's and
+leaves every other byte of the file as committed, so a field whose heads have
+drifted by solver round-off on another machine is not rewritten with them.
 
 WHAT THIS SCRIPT DOES NOT TOUCH
 -------------------------------
@@ -238,7 +244,18 @@ def solve(stem, bc, settings):
     return seep_data, solution
 
 
-def run(stem_rel, bcs, settings, check):
+def _write_phi(path, phi):
+    """Replace the phi column (the last) of a committed companion, nothing else."""
+    lines = open(path).read().split("\n")
+    rows = [i for i, ln in enumerate(lines) if ln and not ln.startswith("#")][1:]
+    if len(rows) != len(phi):
+        raise SystemExit(f"{path}: {len(rows)} rows against {len(phi)} phi values")
+    for i, v in zip(rows, phi):
+        lines[i] = lines[i].rsplit(",", 1)[0] + "," + repr(float(v))
+    open(path, "w").write("\n".join(lines))
+
+
+def run(stem_rel, bcs, settings, check, phi_only=False):
     stem = os.path.join(REPO_ROOT, stem_rel)
     for bc in bcs:
         suffix = "_seep.csv" if bc == 1 else "_seep2.csv"
@@ -265,7 +282,12 @@ def run(stem_rel, bcs, settings, check):
               f"unconfined={solution.get('unconfined')} "
               f"converged={solution.get('converged')} "
               f"closure={solution.get('closure_error'):.3e}")
-        if not check:
+        if phi_only:
+            dphi = float(np.max(np.abs(solution["phi"] - df["phi"].to_numpy())))
+            print(f"{'':<40} d_phi={dphi:.3e}")
+            if not check:
+                _write_phi(path, solution["phi"])
+        elif not check:
             _quiet(export_seep_solution, seep_data, solution, path)
 
 
@@ -274,6 +296,8 @@ def main(argv=None):
     ap.add_argument("stems", nargs="*", help="basenames to limit the run to")
     ap.add_argument("--check", action="store_true",
                     help="compare against the committed field, write nothing")
+    ap.add_argument("--phi-only", action="store_true",
+                    help="rewrite only the phi (stream function) column")
     ap.add_argument("--held", action="store_true",
                     help="also report the held (stale-field) companions")
     args = ap.parse_args(argv)
@@ -286,7 +310,7 @@ def main(argv=None):
             raise SystemExit(f"no model matches {args.stems}")
 
     for stem_rel, bcs, settings in models:
-        run(stem_rel, bcs, settings, args.check)
+        run(stem_rel, bcs, settings, args.check, args.phi_only)
 
     if args.held:
         if not HELD:

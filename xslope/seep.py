@@ -2946,7 +2946,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                                            kr0=None, h0=None, total_flow=None,
                                            bc_type=None, exit_face_active=None,
                                            vg_a=None, vg_n=None, vg_l=None,
-                                           model=None):
+                                           model=None, flux_nodal=None):
     """
     Generates Dirichlet BCs for flow potential φ by integrating the Darcy
     velocity flux along each boundary edge from the owning element's shape
@@ -2956,6 +2956,14 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
     For each boundary edge, the stream function change is:
         Δψ = ∫(-vy·dx + vx·dy) along the edge
     where v = -kr·K·grad(h) is evaluated from the element's shape functions.
+
+    Only edges that carry flow get a Δψ: both corners at a specified head or on
+    an active exit face, or both carrying a specified flux. Every other boundary
+    edge is no-flow, so ψ is held constant along it. The element velocity there
+    is not zero, because the finite element solution meets a no-flow boundary
+    only on average, and near a singularity (a sheet-pile tip, the point where a
+    pool meets a dry slope) that leakage took a sizable share of the total flow and made the flow
+    lines cross the boundary.
 
     Parameters:
         nodes, elements, element_types: mesh data
@@ -3208,6 +3216,23 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
             grad_h = (grad_h1*area1 + grad_h2*area2)/(area1+area2)
             v = -kr_elem * Kmat @ grad_h
             segment_flux[c1] = -v[1]*dx + v[0]*dy
+
+    # Step 3b: No-flow edges carry no flow. An edge carries flow only when both
+    # corners are at a specified head or on an active exit face, or both carry a
+    # specified flux; elsewhere the element velocity's normal component is
+    # discretization leakage, which must not enter ψ.
+    if bc_type is not None:
+        carries = bc_type == 1
+        if exit_face_active is not None:
+            carries = carries | ((bc_type == 2) & exit_face_active)
+        if flux_nodal is not None:
+            carries = carries | (np.asarray(flux_nodal) != 0.0)
+        for i in range(n):
+            c1 = ordered_nodes[i]
+            c2 = ordered_nodes[(i + 1) % n]
+            if not (carries[c1] and carries[c2]):
+                segment_flux[c1] = 0.0
+                midside_flux_from_start.pop(c1, None)
 
     # Step 4: Determine walk orientation from signed area
     signed_area = 0.0
@@ -3860,7 +3885,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             kr0=kr0_per_element, h0=h0_per_element, total_flow=total_flow,
             bc_type=bc_type, exit_face_active=exit_face_active,
             vg_a=vg_a_per_element, vg_n=vg_n_per_element, vg_l=vg_l_per_element,
-            model=model_per_element)
+            model=model_per_element, flux_nodal=flux_nodal)
         phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types,
                                               vg_a=vg_a_per_element, vg_n=vg_n_per_element, vg_l=vg_l_per_element, model=model_per_element)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
@@ -3873,7 +3898,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
                                                 element_types, flux_nodal=flux_nodal)
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
-            total_flow=total_flow, bc_type=bc_type)
+            total_flow=total_flow, bc_type=bc_type, flux_nodal=flux_nodal)
         phi = solve_flow_function_confined(nodes, elements, k1, k2, angle, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, element_types=element_types)

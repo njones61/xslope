@@ -14,6 +14,16 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   its Spacing and overstate the nails by that Spacing.
 - The report's reinforcement table heads Area per unit width (m²/m or ft²/ft),
   which is what it prints. Before, it read m² or ft², a bar's own section.
+- Flow nets: the stream function holds one value along every no-flow boundary
+  and spans exactly the total flow. Before, its boundary values counted the flow
+  the finite element solution leaks across no-flow edges, so on coarse meshes
+  near a sheet-pile tip or where a pool meets a dry slope the flow lines crossed
+  the boundary, and on the shipped samples the drawn lines covered as little as 62%
+  of the flow. Heads, pore pressures, and flow rates do not change.
+- Seepage boundary conditions bind the nodes within 1/10,000 of the model's
+  larger dimension of their line. Before, the tolerance was a tenth of the
+  typical element size, so on a coarse mesh both nodes at the top of a thin sheet
+  pile took both heads and the flow came out about twice too high.
 
 ## 1.0.5 — 2026-10-22
 

@@ -9825,6 +9825,11 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'flownet_boundary': (
+        'flownet_boundary_check.py',
+        "The stream function is constant along every no-flow boundary and spans "
+        "the total flow, so flow lines never cross the base, a sheet pile, or a "
+        "dry slope."),
     'pile_symmetry': (
         'pile_symmetry_check.py',
         "A slope and its mirror image must give the same factor of safety. The "
@@ -16403,6 +16408,10 @@ def main():
         tests.append({'type': 'seep_cycle',
                       'file': 'limit-cycle escapes (steady exit face)',
                       'method': '-', 'source': 'seep_cycle'})
+        # Flow nets: phi holds one value on each no-flow boundary and spans Q.
+        tests.append({'type': 'flownet_boundary',
+                      'file': 'flow-net boundary values',
+                      'method': '-', 'source': 'flownet_boundary'})
 
     if run_tseep:
         # Transient exit-face anti-cycling: the partly-wet resolution of a cycling

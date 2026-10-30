@@ -414,7 +414,7 @@ significant limitations: the method only satisfies moment equilibrium, can produ
 results, and completely neglects interslice forces. This makes OMS most suitable for preliminary analysis and simple geometries where quick results are more important than high accuracy. 
 
 **Simplified Janbu Method:** The [Janbu Method](janbu.md) offers a different approach by satisfying force equilibrium rather than 
-moment equilibrium. This makes it suitable for circular or non-circular failure surfaces where moment equilibrium might be less critical. The method includes a correction factor to compensate for the missing moment equilibrium, though this factor is empirical and may not always provide accurate compensation. [Documentation]
+moment equilibrium. This makes it suitable for circular or non-circular failure surfaces where moment equilibrium might be less critical. The method includes a correction factor to compensate for the missing moment equilibrium, though this factor is empirical and may not always provide accurate compensation.
 
 **Bishop's Simplified Procedure:** [Bishop's Method](bishop.md) represents a significant improvement over OMS and 
 Janbu by satisfying both moment and vertical force equilibrium. This approach provides more accurate results while maintaining reasonable computational efficiency. However, the requirement for circular surfaces limits its applicability, and the iterative solution process increases computational time. Bishop's method finds its niche in projects with circular failure surfaces and moderate accuracy requirements.
@@ -426,7 +426,7 @@ iterative solution, and depends on assumptions about interslice force angles. Th
 explicit interslice force treatment is needed and when complex geometries require more sophisticated analysis than 
 simple methods can provide. Two variations of the force equilibrium method are available in XSLOPE:
 
-The **Corps Engineers method** applies the force equilibrium framework with the assumption that interslice forces are horizontal. 
+The **Corps Engineers method** applies the force equilibrium framework with the side force at each slice boundary parallel to the ground surface at the top of the slice (Corps convention #2). Convention #1, a single inclination parallel to the line joining the ends of the failure surface, is available from the Python API; both are described in [Force Equilibrium](force_eq.md#us-army-corps-of-engineers). 
 
 The **Lowe-Karafiath method** assumes that the interslice force at each slice boundary is equal to the average of 
 the slope angle at the top of the slice $\beta$ and the failure surface angle at the bottom of the slice $\alpha$.
@@ -454,9 +454,9 @@ The primary features of the limit equilibrium methods supported in XSLOPE are su
 | Method | Equilibrium Conditions                       | Failure Surface | Iterative Solution | Interslice Forces |
 |--------|----------------------------------------------|-----------------|--------------------|-------------------|
 | Ordinary Method of Slices | Overall Moment                               | Circular | No | None |
-| Simplified Janbu | $\Sigma F_x=0$                               | Circular/Non-Circular | No | None |
-| Bishop's Simplified Procedure | Overall Moment, $\Sigma F_y=0$               | Circular | Yes | None |
-| Corps Engineers | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Horizontal |
+| Simplified Janbu | $\Sigma F_x=0$                               | Circular/Non-Circular | Yes | Horizontal (no interslice shear) |
+| Bishop's Simplified Procedure | Overall Moment, $\Sigma F_y=0$               | Circular | Yes | Horizontal (no interslice shear) |
+| Corps Engineers | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Parallel to the ground surface |
 | Lowe-Karafiath | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Average of Slope and Surface Angles |
 | Spencer's Method | $\Sigma F_x=0$, $\Sigma F_y=0$, $\Sigma M=0$ | Circular/Non-Circular | Yes | Constant inclination |
 | Morgenstern–Price | $\Sigma F_x=0$, $\Sigma F_y=0$, $\Sigma M=0$ | Circular/Non-Circular | Yes | Variable inclination $\lambda f(x)$ |

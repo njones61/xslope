@@ -558,7 +558,7 @@ option independently, so the two stages of a rapid drawdown may differ.
 The direction applies to limit-equilibrium slices and to the finite-element edge tractions alike. The load distribution typically follows the ground 
 surface. The points should be listed in order from left to right. For example, consider the following load distribution:
 
-![dist_loads.png](images/dist_loads.png)
+![dist_loads.png](images/dist_loads.png){width=1000px}
 
 **Point order.** Left to right is the convention, but a line entered right to left is not an error and does not
 change the answer: a load line that runs monotonically in decreasing X is re-oriented to increasing X when the file

@@ -420,7 +420,7 @@ Solution (critical surface and factor of safety, with the seepage head contours)
 
 ![gsat_seep_results.png](sample_images/gsat_seep_results.png){width=1000}
 
-<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.925, fs_spencer=1.906 -->
+<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.931, fs_spencer=1.911 -->
 
 The same dam analyzed for [rapid drawdown](rapid.md), with the reservoir at
 El. 302 ft before drawdown and El. 250 ft after. The premise of *rapid* drawdown is

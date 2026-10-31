@@ -1048,7 +1048,7 @@ def seep_water_table_profile(slope_data):
         def _u(yy):
             val, found = interpolate_at_point(
                 mesh['nodes'], mesh['elements'], mesh['element_types'],
-                seep_u, (xg, yy), return_found=True)
+                seep_u, (xg, yy), return_found=True, signed=True)
             return (val, found)
         u_lo, f_lo = _u(y_lo_all + 1e-6)
         u_hi, f_hi = _u(y_hi_all - 1e-6)

@@ -568,9 +568,9 @@ overhang, or a small backstep at a toe) has no increasing-X form and is kept exa
 
 The forces are defined using a unit width perpendicular to the plane of the slope. For the water load, 
 the force at each point would be the unit weight of water multiplied by the height of water above the point in 
-question. For the example shown above, the surcharge on the left is defined by points 1 and 2, with a normal force 
-at each. The water load is defined by points 3, 4, and 5, with a normal force of zero at point 3, where the water 
-surface meets the slope, and the full force at points 4 and 5.
+question. In the example shown above, each load is its own table with its own points. Distributed Load #1, the 
+surcharge, has two points with a normal force at each. Distributed Load #2, the water load, has three points, with a 
+normal force of zero at point 1, where the water surface meets the slope, and the full force at points 2 and 3.
 
 ---
 

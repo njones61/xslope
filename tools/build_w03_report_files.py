@@ -26,7 +26,7 @@ one, which no sidecar carries:
     w03_report_example_template.docx    Spencer, built on the example template
 
 The Spencer search is checked against COMBO-1's own published number before
-anything is written — 1.272, from the ``<!-- test: -->`` tag on
+anything is written — 1.276, from the ``<!-- test: -->`` tag on
 ``combo01_seepage_stability.md`` — because a report that ships as this model's
 must carry this model's answers.
 

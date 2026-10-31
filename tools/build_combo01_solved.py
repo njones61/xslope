@@ -31,9 +31,9 @@ count, bracket and tolerance are read from the ``<!-- test: -->`` tags on
 locks, within that tag's own tolerance, or nothing is written:
 
     seepage flow rate   1.948 ft^3/day/ft  +/- 0.005
-    Spencer (u = seep)  FS = 1.272         +/- 0.005
-    Spencer (u = none)  FS = 1.622         +/- 0.005   (the page's contrast run)
-    SSRM                FS = 1.262         +/- 0.01
+    Spencer (u = seep)  FS = 1.276         +/- 0.005
+    Spencer (u = none)  FS = 1.629         +/- 0.005   (the page's contrast run)
+    SSRM                FS = 1.270         +/- 0.01
 
 Young's modulus and Poisson's ratio are the file's own — the materials table
 carries E and nu on all three rows (shell 2.0e6 / 0.20, core 2.0e5 / 0.40,

@@ -297,9 +297,7 @@ One exception to this is Spencer's method. Details can be found in the XSLOPE so
 
 ## Water Pressures: a Practice Note
 
-XSLOPE deliberately offers **no buoyant-unit-weight option**. Water always enters an analysis explicitly: total unit weights for the soil, pore pressures from a piezometric line, r<sub>u</sub>, or an FE seepage solution, and free water (reservoirs, ponds, tailwater) as hydrostatic pressure loads on the ground surface. This follows a maxim Stephen G. Wright taught for decades:
-
-> *"Never use buoyant unit weights. Always use external loads, piezometric lines, etc."*
+XSLOPE deliberately offers **no buoyant-unit-weight option**. Water always enters an analysis explicitly: total unit weights for the soil, pore pressures from a piezometric line, r<sub>u</sub>, or an FE seepage solution, and free water (reservoirs, ponds, tailwater) as hydrostatic pressure loads on the ground surface.
 
 The buoyant shortcut — γ′ = γ − γ<sub>w</sub> below the water table, with pore pressures and boundary water loads dropped in exchange — is provably identical to the explicit formulation **only when the water is static** (a horizontal water table, no flow). When the phreatic surface is inclined, water is moving, and the shortcut omits the seepage forces (γ<sub>w</sub>·i per unit volume) that the flow exerts on the soil skeleton. The explicit formulation makes no such assumption: it gives the buoyant answer when the water is static, and the correct answer when it is not.
 

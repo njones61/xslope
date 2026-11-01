@@ -510,14 +510,11 @@ supported in XSLOPE, the following table defines which methods support non-circu
 
 For the movement option, the following values are supported:
 
-- **Free**: No movement constraint
+- **Free**: End points move along the ground surface. Interior points move perpendicular to the failure surface.
 - **Horiz**: Point moves in the horizontal direction only
 - **Fixed**: Fixed movement constraint at each point
 
-For the **Free** option, if the point is the first or last point in the list, the movement constraint is applied 
-such that the point moves left or right along the ground surface. For interior points, the movement constraint is 
-applied such that the point moves in the direction of tangent of the failure surface at that point. This process is 
-described in more detail in the [Automated Search Algorithms](../lem/search.md) section.
+These moves are described in more detail in the [Automated Search Algorithms](../lem/search.md) section.
 
 ---
 

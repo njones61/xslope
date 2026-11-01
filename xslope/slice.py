@@ -1727,8 +1727,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # The water table is GLOBAL — one phreatic surface per problem, independent
     # of any material's pore-pressure option (the "sidecar" model). It governs
     # slice WEIGHT only; base pore pressure stays with the per-material u option.
-    # Source precedence: a seepage solution's u = 0 contour (root-found on the
-    # UNCLAMPED signed field) beats a hand-drawn piezo line; rapid drawdown
+    # Source precedence: a seepage solution's water table (the highest point in
+    # each column where u > 0) beats a hand-drawn piezo line; rapid drawdown
     # deliberately keys weight to the PRE-drawdown (stage-1) surfaces, never the
     # staged ones — the premise of rapid drawdown is that the soil stays
     # saturated while the pore pressures fall.
@@ -1739,8 +1739,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         wt_kind, wt_src = water_table_source(slope_data)
         if wt_kind == 'seep':
             if not had_cache and piezo_line:
-                print("gamma_sat weight split: using the seepage solution's u = 0 "
-                      "contour as the water table; the piezometric line is NOT "
+                print("gamma_sat weight split: using the seepage solution's water "
+                      "table; the piezometric line is NOT "
                       "used for unit weight (it may still supply pore pressure "
                       "and plotting).")
             xs_grid, wt = wt_src

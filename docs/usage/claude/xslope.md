@@ -468,8 +468,9 @@ slope_data['materials'] = [
                                  #   submerged unit weight — enter both weights and let the water
                                  #   definition do it.
                                  #   The water table is the PROBLEM's, not the material's: one per
-                                 #   model, from the seepage solution's u = 0 contour if there is
-                                 #   one, else the piezo line, independent of this material's 'u'.
+                                 #   model, from the seepage solution if there is one (the highest
+                                 #   point in each column where u > 0), else the piezo line,
+                                 #   independent of this material's 'u'.
                                  #   So u='none' soil below the water table still weighs gamma_sat,
                                  #   and gamma_sat with no water anywhere is weighed gamma.
         'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c/p ratio),

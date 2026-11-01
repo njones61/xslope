@@ -1628,7 +1628,7 @@ def piezo_line_used(slope_data, stage=1):
       load applied can never disagree.
     * **The weight split** — a material carrying ``gamma_sat`` weighs its slice
       saturated below the water table and moist above it, and the water table is
-      the seepage solution's u = 0 contour where there is one and the piezometric
+      the seepage solution's water table where there is one and the piezometric
       line otherwise (``xslope.slice.generate_slices``). Line 1 alone: rapid
       drawdown keys the weight to the pre-drawdown state, so Line 2 never sets it.
 

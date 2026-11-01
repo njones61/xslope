@@ -313,7 +313,7 @@ stability run gets when it ignores the seepage.
 
 **Model** — [xslope_video11_seep_to_lem.xlsx](files/xslope_video11_seep_to_lem.xlsx)
 
-<!-- test: file=files/xslope_video11_seep_to_lem.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.272, tolerance=0.005 -->
+<!-- test: file=files/xslope_video11_seep_to_lem.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.276, tolerance=0.005 -->
 
 **Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
 
@@ -368,13 +368,15 @@ Spencer's method on the same slope.
 The Video 11 dam run through all three analyses on one quadratic mesh: the
 seepage solution, a Spencer search on its pore pressures for comparison, and a
 strength reduction that reads the same pore pressures. The two factors of
-safety, 1.272 and 1.262, agree to within 1%.
+safety, 1.272 and 1.262, agree to within 1%. These are the recording's numbers.
+The current code gives slightly different values, 1.276 and 1.270, because of a
+minor bug fix.
 
 <p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/knHukVX7MMw">▶ Watch · 10 min</a></p>
 
 **Model** — [xslope_video11_seep_to_lem.xlsx](files/xslope_video11_seep_to_lem.xlsx), the Video 11 model, meshed at 100 size divisions
 
-<!-- test: file=files/xslope_video11_seep_to_lem.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.262, tolerance=0.01, f_min=1.0, f_max=2.0, f_stand=1.2578125, f_fail=1.265625, check=edges -->
+<!-- test: file=files/xslope_video11_seep_to_lem.xlsx, type=fem_ssrm, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.270, tolerance=0.01, f_min=1.0, f_max=2.0, f_stand=1.265625, f_fail=1.2734375, check=edges -->
 
 **Related tutorial** — [COMBO-1. Seepage → LEM → FEM](../tutorials/combo01_seepage_stability.md)
 

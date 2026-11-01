@@ -8,6 +8,30 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- The water table read from a seepage solution is the highest point in each column
+  where the pore pressure is positive, between that column's own top and bottom of
+  mesh, in both the limit equilibrium and finite element engines. Before, suction
+  read as zero, so soil under a crest at the top of the mesh weighed its saturated
+  unit weight from the ground down. On a mesh with a sloping base the water table
+  read low or went missing, and a wet embankment on a dry foundation read dry, so
+  soil below the water table weighed its moist unit weight with no warning. A
+  solution with no suction in it, such as an RS2 import, kept the crest error. Only
+  models that carry a saturated unit weight and a seepage solution change, and the
+  published factors of safety rise: COMBO-1's Spencer search from 1.272 to 1.276 and
+  its strength reduction from 1.262 to 1.270; COMBO-2's two-steady and transient
+  rapid-drawdown answers from 1.206 and 1.033 to 1.210 and 1.036, and its drained
+  answer at day 50 from 1.053 to 1.057; COMBO-3's Johnson curve minimum from 1.033
+  to 1.036.
+- A model reads its water table again when its seepage solution is replaced, as by
+  a different time step or a new solve. Before, with water loads set to manual, it
+  kept the first water table: the Johnson dam at day 500 read 1.3012 where its own
+  water table gives 1.3047.
+- Pore pressures read from a quad8 mesh honor each point's height in its element.
+  Before, every read returned the element's mid-height value, so slice-base pore
+  pressures and the water table on a quad8 seepage mesh were off by up to an element
+  height of water. COMBO-1's Spencer search read 1.237 on quad8 against 1.276 on
+  tri6, and reads 1.277 now. No shipped model uses a quad8 mesh with a seepage
+  solution.
 - Studio's assistant is told that the reinforcement it edits holds capacities per
   unit width, so a nail's own capacity is divided by its Spacing before it is
   stored. Before, nothing told it so, and it could store a per-nail Tmax beside

@@ -2616,8 +2616,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # carried as plain arrays so every consumer downstream (the gravity loads, the
     # overburden integral, the 'ru' column stress) reads the same surface without
     # needing slope_data back. Source and precedence are water_table_source's, the
-    # same function the limit equilibrium slicer calls: a seepage solution's u = 0
-    # contour first, a piezometric line second. Sampled only when some material
+    # same function the limit equilibrium slicer calls: a seepage solution's water
+    # table first, a piezometric line second. Sampled only when some material
     # actually splits, so a model without gamma_sat pays nothing for it.
     _water_table = None
     if np.any(np.isfinite(gamma_sat_by_mat)):
@@ -2627,8 +2627,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             _wt_xs, _wt_ys = _wt_src
             # Off the ends of a PIEZOMETRIC line the water table is undefined (NaN),
             # not the nearest endpoint, so soil beyond the line's own span is weighed
-            # moist rather than silently flooded or drained. The seepage contour is
-            # sampled across the whole mesh, so its ends need no such fence.
+            # moist rather than silently flooded or drained. The seepage water table
+            # is sampled across the whole mesh, so its ends need no such fence.
             _water_table = (np.asarray(_wt_xs, dtype=float),
                             np.asarray(_wt_ys, dtype=float),
                             _wt_kind == 'piezo')

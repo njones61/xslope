@@ -205,7 +205,7 @@ def _with_water_loads_once(slope_data):
     old arrangement every trial was sliced against a model dict that had existed
     for a few milliseconds -- and anything the slicer memoizes INTO the model it
     is given went into the throwaway with it. The expensive one is
-    ``_water_table_profile``, the u = 0 contour traced through a seepage mesh for
+    ``_water_table_profile``, the water table read from a seepage mesh for
     the gamma/gamma_sat weight split: 201 stations, each bisected against the
     field. On a dam with saturated unit weights and a seepage solution that is
     ~6,000 mesh point-locations, rebuilt per trial. Deriving once means the model

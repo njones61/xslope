@@ -1008,73 +1008,128 @@ def match_water_blocks(blocks, derived, tol=WATER_MATCH_TOL):
 # moist gamma above — and the effective overburden an overburden-dependent
 # pullout law reads. Base pore pressure stays with the per-material u option.
 #
-# Source precedence: a seepage solution's u = 0 contour beats a hand-drawn
-# piezometric line. Rapid drawdown deliberately keys weight to the PRE-drawdown
+# Source precedence: a seepage solution's water table, the highest point in each
+# column where u > 0, beats a hand-drawn piezometric line. Rapid drawdown deliberately keys weight to the PRE-drawdown
 # (stage-1) surfaces, never the staged ones — the premise of rapid drawdown is
 # that the soil stays saturated while the pore pressures fall — so only
 # 'seep_u' and 'piezo_line' are read here, never their stage-2 twins.
 # ---------------------------------------------------------------------------
 
+def _mesh_outline(nodes, elements, element_types):
+    """The mesh outline as corner-node edges used by exactly one element (holes
+    included), and half the median corner-edge length: a sample spacing no
+    element is stepped over at."""
+    import numpy as np
+    seen = {}
+    for e, t in zip(elements, element_types):
+        nc = 3 if t in (3, 6) else 4
+        for i in range(nc):
+            a, b = int(e[i]), int(e[(i + 1) % nc])
+            key = (a, b) if a < b else (b, a)
+            seen[key] = seen.get(key, 0) + 1
+    keys = list(seen)
+    edges = np.array(keys, dtype=int)
+    h = 0.5 * float(np.median(np.hypot(*(nodes[edges[:, 0]] - nodes[edges[:, 1]]).T)))
+    outline = np.array([k for k in keys if seen[k] == 1], dtype=int)
+    return outline, h
+
+
+def _column_intervals(nodes, edges, x):
+    """The y-intervals of the mesh along the vertical line at x, lowest first,
+    by casting the line through the outline edges (half-open in x, so a vertex
+    is counted once)."""
+    import numpy as np
+    x1, y1 = nodes[edges[:, 0], 0], nodes[edges[:, 0], 1]
+    x2, y2 = nodes[edges[:, 1], 0], nodes[edges[:, 1], 1]
+    lo, hi = np.minimum(x1, x2), np.maximum(x1, x2)
+    hit = (lo <= x) & (x < hi)
+    if not hit.any():
+        return []
+    t = (x - x1[hit]) / (x2[hit] - x1[hit])
+    ys = np.sort(y1[hit] + t * (y2[hit] - y1[hit]))
+    if len(ys) % 2:                      # degenerate outline: one span
+        return [(float(ys[0]), float(ys[-1]))]
+    return [(float(ys[i]), float(ys[i + 1])) for i in range(0, len(ys), 2)
+            if ys[i + 1] - ys[i] > 0]
+
+
 def seep_water_table_profile(slope_data):
-    """(xs, ys) sample of the u = 0 contour of the model's seepage solution, or
+    """(xs, ys) sample of the water table of the model's seepage solution, or
     None when the model carries no seepage field.
 
-    The contour is root-found on the UNCLAMPED signed field by bisection, on a
-    201-point grid spanning the mesh. A column that is wet at its top reads the
-    mesh top; one that is dry at its bottom reads the mesh bottom, so a fully
-    saturated or fully unsaturated column falls out of the same code.
+    The water table in each of 201 columns across the mesh is the highest point
+    at which the field is positive, found by walking the column down from the
+    top of the mesh AT THAT x and bisecting the first dry-to-wet step. A column
+    wet at its top reads the mesh top there (the soil is saturated to the
+    ground; ponded water above it is a surface load), one with no positive
+    pressure reads the mesh bottom there. Suction (u < 0) and a clamped field
+    (u = 0 above the water table) are both dry, so an imported solution with no
+    unsaturated zone reads the same as a solved one. Soil below the water table
+    is weighed saturated even where the field turns negative again underneath
+    (a perched zone): one surface per column is all the weight split carries.
 
-    Cached on ``slope_data['_water_table_profile']`` — the slice generator and
-    the reinforcement pullout law ask for the same surface, and bisecting a
-    finite element field 201 times is not something to repeat per trial surface.
+    Cached on ``slope_data['_water_table_profile']`` against the identity of the
+    field and the mesh it was read from, so a model whose ``seep_u`` is replaced
+    (another frame, another boundary set, a re-solve) is read again. The slice
+    generator and the reinforcement pullout law ask for the same surface, and
+    reading a finite element field 201 times is not something to repeat per trial
+    surface.
     """
     import numpy as np
     from .mesh import interpolate_at_point
 
-    cache = slope_data.get('_water_table_profile')
-    if cache is not None:
-        return cache
     mesh = slope_data.get('mesh')
     seep_u = slope_data.get('seep_u')
     if mesh is None or seep_u is None:
         return None
+    cache = slope_data.get('_water_table_profile')
+    if cache is not None and cache[0] is seep_u and cache[1] is mesh:
+        return cache[2]
 
-    seep_u = np.asarray(seep_u, dtype=float)
+    u_nodes = np.asarray(seep_u, dtype=float)
     nodes = np.asarray(mesh['nodes'], dtype=float)
-    xs_grid = np.linspace(nodes[:, 0].min(), nodes[:, 0].max(), 201)
-    y_lo_all, y_hi_all = nodes[:, 1].min(), nodes[:, 1].max()
+    edges, h = _mesh_outline(nodes, np.asarray(mesh['elements']),
+                             np.asarray(mesh['element_types']))
+
+    def _u(x, y):
+        val, found = interpolate_at_point(mesh['nodes'], mesh['elements'],
+                                          mesh['element_types'], u_nodes, (x, y),
+                                          return_found=True, signed=True)
+        return val if found else np.nan
+
+    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
+    xs_grid = np.linspace(x_min, x_max, 201)
+    nudge = 1e-6 * (x_max - x_min)
     wt = np.full(xs_grid.shape, np.nan)
     for k, xg in enumerate(xs_grid):
-        def _u(yy):
-            val, found = interpolate_at_point(
-                mesh['nodes'], mesh['elements'], mesh['element_types'],
-                seep_u, (xg, yy), return_found=True, signed=True)
-            return (val, found)
-        u_lo, f_lo = _u(y_lo_all + 1e-6)
-        u_hi, f_hi = _u(y_hi_all - 1e-6)
-        if not (f_lo or f_hi):
+        x = min(max(xg, x_min + nudge), x_max - nudge)
+        spans = _column_intervals(nodes, edges, x)
+        if not spans:
             continue
-        if f_hi and u_hi >= 0:
-            wt[k] = y_hi_all          # fully saturated column
-            continue
-        if f_lo and u_lo <= 0:
-            wt[k] = y_lo_all          # fully unsaturated column
-            continue
-        lo, hi = y_lo_all, y_hi_all
-        for _ in range(30):           # bisect u(y) = 0
-            mid = 0.5 * (lo + hi)
-            um, fm = _u(mid)
-            if not fm:
-                hi = mid
+        wt[k] = spans[0][0]                       # dry all the way down
+        for y_bot, y_top in reversed(spans):      # top span first
+            eps = 1e-6 * (y_top - y_bot)
+            n = max(3, int(np.ceil((y_top - y_bot) / h)) + 1)
+            ys = np.linspace(y_top - eps, y_bot + eps, n)
+            us = np.array([_u(x, y) for y in ys])
+            wet = np.where(us > 0)[0]
+            if len(wet) == 0:
                 continue
-            if um > 0:
-                lo = mid
-            else:
-                hi = mid
-        wt[k] = 0.5 * (lo + hi)
-    cache = (xs_grid, wt)
-    slope_data['_water_table_profile'] = cache
-    return cache
+            j = wet[0]
+            if j == 0:
+                wt[k] = y_top                     # wet at the top of the span
+                break
+            lo, hi = ys[j], ys[j - 1]             # lo wet, hi dry
+            for _ in range(25):
+                mid = 0.5 * (lo + hi)
+                if _u(x, mid) > 0:
+                    lo = mid
+                else:
+                    hi = mid
+            wt[k] = 0.5 * (lo + hi)
+            break
+    slope_data['_water_table_profile'] = (seep_u, mesh, (xs_grid, wt))
+    return xs_grid, wt
 
 
 def water_table_source(slope_data):
@@ -1083,7 +1138,7 @@ def water_table_source(slope_data):
     ``(None, None)`` when the model defines no water table at all.
 
     ONE water table per problem, and this is the one place its source is chosen.
-    The seepage solution's u = 0 contour wins over a hand-drawn piezometric line
+    The seepage solution's water table wins over a hand-drawn piezometric line
     whenever the model carries one; the choice is independent of any material's
     pore-pressure option, because the water table governs unit weight while the u
     option governs pore pressure. Both engines call it — the limit equilibrium
@@ -1110,7 +1165,7 @@ def water_table_y(slope_data, x):
     not define one there.
 
     Follows the precedence in :func:`water_table_source`: the seepage solution's
-    u = 0 contour first, the piezometric line second. Off the ends of a
+    water table first, the piezometric line second. Off the ends of a
     piezometric line the answer is NaN rather than the nearest endpoint, so a
     column outside the line's own extent is treated as undefined instead of
     silently flooded or drained.

@@ -783,7 +783,7 @@ counts came out stronger undrained than drained at these stresses, so the draine
 strength was substituted on them and the reported answer is stage 3's 1.0361 rather than
 stage 2's 1.0363. Two ten-thousandths separate the two. In the
 [sweep below](#the-governing-stage-flip) we find why they are this close: the
-core's own $d$ of 250 psf sits 19 psf above the value at which the first slice
+core's own $d$ of 250 psf sits 14 psf above the value at which the first slice
 crosses over.
 
 <!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.036, tolerance=0.005, benchmark=COMBO-2-transient -->

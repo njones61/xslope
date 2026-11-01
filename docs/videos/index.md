@@ -368,7 +368,9 @@ Spencer's method on the same slope.
 The Video 11 dam run through all three analyses on one quadratic mesh: the
 seepage solution, a Spencer search on its pore pressures for comparison, and a
 strength reduction that reads the same pore pressures. The two factors of
-safety, 1.272 and 1.262, agree to within 1%.
+safety, 1.272 and 1.262, agree to within 1%. These are the recording's numbers.
+The current code gives slightly different values, 1.276 and 1.270, because of a
+minor bug fix.
 
 <p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/knHukVX7MMw">▶ Watch · 10 min</a></p>
 

@@ -9577,6 +9577,29 @@ def run_water_table_profile_test(test):
     return 0.0, None
 
 
+
+def run_mesh_interpolation_test(test):
+    """A nodal field read at a point honors where the point sits in its element.
+
+    The check itself lives in test/mesh_interpolation_check.py (file-less; one element
+    of each type with a field it reproduces exactly).
+
+    Returns (0.0, None) on success, else (None, message) -- a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'mesh_interpolation_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('mesh_interpolation_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_nr_ssrm_test(test):
     """The two SSRM drivers must agree on one locked case.
 
@@ -15913,6 +15936,8 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'water_table_profile':
         return run_water_table_profile_test(test)
+    if test_type == 'mesh_interpolation':
+        return run_mesh_interpolation_test(test)
     if test_type == 'nr_ssrm':
         return run_nr_ssrm_test(test)
     if test_type == 'beam_element':
@@ -16123,7 +16148,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -16835,6 +16860,8 @@ def main():
                       'method': '-', 'source': 'k0_level_ground'})
         tests.append({'type': 'water_table_profile', 'file': 'Water table from a seepage field',
                       'method': '-', 'source': 'water_table_profile'})
+        tests.append({'type': 'mesh_interpolation', 'file': 'Nodal field read at a point',
+                      'method': '-', 'source': 'mesh_interpolation'})
         # Guard the saturated unit weight in the FEM: one material carrying gamma
         # and gamma_sat against the same slope hand-zoned at the water table, on a
         # mesh the two share element for element, so the pair must agree exactly —

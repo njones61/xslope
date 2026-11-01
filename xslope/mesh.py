@@ -5664,7 +5664,7 @@ def interpolate_at_point(nodes, elements, element_types, values, point, return_f
     Parameters:
         nodes: np.ndarray of node coordinates (n_nodes, 2)
         elements: np.ndarray of element vertex indices (n_elements, 8)
-        element_types: np.ndarray indicating element type (3, 4, 6, or 8 nodes)
+        element_types: np.ndarray indicating element type (3, 4, 6, 8, or 9 nodes)
         values: np.ndarray of values at nodes (n_nodes,)
         point: tuple (x, y) coordinates of the point to interpolate at
         return_found: if True, return (value, found) so callers can distinguish a
@@ -5826,76 +5826,88 @@ def interpolate_at_point(nodes, elements, element_types, values, point, return_f
         # Interpolate using bilinear shape functions
         interpolated_value = N[0]*v1 + N[1]*v2 + N[2]*v3 + N[3]*v4
         
-    elif elem_type == 8:  # Quadratic quadrilateral
-        # Get all 8 nodes: corners (0,1,2,3) and midpoints (4,5,6,7)
-        # Node ordering: 0-1-2-3 corners, 4 midpoint of 0-1, 5 midpoint of 1-2, 
+    elif elem_type == 8:  # Quadratic quadrilateral (8-node serendipity)
+        # Node ordering: 0-1-2-3 corners, 4 midpoint of 0-1, 5 midpoint of 1-2,
         #                6 midpoint of 2-3, 7 midpoint of 3-0
-        
-        # Get corner coordinates for mapping to natural coordinates
-        x1, y1 = nodes[element[0]]  # Node 0
-        x2, y2 = nodes[element[1]]  # Node 1
-        x3, y3 = nodes[element[2]]  # Node 2
-        x4, y4 = nodes[element[3]]  # Node 3
-        
-        # For quadratic quads, we need to map from physical (x,y) to natural coordinates (xi,eta)
-        # This is complex for general quadrilaterals, so use simplified approach:
-        # Map to unit square [-1,1] x [-1,1] using bilinear mapping of corners
-        
-        # Bilinear inverse mapping (approximate for general quads)
-        # Solve for natural coordinates xi, eta in [-1,1] x [-1,1]
-        
-        # For simplicity, use area coordinate method similar to linear quad
-        # but with quadratic shape functions
-        
-        # Calculate area coordinates (this is an approximation)
-        A_total = 0.5 * abs((x3-x1)*(y4-y2) - (x4-x2)*(y3-y1))
-        if A_total < 1e-12:
-            # Degenerate element, fall back to linear
-            A1 = abs((x - x1) * (y2 - y1) - (x2 - x1) * (y - y1)) / 2
-            A2 = abs((x - x2) * (y3 - y2) - (x3 - x2) * (y - y2)) / 2
-            A3 = abs((x - x3) * (y4 - y3) - (x4 - x3) * (y - y3)) / 2
-            A4 = abs((x - x4) * (y1 - y4) - (x1 - x4) * (y - y4)) / 2
-            A_sum = A1 + A2 + A3 + A4
-            if A_sum > 1e-12:
-                w1, w2, w3, w4 = A1/A_sum, A2/A_sum, A3/A_sum, A4/A_sum
-            else:
-                w1 = w2 = w3 = w4 = 0.25
-            
-            # Linear interpolation as fallback
-            interpolated_value = (w1 * values[element[0]] + w2 * values[element[1]] + 
-                                w3 * values[element[2]] + w4 * values[element[3]])
-        else:
-            # For proper quadratic interpolation, we need natural coordinates
-            # This is a simplified implementation - full implementation would solve
-            # the nonlinear system for xi,eta
-            
-            # Use parametric coordinates estimation
-            # Map point to approximate natural coordinates
-            xi_approx = 2 * (x - 0.5*(x1+x3)) / (x2+x3-x1-x4) if abs(x2+x3-x1-x4) > 1e-12 else 0
-            eta_approx = 2 * (y - 0.5*(y1+y3)) / (y2+y4-y1-y3) if abs(y2+y4-y1-y3) > 1e-12 else 0
-            
+        node_coords = nodes[element[:8]]
+
+        # Newton-Raphson iteration to find natural coordinates (xi, eta)
+        xi, eta = 0.0, 0.0  # Initial guess at element center
+
+        for _ in range(10):  # Max 10 iterations
+            N = np.array([
+                0.25 * (1-xi) * (1-eta) * (-xi-eta-1),    # Node 0: (-1,-1)
+                0.25 * (1+xi) * (1-eta) * (xi-eta-1),     # Node 1: (1,-1)
+                0.25 * (1+xi) * (1+eta) * (xi+eta-1),     # Node 2: (1,1)
+                0.25 * (1-xi) * (1+eta) * (-xi+eta-1),    # Node 3: (-1,1)
+                0.5 * (1-xi*xi) * (1-eta),                # Node 4: (0,-1)
+                0.5 * (1+xi) * (1-eta*eta),               # Node 5: (1,0)
+                0.5 * (1-xi*xi) * (1+eta),                # Node 6: (0,1)
+                0.5 * (1-xi) * (1-eta*eta),               # Node 7: (-1,0)
+            ])
+
+            # Residual
+            fx = np.sum(N * node_coords[:, 0]) - x
+            fy = np.sum(N * node_coords[:, 1]) - y
+
+            if abs(fx) < 1e-10 and abs(fy) < 1e-10:
+                break
+
+            # Shape function derivatives
+            dN_dxi = np.array([
+                0.25 * (1-eta) * (2*xi+eta),
+                0.25 * (1-eta) * (2*xi-eta),
+                0.25 * (1+eta) * (2*xi+eta),
+                0.25 * (1+eta) * (2*xi-eta),
+                -xi * (1-eta),
+                0.5 * (1-eta*eta),
+                -xi * (1+eta),
+                -0.5 * (1-eta*eta),
+            ])
+            dN_deta = np.array([
+                0.25 * (1-xi) * (xi+2*eta),
+                0.25 * (1+xi) * (2*eta-xi),
+                0.25 * (1+xi) * (xi+2*eta),
+                0.25 * (1-xi) * (2*eta-xi),
+                -0.5 * (1-xi*xi),
+                -eta * (1+xi),
+                0.5 * (1-xi*xi),
+                -eta * (1-xi),
+            ])
+
+            # Jacobian
+            dx_dxi = np.sum(dN_dxi * node_coords[:, 0])
+            dx_deta = np.sum(dN_deta * node_coords[:, 0])
+            dy_dxi = np.sum(dN_dxi * node_coords[:, 1])
+            dy_deta = np.sum(dN_deta * node_coords[:, 1])
+
+            det_J = dx_dxi * dy_deta - dx_deta * dy_dxi
+            if abs(det_J) < 1e-12:
+                break
+
+            # Newton-Raphson update
+            xi -= (dy_deta * fx - dx_deta * fy) / det_J
+            eta -= (-dy_dxi * fx + dx_dxi * fy) / det_J
+
             # Clamp to [-1,1]
-            xi = max(-1, min(1, xi_approx))
-            eta = max(-1, min(1, eta_approx))
-            
-            # Quadratic shape functions for 8-node quad in natural coordinates
-            N = np.zeros(8)
-            # Corner nodes
-            N[0] = 0.25 * (1-xi) * (1-eta) * (-xi-eta-1)   # Node 0
-            N[1] = 0.25 * (1+xi) * (1-eta) * (xi-eta-1)    # Node 1  
-            N[2] = 0.25 * (1+xi) * (1+eta) * (xi+eta-1)    # Node 2
-            N[3] = 0.25 * (1-xi) * (1+eta) * (-xi+eta-1)   # Node 3
-            # Midpoint nodes
-            N[4] = 0.5 * (1-xi*xi) * (1-eta)               # Node 4 (midpoint 0-1)
-            N[5] = 0.5 * (1+xi) * (1-eta*eta)              # Node 5 (midpoint 1-2)
-            N[6] = 0.5 * (1-xi*xi) * (1+eta)               # Node 6 (midpoint 2-3)
-            N[7] = 0.5 * (1-xi) * (1-eta*eta)              # Node 7 (midpoint 3-0)
-            
-            # Interpolate using quadratic shape functions
-            interpolated_value = 0.0
-            for i in range(8):
-                interpolated_value += N[i] * values[element[i]]
-    
+            xi = max(-1, min(1, xi))
+            eta = max(-1, min(1, eta))
+
+        # Final serendipity shape functions
+        N = np.array([
+            0.25 * (1-xi) * (1-eta) * (-xi-eta-1),
+            0.25 * (1+xi) * (1-eta) * (xi-eta-1),
+            0.25 * (1+xi) * (1+eta) * (xi+eta-1),
+            0.25 * (1-xi) * (1+eta) * (-xi+eta-1),
+            0.5 * (1-xi*xi) * (1-eta),
+            0.5 * (1+xi) * (1-eta*eta),
+            0.5 * (1-xi*xi) * (1+eta),
+            0.5 * (1-xi) * (1-eta*eta),
+        ])
+
+        # Interpolate using serendipity shape functions
+        interpolated_value = np.sum(N * values[element[:8]])
+
     elif elem_type == 9:  # Biquadratic quadrilateral (9-node Lagrange)
         # Get all 9 nodes: corners (0,1,2,3), edges (4,5,6,7), and center (8)
         # Node ordering: 0-1-2-3 corners, 4 midpoint of 0-1, 5 midpoint of 1-2,

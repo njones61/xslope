@@ -120,17 +120,23 @@ class ProjectDocument(QObject):
         """A snapshot of ``slope_data`` for the undo stack. Everything is deep-copied
         **except** ``mesh``, whose (potentially large) object is shared by reference:
         the mesh is only ever replaced wholesale (Build Mesh / clear), never mutated
-        in place, so sharing is safe and keeps snapshots cheap once a mesh exists."""
+        in place, so sharing is safe and keeps snapshots cheap once a mesh exists.
+        The saved water table stays out of the snapshot: it holds its own reference
+        to the mesh, and the next run reads it again."""
         sd = self.slope_data
         mesh = sd.get("mesh")
-        if mesh is None:
-            return copy.deepcopy(sd)
-        sd["mesh"] = None
+        profile = sd.pop("_water_table_profile", None)
+        if mesh is not None:
+            sd["mesh"] = None
         try:
             snap = copy.deepcopy(sd)
         finally:
-            sd["mesh"] = mesh
-        snap["mesh"] = mesh
+            if mesh is not None:
+                sd["mesh"] = mesh
+            if profile is not None:
+                sd["_water_table_profile"] = profile
+        if mesh is not None:
+            snap["mesh"] = mesh
         return snap
 
     # --- load ------------------------------------------------------------

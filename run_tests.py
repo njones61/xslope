@@ -9555,11 +9555,11 @@ def run_k0_level_ground_test(test):
 
 
 def run_water_table_profile_test(test):
-    """The water table read from a seepage field is its signed u = 0 contour.
+    """The water table read from a seepage field is the highest point in each column
+    where u > 0.
 
-    The check itself lives in test/water_table_profile_check.py (file-less; a linear
-    field on a flat-topped block, so the contour is known exactly). A read with
-    suction clamped to zero takes every column reaching the mesh top as saturated.
+    The check itself lives in test/water_table_profile_check.py (file-less; piecewise
+    linear fields on tri3 blocks, so the surface is known exactly).
 
     Returns (0.0, None) on success, else (None, message) -- a pass/fail test.
     """

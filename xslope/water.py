@@ -1009,16 +1009,17 @@ def match_water_blocks(blocks, derived, tol=WATER_MATCH_TOL):
 # pullout law reads. Base pore pressure stays with the per-material u option.
 #
 # Source precedence: a seepage solution's water table, the highest point in each
-# column where u > 0, beats a hand-drawn piezometric line. Rapid drawdown deliberately keys weight to the PRE-drawdown
-# (stage-1) surfaces, never the staged ones — the premise of rapid drawdown is
-# that the soil stays saturated while the pore pressures fall — so only
-# 'seep_u' and 'piezo_line' are read here, never their stage-2 twins.
+# column where u > 0, beats a hand-drawn piezometric line. Rapid drawdown
+# deliberately keys weight to the PRE-drawdown (stage-1) surfaces, never the staged
+# ones — the premise of rapid drawdown is that the soil stays saturated while the
+# pore pressures fall — so only 'seep_u' and 'piezo_line' are read here, never
+# their stage-2 twins.
 # ---------------------------------------------------------------------------
 
 def _mesh_outline(nodes, elements, element_types):
     """The mesh outline as corner-node edges used by exactly one element (holes
-    included), and half the median corner-edge length: a sample spacing no
-    element is stepped over at."""
+    included), and half the median corner-edge length, the sample spacing of the
+    walk down a column."""
     import numpy as np
     seen = {}
     for e, t in zip(elements, element_types):
@@ -1064,9 +1065,10 @@ def seep_water_table_profile(slope_data):
     ground; ponded water above it is a surface load), one with no positive
     pressure reads the mesh bottom there. Suction (u < 0) and a clamped field
     (u = 0 above the water table) are both dry, so an imported solution with no
-    unsaturated zone reads the same as a solved one. Soil below the water table
-    is weighed saturated even where the field turns negative again underneath
-    (a perched zone): one surface per column is all the weight split carries.
+    unsaturated zone reads its water table to within one element, the most its
+    nodal values can say. Soil below the water table is weighed saturated even
+    where the field turns negative again underneath (a perched zone): one surface
+    per column is all the weight split carries.
 
     Cached on ``slope_data['_water_table_profile']`` against the identity of the
     field and the mesh it was read from, so a model whose ``seep_u`` is replaced

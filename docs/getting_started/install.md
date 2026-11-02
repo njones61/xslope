@@ -30,7 +30,7 @@ those needs to be downloaded by hand.
 
 | Platform | Requirement |
 | --- | --- |
-| **macOS** | macOS 11 (Big Sur) or later, on Apple silicon (M1 or newer). Intel Macs are not covered by the installer — install the [Python package](#for-python-users) instead. |
+| **macOS** | macOS 11 (Big Sur) or later, on Apple silicon (M1 or newer). Intel Macs are not covered by the installer — install the [Python package](#python-package) instead. |
 | **Windows** | Windows 10 or 11, 64-bit (x64). |
 
 Each download is a few hundred megabytes, and the installed application is larger

@@ -1904,7 +1904,7 @@ Slide #72 / Duncan & Wright (2005) Figs. 6.39–6.40: a symmetric embankment dam
 
 Pore pressures are modeled both ways, as in the manual: FE seepage from XSLOPE's own solver, and
 Slide's piezometric line vertex-extracted from Figure 72.2. This dam is also
-[LEM sample problem 4](../lem/samples.md#4-earth-dam), built independently from the book; the
+[LEM sample problem 4](../lem/samples.md#4-earth-dam-duncan-wright-and-brandon), built independently from the book; the
 corpus file follows Slide's slightly different crest and core-top dimensions rather than the
 book's, since Slide's published numbers are the benchmark here.
 

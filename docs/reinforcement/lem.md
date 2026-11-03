@@ -130,8 +130,15 @@ The **Dir** setting sets $\psi$:
 - **Tangent to slip surface** ($\psi = \alpha$) — the **default**. Flexible
   reinforcement cannot resist bending; as the sliding mass moves, the reinforcement deforms with it and the force
   reorients tangent to the slip surface, whatever the line's own inclination. The angle between the force and the
-  base, $\alpha - \psi$, is then zero. This is the appropriate (and conservative) assumption for geotextiles and
-  geogrids, and is discussed by Duncan & Wright (2005).
+  base, $\alpha - \psi$, is then zero. FHWA suggests this direction for geotextiles and geogrids
+  ([GEC 11](https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi10025/nhi10025.pdf), Section 8.3.3), and it is
+  discussed by Duncan & Wright (2005). Where the reinforcement crosses sand or gravel the direction makes little
+  difference: tilting the force adds to its moment but takes away from the normal force on the base and the strength
+  that comes with it. Where it crosses clay with $\phi = 0$ nothing offsets the added moment, so tangent gives the
+  higher factor of safety. In Wright & Duncan's (1991) second example, Spencer's method gives 1.37 with the force
+  horizontal and 1.36 with it tangent when the reinforcement is in sand, and 1.36 and 1.57 when it is in clay. GEC 11
+  calls the direction along the reinforcement the conservative one. Wright & Duncan add that reinforcement is rarely
+  placed in such a clay, since it usually sits on a sand or gravel pad above it.
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
 
@@ -185,5 +192,8 @@ Leave Type blank for a generic tensile line with the defaults (Tangent, Active).
 Duncan, J.M., & Wright, S.G. (2005). *Soil Strength and Slope Stability*. John Wiley & Sons.
 
 Rocscience Inc. *Slide2 Documentation — Support: Active/Passive Force Application; Define Support Properties.*
+
+Wright, S.G., & Duncan, J.M. (1991). Limit equilibrium stability analyses for reinforced slopes. *Transportation
+Research Record* 1330, 40–46.
 
 Wright, S.G. (1999). *UTEXAS4 — A Computer Program for Slope Stability Calculations.* Shinoak Software, Austin.

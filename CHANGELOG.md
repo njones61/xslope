@@ -38,6 +38,11 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   its Spacing and overstate the nails by that Spacing.
 - The report's reinforcement table heads Area per unit width (m²/m or ft²/ft),
   which is what it prints. Before, it read m² or ft², a bar's own section.
+- The report's slice table prints the reinforcement force on every slice base,
+  whatever the line's Dir and Appl: active lines under P and passive lines under
+  P_p, the letters the calculations use. Before, it printed only tangent active
+  reinforcement, so passive and axial lines, the Nail preset among them, showed no
+  reinforcement column at all. No factor of safety changes.
 - Flow nets: the stream function holds one value along every no-flow boundary
   and spans exactly the total flow. Before, its boundary values counted the flow
   the finite element solution leaks across no-flow edges, so on coarse meshes

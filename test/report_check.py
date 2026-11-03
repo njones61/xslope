@@ -3890,6 +3890,78 @@ def test_column_registry():
     return fails
 
 
+#: The reinforcement sample, six geosynthetics of 800 lb/ft. Its first circle
+#: crosses five with their full capacity, so every Dir and Appl totals 4,000.
+REINFORCE_XLSX = os.path.join(_REPO, "docs", "lem", "files", "xslope_reinforce.xlsx")
+REINFORCE_RFACE_XLSX = os.path.join(_REPO, "docs", "lem", "files",
+                                    "xslope_reinforce_rface.xlsx")
+
+
+def test_every_reinforcement_force_reaches_the_slice_table():
+    """The slice table prints the reinforcement force whatever its Dir and Appl.
+
+    It printed the solvers' tangent-active column alone, so a passive or axial
+    line, the Nail preset among them, crossed the surface with no force in the
+    table: the column was all zeros and dropped. Active lines now total under P
+    and passive under P_p, the letters the calculations section uses, and the
+    factor of safety is the same as before. Run on both facings, and at Spacing 2,
+    where the table shows the force per unit thickness.
+    """
+    from xslope import columns as cols
+    from xslope.fileio import cell_ref, load_slope_data, write_cells_to_xlsx
+    from xslope.slice import generate_slices
+    from xslope.solve import spencer
+    from xslope.units import labels
+
+    fails = []
+    want_fs = {("tangent", "active"): 1.612, ("tangent", "passive"): 1.500,
+               ("axial", "active"): 1.620, ("axial", "passive"): 1.508}
+
+    def table(path, d, a):
+        with contextlib.redirect_stdout(io.StringIO()):
+            sd = load_slope_data(path)
+            for r in sd["reinforcement_lines"]:
+                r["dir"], r["appl"] = d, a
+            _ok, (df, _fs) = generate_slices(sd, circle=sd["circles"][0])
+            ok, res = spencer(df)
+        headers, _rows, _legend = cols.slice_table(df, labels("imperial"))
+        total = dict(zip(headers, cols.slice_totals(df)))
+        return headers, total, (res["FS"] if ok else None)
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False).name
+    try:
+        shutil.copyfile(REINFORCE_XLSX, tmp)
+        import openpyxl
+        wb = openpyxl.load_workbook(tmp, read_only=True)
+        col = next(c.column for c in next(wb["reinforce"].iter_rows(min_row=2, max_row=2))
+                   if str(c.value).strip().lower() == "spacing")
+        wb.close()
+        write_cells_to_xlsx(tmp, {"reinforce": {cell_ref(r, col): 2.0
+                                                for r in range(3, 9)}})
+        for (d, a), fs in want_fs.items():
+            this = "P (lb/ft)" if a == "active" else "P_p (lb/ft)"
+            other = "P_p (lb/ft)" if a == "active" else "P (lb/ft)"
+            for path, name, total in ((REINFORCE_XLSX, "xslope_reinforce", "4000.0"),
+                                      (REINFORCE_RFACE_XLSX, "xslope_reinforce_rface",
+                                       "4000.0"),
+                                      (tmp, "xslope_reinforce at Spacing 2", "2000.0")):
+                headers, totals, got_fs = table(path, d, a)
+                where = f"{name}, {d} {a}"
+                if this not in headers:
+                    fails.append(f"{where}: the slice table has no {this} column: "
+                                 f"{headers}")
+                elif totals[this] != total:
+                    fails.append(f"{where}: {this} totals {totals[this]}, not {total}")
+                if other in headers:
+                    fails.append(f"{where}: the slice table prints {other} as well")
+                if path != tmp and (got_fs is None or round(got_fs, 3) != fs):
+                    fails.append(f"{where}: Spencer gives F = {got_fs}, not {fs:.3f}")
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    return fails
+
+
 def _the_load_and_its_angle_travel_together(slice_df):
     """A distributed load and the angle it acts at are printed together or not
     at all.
@@ -20617,6 +20689,8 @@ CHECKS = [
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),
+    ("every reinforcement force reaches the slice table",
+     test_every_reinforcement_force_reaches_the_slice_table),
     ("every force is in every equation or says why not",
      test_force_term_registry),
     ("a converged solution gets its working",

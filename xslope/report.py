@@ -5284,7 +5284,7 @@ def _spencer_force_sums(A, absent):
     if any(sym.startswith("P ") for sym in transcribed + printed):
         # P is the one letter the section would otherwise use for two different
         # forces: the load on top of the slice here, the reinforcement below.
-        dload, reinf = BY_KEY["dload"].label, BY_KEY["p"].label
+        dload, reinf = BY_KEY["dload"].label, BY_KEY["p_active"].label
         meaning = (f"resultant of the distributed load on the top of the slice, "
                    f"in the symbols of equations (1) and (2) — column {dload} of "
                    f"the slice table")

@@ -121,9 +121,17 @@ SLICE_COLUMNS = (
            "thickness.", "force_per_len", "{:.1f}", True),
     Column("t", "T_c", "Water force in the tension crack, per unit thickness.",
            "force_per_len", "{:.1f}", True),
-    Column("p", "P", "Reinforcement force acting on the slice base, resolved "
-           "tangent to the failure surface, per unit thickness.",
-           "force_per_len", "{:.1f}", True),
+    # One column per Appl, under the letters the method derivations use: P is
+    # active reinforcement there and P_p passive, which carries 1/F. Each is
+    # every such line crossing the base, whatever its Dir; the solvers' own
+    # p, p_pt, pa_ and pp_ columns split the same forces by direction.
+    Column("p_active", "P", "Force of the active reinforcement crossing the "
+           "slice base, per unit thickness, each line acting in its own "
+           "direction.", "force_per_len", "{:.1f}", True),
+    Column("p_passive", "P_p", "Force of the passive reinforcement crossing "
+           "the slice base, per unit thickness, each line acting in its own "
+           "direction; it mobilizes with the soil, so the equations divide it "
+           "by the factor of safety.", "force_per_len", "{:.1f}", True),
     Column("h_pile", "H_p", "Pile resistance mobilized at the slice base, per "
            "unit thickness.", "force_per_len", "{:.1f}", True),
     Column("hw", "h_w", "Height of water above the slice base at its mid-point.",
@@ -427,7 +435,7 @@ def format_residual(value):
 #: statement is ΣQ = 0, and a total under F_h would be a number with no equation
 #: to check it against.
 TOTALLED = frozenset({
-    "dx", "dl", "w", "dload", "kw", "t", "p", "h_pile", "n_eff",
+    "dx", "dl", "w", "dload", "kw", "t", "p_active", "p_passive", "h_pile", "n_eff",
     "m_res", "m_drv", "f_res", "f_drv", "q_s",
 })
 

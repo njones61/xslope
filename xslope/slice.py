@@ -2028,6 +2028,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         p_pt_sum = 0.0     # tangent, passive
         pa_cx = pa_cy = pa_mx = pa_my = 0.0   # axial, active
         pp_cx = pp_cy = pp_mx = pp_my = 0.0   # axial, passive
+        # Every line's T summed as a magnitude, by Appl, for the report's slice
+        # table: lines crossing one base can differ in direction, so the total
+        # is not recoverable from the components above.
+        p_active = p_passive = 0.0
         for rl in reinf_lines_data:
             intersec = slice_base.intersection(rl["geom"])
             if intersec.is_empty:
@@ -2065,6 +2069,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 t_i = np.interp(intersec.x, rl["xs"], rl["ts"], left=0.0, right=0.0)
             if t_i <= 0.0:
                 continue
+            if rl["appl"] == "active":
+                p_active += t_i
+            else:
+                p_passive += t_i
 
             if rl["dir"] == "tangent":
                 if rl["appl"] == "active":
@@ -2605,6 +2613,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'pp_cy': pp_cy,
             'pp_mx': pp_mx,
             'pp_my': pp_my,
+            'p_active': p_active,   # all active lines' T, any direction (report column P)
+            'p_passive': p_passive, # all passive lines' T, before division by FS (P_p)
             'lload': ll_res,   # line-load resultant on slice top (dload convention)
             'll_beta': ll_beta,   # equivalent inclination of the line-load resultant (deg)
             'll_x': ll_x_pt,   # line-load application point

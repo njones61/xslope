@@ -1,6 +1,6 @@
 ---
-title: "Verification — 800+ published benchmark cases — XSLOPE"
-description: "XSLOPE verification: more than 800 benchmark cases checked problem by problem against the published verification manuals of Rocscience Slide2 and RS2 and GeoStudio SLOPE/W, plus analytical solutions — every comparison published."
+title: "Verification — 1,095 published comparisons — XSLOPE"
+description: "XSLOPE verification: 1,095 comparisons on 402 models, checked problem by problem against the published verification manuals of Rocscience Slide2 and RS2 and GeoStudio SLOPE/W, analytical solutions, published design problems, and XSLOPE's own samples — every comparison published."
 ---
 
 # Verification and Validation

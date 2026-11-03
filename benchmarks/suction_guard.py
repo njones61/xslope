@@ -31,7 +31,12 @@ table and carries matric suction. The guard freezes four invariants of the
      ``c_suction`` equals gamma_w*(y_piezo - y_base) clamped to >= 0, times
      tan(phi_b) — the exact (u_a - u_w) tan(phi_b) term with u_a = 0.
 
-Deterministic, no network; builds its slope on docs/lem/files/xslope_acads_simple.xlsx.
+Later branches carry the same strength through a seepage field, the file's own
+phi_b/s_cap columns, and the FEM, and check_lem_fem compares the two engines'
+factors of safety on one slope where suction raises the factor of safety by a third.
+
+Deterministic, no network; builds its slope on docs/lem/files/xslope_acads_simple.xlsx
+(check_lem_fem on docs/fem/files/xslope_griffiths5_1.xlsx).
 
 Run from the repo root:  PYTHONPATH=. python3 benchmarks/suction_guard.py
 Exits non-zero on any failure.
@@ -576,6 +581,82 @@ def check_fem():
     return failures
 
 
+# === LEM vs FEM: the two engines' factors of safety with suction strength on ===
+# The branches above check each engine's suction term on its own. This one checks
+# that they agree on an answer. Griffiths & Lane's Example 5 slope with the water
+# table at the toe (xslope_griffiths5_1) is dry above it, so the whole slip surface
+# is in suction; uncapped at phi_b = 20 deg, suction raises the critical Spencer FS
+# from 1.376 to 1.821. A Spencer circular search and a strength reduction read the
+# same phi_b off the model's materials.
+#
+# The mesh is coarse to keep the suite fast (387 tri6 elements, about 20 s), and
+# coarse tri6 runs high: this model's SSRM reads 1.877 here and 1.825 on a target
+# size of 3. A 5% band holds that bias and still fails an FEM that drops the
+# suction term, which reads 1.372 on the finer mesh.
+# The search starts at the critical circle's center, which only shortens it.
+LEM_FEM_XLSX = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "docs", "fem", "files", "xslope_griffiths5_1.xlsx")
+LEM_FEM_PHI_B = 20.0
+LEM_FEM_CIRCLE = {"Xo": 130.0, "Yo": 101.0, "Depth": 0.0, "R": 101.0}
+LEM_FEM_TARGET = 6.0
+LEM_FEM_BAND = 0.05          # |FEM - LEM| / LEM
+LEM_FEM_MIN_GAIN = 0.20      # suction's share of the LEM answer: FS_on / FS_off - 1
+
+
+def _lem_fem_model(phi_b):
+    sd = load_slope_data(LEM_FEM_XLSX)
+    sd["circles"] = [dict(LEM_FEM_CIRCLE)]
+    for m in sd["materials"]:
+        m["phi_b"] = phi_b
+    return sd
+
+
+def check_lem_fem():
+    """Spencer search vs strength reduction with suction strength on. Returns a list
+    of failure strings."""
+    from xslope.search import circular_search
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    failures = []
+    sd = _lem_fem_model(LEM_FEM_PHI_B)
+    fs_cache, _conv, _path, _cc = circular_search(sd, "spencer", num_slices=_NUM_SLICES)
+    if not fs_cache or fs_cache[0]["FS"] >= 9999:
+        return ["lem-fem: the Spencer search found no surface"]
+    best = fs_cache[0]
+    fs_lem = float(best["FS"])
+
+    # The gain must be large, or agreement says nothing about the suction term:
+    # the same circle with phi_b off.
+    crit = {"Xo": best["Xo"], "Yo": best["Yo"], "Depth": best["Depth"],
+            "R": best["Yo"] - best["Depth"]}
+    ok, res = generate_slices(_lem_fem_model(None), circle=crit,
+                              num_slices=_NUM_SLICES, debug=False)
+    if not ok:
+        return [f"lem-fem: generate_slices failed on the critical circle: {res}"]
+    s_off, r_off = spencer(res[0].copy())
+    if not s_off:
+        return ["lem-fem: Spencer did not solve the critical circle with suction off"]
+    gain = fs_lem / r_off["FS"] - 1.0
+    if gain < LEM_FEM_MIN_GAIN:
+        failures.append(f"lem-fem: suction raised Spencer's FS by only {gain:.1%} "
+                        f"({r_off['FS']:.3f} to {fs_lem:.3f}); the comparison needs at "
+                        f"least {LEM_FEM_MIN_GAIN:.0%}")
+
+    mesh = build_mesh_from_polygons(get_material_polygons(sd), target_size=LEM_FEM_TARGET,
+                                    element_type="tri6")
+    result = solve_ssrm(build_fem_data(sd, mesh), F_min=1.4, F_max=2.4, tolerance=0.02,
+                        debug_level=0)
+    if not result.get("converged"):
+        return failures + [f"lem-fem: SSRM did not converge: {result.get('error')}"]
+    fs_fem = float(result["FS"])
+    if abs(fs_fem - fs_lem) / fs_lem > LEM_FEM_BAND:
+        failures.append(f"lem-fem: with phi_b = {LEM_FEM_PHI_B:g} deg, SSRM gives "
+                        f"{fs_fem:.3f} and Spencer {fs_lem:.3f}, more than "
+                        f"{LEM_FEM_BAND:.0%} apart")
+    return failures
+
+
 def main():
     if not os.path.exists(_BASE_XLSX):
         print(f"SKIP: base template not found ({_BASE_XLSX})")
@@ -584,6 +665,7 @@ def main():
     failures += check_seep()
     failures += check_autowire()
     failures += check_fem()
+    failures += check_lem_fem()
     if failures:
         print("FAILED:")
         for f in failures:
@@ -607,6 +689,8 @@ def main():
           "phi_b>0 relieves yielding ONLY above the water table and creates none; and the "
           "apparent cohesion is reduced by the trial F (capped cap*tan(phi_b)/F reproduces "
           "baking cap*tan(phi_b) into c' at the same F) — the RS2 / SIGMA/W SRF treatment.")
+    print("OK: on a slope where suction raises the factor of safety by 20% or more, the "
+          "Spencer search and the strength reduction agree within 5%.")
     return 0
 
 

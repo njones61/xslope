@@ -15160,8 +15160,10 @@ def run_suction_guard_test(test):
     extended-Mohr-Coulomb option: OFF (None / phi_b=0) is bit-identical to the
     clamped baseline, phi_b>0 strictly raises FS, suction_cap gives baseline <
     capped < uncapped, and c_suction = max(0, gamma_w*(y_base - y_piezo))*tan(phi_b)
-    exactly. Returns (0.0, None) on pass, else (None, message). File-less: builds
-    on xslope_acads_simple.xlsx."""
+    exactly. Then a Spencer search and a strength reduction on one slope where
+    suction raises the factor of safety by 20% or more must agree within 5%.
+    Returns (0.0, None) on pass, else (None, message). File-less: builds on
+    xslope_acads_simple.xlsx and xslope_griffiths5_1.xlsx."""
     import importlib
     bench = str(Path(__file__).parent / 'benchmarks')
     if bench not in sys.path:
@@ -15176,6 +15178,8 @@ def run_suction_guard_test(test):
     failures += mod.check_seep()
     failures += mod.check_autowire()
     failures += mod.check_fem()
+    # The two engines' answers with suction on (about 35 s: one search, one SSRM).
+    failures += mod.check_lem_fem()
     if failures:
         return None, "matric suction: " + "; ".join(failures[:4])
     return 0.0, None

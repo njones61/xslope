@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.0.6 — 2026-11-02
+
 ### Fixed
 
 - The water table read from a seepage solution is the highest point in each column

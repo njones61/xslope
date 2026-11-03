@@ -6,6 +6,15 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Changed
+
+- The limit equilibrium note "Tension on the base of N slices near the crest.
+  Consider adding a tension crack." also appears when suction strength (φᵇ) is on,
+  and a slice's suction cohesion counts toward the cohesion the tension is measured
+  against. Suction adds shear strength, not tensile strength. Before, suction
+  strength on any slice of the run silenced the note, so a cut slope relying on
+  suction near the crest got no advice. No factor of safety changes.
+
 ## 1.0.6 — 2026-11-02
 
 ### Fixed

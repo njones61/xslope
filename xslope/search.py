@@ -1514,18 +1514,6 @@ _SUPPORT_COLUMNS = ('p', 'p_pt', 'pa_cx', 'pa_cy', 'pp_cx', 'pp_cy',
                     'h_pile', 'h_pile_pas')
 
 
-def _suction_on(slice_df, rows):
-    """Whether any of these slices carries matric-suction strength.
-
-    ``c_suction`` is the apparent cohesion generate_slices writes for the opt-in
-    phi_b option; it is 0.0 on every slice of a model without the option.
-    """
-    if "c_suction" not in slice_df.columns:
-        return False
-    suction = np.nan_to_num(np.asarray(slice_df["c_suction"].values, dtype=float))
-    return bool(np.any(suction[rows] > 0))
-
-
 def crest_tension_note(slice_df, slope_data):
     """The note on base tension at the crest end of a solved surface, or None.
 
@@ -1552,10 +1540,10 @@ def crest_tension_note(slice_df, slope_data):
     * No note at all when a reinforcement or pile force acts anywhere on the
       slip surface: whether the support causes the crest tension cannot be told
       from the solution, so the note does not guess.
-    * No note when any slice of the run carries matric-suction strength (a
-      non-zero ``c_suction``, written only where the opt-in phi_b option is on
-      and the base is in suction): a model run with suction strength on is not
-      told to add a crack.
+    * A slice's cohesion is its apparent cohesion: ``c`` plus the matric-suction
+      cohesion ``c_suction`` where the phi_b option is on. Suction adds shear
+      strength, not tensile strength, so a run in suction is judged like any
+      other.
     * With no tension crack in the model (``tcrack_depth`` zero or absent) the
       note is "Tension on the base of N slices near the crest. Consider adding a
       tension crack." With a crack it is the first sentence alone: the tension is
@@ -1593,8 +1581,6 @@ def crest_tension_note(slice_df, slope_data):
         else:
             break
     if len(run) < CREST_TENSION_MIN_SLICES:
-        return None
-    if _suction_on(slice_df, run):
         return None
     stress = n_eff[run] / dl[run]
     worst = run[int(np.argmin(stress))]

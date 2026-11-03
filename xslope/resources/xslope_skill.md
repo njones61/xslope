@@ -1587,7 +1587,8 @@ Method notes:
   worst of them at least half its cohesion: "Tension on
   the base of N slices near the crest. Consider adding a tension crack." (first sentence only when
   the model already has a crack). It is not shown when a reinforcement or pile force acts on
-  the slip surface, or when suction strength (phi_b) is on for the slices in tension. The run prints its warnings before the factor of safety. When you call `circular_search` directly, get the same note
+  the slip surface. Suction strength (phi_b) counts toward a slice's cohesion here and does
+  not silence the note: suction adds shear strength, not tensile strength. The run prints its warnings before the factor of safety. When you call `circular_search` directly, get the same note
   with `xslope.search.crest_tension_note(fs_cache[0]['slices'], slope_data)`. If it suggests a
   crack, tell the user and offer to add one (z_c = 2c/γ is the usual starting depth).
 

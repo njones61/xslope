@@ -78,13 +78,13 @@ WHAT IS CHECKED
   model already has a crack, and the same on both facings;
 * the advice's threshold at each edge: 2 slices at just over half the cohesion
   fire, just under does not, 1 slice does not, a sliver is passed over, and a
-  a reinforcement or pile force anywhere on the surface silences it, and so
-  does suction strength on a slice of the run;
+  a reinforcement or pile force anywhere on the surface silences it, while
+  suction strength on the run does not and is counted in the cohesion;
 * ten mutations: the silent skip restored, a classifier that calls the refused
   circle an iteration failure, a verdict that claims absolute insolubility, the
   old catch-all that folded unmapped messages into "not_converged", advice that
-  ignores the crack the model already has, and each of the advice's five
-  conditions removed.
+  ignores the crack the model already has, each of the advice's four
+  conditions removed, and suction strength made to silence the advice.
 
 Run directly:  PYTHONPATH=. python3 test/spencer_disclosure_check.py
 """
@@ -768,8 +768,9 @@ def leg_crest_tension_threshold():
     The crest of CRITICAL is the last slice. Two slices at 0.6 c fire; one slice
     does not, two at 0.49 c do not; a sliver at the crest end is passed over and
     does not make up the count; a reinforcement or pile force on any slice of the
-    surface, however far from the run, silences it, and so does suction strength
-    on a slice of the run.
+    surface, however far from the run, silences it. Suction strength on the run
+    does not: it adds to each slice's cohesion, so the same tension fires against
+    c alone and stays silent once suction doubles the cohesion.
     """
     fails = []
     note = xsearch.crest_tension_note
@@ -813,10 +814,10 @@ def leg_crest_tension_threshold():
         expect(label, table, None)
     suction = supported.copy()
     cs = suction['c_suction'].values.astype(float).copy()
-    cs[n - 2] = 40.0                           # suction strength on one run slice
+    cs[crest] = suction['c'].values[crest]     # suction doubles the run's cohesion
     suction['c_suction'] = cs
-    suction = _tension(suction, crest, 0.8)
-    expect("suction strength on the run", suction, None)
+    expect("suction, run at 1.2 c", _tension(suction, crest, 1.2), want)
+    expect("suction, run at 0.8 c", _tension(suction, crest, 0.8), None)
     cracked = note(_tension(df, crest, 0.8), {'tcrack_depth': 2.0})
     if cracked != want.split(' Consider')[0]:
         fails.append(f"with a crack, a run over the threshold reads {cracked!r}")
@@ -891,10 +892,14 @@ def leg_mutations():
                   lambda name=name, value=value: setattr(xsearch, name, value),
                   lambda name=name, was=was: setattr(xsearch, name, was),
                   leg_crest_tension_threshold, fails)
-    was_suction = xsearch._suction_on
-    _mutation("suction strength ignored",
-              lambda: setattr(xsearch, '_suction_on', lambda df, rows: False),
-              lambda: setattr(xsearch, '_suction_on', was_suction),
+    def suction_silences(df, sd):
+        if 'c_suction' in df.columns and (df['c_suction'].values > 0).any():
+            return None
+        return original_note(df, sd)
+
+    _mutation("suction strength silences the advice",
+              lambda: setattr(xsearch, 'crest_tension_note', suction_silences),
+              lambda: setattr(xsearch, 'crest_tension_note', original_note),
               leg_crest_tension_threshold, fails)
     was_cols = xsearch._SUPPORT_COLUMNS
     _mutation("reinforcement ignored",

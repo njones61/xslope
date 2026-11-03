@@ -1,6 +1,6 @@
 ---
 title: "XSLOPE — free, open-source slope stability analysis software"
-description: "XSLOPE is free, open-source slope stability and seepage analysis software — seven limit equilibrium methods, finite element seepage, and finite element strength reduction from one model. Desktop app for macOS and Windows plus a scriptable Python package, verified against 800+ published benchmark cases, Apache 2.0."
+description: "XSLOPE is free, open-source slope stability and seepage analysis software — seven limit equilibrium methods, finite element seepage, and finite element strength reduction from one model. Desktop app for macOS and Windows plus a scriptable Python package, verified by 1,095 published comparisons on 402 models, Apache 2.0."
 ---
 
 <div class="hero" markdown="1">
@@ -10,7 +10,7 @@ description: "XSLOPE is free, open-source slope stability and seepage analysis s
 Limit equilibrium, finite element seepage, and finite element strength reduction —
 three analysis modes driven from **one** problem definition, in a desktop
 application for macOS and Windows and a Python package you can script. Verified
-against more than 800 published benchmark cases, and free under the Apache 2.0
+by 1,095 comparisons on 402 models, all published, and free under the Apache 2.0
 license.
 { .tagline }
 
@@ -34,7 +34,7 @@ and Windows 10 / 11 · [Install guide](getting_started/install.md) ·
 <div class="stat-band" markdown="1">
 <div class="stat"><span class="num">3</span><span class="lbl">analysis modes, one model</span></div>
 <div class="stat"><span class="num">7</span><span class="lbl">limit equilibrium methods</span></div>
-<div class="stat"><span class="num">800+</span><span class="lbl">verification cases, all published</span></div>
+<div class="stat"><span class="num">1,095</span><span class="lbl">verification comparisons, all published</span></div>
 <div class="stat"><span class="num">&#36;0</span><span class="lbl">per seat, per year, forever</span></div>
 </div>
 
@@ -131,9 +131,9 @@ Rather than a handful of textbook cases, XSLOPE is checked problem by problem
 against the published
 verification manuals of the major commercial codes — the Rocscience Slide2,
 Slide2 groundwater and RS2 manuals and the GeoStudio SLOPE/W manual and SEEP/W
-examples — alongside classical closed-form solutions. More than 800 cases are
-checked by an automated regression suite that re-runs on every change, and every
-comparison is published here, problem by problem, including the ones where
+examples — alongside classical closed-form solutions. An automated regression
+suite that re-runs on every change checks 1,095 comparisons on 402 models, and
+every comparison is published here, problem by problem, including the ones where
 XSLOPE and the vendor disagree.
 
 **[Inspect every verification case →](verification/index.md)**

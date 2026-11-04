@@ -6,6 +6,14 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Fixed
+
+- Quitting Studio, or closing its window, while the assistant is waiting for a
+  reply no longer crashes it. The assistant's request was the one background job
+  Studio did not stop on the way out, and the operating system reported the exit as
+  a crash. The assistant's Stop button also ends a turn at once now, instead of
+  after the reply arrives.
+
 ## 1.0.7 — 2026-11-04
 
 ### Fixed

@@ -2384,6 +2384,165 @@ def _drive_worker(content, text_fallback):
     return ran, failures
 
 
+def _stub_litellm(completion):
+    """A stand-in litellm module whose ``completion`` is the given function."""
+    import types
+    stub = types.ModuleType("litellm")
+    stub.drop_params = False
+    stub.suppress_debug_info = False
+    stub.token_counter = lambda **kw: 0
+    stub.completion = completion
+    return stub
+
+
+def check_a_pending_turn_stops_at_once():
+    """Stop, and quitting, end a turn at once, whatever it is waiting on.
+
+    Quitting Studio while a reply was on its way aborted the process (Norm's crash
+    report, 2026-11-04): the worker thread was still inside ``litellm.completion``,
+    and Qt aborts on destroying a thread that is running. Two waits must give way
+    to a cancel: a reply that has not come back, and a tool call the window has not
+    run (it never will once Studio is quitting).
+    """
+    import time
+    import types
+    from PySide6.QtCore import Qt
+    from studio.ai import assistant as A
+
+    out = []
+    saved = sys.modules.get("litellm")
+    try:
+        # 1. a reply that has not come back
+        entered = threading.Event()
+
+        def slow(**kwargs):
+            entered.set()
+            time.sleep(30)
+            raise RuntimeError("the reply came after the turn was stopped")
+
+        sys.modules["litellm"] = _stub_litellm(slow)
+        worker = A._AgentWorker({}, "system", [], [A.RUN_PYTHON_TOOL])
+        failures = []
+        worker.failed.connect(failures.append)
+        worker.start()
+        if not entered.wait(5):
+            out.append("the scripted request never started")
+        t0 = time.time()
+        worker.cancel()
+        if not worker.wait(3000):
+            out.append("a turn waiting on its reply did not stop within 3 s of a cancel")
+            worker.wait()                       # let it finish before teardown
+        elif time.time() - t0 > 1.0:
+            out.append(f"a turn waiting on its reply took {time.time() - t0:.1f} s "
+                       f"to stop after a cancel")
+
+        # 2. a tool call the window never runs
+        call = types.SimpleNamespace(
+            id="t1", function=types.SimpleNamespace(
+                name="run_python", arguments='{"code": "print(1)"}'))
+
+        def asks_for_a_tool(**kwargs):
+            msg = types.SimpleNamespace(content="", tool_calls=[call])
+            return types.SimpleNamespace(
+                choices=[types.SimpleNamespace(message=msg)], usage=None)
+
+        sys.modules["litellm"] = _stub_litellm(asks_for_a_tool)
+        worker = A._AgentWorker({}, "system", [], [A.RUN_PYTHON_TOOL])
+        posted = []                             # the window never runs these
+        worker.tool_call.connect(posted.append, Qt.DirectConnection)
+        worker.start()
+        deadline = time.time() + 5
+        while not posted and time.time() < deadline:
+            time.sleep(0.02)
+        if not posted:
+            out.append("the scripted tool call never reached the window")
+        worker.cancel()
+        if not worker.wait(3000):
+            out.append("a turn waiting on a tool call did not stop within 3 s of a "
+                       "cancel")
+            for req in posted:                  # release it so the check can end
+                req["holder"]["event"].set()
+            worker.wait()
+    finally:
+        if saved is None:
+            sys.modules.pop("litellm", None)
+        else:
+            sys.modules["litellm"] = saved
+    return out
+
+
+_QUIT_DURING_REPLY = r'''
+import os, sys, threading, time, types
+sys.path.insert(0, {repo!r})
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+os.environ.setdefault("MPLBACKEND", "Agg")
+from tools import studio_settings
+
+@studio_settings.isolated
+def main():
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    entered = threading.Event()
+    stub = types.ModuleType("litellm")
+    stub.drop_params = False
+    stub.suppress_debug_info = False
+    stub.token_counter = lambda **kw: 0
+    def completion(**kw):
+        entered.set()
+        time.sleep(60)
+        raise RuntimeError("too late")
+    stub.completion = completion
+    sys.modules["litellm"] = stub
+    from studio.main_window import MainWindow
+    mw = MainWindow()
+    mw.assistant.config.is_ready = lambda: True
+    mw.assistant.config.completion_kwargs = lambda: {{}}
+    mw.assistant.send("hello")
+    def quit_when_waiting():
+        if entered.is_set():
+            app.quit()
+        else:
+            QTimer.singleShot(50, quit_when_waiting)
+    QTimer.singleShot(50, quit_when_waiting)
+    app.exec()
+    return 0
+
+sys.exit(main())
+'''
+
+
+def check_quitting_during_a_reply_exits_cleanly():
+    """Studio quits cleanly with an assistant reply still on its way.
+
+    Run in a process of its own, because the failure is the process itself: Qt
+    aborts at interpreter exit (exit code 134, "QThread: Destroyed while thread is
+    still running") when the assistant's worker is still waiting on its reply. The
+    reply here is a stand-in that takes a minute, and the quit comes while it waits.
+    """
+    import subprocess
+    import time
+    with tempfile.TemporaryDirectory() as tmp:
+        script = os.path.join(tmp, "quit_during_reply.py")
+        with open(script, "w", encoding="utf-8") as fh:
+            fh.write(_QUIT_DURING_REPLY.format(repo=_REPO))
+        t0 = time.time()
+        try:
+            proc = subprocess.run([sys.executable, script], capture_output=True,
+                                  text=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            return ["Studio did not exit within 120 s of a quit during a reply"]
+    out = []
+    if proc.returncode != 0:
+        tail = (proc.stderr or proc.stdout).strip().splitlines()[-3:]
+        out.append(f"quitting during a reply exited with code {proc.returncode}: "
+                   f"{' | '.join(tail)}")
+    elif time.time() - t0 > 60:
+        out.append(f"quitting during a reply waited the reply out "
+                   f"({time.time() - t0:.0f} s)")
+    return out
+
+
 def check_prose_fence_is_not_code():
     """`_extract_code` reads only a fence marked for execution."""
     from studio.ai import assistant as A
@@ -3212,6 +3371,9 @@ CHECKS = [
     ("O. a rewritten file is reported", check_a_rewritten_file_is_reported),
     ("O. a sweep step reports its warnings", check_a_sweep_step_reports_its_warnings),
     ("O. a new project names no surface family", check_a_new_project_names_no_surface_family),
+    ("O. a pending turn stops at once", check_a_pending_turn_stops_at_once),
+    ("O. quitting during a reply exits cleanly",
+     check_quitting_during_a_reply_exits_cleanly),
 ]
 
 

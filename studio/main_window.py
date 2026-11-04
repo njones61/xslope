@@ -3867,6 +3867,11 @@ class MainWindow(QMainWindow):
         Idempotent, so the two paths can both run it (a window closed with Cmd-W
         and then quit, say) and the second call finds nothing left to stop.
         """
+        # The assistant's turn: a reply still on its way is abandoned, not waited
+        # out (quitting during one aborted the process, 2026-11-04).
+        assistant = getattr(self, "assistant", None)
+        if assistant is not None:
+            assistant.stop()
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()     # ask an in-flight run to stop, then wait briefly
             self._runner.wait(5000)

@@ -1478,6 +1478,7 @@ class _AgentWorker(QThread):
         # :func:`text_fallback_enabled`.
         self._text_fallback = text_fallback
         self._cancel = threading.Event()
+        self._pending_tool = None   # the holder _run is waiting on, if any
 
     def _system_message(self):
         # Anthropic prompt caching: a content block carrying cache_control. The
@@ -1530,7 +1531,41 @@ class _AgentWorker(QThread):
         return msgs
 
     def cancel(self):
+        """End the turn now: out of a reply still on its way (:meth:`_completion`)
+        and out of a tool call waiting on the window, which never runs it once
+        Studio is quitting."""
         self._cancel.set()
+        holder = self._pending_tool
+        if holder is not None:
+            holder["event"].set()
+
+    def _completion(self, litellm, **kwargs):
+        """``litellm.completion``, given up on if the turn is cancelled meanwhile.
+
+        The request runs on a daemon thread while this one waits for it, checking
+        for a cancel, so Stop and quitting return at once instead of after the
+        reply. A QThread still running when Studio exits makes Qt abort the whole
+        process, which is what quitting during a reply did (Norm's crash report,
+        2026-11-04); a daemon thread left waiting does not hold up the exit.
+        Returns None when cancelled, and re-raises what the request raised.
+        """
+        box = {}
+
+        def call():
+            try:
+                box["resp"] = litellm.completion(**kwargs)
+            except BaseException as exc:      # handed back to the worker below
+                box["exc"] = exc
+
+        request = threading.Thread(target=call, name="assistant-request", daemon=True)
+        request.start()
+        while request.is_alive():
+            request.join(0.1)
+            if self._cancel.is_set():
+                return None
+        if "exc" in box:
+            raise box["exc"]
+        return box["resp"]
 
     def run(self):
         try:
@@ -1545,9 +1580,11 @@ class _AgentWorker(QThread):
             for _ in range(MAX_STEPS):
                 if self._cancel.is_set():
                     break
-                resp = litellm.completion(
-                    messages=self._request_messages(),
+                resp = self._completion(
+                    litellm, messages=self._request_messages(),
                     tools=self._tools, max_tokens=MAX_TOKENS, **self._kwargs)
+                if resp is None:                # cancelled while the reply was due
+                    break
                 # Every completion in the turn counts, not just the last: an
                 # agentic turn is a dozen of these, and the tool results between
                 # them are what the input count grows by.
@@ -1604,9 +1641,13 @@ class _AgentWorker(QThread):
 
     def _run(self, name, args):
         """Marshal one tool call to the GUI thread and wait for its result text."""
+        if self._cancel.is_set():
+            return ""
         holder = {"event": threading.Event(), "content": ""}
+        self._pending_tool = holder         # so cancel() can release the wait
         self.tool_call.emit({"id": "x", "name": name, "input": args, "holder": holder})
         holder["event"].wait()
+        self._pending_tool = None
         return holder["content"]
 
 
@@ -1776,6 +1817,15 @@ class Assistant(QObject):
     def cancel(self):
         if self._worker is not None:
             self._worker.cancel()
+
+    def stop(self, timeout_ms=3000):
+        """Cancel a turn in flight and wait for its worker to end. Called when
+        Studio closes or quits (MainWindow.stop_threads): Qt aborts the process if
+        it destroys a worker thread that is still running."""
+        worker = self._worker
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            worker.wait(timeout_ms)
 
     # --- tool execution (GUI thread) ------------------------------------
     def _on_tool_call(self, req):

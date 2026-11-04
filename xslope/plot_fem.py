@@ -22,7 +22,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Patch, Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
-from .plot import (adaptive_colorbar_ticks, declared_unit_labels,
+from .plot import (adaptive_colorbar_ticks, declared_unit_labels, fill_merged,
                    JOINT_COLOR, JOINT_LINEWIDTH, JOINT_TICK_MAX_LINES)
 
 
@@ -578,10 +578,9 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
             pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
             ax.add_collection(pc)
         elif has_no_edge and not has_edge:
-            # All quadratic sub-polys — no edges on fills
-            patch_list = [Polygon(p) for p in polys]
-            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
-            ax.add_collection(pc)
+            # All quadratic sub-polys — no edges on fills, so merge them: cell-by-
+            # cell fills leave hairlines inside every element (plot.fill_merged).
+            fill_merged(ax, polys, facecolor=color, alpha=alpha, gid='MESH_FILL')
         else:
             # Mixed — separate linear (with edges) and quadratic sub-polys (no edges)
             linear_polys = []
@@ -603,8 +602,7 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
                 pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
                 ax.add_collection(pc)
             if sub_polys:
-                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
-                ax.add_collection(pc)
+                fill_merged(ax, sub_polys, facecolor=color, alpha=alpha, gid='MESH_FILL')
 
     # Render outer boundary edges of quadratic elements as a single LineCollection
     if edge_segments:

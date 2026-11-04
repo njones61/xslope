@@ -3233,6 +3233,60 @@ def adaptive_colorbar_ticks(fig, cbar, steps=(2, 5, 10), min_ticks=2,
     cbar.update_ticks()
 
 
+def fill_merged(ax, polys, **patch_kw):
+    """Shade ``polys`` (each an (n, 2) array of vertices) as one merged shape.
+
+    Filled cell by cell, a zone shows a hairline at every shared edge: anti-aliasing
+    covers each edge pixel partly from both sides, so the background shows through.
+    On a quadratic mesh, whose elements are drawn as four sub-cells each, those
+    hairlines read as a mesh four times finer than the real one, and a seepage
+    solution looked as if it had been solved on the previous, finer mesh (Norm,
+    2026-11-04). Merged first, the zone has no internal edge left to show.
+
+    Adds the union to ``ax``, holes included, as a one-path PatchCollection and
+    returns it: a collection, as the cell-by-cell fill was, so the axes scale to it
+    the same way and the DXF export reads it as before. If the merge fails, the
+    cells themselves are added instead, so the zone is still shaded. ``patch_kw``
+    (facecolor, alpha, gid, ...) goes to the collection.
+    """
+    from matplotlib.collections import PatchCollection
+    from matplotlib.patches import PathPatch, Polygon as MplPolygon
+    try:
+        from shapely.geometry import Polygon as SPolygon
+        from shapely.geometry.polygon import orient
+        from shapely.ops import unary_union
+
+        cells = [SPolygon(p) for p in polys if len(p) >= 3]
+        merged = unary_union([c if c.is_valid else c.buffer(0) for c in cells])
+        parts, stack = [], [merged]
+        while stack:
+            g = stack.pop()
+            if g.geom_type == "Polygon":
+                if not g.is_empty:
+                    parts.append(orient(g, sign=1.0))  # holes wind opposite: nonzero fill
+            elif hasattr(g, "geoms"):
+                stack.extend(g.geoms)
+        verts, codes = [], []
+        for part in parts:
+            for ring in (part.exterior, *part.interiors):
+                xy = np.asarray(ring.coords)
+                verts.append(xy)
+                codes.append([Path.MOVETO] + [Path.LINETO] * (len(xy) - 2)
+                             + [Path.CLOSEPOLY])
+        if not verts:
+            raise ValueError("nothing to fill")
+        pc = PatchCollection(
+            [PathPatch(Path(np.concatenate(verts), np.concatenate(codes)))],
+            edgecolor="none", **patch_kw)
+        ax.add_collection(pc)
+        return pc
+    except Exception:
+        pc = PatchCollection([MplPolygon(p) for p in polys], edgecolor="none",
+                             **patch_kw)
+        ax.add_collection(pc)
+        return pc
+
+
 # Mesh element-edge linewidth: calibrated so a mesh whose elements render at
 # EDGE_REF_PTS points across draws at BASE_LW (today's 0.5 pt weight — a sparse
 # teaching mesh), scaling linearly with rendered edge size and clamped to a

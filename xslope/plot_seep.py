@@ -345,6 +345,7 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
             edge_segments.extend([[n0, n1], [n1, n2], [n2, n3], [n3, n0]])
 
     # Render filled polygons as batched PatchCollections (one per material)
+    from .plot import fill_merged
     for mat in materials:
         polys = mat_fill_polys[mat]
         if not polys:
@@ -358,9 +359,9 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
             pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
             ax.add_collection(pc)
         elif has_no_edge and not has_edge:
-            patch_list = [Polygon(p) for p in polys]
-            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
-            ax.add_collection(pc)
+            # Quadratic sub-cells carry no outline, so merge them: cell-by-cell
+            # fills leave hairlines inside every element (fill_merged).
+            fill_merged(ax, polys, facecolor=color, alpha=alpha, gid='MESH_FILL')
         else:
             linear_polys = []
             sub_polys = []
@@ -377,8 +378,7 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
                 pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
                 ax.add_collection(pc)
             if sub_polys:
-                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
-                ax.add_collection(pc)
+                fill_merged(ax, sub_polys, facecolor=color, alpha=alpha, gid='MESH_FILL')
 
     # Render outer boundary edges of quadratic elements as a single LineCollection
     if edge_segments:
@@ -463,6 +463,10 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
                     legend_handles.append(hf)
 
     from .plot import _legend_below
+    # Fit the view to the mesh. Collections update the data limits but do not ask
+    # for a rescale, so with the boundary conditions off (no ax.plot call) the axes
+    # stayed at 0 to 1 and the mesh was drawn off-screen.
+    ax.autoscale_view()
     # Box-adjust (not datalim): seepage domains are typically wide and thin, so
     # filling the figure via datalim would squish the mesh into a tiny band.
     ax.set_aspect("equal")
@@ -718,13 +722,14 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
                     np.array([n7, center, n6, n3]),
                 ])
 
-        # Render as batched PatchCollections (one per material)
+        # One merged shape per material: cell-by-cell fills leave anti-aliased
+        # hairlines at every shared edge, which read as a finer mesh (fill_merged).
+        from .plot import fill_merged
         for mat in materials:
             polys = mat_fill_polys[mat]
             if polys:
-                patch_list = [Polygon(p) for p in polys]
-                pc = PatchCollection(patch_list, facecolor=mat_to_color[mat], edgecolor='none', alpha=alpha, gid='ZONE_FILL')
-                ax.add_collection(pc)
+                fill_merged(ax, polys, facecolor=mat_to_color[mat], alpha=alpha,
+                            gid='ZONE_FILL')
 
     # Set up contour levels
     # Contour/colorbar range. Default (vmin/vmax None) auto-scales to THIS frame's data

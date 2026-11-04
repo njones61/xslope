@@ -718,13 +718,15 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
         # PatchCollection / PolyCollection / contour fills: the paths are the
         # geometry (in data coords). Close a ring only if its vertices actually
         # close, so open contour lines stay open.
+        # A path may hold several rings (a fill with holes): one polyline each, or
+        # the rings would be joined into one shape by the segments between them.
         for path in getattr(coll, 'get_paths', lambda: [])():
-            v = path.vertices
-            pts = finite_pts(v[:, 0], v[:, 1])
-            if len(pts) >= 2:
-                closed = (abs(pts[0][0] - pts[-1][0]) < 1e-9 and
-                          abs(pts[0][1] - pts[-1][1]) < 1e-9)
-                msp.add_lwpolyline(pts, close=closed, dxfattribs=att)
+            for v in path.to_polygons(closed_only=False):
+                pts = finite_pts(v[:, 0], v[:, 1])
+                if len(pts) >= 2:
+                    closed = (abs(pts[0][0] - pts[-1][0]) < 1e-9 and
+                              abs(pts[0][1] - pts[-1][1]) < 1e-9)
+                    msp.add_lwpolyline(pts, close=closed, dxfattribs=att)
 
     # Patches: filled material zones / stress bars (ax.fill -> Polygon), circles.
     for p in ax.patches:
@@ -734,12 +736,16 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             msp.add_circle((float(c[0]), float(c[1])), float(p.radius), dxfattribs=att)
             continue
         try:
-            verts = p.get_path().transformed(p.get_patch_transform()).vertices
+            rings = p.get_path().transformed(p.get_patch_transform()).to_polygons(
+                closed_only=False)
         except Exception:
             continue
-        pts = finite_pts(verts[:, 0], verts[:, 1])
-        if len(pts) >= 2:
-            msp.add_lwpolyline(pts, close=True, dxfattribs=att)
+        # One polyline per ring: a merged material fill (plot.fill_merged) carries
+        # its holes as further rings of the same path.
+        for verts in rings:
+            pts = finite_pts(verts[:, 0], verts[:, 1])
+            if len(pts) >= 2:
+                msp.add_lwpolyline(pts, close=True, dxfattribs=att)
 
     doc.saveas(dxf_path)
     return dxf_path

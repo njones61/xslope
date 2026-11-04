@@ -14,6 +14,13 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   package for any request that offers tools without installing it. The same error
   met anyone who installed `xslope[ai]` with pip. Both now install mcp, and the
   installer build sends a test request with tools before it ships.
+- The material shading in the seepage solution and the mesh plots no longer shows
+  faint lines inside the elements. Each 6-node triangle was shaded as four smaller
+  triangles, and the edges between them showed through, so a solution looked as if
+  it had been drawn on a mesh four times finer than the one it was solved on. Each
+  material is now shaded as one shape, and a DXF export of a plot writes each
+  outline of a shaded area, holes included, as its own line. The seepage mesh plot
+  no longer comes up empty when the boundary conditions are hidden.
 
 ### Changed
 

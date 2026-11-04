@@ -113,7 +113,7 @@ blank:
 | name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | `embankment` | 125 | 130 | `mc` | 250 | 28 |  |  |  |  |  |  |  | `piezo` |
-| `silty clay` | 118 | 123 | `mc` | 700 | 0 |  |  |  |  |  |  |  | `piezo` |
+| `silty clay` | 118 | 123 | `mc` | 700 | 0 |  |  |  |  |  |  |  | `none` |
 | `dense sand` | 132 | 137 | `mc` | 0 | 36 |  |  |  |  |  |  |  | `piezo` |
 
 Then we open the distributed loads editor and set the surcharge to 600 psf at both

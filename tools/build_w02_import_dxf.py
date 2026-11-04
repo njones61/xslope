@@ -70,8 +70,9 @@ XLSX_OUT = os.path.join(OUT_DIR, "w02_section_imported.xlsx")
 MATERIALS = [
     {"name": "embankment", "gamma": 125.0, "gamma_sat": 130.0, "option": "mc", "c": 250.0, "phi": 28.0,
      "u": "piezo"},
+    # Undrained (phi = 0): pore pressure cannot change its strength, so u = none.
     {"name": "silty clay", "gamma": 118.0, "gamma_sat": 123.0, "option": "mc", "c": 700.0, "phi": 0.0,
-     "u": "piezo"},
+     "u": "none"},
     {"name": "dense sand", "gamma": 132.0, "gamma_sat": 137.0, "option": "mc", "c": 0.0, "phi": 36.0,
      "u": "piezo"},
 ]

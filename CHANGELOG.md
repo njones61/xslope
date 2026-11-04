@@ -6,6 +6,15 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Fixed
+
+- The assistant in XSLOPE Studio works again. In 1.0.6 every request failed with
+  "No module named 'mcp'": the installer picked up a new release of litellm, the
+  library the assistant uses to reach the model, and that release needs the mcp
+  package for any request that offers tools without installing it. The same error
+  met anyone who installed `xslope[ai]` with pip. Both now install mcp, and the
+  installer build sends a test request with tools before it ships.
+
 ### Changed
 
 - The limit equilibrium note "Tension on the base of N slices near the crest.

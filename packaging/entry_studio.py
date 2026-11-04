@@ -232,6 +232,29 @@ def _self_test(path=None):
         return 10
     emit(f"[ok] assistant tokenizer {encoding.name} ({n} tokens)")
 
+    # --- an assistant request with tools, through litellm ---------------------
+    # Every assistant request offers tools. litellm 1.106 imports the mcp package
+    # for any completion with tools, and lists it only as an optional extra, so the
+    # 1.0.6 bundle left it out and every request failed with "No module named
+    # 'mcp'". A mock response stops short of the network, after that import.
+    try:
+        from importlib.metadata import version
+
+        import litellm
+        tool = {"type": "function", "function": {
+            "name": "run_python", "description": "self-test",
+            "parameters": {"type": "object", "properties": {}}}}
+        resp = litellm.completion(
+            model="anthropic/claude-opus-5-5", api_key="self-test", max_tokens=8,
+            messages=[{"role": "user", "content": "self-test"}],
+            tools=[tool], mock_response="ok")
+        reply = resp.choices[0].message.content
+    except Exception as exc:
+        emit(f"[fail] assistant request with tools: {type(exc).__name__}: {exc}")
+        return 10
+    emit(f"[ok] assistant request with tools (litellm {version('litellm')}, "
+         f"reply {reply!r})")
+
     # --- gmsh: build a tri6 mesh (loads gmsh's bundled shared library) --------
     import gmsh  # noqa: F401  (import is itself the test: it dlopens libgmsh)
 

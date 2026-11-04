@@ -65,7 +65,7 @@ IS_WIN = sys.platform == "win32"
 # a 400 MB bundle.
 REQUIRED_IMPORTS = [
     "xslope", "studio", "numpy", "scipy", "pandas", "matplotlib", "shapely",
-    "openpyxl", "lxml", "tabulate", "gmsh", "PySide6", "litellm", "keyring",
+    "openpyxl", "lxml", "tabulate", "gmsh", "PySide6", "litellm", "mcp", "keyring",
     "ezdxf", "PyInstaller",
 ]
 
@@ -303,7 +303,11 @@ EXPECTED_MARKERS = [
     # ...and released afterwards. A handle left open on the workbook is invisible on
     # POSIX and blocks the user's next save, delete or Excel open on Windows.
     "[ok] saved file released",
-    "[ok] packaged skill prompt", "[ok] gmsh",
+    "[ok] packaged skill prompt",
+    # A mock assistant request with tools. litellm 1.106 needs the mcp package for
+    # any such request; the 1.0.6 bundle lacked it and every request failed.
+    "[ok] assistant request with tools",
+    "[ok] gmsh",
     "[ok] bishop FS",
     # Downloads over https, through the app's own code and the certificates it
     # carries. Without them every Open in Studio link and update check failed on

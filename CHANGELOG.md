@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.0.7 — 2026-11-04
+
 ### Fixed
 
 - The assistant in XSLOPE Studio works again. In 1.0.6 every request failed with

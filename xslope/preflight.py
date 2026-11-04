@@ -2481,6 +2481,48 @@ def _mat_no_shear_strength(ctx):
                    f"{_AT_MAT}.")
 
 
+#: Where a material's pore pressure comes from, by its u option, for the message.
+_U_SOURCE = {"piezo": "the piezometric line", "seep": "the seepage solution",
+             "ru": "a pore pressure ratio"}
+
+
+@rule("mat.u_on_phi_zero", WARNING, ("lem",),
+      "A phi = 0 (undrained, total stress) material should take u = none: pore "
+      "pressure has no effect on its strength.",
+      fields=("c", "phi"))
+def _mat_u_on_phi_zero(ctx):
+    # Measured case (Norm, 2026-11-04): asked to build a slope of phi = 0 clay under
+    # 10 ft of water, the assistant set u = piezo on the clay so the piezometric line
+    # would carry the submergence. The factor of safety came out right, since c alone
+    # resists on every base, but the solution drew pore pressure on every slice. The
+    # line does its job with u = none: the water table, the saturated unit weights
+    # and the automatic water loads are read from it whatever any material's u says
+    # (water.water_line_for_stage; the gamma_sat split in slice.py).
+    #
+    # Silent where pore pressure can still reach the strength: suction strength
+    # (phi_b) reads negative pore pressure, and a rapid drawdown material's R
+    # envelope (d, psi) is entered at the effective consolidation stress.
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "mc":
+            continue
+        u = str(m.get("u") or "").strip().lower()
+        if u not in _U_SOURCE:
+            continue
+        c, phi = _num(m.get("c")) or 0.0, _num(m.get("phi")) or 0.0
+        if phi != 0.0 or c <= 0.0:
+            continue
+        if any((_num(m.get(k)) or 0.0) > 0.0 for k in ("phi_b", "d", "psi")):
+            continue
+        yield (f"{ctx.mat_label(i)} has φ = 0, an undrained (total stress) "
+               f"strength, but takes pore pressure from {_U_SOURCE[u]} (u = {u}). "
+               f"Pore pressure has no effect on a φ = 0 strength, so the factor of "
+               f"safety is the same either way, but the solution would show pore "
+               f"pressures on the slice bases that play no part in the answer. Set "
+               f"u = none for this material. The water stays in the model: the "
+               f"water table, saturated unit weights, and automatic water loads do "
+               f"not depend on u {_AT_MAT}.")
+
+
 @rule("mat.cp_zero_strength", ERROR, ("lem",),
       "option = cp with both c and c/p zero gives zero undrained strength.",
       fields=("c", "cp"))

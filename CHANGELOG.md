@@ -17,6 +17,15 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Changed
 
+- The checks before a limit equilibrium run warn when a φ = 0 (undrained, total
+  stress) material takes pore pressure from a piezometric line, a seepage solution,
+  or a pore pressure ratio. Pore pressure has no effect on a φ = 0 strength, so the
+  factor of safety is the same either way, but the solution showed pore pressures
+  on slice bases where they play no part in the answer. Set u to none: the water
+  table, saturated unit weights, and automatic water loads still come from the
+  water definition. The assistant is told the same, and it sees the warning after
+  each edit. The check stays silent where pore pressure can still reach the
+  strength: a material with suction strength (φᵇ) or a rapid drawdown envelope.
 - The limit equilibrium note "Tension on the base of N slices near the crest.
   Consider adding a tension crack." also appears when suction strength (φᵇ) is on,
   and a slice's suction cohesion counts toward the cohesion the tension is measured

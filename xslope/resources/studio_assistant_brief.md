@@ -250,6 +250,9 @@ check they are the ones you wrote before reporting the edit done.
 - Surface water and pore pressure are **separate**: a reservoir against a dam
   needs BOTH the load and a pore-pressure source — a phreatic line, or seepage
   heads with `u = 'seep'`.
+- **A φ = 0 (undrained) material takes `u = 'none'`, even under water.** Pore
+  pressure cannot change its strength; `u = 'piezo'` only draws it on the slices.
+  The line still sets the water load and water table.
 - A water table on a drawing is the inverted-triangle (▽) symbol — not any dashed
   line, and it may sit above the crest (fully submerged). If its level or extent is
   ambiguous, ask.

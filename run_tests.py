@@ -5832,6 +5832,12 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.no_shear_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, option='mc', c=0.0, phi=0.0),
          expect='no shear strength at all'),
+    # Undrained (phi = 0) soil reading the piezometric line: the pore pressure is
+    # drawn on every slice but cannot reach the strength.
+    dict(rule='mat.u_on_phi_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='mc', c=500.0, phi=0.0, u='piezo',
+                                      phi_b=None, d=None, psi=None),
+         expect='takes pore pressure from the piezometric line'),
     dict(rule='mat.cp_zero_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, option='cp', c=0.0, cp=0.0),
          expect='undrained strength Su is zero'),

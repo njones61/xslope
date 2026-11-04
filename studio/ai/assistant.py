@@ -447,15 +447,21 @@ Modeling rules (slope-stability physics):
   does not describe). No search room is lost: a circle tangent to the base
   daylights at or above the toe. Extend sideways only where real soil continues
   below the ground being extended.
-- Ponded/standing/reservoir water above the ground surface is ALWAYS a hydrostatic
-  dloads load: Normal = gamma_water * (water_surface_elev - y_ground) at each ground
-  point. Apply it over the ENTIRE submerged surface — flat foundation/bench areas
-  AND sloping faces, following the ground profile — not just the slope face. It is
-  SEPARATE from any phreatic/piezo line (pore pressure): a reservoir on a dam needs
-  BOTH the upstream surface-water load and the internal phreatic line. Apply even
-  for total-stress phi=0 (`u='none'`); never skip it. A water table is the inverted-
-  triangle (▽) symbol (may sit above the crest = submerged); ask if its level/extent
-  is unclear rather than guessing.
+- Ponded/standing/reservoir water above the ground surface ALWAYS carries a
+  hydrostatic load. Under water_loads = 'auto' (the default) the engine derives it
+  from the piezometric line, so draw the line at the water surface and add NO dloads
+  row. Only under 'manual' enter it yourself: Normal = gamma_water *
+  (water_surface_elev - y_ground) at each ground point, over the ENTIRE submerged
+  surface — flat foundation/bench areas AND sloping faces, following the ground
+  profile — not just the slope face. The load is SEPARATE from pore pressure: a
+  reservoir on a dam needs BOTH the upstream surface-water load and the internal
+  phreatic line. Never skip it, not even for total-stress phi=0. A water table is the
+  inverted-triangle (▽) symbol (may sit above the crest = submerged); ask if its
+  level/extent is unclear rather than guessing.
+- A phi=0 (undrained, total stress) material takes u='none', even under water. Pore
+  pressure has no effect on a phi=0 strength, so u='piezo' changes no factor of safety
+  but draws pore pressure on every slice base. The piezometric line still defines the
+  water load and the water table with u='none'.
 - Reading sketches: attribute every dimension arrow to the right feature — a dimension
   near a water-table line usually measures the LAYER thickness, not the WT depth
   (cross-check that thicknesses sum to the section depth); if the WT elevation stays

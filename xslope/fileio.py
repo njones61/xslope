@@ -482,13 +482,43 @@ def reinforce_available_tension(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0,
       are read off the profile. Lp1/Lp2 play no part; the profile carries the
       whole law.
     """
+    cap1, cap2 = _reinforce_end_capacities(d1, d2, t_max, lp1, lp2, tend1,
+                                           tend2, pullout)
+    return max(0.0, min(t_max, cap1, cap2))
+
+
+def _reinforce_end_capacities(d1, d2, t_max, lp1, lp2, tend1, tend2, pullout):
+    """What each end can develop at a point: ``(cap1, cap2)``, the two terms
+    :func:`reinforce_available_tension` takes the minimum of with ``Tmax``."""
     if pullout is not None:
         cap1 = tend1 + pullout.from_end1(d1)
         cap2 = tend2 + pullout.from_end2(d2)
     else:
         cap1 = t_max if lp1 <= 0 else tend1 + t_max * d1 / lp1
         cap2 = t_max if lp2 <= 0 else tend2 + t_max * d2 / lp2
-    return max(0.0, min(t_max, cap1, cap2))
+    return cap1, cap2
+
+
+def reinforce_limiting_term(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0,
+                            pullout=None):
+    """Which term of the capacity envelope sets the available tension at a point.
+
+    Returns ``"tmax"`` where the member's own capacity governs, ``"end1"`` or
+    ``"end2"`` where what that end can develop (its anchorage plus the pullout
+    resistance between it and the point) is less, and ``"ends"`` where the two
+    ends develop the same force below ``Tmax``. A tie with ``Tmax`` is reported
+    as ``"tmax"``: the member is at its capacity whichever term is read. The
+    arguments are those of :func:`reinforce_available_tension`, so the term
+    named here is the one that function's value came from.
+    """
+    cap1, cap2 = _reinforce_end_capacities(d1, d2, t_max, lp1, lp2, tend1,
+                                           tend2, pullout)
+    tol = 1e-9 * max(1.0, abs(t_max))
+    if t_max <= min(cap1, cap2) + tol:
+        return "tmax"
+    if abs(cap1 - cap2) <= tol:
+        return "ends"
+    return "end1" if cap1 < cap2 else "end2"
 
 
 def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,

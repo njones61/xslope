@@ -1023,6 +1023,14 @@ or `adhesion`/`delta`) and `tend1`/`tend2` are all allowable values, each the no
 divided by its own factor of safety. With `passive` they are all nominal and the LEM divides
 them by F.
 
+To report the force in each line after a limit equilibrium solve, read the crossing records:
+`xslope.crossings.crossings(slice_df, slope_data, fs)` returns one row per point where the
+surface crosses a line, with the slice, the point, the available tension `T`, the force applied
+(`T`, or `T/F` for a passive line), and what limits `T` (`Tmax`, or pullout from end 1 or end 2),
+plus the lines the surface does not cross. It is the table Studio shows under the solution plot
+and the report prints; the slice table's `p_active`/`p_passive` columns sum the same forces per
+slice.
+
 Support-type recipes, end 1 at the face or wall (column-by-column entries with typical values
 from the FHWA manuals: `docs/reinforcement/types.md`):
 - geosynthetics -> `type='geosynthetic'` (tangent, active): `t_max` = long-term strength

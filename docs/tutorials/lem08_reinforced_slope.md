@@ -419,19 +419,18 @@ five lines at the full 800.
 ### Where the surface meets the lines
 
 The critical circle crosses five of the six layers, and the capacity envelope
-sets the force each one provides:
+sets the force each one provides. Studio lists the crossings in a table under
+the solution plot, and the report prints the same table: the slice each crossing
+falls on, the crossing point, the tension available there, the force applied to
+the sliding mass, and what limits the tension
+([Forces at the Crossings](../reinforcement/lem.md#forces-at-the-crossings)):
 
-| Line | Crossing x | To the nearer end (ft) | T (lb/ft) |
-| :---: | :---: | :---: | :---: |
-| 2 | 14.52 | 9.52 | 800 |
-| 3 | 21.59 | 8.41 | 800 |
-| 4 | 26.65 | 8.35 | 800 |
-| 5 | 30.56 | 9.44 | 800 |
-| 6 | 33.67 | 8.67 | 800 |
+![The reinforcement forces at the crossings of the critical circle](images/lem08_crossings.png){width=533}
 
 Every crossing lands more than 8 ft from the nearer end of its line, twice the
-4 ft it takes to develop the full capacity, so pullout limits nothing here and
-all five deliver 800 lb/ft.
+4 ft it takes to develop the full capacity. Pullout limits nothing here, so the
+last column reads `Tmax` and all five deliver 800 lb/ft. Line 2, for example,
+runs from x = 5 to 25 and is crossed at x = 14.51, 9.51 ft from end 1.
 
 To see the pullout lengths at work, we solve this same circle as a **Single
 surface** run — no search, so changing `Lp1` and `Lp2` is the only thing that
@@ -439,13 +438,14 @@ moves — at two other values. At `Lp1` = `Lp2` = 0, fully anchored, the answer
 stays **1.587**: anchorage had nothing to add. At 10 ft, a longer development
 length than this fill would give, the five crossings fall inside their
 development zones, mobilize 3,553 lb/ft between them rather than 4,000, and
-the factor of safety drops to **1.539**.
+the factor of safety drops to **1.539**. The table's last column then names the
+end each line is limited by: end 1, at the face, for Lines 2 and 6, and end 2,
+behind the surface, for Lines 3 to 5.
 
 Line 1 gives nothing at all. It runs from the toe at elevation 0, and the
 surface daylights at the toe and climbs away from it, so the whole line lies in
 the soil below the sliding mass. A layer the critical surface never crosses is
-not in the analysis — which is why we read the plotted lines against the
-plotted surface rather than counting rows in the sheet.
+not in the analysis, and the note above the table lists Line 1 as not crossed.
 
 ### Factor of safety by method {#what-the-other-methods-say}
 

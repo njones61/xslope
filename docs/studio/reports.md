@@ -122,6 +122,11 @@ Then **one block per method**, under that method's own heading:
   stresses, and any admissibility notes the solution reported. A surface that
   was entered rather than searched for is identified as entered, and is not
   called critical.
+- **Reinforcement forces at the crossings**, where the model has reinforcement
+  lines — one row for each point where the surface crosses a line: the slice it
+  falls on, the tension available there, the force applied, and what limits it,
+  with the lines the surface misses named above the table
+  ([Forces at the Crossings](../reinforcement/lem.md#forces-at-the-crossings)).
 - **Rapid drawdown** — the three stage factors of safety and which one governs,
   for a [rapid drawdown](../lem/rapid.md) run.
 - **The slice table** — geometry, forces and strengths on a landscape page, with

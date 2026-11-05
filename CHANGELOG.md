@@ -6,6 +6,18 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### New
+
+- The force each reinforcement line applies in a limit equilibrium solution is now
+  listed in a table under the plot on Studio's LEM · Solution tab, and the Analysis
+  Report prints the same table under each method. Each point where the surface
+  crosses a line is one row, with the slice it falls on, the tension the line can
+  develop there, the force applied to the sliding mass (that tension divided by the
+  factor of safety for a Passive line), and whether `Tmax` or pullout from one end
+  limits it. Lines the surface misses are named above the table. Until now the plot
+  drew these forces without numbers, and the slice table summed them per slice
+  without saying which line each came from.
+
 ### Fixed
 
 - Quitting Studio, or closing its window, while the assistant is waiting for a

@@ -718,6 +718,12 @@ rest of the page, the table below is a snapshot of October 2026 (see the note at
 the top), so treat its numbers as an example of how to compare models, not as a
 rating of any of them.
 
+These October runs used an earlier wording of the water request in
+[Modifying the model](#modifying-the-model), which asked for the `piezo`
+pore-pressure option on both soils. On these φ = 0 soils that gives the same
+factors of safety. The Claude Opus 5.5 row is the October run, which is why its
+cost differs from the table under [What it costs](#what-it-costs).
+
 Each session is scored twice. **Model and numbers** asks whether the work was
 done: the model built or edited is the one the request describes, and every
 factor of safety reported is right. **Explanation** asks whether what it said

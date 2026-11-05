@@ -1272,7 +1272,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     reinf_lines_data = []
     _reinf_source = slope_data.get("reinforcement_lines")
     if _reinf_source:
-        from .fileio import reinforce_available_tension  # shared envelope
+        from .fileio import (reinforce_available_tension,  # shared envelope
+                             reinforce_limiting_term)
         for _ri, r in enumerate(_reinf_source):
             dxl = r["x2"] - r["x1"]
             dyl = r["y2"] - r["y1"]
@@ -1298,16 +1299,24 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                                         "active", _ri, "Reinforcement line"),
                 "psi": psi_line,
                 "avail": reinforce_available_tension,
+                "limit": reinforce_limiting_term,
+                "index": _ri,
                 "claimed": set(),
             })
     elif _reinf_source is None and slope_data.get("reinforce_lines"):
-        for line in slope_data["reinforce_lines"]:
+        for _ri, line in enumerate(slope_data["reinforce_lines"]):
             xs = [pt["X"] for pt in line]
             ts = [pt["T"] for pt in line]
             geom = LineString([(pt["X"], pt["Y"]) for pt in line])
             reinf_lines_data.append({"xs": xs, "ts": ts, "geom": geom,
                                      "dir": "tangent", "appl": "active",
-                                     "claimed": set()})
+                                     "index": _ri, "claimed": set()})
+    # One record per crossing of a reinforcement line by the failure surface,
+    # carried out on df.attrs['reinf_crossings'] (as the piles' are on
+    # 'pile_report') for the crossing table in the report and in Studio
+    # (xslope.crossings): where the surface crosses the line, the force
+    # available there, and which term of the capacity envelope sets it.
+    reinf_crossings = []
 
     # Prepare pile lines data
     pile_lines_data = []
@@ -2058,15 +2067,26 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 continue
             rl["claimed"].add(pt_key)
 
+            limit = None
             if "envelope" in rl:
                 s_along = rl["geom"].project(intersec)
                 t_mx, lp1, lp2, te1, te2 = rl["envelope"]
                 t_i = rl["avail"](s_along, rl["length"] - s_along,
                                   t_mx, lp1, lp2, te1, te2,
                                   pullout=rl.get("pullout"))
+                limit = rl["limit"](s_along, rl["length"] - s_along,
+                                    t_mx, lp1, lp2, te1, te2,
+                                    pullout=rl.get("pullout"))
             else:
                 # legacy point-list path (hand-built slope_data): interp on X
                 t_i = np.interp(intersec.x, rl["xs"], rl["ts"], left=0.0, right=0.0)
+            # Recorded before the zero test: a crossing so near a free end that
+            # it develops nothing is still a crossing, and the table says so.
+            reinf_crossings.append({
+                "line": rl["index"], "slice": i + 1,
+                "x": float(intersec.x), "y": float(intersec.y),
+                "T": float(max(t_i, 0.0)), "dir": rl["dir"], "appl": rl["appl"],
+                "limit": limit})
             if t_i <= 0.0:
                 continue
             if rl["appl"] == "active":
@@ -2695,6 +2715,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     df.attrs['facing_note'] = facing_note
     if pile_lines_data:
         df.attrs['pile_report'] = pile_report
+    if reinf_lines_data:
+        df.attrs['reinf_crossings'] = reinf_crossings
     if material_breakdown:
         _mats_of_poly = []
         for pe in poly_edges:

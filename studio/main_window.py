@@ -17,13 +17,14 @@ import sys
 import traceback
 from urllib.parse import urlparse
 
-from PySide6.QtCore import (Qt, QEvent, QObject, QSettings, QStandardPaths, QThread,
+from PySide6.QtCore import (Qt, QEvent, QObject, QSettings, QSize, QStandardPaths, QThread,
                             QTimer, Signal)
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
-    QInputDialog, QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
-    QPushButton, QStackedWidget, QTabWidget, QToolBar, QToolButton, QTreeWidget,
+    QAbstractItemView, QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog,
+    QHBoxLayout, QInputDialog, QLabel, QMainWindow, QMenu, QMessageBox,
+    QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy, QStackedWidget,
+    QTableWidget, QTableWidgetItem, QTabWidget, QToolBar, QToolButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -148,6 +149,35 @@ class _LogStream(QObject):
                 pass
 
 
+class _FittedTable(QTableWidget):
+    """A read-only table whose size hint is its content, so a layout sets it at
+    the width its columns need and lets it shrink, with a scroll bar, below
+    that. A plain QTableWidget hints a fixed 256 pixels whatever it holds."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._hint = None
+        self.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+
+    def fit_to(self, rows_shown):
+        """Size the hint to every column and to ``rows_shown`` rows."""
+        self.resizeColumnsToContents()
+        self.resizeRowsToContents()
+        frame = 2 * self.frameWidth()
+        width = sum(self.columnWidth(j) for j in range(self.columnCount())) + frame
+        if self.rowCount() > rows_shown:
+            width += self.verticalScrollBar().sizeHint().width()
+        height = (self.horizontalHeader().sizeHint().height() + frame
+                  + sum(self.rowHeight(i) for i in range(min(rows_shown,
+                                                             self.rowCount()))))
+        self._hint = QSize(width, height)
+        self.setFixedHeight(height)
+        self.updateGeometry()
+
+    def sizeHint(self):
+        return self._hint if self._hint is not None else super().sizeHint()
+
+
 class SolutionView(QWidget):
     """The LEM Solution tab: an admissibility-warning strip stacked above the
     result canvas.
@@ -164,11 +194,23 @@ class SolutionView(QWidget):
     list is empty, otherwise one amber line per note. It refreshes from the fresh
     results on every render, so it clears on the next (clean) solve.
 
+    Below the canvas, a model with reinforcement lines gets the crossing table:
+    one row per point where the surface crosses a line, with the tension
+    available there, the force applied, and the term of the capacity envelope
+    that limits it (:mod:`xslope.crossings`, the table the report prints). The
+    plot draws the forces without numbers, and the slice table totals them per
+    slice without saying which line each came from. A model without
+    reinforcement lines never shows the table.
+
     The view quacks like the ``MplCanvas`` it wraps for the two calls the main
     window makes on a result view — ``render_solution`` and ``ensure_fitted`` — so
     it slots into the existing tab / display / clear machinery with no
     special-casing beyond the one-line class swap that builds it.
     """
+
+    #: Rows the crossing table shows before it scrolls: enough for a reinforced
+    #: wall's usual six to eight layers, few enough to leave the plot its room.
+    CROSSING_ROWS_SHOWN = 8
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -190,17 +232,42 @@ class SolutionView(QWidget):
             " }")
         self._warning.setVisible(False)
 
+        self._crossings_title = QLabel()
+        self._crossings_title.setWordWrap(True)
+        self._crossings_title.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._crossings = _FittedTable()
+        self._crossings.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self._crossings.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self._crossings.setAlternatingRowColors(True)
+        self._crossings.verticalHeader().setVisible(False)
+        self._crossings.horizontalHeader().setStretchLastSection(False)
+        self._crossings_box = QWidget()
+        box = QVBoxLayout(self._crossings_box)
+        box.setContentsMargins(6, 0, 6, 4)
+        box.setSpacing(2)
+        box.addWidget(self._crossings_title)
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self._crossings)
+        row.addStretch(1)
+        box.addLayout(row)
+        self._crossings_box.setVisible(False)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         layout.addWidget(self._warning)        # strip above the plot
         layout.addWidget(self.canvas, 1)       # canvas takes the remaining height
+        layout.addWidget(self._crossings_box)  # crossing table below it
 
     def render_solution(self, *args, **kwargs):
         # The main window passes ``results`` as the 4th positional arg; refresh the
         # strip from it (empty -> hidden) before drawing, so it tracks each solve.
         results = args[3] if len(args) > 3 else kwargs.get("results")
         self._set_warnings(results)
+        slope_data = args[0] if args else kwargs.get("slope_data")
+        slice_df = args[1] if len(args) > 1 else kwargs.get("slice_df")
+        self._set_crossings(slope_data, slice_df, results)
         self.canvas.render_solution(*args, **kwargs)
 
     def ensure_fitted(self):
@@ -219,6 +286,58 @@ class SolutionView(QWidget):
         body = "<br>".join("&#8226;&nbsp;" + html.escape(w) for w in warns)
         self._warning.setText(f"<b>{html.escape(head)}</b><br>{body}")
         self._warning.setVisible(True)
+
+    def _set_crossings(self, slope_data, slice_df, results):
+        """Fill the crossing table from this solve, or hide it."""
+        made = None
+        try:
+            from xslope.crossings import DEFINITIONS, crossing_table
+            from xslope.plot import declared_unit_labels
+            if slope_data and slice_df is not None:
+                fs = results.get("FS") if isinstance(results, dict) else None
+                made = crossing_table(slice_df, slope_data, fs,
+                                      declared_unit_labels(slope_data))
+        except Exception:
+            traceback.print_exc()
+            made = None
+        if made is None:
+            self._crossings_box.setVisible(False)
+            self._crossings.clear()
+            self._crossings.setRowCount(0)
+            return
+        headers, rows, found = made
+        title = "<b>Reinforcement forces at the crossings</b>"
+        notes = []
+        if not rows:
+            notes.append("The surface crosses none of the reinforcement lines.")
+        if found["passive"] and isinstance(results, dict) \
+                and results.get("FS") is not None:
+            notes.append(f"Passive lines apply their available tension divided "
+                         f"by F = {float(results['FS']):.3f}.")
+        if rows and found["uncrossed"]:
+            names = ", ".join(found["uncrossed"])
+            notes.append(f"Not crossed: {html.escape(names)}.")
+        self._crossings_title.setText(
+            title + ("<br>" + " ".join(notes) if notes else ""))
+        self._crossings.clear()
+        self._crossings.setColumnCount(len(headers))
+        self._crossings.setRowCount(len(rows))
+        self._crossings.setHorizontalHeaderLabels(headers)
+        for j, tip in enumerate(DEFINITIONS):
+            item = self._crossings.horizontalHeaderItem(j)
+            if item is not None:
+                item.setToolTip(tip)
+        for i, row in enumerate(rows):
+            for j, cell in enumerate(row):
+                item = QTableWidgetItem(cell)
+                # Numbers right, words left, as the sweep tables set them.
+                if 1 <= j <= 3 or j in (5, 6):
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self._crossings.setItem(i, j, item)
+        self._crossings.setCurrentCell(-1, -1)
+        self._crossings.setVisible(bool(rows))
+        self._crossings.fit_to(self.CROSSING_ROWS_SHOWN)
+        self._crossings_box.setVisible(True)
 
 
 class SweepCanvas(MplCanvas):

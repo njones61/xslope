@@ -822,6 +822,9 @@ DEFAULT_OPTIONS = {
     "lem_search": True,
     "lem_search_figure": True,
     "lem_solution_figure": True,
+    "lem_crossings": True,            # the force at each crossing of a
+                                      # reinforcement line by the surface;
+                                      # only where the model has reinforcement
     "lem_slice_table": True,
     "lem_slice_key": True,
     "lem_calculations": True,
@@ -6334,6 +6337,58 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
     return blocks
 
 
+def _crossings_section(slope_data, slice_df, results, named, label, counter):
+    """Where one method's surface crosses each reinforcement line, the tension
+    the line can develop there, what limits it, and the force applied.
+
+    The slice table totals the reinforcement on each slice base; it does not say
+    which line a force came from, how much of the line's capacity reached the
+    surface, or why. This table does, one row per crossing, from the records
+    :func:`xslope.slice.generate_slices` keeps (:mod:`xslope.crossings`). A model
+    without reinforcement lines gets no section.
+    """
+    from .crossings import DEFINITIONS, HEADERS, crossing_table
+    fs = _num(results.get("FS"))
+    made = crossing_table(slice_df, slope_data, fs, _unit_labels(slope_data))
+    if made is None:
+        return None
+    headers, rows, found = made
+    # Named for the crossings: "Reinforcement Forces" is the finite element
+    # section's subsection, the forces along each bar.
+    sub = Section("Reinforcement Forces at the Crossings")
+    uncrossed = found["uncrossed"]
+    if not rows:
+        sub.blocks.append(Prose(
+            f"The {named} crosses none of the reinforcement lines, so the "
+            f"reinforcement applies no force to it."))
+        return sub
+    number = counter.next_table()
+    where, links = cite("Table", number)
+    text = (f"{where} lists each point where the {named} crosses a "
+            f"reinforcement line, the tension available in the line there, and "
+            f"the force applied to the sliding mass. The available tension is "
+            f"the line's capacity envelope at the crossing: Tmax, unless the "
+            f"crossing is close enough to an end that the pullout resistance "
+            f"between that end and the crossing, with any end anchorage, "
+            f"develops less. The last column names the term that governs.")
+    if found["passive"] and fs is not None:
+        text += (f" A passive line is mobilized with the soil, so the force "
+                 f"applied is its available tension divided by the factor of "
+                 f"safety, F = {fs:.3f}.")
+    if uncrossed:
+        they = "it applies" if len(uncrossed) == 1 else "they apply"
+        text += (f" The {named} does not cross {_join(uncrossed)}, so {they} "
+                 f"no force to it.")
+    sub.blocks.append(Prose(text, links=links))
+    keep = {"Appl", "Available T", "Applied force", "Limited by"}
+    legend = [(shown, d) for h, shown, d in zip(HEADERS, headers, DEFINITIONS)
+              if h in keep]
+    sub.blocks.append(Table(headers, rows,
+                            f"Reinforcement forces at the {named} — {label}",
+                            number, legend=legend))
+    return sub
+
+
 def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
                     progress=None):
     """Everything the report says about ONE method, under that method's heading.
@@ -6436,6 +6491,13 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     if figure is not None:
         res.blocks.append(figure)
     sec.children.append(res)
+
+    # --- the reinforcement force at each crossing of this surface ---
+    if opts["lem_crossings"] and slice_df is not None:
+        crossings = _crossings_section(slope_data, slice_df, results, named,
+                                       label, counter)
+        if crossings is not None:
+            sec.children.append(crossings)
 
     # --- rapid drawdown ---
     if opts["lem_rapid"]:

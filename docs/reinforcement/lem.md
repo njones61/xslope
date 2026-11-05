@@ -187,6 +187,36 @@ The **Type** column fills Dir and Appl automatically (either can be overridden b
 
 Leave Type blank for a generic tensile line with the defaults (Tangent, Active).
 
+## Forces at the Crossings
+
+After a limit equilibrium solve, Studio lists every point where the surface crosses a reinforcement line in a table
+under the plot on the **LEM · Solution** tab ([Running an Analysis](../studio/analysis.md)). The
+[report](../studio/reports.md) prints the same table under each method, in a subsection titled Reinforcement Forces
+at the Crossings. Each crossing is one row, and every force is per unit width:
+
+| Column | Meaning |
+|---|---|
+| Line | The reinforcement line, by its label. |
+| Slice | The slice whose base the crossing is on, numbered as in the report's slice table. |
+| x, y | The crossing point. |
+| Appl | Active or Passive. |
+| Available T | The [capacity envelope](#capacity-envelope) $T(x)$ at the crossing. |
+| Applied force | The force applied to the sliding mass: $T$ for an Active line, $T/F$ for a Passive one. |
+| Limited by | The term of the envelope that sets $T$: `Tmax`, or `Pullout from end 1` or `end 2` where the bond between that end and the crossing develops less than $T_{max}$. An end with anchorage reads `Tend1 + pullout from end 1`. |
+
+A line the surface does not cross has no row, and the note above the table names it. A crossing at a line's free end
+has a row with no force.
+
+On the [LEM-8](../tutorials/lem08_reinforced_slope.md) slope, every crossing of the critical circle is more than 8 ft
+from the nearer end of its line, and the 4 ft pullout lengths let all five lines reach their full 800 lb/ft. With
+$L_{p1} = L_{p2} = 10$ ft, the same circle crosses each line inside a development zone, and pullout limits every
+force:
+
+![The crossing table for the LEM-8 critical circle with 10 ft pullout lengths](../lem/images/reinf_crossings_pullout.png){width=579}
+
+Lines 2 and 6 are limited from end 1, at the slope face, and Lines 3 to 5 from end 2, behind the surface. The five
+forces total 3,553 lb/ft, and Spencer's factor of safety drops from 1.587 to 1.539.
+
 ## References
 
 Duncan, J.M., & Wright, S.G. (2005). *Soil Strength and Slope Stability*. John Wiley & Sons.

@@ -244,6 +244,9 @@ EXPECTED_SECTIONS = [
     (2, "Spencer's Method"),
     (3, "Search for the Critical Surface"),
     (3, "Results"),
+    # Where the method's surface crosses each reinforcement line, beside the
+    # surface it was read off: the sample is reinforced.
+    (3, "Reinforcement Forces at the Crossings"),
     (3, "Slice Table"),
     (3, "Calculations"),
 ]
@@ -506,6 +509,7 @@ def test_toggles():
         ({"lem_materials": False}, "Materials"),
         ({"lem_loads": False}, "Loads"),
         ({"lem_members": False}, "Reinforcement"),
+        ({"lem_crossings": False}, "Reinforcement Forces at the Crossings"),
     ]
     for opts, gone in cases:
         titles = [t for _lvl, t in _build(opts).section_titles()]
@@ -898,7 +902,9 @@ def test_multi_method_detail():
         detail, _note = detail_bundle(slope_data, solutions, m)
         want_kids = (["Search for the Critical Surface"]
                      if (detail or {}).get("search") else [])
-        want_kids += ["Results", "Slice Table", "Calculations"]
+        # The sample is reinforced, so each block has its crossing table.
+        want_kids += ["Results", "Reinforcement Forces at the Crossings",
+                      "Slice Table", "Calculations"]
         kids = [c.title for c in node.children]
         if kids != want_kids:
             fails.append(f"{node.title!r} carries {kids}, expected {want_kids}")
@@ -3959,6 +3965,219 @@ def test_every_reinforcement_force_reaches_the_slice_table():
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
+    return fails
+
+
+def _crossing_model(path, edit=None, appl=None):
+    """``(slope_data, slice_df, F)`` on the model's first circle, Spencer, with
+    ``edit(lines)`` applied to its reinforcement lines first."""
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.solve import spencer
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(path)
+        for r in sd["reinforcement_lines"]:
+            if appl:
+                r["appl"] = appl
+        if edit:
+            edit(sd["reinforcement_lines"])
+        _ok, (df, _surface) = generate_slices(sd, circle=sd["circles"][0])
+        ok, res = spencer(df)
+    return sd, df, (res["FS"] if ok else None)
+
+
+def test_the_force_at_each_crossing():
+    """The crossing table: one row per point where the surface crosses a
+    reinforcement line, with the tension available there, the force applied, and
+    the term of the capacity envelope that sets it (Norm, Q38).
+
+    On the reinforcement sample's first circle, five of the six 800 lb/ft
+    geogrids are crossed at full capacity, and Line 1 is crossed at its own end
+    at the toe, where it develops nothing. A passive line applies its tension
+    divided by F. Line 2 given a 30 ft pullout length at end 2 is limited by
+    pullout from that end, and by its anchorage plus pullout once Tend2 is set;
+    the force is the envelope's value at the crossing either way. A line moved
+    out of the surface's way is listed as not crossed. Each case is run on the
+    right-facing mirror too, which must give the same rows.
+    """
+    from xslope.crossings import crossings, crossing_table
+    from xslope.fileio import reinforce_available_tension
+    from xslope.units import labels
+
+    fails = []
+    for path, name in ((REINFORCE_XLSX, "xslope_reinforce"),
+                       (REINFORCE_RFACE_XLSX, "xslope_reinforce_rface")):
+        sd, df, fs = _crossing_model(path, appl="active")
+        got = crossings(df, sd, fs)
+        want = [(f"Line {n}", 800.0, "Tmax") for n in range(2, 7)]
+        rows = [(r["name"], round(r["T"], 6), r["limit"]) for r in got["rows"]]
+        # The circle leaves the toe where Line 1 begins: a crossing at the
+        # line's own end, which develops nothing, or on the mirror, where the
+        # arc is computed from the other side, a miss by rounding. Either is
+        # the right answer; anything else is not.
+        toe = rows[:1] == [("Line 1", 0.0, "Pullout from end 1")]
+        if (rows[1:] if toe else rows) != want:
+            fails.append(f"{name}: the crossings are {rows}, not {want}")
+        if not toe and got["uncrossed"] != ["Line 1"]:
+            fails.append(f"{name}: Line 1 is neither crossed at its end nor "
+                         f"listed as missed: {got['uncrossed']}")
+        if name == "xslope_reinforce" and not toe:
+            fails.append(f"{name}: the toe crossing of Line 1 is gone: {rows}")
+        if any(r["applied"] != r["T"] for r in got["rows"]):
+            fails.append(f"{name}: an active line applies other than its tension")
+        if got["passive"] or (toe and got["uncrossed"]):
+            fails.append(f"{name}: uncrossed {got['uncrossed']}, passive "
+                         f"{got['passive']}")
+        headers, table, _found = crossing_table(df, sd, fs, labels("imperial"))
+        if headers != ["Line", "Slice", "x (ft)", "y (ft)", "Appl",
+                       "Available T (lb/ft)", "Applied force (lb/ft)",
+                       "Limited by"]:
+            fails.append(f"{name}: the headings are {headers}")
+        line2 = next((r for r in table if r[0] == "Line 2"), None)
+        if line2 is None or line2[4:] != ["Active", "800.0", "800.0", "Tmax"]:
+            fails.append(f"{name}: Line 2 prints {line2}")
+
+        # Passive: the force applied is the tension over F.
+        sd, df, fs = _crossing_model(path, appl="passive")
+        got = crossings(df, sd, fs)
+        for r in got["rows"]:
+            if abs(r["applied"] - r["T"] / fs) > 1e-9:
+                fails.append(f"{name}, passive: {r['name']} applies "
+                             f"{r['applied']}, not {r['T']} / {fs}")
+        if not got["passive"]:
+            fails.append(f"{name}, passive: the table does not say so")
+
+        # Pullout from end 2 governs, then the anchorage plus pullout.
+        def long_lp2(lines, tend2=0.0):
+            lines[1]["lp2"] = 30.0
+            lines[1]["tend2"] = tend2
+        for tend2, words in ((0.0, "Pullout from end 2"),
+                             (100.0, "Tend2 + pullout from end 2")):
+            sd, df, fs = _crossing_model(path, edit=lambda l: long_lp2(l, tend2),
+                                         appl="active")
+            row = next(r for r in crossings(df, sd, fs)["rows"]
+                       if r["name"] == "Line 2")
+            line = sd["reinforcement_lines"][1]
+            # Line 2 is horizontal, so the distance to end 2 is along x.
+            d2 = abs(line["x2"] - row["x"])
+            d1 = abs(row["x"] - line["x1"])
+            want_T = reinforce_available_tension(d1, d2, 800.0, line["lp1"], 30.0,
+                                                 0.0, tend2)
+            if row["limit"] != words or abs(row["T"] - want_T) > 1e-6:
+                fails.append(f"{name}, Lp2 30, Tend2 {tend2:g}: Line 2 reads "
+                             f"{row['T']:.3f} limited by {row['limit']!r}, not "
+                             f"{want_T:.3f} by {words!r}")
+            if not 0.0 < row["T"] < 800.0:
+                fails.append(f"{name}, Lp2 30, Tend2 {tend2:g}: the pullout case "
+                             f"develops {row['T']}")
+
+        # A line the surface never reaches.
+        def away(lines):
+            lines[5].update(y1=-8.0, y2=-8.0)
+        sd, df, fs = _crossing_model(path, edit=away, appl="active")
+        got = crossings(df, sd, fs)
+        if "Line 6" not in got["uncrossed"] or any(r["name"] == "Line 6"
+                                                   for r in got["rows"]):
+            fails.append(f"{name}: Line 6 moved below the surface is listed as "
+                         f"{got['uncrossed']}")
+    return fails
+
+
+def test_the_crossing_section():
+    """The report prints the crossing table under each method, only where the
+    model has reinforcement, and its sentences say what the table does not:
+    that a passive line's force is divided by F, and which lines the surface
+    misses."""
+    from xslope.report import build_report
+
+    fails = []
+    opts = {"pd_figure": False, "lem_inputs_figure": False,
+            "lem_search_figure": False, "lem_solution_figure": False,
+            "lem_slice_table": False, "lem_calculations": False}
+
+    def section(sd, df, fs, extra=None):
+        bundle = {"slice_df": df, "failure_surface": None,
+                  "results": {"FS": fs, "method": "spencer"}, "search": None,
+                  "method": "spencer",
+                  "options": {"analysis": "single_surface",
+                              "surface": "circular", "num_slices": 40}}
+        with contextlib.redirect_stdout(io.StringIO()):
+            report = build_report(sd, {"lem": [bundle]},
+                                  dict(opts, method="spencer", **(extra or {})),
+                                  tempfile.mkdtemp(prefix="xslope_report_"))
+        found = []
+
+        def walk(sec):
+            if sec.title == "Reinforcement Forces at the Crossings":
+                found.append(sec)
+            for child in sec.children:
+                walk(child)
+        for sec in report.sections:
+            walk(sec)
+        return found
+
+    def away(lines):
+        lines[5].update(y1=-8.0, y2=-8.0)
+    sd, df, fs = _crossing_model(REINFORCE_XLSX, edit=away, appl="passive")
+    found = section(sd, df, fs)
+    if len(found) != 1:
+        return [f"the report has {len(found)} crossing sections"]
+    prose = " ".join(b.text for b in found[0].blocks if b.kind == "prose")
+    tables = [b for b in found[0].blocks if b.kind == "table"]
+    if len(tables) != 1 or len(tables[0].rows) != 5:
+        fails.append(f"the section's tables: {[len(t.rows) for t in tables]}")
+    if f"F = {fs:.3f}" not in prose:
+        fails.append(f"a passive model's sentence does not divide by F: {prose}")
+    if "does not cross Line 6" not in prose:
+        fails.append(f"the uncrossed line is not named: {prose}")
+    if section(sd, df, fs, {"lem_crossings": False}):
+        fails.append("lem_crossings off left the section in")
+
+    sd, df, fs = _crossing_model(REINFORCE_XLSX)
+    sd = dict(sd, reinforcement_lines=[])
+    if section(sd, df, fs):
+        fails.append("a model without reinforcement lines got the section")
+    return fails
+
+
+def test_studio_crossing_table():
+    """Studio's LEM Solution view shows the crossing table under the plot for a
+    reinforced model, the same rows the report prints, and hides it for a model
+    without reinforcement."""
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from xslope.crossings import crossing_table
+    from xslope.plot import declared_unit_labels
+    from studio.main_window import SolutionView
+
+    fails = []
+    sd, df, fs = _crossing_model(REINFORCE_XLSX, appl="passive")
+    results = {"FS": fs, "method": "spencer", "warnings": []}
+    view = SolutionView()
+    try:
+        view.canvas.render_solution = lambda *a, **kw: None   # no plot needed
+        view.render_solution(sd, df, None, results, {})
+        if view._crossings_box.isHidden():
+            fails.append("a reinforced model's view hides the crossing table")
+        headers, rows, _found = crossing_table(df, sd, fs, declared_unit_labels(sd))
+        table = view._crossings
+        shown_headers = [table.horizontalHeaderItem(j).text()
+                         for j in range(table.columnCount())]
+        shown = [[table.item(i, j).text() for j in range(table.columnCount())]
+                 for i in range(table.rowCount())]
+        if shown_headers != headers or shown != rows:
+            fails.append(f"the view shows {shown_headers} {shown}, not the "
+                         f"report's {headers} {rows}")
+        if f"F = {fs:.3f}" not in view._crossings_title.text():
+            fails.append(f"the view's note does not divide by F: "
+                         f"{view._crossings_title.text()}")
+        view.render_solution(dict(sd, reinforcement_lines=[]), df, None,
+                             results, {})
+        if not view._crossings_box.isHidden():
+            fails.append("a model without reinforcement lines shows the table")
+    finally:
+        view.deleteLater()
     return fails
 
 
@@ -20691,6 +20910,9 @@ CHECKS = [
     ("the slice-column registry", test_column_registry),
     ("every reinforcement force reaches the slice table",
      test_every_reinforcement_force_reaches_the_slice_table),
+    ("the force at each crossing", test_the_force_at_each_crossing),
+    ("the crossing section", test_the_crossing_section),
+    ("Studio's crossing table", test_studio_crossing_table),
     ("every force is in every equation or says why not",
      test_force_term_registry),
     ("a converged solution gets its working",
@@ -20814,7 +21036,8 @@ _STUDIO_ONLY = {test_seep_panels_mirror_the_seep_view,
                 test_report_runner_cancel, test_report_runner_failure,
                 test_noncircular_dims_the_moment_methods,
                 test_slice_numbers_display_option, test_main_window_action,
-                test_report_solutions_carry_every_engine}
+                test_report_solutions_carry_every_engine,
+                test_studio_crossing_table}
 
 
 @studio_settings.isolated

@@ -150,6 +150,15 @@ see [Interpreting the Admissibility
 Warnings](../lem/spencer.md#interpreting-the-admissibility-warnings). A clean
 solution shows no strip.
 
+When the model has reinforcement lines, a table under the plot lists each point
+where the surface crosses one: the slice it falls on, the tension the line can
+develop there, the force applied to the sliding mass, and what limits that
+tension. The note above the table names any line the surface misses, and, when
+a line is Passive, the factor of safety its force is divided by. The columns are
+described in [Forces at the Crossings](../reinforcement/lem.md#forces-at-the-crossings).
+
+![LEM Solution with the reinforcement forces at the crossings](images/analysis_crossing_table.png){width=1500}
+
 Both circular and non-circular surfaces are supported for single solves and
 searches. Search iteration progress streams to the Log pane, and a search can be
 **cancelled** from the status bar.

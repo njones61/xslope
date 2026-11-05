@@ -71,6 +71,16 @@ Parametric captures:
     Parametric pages' worked examples are, so a shot shows the numbers its text
     quotes. The FEM and Seepage versions of the dialog are grabbed unrun.
 
+Crossing-table captures (the LEM Solution view's reinforcement forces):
+
+  * ``analysis_crossing_table.png`` — the **LEM · Solution** view on the LEM-8
+    geogrid slope's critical circle, Spencer, with the crossing table under the
+    plot. The search is the real one the tutorial runs.
+  * ``docs/tutorials/images/lem08_crossings.png`` — that table alone, for LEM-8.
+  * ``docs/lem/images/reinf_crossings_pullout.png`` — the table on the same circle
+    with ``Lp1 = Lp2 = 10`` ft, set in memory and solved as a single surface, so
+    pullout limits every crossing (the reference page's example).
+
 The remaining dialogs and dock panels — Build mesh, the steady Run Seepage dialog,
 the welcome window, the DXF import wizard, the Global parameters form, the two
 Assistant dialogs, the Inputs tree and the two Display panels — are captured the
@@ -85,6 +95,7 @@ show anything about) whoever runs it, and it must never touch the real keychain.
 
 Run:  python tools/capture_studio_screenshots.py              # regenerate every PNG
       python tools/capture_studio_screenshots.py parametric   # the Parametric set only
+      python tools/capture_studio_screenshots.py crossings    # the crossing tables only
 
 Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
 layer to capture), mirroring the transient studio smoke test.
@@ -1380,6 +1391,97 @@ def capture_parametric_back_curve():
                           mode="back_analysis", ranges=ACADS_BACK)
 
 
+#: The LEM-8 geogrid slope, as the tutorial ships it.
+LEM8 = os.path.join(REPO_ROOT, "docs", "lem", "files", "xslope_reinforce.xlsx")
+_LEM8_SOLVED = {}
+
+
+def _lem8_critical():
+    """The LEM-8 model and its Spencer search, run once for the three shots."""
+    if "it" not in _LEM8_SOLVED:
+        from xslope.fileio import load_slope_data
+        from xslope.search import run_lem_analysis
+        sd = _quiet(load_slope_data, LEM8)
+        bundle = _quiet(run_lem_analysis, sd, "spencer", analysis="auto_search",
+                        announce=False)
+        _LEM8_SOLVED["it"] = (sd, bundle)
+    return _LEM8_SOLVED["it"]
+
+
+def _solution_view(sd, bundle):
+    """A LEM Solution view showing one solve, laid out at the window size the
+    other result-view shots use, with its plot rendered."""
+    from studio.display_panels import SolutionDisplayPanel
+    from studio.main_window import SolutionView
+    view = SolutionView()
+    view.resize(1500, 1050)
+    view.show()
+    view.render_solution(sd, bundle["slice_df"], bundle["failure_surface"],
+                         bundle["results"], SolutionDisplayPanel().options())
+    _settle()
+    view.canvas.render_now()
+    _settle()
+    return view
+
+
+def _grab_table(view, out):
+    """The crossing table and its note, cropped at the table's right edge: the
+    strip under the plot spans the window, and the table fills a third of it."""
+    from PIL import Image, ImageChops
+    view._crossings_box.grab().save(out)
+    im = Image.open(out).convert("RGB")
+    bg = Image.new("RGB", im.size, im.getpixel((im.width - 1, 0)))
+    box = ImageChops.difference(im, bg).getbbox()
+    im.crop((0, 0, min(im.width, box[2] + 8), im.height)).save(out)
+    return out
+
+
+def capture_crossing_table():
+    """The LEM Solution view with the crossing table, on LEM-8's critical circle."""
+    sd, bundle = _lem8_critical()
+    view = _solution_view(sd, bundle)
+    out = os.path.join(OUT_DIR, "analysis_crossing_table.png")
+    view.grab().save(out)
+    view.close()
+    return out
+
+
+def capture_lem8_crossings():
+    """The crossing table alone, for LEM-8's Where the surface meets the lines."""
+    sd, bundle = _lem8_critical()
+    view = _solution_view(sd, bundle)
+    out = _grab_table(view, os.path.join(REPO_ROOT, "docs", "tutorials", "images",
+                                         "lem08_crossings.png"))
+    view.close()
+    return out
+
+
+def capture_crossings_pullout():
+    """The crossing table on the same circle with 10 ft pullout lengths, solved as
+    a single surface: every crossing is then limited by pullout from one end."""
+    from xslope.fileio import load_slope_data
+    from xslope.search import run_lem_analysis
+    _sd, searched = _lem8_critical()
+    critical = searched["search"]["fs_cache"][0]
+    sd = _quiet(load_slope_data, LEM8)
+    for line in sd["reinforcement_lines"]:
+        line["lp1"] = line["lp2"] = 10.0
+    sd["circles"] = [dict(sd["circles"][0], Xo=critical["Xo"], Yo=critical["Yo"],
+                          Depth=critical["Depth"],
+                          R=critical["Yo"] - critical["Depth"])]
+    bundle = _quiet(run_lem_analysis, sd, "spencer", analysis="single_surface",
+                    announce=False)
+    view = _solution_view(sd, bundle)
+    out = _grab_table(view, os.path.join(REPO_ROOT, "docs", "lem", "images",
+                                         "reinf_crossings_pullout.png"))
+    view.close()
+    return out
+
+
+CROSSING_SHOTS = (capture_crossing_table, capture_lem8_crossings,
+                  capture_crossings_pullout)
+
+
 PARAMETRIC_SHOTS = (capture_parametric_dialog, capture_parametric_design_dialog,
                     capture_parametric_back_dialog, capture_parametric_fem_dialog,
                     capture_parametric_seep_dialog, capture_parametric_tornado,
@@ -1392,6 +1494,18 @@ def main():
         print("capture_studio_screenshots: regenerating the Parametric images")
         for fn in PARAMETRIC_SHOTS:
             print(f"  wrote {os.path.relpath(fn(), REPO_ROOT)}")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "crossings":
+        print("capture_studio_screenshots: regenerating the crossing tables")
+        for fn in CROSSING_SHOTS:
+            print(f"  wrote {os.path.relpath(fn(), REPO_ROOT)}")
+        return
+    if len(sys.argv) > 1:
+        # One capture by name, e.g. capture_report_dialog.
+        fn = globals().get(sys.argv[1])
+        if not callable(fn):
+            raise SystemExit(f"no capture named {sys.argv[1]!r}")
+        print(f"  wrote {os.path.relpath(fn(), REPO_ROOT)}")
         return
     print("capture_studio_screenshots: regenerating Studio dialog images")
     analysis_reliability_dialog_lem()
@@ -1416,7 +1530,7 @@ def main():
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,
-               capture_display_dock_fem) + PARAMETRIC_SHOTS:
+               capture_display_dock_fem) + PARAMETRIC_SHOTS + CROSSING_SHOTS:
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     global _MW

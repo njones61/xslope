@@ -106,6 +106,10 @@ CONTENT_TREE = [
           "highlighted."),
          ("lem_solution_figure", "Critical surface plot",
           "The critical surface with its slices and base stresses."),
+         ("lem_crossings", "Reinforcement forces at the crossings",
+          "Where the surface crosses each reinforcement line, the tension the "
+          "line can develop there, what limits it, and the force applied. Only "
+          "where the model has reinforcement lines."),
          ("lem_slice_table", "Slice table",
           "Slice geometry, forces and strengths, on a landscape page, with a "
           "legend defining every column."),

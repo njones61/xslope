@@ -772,6 +772,11 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
     result["usage"] = dict(totals or probe or {})
     if probe is not None:
         result["usage"]["calls"] = probe.get("calls", 0)
+    # The provider's own cache accounting, from the probe: the cost of a session
+    # depends on how its cache writes split between the five-minute and the
+    # one-hour lifetimes, which the Assistant's accumulator does not keep.
+    result["cache"] = {k: v for k, v in (probe or {}).items()
+                       if "cache" in k or "ephemeral" in k}
     result["seconds"] = time.time() - started
     _append_footer(transcript_path, result)
     print("   session %r: %.1fs, %s" % (name, result["seconds"],
@@ -903,6 +908,9 @@ def _append_footer(path, result):
     lines = ["## Session total", "",
              "- Tokens: %s" % _format_usage(result["usage"]),
              "- Wall time: %.1fs" % result["seconds"]]
+    if result.get("cache"):
+        lines.append("- Provider cache: %s" % " · ".join(
+            "%s %s" % (k, format(v, ",")) for k, v in sorted(result["cache"].items())))
     if result["workbook"]:
         lines.append("- Workbook written: `%s`"
                      % os.path.relpath(result["workbook"], REPO_ROOT))
@@ -982,18 +990,21 @@ def w1_modify(dry_run=False):
     """Three edits to a finished model, in one conversation, each rerun.
 
     Each turn changes a different KIND of input — the geometry, then the water
-    and the strengths' pore-pressure option together, then one strength — and
-    the third asks which circle governs, which on a layered section is the whole
-    question. The workbook is written after every turn: the end state cannot
-    show what the second of three edits did.
+    and the saturated unit weights together, then one strength — and the third
+    asks which circle governs, which on a layered section is the whole question.
+    Both soils are phi = 0, so the water turn keeps their pore-pressure option at
+    none (preflight's mat.u_on_phi_zero; Norm, 2026-11-05, 60a). The workbook is
+    written after every turn: the end state cannot show what the second of three
+    edits did.
     """
     return run_assistant_session(
         "modify", W1_MODEL,
         ["Change the face to 3:1 and rerun the search.",
          "Add a piezometric line at elevation 30 across the whole section so the "
-         "slope is fully submerged. Use the piezo pore-pressure option on both "
-         "soils and enter saturated unit weights of 135 pcf for the embankment "
-         "and 140 pcf for the foundation. Rerun the search.",
+         "slope is fully submerged. Both soils are phi = 0, so keep their "
+         "pore-pressure option at none. Enter saturated unit weights of 135 pcf "
+         "for the embankment and 140 pcf for the foundation, and rerun the "
+         "search.",
          "Reduce the foundation cohesion to 250 psf and rerun the search. Which "
          "circle governs now, and why?"],
         timeout_s=900, max_height=20000, save_each_turn=True, dry_run=dry_run)

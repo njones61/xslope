@@ -29,9 +29,10 @@ learn how to check each kind of answer it gives back.
 [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx)</div>
 </div>
 
-!!! note "October 2026"
+!!! note "October and November 2026"
     The conversations, scores and costs on this page show what the models could
-    do, and what they cost, as of October 2026, when the sessions were recorded.
+    do, and what they cost, as of October and November 2026, when the sessions
+    were recorded.
     Both change over time: models are updated or replaced, and providers change
     their prices.
 
@@ -127,7 +128,7 @@ A routine question — one asked of a built model, answered with a run — costs
 about **40,000 input tokens** on Claude Opus 5.5, nearly all of them served from
 the provider's prompt cache at a twentieth of the price of fresh input. A
 conversation that edits and re-solves the model several times costs several
-times that: the three edits below spend 195,000 across nine calls.
+times that: the three edits below spend 222,000 across ten calls.
 
 The eight conversations below were run on Claude Opus 5.5, one of the more
 expensive models, and cost this much between them, measured as they ran:
@@ -135,21 +136,21 @@ expensive models, and cost this much between them, measured as they ran:
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Time |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Building a model from a drawing | 1 | 3 | 63,953 (61,064) | 2,401 | 39 s |
-| Modifying the model | 3 | 9 | 195,368 (170,963) | 4,495 | 78 s |
+| Modifying the model | 3 | 10 | 221,965 (216,546) | 5,300 | 101 s |
 | A sweep with the helper | 1 | 2 | 40,377 (19,568) | 1,193 | 70 s |
 | A sweep written ad hoc | 1 | 3 | 60,035 (58,526) | 1,464 | 34 s |
 | Stiffnesses and a strength reduction run | 2 | 4 | 83,255 (77,723) | 1,835 | 436 s |
 | Two documentation questions | 2 | 4 | 88,380 (82,373) | 4,038 | 98 s |
 | A broken file | 1 | 3 | 60,884 (58,888) | 2,203 | 62 s |
 | Generating a report | 2 | 4 | 80,927 (79,156) | 935 | 26 s |
-| **Total** | **13** | **32** | **673,179 (608,261)** | **18,564** | **844 s** |
+| **Total** | **13** | **33** | **699,776 (653,844)** | **19,369** | **867 s** |
 
-That comes to **\$0.93** at Anthropic's list prices on 2026-10-10: \$4.00 per
+That comes to **\$0.80** at Anthropic's list prices on 2026-10-10: \$4.00 per
 million input tokens, \$5.00 per million for a five-minute cache write and \$8.00
 for a one-hour write, \$0.20 per million for a cache read, and \$20.00 per million
 output tokens. The input counts above include the cache writes and the cache
 reads. Price and elapsed time do not track each other: the strength reduction run
-takes more than half the total time for under a tenth of the cost, because
+takes half the total time for about a tenth of the cost, because
 404 of its 436 seconds are spent inside the finite element solver.
 
 The same eight conversations cost between \$0.25 and \$1.30 on the four other
@@ -279,7 +280,7 @@ Then the water:
 
 <div class="prompt-block" markdown>
 ```text
-Add a piezometric line at elevation 30 across the whole section so the slope is fully submerged. Use the piezo pore-pressure option on both soils and enter saturated unit weights of 135 pcf for the embankment and 140 pcf for the foundation. Rerun the search.
+Add a piezometric line at elevation 30 across the whole section so the slope is fully submerged. Both soils are phi = 0, so keep their pore-pressure option at none. Enter saturated unit weights of 135 pcf for the embankment and 140 pcf for the foundation, and rerun the search.
 ```
 </div>
 
@@ -293,30 +294,33 @@ Reduce the foundation cohesion to 250 psf and rerun the search. Which circle gov
 
 ![The three-turn conversation in the dock: the profile lines read back and rewritten for the 3:1 face, then the piezometric line and the saturated unit weights, then the cohesion change, each with the edit reported, a searched factor of safety and a plot of the solution](images/w1_modify_3.png){width=560}
 
-The first turn moved the crest break to (60, 20) on the profile lines, moved both
-starting circles to the middle of the new face, and reran: **FS = 1.546**, still
-bottoming at elevation 0. It also extended the crest and the foundation from
-x = 90 to x = 110, so that the crest stays 50 ft wide, which nothing asked for.
-Its reply says so, and the change is harmless: the same edit on the file's own
-extents searches to the same 1.546.
+The first turn moved the crest break to (60, 20) on the profile lines,
+re-centered the starting circles over the new face, and reran: **FS = 1.546**,
+still bottoming at elevation 0. It also extended the crest and the foundation
+from x = 90 to x = 100, to keep 40 ft of ground behind the crest, which nothing
+asked for. Its reply says so, and the change is harmless: the same edit on the
+file's own extents searches to the same 1.546. The reply has one slip: it says
+the circle comes out on the face about 12 ft up from the toe. The exit is at
+x = 12.4, which on a 3:1 face is about 4 ft up.
 
-The second turn adds the piezometric line and the saturated unit weights:
-**FS = 2.767**, without the admissibility warnings the dry run raised. It added
-no distributed load for the pool, because **Water loads** in **Global
-parameters** is already `auto` and the load on the submerged ground comes from
-the piezometric line itself. Since pore pressure cannot change a φ = 0 strength,
-it put the rise down to the water — the pond pressing on the face and crest —
-and said it had not tested how much comes from the water and how much from the
-heavier saturated soil. The water is the source: with the saturated weights
-taken out, the same model searches to 2.972, so the heavier weights take some of
-the rise back rather than adding to it.
+The second turn adds the piezometric line and the saturated unit weights and
+leaves both soils at `u = none`: **FS = 2.767**, without the admissibility
+warnings the dry run raised. It added no distributed load for the pool, because
+**Water loads** in **Global parameters** is already `auto` and the load on the
+submerged ground comes from the piezometric line itself. It put the rise down to
+the water pressing on the face, and said it had not tested how much comes from
+the water and how much from the heavier saturated soil. The water is the source:
+with the saturated weights taken out, the same model searches to 2.972, so the
+heavier weights take some of the rise back rather than adding to it.
 
 The third turn drops the foundation to 250 psf: **FS = 1.418**, on a critical
-surface that bottoms at **elevation −10** and exits past the toe. At 250 psf the
-foundation is the weakest material in the section, and with φ = 0 its strength
-does not grow with depth, so the search drives the surface down to the rigid
-base at −10 — the same change of mechanism demonstrated in
-[LEM-3](lem03_layered_slope.md).
+surface that bottoms at **elevation −10** and exits 2.5 ft past the toe. At
+250 psf the foundation is the weakest material in the section, and with φ = 0
+its strength does not grow with depth, so the search drives the surface down to
+the rigid base at −10 — the same change of mechanism demonstrated in
+[LEM-3](lem03_layered_slope.md). To show why the shallow circle no longer
+governs, it re-solved the previous critical circle on the new model: still
+2.767, because that circle never enters the foundation.
 
 One workbook was saved per turn —
 [w1_modify_after_1.xlsx](files/w1_modify_after_1.xlsx),
@@ -334,15 +338,17 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 - **Read the lowest point beside each number.** Elevation 0, then 0, then −10.
   The third run is a different mechanism, not the same surface re-solved.
 - **Profile lines editor, first workbook.** The crest and the foundation run to
-  x = 110, 20 ft past the file we opened. Decide whether to keep that before
+  x = 100, 10 ft past the file we opened. Decide whether to keep that before
   comparing 1.546 with anything.
-- **Circles editor, first workbook.** One starting circle is tangent to the top
-  of the foundation (Depth 0) and one to the rock (Depth −10). A search started
-  only from circles that cut into the foundation can stay deep and miss the
-  1.546 surface.
-- **Materials editor, second workbook.** `u = piezo`, with the saturated unit
-  weights beside the total ones — the water explicit and the weights total, which
-  is how a submerged section is entered in XSLOPE.
+- **Circles editor, first workbook.** Three starting circles: one tangent to the
+  top of the foundation (Depth 0) and two identical ones tangent to the rock
+  (Depth −10). The duplicate only repeats work. A search started only from
+  circles that cut into the foundation can stay deep and miss the 1.546 surface.
+- **Materials editor, second workbook.** `u = none` on both soils, with the
+  saturated unit weights beside the total ones. On a φ = 0 soil the water acts
+  through the load on the submerged ground and the saturated weights below the
+  water table. Pore pressure cannot change a φ = 0 strength, and preflight warns
+  when a φ = 0 material takes it.
 
 ---
 
@@ -448,7 +454,7 @@ is
 
 - **Re-run the three steps.** The three values reproduce, and the 3:1 row agrees
   with the 3:1 face change in [Modifying the model](#modifying-the-model), which
-  ran on ground extended to x = 110.
+  ran on ground extended to x = 100.
 - **Read the circle at each step, not only the number.** All three bottom at
   elevation 0, tangent to the top of the foundation. The 3:1 circle reaches the
   crest at about x = 75, inside the model, so the short crest does not change

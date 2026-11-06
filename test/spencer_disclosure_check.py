@@ -137,7 +137,7 @@ GENERAL_INSOLUBLE = {'Xo': -8.0, 'Yo': 48.0, 'R': 45.0}
 #: produce them. Neither is an iteration failure and neither may be reported as
 #: one; the first is M-P's own no-admissible-root condition.
 MP_NO_CROSSING = {'Xo': 4.0, 'Yo': 30.0, 'R': 30.0}
-MP_INADMISSIBLE = {'Xo': -8.0, 'Yo': 28.0, 'R': 28.0}
+MP_INADMISSIBLE = {'Xo': -10.0, 'Yo': 30.0, 'R': 30.0}
 
 NUM_SLICES = 40
 
@@ -230,8 +230,8 @@ REJECTED = "solution rejected as physically unreasonable"
 RANKING_WORDS = ("rank lower", "moment measure", "ranking could not be measured")
 
 #: The crest-tension note on the tutorial embankment's uncracked Spencer answer,
-#: whose last three slices (at the crest) are in base tension.
-CREST_NOTE = ("Tension on the base of 3 slices near the crest. "
+#: whose last four slices (at the crest) are in base tension.
+CREST_NOTE = ("Tension on the base of 4 slices near the crest. "
               "Consider adding a tension crack.")
 
 
@@ -677,7 +677,7 @@ def leg_crest_tension_note():
     """The tension-crack advice: where it appears and where it must not.
 
     It appears on the uncracked tutorial embankment, whose reported Spencer circle
-    has three crest slices in base tension, in the warnings and on the console,
+    has four crest slices in base tension, in the warnings and on the console,
     and changes no factor of safety. It is absent on the same model with the
     8 ft crack. On the solved slice table it stays silent for tension away from
     the crest and for cohesionless crest slices, drops the suggestion when the

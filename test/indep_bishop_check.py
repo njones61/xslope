@@ -9,7 +9,7 @@ Derived from published theory (Bishop, 1955):
 For each slice, vertical force equilibrium gives the effective normal force N'
 on the base. The mobilized shear from Mohr-Coulomb (divided by FS) is:
 
-    S_m = (1/FS) * [ c*b/cos(a) + (N') * tan(phi) ]   ... along base length dl=b/cos(a)
+    S_m = (1/FS) * [ c*l + (N') * tan(phi) ]   ... along the base length l
 
 Solving vertical equilibrium for N' and substituting into moment equilibrium
 about the center (where the lever arm for shear is R and the driving term is
@@ -20,8 +20,11 @@ W*sin(a)*R, R cancels) yields the classic iterative form:
 with
     m_a = cos(a) * (1 + tan(a)*tan(phi)/FS)
 
-Here a = base inclination (alpha), b = horizontal slice width (dx),
-W = slice weight, u = pore pressure at base center, c, phi = base strength.
+Here a = base inclination (alpha), b = l*cos(a) = the base length projected
+horizontally, W = slice weight, u = pore pressure at base center, c, phi = base
+strength. On a straight base b is the slice width; on a circle the base is the
+arc between the slice's corners, a little longer than its width over cos(a), so
+b is read from the slice set's base length rather than its width.
 
 This file deliberately re-derives the FS computation and does NOT consult
 xslope's solve.bishop(). It is what lets the shipped solver be scored against
@@ -39,7 +42,7 @@ def bishop_independent(df, fs_init=1.5, tol=1e-10, max_iter=200):
     c = df['c'].to_numpy(float)                    # cohesion
     W = df['w'].to_numpy(float)                    # slice weight
     u = df['u'].to_numpy(float)                    # pore pressure at base center
-    b = df['dx'].to_numpy(float)                   # horizontal slice width
+    b = df['dl'].to_numpy(float) * np.cos(a)       # base length, projected
 
     tan_phi = np.tan(phi)
     sin_a = np.sin(a)

@@ -1446,12 +1446,12 @@ def interslice_tension_note(Z):
 
       * the tension-crack sample (docs/lem/files/xslope_tension_KEY.xlsx) run with
         its crack removed — the crest tension a crack exists to remove — reports
-        10% and its factor of safety is 8% HIGH (4.960 against 4.588 with the
+        13% and its factor of safety is 8% HIGH (4.962 against 4.589 with the
         crack modeled);
       * GS-2.26's toe plane reports 69-71% on all four methods and every one of
         them returns 1.35199772881, which is SLOPE/W's own answer on the same
         plane;
-      * the tutorial embankment's phi = 0 circles report 26-36% across a smooth
+      * the tutorial embankment's phi = 0 circles report 28-41% across a smooth
         family, and every solution in it — reported and refused alike — returns
         Bishop's exact phi = 0 moment factor of safety to four decimals, since at
         phi = 0 moment equilibrium fixes the answer whatever the interslice
@@ -3082,10 +3082,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
     # The band refuses roots that reverse a base normal; it does not decide
     # between two crossings that both stand inside it, and the cascade above
     # reports whichever of its starts reached one first. On the critical circle
-    # a Spencer search finds for VP16 both crossings are in band, and the
-    # default start reaches F = 1.082 at theta = -27.1 deg where the other
-    # reads 1.113 — Bishop's answer on the same slices, and Morgenstern-Price's
-    # with f(x) = 1, the same equations solved a different way.
+    # a Spencer search finds for VP16, cut into 30 slices, both crossings are
+    # in band, and the default start reaches F = 1.084 at theta = -26.3 deg
+    # where the other reads 1.114 — within 0.1% of Bishop's answer on the same
+    # slices, and Morgenstern-Price's with f(x) = 1, the same equations solved a
+    # different way.
     #
     # Sweeping the band settles it and costs about a hundred times what the
     # cascade does, which a search cannot pay on every trial. So the reported

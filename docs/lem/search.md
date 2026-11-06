@@ -151,7 +151,7 @@ A trial surface can be geometrically admissible and still have no solution by th
 The circular search counts these trials. When the method could not solve one or more admissible trials, the search prints one line giving the count and the reason. This line is from Spencer on the embankment of [Tutorial LEM-1](../tutorials/lem01_simple_embankment.md), where the material is undrained (φ = 0):
 
 ```
-[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (on 56, no
+[⚠️ unsolved trials] Spencer could not solve 49 of 173 trial surfaces (on 49, no
 interslice force inclination satisfies both force and moment equilibrium)
 ```
 

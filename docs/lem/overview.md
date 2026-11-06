@@ -274,7 +274,7 @@ $S$ = shear force acting on the base of the slice<br>
 $E_i$ = horizontal interslice force on the left side of the slice (boundary $i$); $E_{i+1}$ acts on the right side<br>
 $X_i$ = vertical (shear) interslice force on the left side of the slice (boundary $i$); $X_{i+1}$ acts on the right side<br>
 $\Delta x$ = width of the slice<br>
-$\Delta \ell$ = length of the slice base, calculated as $\Delta x \sec \alpha$<br>
+$\Delta \ell$ = length of the slice base: $\Delta x \sec \alpha$ on a straight base, and the arc between the base corners on a circle<br>
 $\alpha$ = inclination angle of the slice base<br>
 $\beta$ = inclination angle of the slope at the top of the slice<br>
 
@@ -294,6 +294,12 @@ directions of the forces are reversed simply by changing the sign convention of 
 ![alpha_sign_convention.png](images/alpha_sign_convention.png){width="800px"}
 
 One exception to this is Spencer's method. Details can be found in the XSLOPE source code for Spencer's method.
+
+### Slices on a Circle
+
+A circular surface is cut into slices of equal angle, so each slice base spans the same arc of the circle and the slices narrow where the circle steepens toward the ground. A base on the circle takes the arc between its two corners as its length $\Delta \ell$, and the circle's tangent below the middle of the slice as its inclination $\alpha$. With slices of equal width, the last slice at a steep exit would span a wide arc (14° for a circle meeting the crest of a 20 ft slope vertically, with 40 slices), and no single base length and inclination represent a base that turns that far: the cohesion and the pore-pressure force on that slice both come out wrong, by enough to move the factor of safety by several percent.
+
+Slices also break at every vertex of the ground and the material zones above the surface, at every point where the surface crosses a material boundary or a piezometric line, and at every point that defines a distributed load. Non-circular surfaces, and the run along the floor of a composite surface, are straight between their vertices; they are cut into slices of equal width, and $\Delta \ell = \Delta x \sec \alpha$ is exact for them.
 
 ## Water Pressures: a Practice Note
 

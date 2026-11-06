@@ -163,13 +163,18 @@ def _dedupe_coincident(points, tol=1e-6):
     return kept
 
 
-def _circle_polyline_all(Xo, Yo, R, polyline):
+def _circle_polyline_all(Xo, Yo, R, polyline, skip_tangent=False):
     """
     Every crossing of a full circle with a polyline, one point per crossing.
 
     Coincident roots from adjoining segments (a vertex hit) or from one segment
     (a tangency) are collapsed by _dedupe_coincident, so the length of the
     returned list is a crossing count callers can trust.
+
+    With skip_tangent, a segment the circle only touches (its two roots within
+    1e-6 of each other) gives no point. Whether rounding leaves such a root pair
+    just real or just complex is chance: a circle tangent to the base of the
+    model found the touch on one slope and not on its mirror image.
 
     Callers almost always want circle_polyline_intersections instead — see its
     docstring for why crossings above the equator must not reach the slicer.
@@ -192,6 +197,8 @@ def _circle_polyline_all(Xo, Yo, R, polyline):
         discriminant = b**2 - 4*a*c
         if discriminant < 0:
             continue  # No intersection
+        if skip_tangent and discriminant < 1e-12 * a:
+            continue  # a touch: the roots are under 1e-6 apart along the segment
 
         sqrt_disc = np.sqrt(discriminant)
         for sign in [-1, 1]:
@@ -1610,7 +1617,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         ground crossing could displace the surface's true end in the merge below."""
         xs = []
         if use_arc or comp is not None:
-            for p in _circle_polyline_all(Xo, Yo, R, line):
+            for p in _circle_polyline_all(Xo, Yo, R, line, skip_tangent=True):
                 if p.y <= Yo and (comp is None or not comp.on_floor(p.x)):
                     xs.append(p.x)
         if not use_arc:
@@ -1642,16 +1649,41 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     
     fixed_xs = cleaned_xs
 
-    # Generate slice boundaries
-    segment_lengths = [fixed_xs[i + 1] - fixed_xs[i] for i in range(len(fixed_xs) - 1)]
+    # Generate slice boundaries. Each stretch between fixed points gets its share
+    # of num_slices by its length along the failure surface, and its slices are
+    # spaced evenly along it. On a circle that is equal angles, so the slices
+    # narrow where the circle steepens: equal widths there left one slice spanning
+    # 14 degrees of arc at a vertical exit, too coarse for any one base angle and
+    # length to represent (OMS 1.4% and Janbu 1.1% low on a sand slope with
+    # ru = 0.3, even with the base length right). The floor of a composite
+    # surface and a non-circular surface, both straight between their vertices,
+    # keep equal widths.
+    def _theta(x):
+        return asin(max(-1.0, min(1.0, (x - Xo) / R)))
+
+    def _on_arc(a, b):
+        return use_arc or (comp is not None and not comp.on_floor(0.5 * (a + b)))
+
+    def _along(a, b):
+        if _on_arc(a, b):
+            return R * abs(_theta(b) - _theta(a))
+        if comp is not None:
+            return hypot(b - a, comp.floor_y(b) - comp.floor_y(a))
+        return b - a
+
+    segment_lengths = [_along(fixed_xs[i], fixed_xs[i + 1]) for i in range(len(fixed_xs) - 1)]
     total_length = sum(segment_lengths)
     all_xs = [fixed_xs[0]]
     for i in range(len(fixed_xs) - 1):
         x_start = fixed_xs[i]
         x_end = fixed_xs[i + 1]
-        segment_length = x_end - x_start
-        n_subdiv = max(1, int(round((segment_length / total_length) * num_slices)))
-        xs = np.linspace(x_start, x_end, n_subdiv + 1).tolist()
+        n_subdiv = max(1, int(round((segment_lengths[i] / total_length) * num_slices)))
+        if _on_arc(x_start, x_end):
+            xs = (Xo + R * np.sin(np.linspace(_theta(x_start), _theta(x_end),
+                                              n_subdiv + 1))).tolist()
+            xs[0], xs[-1] = x_start, x_end
+        else:
+            xs = np.linspace(x_start, x_end, n_subdiv + 1).tolist()
         all_xs.extend(xs[1:])
 
     # === END : Find set of points that should correspond to slice boundaries. ===

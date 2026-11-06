@@ -305,7 +305,7 @@ A circular surface is cut into slices of equal angle, so each slice base spans t
 
 A base on the circle takes the arc between its corners A and B as its length $\Delta \ell$ and the chord AB for its inclination $\alpha$; the chord is parallel to the circle's tangent at M, the middle of the arc. The base forces act at C, the middle of the chord, and the pore pressure is read at M; under r<sub>u</sub>, the vertical stress is that of the soil column above M.
 
-![One steep slice: the arc AB, the chord AB, the points C, M and P](images/circle_slice_base.png){width="714px"}
+![One steep slice: the arc AB, the chord AB, the points C, M and P](images/circle_slice_base.png){width="767px"}
 
 *One steep slice drawn large. The weight W and the base forces act on the slice's center line, through C; the normal force N points at the circle's center O.*
 

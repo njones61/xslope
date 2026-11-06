@@ -76,10 +76,10 @@ def draw_section(ax, bounds, title):
     tm = np.radians(0.5 * (theta(bounds[-2]) + theta(bounds[-1])))
     span = theta(bounds[-1]) - theta(bounds[-2])
     ax.annotate("last slice: %.0f° of arc" % span,
-                xy=(XO + R * np.sin(tm) + 0.3, YO - R * np.cos(tm)), xytext=(25.0, 9.0),
+                xy=(XO + R * np.sin(tm), YO - R * np.cos(tm)), xytext=(25.0, 9.0),
                 fontsize=12.5, ha="left", va="center", color="#c0392b",
                 arrowprops=dict(arrowstyle="-", color="#c0392b", lw=0.9,
-                                shrinkA=3, shrinkB=9))
+                                shrinkA=3, shrinkB=5.5))
     ax.text(-7.0, 22.6, title, fontsize=13.5, ha="left", va="bottom", weight="bold")
     ax.set_xlim(-8.0, 37.0)
     ax.set_ylim(-3.0, 24.5)
@@ -181,7 +181,7 @@ def figure_base():
     tip = C + n_len * d
     ax.add_patch(FancyArrowPatch(tuple(C), tuple(tip), arrowstyle="-|>", shrinkA=5,
                                  mutation_scale=14, color="black", lw=1.4, zorder=6))
-    npos = C + 0.55 * n_len * d + 0.48 * up
+    npos = C + 0.88 * n_len * d + 0.42 * up      # just above the arrowhead
     ax.text(npos[0], npos[1], "N", fontsize=13.5, ha="center", va="center")
     # alpha, the chord's inclination, drawn at A
     ax.plot([A[0], A[0] + 2.0], [A[1], A[1]], color="0.3", lw=0.9)
@@ -200,18 +200,20 @@ def figure_base():
     ax.text(A[0] - 0.47, A[1] + 0.03, "A", fontsize=13.5, ha="center", va="center")
     ax.text(B[0] + 0.32, B[1] + 0.3, "B", fontsize=13.5, ha="left", va="center")
 
-    def label(target, xy_text, text, color, ha="left"):
+    def label(target, xy_text, text, color, ha="left", gap=3.5):
+        """``gap`` in points from the target's center: past a marker's radius, or
+        half a line's width, by about two and a half points."""
         ax.annotate(text, xy=tuple(target), xytext=xy_text, fontsize=12, ha=ha,
                     va="center", color=color, linespacing=1.2,
                     arrowprops=dict(arrowstyle="-", color=color, lw=0.9,
-                                    shrinkA=4, shrinkB=8))
+                                    shrinkA=4, shrinkB=gap))
 
     label(C, (A[0] - 0.55, C[1] - 0.6), "C, the middle of the chord AB:\n"
-          "the base forces act here", "black", ha="right")
+          "the base forces act here", "black", ha="right", gap=7.0)
     label(on(t1 + 0.92 * (t2 - t1)), (right, -1.6), "Δℓ, the length of the arc AB",
-          "black")
+          "black", gap=4.0)
     label(M, (right, -3.9), "M, the middle of the arc AB:\nthe pore pressure is read here",
-          WATER)
+          WATER, gap=7.0)
     label(M - 0.9 * half * tan, (right, -6.3), "the circle's tangent at M,\nparallel to the chord AB",
           "0.35")
     ax.set_xlim(x_lo, x_hi)

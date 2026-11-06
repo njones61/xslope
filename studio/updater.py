@@ -50,6 +50,7 @@ __all__ = [
     "manifest_url", "platform_key", "is_frozen", "app_executable",
     "parse_version", "is_newer", "evaluate", "fetch_manifest", "check_for_update",
     "sha256_file", "download_artifact", "plan_install", "launch_detached",
+    "macos_app_bundle", "macos_replace_blocker", "macos_replace_in_place",
     "due_for_check", "utc_stamp",
 ]
 
@@ -322,8 +323,8 @@ def download_artifact(artifact, dest_dir, progress=None, cancel=None,
 
     Returns the path of the verified file. **A digest mismatch deletes the file
     and raises** — the caller therefore cannot reach an installer that is not the
-    exact bytes ``latest.json`` describes, which is the whole security story of an
-    unsigned-era updater.
+    exact bytes ``latest.json`` describes. (The installers are also signed; the
+    digest is what ties the download to this release's manifest.)
     """
     url = artifact["url"]
     name = artifact.get("filename") or os.path.basename(url)
@@ -398,29 +399,132 @@ class InstallPlan:
         return f"InstallPlan(kind={self.kind!r}, argv={self.argv!r})"
 
 
-# --- Stage C seam ----------------------------------------------------------
-# Today's macOS builds are unsigned, so a downloaded .app carries a quarantine
-# flag and (once opened from a dmg) can be path-translocated: a script that
-# swapped the running bundle out from under itself would produce an app the
-# user then has to right-click-Open anyway. So the unsigned-era branch mounts
-# the dmg and asks for a drag, which is the same gesture as a fresh install.
-#
-# STAGE C (plan §6 — Developer ID + notarization in CI): flip this flag and
-# implement macos_replace_in_place() below. It is the ONLY place the macOS
-# branch changes; plan_install() already routes through it.
-MACOS_SCRIPTED_REPLACE = False
+# --- macOS -----------------------------------------------------------------
+# The macOS builds are signed with a Developer ID and notarized, so the new
+# bundle can replace the installed one and start without a Gatekeeper prompt.
+# The update is the mirror of the Windows one: Studio writes a helper, spawns it
+# detached and quits; the helper waits for our exit, mounts the verified dmg,
+# copies the new bundle beside the installed one with ditto (which keeps the
+# signature and extended attributes), swaps the two by rename, detaches and
+# relaunches. Where the installed bundle cannot be replaced in place (no write
+# permission, or a translocated copy run straight from a download) the update
+# falls back to opening the dmg for a drag, the same gesture as a fresh install.
+MACOS_SCRIPTED_REPLACE = True
+
+#: The helper that performs a macOS update after Studio has exited.
+_MACOS_HELPER = r"""#!/bin/sh
+# XSLOPE Studio update helper - written by studio/updater.py, deletes itself.
+#   $1 = pid of the Studio process to wait for
+#   $2 = the .dmg (already sha256-verified)
+#   $3 = the installed .app bundle to replace
+#   $4 = "interactive" to relaunch and to report a failure; anything else runs quietly
+WAITPID="$1"
+DMG="$2"
+APP="${3%/}"
+MODE="$4"
+
+# 1. Wait (up to ~2 minutes) for Studio to exit, so its bundle can be replaced.
+i=0
+while kill -0 "$WAITPID" 2>/dev/null; do
+  i=$((i + 1))
+  [ "$i" -gt 240 ] && break
+  sleep 0.5
+done
+
+# 2. Mount the dmg, copy the new bundle beside the old one, swap by rename.
+STATUS=failed
+MNT=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/xslope-update-mnt.XXXXXX")
+if /usr/bin/hdiutil attach -nobrowse -noautoopen -readonly -mountpoint "$MNT" "$DMG" >/dev/null 2>&1; then
+  SRC=""
+  for f in "$MNT"/*.app; do
+    if [ -d "$f" ]; then SRC="$f"; break; fi
+  done
+  if [ -n "$SRC" ]; then
+    NEW="$APP.xslope-new"
+    OLD="$APP.xslope-old"
+    /bin/rm -rf "$NEW" "$OLD"
+    if /usr/bin/ditto "$SRC" "$NEW"; then
+      if /bin/mv "$APP" "$OLD"; then
+        if /bin/mv "$NEW" "$APP"; then
+          STATUS=ok
+          /bin/rm -rf "$OLD"
+        else
+          /bin/mv "$OLD" "$APP"
+        fi
+      fi
+    fi
+    /bin/rm -rf "$NEW"
+  fi
+  /usr/bin/hdiutil detach "$MNT" -quiet >/dev/null 2>&1 || /usr/bin/hdiutil detach "$MNT" -force -quiet >/dev/null 2>&1
+fi
+/bin/rmdir "$MNT" 2>/dev/null
+
+# 3. Start the new version; on a failure, say so and open the dmg for a drag.
+if [ "$STATUS" = ok ]; then
+  /bin/rm -f "$DMG"
+  [ "$MODE" = interactive ] && /usr/bin/open "$APP"
+elif [ "$MODE" = interactive ]; then
+  /usr/bin/osascript -e 'display dialog "XSLOPE Studio could not replace itself. In the window that opens, drag XSLOPE Studio to the Applications folder, replacing the existing copy." buttons {"OK"} default button "OK" with title "XSLOPE Studio update"' >/dev/null 2>&1
+  /usr/bin/open "$DMG"
+fi
+
+# 4. Remove this helper.
+/bin/rm -f "$0"
+[ "$STATUS" = ok ]
+"""
 
 
-def macos_replace_in_place(dmg_path, app_path, pid=None, helper_dir=None):
-    """Stage C: mount the dmg, swap the installed .app, relaunch — unattended.
+def macos_app_bundle(executable=None):
+    """The ``.app`` bundle a frozen macOS Studio runs from, or None.
 
-    Deliberately unimplemented while builds are unsigned. When signing lands this
-    becomes the mirror of :func:`windows_update_command`: a detached helper that
-    waits for our exit, ``hdiutil attach``es the dmg, ``ditto``s the new bundle
-    over the installed one, detaches, and relaunches.
+    Frozen, ``sys.executable`` is ``…/XSLOPE Studio.app/Contents/MacOS/XSLOPE
+    Studio``; the bundle is the nearest ancestor whose name ends in ``.app``.
     """
-    raise NotImplementedError(
-        "Scripted macOS replacement waits on a signed, notarized build (Stage C).")
+    path = os.path.abspath(executable or app_executable())
+    while True:
+        if path.endswith(".app"):
+            return path
+        parent = os.path.dirname(path)
+        if parent == path:
+            return None
+        path = parent
+
+
+def macos_replace_blocker(bundle):
+    """Why the installed bundle cannot be replaced in place, or None if it can.
+
+    The swap renames the bundle inside its folder, so it needs write permission
+    on the bundle and on the folder holding it. A bundle macOS has translocated
+    (a copy run straight from where it was downloaded) is a read-only stand-in:
+    replacing it would update nothing the user opens again.
+    """
+    if not bundle or not bundle.endswith(".app") or not os.path.isdir(bundle):
+        return "this copy of Studio is not an installed app"
+    if "/AppTranslocation/" in bundle:
+        return "this copy was started from its download location"
+    parent = os.path.dirname(bundle)
+    if not (os.access(parent, os.W_OK) and os.access(bundle, os.W_OK)):
+        return f"this account cannot change {parent}"
+    return None
+
+
+def macos_replace_in_place(dmg_path, app_path, pid=None, helper_dir=None,
+                           mode="interactive"):
+    """Write the macOS update helper and return ``(argv, helper_path)``.
+
+    ``argv`` is what :func:`launch_detached` spawns just before Studio quits.
+    ``mode="interactive"`` relaunches the new version and reports a failed swap
+    with a dialog and the opened dmg; any other mode runs quietly, for tests.
+    Nothing is executed here.
+    """
+    pid = os.getpid() if pid is None else pid
+    helper_dir = helper_dir or os.path.dirname(os.path.abspath(dmg_path))
+    helper = os.path.join(helper_dir, "xslope_update.sh")
+    with open(helper, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(_MACOS_HELPER)
+    os.chmod(helper, 0o700)
+    argv = ["/bin/sh", helper, str(pid), str(dmg_path), str(app_path), mode]
+    return argv, helper
 
 
 #: The helper that performs a Windows update after Studio has exited.
@@ -524,21 +628,24 @@ def plan_install(info, artifact_path=None, frozen=None, platform_name=None,
                     f"will start automatically.")
 
     if plat == "darwin":
-        if MACOS_SCRIPTED_REPLACE:                      # Stage C
-            argv, helper = macos_replace_in_place(artifact_path, app_path or "",
-                                                  pid=pid, helper_dir=helper_dir)
-            return InstallPlan("macos-replace", argv=argv, helper=helper,
-                               quits_app=True,
-                               message=f"Installing XSLOPE Studio {info.latest}…")
+        bundle = macos_app_bundle(app_path)
+        blocker = macos_replace_blocker(bundle)
+        if MACOS_SCRIPTED_REPLACE and blocker is None:
+            argv, helper = macos_replace_in_place(artifact_path, bundle, pid=pid,
+                                                  helper_dir=helper_dir)
+            return InstallPlan(
+                "macos-replace", argv=argv, helper=helper, quits_app=True,
+                message=f"XSLOPE Studio {info.latest} is ready to install. Studio "
+                        f"will close, the new version will replace this one, and "
+                        f"it will start automatically.")
         return InstallPlan(
             "macos-dmg", argv=macos_open_command(artifact_path), quits_app=False,
             message=(f"XSLOPE Studio {info.latest} has been downloaded and its "
-                     f"checksum verified.\n\n"
-                     f"1. Drag XSLOPE Studio to the Applications folder in the "
-                     f"window that opens (replace the existing copy).\n"
-                     f"2. Quit this copy and start the new one.\n\n"
-                     f"Because this build is not yet signed by Apple, the first "
-                     f"launch needs a right-click → Open."))
+                     f"checksum verified, but Studio cannot replace itself here "
+                     f"({blocker or 'automatic replacement is off'}).\n\n"
+                     f"In the window that opens, drag XSLOPE Studio to the "
+                     f"Applications folder, replacing the existing copy. Then quit "
+                     f"this copy and start the new one."))
 
     # A frozen build on a platform with no install story (there is no Linux
     # installer today) — the artifact is downloaded, the user takes it from there.

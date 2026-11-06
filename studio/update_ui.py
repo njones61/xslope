@@ -296,14 +296,15 @@ class UpdateController(QObject):
     def run_plan(self, plan):
         """Execute a prepared :class:`~studio.updater.InstallPlan`.
 
-        Windows quits first and installs after: the silent NSIS upgrade kills
-        ``XSLOPE Studio.exe`` and wipes the directory we are executing from, so
-        the helper is spawned only once the window has actually agreed to close
-        (a cancelled save prompt cancels the update with it). macOS mounts the
-        dmg and states the two steps; pip and the no-installer platforms only
-        ever show text.
+        Windows and macOS quit first and install after: the silent NSIS upgrade
+        kills ``XSLOPE Studio.exe`` and wipes the directory we are executing from,
+        and the macOS helper renames the running bundle away, so the helper is
+        spawned only once the window has actually agreed to close (a cancelled
+        save prompt cancels the update with it). A macOS install that cannot be
+        replaced in place opens the dmg and states the steps; pip and the
+        no-installer platforms only ever show text.
         """
-        if plan.kind == "windows-installer":
+        if plan.kind in ("windows-installer", "macos-replace"):
             box = QMessageBox(self.win)
             box.setIcon(QMessageBox.Question)
             box.setWindowTitle("Install Update")
@@ -325,7 +326,7 @@ class UpdateController(QObject):
             QTimer.singleShot(0, QApplication.quit)
             return
 
-        if plan.kind in ("macos-dmg", "macos-replace"):
+        if plan.kind == "macos-dmg":
             updater.launch_detached(plan.argv)
             QMessageBox.information(self.win, "Finish Updating", plan.message)
             return

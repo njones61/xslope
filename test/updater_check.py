@@ -40,14 +40,23 @@ What is guarded:
      automatic one.
   H. END TO END — check → new version → download a (small, fake) artifact →
      verify → the Windows branch reaches its hand-off with the exact argv and
-     helper script it would run, and the macOS branch reaches ``open <dmg>``.
+     helper script it would run; the macOS branch, for an installed bundle it can
+     replace, reaches its own helper and quits the app, and for one it cannot (not
+     an app, translocated) falls back to ``open <dmg>`` with drag instructions
+     that say nothing about signing.
   I. THE DOWNLOAD, THROUGH THE APP — the same happy path driven by the real
      controller and its background runner (progress bar up, plan produced, bar
      down), and the same run with a corrupted digest, which must land on the
      failure dialog and produce NO install plan at all.
 
-Skips its Studio legs cleanly (exit 0) when PySide6 is not installed; A-F run
-either way.
+  J. THE macOS SWAP, RUN — on a Mac, the helper is run for real against a small
+     dmg and a stand-in installed bundle: the bundle is replaced, nothing is left
+     beside it, the dmg and the helper are deleted. Two mutations: a dmg with no
+     app in it, and a folder the swap cannot write to, must both leave the
+     installed bundle exactly as it was and report failure.
+
+Skips its Studio legs cleanly (exit 0) when PySide6 is not installed, and J off
+macOS; A-F run either way.
 """
 import hashlib
 import json
@@ -662,25 +671,60 @@ def test_end_to_end():
             if "\r\n" not in helper:
                 fails.append("the windows helper needs CRLF line endings")
 
-        # 3b. macOS: mount the dmg and instruct. Assert the command, run nothing.
-        plan = updater.plan_install(info, path, frozen=True, platform_name="darwin")
-        if plan.kind != "macos-dmg":
-            fails.append(f"darwin planned {plan.kind!r}")
-        if plan.argv != ["/usr/bin/open", path]:
-            fails.append(f"darwin argv = {plan.argv!r}, expected open <dmg>")
-        if plan.quits_app:
-            fails.append("the unsigned macOS branch must not quit the app")
-        for phrase in ("Applications", "checksum"):
-            if phrase.lower() not in plan.message.lower():
-                fails.append(f"the macOS instructions never mention {phrase!r}")
-        # The Stage-C seam is present, off, and refuses to be used early.
-        if updater.MACOS_SCRIPTED_REPLACE:
-            fails.append("MACOS_SCRIPTED_REPLACE is on before signing (Stage C)")
-        try:
-            updater.macos_replace_in_place(path, "/Applications/XSLOPE Studio.app")
-            fails.append("the Stage-C scripted replace ran while builds are unsigned")
-        except NotImplementedError:
-            pass
+        # 3b. macOS, a bundle it can replace: the helper, then quit. Run nothing.
+        bundle = os.path.join(dest, "XSLOPE Studio.app")
+        os.makedirs(os.path.join(bundle, "Contents", "MacOS"))
+        exe = os.path.join(bundle, "Contents", "MacOS", "XSLOPE Studio")
+        plan = updater.plan_install(info, path, frozen=True, platform_name="darwin",
+                                    app_path=exe, pid=31337, helper_dir=dest)
+        if plan.kind != "macos-replace":
+            fails.append(f"darwin with a writable bundle planned {plan.kind!r}")
+        if not plan.quits_app:
+            fails.append("the macOS replace must quit the app first")
+        want = ["/bin/sh", os.path.join(dest, "xslope_update.sh"), "31337", path,
+                bundle, "interactive"]
+        if plan.argv != want:
+            fails.append(f"darwin argv:\n  got  {plan.argv}\n  want {want}")
+        if not os.path.exists(plan.helper or ""):
+            fails.append("the macOS helper script was not written")
+        else:
+            helper = open(plan.helper, encoding="utf-8").read()
+            for needed, why in [
+                ('kill -0 "$WAITPID"', "waiting for our own exit"),
+                ('/usr/bin/hdiutil attach -nobrowse', "mounting the dmg quietly"),
+                ('/usr/bin/ditto "$SRC" "$NEW"', "copying the new bundle with ditto"),
+                ('/bin/mv "$NEW" "$APP"', "swapping the new bundle in"),
+                ('/bin/mv "$OLD" "$APP"', "putting the old bundle back on a failure"),
+                ('/usr/bin/open "$APP"', "the relaunch"),
+                ('/bin/rm -f "$0"', "the helper deleting itself"),
+            ]:
+                if needed not in helper:
+                    fails.append(f"the macOS helper is missing {why}: {needed!r}")
+            if not os.access(plan.helper, os.X_OK):
+                fails.append("the macOS helper is not executable")
+        if "right-click" in plan.message.lower() or "signed" in plan.message.lower():
+            fails.append(f"the macOS message still talks about signing: {plan.message!r}")
+
+        # 3c. macOS, a bundle it cannot replace: open the dmg and instruct.
+        trans = os.path.join(dest, "AppTranslocation", "X", "XSLOPE Studio.app")
+        os.makedirs(trans)
+        for label, where in (("not an app", os.path.join(dest, "python3")),
+                             ("translocated", trans)):
+            plan = updater.plan_install(info, path, frozen=True,
+                                        platform_name="darwin", app_path=where)
+            if plan.kind != "macos-dmg":
+                fails.append(f"darwin ({label}) planned {plan.kind!r}")
+                continue
+            if plan.argv != ["/usr/bin/open", path]:
+                fails.append(f"darwin ({label}) argv = {plan.argv!r}, expected open <dmg>")
+            if plan.quits_app:
+                fails.append(f"darwin ({label}) must not quit the app")
+            for phrase in ("Applications", "checksum"):
+                if phrase.lower() not in plan.message.lower():
+                    fails.append(f"the macOS instructions ({label}) never mention "
+                                 f"{phrase!r}")
+            if "right-click" in plan.message.lower() or "signed" in plan.message.lower():
+                fails.append(f"the macOS fallback still talks about signing ({label})")
     finally:
         shutil.rmtree(dest, ignore_errors=True)
         fx.close()
@@ -754,6 +798,115 @@ def test_download_path():
     return fails
 
 
+def _bundle(path, version):
+    os.makedirs(os.path.join(path, "Contents", "MacOS"), exist_ok=True)
+    with open(os.path.join(path, "Contents", "version.txt"), "w") as fh:
+        fh.write(version)
+
+
+def _bundle_version(path):
+    try:
+        return open(os.path.join(path, "Contents", "version.txt")).read()
+    except OSError:
+        return None
+
+
+def test_macos_swap():
+    """The macOS helper, run for real: a dmg holding a new bundle replaces the
+    installed one; a dmg with no app, and a folder it cannot write to, leave the
+    installed bundle as it was."""
+    if sys.platform != "darwin":
+        print("  (macOS swap: not on a Mac, skipped)")
+        return []
+    import subprocess
+    fails = []
+    root = tempfile.mkdtemp(prefix="xslope-swap-")
+    try:
+        dead = subprocess.Popen(["/usr/bin/true"])
+        dead.wait()
+
+        def make_dmg(name, with_app):
+            src = os.path.join(root, name + "-src")
+            os.makedirs(src)
+            if with_app:
+                _bundle(os.path.join(src, "XSLOPE Studio.app"), "new")
+            else:
+                open(os.path.join(src, "README.txt"), "w").close()
+            dmg = os.path.join(root, name + ".dmg")
+            subprocess.run(["/usr/bin/hdiutil", "create", "-quiet", "-volname", name,
+                            "-srcfolder", src, "-ov", "-format", "UDZO", dmg],
+                           check=True)
+            return dmg
+
+        def run(dmg, bundle):
+            argv, helper = updater.macos_replace_in_place(
+                dmg, bundle, pid=dead.pid, helper_dir=root, mode="quiet")
+            done = subprocess.run(argv, capture_output=True, timeout=120)
+            return done.returncode, helper
+
+        # the swap
+        install = os.path.join(root, "Applications")
+        bundle = os.path.join(install, "XSLOPE Studio.app")
+        _bundle(bundle, "old")
+        dmg = make_dmg("good", True)
+        code, helper = run(dmg, bundle)
+        if code != 0:
+            fails.append(f"the swap reported failure (exit {code})")
+        if _bundle_version(bundle) != "new":
+            fails.append(f"after the swap the installed bundle reads "
+                         f"{_bundle_version(bundle)!r}, not the new one")
+        leftovers = [n for n in os.listdir(install) if n != "XSLOPE Studio.app"]
+        if leftovers:
+            fails.append(f"the swap left {leftovers} beside the bundle")
+        if os.path.exists(dmg):
+            fails.append("the dmg was not deleted after a good swap")
+        if os.path.exists(helper):
+            fails.append("the helper did not delete itself")
+
+        # MUTATION: a dmg with no app in it
+        _bundle(bundle, "old")
+        dmg = make_dmg("empty", False)
+        code, helper = run(dmg, bundle)
+        if code == 0:
+            fails.append("a dmg with no app in it reported success")
+        if _bundle_version(bundle) != "old":
+            fails.append("a dmg with no app in it changed the installed bundle")
+        if not os.path.exists(dmg):
+            fails.append("a failed swap deleted the dmg the user needs to finish by hand")
+
+        # MUTATION: a folder the swap cannot write to
+        dmg = make_dmg("good2", True)
+        os.chmod(install, 0o555)
+        try:
+            code, helper = run(dmg, bundle)
+        finally:
+            os.chmod(install, 0o755)
+        if code == 0:
+            fails.append("a read-only folder reported success")
+        if _bundle_version(bundle) != "old":
+            fails.append("a read-only folder changed the installed bundle")
+        if sorted(os.listdir(install)) != ["XSLOPE Studio.app"]:
+            fails.append(f"a failed swap left {os.listdir(install)} in the folder")
+        if updater.macos_replace_blocker(bundle) is not None:
+            fails.append(f"a writable bundle was refused: "
+                         f"{updater.macos_replace_blocker(bundle)}")
+        os.chmod(install, 0o555)
+        try:
+            if updater.macos_replace_blocker(bundle) is None:
+                fails.append("a bundle in a read-only folder was not refused")
+        finally:
+            os.chmod(install, 0o755)
+    finally:
+        for dirpath, dirnames, _files in os.walk(root):
+            for d in dirnames:
+                try:
+                    os.chmod(os.path.join(dirpath, d), 0o755)
+                except OSError:
+                    pass
+        shutil.rmtree(root, ignore_errors=True)
+    return fails
+
+
 CHECKS = [("version comparison", test_version_comparison),
           ("the platform artifact key", test_platform_key),
           ("minimum_version blocks the install", test_minimum_version),
@@ -762,6 +915,7 @@ CHECKS = [("version comparison", test_version_comparison),
           ("the once-per-day throttle", test_once_per_day),
           ("the Help menu and both check paths", test_menu_and_paths),
           ("end to end: check -> verify -> hand-off", test_end_to_end),
+          ("the macOS swap, run", test_macos_swap),
           ("Download & Install through the controller", test_download_path)]
 
 #: The legs that need Qt; everything else runs on an engine-only install.

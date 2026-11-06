@@ -27,6 +27,11 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- The Mac app now states the macOS version it really needs: macOS 14 (Sonoma)
+  or later. The install page said macOS 11, but the numerical and window
+  libraries inside the app are built for macOS 14, and the app has been checked
+  only on 14 and later. An older Mac now shows macOS's own message that a newer
+  system is required.
 - Quitting Studio, or closing its window, while the assistant is waiting for a
   reply no longer crashes it. The assistant's request was the one background job
   Studio did not stop on the way out, and the operating system reported the exit as

@@ -266,7 +266,7 @@ if sys.platform == "darwin":
             "CFBundleVersion": VERSION,
             "NSHighResolutionCapable": True,
             "NSRequiresAquaSystemAppearance": False,
-            "LSMinimumSystemVersion": "11.0",
+            "LSMinimumSystemVersion": "14.0",
             "NSHumanReadableCopyright": "Copyright (c) Norman L. Jones. Apache-2.0.",
             "CFBundleDocumentTypes": [
                 {

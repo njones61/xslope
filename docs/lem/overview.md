@@ -311,9 +311,9 @@ A base on the circle takes the arc between its corners A and B as its length $\D
 
 In every method of slices, the weight and the base forces act on the slice's center line (dotted in the figure). On a circular base, the normal force also points at the circle's center, O. The center line and the line from O through M cross at C, so the base forces act at C.
 
-The pore pressure changes along the base, but each slice uses one value for its whole base. The value at M, the middle of the arc, is the closest to the average. P, lower on the arc, reads too high.
+The pore pressure changes along the base, but each slice uses one value for its whole base. The value at M, the middle of the arc, is the closest to the average.
 
-P, the point on the circle directly below the slice's center line, lies lower on the arc than M: by up to a fifth of the base length on the last slice at a vertical exit. The pore pressure at P reads several percent high there, and the tangent at P is flatter than the base.
+P, the point on the circle directly below the slice's center line, sits lower on the arc than M, by up to a fifth of the base length on a steep slice. Its pore pressure reads several percent high, and its tangent is flatter than the base.
 
 Slices also break at every vertex of the ground and the material zones above the surface, at every point where the surface crosses a material boundary or a piezometric line, and at every point that defines a distributed load. Non-circular surfaces, and the run along the floor of a composite surface, are straight between their vertices; they are cut into slices of equal width, and $\Delta \ell = \Delta x \sec \alpha$ is exact for them.
 

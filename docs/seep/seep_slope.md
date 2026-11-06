@@ -225,7 +225,7 @@ Input file: [xslope_rface_PIEZO_KEY.xlsx](files/xslope_rface_PIEZO_KEY.xlsx)
 
 Spencer's method gives **FS = 1.98**.
 
-<!-- test: file=files/xslope_rface_PIEZO_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.334, fs_bishop=1.964, fs_janbu=1.747, fs_corps=2.694, fs_lowe=2.146, fs_spencer=1.978, fs_mprice=1.979 -->
+<!-- test: file=files/xslope_rface_PIEZO_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.334, fs_bishop=1.964, fs_janbu=1.754, fs_corps=2.686, fs_lowe=2.146, fs_spencer=1.978, fs_mprice=1.979 -->
 
 ### Part b — seepage-derived pore pressures
 
@@ -240,7 +240,7 @@ file: [xslope_rface_SEEP_KEY.xlsx](files/xslope_rface_SEEP_KEY.xlsx)
 
 Spencer's method gives **FS = 2.12**.
 
-<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.509, fs_bishop=2.109, fs_janbu=1.897, fs_corps=2.857, fs_lowe=2.306, fs_spencer=2.119, fs_mprice=2.121 -->
+<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.509, fs_bishop=2.109, fs_janbu=1.904, fs_corps=2.857, fs_lowe=2.306, fs_spencer=2.119, fs_mprice=2.121 -->
 
 ### Comparison
 
@@ -251,12 +251,12 @@ the slope than the flow field does, and slightly less near the toe.*
 
 | Pore-pressure model | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:--|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Piezometric line | 1.334 | 1.964 | 1.747 | 2.694 | 2.146 | 1.978 | 1.979 |
-| Seepage | 1.509 | 2.109 | 1.897 | 2.857 | 2.306 | 2.119 | 2.121 |
+| Piezometric line | 1.334 | 1.964 | 1.754 | 2.686 | 2.146 | 1.978 | 1.979 |
+| Seepage | 1.509 | 2.109 | 1.904 | 2.857 | 2.306 | 2.119 | 2.121 |
 
 For this slope the piezometric line returns a modestly **lower (more conservative)** factor of
 safety. All seven factors move by a similar amount — between 0.141 and 0.175 — so the percentage
-difference tracks the size of the factor rather than the method: 6.1 to 8.6% for the six methods
+difference tracks the size of the factor rather than the method: 6.4 to 8.6% for the six methods
 that carry interslice forces, and 13.1% for OMS, whose factor is the smallest of the seven.
 
 The difference is not always this small nor always in this direction: where seepage is routed

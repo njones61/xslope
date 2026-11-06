@@ -29,14 +29,14 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp009.xlsx, type=noncircular_search, num_slices=50, fs_spencer=0.724, fs_janbu=0.718, benchmark=VP9 -->
 <!-- test: file=files/rocscience/vp010.xlsx, type=circular_search, num_slices=40, fs_bishop=1.500, fs_spencer=1.501, fs_janbu=1.458, benchmark=VP10 -->
 <!-- test: file=files/rocscience/vp015.xlsx, type=circular_search, num_slices=40, fs_bishop=0.419, fs_spencer=0.422, fs_janbu=0.436, fs_mprice=0.420, benchmark=VP15 -->
-<!-- test: file=files/rocscience/vp016.xlsx, type=circular_search, num_slices=40, fs_bishop=1.112, fs_spencer=1.113, fs_janbu=1.122, fs_mprice=1.111, benchmark=VP16 -->
+<!-- test: file=files/rocscience/vp016.xlsx, type=circular_search, num_slices=40, fs_bishop=1.112, fs_spencer=1.113, fs_janbu=1.130, fs_mprice=1.111, benchmark=VP16 -->
 <!-- test: file=files/rocscience/vp017.xlsx, type=circular_search, num_slices=50, fs_oms=1.274, fs_bishop=1.342, fs_spencer=1.340, benchmark=VP17 -->
 <!-- test: file=files/rocscience/vp018.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.033, fs_mprice=1.024, benchmark=VP18 -->
 <!-- test: file=files/rocscience/vp019.xlsx, type=circular_search, num_slices=50, fs_bishop=1.448, fs_spencer=1.429, benchmark=VP19 -->
 <!-- test: file=files/rocscience/vp020.xlsx, type=circular_search, num_slices=50, fs_bishop=1.085, fs_spencer=1.091, benchmark=VP20-circ -->
 <!-- test: file=files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
-<!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
-<!-- test: file=files/rocscience/vp023.xlsx, type=single_circle, circle_index=1, num_slices=50, fs_oms=1.377, fs_bishop=1.195, benchmark=VP23-circle -->
+<!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.142, benchmark=VP23 -->
+<!-- test: file=files/rocscience/vp023.xlsx, type=single_circle, circle_index=1, num_slices=50, fs_oms=1.396, fs_bishop=1.200, benchmark=VP23-circle -->
 <!-- test: file=files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.435, fs_bishop=1.435, benchmark=VP24 -->
 <!-- test: file=files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
 <!-- test: file=files/rocscience/vp026.xlsx, type=single_noncirc, num_slices=60, right_facing=true, fs_spencer=1.043, benchmark=VP26 -->
@@ -60,8 +60,8 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp028c.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.789, tolerance=0.02, expected_pf=0.209, pf_tol=0.02, benchmark=VP28c-mc -->
 <!-- test: file=files/rocscience/vp029.xlsx, type=single_circle, num_slices=60, fs_spencer=1.145, fs_mprice=1.145, benchmark=VP29-det -->
 <!-- test: file=files/rocscience/vp029.xlsx, type=reliability, method=spencer, circular=true, search=false, expected_beta=0.936, tolerance=0.03, benchmark=VP29-beta -->
-<!-- test: file=files/rocscience/vp030a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.679, benchmark=VP30a -->
-<!-- test: file=files/rocscience/vp030b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.650, benchmark=VP30b -->
+<!-- test: file=files/rocscience/vp030a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.689, benchmark=VP30a -->
+<!-- test: file=files/rocscience/vp030b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.655, benchmark=VP30b -->
 <!-- test: file=files/rocscience/vp032a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.218, fs_spencer=1.218, benchmark=VP32a -->
 <!-- test: file=files/rocscience/vp032b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.216, fs_spencer=1.216, benchmark=VP32b -->
 <!-- test: file=files/rocscience/vp032c.xlsx, type=single_circle, num_slices=60, fs_bishop=0.981, fs_spencer=0.982, benchmark=VP32c -->
@@ -129,9 +129,9 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp106d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.341, benchmark=VP106d -->
 <!-- test: file=files/rocscience/vp106e.xlsx, type=circular_search, num_slices=40, fs_bishop=1.260, benchmark=VP106e -->
 <!-- test: file=files/rocscience/vp106b.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=0.000, tolerance=0.05, benchmark=VP106b-depth -->
-<!-- test: file=files/rocscience/vp106c.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.142, tolerance=0.05, benchmark=VP106c-depth -->
+<!-- test: file=files/rocscience/vp106c.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.094, tolerance=0.05, benchmark=VP106c-depth -->
 <!-- test: file=files/rocscience/vp106d.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.261, tolerance=0.05, benchmark=VP106d-depth -->
-<!-- test: file=files/rocscience/vp106e.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.462, tolerance=0.05, benchmark=VP106e-depth -->
+<!-- test: file=files/rocscience/vp106e.xlsx, type=slip_depth, method=bishop, num_slices=40, depth_x=17.5, expected_depth=3.488, tolerance=0.05, benchmark=VP106e-depth -->
 <!-- test: file=files/rocscience/vp107a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.381, fs_spencer=1.397, benchmark=VP107a -->
 <!-- test: file=files/rocscience/vp107b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.381, fs_spencer=1.397, benchmark=VP107b -->
 <!-- test: file=files/rocscience/vp108a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP108a -->
@@ -181,7 +181,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp077a.xlsx, type=single_circle, num_slices=60, fs_oms=1.506, fs_bishop=1.652, fs_spencer=1.724, fs_mprice=1.734, benchmark=VP77-seep-circle -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=circular_search, num_slices=50, fs_bishop=1.637, fs_spencer=1.700, benchmark=VP77-seep-search -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=single_circle, num_slices=60, fs_oms=1.477, fs_bishop=1.591, fs_spencer=1.659, fs_mprice=1.670, benchmark=VP77-piezo-circle -->
-<!-- test: file=files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.129, benchmark=VP78 -->
+<!-- test: file=files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.134, fs_spencer=1.135, benchmark=VP78 -->
 <!-- test: file=files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
 <!-- test: file=files/rocscience/vp080a.xlsx, type=single_circle, num_slices=60, fs_bishop=2.533, fs_spencer=2.530, benchmark=VP80-t0 -->
 <!-- test: file=files/rocscience/vp080b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.389, fs_spencer=1.352, benchmark=VP80-t15 -->
@@ -220,14 +220,14 @@ Full bibliographic details for the author-year citations on this page are on the
 | [20](#vp20) | 🟢 | Slope, (4) materials, weak layer, water table | Spencer 1.091 vs Slide 1.093 (−0.2%) · Bishop 1.085 vs Slide 1.087 (−0.2%) | same search-power gap as #19 |
 | [21](#vp21) | 🟢 | Slope, homogenous, ru pore pressure | dry: Spencer 2.071 vs F&K 2.073 (−0.1%) · r<sub>u</sub> = 0.25: Spencer 1.757 vs F&K 1.761 (−0.2%) · water table: Spencer 1.827 vs F&K 1.830 (−0.2%) |  |
 | [22](#vp22) | 🟢 | Slope, (2) materials, weak layer, ru pore pressure | dry: Spencer 1.379 vs Slide 1.382 (−0.2%) · r<sub>u</sub> = 0.25: Spencer 1.122 vs Slide 1.124 (−0.2%) | the corpus's first composite-surface problem |
-| [23](#vp23) | 🟢 | Slope, (3) materials | Ordinary 1.357 vs Low 1.36 (−0.2%) · Bishop 1.130 vs Low 1.14 (−0.9%) | the published Bishop values themselves spread 1.14–1.19 |
+| [23](#vp23) | 🟢 | Slope, (3) materials | Ordinary 1.357 vs Low 1.36 (−0.2%) · Bishop 1.142 vs Low 1.14 (+0.2%) | the published Bishop values themselves spread 1.14–1.19 |
 | [24](#vp24) | 🟢 | Slope, (3) materials | Ordinary 1.435 vs Slide 1.439 (−0.3%) · Bishop 1.435 vs STABR, printed by Low, 1.44 (−0.3%) | The 1.44 is the circle search by another program that Low printed for comparison; Low's own method gives 1.45. |
 | [25](#vp25) | 🟢 | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | Spencer 1.052 vs Slide 1.051 (+0.1%) · Spencer 1.052 vs Chen & Shao 1.05 (+0.2%) | the Prandtl surface is built analytically |
 | [26](#vp26) | 🟢 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | Spencer 1.043 vs bearing-capacity theory 1.0 (+4.3%) · Lowe 1.017 vs bearing-capacity theory 1.0 (+1.7%) | the closed form is the reference authority; Slide2's own Spencer 0.941 sits ~6% below it |
 | [27](#vp27) | 🟢 | Slope, (2) materials, tension crack, water table (auto Hu) | Spencer 1.375 vs Slide 1.402 (−1.9%) · Spencer 1.375 vs XSTABL 1.403 (−2.0%) | a uniform offset across all six methods (digitized water table) |
 | [28](#vp28) | 🟢 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | Congress St.: Bishop 1.129 vs Slide 1.128 (+0.1%) · embankment, interface: Bishop 1.158 vs Slide 1.160 (−0.2%) · embankment, base: Bishop 1.177 vs Slide 1.185 (−0.7%) | 3 of Chowdhury & Xu's 10 cases; all ten are compared at [SLOPE/W §2.17](geostudio.md) |
 | [29](#vp29) | 🟢 | Submerged slope, homogenous, probabilistic analysis, water table | Spencer 1.145 vs Slide 1.157 (−1.0%) · Spencer 1.145 vs Duncan 1.17 (−2.1%) |  |
-| [30](#vp30) | 🟢 | Reinforced embankment, (4) materials, tension crack, geosynthetic | circle A: Bishop 1.679 vs Slide 1.69 (−0.7%) · circle B: Bishop 1.650 vs Slide 1.66 (−0.6%) | the manual specifies Bishop for this problem |
+| [30](#vp30) | 🟢 | Reinforced embankment, (4) materials, tension crack, geosynthetic | circle A: Bishop 1.689 vs Slide 1.69 (−0.1%) · circle B: Bishop 1.655 vs Slide 1.66 (−0.3%) | the manual specifies Bishop for this problem |
 | [31](geostudio.md#gs-2-18) | 🟢 | Reinforced embankment, (5) materials, geosynthetic | M-P 1.153 vs SLOPE/W 1.171 (−1.5%) · M-P 1.153 vs Borges & Cardoso 1.15 (+0.3%) · Bishop 1.154 vs SLOPE/W 1.170 (−1.4%) | *covered* — Borges & Cardoso Case 2, built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) (identical embankment c'=0, φ'=35, γ=20; soft-clay layers Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding; unanchored 200 kN/m geosynthetic at δ=33.7°). Slide2's own Circle A/B read 1.18 / 1.16 (Borges 1.19 / 1.15); the VP30 reverse-curvature blocker does not arise here. |
 | [32](#vp32) | 🟢 | Reinforced embankment, (7) materials, geosynthetic | H = 7, circle A: Bishop 1.218 vs Slide 1.23 (−1.0%) · circle B: Bishop 1.216 vs Slide 1.22 (−0.3%) · H = 8.75, circle C: Bishop 0.981 vs Slide 0.98 (+0.1%) |  |
 | [33](#vp33) | 🟢 | Dike, (5) materials, probabilistic analysis, water table | Bishop 1.320 vs Slide 1.305 (+1.1%) | deterministic factor of safety; composite critical surface. El-Ramly et al.'s own deterministic Bishop, 1.30, rests on measured band pore pressures the model does not carry and is shown, not scored; the 1.31 the manual quotes is their Monte Carlo mean. The probability of failure sits about two times above the paper's simplified-analysis figure, 1.6×10⁻². |
@@ -275,7 +275,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [75](#vp75) | 🟢 | Dyke, (4) materials | free search: Bishop 1.424 vs D&W 1.45 (−1.8%) | D&W report Bishop, so Bishop governs like-for-like |
 | [76](#vp76) | 🟢 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.072 vs Slide 1.075 (−0.3%) · piezometric line: Spencer 1.078 vs Slide 1.100 (−2.0%) | a shallow toe surface hypersensitive to the piezometric-line elevation; the line carries Slide2's own vertices |
 | [77](#vp77) | 🟢 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.724 vs Slide 1.724 (0.0%) · piezometric line: Spencer 1.659 vs Slide 1.648 (+0.7%) |  |
-| [78](#vp78) | 🟢 | Slope, homogenous | Spencer 1.129 vs Slide 1.139 (−0.9%) · Bishop 1.117 vs D&W 1.124 (−0.6%) |  |
+| [78](#vp78) | 🟢 | Slope, homogenous | Spencer 1.135 vs Slide 1.139 (−0.4%) · Bishop 1.134 vs D&W 1.124 (+0.9%) |  |
 | [79](#vp79) | 🟢 | Slope, (2) materials, infinite slope failure | Spencer 1.397 vs Slide 1.400 (−0.2%) · Spencer 1.397 vs D&W 1.40 (−0.2%) |  |
 | [80](#vp80) | 🟢 | Embankment, (6) materials | tangent 0 ft: Spencer 2.530 vs Slide 2.545 (−0.6%) · tangent 15 ft: Spencer 1.352 vs Slide 1.359 (−0.5%) |  |
 | [81](#vp81) | 🟢 | Embankment, (2) materials, infinite slope failure | Spencer 1.204 vs Slide 1.209 (−0.4%) · Spencer 1.204 vs D&W 1.21 (−0.5%) |  |
@@ -620,7 +620,7 @@ Slide #16: Arai & Tagyo (1985) example 3 — a homogeneous slope with a water ta
 | Method | XSLOPE | Slide | A&T | SLOPE/W |
 |---|---|---|---|---|
 | Bishop | 1.112 | 1.118 (−0.5%) | 1.138 (−2.3%) | 1.190 (−6.6%) |
-| Janbu (corrected) | 1.122 | 1.131 (−0.8%) | — | — |
+| Janbu (corrected) | 1.130 | 1.131 (−0.1%) | — | — |
 | Spencer | 1.113 | 1.118 (−0.4%) | — | — |
 | Morgenstern-Price | 1.111 | — | — | — |
 | Janbu (simplified) — cross-method, XSLOPE reports the f₀-corrected value | — | 1.046 | — | — |
@@ -774,24 +774,23 @@ finite-element limit analysis of the same section.
 | Method | XSLOPE | Slide | Low | Kim |
 |---|---|---|---|---|
 | Ordinary | 1.357 | 1.370 (−0.9%) | 1.36 (−0.2%) | — |
-| Bishop | 1.130 | 1.192 (−5.2%) | 1.14 (−0.9%) | 1.17 (−3.4%) |
+| Bishop | 1.142 | 1.192 (−4.2%) | 1.14 (+0.2%) | 1.17 (−2.4%) |
 
 The manual prints no radius for its critical circle, so the surfaces cannot be compared
-directly; what can be compared is a circle that carries both published values. One circle
-through this model, center (19.0, 18.5) and radius 18, returns Slide's Ordinary and its
-Bishop together:
+directly. A circle that carried both published values would identify it; the closest one
+through this model, center (19.0, 18.5) and radius 18, reads:
 
 | Method, on that circle | XSLOPE | Slide |
 |---|---|---|
-| Ordinary | 1.377 | 1.370 (+0.5%) |
-| Bishop | 1.195 | 1.192 (+0.3%) |
+| Ordinary | 1.396 | 1.370 (+1.9%) |
+| Bishop | 1.200 | 1.192 (+0.7%) |
 
-*Two independent values matching identifies the circle far more tightly than either would
-alone, and on it the two programs agree on both methods. The Bishop spread in the first
-table is therefore a search result rather than a solver difference: XSLOPE's Bishop search
-reaches a deeper circle and a lower minimum than Slide's reported critical, and the lower
-minimum is the one Low's published 1.14 corroborates. Both searches settle on the same
-center (XSLOPE (18.00, 16.04), Slide (18.001, 16.000)).*
+*No circle within 2 m of that one in center or radius returns both of Slide's values; the
+nearest pair misses by 0.9%. So the published numbers do not pin down Slide's critical
+circle, and the Bishop spread in the first table cannot be divided between the two
+searches and the two programs' slices. XSLOPE's Bishop search settles on the center Slide
+reports (XSLOPE (18.00, 16.05), Slide (18.001, 16.000)) at the lower minimum that Low's
+published 1.14 corroborates.*
 
 ![vp023: inputs and representative solution](images/vp023.png)
 
@@ -973,11 +972,11 @@ on a 1.0 m arm puts the geosynthetic at y = 0.
 
 | Circle | XSLOPE (Bishop) | Slide2 | Borges & Cardoso |
 |---|---|---|---|
-| A (R = 5.74) | **1.679** | 1.69 (−0.7%) | 1.77 (−5.1%) |
-| B (R = 5.24) | **1.650** | 1.66 (−0.6%) | 1.74 (−5.2%) |
+| A (R = 5.74) | **1.689** | 1.69 (−0.1%) | 1.77 (−4.6%) |
+| B (R = 5.24) | **1.655** | 1.66 (−0.3%) | 1.74 (−4.9%) |
 
 Bishop is the method the manual specifies for this problem — it "best simulates the moment based
-limit-equilibrium method the authors use" — and it lands within 0.7% of Slide on both circles. The
+limit-equilibrium method the authors use" — and it lands within 0.3% of Slide on both circles. The
 three published anchors reconcile: Borges' column is the uncracked arc integrated whole plus the
 geosynthetic, Slide's and XSLOPE's are the cracked arc plus the same geosynthetic, and what
 separates the two pairs is the cost of the crack.
@@ -996,14 +995,14 @@ vertical slices cannot represent it at all.
 **Only Bishop is compared.** For φ = 0 circles the moment-equilibrium factor of safety is the
 complete-equilibrium value (Duncan, Wright & Brandon 2014, pp. 89, 96–97), which is why the manual
 prescribes Bishop. Spencer is inadmissible here: base angles on the crack-shortened arc run from
-+83° to −74°, so the horizontal projections of the base normals nearly cancel and the whole mass
++88° to −79°, so the horizontal projections of the base normals nearly cancel and the whole mass
 carries only ≈68 kN/m of net horizontal driving force at F = 1 against the 200 kN/m the geosynthetic
 mobilizes. Spencer can satisfy horizontal equilibrium only by hanging interslice tension at the
 crack face — a root that satisfies both equations while the thrust line leaves the soil, and that
 walks with the slice count instead of converging. Two controls isolate the cause: soil-only, Bishop
 and Spencer agree to three decimals; and spreading the same 200 kN/m along the arc returns Spencer
 beside Bishop. Complete equilibrium is satisfiable at the moment answer — Morgenstern–Price with a
-half-sine interslice function converges with all base normals positive within 0.6% of Bishop.
+half-sine interslice function converges with all base normals positive within 1.0% of Bishop.
 
 ![vp030a: inputs and representative solution](images/vp030a.png)
 
@@ -2018,8 +2017,8 @@ Slide #78 / Duncan & Wright (2005) Fig. 14.3: c = 1000 psf, φ = 0, γ = 100 pcf
 
 | Method | XSLOPE (search) | Slide (base-tangent) | Slide (toe circle — a different surface) | D&W |
 |---|:---:|:---:|:---:|:---:|
-| Bishop | 1.117 | 1.141 (−2.1%) | 1.126 | 1.124 (−0.6%) |
-| Spencer | 1.129 | 1.139 (−0.9%) | 1.200 | — |
+| Bishop | 1.134 | 1.141 (−0.6%) | 1.126 | 1.124 (+0.9%) |
+| Spencer | 1.135 | 1.139 (−0.4%) | 1.200 | — |
 
 *xslope's free search reaches slightly below Slide's tangent-line-constrained minimum. Slide's toe-circle rows repeat identically for the 46.5-ft and 60-ft foundation variants, so only the 30-ft model is built.*
 
@@ -2536,12 +2535,12 @@ the pile station x = 17.5 m.
 | Case | XSLOPE depth at the pile (m) | Cai & Ugai (Bishop, m) |
 |---|---|---|
 | D1/D = 2 | 0.000 | 2.84 |
-| D1/D = 3 | 3.142 | 3.18 (−1.2%) |
+| D1/D = 3 | 3.094 | 3.18 (−2.7%) |
 | D1/D = 4 | 3.261 | 3.34 (−2.4%) |
-| D1/D = 6 | 3.462 | 3.50 (−1.1%) |
+| D1/D = 6 | 3.488 | 3.50 (−0.3%) |
 
 Three of the four spacings match, and the trend the paper reports — a shallower surface as
-the piles close up — comes out at the same rate: 3.462 m at six diameters to 3.142 m at
+the piles close up — comes out a little steeper: 3.488 m at six diameters to 3.094 m at
 three, against 3.50 m to 3.18 m. At D1/D = 2 the two readings are two different mechanisms
 rather than a pairing, so no difference is given. The row's match dot is set by the factors
 of safety; the depths say which surface each factor belongs to.

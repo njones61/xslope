@@ -372,9 +372,9 @@ Spencer's answer on that circle:
 
 ![Spencer's critical surface](images/lem01_solution_search.png){width=1000}
 
-**FS = 1.276**. In Studio, the solution view also has an amber strip across the top
+**FS = 1.282**. In Studio, the solution view also has an amber strip across the top
 listing *admissibility warnings*: interslice tension, a line of thrust outside the
-slices on about half the boundaries, and tension on the base of 3 slices near
+slices on about half the boundaries, and tension on the base of 4 slices near
 the crest. These warnings mean the solution requires the soil near the crest to
 carry tension, which soil cannot do.
 
@@ -390,29 +390,29 @@ to solve.
 
 ![Bishop's critical surface](images/lem01_solution_bishop.png){width=1000}
 
-Bishop finds **FS = 1.215** on a smaller, shallower circle — radius 33.5 against
-Spencer's 40.4, breaking out of the crest at x = 36 rather than x = 44 — and that
+Bishop finds **FS = 1.215** on a smaller, shallower circle — radius 33.4 against
+Spencer's 40.0, breaking out of the crest at x = 36 rather than x = 45 — and that
 is a *lower* answer than Spencer's on the same model. Look at the crest end of
 the surface: the last few slices' base-stress bars are drawn in red, meaning the
 computed normal stress on the base is negative. The solution needs the top of the
 slope to hold itself together in tension.
 
 Because φ = 0 here, Spencer would also give 1.215 on Bishop's circle. It reports
-1.276 because it could not solve that circle. The run output shows this:
+1.282 because it could not solve that circle. The run output shows this:
 
 ```text
-[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (on 56, no interslice force inclination satisfies both force and moment equilibrium)
-[⚠️ crest tension] Tension on the base of 3 slices near the crest. Consider adding a tension crack.
-Critical FS = 1.276
-Sliding mass = 60,436.2 lb/ft over 50.80 ft of failure surface
+[⚠️ unsolved trials] Spencer could not solve 49 of 173 trial surfaces (on 49, no interslice force inclination satisfies both force and moment equilibrium)
+[⚠️ crest tension] Tension on the base of 4 slices near the crest. Consider adding a tension crack.
+Critical FS = 1.282
+Sliding mass = 60,984.2 lb/ft over 50.94 ft of failure surface
 ```
 
-Spencer's method could not solve 56 of the 211 circles. Spencer has to satisfy both
+Spencer's method could not solve 49 of the 173 circles. Spencer has to satisfy both
 force and moment equilibrium, and on those circles the tension near the crest is so
 large that no solution satisfies both. The second line of the output gives the remedy:
 a tension crack.
 
-Neither Spencer's 1.276 nor Bishop's 1.215 is right. Both solutions put the clay
+Neither Spencer's 1.282 nor Bishop's 1.215 is right. Both solutions put the clay
 near the crest in tension: the top of the sliding mass hangs on the soil behind
 it. Real soil cannot carry tension. It cracks. So both factors of safety count on
 strength that is not there. The warnings, the red bars and the unsolved circles
@@ -448,7 +448,7 @@ and the *same* factor of safety: with no tension in the model, the methods agree
 
 <!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, tcrack_depth=8, tcrack_water=0, fs_spencer=1.084, fs_bishop=1.084, fs_mprice=1.084, tolerance=0.005 -->
 
-The cracked answer is lower. 1.276 → 1.084 is a 15% drop: the uncracked model was
+The cracked answer is lower. 1.282 → 1.084 is a 15% drop: the uncracked model was
 counting cohesion along a stretch of surface that the soil would in reality have
 already torn open, so its answer was too high. The amber strip, the red bars and
 the disagreement between methods on the uncracked run all pointed to the missing
@@ -511,7 +511,7 @@ Which to use is a matter of judgment, and on this slope the impact is minor — 
 two depths are 0.06% apart in factor of safety. The 7¼ ft depth is the closer
 model of the soil; the theoretical 8 ft depth is the more conservative choice.
 The uncracked model is not a reasonable choice: both cracked answers are well
-below its 1.276.
+below its 1.282.
 
 The completed file linked at the top of this page is the uncracked model; keep the
 cracked one with **Save As**.
@@ -547,9 +547,9 @@ tension crack is added:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.276 | 1.226 |
+| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.282 | 1.226 |
 
-<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276, fs_mprice=1.226 -->
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.282, fs_mprice=1.226 -->
 
 The Ordinary Method of Slices (OMS) lands on Bishop's 1.215: with φ = 0 the
 strength on a slice base does not depend on the normal force, so the two compute

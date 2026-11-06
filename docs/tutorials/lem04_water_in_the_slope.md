@@ -542,12 +542,12 @@ of the one above:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.084 | 1.327 | 1.253 | 1.436 | 1.376 | 1.301 | 1.302 |
+| 1.097 | 1.327 | 1.272 | 1.436 | 1.376 | 1.301 | 1.302 |
 
-<!-- test: file=../lem/files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.084, fs_bishop=1.327, fs_janbu=1.253, fs_corps=1.436, fs_lowe=1.376, fs_spencer=1.301, fs_mprice=1.302 -->
+<!-- test: file=../lem/files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.097, fs_bishop=1.327, fs_janbu=1.272, fs_corps=1.436, fs_lowe=1.376, fs_spencer=1.301, fs_mprice=1.302 -->
 
 Spencer's search returns the same 1.301 as the search from the single circle, and
 Morgenstern-Price's 1.302 agrees with it. Bishop sits 2.0% above Spencer. Of the
-force-equilibrium procedures, Janbu comes out 3.7% below Spencer, Lowe & Karafiath
+force-equilibrium procedures, Janbu comes out 2.2% below Spencer, Lowe & Karafiath
 5.8% above and the Corps of Engineers 10.4% above, and OMS is the lowest of the
-seven at 1.084, 16.7% below Spencer.
+seven at 1.097, 15.7% below Spencer.

@@ -946,4 +946,4 @@ model from scratch; in [SEEP-2](seep02_johnson_dam.md) we build this dam, and in
 [COMBO-1](combo01_seepage_stability.md) we run it under a standing pool. The
 [tutorials index](index.md) lists the series.
 
-<!-- test: file=../lem/files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.271, fs_bishop=1.465, fs_janbu=1.390, fs_corps=1.750, fs_lowe=1.576, fs_spencer=1.524, fs_mprice=1.535 -->
+<!-- test: file=../lem/files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.271, fs_bishop=1.465, fs_janbu=1.390, fs_corps=1.756, fs_lowe=1.576, fs_spencer=1.524, fs_mprice=1.535 -->

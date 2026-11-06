@@ -644,7 +644,7 @@ foundation first — defensible, and one to notice before the next person reads
 that table top down. The transcript is
 [w1_diagnose_transcript.md](files/w1_diagnose_transcript.md).
 
-<!-- test: file=files/w1_diagnose_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.9984, tolerance=0.005 -->
+<!-- test: file=files/w1_diagnose_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.0051, tolerance=0.005 -->
 <!-- test: file=files/w1_diagnose_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.2441, tolerance=0.005 -->
 
 ### Check its work

@@ -20,7 +20,7 @@ One producer for every committed tutorial image that a script can make:
 The method matters: a figure is drawn with the same method the tutorial's prose
 quotes, so the factor of safety printed on the image is the number in the sentence
 beside it. LEM-1's arc is the owner's: Spencer's search on the model as built
-(1.276), Bishop's lower answer on a circle Spencer cannot solve (1.215, its crest
+(1.282), Bishop's lower answer on a circle Spencer cannot solve (1.215, its crest
 slices in tension), then the tension crack at 2c/γ = 8 ft — after which Spencer,
 Bishop and M-P land on the same circle and the same 1.084.
 

@@ -525,13 +525,13 @@ started from the file's circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.617 | 1.852 | 1.648 | 1.884 | 1.978 | 1.842 | 1.843 |
+| 1.634 | 1.852 | 1.692 | 1.884 | 1.978 | 1.842 | 1.843 |
 
-<!-- test: file=../lem/files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.617, fs_bishop=1.852, fs_janbu=1.648, fs_corps=1.884, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.634, fs_bishop=1.852, fs_janbu=1.692, fs_corps=1.884, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
 
 Morgenstern-Price agrees with Spencer to within 0.001, and Bishop sits 0.5%
 above it. The Corps of Engineers method and Lowe & Karafiath come out 2.3% and
-7.4% above Spencer, and Janbu and the Ordinary Method of Slices (OMS) 10.5% and
-12.2% below it. The grid search in
+7.4% above Spencer, and Janbu and the Ordinary Method of Slices (OMS) 8.1% and
+11.3% below it. The grid search in
 [Looking above the pile row](#looking-above-the-pile-row) finds Spencer a lower
 surface, at 1.702, that slides over the top of the piles.

@@ -87,11 +87,30 @@ def _solve_all(d, ns=40):
     return out, slice_df
 
 
-def check(theta_p, expect_pile=True, ns=40, quiet=False):
+def on_a_corner(d, ns):
+    """The model with each pile moved to the slice boundary nearest it at ``ns``
+    slices. A pile is not a slice boundary, so moving one leaves the slices as
+    they were, and its crossing then lands exactly on a corner two bases share.
+    Slices of equal angle put no boundary on the sample's piles at any count, so
+    this is how the corner case is reached."""
+    ok, res = generate_slices(d, circle=d["circles"][0], num_slices=ns, debug=False)
+    assert ok, f"generate_slices failed: {res}"
+    inner = res[0]["x_l"].to_numpy()[1:]
+    m = copy.deepcopy(d)
+    for p in m["pile_lines"]:
+        shift = float(inner[np.argmin(np.abs(inner - p["x1"]))]) - p["x1"]
+        p["x1"] += shift
+        p["x2"] += shift
+    return m
+
+
+def check(theta_p, expect_pile=True, ns=40, quiet=False, corner=False):
     base = load_slope_data(PILE_MODEL)
     if expect_pile:
         for p in base["pile_lines"]:
             p["theta_p"] = theta_p
+        if corner:
+            base = on_a_corner(base, ns)
     else:
         # The control is the model with no pile at all. It used to be the model
         # with H = 0, which preflight now rejects — H is a capacity, and a
@@ -119,15 +138,17 @@ def check(theta_p, expect_pile=True, ns=40, quiet=False):
             failures.append(f"{name} at {ns} slices: asym {asym:.3f}% >= {TOL_PCT}% "
                             f"(left={fl:.5f}, mirror={fr:.5f})")
     if not quiet and worst[1] is not None:
-        print(f"    {ns:3d} slices: worst {worst[1]} {worst[0]:.4f}%")
+        print(f"    {ns:3d} slices{' (piles on corners)' if corner else ''}: "
+              f"worst {worst[1]} {worst[0]:.4f}%")
     return failures
 
 
 #: Slice counts the pair is checked at. Which slice a pile is credited to used to
 #: depend on the order the slices were built in, so the asymmetry appeared only
-#: where a pile landed exactly on a slice boundary — at 30 and 60 slices on this
-#: model, where Corps of Engineers moved 1.44% and 0.72% between the model and
-#: its mirror, and nowhere else. A single slice count would have missed it.
+#: where a pile landed exactly on a slice boundary: Corps of Engineers moved
+#: 1.44% and 0.72% between the model and its mirror at the two counts that put a
+#: pile there, and nowhere else. Each count is checked as the sample stands and
+#: with its piles moved onto corners.
 SLICE_COUNTS = (30, 40, 50, 60, 80)
 
 
@@ -141,35 +162,64 @@ def leg_the_mirror_pair_agrees():
         print(f"  pile, theta_p = {theta:+.0f}:")
         for ns in SLICE_COUNTS:
             failures += check(theta, expect_pile=True, ns=ns)
+            failures += check(theta, expect_pile=True, ns=ns, corner=True)
     return failures
 
 
-def leg_a_pile_lands_on_a_boundary():
-    """The case only bites where a pile sits exactly on a slice corner.
+#: A third pile, through the crest beyond the circle's center. The sample's two
+#: piles stand between the toe and the center, where the base falls toward the
+#: center in the sliding direction, so the higher base there is also the one a
+#: sliding-direction rule picks; beyond the center the base rises in the sliding
+#: direction and the two rules part.
+CREST_PILE_X = 40.0
 
-    If no slice count in SLICE_COUNTS puts a pile on a boundary any more, the
-    leg above is no longer testing what it was written for and says so.
+
+def _with_a_crest_pile(d):
+    m = copy.deepcopy(d)
+    m["pile_lines"].append(dict(m["pile_lines"][0], x1=CREST_PILE_X, y1=20.0,
+                                x2=CREST_PILE_X, y2=-15.0, label="crest"))
+    return m
+
+
+def leg_a_pile_lands_on_a_boundary():
+    """A pile moved onto a slice corner is credited once, to the higher base.
+
+    Both bases sharing the corner see the crossing; the one lying higher (by the
+    mean elevation of its two corners) keeps it, on the model and on its mirror
+    image, on either side of the circle's center.
     """
-    base = load_slope_data(PILE_MODEL)
-    on_boundary = []
+    failures = []
+    base = _with_a_crest_pile(load_slope_data(PILE_MODEL))
     for ns in SLICE_COUNTS:
-        ok, res = generate_slices(base, circle=base["circles"][0], num_slices=ns,
-                                  debug=False)
-        if not ok:
-            continue
-        df = res[0]
-        rows = df[df["h_pile"] != 0]
-        for i in rows.index:
-            x = float(df["x_pile"][i])
-            tol = 1e-9 * max(1.0, abs(x))
-            if abs(x - float(df["x_r"][i])) <= tol or abs(x - float(df["x_l"][i])) <= tol:
-                on_boundary.append(ns)
-                break
-    if not on_boundary:
-        return ["no slice count in SLICE_COUNTS puts a pile on a slice boundary, "
-                "so the corner-claim case is no longer exercised"]
-    print(f"  a pile lands on a slice boundary at {sorted(set(on_boundary))} slices")
-    return []
+        for side, d in (("model", on_a_corner(base, ns)),
+                        ("mirror", mirror_slope_data(on_a_corner(base, ns)))):
+            ok, res = generate_slices(d, circle=d["circles"][0], num_slices=ns,
+                                      debug=False)
+            if not ok:
+                failures.append(f"{ns} slices, {side}: generate_slices failed: {res}")
+                continue
+            df = res[0]
+            mid = 0.5 * (df["y_lb"].to_numpy() + df["y_rb"].to_numpy())
+            for p in d["pile_lines"]:
+                x = p["x1"]
+                tol = 1e-9 * max(1.0, abs(x))
+                hits = [i for i in range(len(df)) if df["h_pile"].iat[i] != 0
+                        and abs(float(df["x_pile"].iat[i]) - x) <= tol]
+                at = [i for i in range(len(df) - 1)
+                      if abs(float(df["x_r"].iat[i]) - x) <= tol]
+                if len(at) != 1:
+                    failures.append(f"{ns} slices, {side}: the pile at x = {x:.4f} "
+                                    f"is not on a shared slice corner")
+                    continue
+                want = at[0] if mid[at[0]] > mid[at[0] + 1] else at[0] + 1
+                if hits != [want]:
+                    failures.append(f"{ns} slices, {side}: the pile at x = {x:.4f} "
+                                    f"is credited to slices {hits}; the higher base "
+                                    f"sharing its corner is slice {want}")
+    if not failures:
+        print(f"  piles on corners, credited to the higher base at {SLICE_COUNTS} "
+              f"slices, model and mirror")
+    return failures
 
 
 #: The force a battered pile carries is stated: the Ito & Matsui computation is
@@ -339,19 +389,32 @@ def _mutation(label, apply, restore, leg, fails):
 
 
 def leg_mutations():
-    """Claiming a corner crossing by build order must put the asymmetry back."""
+    """Claiming a corner crossing by build order must put the asymmetry back, and
+    claiming it by the sliding direction must miss the higher base."""
     from xslope import slice as xslice
     fails = []
     original = xslice._corner_claim_is_this_slice
 
-    def first_seen_wins(x_cross, x_l, x_r, i, n_slices, right_facing):
-        """The rule as it stood: whichever base is built first keeps it."""
+    def first_seen_wins(x_cross, x_l, x_r, i, base_mid_y, right_facing):
+        """The first rule: whichever base is built first keeps it."""
         return True
 
-    _mutation("the corner claimed by build order",
-              lambda: setattr(xslice, '_corner_claim_is_this_slice', first_seen_wins),
-              lambda: setattr(xslice, '_corner_claim_is_this_slice', original),
-              leg_the_mirror_pair_agrees, fails)
+    def sliding_direction(x_cross, x_l, x_r, i, base_mid_y, right_facing):
+        """The second rule: a fixed side in the sliding-direction frame."""
+        tol = 1e-9 * max(1.0, abs(x_l), abs(x_r))
+        if right_facing:
+            return not (abs(x_cross - x_r) <= tol and i < len(base_mid_y) - 1)
+        return not (abs(x_cross - x_l) <= tol and i > 0)
+
+    for label, mutant, leg in (
+            ("the corner claimed by build order", first_seen_wins,
+             leg_the_mirror_pair_agrees),
+            ("the corner claimed by the sliding direction", sliding_direction,
+             leg_a_pile_lands_on_a_boundary)):
+        _mutation(label,
+                  lambda m=mutant: setattr(xslice, '_corner_claim_is_this_slice', m),
+                  lambda: setattr(xslice, '_corner_claim_is_this_slice', original),
+                  leg, fails)
 
     # The pile force angle: the loader and the slice builder both take it from
     # slice.pile_force_angle, so replacing that function replaces the rule in

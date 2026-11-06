@@ -25,6 +25,14 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   Studio did not stop on the way out, and the operating system reported the exit as
   a crash. The assistant's Stop button also ends a turn at once now, instead of
   after the reply arrives.
+- A distributed load that starts at the top of a wall drawn with its face leaning
+  very slightly, such as (−0.001, 0) to (0, 25), now stays on top of the wall. One
+  slice spanned the face, and its share of the load was spread down the face as a
+  horizontal push into the wall, which raised the factor of safety: on a 25 ft wall
+  with a 150 psf surcharge, Spencer read 1.757 where an exactly vertical face gives
+  1.717. That slice now takes its load from the ground under it. A face drawn
+  exactly vertical was not affected, and neither was any model shipped with
+  XSLOPE.
 
 ## 1.0.7 — 2026-11-04
 

@@ -158,8 +158,12 @@ def figure_base():
         ax.plot([p[0], q[0]], [p[1], q[1]], color=color, lw=lw, zorder=1)
         return q
     q = toward_o(M, "0.55", 0.9)
-    ax.text(q[0] + 0.1, q[1] - 0.3, "toward O", fontsize=11, color="0.4",
-            ha="left", va="top")
+    # along the line, just above it, near its far end
+    u = (M - q) / np.linalg.norm(M - q)
+    nrm = np.array([-u[1], u[0]]) if u[0] > 0 else np.array([u[1], -u[0]])
+    at = q + 0.25 * u + 0.16 * nrm
+    ax.text(at[0], at[1], "toward O", fontsize=11, color="0.4", ha="left", va="bottom",
+            rotation=np.degrees(np.arctan2(u[1], u[0])), rotation_mode="anchor")
 
     # the base: arc and chord
     ax.plot(arc[:, 0], arc[:, 1], color="black", lw=2.6, zorder=4)
@@ -209,8 +213,8 @@ def figure_base():
           "black")
     label(M, (right, -3.9), "M, the middle of the arc AB:\nthe pore pressure is read here",
           WATER)
-    label(P, (right, -6.3), "P, the circle directly below the\nslice's center line; dashed,\n"
-          "the tangent there", "0.35")
+    label(P, (right, -6.3), "P, the point on the circle directly\nbelow the slice's center line\n"
+          "(dashed line: the circle's tangent at P)", "0.35")
     ax.set_xlim(x_lo, x_hi)
     ax.set_ylim(y_lo, y_hi)
     ax.set_aspect("equal")

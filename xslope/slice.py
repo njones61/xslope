@@ -1750,10 +1750,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     y_u_all = np.array(y_cb_all, dtype=float)
     y_base_all = np.array(y_cb_all, dtype=float)
     if on_arc_all.any():
-        _th = np.arcsin(np.clip((slice_x_coords - Xo) / R, -1.0, 1.0))
+        # |R|: a search refining a circle's depth past its own center hands in a
+        # negative R, and the circle's y-coordinates read R only squared.
+        _ra = abs(R)
+        _th = np.arcsin(np.clip((slice_x_coords - Xo) / _ra, -1.0, 1.0))
         _tm = 0.5 * (_th[:-1] + _th[1:])[on_arc_all]
-        x_u_all[on_arc_all] = Xo + R * np.sin(_tm)
-        y_u_all[on_arc_all] = Yo - R * np.cos(_tm)
+        x_u_all[on_arc_all] = Xo + _ra * np.sin(_tm)
+        y_u_all[on_arc_all] = Yo - _ra * np.cos(_tm)
         y_base_all[on_arc_all] = base_mid_y[on_arc_all]
 
     # Get ground surface y-coordinates
@@ -2845,6 +2848,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'y_rt': y_rt,   # right y-coordinate of the slice top
             'x_c': x_c,     # center x-coordinate of the slice
             'y_cb': y_base_all[i],   # middle of the base (of its chord, on a circle)
+            'x_u': x_u,     # where the base reads its pore pressure: the middle of
+            'y_u': y_u,     # the arc on a circle, the middle of the base otherwise
             'y_ct': y_ct,   # center y-coordinate of the slice top
             'y_cg': y_cg,   # center of gravity y-coordinate of the slice
             'dx': dx,       # width of the slice

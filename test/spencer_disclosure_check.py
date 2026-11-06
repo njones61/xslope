@@ -183,13 +183,26 @@ def _mirror(model):
     return md, (lambda spec: dict(spec, Xo=2 * axis - spec['Xo']))
 
 
+def _radii(df):
+    """Each base's distance from the circle's centre, along its normal."""
+    a = np.radians(df['alpha'].values)
+    dx = df['x_c'].values - float(df['xo'].iloc[0])
+    if df.attrs.get('right_facing', df['y_cb'].iat[0] > df['y_cb'].iat[-1]):
+        # right-facing: alpha is mirrored
+        dx = -dx
+    return dx * np.sin(a) - (df['y_cb'].values - float(df['yo'].iloc[0])) * np.cos(a)
+
+
 def _closed_form(df):
-    """(n, alpha, F_m) — the decoupled problem, from the slice table alone."""
+    """(n, alpha, F_m) — the decoupled problem, from the slice table alone. F_m is
+    the moment factor of safety, sum(r c dl) / sum(r W sin a), with r each base's
+    distance from the centre."""
     alpha = np.radians(df['alpha'].values)
     c = df['c'].values.astype(float)
     dl = df['dl'].values.astype(float)
     W = df['w'].values.astype(float)
-    F_m = float(np.sum(c * dl) / np.sum(W * np.sin(alpha)))
+    r = _radii(df)
+    F_m = float(np.sum(r * c * dl) / np.sum(r * W * np.sin(alpha)))
     return W * np.sin(alpha) - c * dl / F_m, alpha, F_m
 
 
@@ -246,10 +259,11 @@ def leg_closed_form_is_the_shipped_residual():
             fails.append(f"{label}: spencer never handed out its residual function")
             continue
         n, alpha, F_m = _closed_form(df)
-        # sum n = 0 is the moment equation at F_m: the decoupling itself.
-        scale = float(np.sum(np.abs(n)))
-        if abs(float(np.sum(n))) > 1e-9 * scale:
-            fails.append(f"{label}: sum n = {np.sum(n):.3e} is not zero at F_m")
+        # sum r n = 0 is the moment equation at F_m: the decoupling itself.
+        rn = _radii(df) * n
+        scale = float(np.sum(np.abs(rn)))
+        if abs(float(np.sum(rn))) > 1e-9 * scale:
+            fails.append(f"{label}: sum r n = {np.sum(rn):.3e} is not zero at F_m")
         th, _ = _h_over_band(n, alpha, count=9)
         worst = 0.0
         for t in th:

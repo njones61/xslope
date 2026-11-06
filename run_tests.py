@@ -2879,7 +2879,7 @@ def run_design_callable_test(test):
         return None, f"design(modify=) failed: {rm}"
 
     problems = []
-    expected = 4.6119709300          # locked OMS/fixed-surface crossing of FS = 1.35
+    expected = 4.6212865591          # locked OMS/fixed-surface crossing of FS = 1.35
 
     # (a) hand-computable crossing on the callable path
     if not rm['bracketed']:

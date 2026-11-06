@@ -197,6 +197,8 @@ SLICE_COLUMNS = (
     Column("d_x", "d_x", "Horizontal coordinate of the distributed-load resultant.", "length"),
     Column("d_y", "d_y", "Elevation of the distributed-load resultant.", "length"),
     Column("y_t", "y_Tc", "Elevation of the tension-crack water force's line of action.", "length"),
+    Column("x_u", "x_u", "Horizontal coordinate of the point the base reads its pore pressure at: the middle of the arc on a circle, the middle of the base otherwise.", "length"),
+    Column("y_u", "y_u", "Elevation of the point the base reads its pore pressure at.", "length"),
     Column("piezo_y", "y_piezo", "Elevation of the piezometric surface above the point the base reads its pore pressure at.", "length"),
     Column("theta", "θ", "Interslice force inclination on the right-hand side of the slice.", "deg"),
     Column("c_suction", "c_suc", "Apparent cohesion contributed by matric suction.", "stress"),

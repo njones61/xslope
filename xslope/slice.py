@@ -696,6 +696,92 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR, dl):
     return D, d_x, d_y
 
 
+def _load_integral(S, Q, a, b):
+    """``(F, Fs)``: the integral of a load's intensity over distance ``s`` along
+    the ground from ``a`` to ``b``, and its first moment in ``s``.
+
+    The load varies linearly between its points ``(S[k], Q[k])`` (``S``
+    ascending) and is zero before the first and after the last, so it starts
+    and stops where its end points are rather than ramping in from zero.
+    """
+    F = Fs = 0.0
+    for k in range(len(S) - 1):
+        s0, s1 = S[k], S[k + 1]
+        if s1 <= s0:
+            continue
+        lo, hi = max(a, s0), min(b, s1)
+        if hi <= lo:
+            continue
+        q_lo = Q[k] + (Q[k + 1] - Q[k]) * (lo - s0) / (s1 - s0)
+        q_hi = Q[k] + (Q[k + 1] - Q[k]) * (hi - s0) / (s1 - s0)
+        F += 0.5 * (q_lo + q_hi) * (hi - lo)
+        Fs += (hi - lo) / 6.0 * (lo * (2.0 * q_lo + q_hi) + hi * (q_lo + 2.0 * q_hi))
+    return F, Fs
+
+
+def load_on_ground_pieces(pieces, normal_blocks, vertical_blocks, right_facing):
+    """One slice's distributed load, integrated along the ground under its top.
+
+    ``pieces`` is the ground surface over the slice, left to right, as
+    ``[(x, y, s), ...]`` with ``s`` the distance along the ground. Each block
+    is ``(S, Q)``: a load's points by distance along the ground and their
+    intensities. A normal block acts perpendicular to each piece of ground and
+    a vertical block straight down, as on a straight slice top.
+
+    Returns ``(D, d_x, d_y, beta, qL, qR)`` in the convention of the chord
+    path: the solvers apply ``(D sin beta, -D cos beta)`` at ``(d_x, d_y)``,
+    with ``beta`` mirrored on a right-facing slope. ``(d_x, d_y)`` is a point
+    on the resultant's line of action, so its moment about any center is the
+    sum of the pieces' moments.
+    """
+    Fx = Fy = M = signed = 0.0
+    wx = wy = wsum = 0.0
+    for (xa, ya, sa), (xb, yb, sb) in zip(pieces, pieces[1:]):
+        L = sb - sa
+        if L <= 0.0:
+            continue
+        b = atan2(yb - ya, xb - xa)
+        for blocks, normal in ((normal_blocks, True), (vertical_blocks, False)):
+            for S, Q in blocks:
+                F, Fs = _load_integral(S, Q, sa, sb)
+                if F == 0.0:
+                    continue
+                t = (Fs / F - sa) / L
+                px, py = xa + t * (xb - xa), ya + t * (yb - ya)
+                fx, fy = (F * sin(b), -F * cos(b)) if normal else (0.0, -F)
+                Fx += fx
+                Fy += fy
+                M += px * fy - py * fx
+                signed += F
+                wx += abs(F) * px
+                wy += abs(F) * py
+                wsum += abs(F)
+
+    def q_at(s):
+        return sum(float(np.interp(s, S, Q, left=0.0, right=0.0))
+                   for S, Q in list(normal_blocks) + list(vertical_blocks))
+
+    qL, qR = q_at(pieces[0][2]), q_at(pieces[-1][2])
+    (x_l, y_l, _), (x_r, y_r, _) = pieces[0], pieces[-1]
+    chord_beta = degrees(atan2(y_r - y_l, x_r - x_l))
+    H = sqrt(Fx * Fx + Fy * Fy)
+    if wsum == 0.0 or H == 0.0:
+        return (0.0, 0.5 * (x_l + x_r), 0.5 * (y_l + y_r),
+                -chord_beta if right_facing else chord_beta, qL, qR)
+    # A net uplift keeps its sign, as it does on a straight top.
+    if signed < 0.0:
+        D, beta = -H, degrees(atan2(-Fx, Fy))
+    else:
+        D, beta = H, degrees(atan2(Fx, -Fy))
+    if abs(Fy) >= abs(Fx):
+        d_y = wy / wsum
+        d_x = (M + d_y * Fx) / Fy
+    else:
+        d_x = wx / wsum
+        d_y = (d_x * Fy - M) / Fx
+    return D, d_x, d_y, (-beta if right_facing else beta), qL, qR
+
+
 def _polygon_bands(polygon):
     """Decompose a material-zone polygon into y-simple bands.
 
@@ -1784,6 +1870,62 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     dload2_interp_funcs = _interp_funcs(dloads2, dload2_dirs, 'normal')
     dload2_vert_funcs = _interp_funcs(dloads2, dload2_dirs, 'vertical')
 
+    # The same loads placed along the ground surface by distance along it, for
+    # a slice whose top is not one straight piece of ground (_top_pieces). A
+    # slice top is otherwise taken as the chord between its two top corners,
+    # and the load is laid along that chord with its intensity read by X. Where
+    # the thin-slice merge above drops a ground vertex, the chord can cut across
+    # a wall face: a load that starts at the crest of a face leaning by 0.001
+    # was spread along the whole 25 ft face as a horizontal push into the wall
+    # (1,876 lb/ft where 92 lb/ft acts downward on the crest). By distance along
+    # the ground, the face lies before the load's first point and carries none.
+    _g_xy = np.asarray(ground_surface.coords, dtype=float)
+    _g_line = ground_surface
+    if _g_xy[0, 0] > _g_xy[-1, 0]:            # distance runs left to right
+        _g_xy = _g_xy[::-1].copy()
+        _g_line = LineString(_g_xy)
+    _g_s = np.concatenate(([0.0], np.cumsum(np.hypot(np.diff(_g_xy[:, 0]),
+                                                     np.diff(_g_xy[:, 1])))))
+    _g_x_sorted = np.sort(_g_xy[:, 0])
+    _g_tol = 1e-9 * max(1.0, float(_g_s[-1]))
+
+    def _top_pieces(x_l, y_lt, x_r, y_rt, dl_top):
+        """The ground under a slice top, ``[(x, y, s), ...]`` left to right, or
+        None where it is the straight chord between the top corners."""
+        lo = np.searchsorted(_g_x_sorted, x_l, side='right')
+        hi = np.searchsorted(_g_x_sorted, x_r, side='left')
+        if hi <= lo:                          # no ground vertex inside the slice
+            return None
+        s_l = _g_line.project(Point(x_l, y_lt))
+        s_r = _g_line.project(Point(x_r, y_rt))
+        if s_r - s_l <= dl_top * (1.0 + 1e-9):   # the vertices inside are in line
+            return None
+        inside = (_g_s > s_l + _g_tol) & (_g_s < s_r - _g_tol)
+        return ([(x_l, y_lt, s_l)]
+                + [(float(x), float(y), float(s))
+                   for (x, y), s in zip(_g_xy[inside], _g_s[inside])]
+                + [(x_r, y_rt, s_r)])
+
+    def _s_blocks(lines, dirs, want):
+        out = []
+        for i, line in enumerate(lines):
+            if str(dirs[i] if i < len(dirs) else 'normal').lower() != want:
+                continue
+            pts = []
+            for pt in line:
+                y = pt.get('Y')
+                if y is None or (isinstance(y, float) and np.isnan(y)):
+                    y = float(np.interp(pt['X'], _g_xy[:, 0], _g_xy[:, 1]))
+                pts.append((_g_line.project(Point(pt["X"], y)), pt["Normal"]))
+            pts.sort(key=lambda p: p[0])
+            out.append((np.array([p[0] for p in pts]), np.array([p[1] for p in pts])))
+        return out
+
+    dload_s_blocks = (_s_blocks(dloads, dload_dirs, 'normal'),
+                      _s_blocks(dloads, dload_dirs, 'vertical'))
+    dload2_s_blocks = (_s_blocks(dloads2, dload2_dirs, 'normal'),
+                       _s_blocks(dloads2, dload2_dirs, 'vertical'))
+
     # Generate slices
     slices = []
     # Per-slice, per-band geometry the material-derived columns are built from,
@@ -1971,12 +2113,26 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     (abs(Dn) * dyn + abs(Dv) * dyv) / w,
                     degrees(atan2(Fx, -Fy)), qL_, qR_)
 
-        dload, d_x, d_y, beta_d, qL, qR = _combine(dload_interp_funcs,
-                                                   dload_vert_funcs)
+        # A slice whose top crosses a bend in the ground (a vertex the thin-
+        # slice merge left inside it) takes its load from the ground itself;
+        # every other slice, the straight top it has, by the chord as before.
+        pieces = None
+        if any(dload_s_blocks) or any(dload2_s_blocks):
+            pieces = _top_pieces(x_l, y_lt, x_r, y_rt, dl_top)
+        if pieces is not None and any(dload_s_blocks):
+            dload, d_x, d_y, beta_d, qL, qR = load_on_ground_pieces(
+                pieces, *dload_s_blocks, right_facing)
+        else:
+            dload, d_x, d_y, beta_d, qL, qR = _combine(dload_interp_funcs,
+                                                       dload_vert_funcs)
 
         # Second distributed load (rapid-drawdown stage 2)
-        dload2, d_x2, d_y2, beta_d2, qL2, qR2 = _combine(dload2_interp_funcs,
-                                                         dload2_vert_funcs)
+        if pieces is not None and any(dload2_s_blocks):
+            dload2, d_x2, d_y2, beta_d2, qL2, qR2 = load_on_ground_pieces(
+                pieces, *dload2_s_blocks, right_facing)
+        else:
+            dload2, d_x2, d_y2, beta_d2, qL2, qR2 = _combine(dload2_interp_funcs,
+                                                             dload2_vert_funcs)
 
         # Seismic force
         kw = abs(k_seismic) * soil_weight

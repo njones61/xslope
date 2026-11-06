@@ -9898,6 +9898,11 @@ MODULE_CHECKS = {
         'tension_crack_symmetry_check.py',
         "A tension crack and its mirror image: the crack water thrust flips with "
         "the sliding direction, and every method must read the pair the same."),
+    'face_load': (
+        'face_load_check.py',
+        "A surcharge that starts at the crest of a wall stays on the crest: a "
+        "slice straddling a face drawn leaning by 0.001 takes its load from the "
+        "ground under it, not along the chord up the face."),
     'dload_pass2b': (
         'dload_direction_check.py',
         "The FEM's lumped surface-load fallback must take the direction a "
@@ -16209,7 +16214,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
-              'indep_bishop': 3, 'tension_crack_symmetry': 2,
+              'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
               'reinforce_mesh_geometry': 2, 'bonded_junction': 2, 'joint_mesh': 3,
@@ -16698,6 +16703,12 @@ def main():
         tests.append({'type': 'tension_crack_symmetry',
                       'file': 'a tension crack and its mirror image',
                       'method': 'all methods', 'source': 'tension_crack_symmetry'})
+        # A surcharge starting at the crest of a wall drawn leaning by 0.001
+        # was laid along the face of the slice straddling it, a horizontal
+        # push into the wall (1,876 lb/ft for 92 on the crest).
+        tests.append({'type': 'face_load',
+                      'file': 'a crest surcharge on a leaning wall face',
+                      'method': 'five methods', 'source': 'face_load'})
         # Bishop scored against an implementation written from the published
         # equations and nothing else.
         tests.append({'type': 'indep_bishop',

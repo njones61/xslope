@@ -460,9 +460,10 @@ def _moment_arms(slice_df, Xo, Yo, alpha, right_facing):
         a_S  moment arm of the base shear              ( = R       on a circle )
         a_N  perpendicular offset of the base normal   ( = 0       on a circle )
 
-    On a true circular arc the base normal points straight at the center, so it
-    exerts no moment, and every base is at radius R — which is what lets the
-    textbook OMS/Bishop equations factor R out and drop the normal entirely.
+    On a circle every base normal points straight at the center, so it exerts no
+    moment, and every base is at radius R (R cos(dtheta/2) for a base taken at the
+    middle of its chord) — which is what lets the textbook OMS/Bishop equations
+    factor R out and drop the normal entirely.
     Neither holds on a COMPOSITE surface (a circle truncated at bedrock, see
     slice.CompositeSurface): the run along the floor is not at radius R and its
     normal misses the center. These are the general arms — SLOPE/W's per-slice R
@@ -1446,12 +1447,12 @@ def interslice_tension_note(Z):
 
       * the tension-crack sample (docs/lem/files/xslope_tension_KEY.xlsx) run with
         its crack removed — the crest tension a crack exists to remove — reports
-        10% and its factor of safety is 8% HIGH (4.960 against 4.588 with the
+        13% and its factor of safety is 8% HIGH (4.962 against 4.589 with the
         crack modeled);
       * GS-2.26's toe plane reports 69-71% on all four methods and every one of
         them returns 1.35199772881, which is SLOPE/W's own answer on the same
         plane;
-      * the tutorial embankment's phi = 0 circles report 26-36% across a smooth
+      * the tutorial embankment's phi = 0 circles report 28-41% across a smooth
         family, and every solution in it — reported and refused alike — returns
         Bishop's exact phi = 0 moment factor of safety to four decimals, since at
         phi = 0 moment equilibrium fixes the answer whatever the interslice
@@ -2732,26 +2733,27 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         gives Q_i = n_i sec(a_i - theta), so
 
             R1 = sum_i n_i sec(a_i - theta)                                (force)
-            R2 = (Xo sin(theta) - Yo cos(theta)) R1 + R sum_i n_i         (moment)
+            R2 = (Xo sin(theta) - Yo cos(theta)) R1 + sum_i r_i n_i       (moment)
 
-        — the moment sum factors that way because on a circle
-        x_b = Xo + R sin(a) and y_b = Yo - R cos(a), which is the identity this
-        checks on the surface's own numbers rather than assuming. So R2 = 0 with
-        R1 = 0 forces sum_i n_i = 0, i.e. F is the MOMENT factor of safety
-        sum(c dl) / sum(W sin a) — Bishop's phi = 0 answer exactly — and theta is
+        — the moment sum factors that way because each base's normal passes
+        through the circle's center, x_b = Xo + r_i sin(a) and y_b = Yo - r_i
+        cos(a), with r_i the base's distance from the center: R on the arc, R
+        cos(dtheta/2) for a base taken at the middle of its chord. That is the
+        identity this checks on the surface's own numbers rather than assuming.
+        So R2 = 0 with R1 = 0 forces sum_i r_i n_i = 0, i.e. F is the MOMENT
+        factor of safety sum(r c dl) / sum(r W sin a) — Bishop's phi = 0 answer
+        exactly, and sum(c dl) / sum(W sin a) when every r_i is R — and theta is
         left to satisfy the scalar h(theta) = sum_i n_i sec(a_i - theta) = 0.
 
         Returns ``(n, F_m, R)`` or None when any precondition fails, in which case
         the caller falls back to the coarse sweep.
 
         BOTH FACINGS QUALIFY. A right-facing slope reaches this with alpha
-        negated, and on a mirrored model x_b is mirrored with it, so
-        x_b - R sin(alpha) returns the mirrored centre exactly (measured: ptp 0.0
-        on a mirrored embankment, against 7e-15 on the original) and the same
-        surface gets the same verdict either way round. What the identity check
-        actually excludes is a surface that is not a circle in the frame it is
-        evaluated in — a composite surface truncated along the base, whose run
-        there is not at radius R.
+        negated, and on a mirrored model x_b is mirrored with it, so the base
+        normals meet the mirrored centre and the same surface gets the same
+        verdict either way round. What the identity check actually excludes is a
+        surface whose base normals miss the centre — a composite surface
+        truncated along the base, whose run there is not on the circle.
         """
         if np.any(np.abs(tan_p) > 1e-12):
             return None                      # phi = 0 only
@@ -2765,22 +2767,29 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         Rr = float(slice_df['r'].iloc[0])
         if not np.isfinite(Rr) or Rr <= 0:
             return None
-        # x_b = Xo + R sin(a), y_b = Yo - R cos(a) — constant to rounding on a
-        # true circle in either facing, and NOT constant on a composite surface,
-        # whose run along the base is not at radius R.
-        Xo_i = x_b - Rr * sin_a
-        Yo_i = y_b + Rr * cos_a
-        if (np.ptp(Xo_i) > 1e-6 * Rr) or (np.ptp(Yo_i) > 1e-6 * Rr):
+        # The centre, and each base's distance r_i from it along its normal. Every
+        # base normal must pass through the centre (off = 0 to rounding) in either
+        # facing; on a composite surface the run along the base does not.
+        if 'xo' in slice_df.columns and 'yo' in slice_df.columns:
+            Xo_c, Yo_c = float(slice_df['xo'].iloc[0]), float(slice_df['yo'].iloc[0])
+        else:                                # a hand-built table: every base at R
+            Xo_c = float(np.mean(x_b - Rr * sin_a))
+            Yo_c = float(np.mean(y_b + Rr * cos_a))
+        if not (np.isfinite(Xo_c) and np.isfinite(Yo_c)):
             return None
-        drive = float(np.sum(-Fv * sin_a - Fh * cos_a))   # sum W sin(alpha)
-        coh = float(np.sum(c * dl))                       # sum c dl
+        r_i = (x_b - Xo_c) * sin_a - (y_b - Yo_c) * cos_a
+        off = (x_b - Xo_c) * cos_a + (y_b - Yo_c) * sin_a
+        if np.max(np.abs(off)) > 1e-6 * Rr or np.min(r_i) <= 0.0:
+            return None
+        drive = float(np.sum(r_i * (-Fv * sin_a - Fh * cos_a)))   # sum r W sin(alpha)
+        coh = float(np.sum(r_i * c * dl))                         # sum r c dl
         if drive == 0.0 or not np.isfinite(coh):
             return None
         F_m = coh / drive                    # both flip together when right-facing
         if not np.isfinite(F_m) or F_m <= 0:
             return None
         n = -Fv * sin_a - Fh * cos_a - (c / F_m) * dl
-        return n, F_m, Rr
+        return n, F_m, float(np.min(r_i))
 
     def _roots_outside_band(n, lo, hi):
         """Whether h has a zero at an INADMISSIBLE inclination, outside the band.
@@ -3082,10 +3091,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
     # The band refuses roots that reverse a base normal; it does not decide
     # between two crossings that both stand inside it, and the cascade above
     # reports whichever of its starts reached one first. On the critical circle
-    # a Spencer search finds for VP16 both crossings are in band, and the
-    # default start reaches F = 1.082 at theta = -27.1 deg where the other
-    # reads 1.113 — Bishop's answer on the same slices, and Morgenstern-Price's
-    # with f(x) = 1, the same equations solved a different way.
+    # a Spencer search finds for VP16, cut into 30 slices, both crossings are
+    # in band, and the default start reaches F = 1.084 at theta = -26.3 deg
+    # where the other reads 1.114 — within 0.1% of Bishop's answer on the same
+    # slices, and Morgenstern-Price's with f(x) = 1, the same equations solved a
+    # different way.
     #
     # Sweeping the band settles it and costs about a hundred times what the
     # cascade does, which a search cannot pay on every trial. So the reported

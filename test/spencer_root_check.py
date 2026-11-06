@@ -46,9 +46,9 @@ WHICH OF TWO ROOTS INSIDE THE BAND
 The band refuses a root that has reversed a base normal. It cannot separate two
 crossings that both stand inside it, and there the cascade reported whichever of
 its starts reached one first: on the critical circle a Spencer search finds for
-VP16, F = 1.082 at theta = -27.1 degrees where the other crossing reads 1.113 —
-Bishop's answer on the same slices — and on the critical non-circular surface of
-VP9, 0.580 where the other reads 1.529.
+VP16, cut into 30 slices, F = 1.084 at theta = -26.3 degrees where the other
+crossing reads 1.114 — within 0.1% of Bishop's answer on the same slices — and on
+the critical non-circular surface of VP9, 0.580 where the other reads 1.529.
 
 Sweeping the band settles it and costs about a hundred times what the cascade
 does, which a search cannot pay on every trial, so the reported root is first
@@ -95,7 +95,7 @@ WHAT IS CHECKED
 * the out-of-band refusal classifies as inadmissible, so a search reports it by
   class;
 * two mutations: the band gate lifted, which puts the low out-of-band roots
-  back, and the disputed-root trigger disarmed, which puts VP16's 1.082 and
+  back, and the disputed-root trigger disarmed, which puts VP16's 1.084 and
   VP9's 0.580 back.
 
 Run directly:  PYTHONPATH=. python3 test/spencer_root_check.py
@@ -168,8 +168,8 @@ DISPUTED = {
         model=os.path.join(CORPUS, 'vp016.xlsx'),
         circle=dict(Xo=28.282006072998048, Yo=43.12587432861328,
                     Depth=13.179095584154132, R=29.946778744459145),
-        num_slices=40,
-        disputed=1.0823, answer=1.1128,
+        num_slices=30,
+        disputed=1.0841, answer=1.1140,
     ),
     'vp009': dict(
         model=os.path.join(CORPUS, 'vp009.xlsx'),

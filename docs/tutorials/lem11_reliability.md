@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-11 — Reliability"
-description: "A submerged clay slope in XSLOPE whose factor of safety is 1.354 and whose probability of failure is 17%: the standard-deviation columns, the Taylor series and Monte Carlo run on the same model, and the effect of halving one σ."
+description: "A submerged clay slope in XSLOPE whose factor of safety is 1.359 and whose probability of failure is 17%: the standard-deviation columns, the Taylor series and Monte Carlo run on the same model, and the effect of halving one σ."
 ---
 
 # Tutorial LEM-11 — Reliability
@@ -28,7 +28,7 @@ it to one in a hundred" is a statement a decision can rest on, and one that
 can be weighed against cost and consequence.
 
 The slope on this page — 30 ft of undrained clay standing under 40 ft of water —
-makes the difference concrete. The deterministic answer is FS = 1.354; the
+makes the difference concrete. The deterministic answer is FS = 1.359; the
 stochastic answer is that the slope has roughly one chance in six of failing.
 The factor of safety does not change; the reliability analysis adds a measure of
 how well it is known.
@@ -122,22 +122,22 @@ left at 40:
 ![The Run LEM dialog on the loaded model](images/lem11_studio_run_lem.png)
 
 Click **Run**. The circle in the file already reaches the rigid base at
-elevation −20, and solved on its own it gives 1.366, so the search cannot take it
-any deeper. It moves the circle in instead — radius 80 ft to 67.36,
-failure surface 152.62 ft to 141.27, factor of safety 1.366 to 1.354:
+elevation −20, and solved on its own it gives 1.369, so the search cannot take it
+any deeper. It moves the circle in instead — radius 80 ft to 68.00,
+failure surface 152.73 ft to 142.12, factor of safety 1.369 to 1.359:
 
 ![Spencer on the most-likely values](images/lem11_solution.png){width=1000}
 
-**FS = 1.354**, on a circle centered at (23.14, 47.36), still tangent to the
-rigid base, carrying 370,624 lb/ft of clay. The deterministic analyses in the
+**FS = 1.359**, on a circle centered at (22.50, 48.00), still tangent to the
+rigid base, carrying 370,449 lb/ft of clay. The deterministic analyses in the
 previous ten tutorials stop at this point. The rest of this page measures how
-reliable the 1.354 is.
+reliable the 1.359 is.
 
-<!-- test: file=../lem/files/xslope_reliability.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.354, tolerance=0.005 -->
-<!-- test: file=../lem/files/xslope_reliability.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.366, tolerance=0.005 -->
-<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability, method=spencer, expected_beta=0.935, tolerance=0.03 -->
-<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10000, converge_rel=0.10, expected_beta=0.979, tolerance=0.02, expected_pf=0.165, pf_tol=0.02 -->
-<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability_rs, method=spencer, search=true, n_surrogate=10000000, expected_beta=0.997, tolerance=0.01, expected_pf=0.1657, pf_tol=0.005 -->
+<!-- test: file=../lem/files/xslope_reliability.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.359, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_reliability.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.369, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability, method=spencer, expected_beta=0.949, tolerance=0.03 -->
+<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10000, converge_rel=0.10, expected_beta=0.992, tolerance=0.02, expected_pf=0.162, pf_tol=0.02 -->
+<!-- test: file=../lem/files/xslope_prob_submerged_KEY.xlsx, type=reliability_rs, method=spencer, search=true, n_surrogate=10000000, expected_beta=1.010, tolerance=0.01, expected_pf=0.1630, pf_tol=0.005 -->
 
 ---
 
@@ -193,8 +193,8 @@ per-parameter table is written to the Log pane:
 
 | Parameter | MLV | σ | F⁺ | F⁻ | ΔF |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| soil γ | 120 | 8 | 1.189 | 1.572 | 0.383 |
-| soil c | 400 | 100 | 1.692 | 1.015 | 0.677 |
+| soil γ | 120 | 8 | 1.193 | 1.578 | 0.385 |
+| soil c | 400 | 100 | 1.699 | 1.019 | 0.680 |
 
 Each row is one of those ±σ pairs: **F⁺** is the factor of safety solved with
 that parameter raised to MLV + σ, **F⁻** with it lowered to MLV − σ (the
@@ -202,14 +202,14 @@ other parameter staying at its MLV both times), and **ΔF** is the swing
 between them. The unit-weight row runs the other way from the strength row: heavier clay is a
 larger driving moment, so **F⁺ is the lower** of its pair. Only the size of
 each swing enters the variance, σ<sub>F</sub>² = Σ(ΔF/2)², which here gives
-**σ<sub>F</sub> = 0.389** and **COV<sub>F</sub> = 0.287**. From the factor of
+**σ<sub>F</sub> = 0.391** and **COV<sub>F</sub> = 0.287**. From the factor of
 safety and its coefficient of variation comes the lognormal reliability index
-**β<sub>LN</sub> = 0.935**, a **reliability of 82.52%** and a **probability of
-failure of 17.48%**.
+**β<sub>LN</sub> = 0.949**, a **reliability of 82.86%** and a **probability of
+failure of 17.14%**.
 
 The plot's legend names F⁺ and F⁻ surfaces that cannot be found on it. This is
 not a drawing error: all five searches returned the same
-circle, center (23.14, 47.36) tangent at elevation −20, so the perturbation
+circle, center (22.50, 48.00) tangent at elevation −20, so the perturbation
 surfaces lie exactly under the F<sub>MLV</sub> surface drawn over them. On a
 single-material φ = 0 slope neither scaling the strength nor scaling the weight
 moves the critical circle — both scale the resisting and driving terms of every
@@ -312,7 +312,7 @@ measurement is documented on the
 **Stop when P_f converges** ends the campaign early once the probability of
 failure is known to within a stated percentage of its own value — ±5% of a
 17% answer means trusted between about 16% and 18%, which this model reaches
-at 8,000 realizations — with the samples field as the cap. The tolerance
+at 8,100 realizations — with the samples field as the cap. The tolerance
 has a large effect on the cost: halving it takes four times the realizations, so
 ±2.5% on this model would need roughly 30,000 — when tightening the
 tolerance, raise the samples cap to match. The
@@ -327,15 +327,15 @@ safety — the actual distribution of FS, not an assumed shape:
 
 ![The Monte Carlo FS histogram](images/lem11_mc.png){width=1000}
 
-**Mean FS = 1.381, σ<sub>F</sub> = 0.402**, and the shaded region left of
+**Mean FS = 1.386, σ<sub>F</sub> = 0.404**, and the shaded region left of
 the FS = 1 line — the **tail** of the distribution, where the unlucky
-combinations of draws landed — holds **1,642 of the 10,000 realizations —
-P<sub>f</sub> = 16.42%**, counted directly. The reliability index comes in two conventions:
-β<sub>normal</sub> = (F̄ − 1)/σ<sub>F</sub> = **0.947**, and the lognormal
-β<sub>LN</sub> = **0.988** computed from the same sample moments as the Taylor
+combinations of draws landed — holds **1,613 of the 10,000 realizations —
+P<sub>f</sub> = 16.13%**, counted directly. The reliability index comes in two conventions:
+β<sub>normal</sub> = (F̄ − 1)/σ<sub>F</sub> = **0.956**, and the lognormal
+β<sub>LN</sub> = **1.001** computed from the same sample moments as the Taylor
 series uses.
 
-Against 17.48% from five solves, 16.42% from ten thousand. The two estimators
+Against 17.14% from five solves, 16.13% from ten thousand. The two estimators
 agree to about a percentage point on the answer that matters, which is
 the ordinary result — the [reliability
 overview](../reliability/index.md#when-to-use-monte-carlo-versus-the-taylor-series)
@@ -346,7 +346,7 @@ same conclusion: the choice of σ inputs moves the probability of
 failure further than the choice of estimator does.
 
 The one visible disagreement is the mean: the Taylor series reports
-F<sub>MLV</sub> = 1.354 and Monte Carlo a mean of 1.381, 2% higher. Both are
+F<sub>MLV</sub> = 1.359 and Monte Carlo a mean of 1.386, 2% higher. Both are
 right about different things. F<sub>MLV</sub> is the factor of safety *at* the
 mean inputs; the Monte Carlo mean is the *mean of* the factors of safety, and
 the two differ whenever F does not change in a straight line with a
@@ -354,17 +354,17 @@ parameter. The Taylor table above shows which parameter is responsible.
 We average each parameter's own F⁺ and F⁻ and compare against F<sub>MLV</sub>:
 if the response were a straight line, moving the parameter up and down by the
 same amount would move F by equal and opposite amounts, and the average would
-land back on F<sub>MLV</sub>. The cohesion's pair does exactly that — 1.354
+land back on F<sub>MLV</sub>. The cohesion's pair does exactly that — 1.359
 to seven digits, because with φ = 0 the factor of safety really is a straight
-line in c. The unit weight's pair averages **+0.0266 above**
+line in c. The unit weight's pair averages **+0.0267 above**
 F<sub>MLV</sub> — its response bends — and the Monte Carlo mean sits
-**+0.0272 above** it. The bend in the γ response accounts for the whole gap;
+**+0.0274 above** it. The bend in the γ response accounts for the whole gap;
 the straight-line shortcut does not capture it, and a sampling method does.
 
 ### Trying random sampling
 
 We can test the **MC sampling** control with one click: set it to `Random` and
-**Run** again. The result is **P<sub>f</sub> = 16.71%**, with the mean and
+**Run** again. The result is **P<sub>f</sub> = 16.43%**, with the mean and
 σ<sub>F</sub> nearly unchanged. That is the expected outcome: both runs
 estimate the same number, and both landed inside the ±0.7-point band that a
 count of 10,000 can resolve.
@@ -383,8 +383,8 @@ repeatable.
 
 ## The response surface
 
-Monte Carlo's answer still has sampling error. The 16.42% rests on a
-count — 1,642 failing realizations — and rerunning with different seeds changes
+Monte Carlo's answer still has sampling error. The 16.13% rests on a
+count — 1,613 failing realizations — and rerunning with different seeds changes
 that count; at 10,000 realizations the statistics give P<sub>f</sub> only
 to about ±0.7 percentage points (the band the convergence stop watches —
 Latin hypercube usually lands tighter, but with no firmer guarantee).
@@ -417,12 +417,12 @@ of the formula:
 
 ![The response-surface FS histogram](images/lem11_rs.png){width=1000}
 
-**P<sub>f</sub> = 16.6%** and **β<sub>LN</sub> = 0.997**, beside Monte
-Carlo's 16.42% and 0.988. The checks are reported with the answer: across the 500 checking solves the formula reproduced the
-real factor of safety with a typical error of 0.018 (R² = 0.998), and only
-1 of the 500 landed on the other side of FS = 1 from where the formula put
+**P<sub>f</sub> = 16.3%** and **β<sub>LN</sub> = 1.010**, beside Monte
+Carlo's 16.13% and 1.001. The checks are reported with the answer: across the 500 checking solves the formula reproduced the
+real factor of safety with a typical error of 0.018 (R² = 0.998), and none
+of the 500 landed on the other side of FS = 1 from where the formula put
 it. In a fuller test run for this page, thirty thousand of the draws were
-re-solved with the real model: the formula's P<sub>f</sub> came out 0.07
+re-solved with the real model: the formula's P<sub>f</sub> came out 0.08
 percentage points low. The sampling error is removed, and the small fit error
 remains. The
 [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
@@ -444,10 +444,10 @@ P<sub>f</sub> = Φ(−β) and the two always move together:
 
 | Estimator | F | σ<sub>F</sub> | β | P<sub>f</sub> |
 | --- | :---: | :---: | :---: | :---: |
-| Taylor series (TSPM) | 1.354 | 0.389 | 0.935 (lognormal) | 17.48% |
-| Monte Carlo, 10,000 samples (Latin hypercube) | 1.381 | 0.402 | 0.988 (lognormal) | 16.42% (counted) |
-| Monte Carlo, 10,000 samples (random) | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
-| Response surface, 10⁷ formula realizations | 1.381 | 0.400 | 0.997 (lognormal) | 16.57% (counted on the formula) |
+| Taylor series (TSPM) | 1.359 | 0.391 | 0.949 (lognormal) | 17.14% |
+| Monte Carlo, 10,000 samples (Latin hypercube) | 1.386 | 0.404 | 1.001 (lognormal) | 16.13% (counted) |
+| Monte Carlo, 10,000 samples (random) | 1.386 | 0.410 | 0.982 (lognormal) | 16.43% (counted) |
+| Response surface, 10⁷ formula realizations | 1.387 | 0.401 | 1.010 (lognormal) | 16.30% (counted on the formula) |
 
 Of the two, P<sub>f</sub> is the one that communicates. A one-in-six chance
 of failure means something to a client, a review board, or the public; a
@@ -455,14 +455,14 @@ reliability index does not. β plays a narrower, more technical role — it is
 the number reliability-based design manuals set targets with — and its
 convenience is that it stays numerically steady where a small
 P<sub>f</sub> becomes awkward to write down. The two always move together,
-but not at the same rate: β = 0.935 corresponds to P<sub>f</sub> = 17.5%,
+but not at the same rate: β = 0.949 corresponds to P<sub>f</sub> = 17.1%,
 β = 2 to 2.3%, and β = 3 to 0.13%, so for a safe slope two analyses that
 barely disagree about β can look far apart on P<sub>f</sub>.
 
 A small P<sub>f</sub> raises a practical issue for Monte Carlo: a counted probability
 can only be as fine as the count behind it. With 10,000 realizations, each
 one represents 0.01 percentage points of probability — one part in ten
-thousand. This model's 16.42% is a count of 1,642 failed realizations, which
+thousand. This model's 16.13% is a count of 1,613 failed realizations, which
 is plenty to trust. Now picture a much safer slope with a P<sub>f</sub> near
 0.05%: the same campaign would catch only about five failures, and if a
 single realization had landed on the other side of FS = 1, the reported
@@ -477,7 +477,7 @@ an assumed distribution shape — free, but only as good as the assumption.
 ## Which uncertainty to reduce
 
 The Taylor series put the spread of the factor of safety at
-σ<sub>F</sub> = 0.389. That spread comes from two sources — the uncertainty
+σ<sub>F</sub> = 0.391. That spread comes from two sources — the uncertainty
 in the unit weight and the uncertainty in the cohesion — and they do not
 contribute equally. The split shows which parameter further testing should
 target.
@@ -498,11 +498,11 @@ Click **Run**. The bars are the two parameters, tallest first:
 
 Each bar is that parameter's own (ΔF/2)² term as a share of σ<sub>F</sub>², which
 is the same arithmetic the Taylor series already did — the cohesion accounts for
-**75.8%** of the variance and the unit weight **24.2%**. Cohesion dominates
+**75.7%** of the variance and the unit weight **24.3%**. Cohesion dominates
 because its uncertainty is wide, not because the slope is more sensitive to
 it. To see that, we divide each ΔF by its own coefficient of variation: a 1%
-change in γ moves the factor of safety by 0.057 (0.383 over 6.7%), while a 1%
-change in c moves it by only 0.027 (0.677 over 25%). Per percent of change,
+change in γ moves the factor of safety by 0.057 (0.385 over 6.7%), while a 1%
+change in c moves it by only 0.027 (0.680 over 25%). Per percent of change,
 the factor of safety is twice as sensitive to the unit weight — but the cohesion
 is uncertain over an interval nearly four times wider, and because each
 contribution enters the variance squared, the wider interval dominates.
@@ -563,24 +563,24 @@ it:
 
 | Run | F | σ<sub>F</sub> | β<sub>LN</sub> | P<sub>f</sub> |
 | --- | :---: | :---: | :---: | :---: |
-| TSPM, σ(c) = 100 | 1.354 | 0.389 | 0.935 | 17.48% |
-| TSPM, σ(c) = 50 | 1.354 | 0.256 | 1.526 | 6.36% |
-| Monte Carlo, σ(c) = 100 | 1.381 | 0.402 | 0.988 | 16.42% |
-| Monte Carlo, σ(c) = 50 | 1.381 | 0.267 | 1.588 | 5.01% |
+| TSPM, σ(c) = 100 | 1.359 | 0.391 | 0.949 | 17.14% |
+| TSPM, σ(c) = 50 | 1.359 | 0.257 | 1.545 | 6.12% |
+| Monte Carlo, σ(c) = 100 | 1.386 | 0.404 | 1.001 | 16.13% |
+| Monte Carlo, σ(c) = 50 | 1.387 | 0.269 | 1.607 | 4.80% |
 
-**The factor of safety is unchanged at 1.354, to every digit.** Nothing about the
+**The factor of safety is unchanged at 1.359, to every digit.** Nothing about the
 slope moved — the same clay at the same strength on the same critical circle. The
 probability of failure fell from roughly one in six to roughly one in twenty,
-11.4 percentage points, and the failed count in the Monte Carlo campaign fell
-from 1,642 realizations to 501. The factor of safety does not use the σ
+11.3 percentage points, and the failed count in the Monte Carlo campaign fell
+from 1,613 realizations to 480. The factor of safety does not use the σ
 columns at all; the probability of failure moved by a factor of three. The
 computed P<sub>f</sub> therefore depends strongly on the σ estimates, so they
 deserve the same care as the strengths themselves; when a σ is uncertain,
 running the analysis at a second plausible value shows whether the conclusion
 still holds.
 
-The unit weight's contribution is unchanged in size. Its ΔF is 0.383 before the
-edit and 0.383 after — nothing about γ changed — but it now makes up 56% of
+The unit weight's contribution is unchanged in size. Its ΔF is 0.385 before the
+edit and 0.385 after — nothing about γ changed — but it now makes up 56% of
 the smaller total variance instead of 24% of the larger one. The ranking has
 flipped: the unit weight, not the cohesion, is now the bigger contributor.
 That means halving σ(c) a second time would gain much less than the first

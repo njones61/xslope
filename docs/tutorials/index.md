@@ -232,7 +232,7 @@ Two slopes with competing failure mechanisms: an embankment on soft clay where m
 
 ### [Reliability](lem11_reliability.md)
 
-A submerged clay slope whose strength and unit weight carry standard deviations — the factor of safety of 1.354 turned into a reliability index and a probability of failure two ways, by the Taylor series over 1 + 2N searches and by a 10,000-realization Monte Carlo campaign, then the dominant uncertainty measured and halved.
+A submerged clay slope whose strength and unit weight carry standard deviations — the factor of safety of 1.359 turned into a reliability index and a probability of failure two ways, by the Taylor series over 1 + 2N searches and by a 10,000-realization Monte Carlo campaign, then the dominant uncertainty measured and halved.
 
 <p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">undrained strength</span><span class="tut-tag">distributed load</span><span class="tut-tag">standard deviations</span><span class="tut-tag">Taylor series (TSPM)</span><span class="tut-tag">Monte Carlo</span><span class="tut-tag">variance Pareto</span><span class="tut-tag">circular search</span></p>
 

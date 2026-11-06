@@ -92,7 +92,7 @@ cap. The tolerance is relative because an absolute one is miscalibrated across
 the $P_f$ range: half a percentage point is ±3% of a 17% probability of
 failure but ±25% of a 2% one. With a relative tolerance the required sample count
 scales as $(1-p)/p$ — the submerged-slope model below converges at the default ±5% in
-8,000 realizations at $P_f \approx 16$% (18 s), and the same rule would require
+8,100 realizations at $P_f \approx 16$% (18 s), and the same rule would require
 roughly 75,000 for a 2% problem — raise the sample cap when a small $P_f$
 meets a tight tolerance. The rule never fires before 500 realizations or before
 10 failures have been observed, so a rare-event problem — where the normal
@@ -104,7 +104,7 @@ stopping $n$ and its achieved resolution in the console summary.
 
 The running estimate and its confidence band can be read off any Monte Carlo
 result with `plot_reliability_convergence`. The submerged-slope campaign is drawn here
-in full, with the ±5% stop target it satisfies at n = 8,000:
+in full, with the ±5% stop target it satisfies at n = 8,100:
 
 ![Running P_f with its 95% confidence band](images/mc_convergence_trace.png)
 
@@ -200,9 +200,9 @@ the real pipeline, in two places:
 
 Both thresholds are calibrated against what the fit error costs the answer, measured
 by solving tens of thousands of realizations for real and predicting the same draws
-with the surrogate. On the submerged-slope model below the surrogate fits to 0.042
+with the surrogate. On the submerged-slope model below the surrogate fits to 0.043
 of the real spread ($R^2$ = 0.9982) and its probability of failure differs from the
-solver's, over the same 30,000 realizations, by **0.07 percentage points** — 0.4% of
+solver's, over the same 30,000 realizations, by **0.08 percentage points** — 0.5% of
 its own value, well inside the sampling noise of the Monte Carlo campaign it
 replaces. Every check measurement is reported with the answer, in the console
 summary and in the result dictionary.
@@ -221,11 +221,11 @@ them separately.
 | Real limit-equilibrium solves | 2,000 | 710 |
 | Realizations counted | 2,000 | 10,000,000 |
 | Wall time | 6.3 s | 4.9 s |
-| Mean FS | 1.378 | 1.381 |
-| $\sigma_F$ | 0.402 | 0.400 |
-| $\beta_{LN}$ | 0.979 | 0.997 |
-| $P_f$ | 16.50% | 16.57% |
-| 95% sampling half-width on $P_f$ | ±1.63 pp | ±0.02 pp |
+| Mean FS | 1.383 | 1.387 |
+| $\sigma_F$ | 0.404 | 0.401 |
+| $\beta_{LN}$ | 0.992 | 1.010 |
+| $P_f$ | 16.20% | 16.30% |
+| 95% sampling half-width on $P_f$ | ±1.61 pp | ±0.02 pp |
 
 ```python
 from xslope.fileio import load_slope_data

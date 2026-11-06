@@ -274,7 +274,7 @@ $S$ = shear force acting on the base of the slice<br>
 $E_i$ = horizontal interslice force on the left side of the slice (boundary $i$); $E_{i+1}$ acts on the right side<br>
 $X_i$ = vertical (shear) interslice force on the left side of the slice (boundary $i$); $X_{i+1}$ acts on the right side<br>
 $\Delta x$ = width of the slice<br>
-$\Delta \ell$ = length of the slice base, calculated as $\Delta x \sec \alpha$<br>
+$\Delta \ell$ = length of the slice base: $\Delta x \sec \alpha$ on a straight base, and the arc between the base corners on a circle<br>
 $\alpha$ = inclination angle of the slice base<br>
 $\beta$ = inclination angle of the slope at the top of the slice<br>
 
@@ -295,6 +295,26 @@ directions of the forces are reversed simply by changing the sign convention of 
 
 One exception to this is Spencer's method. Details can be found in the XSLOPE source code for Spencer's method.
 
+### Slices on a Circle
+
+A circular surface is cut into slices of equal angle, so each slice base spans the same arc of the circle and the slices narrow where the circle steepens toward the ground. With slices of equal width, the last slice at a steep exit spans a wide arc, and no single base length and inclination represent a base that turns that far: the cohesion and the pore-pressure force on that slice both come out wrong, by enough to move the factor of safety by several percent.
+
+![The same circle cut into twelve slices of equal width and of equal angle](images/circle_slices_width_angle.png){width="686px"}
+
+*A circle meeting the crest of a 20 ft slope vertically, cut into 12 slices, with a boundary at the crest, which is a ground vertex. Equal widths leave the last slice spanning 25° of arc; equal angles cut the stretch beyond the crest into slices of 9°. At 40 slices, the last slice of equal width still spans 14°.*
+
+A base on the circle takes the arc between its corners A and B as its length $\Delta \ell$ and the chord AB for its inclination $\alpha$; the chord is parallel to the circle's tangent at M, the middle of the arc. The base forces act at C, the middle of the chord, and the pore pressure is read at M; under r<sub>u</sub>, the vertical stress is that of the soil column above M.
+
+![One steep slice: the arc AB, the chord AB, the points C and M, and the tangent at M](images/circle_slice_base.png){width="767px"}
+
+*One steep slice drawn large. The weight W and the base forces act on the slice's center line, through C; the normal force N points at the circle's center O.*
+
+The normal force points at the circle's center, O, along the line through M, so it would be the same force placed at M or at C. XSLOPE places the base forces at C because C is also on the slice's center line, directly under the weight, which is how its equations are written. C and M are very close, about half a percent of the base length apart at 40 slices.
+
+The pore pressure changes along the base, but each slice uses one value for its whole base. The value at M, the middle of the arc, is the closest to the average.
+
+Slices also break at every vertex of the ground and the material zones above the surface, at every point where the surface crosses a material boundary or a piezometric line, and at every point that defines a distributed load. Non-circular surfaces, and the run along the floor of a composite surface, are straight between their vertices; they are cut into slices of equal width, and $\Delta \ell = \Delta x \sec \alpha$ is exact for them.
+
 ## Water Pressures: a Practice Note
 
 XSLOPE deliberately offers **no buoyant-unit-weight option**. Water always enters an analysis explicitly: total unit weights for the soil, pore pressures from a piezometric line, r<sub>u</sub>, or an FE seepage solution, and free water (reservoirs, ponds, tailwater) as hydrostatic pressure loads on the ground surface.
@@ -313,7 +333,7 @@ XSLOPE handles this the way every limit equilibrium code does, by **truncating**
 
 The result is called a **composite surface**. It is the correct failure mechanism whenever a slope is underlain by a weak seam or a hard stratum: the mass shears along the arc where it can, and along the weak base where that is cheaper. The example below is the [Fredlund & Krahn (1977)](https://doi.org/10.1139/t77-045) benchmark, where a 1-ft weak seam sits on the model base and half the slices have their bases on the seam.
 
-![composite_surface.png](images/composite_surface.png)
+![composite_surface.png](images/composite_surface.png){width="825px"}
 
 XSLOPE handles the kink where arc meets floor in two ways:
 

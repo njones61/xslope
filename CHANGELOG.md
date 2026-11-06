@@ -33,6 +33,19 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   1.717. That slice now takes its load from the ground under it. A face drawn
   exactly vertical was not affected, and neither was any model shipped with
   XSLOPE.
+- A circular failure surface is now cut into slices of equal angle instead of
+  equal width, and each slice base on the circle takes the length of the arc
+  between its corners, the inclination of the chord between them, and its pore
+  pressure at the middle of the arc. Where a circle meets the ground steeply, an
+  equal-width slice spanned a wide stretch of arc, and its base length, inclination
+  and pore pressure all came out wrong: on a 20 ft clay slope whose critical circle
+  meets the crest vertically (the slope of Duncan, Wright & Brandon's Figure 8.1),
+  the Ordinary Method of Slices read 1.286 on that circle where the exact answer is
+  1.345, and it now reads within 0.2% of it. Most factors
+  of safety on circles move by less than 0.005; on steep exits they move by 1 to
+  3%, toward the answer a finer slicing gives. A reinforcement or pile crossing
+  that lands exactly on a slice corner is credited to the higher of the two
+  slices, the one in the soil above the boundary.
 
 ## 1.0.7 — 2026-11-04
 

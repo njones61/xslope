@@ -137,7 +137,7 @@ GENERAL_INSOLUBLE = {'Xo': -8.0, 'Yo': 48.0, 'R': 45.0}
 #: produce them. Neither is an iteration failure and neither may be reported as
 #: one; the first is M-P's own no-admissible-root condition.
 MP_NO_CROSSING = {'Xo': 4.0, 'Yo': 30.0, 'R': 30.0}
-MP_INADMISSIBLE = {'Xo': -8.0, 'Yo': 28.0, 'R': 28.0}
+MP_INADMISSIBLE = {'Xo': -10.0, 'Yo': 30.0, 'R': 30.0}
 
 NUM_SLICES = 40
 
@@ -183,13 +183,26 @@ def _mirror(model):
     return md, (lambda spec: dict(spec, Xo=2 * axis - spec['Xo']))
 
 
+def _radii(df):
+    """Each base's distance from the circle's centre, along its normal."""
+    a = np.radians(df['alpha'].values)
+    dx = df['x_c'].values - float(df['xo'].iloc[0])
+    if df.attrs.get('right_facing', df['y_cb'].iat[0] > df['y_cb'].iat[-1]):
+        # right-facing: alpha is mirrored
+        dx = -dx
+    return dx * np.sin(a) - (df['y_cb'].values - float(df['yo'].iloc[0])) * np.cos(a)
+
+
 def _closed_form(df):
-    """(n, alpha, F_m) — the decoupled problem, from the slice table alone."""
+    """(n, alpha, F_m) — the decoupled problem, from the slice table alone. F_m is
+    the moment factor of safety, sum(r c dl) / sum(r W sin a), with r each base's
+    distance from the centre."""
     alpha = np.radians(df['alpha'].values)
     c = df['c'].values.astype(float)
     dl = df['dl'].values.astype(float)
     W = df['w'].values.astype(float)
-    F_m = float(np.sum(c * dl) / np.sum(W * np.sin(alpha)))
+    r = _radii(df)
+    F_m = float(np.sum(r * c * dl) / np.sum(r * W * np.sin(alpha)))
     return W * np.sin(alpha) - c * dl / F_m, alpha, F_m
 
 
@@ -230,8 +243,8 @@ REJECTED = "solution rejected as physically unreasonable"
 RANKING_WORDS = ("rank lower", "moment measure", "ranking could not be measured")
 
 #: The crest-tension note on the tutorial embankment's uncracked Spencer answer,
-#: whose last three slices (at the crest) are in base tension.
-CREST_NOTE = ("Tension on the base of 3 slices near the crest. "
+#: whose last four slices (at the crest) are in base tension.
+CREST_NOTE = ("Tension on the base of 4 slices near the crest. "
               "Consider adding a tension crack.")
 
 
@@ -246,10 +259,11 @@ def leg_closed_form_is_the_shipped_residual():
             fails.append(f"{label}: spencer never handed out its residual function")
             continue
         n, alpha, F_m = _closed_form(df)
-        # sum n = 0 is the moment equation at F_m: the decoupling itself.
-        scale = float(np.sum(np.abs(n)))
-        if abs(float(np.sum(n))) > 1e-9 * scale:
-            fails.append(f"{label}: sum n = {np.sum(n):.3e} is not zero at F_m")
+        # sum r n = 0 is the moment equation at F_m: the decoupling itself.
+        rn = _radii(df) * n
+        scale = float(np.sum(np.abs(rn)))
+        if abs(float(np.sum(rn))) > 1e-9 * scale:
+            fails.append(f"{label}: sum r n = {np.sum(rn):.3e} is not zero at F_m")
         th, _ = _h_over_band(n, alpha, count=9)
         worst = 0.0
         for t in th:
@@ -677,7 +691,7 @@ def leg_crest_tension_note():
     """The tension-crack advice: where it appears and where it must not.
 
     It appears on the uncracked tutorial embankment, whose reported Spencer circle
-    has three crest slices in base tension, in the warnings and on the console,
+    has four crest slices in base tension, in the warnings and on the console,
     and changes no factor of safety. It is absent on the same model with the
     8 ft crack. On the solved slice table it stays silent for tension away from
     the crest and for cohesionless crest slices, drops the suggestion when the

@@ -178,7 +178,7 @@ def check():
 
     # (4) Hand-check c_suction on the suction slice with the largest suction.
     row = df_on.loc[df_on["c_suction"].idxmax()]
-    y_base = float(row["y_cb"])
+    y_base = float(row["y_u"])          # where the base reads its pore pressure
     y_piezo = float(row["piezo_y"])
     s_expected = max(0.0, GW * (y_piezo - y_base) * -1.0)  # gamma_w*(y_base - y_piezo)
     c_expected = s_expected * math.tan(math.radians(PHI_B))
@@ -314,7 +314,7 @@ def check_seep():
     # max(0, gamma_w*(y_base - y_wt)) * tan(phi_b). Also confirm the CLAMPED read
     # (the old default) would have returned 0 there -- i.e. the sign is load-bearing.
     row = df_on.loc[df_on["c_suction"].idxmax()]
-    x_c, y_base = float(row["x_c"]), float(row["y_cb"])
+    x_c, y_base = float(row["x_u"]), float(row["y_u"])   # the pore-pressure point
     mesh, seep_u = _synthetic_hydrostatic_mesh(Y_WT_SEEP, GW)
     u_signed = interpolate_at_point(mesh["nodes"], mesh["elements"],
                                     mesh["element_types"], seep_u, (x_c, y_base),
@@ -341,7 +341,7 @@ def check_seep():
     #   effective-normal u = max(0, gamma_w*(y_wt - y_base))  (clamped, saturated only)
     #   c_suction         = max(0, gamma_w*(y_base - y_wt)) * tan(phi_b)  (signed)
     tanb = math.tan(math.radians(PHI_B))
-    yb = df_on["y_cb"].to_numpy()
+    yb = df_on["y_u"].to_numpy()
     u_exp = np.maximum(0.0, GW * (Y_WT_SEEP - yb))
     cs_exp = np.maximum(0.0, GW * (yb - Y_WT_SEEP)) * tanb
     du_all = float(np.max(np.abs(df_on["u"].to_numpy() - u_exp)))

@@ -17,11 +17,11 @@ not tell a right answer from a wrong one, so no threshold on it can be a
 refusal:
 
   * the tension-crack sample run with its crack removed — the very case a crack
-    exists to handle — reports the LOWEST reading of any model here, 10%, and its
+    exists to handle — reports the LOWEST reading of any model here, 13%, and its
     factor of safety is 8% high;
   * GS-2.26's toe plane reports 69-71% and every method returns 1.35199772881,
     which is SLOPE/W's own answer on the same plane;
-  * the tutorial embankment's phi = 0 circles sweep 26-36% across a smooth
+  * the tutorial embankment's phi = 0 circles sweep 28-41% across a smooth
     family and every one of them returns Bishop's exact phi = 0 moment factor of
     safety, which no interslice assumption can move.
 
@@ -90,7 +90,7 @@ CRACK_SLICES = 40
 PHI0_MODEL = os.path.join(REPO, 'docs', 'lem', 'files', 'xslope_simple_embankment.xlsx')
 PHI0_SLICES = 40
 PHI0_CIRCLES = [{'Xo': xo, 'Yo': yo, 'R': yo}
-                for xo in (2.0, 4.0, 5.28, 6.0, 8.0)
+                for xo in (4.0, 5.28, 8.0, 10.0, 12.0)
                 for yo in (39.0, 42.0, 48.0)]
 
 #: The methods that carry interslice forces and therefore report this measure.

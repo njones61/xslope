@@ -125,7 +125,7 @@ show what the water costs.
 
 **Starting model** — [xslope_video04_water_start.xlsx](files/xslope_video04_water_start.xlsx)
 
-<!-- test: file=files/xslope_video04_water_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.667, tolerance=0.005 -->
+<!-- test: file=files/xslope_video04_water_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.676, tolerance=0.005 -->
 
 **Completed model** — [xslope_method_slices_problem.xlsx](../lem/files/xslope_method_slices_problem.xlsx)
 

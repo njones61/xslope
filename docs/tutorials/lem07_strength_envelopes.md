@@ -238,18 +238,17 @@ Click **Run**:
 
 ![Bishop on the depth-varying strength](images/lem07_low_cp.png){width=1000}
 
-**FS = 1.130**, against Low's published 1.14, the 1.17 that Kim, Salgado &
+**FS = 1.142**, against Low's published 1.14, the 1.17 that Kim, Salgado &
 Lee (2002) later found for the same section by finite-element limit analysis,
 and Slide's 1.192 — the published values themselves spread 1.14 to 1.19 on
 this deep φ = 0 problem, and the
-[VP23 page](../verification/rocscience.md#vp23) measures where the spread
-comes from. The circle is centered at (18.00, 16.04), 38.09 m of surface carrying
-4943.5 kN/m of soil, and its lowest point is at **elevation 0.82**, four fifths
+[VP23 page](../verification/rocscience.md#vp23) sets them side by side. The circle is centered at (18.00, 16.05), 39.30 m of surface carrying
+4937.0 kN/m of soil, and its lowest point is at **elevation 0.83**, four fifths
 of a meter above the rigid base, although the search could have reached the
-base. Of the 38.09 m of surface, 20.05 m lies in the lowest clay, and the
-strength mobilized along that stretch averages 22.91 kPa.
+base. Of the 39.30 m of surface, 20.02 m lies in the lowest clay, and the
+strength mobilized along that stretch averages 22.88 kPa.
 
-<!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, expected_fs=1.130, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, expected_fs=1.142, tolerance=0.005 -->
 
 ### Replacing the profile with a constant strength {#flatten-the-profile}
 
@@ -276,9 +275,9 @@ Click **OK** and run the same Bishop auto search at 50 slices:
 
 ![Bishop on a constant undrained strength](images/lem07_low_const.png){width=1000}
 
-**FS = 1.075**, and the critical circle now sits **tangent to elevation 0** —
-flat on the rigid base, the deepest surface the model allows. It is 40.63 m
-long against 38.09 m, and 23.12 m of it runs through the lowest clay. With a
+**FS = 1.084**, and the critical circle now sits **tangent to elevation 0** —
+flat on the rigid base, the deepest surface the model allows. It is 41.89 m
+long against 39.30 m, and 23.13 m of it runs through the lowest clay. With a
 constant strength a shallower surface has no advantage, so the search takes the
 largest circle the geometry permits.
 
@@ -287,19 +286,19 @@ effects, we run the same edit at four different constants:
 
 | Lower-layer strength | s<sub>u</sub> (kPa) | Bishop FS | Tangent elevation |
 | --- | :---: | :---: | :---: |
-| Constant, layer top | 15.00 | 0.872 | 0.00 |
-| Constant, layer average | 22.50 | 1.075 | 0.00 |
-| Constant, mobilized average | 22.91 | 1.086 | 0.00 |
-| Growing 15 → 30 (`cp`) | — | **1.130** | **0.82** |
+| Constant, layer top | 15.00 | 0.880 | 0.00 |
+| Constant, layer average | 22.50 | 1.084 | 0.00 |
+| Constant, mobilized average | 22.88 | 1.094 | 0.00 |
+| Growing 15 → 30 (`cp`) | — | **1.142** | **0.83** |
 
-The third row makes the fairest comparison: 22.91 kPa is the strength the `cp`
+The third row makes the fairest comparison: 22.88 kPa is the strength the `cp`
 profile actually mobilized, length-weighted, along its own critical surface. Set
-as a constant it still gives only 1.086, because the surface does not stay
+as a constant it still gives only 1.094, because the surface does not stay
 where it was — with no gain in strength with depth, it drops to the base,
-lengthens by 2.5 m, and picks up 654 kN/m more soil to drive it. Matching the
+lengthens by 2.6 m, and picks up 659 kN/m more soil to drive it. Matching the
 average strength on the old surface does not reproduce the old answer, because
 the strength profile determined which surface was critical. A constant taken
-from the top of the layer gives 0.872 and one taken from the bottom gives 1.268
+from the top of the layer gives 0.880 and one taken from the bottom gives 1.280
 — the second 45% above the first, on one section, from the modeling choice
 alone.
 

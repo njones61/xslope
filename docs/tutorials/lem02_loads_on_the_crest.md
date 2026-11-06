@@ -185,18 +185,18 @@ stresses under it and the surcharge standing on the crest:
 
 ![Spencer on the loaded model](images/lem02_solution_load.png){width=1000}
 
-**FS = 0.918.** The unloaded slope stood at 1.276; 750 psf over 10 ft of crest
+**FS = 0.918.** The unloaded slope stood at 1.282; 750 psf over 10 ft of crest
 takes 28% off it and puts the embankment below 1. The drop is large for a
 small-looking load because the critical surface moved to the loaded strip, as the
 figure and the table below show.
 
 | | unloaded | with the surcharge |
 | --- | :---: | :---: |
-| Factor of safety (Spencer) | 1.276 | 0.918 |
-| Circle radius (ft) | 40.4 | 33.8 |
-| Surface exits the crest at x = | 44.5 | 35.0 |
-| Length of the surface (ft) | 50.8 | 42.8 |
-| Weight of the sliding mass (lb/ft) | 60,436 | 40,925 |
+| Factor of safety (Spencer) | 1.282 | 0.918 |
+| Circle radius (ft) | 40.0 | 33.8 |
+| Surface exits the crest at x = | 44.6 | 35.0 |
+| Length of the surface (ft) | 50.9 | 42.8 |
+| Weight of the sliding mass (lb/ft) | 60,984 | 40,923 |
 
 The critical circle is *smaller* than the unloaded one and reaches a third less
 soil, yet it is the more critical of the two. It exits the crest at x = 35.0 —
@@ -209,10 +209,10 @@ than the unloaded critical surface while carrying 7500 lb/ft more force.
 ### The warnings from Tutorial LEM-1 {#the-warnings-lem-1-left-behind}
 
 The uncracked embankment in LEM-1 could not be solved cleanly: Spencer and Bishop
-disagreed (1.276 against 1.215) because the crest slices were being asked to
-carry tension, and 26 of the trial circles that ranked below the reported minimum
-admitted no solution at all. Now we run the loaded model with Bishop, the Ordinary
-Method of Slices (OMS) and Morgenstern-Price: all three return **0.918 on the same
+disagreed (1.282 against 1.215) because the crest slices were being asked to
+carry tension, and 49 of Spencer's 173 trial circles admitted no solution at
+all. Now we run the loaded model with Bishop, the Ordinary Method of Slices (OMS)
+and Morgenstern-Price: all three return **0.918 on the same
 circle** as Spencer, and no trial circle below the minimum goes unsolved.
 
 The surcharge presses down on the crest, against the tension that left those
@@ -283,7 +283,7 @@ elevations 5 and 15 — and they are not:
 into the hill at 45°, because perpendicular to a 1:1 face is 45° from vertical:
 the reading gives the load a horizontal component equal to its own magnitude,
 pushing the slope horizontally into the hill. The answer comes out *above* the unloaded
-1.276 — the surcharge is holding the slope up.
+1.282 — the surcharge is holding the slope up.
 
 ![750 psf on the face, read as vertical](images/lem02_face_vertical.png){width=1000}
 

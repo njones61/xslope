@@ -33,7 +33,7 @@ XSLOPE's own with no published counterpart and takes no dot.
 
 | # | Match | Problem | Results | Notes |
 |:---:|:-:|---|---|---|
-| [E1](#fhwa-e1) | 🟢 | FHWA MSE wall — per-layer geogrid pullout | All eleven layers of Table E1-7.5 reproduced within 0.1% of the manual's nominal pullout resistance | **built**; the example defers global and compound stability, so XSLOPE's searched Spencer 1.477 has no published counterpart |
+| [E1](#fhwa-e1) | 🟢 | FHWA MSE wall — per-layer geogrid pullout | All eleven layers of Table E1-7.5 reproduced within 0.1% of the manual's nominal pullout resistance | **built**; the example defers global and compound stability, so XSLOPE's searched Spencer 1.427 has no published counterpart |
 | [E3](#fhwa-e3) | 🟢 | FHWA MSE wall — sloping backfill, steel strips | Every one of the twelve levels of Table E3-7.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.404 has no published counterpart |
 | [E4](#fhwa-e4) | 🟢 | FHWA MSE wall — level backfill, steel bar mats | All ten levels of Table E4-7.4 within 0.1% of the manual's per-mat pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.536 has no published counterpart |
 | [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.637 has no published counterpart |
@@ -174,8 +174,11 @@ safety below, where the live load is a driving load like any other.
   own length, has no input to carry that variation.
 
 **Global stability.** With the eleven layers in place, a Spencer search returns
-FS = 1.477 on a surface that passes under the wall and daylights in the level
-ground in front of the toe. Example E1 defers its Steps 9 and 10 — overall and
+FS = 1.427 on a surface that cuts through the reinforced zone: it starts in the
+level backfill 14 ft behind the crest, crosses layers 7, 8 and 9 between 7 and
+15 ft from the face, each at its full 2,169 lb/ft, leaves the wall through the
+2 ft of its face below grade, and daylights in the level ground 18.5 ft in front
+of the toe. Example E1 defers its Steps 9 and 10 — overall and
 compound stability — to a separate chapter and works neither, so this is
 XSLOPE's own number with no published value behind it, and it takes no part in
 the match above.
@@ -184,7 +187,7 @@ the match above.
 Step 7 (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e1.xlsx, type=pullout_envelope, expected_pullout=10.28:5378;9.22:7488;8.16:9928;7.09:12709;6.03:15813;4.96:19260;3.90:23027;2.84:27126;1.77:31571;0.71:36333;0.36:37978, expected_envelope=10.28:1085;9.22:1085;8.16:1085;7.09:1085;6.03:2169;4.96:2169;3.90:2169;2.84:2169;1.77:2169;0.71:2169;0.36:2169, tolerance=0.002, benchmark=FHWA-E1 -->
-<!-- test: file=files/published/fhwa_e1.xlsx, type=circular_search, method=spencer, expected_fs=1.477, num_slices=30, benchmark=FHWA-E1-global -->
+<!-- test: file=files/published/fhwa_e1.xlsx, type=circular_search, method=spencer, expected_fs=1.427, num_slices=30, benchmark=FHWA-E1-global -->
 
 ---
 

@@ -65,10 +65,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1.154 | 1.154 | 1.248 | 2.011 | 1.861 | 1.154 | 1.154 |
+| 1.154 | 1.154 | 1.253 | 2.011 | 1.861 | 1.154 | 1.154 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.154, fs_bishop=1.154, fs_janbu=1.248, fs_corps=2.011, fs_lowe=1.861, fs_spencer=1.154, fs_mprice=1.154 -->
+<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.154, fs_bishop=1.154, fs_janbu=1.253, fs_corps=2.011, fs_lowe=1.861, fs_spencer=1.154, fs_mprice=1.154 -->
 
 ### 3. Slope with Eight Layers
 
@@ -391,7 +391,7 @@ A model can also supply γ_sat with no water table anywhere
 ([xslope_gsat_nowater.xlsx](files/xslope_gsat_nowater.xlsx)); with no elevation
 below which the saturated weight applies, the slope is analyzed with γ throughout.
 
-<!-- test: file=files/xslope_gsat_nowater.xlsx, type=circular_search, num_slices=40, fs_bishop=1.468, fs_spencer=1.468, fs_janbu=1.565 -->
+<!-- test: file=files/xslope_gsat_nowater.xlsx, type=circular_search, num_slices=40, fs_bishop=1.468, fs_spencer=1.468, fs_janbu=1.571 -->
 
 The same slope and water table with a drained strength ($c' = 200$ psf,
 $\phi' = 25°$) and `u = piezo`: the piezometric line now supplies the pore

@@ -56,22 +56,10 @@ current user only, so Windows never asks for administrator rights, and the last
 page offers to launch Studio immediately. Afterwards, Studio is on the Start menu
 under **XSLOPE Studio**.
 
-<details markdown="1">
-<summary>If the download is not code-signed</summary>
-
-A build that is not code-signed behaves like any other unsigned download, and the
-operating system warns you once before it runs:
-
-- **Windows** — SmartScreen shows a blue *Windows protected your PC* dialog.
-  Click **More info**, then **Run anyway** to start the installer.
-- **macOS** — Gatekeeper blocks a double-click. Right-click (or Control-click)
-  **XSLOPE Studio** in Applications, choose **Open**, and confirm once. Later
-  launches open normally.
-
-The `.sha256` file published beside each installer lets you confirm that what you
-downloaded is what was built.
-
-</details>
+Both installers are code-signed by Jones Geoscience LLC, and the macOS app is also
+notarized by Apple; on a Mac, the first launch shows only macOS's usual question
+about an app downloaded from the internet. The `.sha256` file published beside
+each installer lets you confirm that what you downloaded is what was built.
 
 Once the window is open, use **File → Open** to load an Excel problem, or
 **File → New** to start an empty project and build it up with the editors or the
@@ -108,11 +96,11 @@ at most once a day and shows nothing unless an update is available.
 
 When an update is available, Studio offers **Download & Install**: it downloads
 the installer for your platform, verifies its SHA-256 checksum against the one
-published with the release, and discards anything that does not match. On Windows
-the verified installer then runs silently and the new version restarts itself; on
-macOS Studio opens the disk image and asks you to drag the new copy into
-Applications. See [App management](../studio/app_management.md) for the full
-behavior, including what the dialogs say and how to turn the startup check off.
+published with the release, and discards anything that does not match. **Install
+and Restart** then closes Studio, puts the new version in place of the old one,
+and starts it, on Windows and on macOS alike. See
+[App management](../studio/app_management.md) for the full behavior, including
+what the dialogs say and how to turn the startup check off.
 
 ## Uninstalling
 

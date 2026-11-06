@@ -27,11 +27,14 @@ What the update offers depends on how Studio was installed:
 | **pip** | The literal `pip install -U "xslope[gui]"` line, with a **Copy** button. Studio never modifies your Python environment itself — you run the upgrade where you installed it, and restart Studio. |
 | **A native installer** (`.dmg` / `.exe`) | **Download & Install**. Studio downloads the installer for your platform with a progress bar you can cancel, and verifies its SHA-256 checksum against the one published with the release. A file that does not match is discarded and nothing is installed. |
 
-On **Windows**, a verified installer runs silently: Studio closes, the installer
-upgrades the existing per-user installation in place, and the new version starts
-by itself. On **macOS**, Studio mounts the downloaded disk image and asks you to
-drag **XSLOPE Studio** to Applications, replacing the old copy, then quit and
-relaunch.
+Then **Install and Restart** finishes the job on both platforms: Studio closes
+(asking first about unsaved work), the new version replaces the installed one, and
+it starts by itself. On **Windows** the verified installer upgrades the per-user
+installation silently; on **macOS** the new app replaces the old one in its
+folder. If Studio cannot replace itself on a Mac (an account without permission
+to change the Applications folder, for example), it opens the downloaded disk
+image instead and asks you to drag **XSLOPE Studio** to Applications, replacing
+the old copy.
 
 If a release states that it cannot be installed on top of your version — or
 publishes no download for your platform — the dialog states this and links to the

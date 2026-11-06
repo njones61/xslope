@@ -8,6 +8,13 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### New
 
+- On a Mac, an update now installs in one step, as it does on Windows: after
+  **Download & Install**, **Install and Restart** closes Studio, puts the new
+  version in place of the old one in its folder, and starts it. Until now Studio
+  opened the disk image and asked you to drag the new copy to Applications, quit
+  and restart, and warned about a right-click launch that the signed and
+  notarized app does not need. Updating to this version from 1.0.7 still takes
+  the old steps, one last time; the right-click it mentions can be skipped.
 - The force each reinforcement line applies in a limit equilibrium solution is now
   listed in a table under the plot on Studio's LEM · Solution tab, and the Analysis
   Report prints the same table under each method. Each point where the surface

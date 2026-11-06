@@ -170,9 +170,10 @@ def figure_base():
     ax.plot([A[0], B[0]], [A[1], B[1]], color="black", lw=1.0, ls=(0, (6, 3)), zorder=4)
     # the slice's center line and the weight on it
     ax.plot([C[0], C[0]], [P[1] - 0.6, top + 0.3], ls=":", color="0.2", lw=1.1)
-    ax.add_patch(FancyArrowPatch((C[0], top - 0.35), (C[0], top - 2.4),
+    mid = 0.5 * (top + C[1])         # halfway down the slice, on its center line
+    ax.add_patch(FancyArrowPatch((C[0], mid + 1.0), (C[0], mid - 1.0),
                                  arrowstyle="-|>", mutation_scale=14, color="black", lw=1.4))
-    ax.text(C[0] + 0.22, top - 1.35, "W", fontsize=13.5, ha="left", va="center")
+    ax.text(C[0] + 0.22, mid, "W", fontsize=13.5, ha="left", va="center")
     # the base normal at C, along the radius toward O, labeled below the arrow
     d = -C / np.linalg.norm(C)
     up = np.array([-d[1], d[0]])

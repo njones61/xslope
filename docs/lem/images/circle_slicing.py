@@ -87,12 +87,31 @@ def draw_section(ax, bounds, title):
     ax.axis("off")
 
 
+def split(fixed, length, cut):
+    """Slice boundaries the way the slicer places them: each stretch between fixed
+    points takes its share of the N slices by ``length`` and is cut by ``cut``."""
+    lens = [length(a, b) for a, b in zip(fixed[:-1], fixed[1:])]
+    out = [fixed[0]]
+    for (a, b), L in zip(zip(fixed[:-1], fixed[1:]), lens):
+        n = max(1, int(round(L / sum(lens) * N)))
+        out += list(cut(a, b, n)[1:])
+    return np.array(out)
+
+
 def figure_width_angle():
     x_in, x_out = entry_exit()
-    widths = np.linspace(x_in, x_out, N + 1)
-    t = np.radians(np.linspace(theta(x_in), theta(x_out), N + 1))
-    angles = XO + R * np.sin(t)
-    angles[0], angles[-1] = x_in, x_out
+    # the crest is a ground vertex above the surface, so it is a slice boundary
+    fixed = [x_in, GROUND[2][0], x_out]
+    widths = split(fixed, lambda a, b: b - a, lambda a, b, n: np.linspace(a, b, n + 1))
+
+    def by_angle(a, b, n):
+        xs = XO + R * np.sin(np.radians(np.linspace(theta(a), theta(b), n + 1)))
+        xs[0], xs[-1] = a, b
+        return xs
+    angles = split(fixed, lambda a, b: theta(b) - theta(a), by_angle)
+    for name, xs in (("widths", widths), ("angles", angles)):
+        print("   %s: %d slices, arcs %s deg" % (name, len(xs) - 1,
+              ", ".join("%.1f" % (theta(b) - theta(a)) for a, b in zip(xs[:-1], xs[1:]))))
     fig, axes = plt.subplots(2, 1, figsize=(8.6, 9.6))
     draw_section(axes[0], widths, "Equal widths")
     draw_section(axes[1], angles, "Equal angles")

@@ -309,9 +309,9 @@ A base on the circle takes the arc between its corners A and B as its length $\D
 
 *One steep slice drawn large. The weight W and the base forces act on the slice's center line, through C; the normal force N points at the circle's center O.*
 
-Every method of slices treats a slice's weight and the forces on its base as acting along one vertical line through the middle of the slice. On a circle, the soil pushes on the base straight toward the circle's center O, so that push acts along a line through O. C is the only point on both lines, the slice's center line and the line from O through M, which is why the base forces are placed there.
+In every method of slices, the weight and the base forces act on the slice's center line (dotted in the figure). On a circular base, the normal force also points at the circle's center, O. The center line and the line from O through M cross at C, so the base forces act at C.
 
-The water force on the base depends on the average water pressure along it. The pressure at M, the middle of the arc, gives that average: exactly when the pressure changes evenly from one end of the base to the other, and very closely otherwise. Away from the middle, at P for example, the reading is too high or too low.
+The pore pressure changes along the base, but each slice uses one value for its whole base. The value at M, the middle of the arc, is the closest to the average. P, lower on the arc, reads too high.
 
 P, the point on the circle directly below the slice's center line, lies lower on the arc than M: by up to a fifth of the base length on the last slice at a vertical exit. The pore pressure at P reads several percent high there, and the tangent at P is flatter than the base.
 

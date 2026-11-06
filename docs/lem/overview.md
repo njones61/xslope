@@ -297,7 +297,19 @@ One exception to this is Spencer's method. Details can be found in the XSLOPE so
 
 ### Slices on a Circle
 
-A circular surface is cut into slices of equal angle, so each slice base spans the same arc of the circle and the slices narrow where the circle steepens toward the ground. A base on the circle takes the arc between its two corners as its length $\Delta \ell$ and the chord between them for its inclination $\alpha$, which is the circle's tangent at the middle of the arc. The base forces act at the middle of the chord: it lies on the slice's centerline, where the weight acts, and on the radius through the middle of the arc, so the normal force on the base passes through the circle's center. The pore pressure is read at the middle of the arc, where a pore pressure that varies smoothly along the base equals its average over the base to second order in the slice's angle; under r<sub>u</sub>, the vertical stress is that of the soil column above that point. The point on the circle directly below the slice's center lies lower on the arc, by up to a fifth of the base length on the last slice at a vertical exit, and reads the pore pressure there several percent high. With slices of equal width, the last slice at a steep exit would span a wide arc (14° for a circle meeting the crest of a 20 ft slope vertically, with 40 slices), and no single base length and inclination represent a base that turns that far: the cohesion and the pore-pressure force on that slice both come out wrong, by enough to move the factor of safety by several percent.
+A circular surface is cut into slices of equal angle, so each slice base spans the same arc of the circle and the slices narrow where the circle steepens toward the ground. With slices of equal width, the last slice at a steep exit spans a wide arc, and no single base length and inclination represent a base that turns that far: the cohesion and the pore-pressure force on that slice both come out wrong, by enough to move the factor of safety by several percent.
+
+![The same circle cut into twelve slices of equal width and of equal angle](images/circle_slices_width_angle.png){width="640px"}
+
+*A circle meeting the crest of a 20 ft slope vertically, cut into 12 slices. Equal widths leave the last slice spanning 25° of arc; equal angles give every slice 8°. At 40 slices, the last slice of equal width still spans 14°.*
+
+A base on the circle takes the arc between its corners A and B as its length $\Delta \ell$ and the chord AB for its inclination $\alpha$; the chord is parallel to the circle's tangent at M, the middle of the arc. The base forces act at C, the middle of the chord. C lies on the slice's center line, where the weight acts, and on the radius OM, so the normal force on the base passes through the circle's center O. The pore pressure is read at M, where a pore pressure that varies smoothly along the base equals its average over the base to second order in the slice's angle; under r<sub>u</sub>, the vertical stress is that of the soil column above M.
+
+![One steep slice: the arc AB, the chord AB, the points C, M and P](images/circle_slice_base.png){width="700px"}
+
+*One steep slice drawn large. The weight W and the base forces act on the slice's center line, through C; the normal force N points at the circle's center O.*
+
+P, the point on the circle directly below the slice's center line, lies lower on the arc than M: by up to a fifth of the base length on the last slice at a vertical exit. The pore pressure at P reads several percent high there, and the tangent at P is flatter than the base.
 
 Slices also break at every vertex of the ground and the material zones above the surface, at every point where the surface crosses a material boundary or a piezometric line, and at every point that defines a distributed load. Non-circular surfaces, and the run along the floor of a composite surface, are straight between their vertices; they are cut into slices of equal width, and $\Delta \ell = \Delta x \sec \alpha$ is exact for them.
 

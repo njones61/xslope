@@ -2165,8 +2165,19 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         # === BEGIN : "Reinforcement lines" ===
 
-        # 1) Build this slice's base as a LineString from (x_l, y_lb) to (x_r, y_rb):
-        slice_base = LineString([(x_l, y_lb), (x_r, y_rb)])
+        # 1) Build this slice's base as a LineString from (x_l, y_lb) to (x_r, y_rb),
+        # reaching a hair past each corner for the crossing tests. A line through a
+        # shared slice corner has to reach BOTH adjacent bases so the corner claim
+        # below can hand it to one of them. Rounding can leave the corner a hair to
+        # one side of the line, and then only one base saw it; when that was the base
+        # the claim passes over, the line's force was lost (vp030b, a geosynthetic on
+        # the base of an embankment that the circle crosses at a material boundary:
+        # Bishop 1.650 -> 1.267 once that boundary was solved on the exact circle).
+        _ext = 1e-9 * max(1.0, abs(x_l), abs(x_r))
+        _blen = hypot(x_r - x_l, y_rb - y_lb)
+        _ux, _uy = ((x_r - x_l) / _blen, (y_rb - y_lb) / _blen) if _blen > 0 else (1.0, 0.0)
+        slice_base = LineString([(x_l - _ux * _ext, y_lb - _uy * _ext),
+                                 (x_r + _ux * _ext, y_rb + _uy * _ext)])
 
         # 2) For each reinforcement line crossing this base, evaluate the available
         # tension and route it by the line's Dir/Appl settings:

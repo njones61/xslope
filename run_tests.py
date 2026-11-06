@@ -9903,6 +9903,11 @@ MODULE_CHECKS = {
         "A surcharge that starts at the crest of a wall stays on the crest: a "
         "slice straddling a face drawn leaning by 0.001 takes its load from the "
         "ground under it, not along the chord up the face."),
+    'circle_arc': (
+        'circle_arc_check.py',
+        "The base of a slice on a circle is as long as the arc it follows: on a "
+        "phi = 0 slope with a circle meeting the crest vertically, OMS and Bishop "
+        "match the exact c R L / (W x), and the bases sum to the surface length."),
     'dload_pass2b': (
         'dload_direction_check.py',
         "The FEM's lumped surface-load fallback must take the direction a "
@@ -16214,7 +16219,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
-              'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2,
+              'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
               'reinforce_mesh_geometry': 2, 'bonded_junction': 2, 'joint_mesh': 3,
@@ -16709,6 +16714,12 @@ def main():
         tests.append({'type': 'face_load',
                       'file': 'a crest surcharge on a leaning wall face',
                       'method': 'five methods', 'source': 'face_load'})
+        # A slice base on a circle took its length as width / cos(alpha at the
+        # centerline), short where the circle steepens across a slice: 4.5% low
+        # on a phi = 0 circle meeting the crest vertically.
+        tests.append({'type': 'circle_arc',
+                      'file': 'a phi = 0 circle meeting the crest vertically',
+                      'method': 'OMS, Bishop, Spencer', 'source': 'circle_arc'})
         # Bishop scored against an implementation written from the published
         # equations and nothing else.
         tests.append({'type': 'indep_bishop',

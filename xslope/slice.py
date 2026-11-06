@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from math import sin, cos, tan, radians, atan, atan2, degrees, sqrt
+from math import sin, cos, tan, radians, asin, atan, atan2, degrees, hypot, sqrt
 
 import warnings
 
@@ -2637,7 +2637,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         if right_facing:
             alpha = -alpha
-        dl = dx / cos(radians(alpha))
+        if use_arc or (comp is not None and not comp.on_floor(x_c)):
+            # A base on the circle is curved, so its length is the arc between its
+            # two corners. dx / cos(alpha), with alpha the tangent at x_c, is exact
+            # only for a straight base: where the circle steepens across a slice it
+            # reads short (a 0.57 ft slice at a vertical exit gave 3.4 ft for an
+            # arc of 4.8), and the cohesion and pore-pressure terms short with it.
+            dl = 2.0 * R * asin(min(1.0, hypot(dx, y_rb - y_lb) / (2.0 * R)))
+        else:
+            dl = dx / cos(radians(alpha))
 
         if base_material_idx is None:
             phi = 0

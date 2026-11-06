@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.0.8 — 2026-11-06
+
 ### New
 
 - On a Mac, an update now installs in one step, as it does on Windows: after

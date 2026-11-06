@@ -190,8 +190,9 @@ def figure_base():
     ax.text(A[0] + 1.62, A[1] + 0.55, "α", fontsize=14, ha="left", va="center")
     # the tangent at M, parallel to the chord
     tan = np.array([np.cos(tm), np.sin(tm)])
-    ax.plot([M[0] - 2.4 * tan[0], M[0] + 1.4 * tan[0]],
-            [M[1] - 2.4 * tan[1], M[1] + 1.4 * tan[1]], color="0.35", lw=1.3, ls="--",
+    half = 2.1                      # the same length on each side of M
+    ax.plot([M[0] - half * tan[0], M[0] + half * tan[0]],
+            [M[1] - half * tan[1], M[1] + half * tan[1]], color="0.35", lw=1.3, ls="--",
             zorder=5)
     # the three points
     ax.plot(*C, "o", ms=8, mfc="white", mec="black", mew=1.8, zorder=7)
@@ -211,7 +212,7 @@ def figure_base():
           "black")
     label(M, (right, -3.9), "M, the middle of the arc AB:\nthe pore pressure is read here",
           WATER)
-    label(M - 2.0 * tan, (right, -6.3), "the circle's tangent at M,\nparallel to the chord AB",
+    label(M - 0.9 * half * tan, (right, -6.3), "the circle's tangent at M,\nparallel to the chord AB",
           "0.35")
     ax.set_xlim(x_lo, x_hi)
     ax.set_ylim(y_lo, y_hi)

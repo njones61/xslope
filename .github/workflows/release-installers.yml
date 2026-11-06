@@ -56,14 +56,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          # GitHub retired the macos-14 image in November 2026 (jobs refused with
+          # "configuration 'macos-14-arm64-us-default' is not supported").
+          - os: macos-15
             label: macOS arm64
             platform: macos
             arch: arm64
           # Intel Mac leg. Enable when a second Mac target is wanted; the spec,
           # build script and dmg step are already architecture-agnostic (the dmg
           # name picks up `uname -m`).
-          # - os: macos-13
+          # - os: macos-15-intel
           #   label: macOS x86_64
           #   platform: macos
           #   arch: x86_64

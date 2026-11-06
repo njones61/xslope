@@ -424,7 +424,9 @@ def _isolated(mw):
     """Point the window's controller at a throwaway settings file so the checks
     never write to the real user's preferences."""
     from PySide6.QtCore import QSettings
+    import atexit
     tmp = tempfile.mkdtemp(prefix="xslope-settings-")
+    atexit.register(shutil.rmtree, tmp, True)   # QSettings may write until exit
     s = QSettings(os.path.join(tmp, "u.ini"), QSettings.IniFormat)
     mw.updates.settings = s
     return s, tmp
@@ -578,8 +580,10 @@ def test_menu_and_paths():
         os.environ.pop("XSLOPE_UPDATE_URL", None)
 
     # --- the dialog itself: frozen and pip look different -----------------
-    info = updater.evaluate(Fixture(version=NEWER).manifest, CURRENT,
+    dialog_fx = Fixture(version=NEWER)
+    info = updater.evaluate(dialog_fx.manifest, CURRENT,
                             key="win32-amd64", frozen=True)
+    dialog_fx.close()
     dlg = update_ui.UpdateAvailableDialog(info, frozen=True, parent=mw)
     if dlg.install_btn is None:
         fails.append("a frozen app's update dialog has no Download & Install button")
@@ -743,6 +747,9 @@ def test_download_path():
     mw = MainWindow()
     _isolated(mw)
     fx = Fixture(version=NEWER)
+    import glob
+    pattern = os.path.join(tempfile.gettempdir(), "xslope-update-*")
+    before = set(glob.glob(pattern))      # the controller's download folders
     plans, errors = [], []
     mw.updates.run_plan = plans.append
     orig_critical = QMessageBox.critical
@@ -795,6 +802,8 @@ def test_download_path():
         _pump(lambda: mw._update_dl_runner is None, timeout=5.0)
         mw.close()
         fx.close()
+        for d in set(glob.glob(pattern)) - before:
+            shutil.rmtree(d, ignore_errors=True)
     return fails
 
 

@@ -309,7 +309,7 @@ A base on the circle takes the arc between its corners A and B as its length $\D
 
 *One steep slice drawn large. The weight W and the base forces act on the slice's center line, through C; the normal force N points at the circle's center O.*
 
-In every method of slices, the weight and the base forces act on the slice's center line (dotted in the figure). On a circular base, the normal force also points at the circle's center, O. The center line and the line from O through M cross at C, so the base forces act at C.
+The normal force points at the circle's center, O, along the line through M, so it would be the same force placed at M or at C. XSLOPE places the base forces at C because C is also on the slice's center line, directly under the weight, which is how its equations are written. C and M are very close, about half a percent of the base length apart at 40 slices.
 
 The pore pressure changes along the base, but each slice uses one value for its whole base. The value at M, the middle of the arc, is the closest to the average.
 

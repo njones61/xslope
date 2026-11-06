@@ -20,6 +20,15 @@ and a base on the circle takes the length of its arc, 2 R asin(chord / 2R).
 The slicer also keeps the surface's own end points when it merges slice
 boundaries closer than 0.01; it used to drop the end for an interior point.
 
+Each base on the circle takes its inclination from the chord between its
+corners, which is the circle's tangent at the middle of the arc; its forces act
+at the middle of that chord, on the slice's centerline and on the radius through
+the arc's middle; and it reads its pore pressure at the middle of the arc, where
+a smoothly varying u equals its average over the base to second order. The
+point on the circle directly below the slice's center, where both were read
+before, sits off the middle of the arc by up to a fifth of the base length on
+the last slice of the vertical-exit circle, and read u there up to 5.6% high.
+
 The checks use the same slope without the force, so the exact factor of safety
 of the clay on a circle is c R L / (W x), with L the arc in the soil, W the
 weight of the sliding mass and x its lever arm about the center (1.3453 on the
@@ -40,6 +49,10 @@ vertical-exit circle, where the old slicer read 1.2864):
 4. A c-phi slope with ru = 0.3 and its mirror image give the same bases and
    factors of safety in OMS, Bishop, Janbu and Spencer, on each of those
    surfaces, and every one of those methods has a solution on both.
+5. On the vertical-exit circle at 40 slices, every base's inclination is its
+   chord's, its normal passes through the circle's center, and its u is within
+   0.5% of the exact average along its arc, under a sloping water table and
+   under ru = 0.3.
 
 Run directly:  PYTHONPATH=. python3 test/circle_arc_check.py
 """
@@ -49,6 +62,8 @@ import copy
 import io
 import os
 import tempfile
+
+import numpy as np
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = os.path.join(_REPO, "docs", "lem", "files", "xslope_acads_simple.xlsx")
@@ -64,6 +79,9 @@ COMPOSITE = ([(-30.0, 0.0)] + _SLOPE, -5.0, (3.0, 21.0, 28.0))   # dips 2 ft bel
 LOAD_FROM = 22.73                      # 0.0066 ft inside the steep circle's exit
 METHODS = ("oms", "bishop", "janbu", "spencer")
 TOL = 2e-3                             # relative, on F: the old slicer missed by 1 to 4%
+WATER = [(-40.0, 8.0), (-5.0, 8.0), (25.0, 19.5), (100.0, 19.5)]   # a sloping water table
+GAMMA_W = 62.4
+U_TOL = 5e-3          # relative, per base: u read below the slice's center missed by 5.6%
 
 
 def _quiet(fn, *a, **k):
@@ -103,6 +121,14 @@ def _slope(model, soil=CLAY, mirror=False, load_from=None):
         return _quiet(load_slope_data, path)
     finally:
         os.unlink(path)
+
+
+def _with_water(sd, line):
+    sd = copy.deepcopy(sd)
+    sd["piezo_line"] = line
+    for m in sd["materials"]:
+        m["u"] = "piezo"
+    return sd
 
 
 def _circle(model, mirror=False):
@@ -214,11 +240,48 @@ def check_mirror():
     return fails
 
 
+def check_base_points():
+    fails = []
+    circle = _circle(STEEP)
+    xo, yo, r = circle["Xo"], circle["Yo"], circle["R"]
+    gx, gy = (np.array(v) for v in zip(*STEEP[0]))
+    wx, wy = (np.array(v) for v in zip(*WATER))
+    for label, sd, u_of in (
+            ("a sloping water table", _with_water(_slope(STEEP, dict(CPHI, ru=0.0)), WATER),
+             lambda x, y: GAMMA_W * (np.interp(x, wx, wy) - y)),
+            ("ru = 0.3", _slope(STEEP, CPHI),
+             lambda x, y: CPHI["ru"] * GAMMA * (np.interp(x, gx, gy) - y))):
+        df = _slices(sd, circle, 40)
+        scored = 0
+        for s in df.itertuples():
+            chord = np.degrees(np.arctan2(s.y_rb - s.y_lb, s.x_r - s.x_l))
+            if abs(s.alpha - chord) > 1e-9:
+                fails.append(f"{label}: the base at x = {s.x_c:.3f} is inclined "
+                             f"{s.alpha:.4f} deg, its chord {chord:.4f}")
+            a = np.radians(s.alpha)
+            arm = (s.x_c - xo) * np.cos(a) + (s.y_cb - yo) * np.sin(a)
+            if abs(arm) > 1e-9 * r:
+                fails.append(f"{label}: the normal on the base at x = {s.x_c:.3f} "
+                             f"passes {arm:.2e} from the circle's center")
+            t = np.linspace(np.arcsin((s.x_l - xo) / r), np.arcsin((s.x_r - xo) / r), 2001)
+            u = u_of(xo + r * np.sin(t), yo - r * np.cos(t))
+            if u.min() <= 0.0:
+                continue                    # dry, or wet over part of the base only
+            avg = float(np.trapz(u, t) / (t[-1] - t[0]))
+            scored += 1
+            if abs(s.u - avg) > U_TOL * avg:
+                fails.append(f"{label}: the base at x = {s.x_c:.3f} reads u = {s.u:.2f}; "
+                             f"its average along the arc is {avg:.2f}")
+        if scored < 30:
+            fails.append(f"{label}: only {scored} bases are wet along their whole length")
+    return fails
+
+
 def run():
     """Failures as a list, for run_tests.py."""
     fails = []
     for check in (check_clay_matches_the_exact_answer, check_sand_with_water_converges,
-                  check_bases_sum_to_the_surface, check_mirror):
+                  check_bases_sum_to_the_surface, check_mirror, check_base_points):
         try:
             fails += check()
         except Exception as exc:          # a crash is a failure, not a pass

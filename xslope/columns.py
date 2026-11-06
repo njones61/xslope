@@ -93,8 +93,9 @@ SLICE_COLUMNS = (
            "failure surface.", "", "{:.0f}", True),
     Column("x_c", "x_c", "Horizontal coordinate of the slice mid-point.",
            "length", "{:.2f}", True),
-    Column("y_cb", "y_b", "Elevation of the failure surface at the slice "
-           "mid-point.", "length", "{:.2f}", True),
+    Column("y_cb", "y_b", "Elevation of the middle of the slice base; on a "
+           "circle, the middle of the chord between its corners.", "length",
+           "{:.2f}", True),
     Column("y_ct", "y_t", "Elevation of the ground surface at the slice "
            "mid-point.", "length", "{:.2f}", True),
     Column("dx", "Δx", "Slice width.", "length", "{:.2f}", True),
@@ -196,7 +197,7 @@ SLICE_COLUMNS = (
     Column("d_x", "d_x", "Horizontal coordinate of the distributed-load resultant.", "length"),
     Column("d_y", "d_y", "Elevation of the distributed-load resultant.", "length"),
     Column("y_t", "y_Tc", "Elevation of the tension-crack water force's line of action.", "length"),
-    Column("piezo_y", "y_piezo", "Elevation of the piezometric surface at the slice mid-point.", "length"),
+    Column("piezo_y", "y_piezo", "Elevation of the piezometric surface above the point the base reads its pore pressure at.", "length"),
     Column("theta", "θ", "Interslice force inclination on the right-hand side of the slice.", "deg"),
     Column("c_suction", "c_suc", "Apparent cohesion contributed by matric suction.", "stress"),
     Column("r", "R", "Radius of the trial circle (circular surfaces only).", "length"),

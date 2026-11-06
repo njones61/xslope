@@ -1601,85 +1601,37 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if x_min <= pt['X'] <= x_max
         )
 
+    def _crossing_xs(line):
+        """x of each point where `line` crosses the failure surface, within the
+        surface's span. Crossings with a circle, or with the arc part of a
+        composite surface, are solved on the circle itself. A polygon drawn along
+        the arc puts them slightly inside it, which at a steep exit is a real
+        distance below the ground, and the end-of-surface copy it made of each
+        ground crossing could displace the surface's true end in the merge below."""
+        xs = []
+        if use_arc or comp is not None:
+            for p in _circle_polyline_all(Xo, Yo, R, line):
+                if p.y <= Yo and (comp is None or not comp.on_floor(p.x)):
+                    xs.append(p.x)
+        if not use_arc:
+            inter = line.intersection(clipped_surface)
+            if not inter.is_empty:
+                pts = [inter] if hasattr(inter, 'x') else [
+                    g for g in getattr(inter, 'geoms', []) if hasattr(g, 'x')]
+                xs.extend(g.x for g in pts if comp is None or comp.on_floor(g.x))
+        return [x for x in xs if x_min <= x <= x_max]
+
     # Find intersections between material-zone boundaries and the failure surface
-    if use_arc:
-        # For circular failure surfaces, we can use a more efficient approach
-        # by creating a dense circle representation and finding intersections
-        theta_range = np.linspace(np.pi, 2 * np.pi, 200)
-        circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
-        circle_line = LineString(circle_coords)
-        for pe in poly_edges:
-            if not pe['is_primary']:
-                continue
-            intersection = pe['exterior'].intersection(circle_line)
-            if not intersection.is_empty:
-                if hasattr(intersection, 'x'):
-                    if x_min <= intersection.x <= x_max:
-                        fixed_xs.add(intersection.x)
-                elif hasattr(intersection, 'geoms'):
-                    for geom in intersection.geoms:
-                        if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
-                            fixed_xs.add(geom.x)
-    else:
-        # For non-circular failure surfaces, use the original approach
-        for pe in poly_edges:
-            if not pe['is_primary']:
-                continue
-            intersection = pe['exterior'].intersection(clipped_surface)
-            if not intersection.is_empty:
-                if hasattr(intersection, 'x'):
-                    if x_min <= intersection.x <= x_max:
-                        fixed_xs.add(intersection.x)
-                elif hasattr(intersection, 'geoms'):
-                    for geom in intersection.geoms:
-                        if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
-                            fixed_xs.add(geom.x)
+    for pe in poly_edges:
+        if pe['is_primary']:
+            fixed_xs.update(_crossing_xs(pe['exterior']))
 
     # Find intersections with piezometric lines. A single point is not a line: it
     # cannot become a LineString and it cannot be interpolated, so it is treated as
     # no line here and reported by the u='piezo' guard below.
-    if piezo_line and len(piezo_line) >= 2:
-        piezo_geom1 = LineString(piezo_line)
-        if use_arc:
-            # Use dense circle representation for intersection
-            theta_range = np.linspace(np.pi, 2 * np.pi, 200)
-            circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
-            circle_line = LineString(circle_coords)
-            intersection1 = piezo_geom1.intersection(circle_line)
-        else:
-            intersection1 = piezo_geom1.intersection(clipped_surface)
-            
-        if not intersection1.is_empty:
-            if hasattr(intersection1, 'x'):
-                # Single point intersection
-                if x_min <= intersection1.x <= x_max:
-                    fixed_xs.add(intersection1.x)
-            elif hasattr(intersection1, 'geoms'):
-                # Multiple points or line intersection
-                for geom in intersection1.geoms:
-                    if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
-                        fixed_xs.add(geom.x)
-
-    if piezo_line2 and len(piezo_line2) >= 2:
-        piezo_geom2 = LineString(piezo_line2)
-        if use_arc:
-            theta_range = np.linspace(np.pi, 2 * np.pi, 200)
-            circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
-            circle_line = LineString(circle_coords)
-            intersection2 = piezo_geom2.intersection(circle_line)
-        else:
-            intersection2 = piezo_geom2.intersection(clipped_surface)
-            
-        if not intersection2.is_empty:
-            if hasattr(intersection2, 'x'):
-                # Single point intersection
-                if x_min <= intersection2.x <= x_max:
-                    fixed_xs.add(intersection2.x)
-            elif hasattr(intersection2, 'geoms'):
-                # Multiple points or line intersection
-                for geom in intersection2.geoms:
-                    if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
-                        fixed_xs.add(geom.x)
+    for pl in (piezo_line, piezo_line2):
+        if pl and len(pl) >= 2:
+            fixed_xs.update(_crossing_xs(LineString(pl)))
 
     # Remove duplicate points that are very close to each other
     tolerance = 1e-6
@@ -1707,14 +1659,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Remove thin slices (width < 1e-2), including at the ends
     min_width = 1e-2
     cleaned_xs = [all_xs[0]]
-    for x in all_xs[1:]:
-        if abs(x - cleaned_xs[-1]) >= min_width:
+    for x in all_xs[1:-1]:
+        if x - cleaned_xs[-1] >= min_width:
             cleaned_xs.append(x)
-    
-    # If the last slice is thin, merge it with the previous one
-    if len(cleaned_xs) > 2 and abs(cleaned_xs[-1] - cleaned_xs[-2]) < min_width:
-        cleaned_xs.pop(-2)
-    
+    # The surface's own end always closes the last slice: an interior boundary
+    # within min_width of it gives way. Dropping the end instead cut the surface
+    # short, and at a steep exit 0.01 of x is a great deal of height.
+    x_end = all_xs[-1]
+    if len(cleaned_xs) > 1 and x_end - cleaned_xs[-1] < min_width:
+        cleaned_xs.pop()
+    if x_end - cleaned_xs[-1] >= min_width:
+        cleaned_xs.append(x_end)
+
     all_xs = cleaned_xs
 
     # Pre-compute all y-coordinates for efficiency

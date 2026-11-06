@@ -23,6 +23,9 @@ sliding mass and x its lever arm about the center:
    a composite surface (a circle cut off by a firm layer 5 ft below the toe,
    exiting the crest at 88 deg), where the run along the layer keeps its
    straight-base length.
+   The same holds with a crest load starting 0.007 ft inside the exit: the
+   slicer merges boundaries closer than 0.01, and it used to drop the
+   surface's own end for the load's point, stopping 0.5 ft below the crest.
 3. The slope and its mirror image give the same bases and factors of safety.
 
 Run directly:  PYTHONPATH=. python3 test/circle_arc_check.py
@@ -55,7 +58,10 @@ def _ground(model, mirror):
     return [(-x, y) for x, y in reversed(pts)] if mirror else list(pts)
 
 
-def _slope(model, mirror=False):
+LOAD_FROM = 22.73                      # 0.0066 ft inside the steep circle's exit
+
+
+def _slope(model, mirror=False, load_from=None):
     from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
     sd = copy.deepcopy(_quiet(load_slope_data, BASE))
     pts = _ground(model, mirror)
@@ -68,6 +74,12 @@ def _slope(model, mirror=False):
     for key in ("dloads", "dloads2", "line_loads", "reinforcement_lines"):
         if key in sd:
             sd[key] = []
+    if load_from is not None:
+        sgn = -1.0 if mirror else 1.0
+        load = [{"X": sgn * load_from, "Y": 20.0, "Normal": 100.0},
+                {"X": sgn * 60.0, "Y": 20.0, "Normal": 100.0}]
+        sd["dloads"] = [sorted(load, key=lambda p: p["X"])]
+        sd["dload_dirs"] = ["normal"]
     sd["circles"] = [{"Xo": 0.0, "Yo": 30.0, "Depth": 0.0, "R": 30.0}]
     sd["circular"] = True
     path = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False).name
@@ -131,10 +143,12 @@ def check_steep_exit_matches_the_exact_answer():
 
 def check_bases_sum_to_the_surface():
     fails = []
-    for label, model, composite in (("the vertical-exit circle", STEEP, False),
-                                    ("the composite surface", COMPOSITE, True)):
+    for label, model, composite, load in (
+            ("the vertical-exit circle", STEEP, False, None),
+            ("the vertical-exit circle under a crest load", STEEP, False, LOAD_FROM),
+            ("the composite surface", COMPOSITE, True, None)):
         want, _fs = _exact(model)
-        got = float(_slices(_slope(model), _circle(model), 40,
+        got = float(_slices(_slope(model, load_from=load), _circle(model), 40,
                             composite=composite)["dl"].sum())
         if abs(got - want) > 1e-4 * want:
             fails.append(f"{label}: the bases sum to {got:.4f} ft; the surface is "
@@ -145,11 +159,14 @@ def check_bases_sum_to_the_surface():
 def check_mirror():
     from xslope import solve
     fails = []
-    for label, model, composite in (("the vertical-exit circle", STEEP, False),
-                                    ("the composite surface", COMPOSITE, True)):
-        left = _slices(_slope(model), _circle(model), 40, composite=composite)
-        right = _slices(_slope(model, mirror=True), _circle(model, mirror=True), 40,
-                        composite=composite)
+    for label, model, composite, load in (
+            ("the vertical-exit circle", STEEP, False, None),
+            ("the vertical-exit circle under a crest load", STEEP, False, LOAD_FROM),
+            ("the composite surface", COMPOSITE, True, None)):
+        left = _slices(_slope(model, load_from=load), _circle(model), 40,
+                       composite=composite)
+        right = _slices(_slope(model, mirror=True, load_from=load),
+                        _circle(model, mirror=True), 40, composite=composite)
         a, b = float(left["dl"].sum()), float(right["dl"].sum())
         if abs(a - b) > 1e-9 * a:
             fails.append(f"{label}: bases sum to {a:.6f} left-facing, {b:.6f} mirrored")

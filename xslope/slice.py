@@ -588,7 +588,9 @@ def update_slice_materials(slice_df, materials):
     with np.errstate(invalid='ignore', divide='ignore'):
         slice_df['y_cg'] = np.where(sgh > 0, sghy / np.maximum(sgh, 1e-300), np.nan)
 
-    y_cb = slice_df['y_cb'].to_numpy()
+    # cp strength at the elevation the generator read it: the middle of the base
+    # (of the arc, on a circle)
+    y_cb = mb['y_u'] if 'y_u' in mb else slice_df['y_cb'].to_numpy()
     c = np.empty(n); phi = np.empty(n)
     c1 = np.zeros(n); phi1 = np.zeros(n)
     dcol = np.zeros(n); psi = np.zeros(n)
@@ -1729,6 +1731,31 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     y_cb_all = surf_y(slice_centers)
     base_mid_y = 0.5 * (np.asarray(y_lb_all, dtype=float) + np.asarray(y_rb_all, dtype=float))
 
+    # A base on the circle is curved, and three points on it have three jobs.
+    # y_cb_all, the circle directly below the slice's center, closes the soil
+    # column the weight is taken from. The base forces act at the middle of the
+    # chord between the base corners (y_base_all): it lies on the slice's
+    # centerline, where every method applies the weight and the base forces, and
+    # on the radius through the middle of the arc, so the base normal passes
+    # through the circle's center; the chord's inclination is the circle's tangent
+    # at the middle of the arc. Pore pressure is read at the middle of the arc
+    # (x_u_all, y_u_all), where a smoothly varying u equals its average over the
+    # base to second order in the slice's angle. The circle below the slice's
+    # center sits off the middle of the arc by up to a fifth of the base length on
+    # the last slice at a vertical exit, and read u there 3 to 12% high on the
+    # steepest slices of the test circle in test/circle_arc_check.py.
+    on_arc_all = np.array([_on_arc(a, b) for a, b in
+                           zip(slice_x_coords[:-1], slice_x_coords[1:])], dtype=bool)
+    x_u_all = np.array(slice_centers, dtype=float)
+    y_u_all = np.array(y_cb_all, dtype=float)
+    y_base_all = np.array(y_cb_all, dtype=float)
+    if on_arc_all.any():
+        _th = np.arcsin(np.clip((slice_x_coords - Xo) / R, -1.0, 1.0))
+        _tm = 0.5 * (_th[:-1] + _th[1:])[on_arc_all]
+        x_u_all[on_arc_all] = Xo + R * np.sin(_tm)
+        y_u_all[on_arc_all] = Yo - R * np.cos(_tm)
+        y_base_all[on_arc_all] = base_mid_y[on_arc_all]
+
     # Get ground surface y-coordinates
     y_lt_all = get_ground_surface_y_coordinates(slice_x_coords[:-1], ground_surface)
     y_rt_all = get_ground_surface_y_coordinates(slice_x_coords[1:], ground_surface)
@@ -1746,6 +1773,37 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         poly_bot_all.append(np.interp(centers_arr, pe['bxs'], pe['bys']))
         poly_inrange.append((centers_arr >= pe['xmin'] - 1e-9) &
                             (centers_arr <= pe['xmax'] + 1e-9))
+    if on_arc_all.any():
+        poly_top_u = [np.interp(x_u_all, pe['txs'], pe['tys']) for pe in poly_edges]
+        poly_bot_u = [np.interp(x_u_all, pe['bxs'], pe['bys']) for pe in poly_edges]
+        poly_in_u = [(x_u_all >= pe['xmin'] - 1e-9) & (x_u_all <= pe['xmax'] + 1e-9)
+                     for pe in poly_edges]
+        y_ground_u_all = get_ground_surface_y_coordinates(x_u_all, ground_surface)
+
+    def _column_stress_at_u(i, y_w):
+        """sum(gamma h) of the soil column above slice i's pore-pressure point, the
+        middle of the arc on a circle: the vertical stress ru multiplies. Built as
+        the weight's columns are, split at the water table ``y_w``."""
+        total = 0.0
+        y_top_c, y_bot_c = y_ground_u_all[i], y_u_all[i]
+        for p_idx, pe in enumerate(poly_edges):
+            mat_id = pe['mat_id']
+            m_i = (mat_id if mat_id is not None and 0 <= mat_id < len(materials)
+                   else pe['poly_index'])
+            top, bot = poly_top_u[p_idx][i], poly_bot_u[p_idx][i]
+            if (not poly_in_u[p_idx][i]) or np.isnan(top) or np.isnan(bot):
+                continue
+            o_top, o_bot = min(y_top_c, top), max(y_bot_c, bot)
+            if o_top <= o_bot:
+                continue
+            gamma = materials[m_i]['gamma']
+            g_sat = materials[m_i].get('gamma_sat')
+            if g_sat is not None and not np.isnan(y_w):
+                y_split = min(max(y_w, o_bot), o_top)
+                total += g_sat * (y_split - o_bot) + gamma * (o_top - y_split)
+            else:
+                total += gamma * (o_top - o_bot)
+        return total
 
     # Get piezometric y-coordinates. A slice center sitting ON a line's own end is
     # INSIDE it, so the query is first snapped across floating-point noise: the
@@ -1766,6 +1824,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         _snap_to_extent(slice_centers, piezo_line), piezo_line)
     piezo_y2_all = get_piezometric_y_coordinates(
         _snap_to_extent(slice_centers, piezo_line2), piezo_line2)
+    # The same lines at the point each slice reads its pore pressure (the middle
+    # of the arc on a circle); the weight's water table stays at the center.
+    if on_arc_all.any():
+        piezo_y_u_all = get_piezometric_y_coordinates(
+            _snap_to_extent(x_u_all, piezo_line), piezo_line)
+        piezo_y2_u_all = get_piezometric_y_coordinates(
+            _snap_to_extent(x_u_all, piezo_line2), piezo_line2)
+    else:
+        piezo_y_u_all, piezo_y2_u_all = piezo_y_all, piezo_y2_all
 
     # === Piezometric-line extent guard ===
     # get_piezometric_y_coordinates interpolates with left/right = NaN, so a slice
@@ -1832,6 +1899,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # saturated while the pore pressures fall.
     any_gamma_sat = any(m.get('gamma_sat') is not None for m in materials)
     water_table_y_all = np.full(len(slice_centers), np.nan)
+    water_table_y_u_all = water_table_y_all   # at the pore-pressure points (ru's column)
     if any_gamma_sat:
         had_cache = slope_data.get('_water_table_profile') is not None
         wt_kind, wt_src = water_table_source(slope_data)
@@ -1843,8 +1911,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                       "and plotting).")
             xs_grid, wt = wt_src
             water_table_y_all = np.interp(slice_centers, xs_grid, wt)
+            water_table_y_u_all = np.interp(x_u_all, xs_grid, wt)
         elif wt_kind == 'piezo':
             water_table_y_all = np.asarray(piezo_y_all, dtype=float)
+            water_table_y_u_all = np.asarray(piezo_y_u_all, dtype=float)
         # gamma_sat with no water table is reported once, before the run, by
         # preflight (mat.gamma_sat_without_water); a warning here would repeat
         # per trial surface of a search.
@@ -1937,8 +2007,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # what update_slice_materials() needs to rebuild w, y_cg, kw and the base
     # strengths for a new materials list without re-slicing — the geometry never
     # changes, only the properties multiplied onto it.
-    mb_Hm, mb_Hs, mb_HYm, mb_HYs, mb_base = ([], [], [], [], []) \
-        if material_breakdown else (None, None, None, None, None)
+    mb_Hm, mb_Hs, mb_HYm, mb_HYs, mb_base, mb_y_u = ([], [], [], [], [], []) \
+        if material_breakdown else (None, None, None, None, None, None)
     # Coverage tally for u='seep' base points. A single base outside the seepage
     # mesh is a warning (a mesh that stops short of one end of a long surface is a
     # modelling judgement); EVERY base outside it is not a judgement, it is a
@@ -1955,6 +2025,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         y_lb = y_lb_all[i]
         y_rb = y_rb_all[i]
         y_cb = y_cb_all[i]
+        x_u, y_u = x_u_all[i], y_u_all[i]     # where the base reads its pore pressure
         y_lt = y_lt_all[i]
         y_rt = y_rt_all[i]
         y_ct = y_ct_all[i]
@@ -2458,8 +2529,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         # === END: "Line loads" ===
 
         # Process piezometric line and pore pressures using pre-computed coordinates
-        piezo_y = piezo_y_all[i]
-        piezo_y2 = piezo_y2_all[i]
+        piezo_y = piezo_y_u_all[i]
+        piezo_y2 = piezo_y2_u_all[i]
         
         hw = 0
         hw2 = 0
@@ -2482,23 +2553,23 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 raise _no_piezo_line_error(materials[base_material_idx]['name'])
             if _pz_ext is not None and np.isnan(piezo_y):
                 raise _piezo_extent_error(
-                    i, x_c, materials[base_material_idx]['name'], _pz_ext,
+                    i, x_u, materials[base_material_idx]['name'], _pz_ext,
                     "piezometric line")
             if _pz2_ext is not None and np.isnan(piezo_y2):
                 raise _piezo_extent_error(
-                    i, x_c, materials[base_material_idx]['name'], _pz2_ext,
+                    i, x_u, materials[base_material_idx]['name'], _pz2_ext,
                     "second piezometric line")
-            if not np.isnan(piezo_y) and piezo_y > y_cb:
-                hw = piezo_y - y_cb
-            if not np.isnan(piezo_y2) and piezo_y2 > y_cb:
-                hw2 = piezo_y2 - y_cb
+            if not np.isnan(piezo_y) and piezo_y > y_u:
+                hw = piezo_y - y_u
+            if not np.isnan(piezo_y2) and piezo_y2 > y_u:
+                hw2 = piezo_y2 - y_u
             u = hw * gamma_w if not np.isnan(piezo_y) else 0
             u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
             # Signed head to the piezometric line: negative above the line, where
             # its magnitude is the hydrostatic matric suction. No phreatic cos^2
             # correction (that models steady parallel seepage below the line).
             if not np.isnan(piezo_y):
-                u_unclamped = (piezo_y - y_cb) * gamma_w
+                u_unclamped = (piezo_y - y_u) * gamma_w
             # Lines declared Type='phreatic' on the piezo sheet get the
             # phreatic-inclination correction (XSTABL / Slide "Hu: auto"):
             # for steady seepage roughly parallel to an inclined phreatic
@@ -2514,9 +2585,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                         return 1.0 / (1.0 + m * m)
                 return 1.0
             if slope_data.get('piezo_phreatic'):
-                u *= _cos2(slope_data.get('piezo_line'), x_c)
+                u *= _cos2(slope_data.get('piezo_line'), x_u)
             if slope_data.get('piezo_phreatic2'):
-                u2 *= _cos2(slope_data.get('piezo_line2'), x_c)
+                u2 *= _cos2(slope_data.get('piezo_line2'), x_u)
         elif mat_u == 'seep':
             # Seepage-based pore pressure calculation using mesh interpolation.
             # A missing mesh or field is REFUSED here, not read as u = 0 -- the same
@@ -2536,7 +2607,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 # signed=True delivers the RAW field including negative (suction)
                 # values above the water table; this branch then applies its OWN
                 # clamp for the effective-normal u, mirroring the piezo branch.
-                point = (x_c, y_cb)
+                point = (x_u, y_u)
                 u_val, found = interpolate_at_point(
                     mesh['nodes'],
                     mesh['elements'],
@@ -2573,7 +2644,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 seep_u2 = slope_data['seep_u2']
 
                 # Interpolate pore pressure at the slice center base point
-                point = (x_c, y_cb)
+                point = (x_u, y_u)
                 u2_val, found2 = interpolate_at_point(
                     mesh['nodes'],
                     mesh['elements'],
@@ -2597,7 +2668,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             # Morgenstern) sigma_v is the SOIL column only -- distributed loads and
             # crack water are excluded. There is no staged variant: u2 = u.
             ru_ratio = materials[base_material_idx].get('ru', 0.0) if base_material_idx is not None else 0.0
-            u = ru_ratio * sum_gam_h
+            # On a circle sigma_v is the column above the pore-pressure point, the
+            # middle of the arc, rather than the weight's column at the center.
+            sigma_v = (_column_stress_at_u(i, water_table_y_u_all[i]) if on_arc_all[i]
+                       else sum_gam_h)
+            u = ru_ratio * sigma_v
             u2 = u
         else:
             # Unreachable: load_slope_data validates u against this same set. A bare
@@ -2609,22 +2684,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         # Calculate alpha (slope angle of the failure surface) more efficiently
         delta = 0.01
-        if use_arc:
-            # For circular failure surface, use parametric equation for derivative
-            # The slope at any point on the circle is: dy/dx = (x - Xo) / sqrt(R^2 - (x - Xo)^2)
-            dx_circle = x_c - Xo
-            if abs(dx_circle) < R:  # Check if point is on the circle
-                alpha = degrees(atan(dx_circle / sqrt(R**2 - dx_circle**2)))
-            else:
-                # Fallback to numerical method
-                y1 = get_circular_y_coordinates([x_c - delta], Xo, Yo, R)[0]
-                y2 = get_circular_y_coordinates([x_c + delta], Xo, Yo, R)[0]
-                alpha = degrees(atan2(y2 - y1, 2 * delta))
+        if on_arc_all[i]:
+            # A base on the circle: the chord between its corners, whose
+            # inclination is the circle's tangent at the middle of the arc and
+            # which passes through the point the base forces act at (y_base_all).
+            # The tangent at x_c is flatter than that on a steepening slice: 88.26
+            # deg against 88.76 on the last slice at a vertical exit.
+            alpha = degrees(atan2(y_rb - y_lb, dx))
         elif comp is not None:
-            # Exact on both branches: the circle equation on the arc, the floor
-            # segment's own slope on the floor. Every slice lies wholly on one
-            # branch (the crossings are slice boundaries), so this never averages
-            # across the kink the way a +/-delta finite difference would.
+            # The floor segment's own slope. Every slice lies wholly on one branch
+            # of a composite surface (the crossings are slice boundaries), so this
+            # never averages across the kink the way a +/-delta finite difference
+            # would.
             alpha = comp.alpha_deg(x_c)
         else:
             # For non-circular failure surface, use geometric intersection
@@ -2649,12 +2720,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         if right_facing:
             alpha = -alpha
-        if use_arc or (comp is not None and not comp.on_floor(x_c)):
+        if on_arc_all[i]:
             # A base on the circle is curved, so its length is the arc between its
-            # two corners. dx / cos(alpha), with alpha the tangent at x_c, is exact
-            # only for a straight base: where the circle steepens across a slice it
-            # reads short (a 0.57 ft slice at a vertical exit gave 3.4 ft for an
-            # arc of 4.8), and the cohesion and pore-pressure terms short with it.
+            # two corners. dx / cos(alpha) with alpha the tangent at x_c read short
+            # where the circle steepens across a slice (a 0.57 ft slice at a
+            # vertical exit gave 3.4 ft for an arc of 4.8), and the cohesion and
+            # pore-pressure terms short with it.
             dl = 2.0 * R * asin(min(1.0, hypot(dx, y_rb - y_lb) / (2.0 * R)))
         else:
             dl = dx / cos(radians(alpha))
@@ -2732,7 +2803,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 # increasing by the rate cp per unit elevation below it (clamped to c
                 # at/above r_elev): Su = c + cp * max(0, r_elev - y).
                 mat = materials[base_material_idx]
-                c = mat['c'] + max(0.0, mat['r_elev'] - y_cb) * mat['cp']
+                # read where the pore pressure is: the middle of the base
+                c = mat['c'] + max(0.0, mat['r_elev'] - y_u) * mat['cp']
                 phi = 0
                 c1 = 0      # not used in rapid drawdown, but must be defined
                 phi1 = 0    # not used in rapid drawdown, but must be defined
@@ -2772,7 +2844,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'y_rb': y_rb,   # right y-coordinate of the slice base
             'y_rt': y_rt,   # right y-coordinate of the slice top
             'x_c': x_c,     # center x-coordinate of the slice
-            'y_cb': y_cb,   # center y-coordinate of the slice base
+            'y_cb': y_base_all[i],   # middle of the base (of its chord, on a circle)
             'y_ct': y_ct,   # center y-coordinate of the slice top
             'y_cg': y_cg,   # center of gravity y-coordinate of the slice
             'dx': dx,       # width of the slice
@@ -2869,6 +2941,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             mb_HYm.append(_hym)
             mb_HYs.append(_hys)
             mb_base.append(-1 if base_material_idx is None else base_material_idx)
+            mb_y_u.append(y_u)
 
     # Every u='seep' base point outside the seepage mesh: the field was not read at
     # all, so the whole surface priced as dry. The per-point warning above cannot
@@ -2904,6 +2977,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'Hm': np.asarray(mb_Hm), 'Hs': np.asarray(mb_Hs),
             'HYm': np.asarray(mb_HYm), 'HYs': np.asarray(mb_HYs),
             'base_idx': np.asarray(mb_base, dtype=int),
+            'y_u': np.asarray(mb_y_u, dtype=float),   # where cp strength is read
             'mat_of_poly': _mats_of_poly,
             'k_seismic': k_seismic,
             'suction': bool(suction_phi_b),

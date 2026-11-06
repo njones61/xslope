@@ -12,10 +12,15 @@ on the base. The mobilized shear from Mohr-Coulomb (divided by FS) is:
     S_m = (1/FS) * [ c*l + (N') * tan(phi) ]   ... along the base length l
 
 Solving vertical equilibrium for N' and substituting into moment equilibrium
-about the center (where the lever arm for shear is R and the driving term is
-W*sin(a)*R, R cancels) yields the classic iterative form:
+about the center, with the base normal through the center, the shear acting at
+the base's distance r from the center and the weight at r*sin(a) from it, yields
 
-    FS = SUM[ (c*b + (W - u*b)*tan(phi)) / m_a ] / SUM[ W*sin(a) ]
+    FS = SUM[ r * (c*b + (W - u*b)*tan(phi)) / m_a ] / SUM[ W * r * sin(a) ]
+
+which is the classic iterative form when every base lies at the same r = R, and
+r cancels. A base on a circle is the chord between its corners and acts at the
+chord's middle, R*cos(dtheta/2) from the center, so r is the same for slices of
+the same angle and differs slightly between stretches cut to different angles.
 
 with
     m_a = cos(a) * (1 + tan(a)*tan(phi)/FS)
@@ -43,6 +48,8 @@ def bishop_independent(df, fs_init=1.5, tol=1e-10, max_iter=200):
     W = df['w'].to_numpy(float)                    # slice weight
     u = df['u'].to_numpy(float)                    # pore pressure at base center
     b = df['dl'].to_numpy(float) * np.cos(a)       # base length, projected
+    r = np.hypot(df['x_c'].to_numpy(float) - float(df['xo'].iloc[0]),
+                 df['y_cb'].to_numpy(float) - float(df['yo'].iloc[0]))  # base to center
 
     tan_phi = np.tan(phi)
     sin_a = np.sin(a)
@@ -50,7 +57,7 @@ def bishop_independent(df, fs_init=1.5, tol=1e-10, max_iter=200):
     tan_a = np.tan(a)
 
     # Driving (denominator) term is independent of FS.
-    denom = np.sum(W * sin_a)
+    denom = np.sum(W * r * sin_a)
 
     # Cohesive + frictional numerator pieces (independent of FS).
     cohesive = c * b
@@ -59,7 +66,7 @@ def bishop_independent(df, fs_init=1.5, tol=1e-10, max_iter=200):
     fs = fs_init
     for _ in range(max_iter):
         m_a = cos_a * (1.0 + tan_a * tan_phi / fs)
-        numer = np.sum((cohesive + frictional) / m_a)
+        numer = np.sum(r * (cohesive + frictional) / m_a)
         fs_new = numer / denom
         if abs(fs_new - fs) < tol:
             fs = fs_new

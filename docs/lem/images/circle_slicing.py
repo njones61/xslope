@@ -76,11 +76,11 @@ def draw_section(ax, bounds, title):
     tm = np.radians(0.5 * (theta(bounds[-2]) + theta(bounds[-1])))
     span = theta(bounds[-1]) - theta(bounds[-2])
     ax.annotate("last slice: %.0f° of arc" % span,
-                xy=(XO + R * np.sin(tm) + 0.3, YO - R * np.cos(tm)), xytext=(26.0, 9.0),
-                fontsize=10.5, ha="left", va="center", color="#c0392b",
+                xy=(XO + R * np.sin(tm) + 0.3, YO - R * np.cos(tm)), xytext=(25.0, 9.0),
+                fontsize=12.5, ha="left", va="center", color="#c0392b",
                 arrowprops=dict(arrowstyle="-", color="#c0392b", lw=0.9,
                                 shrinkA=3, shrinkB=9))
-    ax.text(-7.0, 22.6, title, fontsize=12, ha="left", va="bottom", weight="bold")
+    ax.text(-7.0, 22.6, title, fontsize=13.5, ha="left", va="bottom", weight="bold")
     ax.set_xlim(-8.0, 37.0)
     ax.set_ylim(-3.0, 24.5)
     ax.set_aspect("equal")
@@ -112,7 +112,7 @@ def figure_width_angle():
     for name, xs in (("widths", widths), ("angles", angles)):
         print("   %s: %d slices, arcs %s deg" % (name, len(xs) - 1,
               ", ".join("%.1f" % (theta(b) - theta(a)) for a, b in zip(xs[:-1], xs[1:]))))
-    fig, axes = plt.subplots(2, 1, figsize=(8.6, 9.6))
+    fig, axes = plt.subplots(2, 1, figsize=(7.4, 8.6))
     draw_section(axes[0], widths, "Equal widths")
     draw_section(axes[1], angles, "Equal angles")
     fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01, hspace=0.04)
@@ -137,7 +137,10 @@ def figure_base():
     top = 2.6
     x_lo, x_hi, y_lo, y_hi = 4.2, 11.6, -8.9, 3.4
 
-    fig, ax = plt.subplots(figsize=(9.6, 6.9))
+    key_w = 8.6                     # data units the key takes beside the slice
+    units_per_inch = 1.75
+    fig, ax = plt.subplots(figsize=((x_hi + key_w - x_lo) / units_per_inch,
+                                    (y_hi - y_lo) / units_per_inch))
     ts = np.linspace(t1, t2, 200)
     arc = np.array([on(t) for t in ts])
     poly = [(A[0], top)] + [tuple(p) for p in arc] + [(B[0], top)]
@@ -158,7 +161,7 @@ def figure_base():
     for p in (A, B):
         toward_o(p, "0.75", 0.8)
     q = toward_o(M, "0.55", 0.9)
-    ax.text(q[0] + 0.15, q[1] + 0.35, "to the center O", fontsize=10, color="0.4",
+    ax.text(q[0] + 0.15, q[1] + 0.35, "to the center O", fontsize=11.5, color="0.4",
             ha="left", va="bottom", rotation=np.degrees(np.arctan2(-M[1], -M[0])) - 180,
             rotation_mode="anchor")
     # the base: arc and chord
@@ -168,18 +171,18 @@ def figure_base():
     ax.plot([C[0], C[0]], [P[1] - 0.6, top + 0.3], ls=":", color="0.2", lw=1.1)
     ax.add_patch(FancyArrowPatch((C[0], top - 0.35), (C[0], top - 2.4),
                                  arrowstyle="-|>", mutation_scale=14, color="black", lw=1.4))
-    ax.text(C[0] + 0.2, top - 1.35, "W", fontsize=12, ha="left", va="center")
+    ax.text(C[0] + 0.2, top - 1.35, "W", fontsize=13.5, ha="left", va="center")
     # the base normal at C, along the radius toward O
     d = -C / np.linalg.norm(C)
     tip = C + 1.7 * d
     ax.add_patch(FancyArrowPatch(tuple(C), tuple(tip), arrowstyle="-|>", shrinkA=5,
                                  mutation_scale=14, color="black", lw=1.4, zorder=6))
-    ax.text(tip[0] + 0.42, tip[1] - 0.42, "N", fontsize=12, ha="center", va="center")
+    ax.text(tip[0] + 0.42, tip[1] - 0.42, "N", fontsize=13.5, ha="center", va="center")
     # alpha, the chord's inclination, drawn at A
     ax.plot([A[0], A[0] + 2.0], [A[1], A[1]], color="0.3", lw=0.9)
     ax.add_patch(Arc(tuple(A), 2.8, 2.8, theta1=0, theta2=np.degrees(tm), color="0.3",
                      lw=0.9))
-    ax.text(A[0] + 1.62, A[1] + 0.55, "α", fontsize=13, ha="left", va="center")
+    ax.text(A[0] + 1.62, A[1] + 0.55, "α", fontsize=14, ha="left", va="center")
     # the tangent at P, flatter than the chord
     tan = np.array([np.cos(tp), np.sin(tp)])
     ax.plot([P[0] - 2.4 * tan[0], P[0] + 2.4 * tan[0]],
@@ -189,34 +192,34 @@ def figure_base():
     ax.plot(*C, "o", ms=8, mfc="white", mec="black", mew=1.8, zorder=7)
     ax.plot(*M, "o", ms=8, color=WATER, zorder=7)
     ax.plot(*P, "o", ms=7, mfc="white", mec="0.4", mew=1.5, zorder=7)
-    ax.text(C[0] - 0.42, C[1] - 0.38, "C", fontsize=12, ha="center", va="center",
+    ax.text(C[0] - 0.42, C[1] - 0.38, "C", fontsize=13.5, ha="center", va="center",
             zorder=8)
-    ax.text(M[0] + 0.48, M[1] + 0.05, "M", fontsize=12, ha="left", va="center",
+    ax.text(M[0] + 0.48, M[1] + 0.05, "M", fontsize=13.5, ha="left", va="center",
             color=WATER, zorder=8)
-    ax.text(P[0] + 0.48, P[1] - 0.22, "P", fontsize=12, ha="left", va="center",
+    ax.text(P[0] + 0.48, P[1] - 0.22, "P", fontsize=13.5, ha="left", va="center",
             color="0.35", zorder=8)
-    ax.text(A[0] - 0.42, A[1] - 0.2, "A", fontsize=12, ha="center", va="center")
-    ax.text(B[0] + 0.32, B[1] + 0.3, "B", fontsize=12, ha="left", va="center")
+    ax.text(A[0] - 0.42, A[1] - 0.2, "A", fontsize=13.5, ha="center", va="center")
+    ax.text(B[0] + 0.32, B[1] + 0.3, "B", fontsize=13.5, ha="left", va="center")
     tb = t1 + 0.8 * (t2 - t1)
-    ax.text(*(on(tb) * 1.07), "Δℓ", fontsize=13, ha="left", va="center")
+    ax.text(*(on(tb) * 1.07), "Δℓ", fontsize=14, ha="left", va="center")
 
     # the key, beside the slice
-    key = [("C", "the middle of the chord AB, on the slice's center line\n"
-                 "and on the radius through M: the base forces act here", "black"),
-           ("M", "the middle of the arc AB: the pore pressure is read here", WATER),
-           ("P", "the circle directly below the slice's center line;\n"
-                 "dashed, the circle's tangent there", "0.35"),
+    key = [("C", "the middle of the chord AB, on the\nslice's center line and on the\n"
+                 "radius through M: the base\nforces act here", "black"),
+           ("M", "the middle of the arc AB: the\npore pressure is read here", WATER),
+           ("P", "the circle directly below the\nslice's center line; dashed, the\n"
+                 "circle's tangent there", "0.35"),
            ("Δℓ", "the length of the arc AB", "black"),
-           ("α", "the inclination of the chord AB, which is\n"
-                 "parallel to the circle's tangent at M", "black")]
-    y = 1.6
+           ("α", "the inclination of the chord AB,\nparallel to the circle's tangent\nat M",
+            "black")]
+    y = 2.4
     for sym, text, color in key:
-        ax.text(x_hi + 0.5, y, sym, fontsize=12, ha="left", va="top", color=color,
+        ax.text(x_hi + 0.4, y, sym, fontsize=13, ha="left", va="top", color=color,
                 weight="bold")
-        ax.text(x_hi + 1.45, y, text, fontsize=10.5, ha="left", va="top", color=color,
-                linespacing=1.25)
-        y -= 0.62 + 0.37 * (1 + text.count("\n"))
-    ax.set_xlim(x_lo, x_hi + 9.6)
+        ax.text(x_hi + 1.5, y, text, fontsize=12, ha="left", va="top", color=color,
+                linespacing=1.2)
+        y -= 0.62 + 0.42 * (1 + text.count("\n"))
+    ax.set_xlim(x_lo, x_hi + key_w)
     ax.set_ylim(y_lo, y_hi)
     ax.set_aspect("equal")
     ax.axis("off")

@@ -22,7 +22,7 @@ from xslope.slice import build_composite_surface, generate_slices
 warnings.filterwarnings("ignore")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-XLSX = os.path.join(HERE, "..", "..", "files", "rocscience", "vp022a.xlsx")
+XLSX = os.path.join(HERE, "..", "..", "verification", "files", "rocscience", "vp022a.xlsx")
 OUT = os.path.join(HERE, "composite_surface.png")
 
 
@@ -33,8 +33,11 @@ def main():
     if not ok:
         raise RuntimeError(fs)
 
-    fig = plt.figure(figsize=(9.5, 4.6))
-    plot_inputs(sd, fig=fig, show_title=False)
+    # Drawn to be shown at 100 px per figure inch (half its 200 dpi pixel width),
+    # where 12 pt text renders at about the page's own text size.
+    plt.rcParams.update({"font.size": 12, "xtick.labelsize": 11, "ytick.labelsize": 11})
+    fig = plt.figure(figsize=(8.4, 4.8))
+    plot_inputs(sd, fig=fig, show_title=False, show_mesh=False)
     ax = fig.axes[0]
 
     # Drop plot_inputs' radius arrow and center marker — the center (120, 90) sits
@@ -57,15 +60,18 @@ def main():
                 label="arc meets the base" if i == 0 else None)
 
     ax.annotate("the trial circle passes\nbelow the model base",
-                xy=(120, 10.2), xytext=(96, -6), fontsize=8.5, color="0.3",
-                ha="center", arrowprops=dict(arrowstyle="->", color="0.5", lw=1.0))
+                xy=(120, 10.2), xytext=(96, -7), fontsize=12, color="0.3",
+                ha="center", arrowprops=dict(arrowstyle="->", color="0.5", lw=1.0,
+                                             shrinkA=3, shrinkB=6))
     ax.set_xlim(-5, 190)
-    ax.set_ylim(-14, 72)
-    ax.legend(loc="upper right", fontsize=8, framealpha=0.9, ncol=2)
-    ax.set_title("A circle deeper than the model base is truncated: it follows the arc "
-                 "down, runs\nalong the base between the two crossings, and climbs back "
-                 "out on the arc", fontsize=10)
-    fig.savefig(OUT, dpi=150, bbox_inches="tight")
+    ax.set_ylim(-12, 66)
+    ax.tick_params(labelsize=11)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), fontsize=11.5,
+              frameon=False, ncol=3)
+    ax.set_title("A circle deeper than the model base is truncated: it follows the arc down,\n"
+                 "runs along the base between the two crossings, and climbs back out on the arc",
+                 fontsize=12)
+    fig.savefig(OUT, dpi=200, bbox_inches="tight")
     print("wrote", OUT)
 
 

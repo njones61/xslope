@@ -617,7 +617,7 @@ faults typed into LEM-3's model: the material rows **swapped**, so the strong
 clay sits in the embankment and the weak clay in the foundation; the
 embankment's unit weight **13 pcf** instead of 130; and the maximum depth
 **−100** instead of −10, putting a rigid base 100 ft below a 20 ft section. A Spencer's-method search returns
-0.998 on it.
+1.005 on it.
 
 <div class="prompt-block" markdown>
 ```text
@@ -625,17 +625,18 @@ This model was built from the LEM-3 tutorial, but the factor of safety looks wro
 ```
 </div>
 
-![The diagnosis in the dock: the model read once and searched as it came in, at 0.998, one snippet that fixes the material assignment on the profile lines, the unit weight and the maximum depth, the rerun at 1.244 with its plot, and the reply with its table of what was wrong](images/w1_diagnose_1.png){width=560}
+![The diagnosis in the dock: the model read once and searched as it came in, at 1.005, one snippet that fixes the material assignment on the profile lines, the unit weight and the maximum depth, the rerun at 1.245 with its plot, and the reply with its table of what was wrong](images/w1_diagnose_1.png){width=560}
 
 It answers by reading the file once against the inputs in the request and
-searching it as it came in, at 0.998. One snippet then fixes all three faults: it
+searching it as it came in, at 1.005. One snippet then fixes all three faults: it
 re-points the two profile lines at the right materials, sets the embankment's
-unit weight back to 130 pcf, and sets the maximum depth to −10. The rerun returns
-**FS = 1.244** on a surface bottoming at elevation 0 — LEM-3's answer — and the
-closing summary places that surface correctly: *"the circle just touches the top
-of the foundation, so the slide runs through the embankment only."* It fixed the
-three together, and says it did not measure how much of the rise from 0.998 to
-1.244 each fix accounts for.
+unit weight back to 130 pcf, and sets the maximum depth to −10, and the model
+checks come back clean. The rerun returns **FS = 1.245** on a surface tangent to
+the top of the foundation, the mechanism LEM-3 finds, and the closing summary
+places that surface correctly: *"Its lowest point is on top of the foundation,
+so the slip passes through the embankment only and doesn't go into the stronger
+foundation."* It fixed the three together, and says it can't tell how much of
+the change from 1.005 to 1.245 each fix caused.
 
 It repaired the swap by re-pointing the profile lines' Mat IDs rather than
 reordering the material rows, so the saved
@@ -645,11 +646,11 @@ that table top down. The transcript is
 [w1_diagnose_transcript.md](files/w1_diagnose_transcript.md).
 
 <!-- test: file=files/w1_diagnose_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.0051, tolerance=0.005 -->
-<!-- test: file=files/w1_diagnose_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.2441, tolerance=0.005 -->
+<!-- test: file=files/w1_diagnose_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.2445, tolerance=0.005 -->
 
 ### Check its work
 
-- **Reload the repaired workbook and search.** 1.2441 on a contact-tangent
+- **Reload the repaired workbook and search.** 1.2445 on a contact-tangent
   circle, against LEM-3's published 1.244.
 - **Materials and Profile lines editors, before trusting the row order.** The
   foundation is still listed first, with profile line 1 pointing at material 2.

@@ -8,8 +8,8 @@ circle_slices_width_angle.png
 circle_slice_base.png
     One steep slice on a circle, drawn large: the arc between its corners, the
     chord, the middle of the chord where the base forces act, the middle of the
-    arc where the pore pressure is read, and the point on the circle directly
-    below the slice's center line.
+    arc where the pore pressure is read, and the circle's tangent there, parallel
+    to the chord.
 
     PYTHONPATH=. python3 docs/lem/images/circle_slicing.py
 """
@@ -124,7 +124,7 @@ def figure_width_angle():
 
 def figure_base():
     """One slice from 42 to 82 degrees of a circle of radius 10, centered at O,
-    drawn zoomed: the radius through M runs off the panel toward O. C, M, P and the arc length
+    drawn zoomed: the radius through M runs off the panel toward O. C, M, the arc length and the tangent at M
     are labeled beside the slice with pointer lines that stop short of what they
     point at; the corner letters, the angle and the two forces are labeled in place."""
     r = 10.0
@@ -133,8 +133,6 @@ def figure_base():
     on = lambda t: np.array([r * np.sin(t), -r * np.cos(t)])
     A, B, M = on(t1), on(t2), on(tm)
     C = 0.5 * (A + B)
-    tp = np.arcsin(C[0] / r)
-    P = on(tp)
     top = 2.6
     x_lo, x_hi, y_lo, y_hi = 1.4, 17.4, -8.9, 3.4
     right = 11.9                    # where the labels on the right begin
@@ -169,7 +167,7 @@ def figure_base():
     ax.plot(arc[:, 0], arc[:, 1], color="black", lw=2.6, zorder=4)
     ax.plot([A[0], B[0]], [A[1], B[1]], color="black", lw=1.0, ls=(0, (6, 3)), zorder=4)
     # the slice's center line and the weight on it
-    ax.plot([C[0], C[0]], [P[1] - 0.6, top + 0.3], ls=":", color="0.2", lw=1.1)
+    ax.plot([C[0], C[0]], [C[1] - 1.2, top + 0.3], ls=":", color="0.2", lw=1.1)
     mid = 0.5 * (top + C[1])         # halfway down the slice, on its center line
     ax.add_patch(FancyArrowPatch((C[0], mid + 1.0), (C[0], mid - 1.0),
                                  arrowstyle="-|>", mutation_scale=14, color="black", lw=1.4))
@@ -190,15 +188,14 @@ def figure_base():
     ax.add_patch(Arc(tuple(A), 2.8, 2.8, theta1=0, theta2=np.degrees(tm), color="0.3",
                      lw=0.9))
     ax.text(A[0] + 1.62, A[1] + 0.55, "α", fontsize=14, ha="left", va="center")
-    # the tangent at P, flatter than the chord
-    tan = np.array([np.cos(tp), np.sin(tp)])
-    ax.plot([P[0] - 2.4 * tan[0], P[0] + 2.4 * tan[0]],
-            [P[1] - 2.4 * tan[1], P[1] + 2.4 * tan[1]], color="0.35", lw=1.3, ls="--",
+    # the tangent at M, parallel to the chord
+    tan = np.array([np.cos(tm), np.sin(tm)])
+    ax.plot([M[0] - 2.4 * tan[0], M[0] + 1.4 * tan[0]],
+            [M[1] - 2.4 * tan[1], M[1] + 1.4 * tan[1]], color="0.35", lw=1.3, ls="--",
             zorder=5)
     # the three points
     ax.plot(*C, "o", ms=8, mfc="white", mec="black", mew=1.8, zorder=7)
     ax.plot(*M, "o", ms=8, color=WATER, zorder=7)
-    ax.plot(*P, "o", ms=7, mfc="white", mec="0.4", mew=1.5, zorder=7)
     ax.text(A[0] - 0.47, A[1] + 0.03, "A", fontsize=13.5, ha="center", va="center")
     ax.text(B[0] + 0.32, B[1] + 0.3, "B", fontsize=13.5, ha="left", va="center")
 
@@ -210,12 +207,12 @@ def figure_base():
 
     label(C, (A[0] - 0.55, C[1] - 0.6), "C, the middle of the chord AB:\n"
           "the base forces act here", "black", ha="right")
-    label(on(t1 + 0.8 * (t2 - t1)), (right, -1.6), "Δℓ, the length of the arc AB",
+    label(on(t1 + 0.92 * (t2 - t1)), (right, -1.6), "Δℓ, the length of the arc AB",
           "black")
     label(M, (right, -3.9), "M, the middle of the arc AB:\nthe pore pressure is read here",
           WATER)
-    label(P, (right, -6.3), "P, the point on the circle directly\nbelow the slice's center line\n"
-          "(dashed line: the circle's tangent at P)", "0.35")
+    label(M - 2.0 * tan, (right, -6.3), "the circle's tangent at M,\nparallel to the chord AB",
+          "0.35")
     ax.set_xlim(x_lo, x_hi)
     ax.set_ylim(y_lo, y_hi)
     ax.set_aspect("equal")

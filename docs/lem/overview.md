@@ -305,15 +305,13 @@ A circular surface is cut into slices of equal angle, so each slice base spans t
 
 A base on the circle takes the arc between its corners A and B as its length $\Delta \ell$ and the chord AB for its inclination $\alpha$; the chord is parallel to the circle's tangent at M, the middle of the arc. The base forces act at C, the middle of the chord, and the pore pressure is read at M; under r<sub>u</sub>, the vertical stress is that of the soil column above M.
 
-![One steep slice: the arc AB, the chord AB, the points C, M and P](images/circle_slice_base.png){width="833px"}
+![One steep slice: the arc AB, the chord AB, the points C and M, and the tangent at M](images/circle_slice_base.png){width="767px"}
 
 *One steep slice drawn large. The weight W and the base forces act on the slice's center line, through C; the normal force N points at the circle's center O.*
 
 In every method of slices, the weight and the base forces act on the slice's center line (dotted in the figure). On a circular base, the normal force also points at the circle's center, O. The center line and the line from O through M cross at C, so the base forces act at C.
 
 The pore pressure changes along the base, but each slice uses one value for its whole base. The value at M, the middle of the arc, is the closest to the average.
-
-P, the point on the circle directly below the slice's center line, sits lower on the arc than M, by up to a fifth of the base length on a steep slice. Its pore pressure reads several percent high, and its tangent is flatter than the base.
 
 Slices also break at every vertex of the ground and the material zones above the surface, at every point where the surface crosses a material boundary or a piezometric line, and at every point that defines a distributed load. Non-circular surfaces, and the run along the floor of a composite surface, are straight between their vertices; they are cut into slices of equal width, and $\Delta \ell = \Delta x \sec \alpha$ is exact for them.
 

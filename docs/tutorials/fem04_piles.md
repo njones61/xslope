@@ -162,13 +162,14 @@ both bands matter at once:
 
 ![The two pile rows with both usage bands shown](images/fem04_studio_piles_table.png)
 
-The columns are colored by which engine reads them. Red is limit equilibrium
+The columns are colored by which engine reads them, in the colors of the `piles`
+worksheet's headers. Green is limit equilibrium
 only: `H`, the stated pile force, and `Appl`, how that force enters the
 equations. `H` is blank on both rows, so Ito & Matsui is used: with no force
 stated, the limit equilibrium engine computes one from `D`,
 `S` and the soil around the pile; enter a number and that number is used
 instead. Blue is finite element only: `E`, `I`, `Area`, and `Head` and `Tip`,
-which say whether each end of the member is free to rotate. The black columns
+which say whether each end of the member is free to rotate. The red columns
 are read by both — `D` and `S`, and also `Vcap` and `Mcap`, which cap the
 per-pile force in the limit equilibrium engine and, in the finite element engine,
 hold the beam shear to Vcap ÷ S and release a plastic hinge where the beam moment

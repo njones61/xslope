@@ -7920,6 +7920,62 @@ def test_the_base_shear_arm_is_named_for_the_surface():
     return fails
 
 
+def test_a_circle_gives_the_solution_under_its_sums():
+    """On a circle the named sums are divided as printed, and the sentence under
+    them gives the solution's factor of safety (Norm, 118a).
+
+    The two moment pages take every slice base at the radius R. A circle is cut
+    into chords, and XSLOPE takes the forces on each base at the middle of its
+    chord, R·cos(Δθ/2) from the center, so the named sums' quotient differs from
+    the solution in about the fifth digit. Printed as the solution's F, the
+    division of the two printed numbers would not come out to it on a model
+    where the two round apart. So the line ends on the sums' own quotient, and
+    the sentence under it ends "their sums give F = " the solution.
+
+    Two models: the sample under OMS, where the two print alike, and the
+    tension-crack model under Bishop at 15 slices, where the sums give 4.592 and
+    the solution is 4.591 — the case this is here for.
+    """
+    import re
+    fails = []
+    from xslope.columns import format_fs
+
+    apart = False
+    for label, xlsx, method in (("the sample model", REINF_XLSX, "oms"),
+                                ("the tension-crack model", TENSION_XLSX,
+                                 "bishop")):
+        report, bundle = _calc_report(method, xlsx=xlsx)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{label} under {method}: no calculation")
+            continue
+        where = f"{label} under {method}"
+        lines = [b.notation for b in section.blocks if b.kind == "math"
+                 and b.notation.startswith("F = frac{N_S")
+                 and "frac{" in b.notation.split(" = ", 2)[-1]]
+        m = re.search(r"= frac\{([-\d.]+)\}\{([-\d.]+)\} = ([-\d.]+)$",
+                      lines[-1]) if lines else None
+        if m is None:
+            fails.append(f"{where}: no division of the named sums: {lines}")
+            continue
+        top, bottom, printed = (float(m.group(i)) for i in (1, 2, 3))
+        if format_fs(top / bottom) != m.group(3):
+            fails.append(f"{where}: {top} / {bottom} prints as "
+                         f"{format_fs(top / bottom)}, and the line says "
+                         f"{m.group(3)}")
+        solved = format_fs(bundle["results"]["FS"])
+        said = [b.text for b in section.blocks if b.kind == "prose"
+                and "is the chord of its arc" in b.text]
+        if not said or not said[0].endswith(f"their sums give F = {solved}."):
+            fails.append(f"{where}: the sentence under the sums does not give "
+                         f"the solution's F = {solved}: {said}")
+        apart = apart or m.group(3) != solved
+    if not apart:
+        fails.append("no model printed its named sums 0.001 away from the "
+                     "solution, so the case this is here for was not reached")
+    return fails
+
+
 def test_calculation_leads_read_once():
     """The sentence that opens a calculation says each of its facts once, and
     attributes each equation to the page that publishes it.
@@ -20971,6 +21027,8 @@ CHECKS = [
      test_table_symbols_are_set_as_symbols),
     ("the base shear's arm is named for the surface",
      test_the_base_shear_arm_is_named_for_the_surface),
+    ("a circle gives the solution under its sums",
+     test_a_circle_gives_the_solution_under_its_sums),
     ("each calculation's lead reads once", test_calculation_leads_read_once),
     ("a wide quotient keeps its own equals sign",
      test_the_wide_quotient_is_narrowed),

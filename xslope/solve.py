@@ -456,9 +456,9 @@ def _moment_arms(slice_df, Xo, Yo, alpha, right_facing):
     """Per-slice moment arms about the center of rotation (Xo, Yo), for the two
     moment methods (OMS, Bishop).
 
-        xr   horizontal arm of the slice weight        ( = R·sinα  on a circle )
-        a_S  moment arm of the base shear              ( = R       on a circle )
-        a_N  perpendicular offset of the base normal   ( = 0       on a circle )
+        xr   horizontal arm of the slice weight        ( = a_S·sinα        on a circle )
+        a_S  moment arm of the base shear              ( = R·cos(dtheta/2) on a circle )
+        a_N  perpendicular offset of the base normal   ( = 0               on a circle )
 
     On a circle every base normal points straight at the center, so it exerts no
     moment, and every base is at radius R (R cos(dtheta/2) for a base taken at the
@@ -467,8 +467,9 @@ def _moment_arms(slice_df, Xo, Yo, alpha, right_facing):
     Neither holds on a COMPOSITE surface (a circle truncated at bedrock, see
     slice.CompositeSurface): the run along the floor is not at radius R and its
     normal misses the center. These are the general arms — SLOPE/W's per-slice R
-    and its normal offset f — and they collapse identically to (R·sinα, R, 0) when
-    the surface is a circle, so no circular result moves.
+    and its normal offset f — and on a circle, whose bases are chords with their
+    forces at each chord's middle, they are (R·cos(dtheta/2)·sinα,
+    R·cos(dtheta/2), 0), where dtheta = dl/R is the angle of arc the base spans.
 
     The x-arms are taken in the orientation-normalized frame that alpha lives in
     (mirrored on right-facing slopes), the same correction as a_dx / pile_x_arm.

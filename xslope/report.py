@@ -5014,40 +5014,71 @@ def _passive_moments(kept_res):
     return out
 
 
-#: How closely every slice base has to stand at one radius before the named parts
-#: of equations (8) and (10) are the equilibrium the solver evaluated.
+#: How closely every slice base has to stand where a circle puts it before the
+#: named parts of equations (8) and (10) are printed as this solution's working.
 #:
 #: Both pages factor the radius out of the moment equilibrium, which they may do
 #: because every base of a circular arc is at radius R and the base normal points
-#: at the center. On a COMPOSITE surface — a circle truncated at bedrock — the run
-#: along the floor is at neither, and Σ W·sin α is no longer the weight's moment
-#: over R. That surface is shown the general moment arms instead.
+#: at the center. A circle is cut into chords, and the forces on each base act at
+#: the middle of its chord, R·cos(Δθ/2) from the center, where Δθ = Δl/R is the
+#: angle of arc the base spans; the normal still points at the center. On a
+#: COMPOSITE surface — a circle truncated at bedrock — the run along the floor is
+#: at neither, and Σ W·sin α is no longer the weight's moment over R. That
+#: surface is shown the general moment arms instead.
 TRUE_CIRCLE_TOLERANCE = 1e-9
 
 
 def _circle_radius(C):
     """``(R, true circle)`` — the radius the two moment pages factor out of their
-    equilibrium, and whether this surface has one.
+    equilibrium, and whether this surface is a circle.
 
-    ``a_S`` is the moment arm of the base shear, which on a circular arc is the
-    radius on every slice; ``a_N`` is the offset of the base normal from the
-    center, which on one is zero. Together they are what makes W·x_r equal to
-    R·W·sin α slice by slice, and so what makes the pages' named sums the sums the
-    solver formed (:func:`xslope.solve._moment_arms`).
+    ``a_S`` is the moment arm of the base shear and ``a_N`` the offset of the base
+    normal from the center (:func:`xslope.solve._moment_arms`). On a circle cut
+    into chords ``a_S`` is R·cos(Δθ/2) on every slice and ``a_N`` is zero, so
+    W·x_r is a_S·W·sin α slice by slice: the pages' named sums are the solver's
+    moments with every base taken at R instead of at its chord's middle
+    (:func:`_differs_only_at_the_chords`).
     """
     import numpy as np
 
-    a_S = np.asarray(C.arms["a_S"], dtype=float)
-    a_N = np.asarray(C.arms["a_N"], dtype=float)
-    R = float(np.mean(a_S))
+    df = C.df
+    if df is None or "r" not in df.columns:
+        return 0.0, False
+    R = abs(float(df["r"].iloc[0]))
     if not np.isfinite(R) or not R:
         return 0.0, False
-    floor = TRUE_CIRCLE_TOLERANCE * abs(R)
-    return R, bool(np.max(np.abs(a_S - R)) <= floor
+    a_S = np.asarray(C.arms["a_S"], dtype=float)
+    a_N = np.asarray(C.arms["a_N"], dtype=float)
+    chord = R * np.cos(np.asarray(C.A["dl"], dtype=float) / (2.0 * R))
+    floor = TRUE_CIRCLE_TOLERANCE * R
+    return R, bool(np.max(np.abs(a_S - chord)) <= floor
                    and np.max(np.abs(a_N)) <= floor)
 
 
-def _numerator_value(method, C, FS):
+def _differs_only_at_the_chords(method, C, passive, FS, R, quotient):
+    """Do a circle's named sums differ from its solution only by where each base
+    is taken?
+
+    The pages take every base at the radius; the solver takes it at the middle
+    of its chord, R·cos(Δθ/2) from the center (:func:`_circle_radius`). Where
+    the slices span different angles, as they do on either side of a ground
+    vertex or a material boundary, the named sums' quotient differs from the
+    solver's in about the fifth digit. True where the same sums with each base
+    at its chord's middle return the solution; False where they do not, which
+    is a force the page does not carry rather than the arm.
+    """
+    import numpy as np
+
+    weights = np.asarray(C.arms["a_S"], dtype=float) / R
+    *_rest, values = _page_quotient(method, C, passive, FS, R, weights=weights)
+    if not values:
+        return False
+    top = sum(sign * value for sign, _n, value in values[0])
+    bottom = sum(sign * value for sign, _n, value in values[1])
+    return bool(bottom) and _closes(top / bottom - quotient, quotient, method)
+
+
+def _numerator_value(method, C, FS, weights=None):
     """``N_S`` on this model — the strength mobilized on the slice bases, as the
     method's own page writes it.
 
@@ -5055,21 +5086,25 @@ def _numerator_value(method, C, FS):
     (4); equation (10) sums the same strength over the base-normal denominator,
     which carries the factor of safety. Each is its page's expression evaluated,
     and not the other's.
+
+    ``weights`` scales each slice's term before the sum: a_S/R, on a circle, is
+    the page's expression with each base at its chord's middle.
     """
     import numpy as np
 
     A = C.A
+    w = 1.0 if weights is None else np.asarray(weights, dtype=float)
     strength = A["c"] * A["dl"]
     if method == "oms":
-        return float(np.sum(strength + A["N"] * A["tan_phi"]))
+        return float(np.sum((strength + A["N"] * A["tan_phi"]) * w))
     group = np.zeros(A["n"])
     for term in _published_terms("bishop_num"):
         group = group + term.sign * np.asarray(term.values(C), dtype=float)
     m = A["cos_a"] + A["sin_a"] * A["tan_phi"] / FS
-    return float(np.sum((strength * A["cos_a"] + group * A["tan_phi"]) / m))
+    return float(np.sum((strength * A["cos_a"] + group * A["tan_phi"]) / m * w))
 
 
-def _page_quotient(method, C=None, passive=None, FS=None, R=0.0):
+def _page_quotient(method, C=None, passive=None, FS=None, R=0.0, weights=None):
     """``(lines, symbols, mobilized, parts)`` — one moment method's factor of
     safety as its own page publishes it, written as a quotient of named sums.
 
@@ -5094,6 +5129,10 @@ def _page_quotient(method, C=None, passive=None, FS=None, R=0.0):
     quotient of those values is what the arithmetic at the foot of the section
     divides, so the letters a reader is shown and the numbers they are given are
     the same statement. Empty values where there is no model to evaluate on.
+
+    ``weights`` scales each slice's term in the sums that do not divide by R,
+    which are the ones that take every base at the radius (N_S and D_W); the
+    parts over R are moments at the arms the solver formed them at already.
     """
     import numpy as np
 
@@ -5130,14 +5169,15 @@ def _page_quotient(method, C=None, passive=None, FS=None, R=0.0):
         the radius where the printed line divides by it."""
         if C is None or not R:
             return None
-        total = sum(float(np.sum(np.asarray(v, dtype=float))) * s
+        w = 1.0 if weights is None or over_R else np.asarray(weights, dtype=float)
+        total = sum(float(np.sum(np.asarray(v, dtype=float) * w)) * s
                     for s, _symbol, v in terms)
         return sign * total / (R if over_R else 1.0)
 
     symbols, parts, lines = [], [], []
     numerators = [(+1, "N_S",
                    None if C is None or FS is None
-                   else _numerator_value(method, C, FS))]
+                   else _numerator_value(method, C, FS, weights))]
     for name, key, label in _RESISTING_PARTS:
         terms = (passive or {}).get(key) or []
         if not terms:
@@ -5552,13 +5592,22 @@ def _calculation(slope_data, bundle, method):
     # the sums the solver formed are read off the general moment arms. Where the
     # two disagree, the page's are not this solution's working, and the section
     # prints the arms instead (:data:`ARMS_INSTEAD`).
+    #
+    # On a circle the page takes every base at the radius and the solver at the
+    # middle of its chord, so the named sums can differ from the solution in the
+    # fifth digit. They are printed wherever that is the only difference, with
+    # their own quotient, and the sentence under them gives the solution's F
+    # (:func:`_named_part_close`); on a rare model the two print 0.001 apart.
     arms = ""
     if method in MOMENT_METHODS and not true_circle:
         arms = "composite"
     elif parts:
         top = sum(sign * value for sign, _n, value in parts[0])
         bottom = sum(sign * value for sign, _n, value in parts[1])
-        if not bottom or not _closes(top / bottom - quotient, quotient, method):
+        if not (bottom and (_closes(top / bottom - quotient, quotient, method)
+                            or _differs_only_at_the_chords(
+                                method, C, _passive_moments(kept_res), FS,
+                                radius, quotient))):
             parts, arms = (), "mismatch"
 
     # The three methods that march print the whole-mass balance under their
@@ -5606,7 +5655,10 @@ def _calculation(slope_data, bundle, method):
         # R is the radius of the circle on the two moment methods' pages and the
         # reinforcement force on Spencer's, and a letter that means two things
         # cannot go in one nomenclature.
-        "symbols": ({"R": "radius of the circular failure surface"}
+        "symbols": ({"R": "radius of the circular failure surface",
+                     "Δθ": "angle of arc a slice base spans, Δl/R"}
+                    if method in MOMENT_METHODS and true_circle
+                    else {"R": "radius of the circular failure surface"}
                     if method in MOMENT_METHODS else {}),
     }, ""
 
@@ -5741,9 +5793,10 @@ ARMS_INSTEAD = ("On this model the named sums of equation (%s) do not return "
 
 #: The arm the resisting-moment column is defined at, in the two shapes a
 #: failure surface comes in. The column registry writes the general one; on a
-#: circular surface it is the radius, and that is what the section around the
-#: table has printed and defined.
-_BASE_SHEAR_ARM = ("·a_S", "·R")
+#: circular surface it is the distance to the middle of the base's chord, written
+#: in the radius the section prints and defines and the angle of arc the base
+#: spans.
+_BASE_SHEAR_ARM = ("·a_S", "·R cos(Δθ/2)")
 
 
 def _legend_arm(legend, calc):
@@ -5751,8 +5804,9 @@ def _legend_arm(legend, calc):
     has it.
 
     The resisting moment is ``(c·Δl + N'·tan φ)·a_S``, and ``a_S`` is the arm of
-    the base shear: on a circular surface it is the radius R, which is the letter
-    the section's equations print and its nomenclature defines. Left as ``a_S``
+    the base shear: on a circular surface it is R·cos(Δθ/2), the distance to the
+    middle of the base's chord, in the letter the section's equations print and
+    its nomenclature defines. Left as ``a_S``
     there, the footnote used a symbol that report defines nowhere. On a composite
     surface the arm is not the radius, and it stays ``a_S``: that section prints
     the general moment arms, so the letter is defined where it is used.
@@ -6238,26 +6292,36 @@ def _named_part_close(calc, where, links, unit_labels):
     drv_col = BY_KEY.get(calc["drv_key"])
     unit = unit_label(res_col, unit_labels) if res_col is not None else ""
     blocks = []
-    said = _evaluated_intro(EVALUATED_EQUATION.get(calc["method"], ""))
-    if where and res_col is not None and drv_col is not None:
-        in_units = f", in {unit}" if unit else ""
-        said += (f" Each named sum below is one force's moment about the center "
-                 f"of rotation, divided by the radius and summed over the "
-                 f"{len(calc['slice_df'])} slices; the per-slice moments are "
-                 f"columns {res_col.label} and {drv_col.label} of "
-                 f"{where}{in_units}:")
-    else:
-        said += " The named sums are:"
-    blocks.append(Prose(said, links=links))
+    number = EVALUATED_EQUATION.get(calc["method"], "")
+    said = _evaluated_intro(number)
+    said += (f" Summed over the {len(calc['slice_df'])} slices, the named sums "
+             f"are:")
+    blocks.append(Prose(said))
     blocks += [Math(f"{name} = {format_sum(value)}")
                for _sign, name, value in list(numerators) + list(driving)]
     top = sum(sign * value for sign, _n, value in numerators)
     bottom = sum(sign * value for sign, _n, value in driving)
+    # The named sums' own quotient: on a circle it can differ from the solution
+    # in the fifth digit, and on a rare model print 0.001 away from it. The
+    # sentence below gives the solution's F.
     blocks.append(Math(
         f"F = frac{{{_signed_notation(numerators)}}}"
         f"{{{_signed_notation(driving)}}} = "
         f"frac{{{format_sum(top)}}}{{{format_sum(bottom)}}} = "
-        f"{format_fs(calc['FS'])}"))
+        f"{format_fs(top / bottom)}"))
+    # Equation (8) takes every base at the radius; the slices are chords, and
+    # their moments are taken at each chord's middle (:func:`_circle_radius`).
+    if where and res_col is not None and drv_col is not None:
+        in_units = f", in {unit}," if unit else ""
+        blocks.append(Prose(
+            f"Equation ({number}) takes every slice base at the radius R. Each "
+            f"base is the chord of its arc, and the forces on it act at the "
+            f"middle of the chord, R cos(Δθ/2) from the center of rotation, "
+            f"where Δθ = Δl/R is the angle of arc the base spans. Columns "
+            f"{res_col.label} and {drv_col.label} of {where} are each slice's "
+            f"moments about the center{in_units} with the base forces at that "
+            f"distance; their sums give F = {format_fs(calc['FS'])}.",
+            links=links))
     return blocks
 
 

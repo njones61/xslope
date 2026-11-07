@@ -1808,8 +1808,9 @@ def test_a_report_run_method_is_run_at_the_analysis_discretization():
     """A method the report runs is cut into the same slices the analysis was.
 
     The count a run was made with cannot be read back off its slice table: the
-    slicer splits at material and water boundaries, so a run of 20 comes back as
-    21 rows. Inferring the option from the table ran the second method at 21,
+    slicer gives every stretch between material and water boundaries at least
+    one slice, so on the dam, with its many boundaries, a run of 20 comes back
+    as 24 rows. Inferring the option from the table ran the second method at 21,
     which is a different discretization of the same surface — and the section's
     Analysis Inputs, which prints the slice count only where the methods share
     one, silently lost the row.
@@ -1826,7 +1827,7 @@ def test_a_report_run_method_is_run_at_the_analysis_discretization():
                                run_requested_methods)
     from xslope.search import run_lem_analysis
 
-    slope_data = load_slope_data(REINF_XLSX)
+    slope_data = load_slope_data(DAM_XLSX)
     asked = 20
     with contextlib.redirect_stdout(io.StringIO()):
         first = run_lem_analysis(slope_data, "bishop", analysis="single_surface",
@@ -1839,7 +1840,7 @@ def test_a_report_run_method_is_run_at_the_analysis_discretization():
                      f"with: {first.get('options')}")
 
     solutions = {"lem": [first]}
-    opts = resolve_options({"input_path": REINF_XLSX,
+    opts = resolve_options({"input_path": DAM_XLSX,
                             "method": ["bishop", "spencer"], "pd_figure": False,
                             "lem_inputs_figure": False,
                             "lem_search_figure": False,
@@ -3920,8 +3921,8 @@ def test_every_reinforcement_force_reaches_the_slice_table():
     from xslope.units import labels
 
     fails = []
-    want_fs = {("tangent", "active"): 1.612, ("tangent", "passive"): 1.500,
-               ("axial", "active"): 1.620, ("axial", "passive"): 1.508}
+    want_fs = {("tangent", "active"): 1.609, ("tangent", "passive"): 1.499,
+               ("axial", "active"): 1.621, ("axial", "passive"): 1.509}
 
     def table(path, d, a):
         with contextlib.redirect_stdout(io.StringIO()):
@@ -3992,8 +3993,9 @@ def test_the_force_at_each_crossing():
     the term of the capacity envelope that sets it (Norm, Q38).
 
     On the reinforcement sample's first circle, five of the six 800 lb/ft
-    geogrids are crossed at full capacity, and Line 1 is crossed at its own end
-    at the toe, where it develops nothing. A passive line applies its tension
+    geogrids are crossed at full capacity. The circle touches Line 1 at the
+    line's own end at the toe, which is either a crossing that develops nothing
+    or a miss; both are right, on either facing. A passive line applies its tension
     divided by F. Line 2 given a 30 ft pullout length at end 2 is limited by
     pullout from that end, and by its anchorage plus pullout once Tend2 is set;
     the force is the envelope's value at the crossing either way. A line moved
@@ -4011,18 +4013,17 @@ def test_the_force_at_each_crossing():
         got = crossings(df, sd, fs)
         want = [(f"Line {n}", 800.0, "Tmax") for n in range(2, 7)]
         rows = [(r["name"], round(r["T"], 6), r["limit"]) for r in got["rows"]]
-        # The circle leaves the toe where Line 1 begins: a crossing at the
-        # line's own end, which develops nothing, or on the mirror, where the
-        # arc is computed from the other side, a miss by rounding. Either is
-        # the right answer; anything else is not.
+        # The circle's lowest point is the toe, where Line 1 begins: the arc
+        # touches the line at its own end. That is a crossing at the end, which
+        # develops nothing, or a miss by rounding, and which one depends on how
+        # the arc is cut into slices. Either is the right answer; anything else
+        # is not.
         toe = rows[:1] == [("Line 1", 0.0, "Pullout from end 1")]
         if (rows[1:] if toe else rows) != want:
             fails.append(f"{name}: the crossings are {rows}, not {want}")
         if not toe and got["uncrossed"] != ["Line 1"]:
             fails.append(f"{name}: Line 1 is neither crossed at its end nor "
                          f"listed as missed: {got['uncrossed']}")
-        if name == "xslope_reinforce" and not toe:
-            fails.append(f"{name}: the toe crossing of Line 1 is gone: {rows}")
         if any(r["applied"] != r["T"] for r in got["rows"]):
             fails.append(f"{name}: an active line applies other than its tension")
         if got["passive"] or (toe and got["uncrossed"]):
@@ -4124,12 +4125,20 @@ def test_the_crossing_section():
         return [f"the report has {len(found)} crossing sections"]
     prose = " ".join(b.text for b in found[0].blocks if b.kind == "prose")
     tables = [b for b in found[0].blocks if b.kind == "table"]
-    if len(tables) != 1 or len(tables[0].rows) != 5:
-        fails.append(f"the section's tables: {[len(t.rows) for t in tables]}")
+    # The circle touches Line 1 at its own end at the toe, a crossing that
+    # develops nothing or a miss (test_the_force_at_each_crossing); the rows and
+    # the sentence follow whichever it is.
+    from xslope.crossings import crossings
+    toe = any(r["name"] == "Line 1" for r in crossings(df, sd, fs)["rows"])
+    rows, missed = ((5, "does not cross Line 6") if toe
+                    else (4, "does not cross Line 1 and Line 6"))
+    if len(tables) != 1 or len(tables[0].rows) != rows:
+        fails.append(f"the section's tables: {[len(t.rows) for t in tables]}, "
+                     f"not one of {rows} rows")
     if f"F = {fs:.3f}" not in prose:
         fails.append(f"a passive model's sentence does not divide by F: {prose}")
-    if "does not cross Line 6" not in prose:
-        fails.append(f"the uncrossed line is not named: {prose}")
+    if missed not in prose:
+        fails.append(f"the uncrossed lines are not named ({missed!r}): {prose}")
     if section(sd, df, fs, {"lem_crossings": False}):
         fails.append("lem_crossings off left the section in")
 

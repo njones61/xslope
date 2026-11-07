@@ -167,10 +167,11 @@ so the choice is set per line:
 - **Active** (Slide2's "Method A", the **default**): the force is a known, *allowable* working load. It is applied
   to the driving side of the equilibrium equations and is **not** divided by $F$ — the factor of safety applies to
   the soil strength only. Appropriate for pre-tensioned supports (tiebacks) and whenever the entered capacity
-  already carries its own safety factor.
+  already carries its own safety factor, as the allowable values of FHWA's soil nail design (GEC 7) do.
 - **Passive** (Slide2's "Method B"): the force is a *nominal* (unfactored) capacity that mobilizes together with the soil
-  strength. It is added to the resisting side and **is** divided by $F$. Appropriate when the support only develops
-  force as the soil deforms (nails, geosynthetics in some formulations) and the entered capacity is unfactored.
+  strength. It is added to the resisting side and **is** divided by $F$. Appropriate when the entered capacity is
+  unfactored and one factor of safety is to cover the soil and the reinforcement together, as in FHWA's design of
+  reinforced soil slopes (GEC 11).
 
 The distinction matters numerically: on the classic Duncan & Wright tieback example (their Fig. 6.34), the same
 9,000 lb/ft support gives FS = 1.51 active and FS = 1.32 passive.
@@ -182,7 +183,7 @@ The **Type** column fills Dir and Appl automatically (either can be overridden b
 | Type | Dir | Appl |
 |---|---|---|
 | Geosynthetic | Tangent | Active |
-| Nail | Axial | Passive |
+| Nail | Axial | Active |
 | Tieback | Axial | Active |
 | Anchor | Axial | Active |
 

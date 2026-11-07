@@ -111,7 +111,7 @@ preset over two settings:
 | Type | Dir | Appl |
 | --- | --- | --- |
 | Geosynthetic | Tangent | Active |
-| Nail | Axial | Passive |
+| Nail | Axial | Active |
 | Tieback | Axial | Active |
 | Anchor | Axial | Active |
 

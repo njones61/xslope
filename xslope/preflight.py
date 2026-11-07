@@ -5586,7 +5586,7 @@ def _reinf_incomplete_cross(ctx):
 
 
 @rule("reinforce.type_blank", WARNING, ("lem", "fem"),
-      "A blank Type defaults to tangent/active -- 13% off a soil nail.")
+      "A blank Type defaults to tangent/active; a nail or tieback acts axially.")
 def _reinf_type_blank(ctx):
     rows = [i for i, r in enumerate(ctx.reinforcement)
             if _vocab(r.get("type")) is None]
@@ -5594,10 +5594,9 @@ def _reinf_type_blank(ctx):
         return None
     return (f"{len(rows)} reinforcement line(s) leave Type blank, starting at "
             f"{ctx.reinf_label(rows[0])}, so they default to Dir = tangent, "
-            f"Appl = active. That is right for a generic tensile line and wrong for "
-            f"a soil nail, which is axial/passive: on the reference model the "
-            f"default read 13% higher than the nail preset. Set Type, or set Dir "
-            f"and Appl explicitly {_AT_REINF}.")
+            f"Appl = active. That is right for a generic tensile line, and wrong in "
+            f"direction for a nail, a tieback or an anchor, which act along their "
+            f"own axis. Set Type, or set Dir and Appl explicitly {_AT_REINF}.")
 
 
 @rule("reinforce.pullout_negative", ERROR, ("lem", "fem"),

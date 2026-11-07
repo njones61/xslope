@@ -37,11 +37,15 @@ from xslope.fileio import (POLYGON_TYPE_WORDS, REINFORCE_TYPE_PRESETS,
 # the network dialog's refusal of a name already in use.
 from xslope.joints import set_name
 
-# Column "usage" tags: which analysis a field applies to. Header text is colored
-# to mirror the input template's header coloring (red = LEM-specific inputs,
-# blue = FEM-specific inputs); seepage/reliability extend the same idea.
-USAGE_COLOR = {"lem": "#c00000", "fem": "#0432ff", "seep": "#2e7d32", "rel": "#9a7d0a"}
-USAGE_NAME = {"lem": "LEM only", "fem": "FEM only",
+# Header colors: which analysis reads a column, in the input template's own colors,
+# so a column is the same color on the sheet and in the editor. Black (no tag) is
+# identity and geometry; green is LEM only, red is read by LEM and FEM both, blue
+# is FEM only. Seepage takes the mat sheet's dark purple. Reliability stays gold:
+# the sheet's gray for its standard deviations reads as a disabled control on a
+# toggle. See Field.color_tag for how a field gets its class.
+USAGE_COLOR = {"lem": "#3b7d23", "both": "#c00000", "fem": "#0432ff",
+               "seep": "#78206e", "rel": "#9a7d0a"}
+USAGE_NAME = {"lem": "LEM only", "both": "LEM & FEM", "fem": "FEM only",
               "seep": "Seepage only", "rel": "Reliability"}
 # Short labels for the show/hide toggles at the top of an editor.
 USAGE_TOGGLE_LABEL = {"lem": "LEM", "fem": "FEM", "seep": "Seepage", "rel": "Reliability"}
@@ -165,15 +169,20 @@ class Field:
         self.choices = [str(c) for c in (choices or [])]
         # `applies`: the set of analyses this field is used in — drives the
         # show/hide column toggles; None = universal (geometry/identity, always
-        # shown). `usage`: the single analysis a field is *specific* to, used for
-        # the mirrored header color — only set when the field belongs to exactly
-        # one analysis (shared fields like c/φ stay uncolored but still hide when
-        # neither of their analyses is toggled on).
+        # shown). `usage`: the single analysis a field is *specific* to — only set
+        # when the field belongs to exactly one analysis (shared fields like c/φ
+        # have none, and still hide when neither of their analyses is toggled on).
+        # The header color comes from `color_tag`, below.
         if applies is None and usage is not None:
             applies = {usage}
         self.applies = frozenset(applies) if applies is not None else None
         self.usage = usage if usage is not None else (
             next(iter(self.applies)) if (self.applies and len(self.applies) == 1) else None)
+        # The header-color class (a USAGE_COLOR key): the one analysis the field is
+        # specific to, "both" for a field LEM and FEM both read (the template's red
+        # columns), or None for identity and geometry (black).
+        self.color_tag = self.usage or (
+            "both" if self.applies == frozenset({"lem", "fem"}) else None)
         if default is None:
             default = (self.choices[0] if kind == "choice" and self.choices
                        else self._BLANK[kind])
@@ -657,12 +666,12 @@ class _EditableTable(QWidget):
         self.table.setEditTriggers(
             QAbstractItemView.AnyKeyPressed | QAbstractItemView.EditKeyPressed
             | QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
-        for j, f in enumerate(fields):  # color usage-tagged headers (red=LEM, blue=FEM, …)
+        for j, f in enumerate(fields):  # header colors as on the sheet (see USAGE_COLOR)
             hi = self.table.horizontalHeaderItem(j)
             if hi is None:
                 continue
-            if f.usage:
-                hi.setForeground(QColor(USAGE_COLOR[f.usage]))
+            if f.color_tag:
+                hi.setForeground(QColor(USAGE_COLOR[f.color_tag]))
                 fnt = hi.font()
                 fnt.setBold(True)
                 hi.setFont(fnt)
@@ -1323,17 +1332,39 @@ def _wire_cell_help(strip, table, fields, mapping):
     table.table.currentCellChanged.connect(_push)
 
 
-def _usage_legend(fields):
-    """A colored legend for any usage-tagged columns, or None if there are none."""
-    present = [u for u in ("lem", "fem", "seep", "rel")
-               if any(getattr(f, "usage", None) == u for f in fields)]
-    if not present:
+def _usage_legend(fields, enabled=None):
+    """A key to the LEM/FEM header colors these fields carry, or None if they carry
+    none. Like the key on the sheets it names the three LEM/FEM colors only; the
+    seepage and reliability columns are named by their own toggles. ``enabled`` is
+    the set of ticked analyses (None: all); see :func:`_set_usage_legend`."""
+    if not any(getattr(f, "color_tag", None) in ("lem", "both", "fem") for f in fields):
         return None
+    lbl = QLabel()
+    lbl.setTextFormat(Qt.RichText)
+    _set_usage_legend(lbl, fields, enabled)
+    return lbl
+
+
+def _set_usage_legend(lbl, fields, enabled):
+    """Key only the colors of the columns in view. A toggle hides its analysis's
+    columns, and the red "LEM & FEM" ones hide only when LEM and FEM are both off,
+    so a seepage-only view carries no LEM/FEM key at all."""
+    if lbl is None:
+        return
+
+    def in_view(u):
+        if enabled is None:
+            return True
+        return bool(set(enabled) & {"lem", "fem"}) if u == "both" else u in enabled
+    present = [u for u in ("lem", "both", "fem")
+               if in_view(u) and any(getattr(f, "color_tag", None) == u for f in fields)]
     spans = [f'<b><span style="color:{USAGE_COLOR[u]}">&#9632; {USAGE_NAME[u]}</span></b>'
              for u in present]
-    lbl = QLabel("Header colors:&nbsp;&nbsp; " + "&nbsp;&nbsp;&nbsp; ".join(spans))
-    lbl.setTextFormat(Qt.RichText)
-    return lbl
+    lbl.setText("Header colors:&nbsp;&nbsp; " + "&nbsp;&nbsp;&nbsp; ".join(spans))
+    if not present:
+        lbl.hide()
+    elif lbl.parent() is not None:      # show() on a label not yet in a layout would
+        lbl.show()                      # open it as a window of its own
 
 
 def _ok_cancel(dialog, layout):
@@ -2481,7 +2512,7 @@ class TableEditorDialog(QDialog):
                                         on_change=on_change, on_select=on_select,
                                         unit_labels=self._unit_labels)
         if usage_toggles:
-            layout.addLayout(self._build_toggle_bar(usage_toggles))
+            layout.addLayout(self._build_toggle_bar(usage_toggles, fields))
         else:
             legend = _usage_legend(fields)
             if legend:
@@ -2995,7 +3026,7 @@ class TableEditorDialog(QDialog):
         if row is not None:
             self._editable.select_row(row)
 
-    def _build_toggle_bar(self, tags):
+    def _build_toggle_bar(self, tags, fields):
         from PySide6.QtWidgets import QCheckBox
         from PySide6.QtCore import QSettings
         s = QSettings("XSlope", "XSlope Studio")
@@ -3012,12 +3043,19 @@ class TableEditorDialog(QDialog):
             self._toggles[t] = cb
             bar.addWidget(cb)
         bar.addStretch(1)
+        # The toggles name the analyses; this keys the header colors, red included.
+        self._legend = _usage_legend(fields, {t for t, cb in self._toggles.items()
+                                              if cb.isChecked()})
+        self._legend_fields = fields
+        if self._legend:
+            bar.addWidget(self._legend)
         return bar
 
     def _apply_toggles(self):
         from PySide6.QtCore import QSettings
         enabled = {t for t, cb in self._toggles.items() if cb.isChecked()}
         self._editable.apply_usage_filter(enabled)
+        _set_usage_legend(self._legend, self._legend_fields, enabled)
         s = QSettings("XSlope", "XSlope Studio")
         for t, cb in self._toggles.items():
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
@@ -4477,6 +4515,9 @@ class MaterialsDialog(QDialog):
             self._toggles[t] = cb
             top.addWidget(cb)
         top.addStretch(1)
+        self._legend = _usage_legend(fields, self._enabled_usage())
+        if self._legend:
+            top.addWidget(self._legend)
         layout.addLayout(top)
         self._sync_rel_enabled()
 
@@ -4564,6 +4605,7 @@ class MaterialsDialog(QDialog):
         for t, cb in self._toggles.items():
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
         self._sync_rel_enabled()
+        _set_usage_legend(self._legend, self._fields, self._enabled_usage())
         if self._mode == "table" and self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
             # Columns that were just shown belong on the dialog, not past its right
@@ -4978,8 +5020,8 @@ class _LineListView(QWidget):
         else:
             lab = QLabel(f.display_header(self._unit_labels))
         lab.setMinimumWidth(label_w)
-        if f.usage:                             # mirror the table's header coloring
-            lab.setStyleSheet(f"color:{USAGE_COLOR[f.usage]};")
+        if f.color_tag:                         # mirror the table's header coloring
+            lab.setStyleSheet(f"color:{USAGE_COLOR[f.color_tag]};")
         tip = getattr(f, "tooltip", None)
         if tip:
             lab.setToolTip(tip)
@@ -5380,6 +5422,10 @@ class _LineEditorDialog(QDialog):
         # and both bars act on this dialog's rows, so the two views stay in step.
         self._row_actions = list(row_actions or [])
         top.addStretch(1)
+        self._legend = _usage_legend(fields, self._enabled_usage())
+        self._legend_fields = fields
+        if self._legend:
+            top.addWidget(self._legend)
         # Actions on the whole list rather than on one row of it (the joints
         # editor's "Build network…"), right-aligned past the stretch so they sit
         # opposite the view toggles however wide the dialog is.
@@ -5455,6 +5501,7 @@ class _LineEditorDialog(QDialog):
         s = QSettings("XSlope", "XSlope Studio")
         for t, cb in self._toggles.items():
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
+        _set_usage_legend(self._legend, self._legend_fields, self._enabled_usage())
         if self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
             if self._mode == "table":
@@ -6861,13 +6908,14 @@ class JointsEditor(CategoryEditor):
     label = "Joints"
     # A joint line is FEM only: the mesh splits along it and interface elements
     # carry the two faces. The limit-equilibrium engines never see one, so every
-    # field is tagged fem and the LEM toggle hides the lot.
+    # property is tagged fem. The label and the two ends stay untagged (black), as
+    # on the sheet, where identity and geometry are black on every line sheet.
     FIELDS = [
         Field("label", "Label", "str", tooltip=JOINTS_HELP["label"]),
-        Field("x1", "x1", usage="fem", tooltip=JOINTS_HELP["x1"]),
-        Field("y1", "y1", usage="fem", tooltip=JOINTS_HELP["y1"]),
-        Field("x2", "x2", usage="fem", tooltip=JOINTS_HELP["x2"]),
-        Field("y2", "y2", usage="fem", tooltip=JOINTS_HELP["y2"]),
+        Field("x1", "x1", tooltip=JOINTS_HELP["x1"]),
+        Field("y1", "y1", tooltip=JOINTS_HELP["y1"]),
+        Field("x2", "x2", tooltip=JOINTS_HELP["x2"]),
+        Field("y2", "y2", tooltip=JOINTS_HELP["y2"]),
         Field("c", "c", "optfloat", usage="fem", unit="stress",
               tooltip=JOINTS_HELP["c"]),
         Field("phi", "phi", "optfloat", usage="fem", tooltip=JOINTS_HELP["phi"]),
@@ -7799,8 +7847,8 @@ def _reinf_item_label(i, row):
 
 # Wording mirrors the 'reinforce' worksheet section of input_template.md. Tmax,
 # Lp1/Lp2, Adhesion/Delta, Tend1/Tend2 and Spacing form the capacity envelope used
-# by BOTH LEM and FEM (fem.py caps the truss yield force at the same envelope) even
-# though their header color is "LEM only" red — so they aren't tagged that way here.
+# by BOTH LEM and FEM (fem.py caps the truss yield force at the same envelope), so
+# they are tagged applies=LF and take the sheet's red "LEM & FEM" header color.
 # Lp1/Lp2 and Adhesion/Delta are two ways to state ONE thing, the pullout law: a
 # filled Adhesion/Delta pair takes over and Lp1/Lp2 stop being read, which is what
 # the list view's Pullout switch and the grayed pair in either view say. Type/Dir/

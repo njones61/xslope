@@ -2041,18 +2041,20 @@ def test_fs_summary_reaches_the_document():
 #: The numbers stand at the mid-height of their own slices and come down in size
 #: together until they clear, so on any ordinary section none of them touch. The
 #: dam is not an ordinary section: asked for forty slices it is cut into
-#: forty-one, the downstream crest corner leaves slice 39 at 4.2 ft wide between
-#: slices 7.0 and 10.0 ft wide, and on the upstream face the pool's edge
-#: (x = 225) and the base's crossings of the foundation surface and the core
-#: face (x = 231.5 and 238.9) leave slices 29 and 30 at 6.4 and 7.4 ft against
-#: the 9 ft slices beside them. No size a reader could read separates the
-#: numbers in those slices from their neighbors'. Those pairs, and only those,
-#: are what the key gives up — pinned here, so a change that starts printing
-#: numbers over each other anywhere else is a failure rather than one more entry
-#: on a list.
+#: forty-one, the downstream crest corner leaves slice 38 at 4.2 ft wide between
+#: slices 7.0 and 6.9 ft wide, the circle's steep exit past it is cut by equal
+#: angle into slices of 6.9, 6.7 and 6.4 ft, and on the upstream face the pool's
+#: edge (x = 225) and the base's crossings of the foundation surface and the
+#: core face (x = 231.5 and 238.8) leave slices 27 and 28 at 6.5 and 7.4 ft
+#: against the 9 ft slices beside them. No size a reader could read separates
+#: the numbers in those slices from their neighbors'. Those pairs, and only
+#: those, are what the key gives up — pinned here, so a change that starts
+#: printing numbers over each other anywhere else is a failure rather than one
+#: more entry on a list (Norm accepted the five, 116a).
 _SLICE_KEY_TOUCHING = {
     "the sample": [],
-    "the dam": [("29", "30"), ("38", "39"), ("39", "40")],
+    "the dam": [("27", "28"), ("37", "38"), ("38", "39"), ("39", "40"),
+                ("40", "41")],
 }
 
 
@@ -2192,7 +2194,7 @@ def test_slice_key_figure():
     # inside the text width. The nail model's fifteen stand on a mass as tall as
     # it is wide, which leaves the numbers a narrow band and asks for more width
     # than the page has. The dam's forty-one ask for more still, and its crest
-    # corner leaves a slice 4.2 ft wide between slices of 7.0 and 10.0 ft. The
+    # corner leaves a slice 4.2 ft wide between slices of 7.0 and 6.9 ft. The
     # last two are the case the width rule CLAMPS, which is where the size on
     # the page is smallest and the only place the legibility floor is really
     # tested.
@@ -7915,6 +7917,62 @@ def test_the_base_shear_arm_is_named_for_the_surface():
     defined = dict(equation_symbols("(c·Δl + N'·tan φ)·a_S"))
     if "a_S" not in defined:
         fails.append(f"a section printing the general arms defines {defined}")
+    return fails
+
+
+def test_a_circle_gives_the_solution_under_its_sums():
+    """On a circle the named sums are divided as printed, and the sentence under
+    them gives the solution's factor of safety (Norm, 118a).
+
+    The two moment pages take every slice base at the radius R. A circle is cut
+    into chords, and XSLOPE takes the forces on each base at the middle of its
+    chord, R·cos(Δθ/2) from the center, so the named sums' quotient differs from
+    the solution in about the fifth digit. Printed as the solution's F, the
+    division of the two printed numbers would not come out to it on a model
+    where the two round apart. So the line ends on the sums' own quotient, and
+    the sentence under it ends "their sums give F = " the solution.
+
+    Two models: the sample under OMS, where the two print alike, and the
+    tension-crack model under Bishop at 15 slices, where the sums give 4.592 and
+    the solution is 4.591 — the case this is here for.
+    """
+    import re
+    fails = []
+    from xslope.columns import format_fs
+
+    apart = False
+    for label, xlsx, method in (("the sample model", REINF_XLSX, "oms"),
+                                ("the tension-crack model", TENSION_XLSX,
+                                 "bishop")):
+        report, bundle = _calc_report(method, xlsx=xlsx)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{label} under {method}: no calculation")
+            continue
+        where = f"{label} under {method}"
+        lines = [b.notation for b in section.blocks if b.kind == "math"
+                 and b.notation.startswith("F = frac{N_S")
+                 and "frac{" in b.notation.split(" = ", 2)[-1]]
+        m = re.search(r"= frac\{([-\d.]+)\}\{([-\d.]+)\} = ([-\d.]+)$",
+                      lines[-1]) if lines else None
+        if m is None:
+            fails.append(f"{where}: no division of the named sums: {lines}")
+            continue
+        top, bottom, printed = (float(m.group(i)) for i in (1, 2, 3))
+        if format_fs(top / bottom) != m.group(3):
+            fails.append(f"{where}: {top} / {bottom} prints as "
+                         f"{format_fs(top / bottom)}, and the line says "
+                         f"{m.group(3)}")
+        solved = format_fs(bundle["results"]["FS"])
+        said = [b.text for b in section.blocks if b.kind == "prose"
+                and "is the chord of its arc" in b.text]
+        if not said or not said[0].endswith(f"their sums give F = {solved}."):
+            fails.append(f"{where}: the sentence under the sums does not give "
+                         f"the solution's F = {solved}: {said}")
+        apart = apart or m.group(3) != solved
+    if not apart:
+        fails.append("no model printed its named sums 0.001 away from the "
+                     "solution, so the case this is here for was not reached")
     return fails
 
 
@@ -20969,6 +21027,8 @@ CHECKS = [
      test_table_symbols_are_set_as_symbols),
     ("the base shear's arm is named for the surface",
      test_the_base_shear_arm_is_named_for_the_surface),
+    ("a circle gives the solution under its sums",
+     test_a_circle_gives_the_solution_under_its_sums),
     ("each calculation's lead reads once", test_calculation_leads_read_once),
     ("a wide quotient keeps its own equals sign",
      test_the_wide_quotient_is_narrowed),

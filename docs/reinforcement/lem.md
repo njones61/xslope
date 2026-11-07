@@ -85,7 +85,8 @@ The envelope is then the same three-way minimum, with the ramps integrated rathe
 >$T(s) = \min\left(T_{max},\;\; T_{end1} + \displaystyle\int_0^s r,\;\; T_{end2} + \int_s^L r\right)$
 
 A constant $r$ recovers the straight ramps above, so the two laws are one formula. Both columns filled selects
-this law and $L_{p1}$/$L_{p2}$ are then not read; both blank is the default and selects the development-length
+this law, and $L_{p1}$/$L_{p2}$ are then not read: they can be left blank or keep their values, and the model
+check does not ask for them. Both blank is the default and selects the development-length
 law. Filling one column and leaving the other blank is an input error. LEM and FEM use the same envelope under
 either law.
 

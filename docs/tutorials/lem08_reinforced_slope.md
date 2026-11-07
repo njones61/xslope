@@ -154,7 +154,8 @@ lengths at each end: the tension available rises from zero at an end to the full
 Tmax 4 ft in, so a crossing within 4 ft of either end mobilizes only its share.
 **Adhesion** and **Delta** are blank, which is what selects the development-length
 law above: fill them instead and the pullout resistance follows the effective
-overburden along the line rather than a fixed length. **Tend1** and **Tend2** are
+overburden along the line rather than a fixed length, and Lp1 and Lp2 are then
+ignored. **Tend1** and **Tend2** are
 end anchorage — a bearing plate, a facing connection — and 0 is the friction-only
 case these geogrids are. **Spacing** is
 for discrete supports installed at a spacing out of the page; geogrid properties

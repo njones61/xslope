@@ -2041,18 +2041,20 @@ def test_fs_summary_reaches_the_document():
 #: The numbers stand at the mid-height of their own slices and come down in size
 #: together until they clear, so on any ordinary section none of them touch. The
 #: dam is not an ordinary section: asked for forty slices it is cut into
-#: forty-one, the downstream crest corner leaves slice 39 at 4.2 ft wide between
-#: slices 7.0 and 10.0 ft wide, and on the upstream face the pool's edge
-#: (x = 225) and the base's crossings of the foundation surface and the core
-#: face (x = 231.5 and 238.9) leave slices 29 and 30 at 6.4 and 7.4 ft against
-#: the 9 ft slices beside them. No size a reader could read separates the
-#: numbers in those slices from their neighbors'. Those pairs, and only those,
-#: are what the key gives up — pinned here, so a change that starts printing
-#: numbers over each other anywhere else is a failure rather than one more entry
-#: on a list.
+#: forty-one, the downstream crest corner leaves slice 38 at 4.2 ft wide between
+#: slices 7.0 and 6.9 ft wide, the circle's steep exit past it is cut by equal
+#: angle into slices of 6.9, 6.7 and 6.4 ft, and on the upstream face the pool's
+#: edge (x = 225) and the base's crossings of the foundation surface and the
+#: core face (x = 231.5 and 238.8) leave slices 27 and 28 at 6.5 and 7.4 ft
+#: against the 9 ft slices beside them. No size a reader could read separates
+#: the numbers in those slices from their neighbors'. Those pairs, and only
+#: those, are what the key gives up — pinned here, so a change that starts
+#: printing numbers over each other anywhere else is a failure rather than one
+#: more entry on a list (Norm accepted the five, 116a).
 _SLICE_KEY_TOUCHING = {
     "the sample": [],
-    "the dam": [("29", "30"), ("38", "39"), ("39", "40")],
+    "the dam": [("27", "28"), ("37", "38"), ("38", "39"), ("39", "40"),
+                ("40", "41")],
 }
 
 
@@ -2192,7 +2194,7 @@ def test_slice_key_figure():
     # inside the text width. The nail model's fifteen stand on a mass as tall as
     # it is wide, which leaves the numbers a narrow band and asks for more width
     # than the page has. The dam's forty-one ask for more still, and its crest
-    # corner leaves a slice 4.2 ft wide between slices of 7.0 and 10.0 ft. The
+    # corner leaves a slice 4.2 ft wide between slices of 7.0 and 6.9 ft. The
     # last two are the case the width rule CLAMPS, which is where the size on
     # the page is smallest and the only place the legibility floor is really
     # tested.

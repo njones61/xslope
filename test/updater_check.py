@@ -820,6 +820,27 @@ def _bundle_version(path):
         return None
 
 
+def _helper_steps(trace, root):
+    """What the macOS helper did, from its ``sh -x`` trace: each program it ran
+    and each error line it printed, in order, with the test's temporary folders
+    shortened. A swap that fails then names the step it failed at. The helper
+    sends hdiutil attach's own output to /dev/null, so a failed mount shows as
+    the attach followed directly by the rmdir of the empty mount point."""
+    tmp = os.path.realpath(tempfile.gettempdir())
+    steps = []
+    for line in trace.splitlines():
+        line = line.replace(os.path.realpath(root), "<test>").replace(root, "<test>")
+        line = line.replace(tmp, "<tmp>").replace(tempfile.gettempdir(), "<tmp>")
+        if line.startswith("+"):
+            # one + per level of nesting: a command inside $(...) is "++ "
+            command = line.lstrip("+").strip()
+            if command.startswith(("/usr/bin/", "/bin/")):
+                steps.append(command)
+        elif line.strip():
+            steps.append(line.strip())
+    return " | ".join(steps) or "(no trace)"
+
+
 def test_macos_swap():
     """The macOS helper, run for real: a dmg holding a new bundle replaces the
     installed one; a dmg with no app, and a folder it cannot write to, leave the
@@ -847,17 +868,29 @@ def test_macos_swap():
                            check=True)
             return dmg
 
+        steps = {}
+
         def run(dmg, bundle):
             argv, helper = updater.macos_replace_in_place(
                 dmg, bundle, pid=dead.pid, helper_dir=root, mode="quiet")
+            # sh -x traces each command to stderr and changes nothing else, so
+            # a leg that fails can say which step of the helper went wrong.
+            argv = argv[:1] + ["-x"] + argv[1:]
             done = subprocess.run(argv, capture_output=True, timeout=120)
+            steps["last"] = _helper_steps(
+                done.stderr.decode("utf-8", "replace"), root)
             return done.returncode, helper
+
+        def explain(leg, before):
+            if len(fails) > before:
+                fails.append(f"{leg}, the helper ran: {steps['last']}")
 
         # the swap
         install = os.path.join(root, "Applications")
         bundle = os.path.join(install, "XSLOPE Studio.app")
         _bundle(bundle, "old")
         dmg = make_dmg("good", True)
+        before = len(fails)
         code, helper = run(dmg, bundle)
         if code != 0:
             fails.append(f"the swap reported failure (exit {code})")
@@ -871,10 +904,12 @@ def test_macos_swap():
             fails.append("the dmg was not deleted after a good swap")
         if os.path.exists(helper):
             fails.append("the helper did not delete itself")
+        explain("on the swap", before)
 
         # MUTATION: a dmg with no app in it
         _bundle(bundle, "old")
         dmg = make_dmg("empty", False)
+        before = len(fails)
         code, helper = run(dmg, bundle)
         if code == 0:
             fails.append("a dmg with no app in it reported success")
@@ -882,9 +917,11 @@ def test_macos_swap():
             fails.append("a dmg with no app in it changed the installed bundle")
         if not os.path.exists(dmg):
             fails.append("a failed swap deleted the dmg the user needs to finish by hand")
+        explain("on the dmg with no app", before)
 
         # MUTATION: a folder the swap cannot write to
         dmg = make_dmg("good2", True)
+        before = len(fails)
         os.chmod(install, 0o555)
         try:
             code, helper = run(dmg, bundle)
@@ -896,6 +933,7 @@ def test_macos_swap():
             fails.append("a read-only folder changed the installed bundle")
         if sorted(os.listdir(install)) != ["XSLOPE Studio.app"]:
             fails.append(f"a failed swap left {os.listdir(install)} in the folder")
+        explain("on the read-only folder", before)
         if updater.macos_replace_blocker(bundle) is not None:
             fails.append(f"a writable bundle was refused: "
                          f"{updater.macos_replace_blocker(bundle)}")

@@ -4289,6 +4289,14 @@ SPENCER_REDUCED_SUM = r"^F_[hv] = (0|[^=]+)$"
 _CALC = {}
 
 
+def _calc_key(method, options=None, xlsx=None, edit=None):
+    """The key :func:`_calc_report` caches a report under. A check that has to
+    build one afresh (a mutation) drops it through this, so the two cannot fall
+    out of step."""
+    return (method, tuple(sorted((options or {}).items())), xlsx or REINF_XLSX,
+            edit[0] if edit else None)
+
+
 def _calc_report(method, options=None, xlsx=None, edit=None):
     """A report of the sample model solved by ``method``, and its solved bundle.
 
@@ -4299,8 +4307,7 @@ def _calc_report(method, options=None, xlsx=None, edit=None):
     for a check that needs a model no shipped file is.
     """
     xlsx = xlsx or REINF_XLSX
-    key = (method, tuple(sorted((options or {}).items())), xlsx,
-           edit[0] if edit else None)
+    key = _calc_key(method, options, xlsx, edit)
     if key in _CALC:
         return _CALC[key]
     import matplotlib
@@ -8532,7 +8539,7 @@ def test_prose_is_about_the_analysis():
     import dataclasses
     from xslope.report import TRANSCRIPTIONS
     spec = TRANSCRIPTIONS["bishop"]
-    key = ("bishop", (), REINF_XLSX)
+    key = _calc_key("bishop")
     saved = _CALC.pop(key, None)
     TRANSCRIPTIONS["bishop"] = dataclasses.replace(spec, lead=(
         "Equation (10) of the derivation is the factor of safety this method "

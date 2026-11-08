@@ -3909,19 +3909,19 @@ FORCE_TERMS = (
                       lambda C: C.A["P"] * C.A["cos_a"] + C.A["pa_cx"],
                       rank=1),),
         march_y=(Term(-1, "P sin ψ",
-                      lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"],
+                      lambda C: C.A["P"] * C.A["sin_a"] + C.pa_cy_v(),
                       rank=1),),
         normal=(Term(-1, "P sin ψ",
-                     lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"]),),
+                     lambda C: C.A["P"] * C.A["sin_a"] + C.pa_cy_v()),),
         # Resolved perpendicular to the base the reinforcement contributes
         # sin α·(P cos ψ) − cos α·(P sin ψ), which vanishes term for term where
         # the force is tangent to the base (ψ = α) and is carried by the axial
         # components otherwise.
         oms_num=(Term(+1, "P sin(α − ψ)",
                       lambda C: C.A["sin_a"] * C.A["pa_cx"]
-                      - C.A["cos_a"] * C.A["pa_cy"], rank=7),),
+                      - C.A["cos_a"] * C.pa_cy_v(), rank=7),),
         bishop_num=(Term(-1, "P sin ψ",
-                         lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"],
+                         lambda C: C.A["P"] * C.A["sin_a"] + C.pa_cy_v(),
                          rank=6),),
         page_drv=(Term(-1, "(P cos ψ·a_ry + P sin ψ·a_rx)",
                        lambda C: C.A["pa_cx"] * C.arms["Yo"] - C.A["pa_my"]
@@ -4559,6 +4559,21 @@ class _Calc:
     def l_sin_delta(self):
         """``L sin δ`` — the line load's vertical component, as published."""
         return -self.A["L"] * self.cos("ll_b")
+
+    # --- the axial reinforcement's vertical component ---
+    #
+    # generate_slices stores an axial force's components with the horizontal
+    # one positive (cos ψ > 0). On a right-facing slope the tension on the
+    # sliding mass points the other way along the bar, so its vertical
+    # component is the negation of the stored one. The solver flips it wherever
+    # vertical equilibrium is written (solve.oms, bishop, janbu and the force
+    # march), and every term here that writes the same equilibrium goes through
+    # this method. The moment terms and Spencer's vector take the stored value,
+    # as the solver's do.
+
+    def pa_cy_v(self):
+        """``P sin ψ`` of the axial reinforcement, as it acts on the mass."""
+        return -self.A["pa_cy"] if self.right_facing else self.A["pa_cy"]
 
     @property
     def arms(self):

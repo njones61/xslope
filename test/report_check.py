@@ -7976,6 +7976,66 @@ def test_a_circle_gives_the_solution_under_its_sums():
     return fails
 
 
+def test_a_right_facing_nail_prints_its_mirrors_sums():
+    """A nailed model and its mirror image print the same named sums under both
+    moment methods (Norm, 123a).
+
+    The slicer stores an axial force's components with the horizontal one
+    positive, so on a right-facing slope the stored vertical component is the
+    negation of the pull on the sliding mass, and the solver flips it wherever it
+    writes vertical equilibrium. The report took the stored value: on the
+    right-facing twin of the nail sample, Bishop's N_S came to 661.1 where the
+    left-facing one gives 683.3, the named sums returned 2.101 against the
+    solver's 2.171, and the page fell to the general moment arms. Both twins
+    solve to the same F, and their sums now agree to about 0.02%; the files
+    mirror each other to 0.002 ft.
+
+    The mutation puts the stored value back and requires the right-facing
+    Bishop page to lose its named sums again.
+    """
+    fails = []
+    from xslope import report as report_mod
+
+    twins = [os.path.join(_REPO, "docs", "inputs", "slope", name)
+             for name in ("xslope_nail_axial.xlsx",
+                          "xslope_nail_axial_rface.xlsx")]
+    for method in ("oms", "bishop"):
+        sums = []
+        for label, xlsx in zip(("the nail sample", "its right-facing twin"),
+                               twins):
+            _sd, calc = _calc_of(method, xlsx)
+            if calc is None or calc.get("arms") or not calc.get("parts"):
+                fails.append(f"{label} under {method}: no named sums "
+                             f"(arms={None if calc is None else calc.get('arms')!r})")
+                break
+            sums.append({name: value for side in calc["parts"]
+                         for _sign, name, value in side})
+        if len(sums) != 2:
+            continue
+        left, right = sums
+        if set(left) != set(right):
+            fails.append(f"{method}: the twins print different sums: "
+                         f"{sorted(left)} and {sorted(right)}")
+            continue
+        for name in left:
+            if abs(left[name] - right[name]) > 1e-3 * max(abs(left[name]), 1e-9):
+                fails.append(f"{method}: {name} is {left[name]:.4f} on the nail "
+                             f"sample and {right[name]:.4f} on its mirror")
+
+    # The mutation: the stored vertical component, unflipped.
+    saved = report_mod._Calc.pa_cy_v
+    report_mod._Calc.pa_cy_v = lambda C: C.A["pa_cy"]
+    try:
+        _sd, calc = _calc_of("bishop", twins[1])
+    finally:
+        report_mod._Calc.pa_cy_v = saved
+    if calc is not None and calc.get("parts") and not calc.get("arms"):
+        fails.append("with the stored vertical component put back, the "
+                     "right-facing twin still printed its named sums under "
+                     "Bishop; nothing here would catch the sign")
+    return fails
+
+
 def test_calculation_leads_read_once():
     """The sentence that opens a calculation says each of its facts once, and
     attributes each equation to the page that publishes it.
@@ -21029,6 +21089,8 @@ CHECKS = [
      test_the_base_shear_arm_is_named_for_the_surface),
     ("a circle gives the solution under its sums",
      test_a_circle_gives_the_solution_under_its_sums),
+    ("a right-facing nail prints its mirror's sums",
+     test_a_right_facing_nail_prints_its_mirrors_sums),
     ("each calculation's lead reads once", test_calculation_leads_read_once),
     ("a wide quotient keeps its own equals sign",
      test_the_wide_quotient_is_narrowed),

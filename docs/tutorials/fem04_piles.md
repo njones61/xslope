@@ -509,11 +509,13 @@ wall rather than per member:
 
 The moment of inertia, the section modulus and the area are the published
 PZ-27 constants, each already per foot of wall. The moment capacity entered is
-the moment at which the steel first yields: M<sub>cap</sub> = F<sub>y</sub> × S
-= 36,000 psi × 30.2 in³/ft = 90,600 lb·ft/ft. A steel section can carry about
-20% more than that before it is fully plastic, but the beam element does not
-model that reserve: it stays elastic up to M<sub>cap</sub> and forms a hinge
-there. So the capacity entered is the first-yield moment.
+the moment at which Grade 36 steel first yields, M<sub>cap</sub> = F<sub>y</sub> × S
+= 36,000 psi × 30.2 in³/ft = 90,600 lb·ft/ft, a conservative value. The
+section's full capacity is its plastic moment, F<sub>y</sub> × Z = 36,000 psi ×
+36.49 in³/ft = 109,500 lb·ft/ft, 21% more, and that is the value
+[Pile and Wall Types](../piles/types.md#sheet-pile-wall) gives to enter. The
+beam element stays elastic up to M<sub>cap</sub> and then forms a hinge, so
+entering first yield puts the hinge where the steel starts to yield.
 
 Nothing else about the model changes, so every number in this half is
 comparable to the first half's.

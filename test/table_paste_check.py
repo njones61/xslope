@@ -1488,13 +1488,13 @@ def test_lem08_reinforcement_blocks():
                               "Geosynthetic")
 
 
-def test_lem09_anchor_blocks():
-    """LEM-9's two anchors. This is the leg the preset is FOR: the page says picking
-    Anchor answers Dir and Appl, vp049 carries dir='axial', appl='active' on both
+def test_lem09_tieback_blocks():
+    """LEM-9's two tiebacks. This is the leg the preset is FOR: the page says picking
+    Tieback answers Dir and Appl, vp049 carries dir='axial', appl='active' on both
     lines, and a reader who never types either has to land on exactly that, or the
     page teaches a model different from the one it publishes results for."""
     return _reinforcement_leg("LEM-9", "lem09_tieback_wall.md", LEM09_MODEL,
-                              "Anchor")
+                              "Tieback")
 
 
 def test_lem09_pile_row():
@@ -1805,7 +1805,7 @@ CHECKS = [
     ("LEM-5 non-circular surface", test_lem05_noncircular_surface),
     ("LEM-6 polygon rings", test_lem06_polygon_rings),
     ("LEM-8 reinforcement blocks", test_lem08_reinforcement_blocks),
-    ("LEM-9 anchor blocks", test_lem09_anchor_blocks),
+    ("LEM-9 tieback blocks", test_lem09_tieback_blocks),
     ("LEM-9 pile row", test_lem09_pile_row),
 ]
 

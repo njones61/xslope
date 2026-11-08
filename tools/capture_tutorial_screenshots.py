@@ -886,7 +886,7 @@ SHOTS["lem09_reinforcement_table"] = lem09_reinforcement_table
 def lem09_reinforcement():
     """The reinforcement editor on the upper tieback, in its list view.
 
-    The same editor LEM-8 photographs, on a row whose Type is ``anchor`` rather
+    The same editor LEM-8 photographs, on a row whose Type is ``tieback`` rather
     than blank: the shot's subject is the Type group at the bottom of the form,
     where the preset has filled Dir with ``axial`` and Appl with ``active``, and
     the Anchorage group above it, where Lp1 is 0 at the wall, Lp2 is the

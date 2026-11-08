@@ -18638,7 +18638,7 @@
           "pullout": true,
           "residual_drop": false,
           "types": [
-            "anchor"
+            "tieback"
           ]
         },
         "ru": false,

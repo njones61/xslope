@@ -24,7 +24,7 @@ reproduces the values verified there.
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model a tieback wall: how to enter grouted anchors
-with the Anchor preset and per-foot-of-wall capacities, how to search for the
+with the Tieback preset and per-foot-of-wall capacities, how to search for the
 critical wedge and solve a specified one, and how to measure the anchors'
 contribution and the two ways their force can be applied.
 </div>
@@ -106,7 +106,7 @@ elevation 8 and runs 33 ft. Both are declined 25°:
 | tieback y=20 | 0 | 20 | 31.7208 | 5.20836 |
 | tieback y=8 | 0 | 8 | 29.9082 | -5.9464 |
 
-**Type** comes next in the sheet, and it is `Anchor` on both lines — a preset
+**Type** comes next in the sheet, and it is `Tieback` on both lines — a preset
 over two settings:
 
 | Type | Dir | Appl |
@@ -116,7 +116,7 @@ over two settings:
 | Tieback | Axial | Active |
 | Anchor | Axial | Active |
 
-Picking `Anchor` fills **Dir** with `Axial` — the force acts along the bar, not
+Picking `Tieback` fills **Dir** with `Axial` — the force acts along the bar, not
 along the slip surface — and **Appl** with `Active`, meaning the capacity is an
 allowable working load applied as it stands rather than an ultimate capacity
 divided by the factor of safety. [Soil Reinforcement in LEM](../reinforcement/lem.md)
@@ -223,15 +223,15 @@ it:
 
 <div class="prompt-block" markdown>
 ```text
-Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), ground running 20 ft out in front at elevation 0, and a cut slope above the wall from (0, 30) through (29, 51) to (33, 53), then ground rising to (60, 66), (70, 71) and (178, 80). Layer 1 is the upper wedge above a contact from (33, 53) to (195, 26): 120 pcf, c = 600 psf, phi = 24. Layer 2 is everything below it: 130 pcf, c = 300 psf, phi = 34. Bottom of the model is elevation -20. Add two grouted tiebacks of type Anchor starting on the wall face at elevations 20 and 8, both declined 25 degrees, 35 ft and 33 ft long, with capacities of 15043.1 and 20527.2 lb per foot of wall, fully anchored at the wall end and development lengths of 8.86735 ft and 12.1 ft at the far end. Add a vertical soldier pile at x = 0.5 from elevation 30 to elevation -7 carrying 5900 lb/ft of shear, diameter 0.5, spacing 1. Enter a non-circular failure surface through (0, 0), (37, 33.6) and (61, 67.069).
+Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), ground running 20 ft out in front at elevation 0, and a cut slope above the wall from (0, 30) through (29, 51) to (33, 53), then ground rising to (60, 66), (70, 71) and (178, 80). Layer 1 is the upper wedge above a contact from (33, 53) to (195, 26): 120 pcf, c = 600 psf, phi = 24. Layer 2 is everything below it: 130 pcf, c = 300 psf, phi = 34. Bottom of the model is elevation -20. Add two grouted tiebacks of type Tieback starting on the wall face at elevations 20 and 8, both declined 25 degrees, 35 ft and 33 ft long, with capacities of 15043.1 and 20527.2 lb per foot of wall, fully anchored at the wall end and development lengths of 8.86735 ft and 12.1 ft at the far end. Add a vertical soldier pile at x = 0.5 from elevation 30 to elevation -7 carrying 5900 lb/ft of shear, diameter 0.5, spacing 1. Enter a non-circular failure surface through (0, 0), (37, 33.6) and (61, 67.069).
 ```
 </div>
 
 ### Check its work
 
-- **Type is `Anchor` on both lines.** A blank Type is a generic tensile line, and
+- **Type is `Tieback` on both lines.** A blank Type is a generic tensile line, and
   it acts *tangent* to the slip surface — a flexible geogrid, not a grouted bar.
-  If the Type column came back empty, say: *"Set the support type to Anchor on
+  If the Type column came back empty, say: *"Set the support type to Tieback on
   both reinforcement lines."*
 - **Lp1 = 0 and Lp2 is the development length.** The plate end is fully anchored
   and the grouted end tapers. Both pullout lengths equal, or both zero, is a
@@ -276,7 +276,7 @@ thickness below the toe.
 ### 3. The `reinforce` worksheet
 
 One row per anchor. Enter (or copy-paste) the endpoints into the `Label` through
-`y2` columns, pick `Anchor` from the **Type** drop-down, and enter (or copy-paste)
+`y2` columns, pick `Tieback` from the **Type** drop-down, and enter (or copy-paste)
 the capacity values from `Tmax` through `Spacing`:
 
 ![The finished reinforce worksheet](images/lem09_sheet_reinforce.png)
@@ -337,7 +337,7 @@ for:** toggles to **LEM** alone, and press **Table view** — the columns are th
 worksheet's, in the same order, so the two blocks from the table above paste
 straight in. Paste the endpoint block (`Label` through `y2`)
 into the first cell — the rows come with it — then set each row's **Type** to
-`anchor`, which fills **Dir** with `axial` and **Appl** with `active` on its
+`tieback`, which fills **Dir** with `axial` and **Appl** with `active` on its
 own, and paste the capacity block into the first `Tmax` cell:
 
 ![The reinforcement editor's table view on the two tiebacks](images/lem09_studio_reinforcement_table.png)
@@ -350,7 +350,7 @@ x-range it spans:
 ![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1400}
 
 In the **Type** group, **Dir** reads `axial` and **Appl** `active` beside the
-`anchor` Type; typing over either afterwards keeps
+`tieback` Type; typing over either afterwards keeps
 what you typed, and choosing the Type again puts the preset back. The preview
 draws the anchors on the section with the selected one bold: a marker at each
 end, and one more where its capacity envelope reaches full Tmax, 8.87 ft in
@@ -533,7 +533,7 @@ over its Appl.
 
 This tutorial covered:
 
-- Grouted tiebacks entered with the **Anchor** preset — force along the bar's
+- Grouted tiebacks entered with the **Tieback** preset — force along the bar's
   own axis, applied as a working load.
 - Anchorage different at the two ends: a plate at the wall face, a development
   length at the grouted far end.

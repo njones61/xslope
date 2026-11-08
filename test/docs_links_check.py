@@ -116,7 +116,7 @@ LEM06_FILE = os.path.join(_REPO, "docs/lem/files/xslope_sloping_bottom.xlsx")
 #: pins need: an Inputs tree row that counts them and an editor with a line to
 #: read the capacity fields off.
 LEM08_FILE = os.path.join(_REPO, "docs/lem/files/xslope_reinforce.xlsx")
-#: Tutorial LEM-9's completed model — two Anchor-type reinforcement lines and one
+#: Tutorial LEM-9's completed model — two Tieback-type reinforcement lines and one
 #: soldier pile, which is what its pins need: a reinforcement row whose Type preset
 #: has filled Dir/Appl, and a Piles row in the Inputs tree with a pile to read the
 #: editor's fields off.
@@ -1167,10 +1167,10 @@ LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
 LEM09_INPUT_CATEGORY = "Piles"
 LEM09_PILE_GROUPS = ("Identity", "Geometry", "Capacity / design", "Behavior")
 LEM09_PILE_FIELDS = ("H", "D", "S")
-#: What LEM-9's page asserts the Anchor preset does: the Type column reads
-#: ``anchor`` on both lines, and Dir/Appl come back filled without either being
+#: What LEM-9's page asserts the Tieback preset does: the Type column reads
+#: ``tieback`` on both lines, and Dir/Appl come back filled without either being
 #: typed. Read through the loader, which is where the preset is applied.
-LEM09_ANCHOR_PRESET = ("anchor", "axial", "active")
+LEM09_TIEBACK_PRESET = ("tieback", "axial", "active")
 
 
 #: The two Run LEM search options LEM-10 tells the reader to use, and the field
@@ -2473,7 +2473,7 @@ def _lem08_editor_labels(mw):
 
 
 def _lem09_editor_labels(mw):
-    """The piles editor and the Anchor preset, as Tutorial LEM-9 uses them.
+    """The piles editor and the Tieback preset, as Tutorial LEM-9 uses them.
 
     Read on LEM-9's own model, because the page's Studio step is written on a
     project that already carries the two anchors and the soldier pile: the Inputs
@@ -2481,7 +2481,7 @@ def _lem09_editor_labels(mw):
     the other legs that change which project the window holds.
 
     The preset is checked through the loader rather than against a constant of
-    ours, so the page's claim — pick Anchor and Dir/Appl answer on their own —
+    ours, so the page's claim — pick Tieback and Dir/Appl answer on their own —
     fails here if the preset stops filling them.
     """
     from PySide6.QtWidgets import QGroupBox, QLabel
@@ -2517,9 +2517,9 @@ def _lem09_editor_labels(mw):
                      f"the two tiebacks the page enters")
     for line in lines:
         got = (str(line.get("type")), str(line.get("dir")), str(line.get("appl")))
-        if got != LEM09_ANCHOR_PRESET:
-            fails.append(f"an Anchor line on LEM-9's model reads {got}, not "
-                         f"{LEM09_ANCHOR_PRESET} — the page tells the reader to pick "
+        if got != LEM09_TIEBACK_PRESET:
+            fails.append(f"a Tieback line on LEM-9's model reads {got}, not "
+                         f"{LEM09_TIEBACK_PRESET} — the page tells the reader to pick "
                          f"the Type and let Dir and Appl fill themselves")
 
     fails += _lem09_search_tolerances(mw)

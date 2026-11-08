@@ -2698,7 +2698,7 @@ def vp049():
                       't_max': tens / 8.0, 't_res': float('nan'), 'lp1': 0.0,
                       'lp2': tens / 13571.68, 'E': float('nan'),
                       'area': float('nan'), 'label': f'tieback y={hy:g}',
-                      'type': 'anchor', 'dir': 'axial', 'appl': 'active',
+                      'type': 'tieback', 'dir': 'axial', 'appl': 'active',
                       'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
     sd['reinforcement_lines'] = lines
     sd['reinforce_lines'] = lines

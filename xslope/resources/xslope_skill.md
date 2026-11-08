@@ -1036,10 +1036,11 @@ from the FHWA manuals: `docs/reinforcement/types.md`):
 - geosynthetics -> `type='geosynthetic'` (tangent, active): `t_max` = long-term strength
   Tal ÷ its factor of safety; `tend1` = the facing connection's allowable strength, 0 where the
   layer ends free at the face; `tend2` = 0.
-- soil nails -> `type='nail'` (axial, passive, nominal values): `t_max` = bar area × yield
-  strength per nail; `lp1` = `lp2` = `t_max` ÷ (π × bond strength × drill-hole diameter);
-  `tend1` = nail-head capacity, the smallest of the facing's flexure, punching-shear and
-  headed-stud resistances; `tend2` = 0; `adhesion`/`delta` blank.
+- soil nails -> `type='nail'` (axial, active, GEC 7's allowable values): `t_max` = bar area ×
+  yield strength per nail ÷ 1.8; `lp1` = `lp2` = `t_max` ÷ (π × bond strength × drill-hole
+  diameter ÷ 2.0); `tend1` = nail-head capacity, the smallest of the facing's flexure and
+  punching-shear resistances ÷ 1.5 and headed-stud resistance ÷ its factor; `tend2` = 0;
+  `adhesion`/`delta` blank. Nominal values instead go with `appl='passive'`.
 - tiebacks -> `type='tieback'` (axial, active): `t_max` = the smallest of the tendon's design
   load, the allowable capacity of the head's connection to the wall, and the bond capacity
   (allowable load transfer per unit length × bond length); `lp1` = 0; `lp2` = `t_max` ÷ the

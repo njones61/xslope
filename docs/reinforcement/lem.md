@@ -85,7 +85,8 @@ The envelope is then the same three-way minimum, with the ramps integrated rathe
 >$T(s) = \min\left(T_{max},\;\; T_{end1} + \displaystyle\int_0^s r,\;\; T_{end2} + \int_s^L r\right)$
 
 A constant $r$ recovers the straight ramps above, so the two laws are one formula. Both columns filled selects
-this law and $L_{p1}$/$L_{p2}$ are then not read; both blank is the default and selects the development-length
+this law, and $L_{p1}$/$L_{p2}$ are then not read: they can be left blank or keep their values, and the model
+check does not ask for them. Both blank is the default and selects the development-length
 law. Filling one column and leaving the other blank is an input error. LEM and FEM use the same envelope under
 either law.
 
@@ -166,10 +167,11 @@ so the choice is set per line:
 - **Active** (Slide2's "Method A", the **default**): the force is a known, *allowable* working load. It is applied
   to the driving side of the equilibrium equations and is **not** divided by $F$ — the factor of safety applies to
   the soil strength only. Appropriate for pre-tensioned supports (tiebacks) and whenever the entered capacity
-  already carries its own safety factor.
+  already carries its own safety factor, as the allowable values of FHWA's soil nail design (GEC 7) do.
 - **Passive** (Slide2's "Method B"): the force is a *nominal* (unfactored) capacity that mobilizes together with the soil
-  strength. It is added to the resisting side and **is** divided by $F$. Appropriate when the support only develops
-  force as the soil deforms (nails, geosynthetics in some formulations) and the entered capacity is unfactored.
+  strength. It is added to the resisting side and **is** divided by $F$. Appropriate when the entered capacity is
+  unfactored and one factor of safety is to cover the soil and the reinforcement together, as in FHWA's design of
+  reinforced soil slopes (GEC 11).
 
 The distinction matters numerically: on the classic Duncan & Wright tieback example (their Fig. 6.34), the same
 9,000 lb/ft support gives FS = 1.51 active and FS = 1.32 passive.
@@ -181,7 +183,7 @@ The **Type** column fills Dir and Appl automatically (either can be overridden b
 | Type | Dir | Appl |
 |---|---|---|
 | Geosynthetic | Tangent | Active |
-| Nail | Axial | Passive |
+| Nail | Axial | Active |
 | Tieback | Axial | Active |
 | Anchor | Axial | Active |
 

@@ -6,6 +6,30 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Fixed
+
+- In the Analysis Report, the Ordinary Method of Slices and Bishop's Simplified
+  Method print the named sums of their equation on a circular surface again, with
+  the value of each sum and the factor of safety they give. Since 1.0.8 cut
+  circles into slices of equal angle, the report printed every circle in the
+  general moment-arm form it keeps for composite surfaces: each slice base is now
+  a chord of the circle, its forces act slightly inside the radius, and the report
+  no longer recognized the surface as a circle.
+- On a slope that faces right, the Analysis Report now prints Bishop's named sums
+  for a model with active axial reinforcement, such as a soil nail wall. The
+  report took the vertical part of each reinforcement force with the wrong sign,
+  so its sums did not return the factor of safety, and it printed the general
+  moment-arm form instead. The factor of safety itself was not affected.
+
+### Changed
+
+- The Nail preset in the reinforcement table's Type column now sets Appl to
+  Active, as the other presets do, following FHWA's soil nail manual (GEC 7). A
+  model saved by XSLOPE with Type Nail and Appl left to the preset now runs its
+  nails as active forces, which gives a different factor of safety; set Appl to
+  Passive to keep the old result. A file last saved in Excel keeps Passive,
+  because it carries its own copy of the preset table.
+
 ## 1.0.8 — 2026-11-06
 
 ### New

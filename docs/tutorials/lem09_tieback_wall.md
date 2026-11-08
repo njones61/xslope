@@ -112,7 +112,7 @@ over two settings:
 | Type | Dir | Appl |
 | --- | --- | --- |
 | Geosynthetic | Tangent | Active |
-| Nail | Axial | Passive |
+| Nail | Axial | Active |
 | Tieback | Axial | Active |
 | Anchor | Axial | Active |
 
@@ -523,9 +523,9 @@ the surface. On the vp085a circle — **one surface, no search, Bishop, only
 Appl changing** — active gives 1.567 and passive 1.331, against 0.914 with no
 anchor at all. Passive provides about six-tenths of the increase active provides here, and
 that fraction is not a constant, since the divisor is the factor of safety being
-solved for. Neither convention is a correction of the other, which is why the Type
-presets set it: `Geosynthetic`, `Tieback` and
-`Anchor` are active, `Nail` is passive.
+solved for. Neither convention is a correction of the other. All four Type presets are
+active, and a line entered with nominal capacities is set to passive by typing
+over its Appl.
 
 ---
 

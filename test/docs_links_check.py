@@ -1156,7 +1156,7 @@ LEM08_REINF_TMAX_LABEL = "Tmax (per unit width, lb/ft)"
 #: lookup block (reinforce!AB8:AD11) — the values the Type drop-down offers and
 #: the Dir/Appl its formula fills for each. The page's table is this table.
 LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
-                      ("Nail", "Axial", "Passive"),
+                      ("Nail", "Axial", "Active"),
                       ("Tieback", "Axial", "Active"),
                       ("Anchor", "Axial", "Active"))
 

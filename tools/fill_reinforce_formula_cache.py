@@ -31,7 +31,7 @@ import io
 
 PRESETS = {  # Type -> (Dir, Appl), the template's own lookup block
     "geosynthetic": ("Tangent", "Active"),
-    "nail": ("Axial", "Passive"),
+    "nail": ("Axial", "Active"),
     "tieback": ("Axial", "Active"),
     "anchor": ("Axial", "Active"),
 }

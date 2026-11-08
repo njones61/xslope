@@ -714,27 +714,33 @@ def test_type_preset_fills_dir_and_appl():
     out = _fail((direction.currentText(), appl.currentText()) == ("axial", "active"),
                 f"picking anchor left Dir/Appl at "
                 f"({direction.currentText()!r}, {appl.currentText()!r})")
-    # nail is the preset that differs in BOTH columns, so a fill that only ever wrote
-    # one of them cannot pass this.
+    # Every preset is active, and only the direction tells them apart, so both columns
+    # are first set where no preset puts them: a fill that only ever wrote one of them
+    # cannot pass the next check.
+    direction.setCurrentText("tangent")
+    appl.setCurrentText("passive")
     typ.setCurrentText("nail")
-    out += _fail((direction.currentText(), appl.currentText()) == ("axial", "passive"),
+    out += _fail((direction.currentText(), appl.currentText()) == ("axial", "active"),
                  f"picking nail left Dir/Appl at "
                  f"({direction.currentText()!r}, {appl.currentText()!r})")
     # An override survives: the user's own answer is not overwritten while the Type
     # stands.
-    direction.setCurrentText("tangent")
+    appl.setCurrentText("passive")
     row = t.result_rows()[0]
-    out += _fail((row["dir"], row["appl"]) == ("tangent", "passive"),
-                 f"an overridden Dir came back as {row['dir']!r}/{row['appl']!r}")
+    out += _fail((row["dir"], row["appl"]) == ("axial", "passive"),
+                 f"an overridden Appl came back as {row['dir']!r}/{row['appl']!r}")
     # ...until the Type is picked again. Emitting `activated` is what a user's pick of
     # the entry already showing does; it changes no index, so only that signal carries
     # it.
     typ.activated.emit(typ.currentIndex())
     row = t.result_rows()[0]
-    out += _fail((row["dir"], row["appl"]) == ("axial", "passive"),
+    out += _fail((row["dir"], row["appl"]) == ("axial", "active"),
                  f"re-picking nail left Dir/Appl at {row['dir']!r}/{row['appl']!r}")
     # A blank Type fills nothing — the sheet leaves those cells empty for a generic
-    # line, and the values standing in them are the loader's defaults for one.
+    # line, and the values standing in them are the loader's defaults for one. Appl is
+    # overridden first so that a blank Type that refilled the generic default
+    # (tangent, active) would show in both columns.
+    appl.setCurrentText("passive")
     typ.setCurrentText("")
     row = t.result_rows()[0]
     out += _fail((row["dir"], row["appl"]) == ("axial", "passive"),
@@ -759,7 +765,7 @@ def test_a_pasted_type_fills_dir_and_appl():
     rows = t.result_rows()
     out = _fail(len(rows) == 2, f"a 2-row Type block left {len(rows)} rows")
     out += _fail([(r["type"], r["dir"], r["appl"]) for r in rows]
-                 == [("anchor", "axial", "active"), ("nail", "axial", "passive")],
+                 == [("anchor", "axial", "active"), ("nail", "axial", "active")],
                  f"the pasted Types came back as "
                  f"{[(r['type'], r['dir'], r['appl']) for r in rows]}")
     # Pasting the SAME type over a row that already holds it re-asserts the preset:

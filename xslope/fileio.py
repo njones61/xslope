@@ -153,7 +153,7 @@ POLYGON_TYPE_WORDS = {
 # the loader falls back to ('tangent', 'active'), the pre-v12 behavior.
 REINFORCE_TYPE_PRESETS = {
     'geosynthetic': ('tangent', 'active'),
-    'nail':         ('axial',   'passive'),
+    'nail':         ('axial',   'active'),
     'tieback':      ('axial',   'active'),
     'anchor':       ('axial',   'active'),
 }

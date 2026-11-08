@@ -4289,15 +4289,18 @@ SPENCER_REDUCED_SUM = r"^F_[hv] = (0|[^=]+)$"
 _CALC = {}
 
 
-def _calc_report(method, options=None, xlsx=None):
+def _calc_report(method, options=None, xlsx=None, edit=None):
     """A report of the sample model solved by ``method``, and its solved bundle.
 
     Cached per method: each of these is a full solve, and several checks read the
     same one. ``xlsx`` runs another model through the same path, for a check that
-    needs a section built on a different shape of slope.
+    needs a section built on a different shape of slope. ``edit`` is a
+    ``(name, function)`` pair that changes the loaded model before it is sliced,
+    for a check that needs a model no shipped file is.
     """
     xlsx = xlsx or REINF_XLSX
-    key = (method, tuple(sorted((options or {}).items())), xlsx)
+    key = (method, tuple(sorted((options or {}).items())), xlsx,
+           edit[0] if edit else None)
     if key in _CALC:
         return _CALC[key]
     import matplotlib
@@ -4308,6 +4311,8 @@ def _calc_report(method, options=None, xlsx=None):
     from xslope.solve import solve_selected
 
     slope_data = load_slope_data(xlsx)
+    if edit:
+        slope_data = edit[1](slope_data)
     # A model carries circles or a non-circular surface, and the corpus models
     # the tolerance check reads carry both kinds.
     circles = slope_data.get("circles") or []
@@ -4942,6 +4947,19 @@ def test_calculation_sums_are_printed_precisely_enough():
     return fails
 
 
+def _model_equation(maths):
+    """The factor of safety as the section writes it for this model: the last
+    ``F = `` line that is an equation and not its evaluation. The published form
+    comes first and the model's own after it, where the model leaves terms out,
+    and the general moment arms after both where the section falls to them. An
+    evaluation carries numbers: the named sums' on one line with a second ``=``,
+    the arms' on lines of their own (``F = frac{6376.27}{3179.11}``, then
+    ``F = 2.006``)."""
+    lines = [m for m in maths if m.startswith("F = ") and m.count(" = ") == 1
+             and not any(ch.isdigit() for ch in m)]
+    return lines[-1] if lines else ""
+
+
 def test_calculation_terms_follow_the_model():
     """The equation carries the terms the model exercises and no others.
 
@@ -4990,8 +5008,11 @@ def test_calculation_terms_follow_the_model():
         fails.append("the nailed sample produced no calculation to compare")
     else:
         maths, prose = got
-        equation_line = next((m for m in maths if m.startswith("F = frac{sum")), "")
-        if "P" not in equation_line:
+        equation_line = _model_equation(maths)
+        if not equation_line:
+            fails.append(f"the nailed sample prints no equation of its own: "
+                         f"{maths}")
+        elif "P" not in equation_line:
             fails.append(f"a model with reinforcement crossing the surface "
                          f"prints no P term: {equation_line}")
         # The absent list is the CLAUSE that follows, and a semicolon ends a
@@ -5017,8 +5038,14 @@ def test_calculation_terms_follow_the_model():
         fails.append("the sample model produced no calculation")
     else:
         maths, prose = got
-        equation_line = next((m for m in maths if m.startswith("F = frac{sum")), "")
-        for absent in ("P ", "P·", "kW", "H cos", "T·a_t"):
+        equation_line = _model_equation(maths)
+        if not equation_line:
+            fails.append(f"the sample model prints no equation of its own: "
+                         f"{maths}")
+        # The general moment arms write the forces out; the named sums give
+        # each its letter.
+        for absent in ("P ", "P·", "kW", "H cos", "T·a_t",
+                       "D_P", "D_k", "D_H", "D_T"):
             if absent in equation_line:
                 fails.append(f"the equation prints a {absent!r} term for a model "
                              f"with none: {equation_line}")
@@ -6617,18 +6644,41 @@ def test_the_evaluated_equation_introduces_its_terms():
     return fails
 
 
-def _calc_of(method, xlsx):
+def _calc_of(method, xlsx, edit=None):
     """``(slope_data, calc)`` — one method's worked calculation on one model,
     off the same solved frame the section is built from."""
     from xslope.fileio import load_slope_data
     from xslope.report import _calculation
 
-    report, bundle = _calc_report(method, xlsx=xlsx)
+    report, bundle = _calc_report(method, xlsx=xlsx, edit=edit)
     if report is None:
         return None, None
     slope_data = load_slope_data(xlsx)
+    if edit:
+        slope_data = edit[1](slope_data)
     calc, _note = _calculation(slope_data, bundle, method)
     return slope_data, calc
+
+
+def _lower_nails_passive(slope_data):
+    """The axial sample as it was before the Nail preset became Active (Norm,
+    110a): rows 1 to 3 Active, as the file states them, and rows 4 to 7 Passive,
+    which the preset gave them until then. It solves to the same F as that
+    file did, to six decimals, in every method."""
+    lower = {f"Nail row {i}" for i in range(4, 8)}
+    lines = [line for line in slope_data["reinforcement_lines"]
+             if line.get("label") in lower]
+    if len(lines) != len(lower):
+        raise RuntimeError(f"the axial sample has {len(lines)} of its nail "
+                           f"rows 4 to 7")
+    for line in lines:
+        line["appl"] = "passive"
+    return slope_data
+
+
+#: The axial sample with its lower four nail rows Passive: Active rows above
+#: passive ones, which no shipped model is.
+AXIAL_MIXED = ("nail rows 4 to 7 Passive", _lower_nails_passive)
 
 
 def _names_an_equation(blocks, number):
@@ -6653,24 +6703,28 @@ def test_the_general_arms_name_no_equation():
     one page and unnumbered on the other, so the sentence there names no equation
     at all.
 
-    The axially reinforced model reaches that branch under Bishop: its passive
-    support mobilizes with the soil and stands inside the base normal, in a group
-    of vertical forces equation (8) writes for the active case alone.
+    The axially reinforced model with its lower four rows Passive reaches that
+    branch under Bishop: its passive support mobilizes with the soil and stands
+    inside the base normal, in a group of vertical forces equation (8) writes for
+    the active case alone. That was the shipped sample until the Nail preset
+    became Active (Norm, 110a); no shipped model reaches the branch now, so the
+    check rebuilds it in memory (Norm, 124a).
     """
     fails = []
     from xslope.report import (EVALUATED_EQUATION, _quotient_close,
                                _unit_labels)
 
     number = EVALUATED_EQUATION["bishop"]
-    report, _bundle = _calc_report("bishop", xlsx=AXIAL_XLSX)
+    report, _bundle = _calc_report("bishop", xlsx=AXIAL_XLSX, edit=AXIAL_MIXED)
     section = _calc_section(report) if report is not None else None
     if section is None:
         return ["the axially reinforced model produced no Bishop calculation, "
                 "so the arms branch was not reached"]
     if not any(b.kind == "prose" and "do not return the solution" in b.text
                for b in section.blocks):
-        return ["the axially reinforced model no longer prints the general "
-                "moment arms under Bishop, so nothing here tests them"]
+        return ["the axially reinforced model with rows 4 to 7 Passive no "
+                "longer prints the general moment arms under Bishop, so "
+                "nothing here tests them"]
     said = _names_an_equation(section.blocks, number)
     if not said:
         fails.append("the arithmetic is introduced by no sentence at all")
@@ -6685,7 +6739,7 @@ def test_the_general_arms_name_no_equation():
     # The mutation: the close named its method's equation whatever the section
     # above it printed. Everything else about the calculation is held fixed —
     # only the flag that says the arms are being printed is cleared.
-    slope_data, calc = _calc_of("bishop", AXIAL_XLSX)
+    slope_data, calc = _calc_of("bishop", AXIAL_XLSX, edit=AXIAL_MIXED)
     if calc is None or not calc.get("arms"):
         return fails + ["the Bishop calculation of the axially reinforced model "
                         "no longer falls to the moment arms; the mutation tests "

@@ -505,17 +505,16 @@ wall rather than per member:
 | E | 4.176 × 10<sup>9</sup> psf | 29,000 ksi |
 | I | 0.00888 ft⁴/ft | 184.20 in⁴/ft |
 | Area | 0.0551 ft²/ft | 7.94 in²/ft |
-| M<sub>cap</sub> | 90,600 lb·ft/ft | F<sub>y</sub> 36,000 psi × S 30.2 in³/ft |
+| M<sub>cap</sub> | 152,000 lb·ft/ft | F<sub>y</sub> 50,000 psi × Z 36.49 in³/ft |
 
-The moment of inertia, the section modulus and the area are the published
-PZ-27 constants, each already per foot of wall. The moment capacity entered is
-the moment at which Grade 36 steel first yields, M<sub>cap</sub> = F<sub>y</sub> × S
-= 36,000 psi × 30.2 in³/ft = 90,600 lb·ft/ft, a conservative value. The
-section's full capacity is its plastic moment, F<sub>y</sub> × Z = 36,000 psi ×
-36.49 in³/ft = 109,500 lb·ft/ft, 21% more, and that is the value
-[Pile and Wall Types](../piles/types.md#sheet-pile-wall) gives to enter. The
-beam element stays elastic up to M<sub>cap</sub> and then forms a hinge, so
-entering first yield puts the hinge where the steel starts to yield.
+The moment of inertia and the area are the published PZ-27 constants, each
+already per foot of wall. The moment capacity is the section's full bending
+strength: the yield strength of Grade 50 steel, F<sub>y</sub>, times the
+section's plastic section modulus, Z, which the manufacturer also publishes per
+foot of wall. M<sub>cap</sub> = 50,000 psi × 36.49 in³/ft = 152,000 lb·ft/ft,
+the value [Pile and Wall Types](../piles/types.md#sheet-pile-wall) gives for this
+section. The beam element stays elastic up to M<sub>cap</sub> and then forms a
+hinge.
 
 Nothing else about the model changes, so every number in this half is
 comparable to the first half's.
@@ -535,7 +534,7 @@ use.
 
 Enter the geometry — `x1` 10, `y1` 10, `x2` 10, `y2` −10 — then `E`
 `4176000000`, which the cell redisplays as `4.176e+09`, `I` `0.00888` and `Area`
-`0.0551` from the table above, `Mcap` `90600`, and `S` `1`. Leave `D` and
+`0.0551` from the table above, `Mcap` `152000`, and `S` `1`. Leave `D` and
 `Vcap` empty.
 
 Each of those follows from the member being continuous. A sheet pile wall has no
@@ -576,10 +575,11 @@ already `1.00` to `2.00`. Click
 
 ![The mechanism with the wall in place](images/fem04_wall_shear_fixed.png){width=1000}
 
-The band takes much the route the pile model's did — up from the toe, over the
-wall, and out on the crest behind it — and it concentrates in two places, at the
-toe and on the uphill side of the wall's head. The strain peaks at the toe, at
-0.37 against the pile model's 0.68.
+The shearing gathers in one band that starts at the wall's head and runs up
+behind the face to the crest, so the soil above the wall slides out over its
+top. The strain peaks just uphill of the head, at 0.19 near (10.9, 10.1),
+against the pile model's 0.68. Below the head the soil barely shears: at the
+toe, where the bare slope's band started, the strain is about 0.04.
 
 ### What the wall carries
 
@@ -595,11 +595,11 @@ There are four profiles, all plotted against depth below the pile head, which is
 elevation 10 — so a depth of 14.00 ft on these axes is elevation −4.00.
 
 The **bending moment** is zero at the head, which is free, and largest at the
-toe — **83,939 lb·ft/ft**, 93% of what the section can carry — which is the
+toe — **83,939 lb·ft/ft**, 55% of what the section can carry — which is the
 shape of a member cantilevered from its base. The dashed M<sub>cap</sub> lines on
-the moment panel are the capacity, and the curve runs up to just inside the
-positive one at the toe; the panel's title reads *near capacity* and gives that
-93%. The panel draws those lines whenever the capacity is within about three
+the moment panel are the capacity, and at the toe the curve stops a little past
+halfway to the positive one; the panel's title reads *within capacity* and gives
+that 55%. The panel draws those lines whenever the capacity is within about three
 times the peak. The **shear** holds one sign the whole length, peaking at
 6,060 lb/ft at 13 ft. The **soil reaction** changes sign near 12 ft — the clay
 drives the wall downslope over its upper length and the soil below pushes back —
@@ -609,14 +609,13 @@ the toe.
 
 Switch **Field state** to **At failure**, which is the state the panel opens on:
 
-![The wall's profiles at failure: the moment at the toe on its capacity](images/fem04_wall_profiles_fixed_failure.png){width=1000}
+![The wall's profiles at failure: the moment at the toe at 82% of its capacity](images/fem04_wall_profiles_fixed_failure.png){width=1000}
 
-The extra movement takes the toe the last 7% to its capacity: the moment there
-reaches the whole 90,600 lb·ft/ft, one beam element has yielded in bending, and
-the title now reads *at capacity*. The shear grows with it, from 6,060 to
-7,220 lb/ft, and its peak moves from 13 ft down to 19 ft, the last of the ten
-elements. With 93% of the section's capacity used at the factor of safety, and
-all of it at the captured collapse, the section should be checked.
+The extra movement raises the toe moment to 124,919 lb·ft/ft, 82% of the
+capacity, and the title now reads *near capacity*. No beam element has yielded.
+The shear grows with it, from 6,060 to 9,032 lb/ft, and its peak moves from
+13 ft down to 15 ft. Even at the captured collapse the wall has strength to
+spare: the soil above its head fails first.
 
 ### A finer beam
 
@@ -636,8 +635,8 @@ to **2,418 triangles**, because the constraint line's nodes are the soil mesh's
 nodes. Run the same bracket: it takes noticeably longer than the run above.
 
 **FS = 1.684**, and the peak moment 76,055 lb·ft/ft
-against 90,600. Both moved: the answer came down 0.046, and the toe moment that
-stood at 93% of capacity on ten beam elements stands at 84% on forty. The
+against 152,000. Both moved: the answer came down 0.046, and the toe moment that
+stood at 55% of capacity on ten beam elements stands at 50% on forty. The
 profiles show the effect of the finer beam:
 
 ![The same profiles on 40 beam elements](images/fem04_wall_profiles_refined.png){width=1000}

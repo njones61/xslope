@@ -26,7 +26,7 @@ down to the rigid base at (10, -10), stated per foot of wall:
     E     4.176e9 psf     29,000 ksi
     I     0.00888 ft^4/ft   184.20 in^4/ft
     Area  0.0551 ft^2/ft      7.94 in^2/ft
-    Mcap  90,600 lb*ft/ft   Fy 36 ksi x S 30.2 in^3/ft, the moment at first yield
+    Mcap  152,000 lb*ft/ft  Fy 50 ksi x Z 36.49 in^3/ft, the section's full bending strength
     S     1
 
 ``S`` = 1 passes those constants into the beam elements unchanged: a wall has no
@@ -34,8 +34,8 @@ out-of-plane gap, so there is nothing to smear.  ``D`` is blank because there is
 no circular shaft to derive a section from and no gap for an arching theory to
 act in, ``Vcap`` is blank because the section's shear rating is not part of what
 the page checks, and ``H`` is blank because a strength reduction run never reads
-a stated pile force.  The row ships with its tip free; the page has the reader
-set it to fixed and re-run.
+a stated pile force.  The row ships with its tip fixed, as the page has the
+reader enter it.
 
 Run:  PYTHONPATH=. python3 tools/build_pile_wall_tutorial.py         # both
       PYTHONPATH=. python3 tools/build_pile_wall_tutorial.py start   # one
@@ -79,7 +79,7 @@ WALL_ROW = {
     "x1": 10.0, "y1": 10.0, "x2": 10.0, "y2": -10.0,
     "H": None, "theta_p": 0.0, "D_pile": None, "S": 1.0,
     "E": 4.176e9, "I": 0.00888, "area": 0.0551,
-    "V_cap": None, "M_cap": 90600.0,
+    "V_cap": None, "M_cap": 152000.0,
     "head_fixity": "free", "tip_fixity": "fixed",
     "appl": "active", "label": "sheet pile wall",
 }

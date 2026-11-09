@@ -5354,6 +5354,19 @@ def _pile_capacity_nonpositive(ctx):
                    f"{_AT_PILES}.")
 
 
+@rule("pile.no_force", ERROR, ("lem",),
+      "A pile row with H and D both blank gets no force in the LEM.",
+      fields=("H", "D"))
+def _pile_no_force(ctx):
+    for i, p in enumerate(ctx.piles):
+        if _num(p.get("H")) is not None or _num(p.get("D_pile")) is not None:
+            continue               # H given, or D for Ito & Matsui to compute it
+        yield (f"{ctx.pile_label(i)} has no force: H and D are both blank, so the "
+               f"limit equilibrium has no way to compute H by Ito & Matsui, and the "
+               f"row contributes nothing -- the factor of safety is the slope's "
+               f"without it. Enter H, or D and S for Ito & Matsui {_AT_PILES}.")
+
+
 @rule("pile.spacing_not_greater_than_diameter", ERROR, ("lem",),
       "Ito & Matsui needs a clear gap between piles: S must exceed D.",
       fields=("S", "D"))

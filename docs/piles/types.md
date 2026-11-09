@@ -98,14 +98,13 @@ tiebacks.
 **Use the FEM.** The wall is continuous out of plane, so the FEM represents it directly and also returns the moment,
 shear and deflection in it. Enter it per unit length of wall, with `S` = 1.
 
-The figure shows a wall held by a tieback in section, and its sheets in plan.
+The figure shows a cantilevered wall in section, and its sheets in plan.
 
-![A sheet-pile wall in section, retaining soil above an excavation, held by a tieback and embedded below the excavation's base, beside the interlocked Z-shaped sheets in plan](images/pw_sheet_pile.png){width=766}
+![A cantilevered sheet-pile wall in section, retaining soil above an excavation and embedded below the excavation's base, beside the interlocked Z-shaped sheets in plan](images/pw_sheet_pile.png){width=617}
 
 The pile line runs from the top of the wall to its tip, which is below the excavation's base by the embedment depth.
-The tieback is a line on the `reinforce` sheet, connected as described under
-[A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). In plan, the
-interlocked sheets form one continuous wall, so `I`, `Area` and `Mcap` are entered per unit length of wall.
+In plan, the interlocked sheets form one continuous wall, so `I`, `Area` and `Mcap` are entered per unit length of
+wall.
 
 <p class="rc-legend">Used by: <span class="rc rc-lem">LEM only</span><span class="rc rc-both">LEM and FEM</span><span class="rc rc-fem">FEM only</span></p>
 

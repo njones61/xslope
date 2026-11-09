@@ -116,23 +116,25 @@ interlocked sheets form one continuous wall, so `I`, `Area` and `Mcap` are enter
 | <code class="rc rc-both">D</code> | Leave blank. A wall's `I` and `Area` are entered, so the diameter is not used. | — |
 | <code class="rc rc-both">S</code> | 1, since the values are per unit length of wall. | — |
 | <code class="rc rc-both">Vcap</code> | Leave blank for no limit. | The sources give no typical value. |
-| <code class="rc rc-both">Mcap</code> | Plastic moment per unit length of wall, F<sub>y</sub> × Z, where F<sub>y</sub> is the steel's yield strength and Z the plastic section modulus: the moment at which the whole section has yielded. First yield, F<sub>y</sub> × S with S the elastic section modulus, is about 20% lower and conservative. [GEC 4][gec4] designs the wall elastically, with an allowable bending stress of 0.55 F<sub>y</sub> on S (p. 81). | F<sub>y</sub> = 50 ksi (345 MPa) is the most common grade ([Nucor Skyline][nucor] p. 6). The table below gives values for four sections. |
+| <code class="rc rc-both">Mcap</code> | The wall's full bending strength per unit length of wall: the steel's yield strength times Z, the section's plastic section modulus, from the manufacturer's catalog. The table below gives Z and `Mcap` for four common sections. | Grade 50 (yield strength 50 ksi, or 345 MPa) is the most common grade ([Nucor Skyline][nucor] p. 6). Grade 36 is also used ([GEC 4][gec4] p. 81). |
 | <code class="rc rc-fem">E</code> | Modulus of the steel. | 29,000 ksi (4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa) ([micropile manual][mp] p. 5-16). |
 | <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | Per unit length of wall, from the section table. | The table below. |
 | <code class="rc rc-fem">Head</code> | Leave blank (free). Tiebacks are entered on the `reinforce` sheet and connected as described under [A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). | — |
 | <code class="rc rc-fem">Tip</code> | Leave blank (free), since the embedment holds the toe. | — |
 
-Four common hot-rolled PZ (Z-shaped) sections, per foot and per meter of wall ([Nucor Skyline][nucor] p. 5; `Mcap` computed with
-F<sub>y</sub> = 50 ksi):
+Four common hot-rolled PZ (Z-shaped) sections, per foot and per meter of wall ([Nucor Skyline][nucor] p. 5). `Mcap` is
+50 ksi (345 MPa), the yield strength of Grade 50 steel, times Z:
 
-| Section | `Area` per ft (per m) | `I` per ft (per m) | `Mcap` per ft (per m) |
-|---|---|---|---|
-| PZ 22 | 0.0449 ft² (0.0137 m²) | 0.00407 ft⁴ (1.15 × 10⁻⁴ m⁴) | 90,800 lb-ft (404 kN·m) |
-| PZ 27 | 0.0551 ft² (0.0168 m²) | 0.00888 ft⁴ (2.52 × 10⁻⁴ m⁴) | 152,000 lb-ft (676 kN·m) |
-| PZ 35 | 0.0715 ft² (0.0218 m²) | 0.0174 ft⁴ (4.93 × 10⁻⁴ m⁴) | 238,000 lb-ft (1,060 kN·m) |
-| PZ 40 | 0.0817 ft² (0.0249 m²) | 0.0237 ft⁴ (6.70 × 10⁻⁴ m⁴) | 300,000 lb-ft (1,330 kN·m) |
+| Section | `Area` per ft (per m) | `I` per ft (per m) | Z per ft (per m) | `Mcap` per ft (per m) |
+|---|---|---|---|---|
+| PZ 22 | 0.0449 ft² (0.0137 m²) | 0.00407 ft⁴ (1.15 × 10⁻⁴ m⁴) | 21.79 in³ (1,171 cm³) | 90,800 lb-ft (404 kN·m) |
+| PZ 27 | 0.0551 ft² (0.0168 m²) | 0.00888 ft⁴ (2.52 × 10⁻⁴ m⁴) | 36.49 in³ (1,962 cm³) | 152,000 lb-ft (676 kN·m) |
+| PZ 35 | 0.0715 ft² (0.0218 m²) | 0.0174 ft⁴ (4.93 × 10⁻⁴ m⁴) | 57.17 in³ (3,074 cm³) | 238,000 lb-ft (1,060 kN·m) |
+| PZ 40 | 0.0817 ft² (0.0249 m²) | 0.0237 ft⁴ (6.70 × 10⁻⁴ m⁴) | 71.92 in³ (3,867 cm³) | 300,000 lb-ft (1,330 kN·m) |
 
-The manufacturer states these as 6.47 to 11.77 in² and 84.4 to 491 in⁴ per foot of wall.
+The catalog gives Area and I in inches: 6.47 to 11.77 in² and 84.4 to 491 in⁴ per foot of wall for these four sections.
+The table converts them to ft² and ft⁴, the units entered on the `piles` sheet. Z stays in in³, since it is only used to
+work out `Mcap`.
 
 ## Soldier-Pile Wall
 

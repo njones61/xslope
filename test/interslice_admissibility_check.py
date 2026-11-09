@@ -78,6 +78,13 @@ PLANE_MODEL = os.path.join(REPO, 'docs', 'verification', 'files', 'geostudio',
                            'gs2_26.xlsx')
 PLANE_SLICES = 50
 PLANE_FS = 1.351997728  # SLOPE/W's own solve of the identical toe plane: 1.352
+#: How close each method must come to PLANE_FS, relative. Spencer iterates, and
+#: it stops once both residuals are under its tolerance (1e-4): from its start
+#: at the plane's own inclination that is four iterations, with F 2e-8 from the
+#: root. That is the precision its stopping rule promises, so its bar sits a
+#: decade looser than the others'.
+PLANE_REL_TOL = {'spencer': 1e-7}
+PLANE_REL_TOL_DEFAULT = 1e-8
 
 #: The counter-case: a model whose crest tension a tension crack exists to
 #: remove, run with the crack and without it.
@@ -170,7 +177,8 @@ def leg_plane_is_answered_by_every_method():
         if method != 'janbu':
             notes[method] = _note_of(r)
     for method, fs in answers.items():
-        if abs(fs - PLANE_FS) / PLANE_FS > 1e-8:
+        if abs(fs - PLANE_FS) / PLANE_FS > PLANE_REL_TOL.get(method,
+                                                             PLANE_REL_TOL_DEFAULT):
             fails.append(f"{method} returns {fs:.10f} on the plane, against "
                          f"SLOPE/W's {PLANE_FS} on the same plane")
     if answers:

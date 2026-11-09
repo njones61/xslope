@@ -20,6 +20,13 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   report took the vertical part of each reinforcement force with the wrong sign,
   so its sums did not return the factor of safety, and it printed the general
   moment-arm form instead. The factor of safety itself was not affected.
+- A search with Spencer's method no longer runs for half an hour on a steep slip
+  surface. The solver started every trial surface with the side forces inclined
+  at 8°. On the steep face of a large dump, where the answer stood at 35° to 55°,
+  it missed from there and fell back to a sweep of every inclination, about
+  5 seconds per circle, and one search ran well past 30 minutes. It now starts at
+  the surface's average base inclination, and that search takes 7 seconds. No
+  factor of safety in the test suite changed.
 
 ### Changed
 

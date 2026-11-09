@@ -2978,12 +2978,22 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
 
     # Strategy 1: Newton from the caller's seed when one is given (a Monte
     # Carlo campaign passes the most-likely-values solution, which sits within
-    # a few percent of every realization's root), else the default start.
+    # a few percent of every realization's root), else the default start: the
+    # base inclination of the slices averaged by weight. The root's theta follows
+    # the surface. On issue #9's steep dump face it stood at 35-55 degrees on
+    # most trial circles, and a fixed start of 8 degrees missed it, which sent
+    # each of those circles to the band sweep at about 5 s apiece. The fixed
+    # start stays among the retries below.
     F0 = 1.5 if fs_seed is None else float(fs_seed)
-    if theta_seed is None:
-        theta0_rad = np.radians(-8.0) if right_facing else np.radians(8)
-    else:
+    theta_fixed = np.radians(-8.0) if right_facing else np.radians(8)
+    if theta_seed is not None:
         theta0_rad = np.radians(float(theta_seed))
+    else:
+        w_abs = np.abs(np.asarray(W, dtype=float))
+        if np.isfinite(w_abs).all() and w_abs.sum() > 0:
+            theta0_rad = float(np.average(alpha, weights=w_abs))
+        else:
+            theta0_rad = theta_fixed
 
     converged, F, theta_rad, iteration = newton_solve(F0, theta0_rad, max_iter, tol, debug_level)
     if converged and not accept_or_save(F, theta_rad, "Newton default: "):
@@ -2997,7 +3007,8 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
                 F0_bishop = result_bishop['FS']
                 if debug_level >= 1:
                     print(f"Retrying with Bishop FS = {F0_bishop:.3f} as initial guess")
-                theta_tries = [theta0_rad, -theta0_rad, 0.0, np.radians(15), np.radians(-15)]
+                theta_tries = [theta0_rad, theta_fixed, -theta_fixed, 0.0,
+                               np.radians(15), np.radians(-15)]
                 for theta_try in theta_tries:
                     conv_b, F_b, theta_b, _ = newton_solve(F0_bishop, theta_try, max_iter, tol, debug_level)
                     if conv_b:

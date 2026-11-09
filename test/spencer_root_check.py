@@ -85,7 +85,10 @@ WHAT IS CHECKED
 * the two refined VP104 surfaces: Spencer returns Morgenstern-Price's constant-f
   value to ten significant figures, at an interslice inclination inside the band;
 * the two surfaces where both roots stand inside the band: the answer is
-  Morgenstern-Price's constant-f value and the root passed over is named;
+  Morgenstern-Price's constant-f value. The default start (the base inclination
+  averaged by weight) reaches it directly, so the dispute is exercised from a
+  fixed start of 8 degrees, which reaches the wrong root first: the sweep must
+  return the same answer and name the root passed over;
 * the trigger's bar from both sides — every disputed root stands above it, and
   every answer the corpus locks stands below it;
 * the roots passed over are named in results['warnings'] or in the refusal, with
@@ -333,7 +336,19 @@ def leg_two_roots_inside_the_band():
             fails.append(f"{name}: spencer {res_s['FS']:.4f}, not the "
                          f"{spec['answer']:.4f} this surface is pinned at")
             continue
-        text = " ".join(res_s.get('warnings') or [])
+        # The default start reaches the answer without passing through the
+        # disputed root, so the dispute itself is driven from the fixed start
+        # of 8 degrees, which lands on the disputed root first.
+        right_facing = df.attrs.get('right_facing',
+                                    df['y_cb'].iat[0] > df['y_cb'].iat[-1])
+        ok_f, res_f = solve.spencer(df.copy(),
+                                    theta_seed=-8.0 if right_facing else 8.0)
+        if not ok_f or abs(res_f['FS'] - spec['answer']) > 5e-4:
+            fails.append(f"{name}: from the 8 degree start spencer reports "
+                         f"{res_f['FS'] if ok_f else res_f}, not the "
+                         f"{spec['answer']:.4f} the dispute sweep should settle on")
+            continue
+        text = " ".join(res_f.get('warnings') or [])
         if f"{spec['disputed']:.3f}" not in text:
             fails.append(f"{name}: the root passed over ({spec['disputed']:.3f}) "
                          f"is not named in the warnings: {text[:200]!r}")

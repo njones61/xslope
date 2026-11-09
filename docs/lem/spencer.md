@@ -307,7 +307,7 @@ The partial derivatives of $y_Q$ are:
 
 This iterative solution continues until the residuals $R_1$ and $R_2$ converge to within acceptable tolerance, providing the factor of safety $F$ and interslice force inclination $\theta$ that satisfy both force and moment equilibrium simultaneously.
 
-In **xslope** the Newton direction of equations (31) and (32) is formed from the four first-order partial derivatives — equations (35), (36), (40) and (41). The second-order derivatives are given above for completeness and are not currently evaluated by the solver.
+In **xslope** the Newton direction of equations (31) and (32) is formed from the four first-order partial derivatives — equations (35), (36), (40) and (41). The second-order derivatives are given above for completeness and are not currently evaluated by the solver. The iteration starts from $F = 1.5$ and from $\theta$ equal to the base inclination of the slices averaged by slice weight, so the start follows the steepness of the surface. Where it does not converge, the solver retries from other starting points and then sweeps the band of admissible inclinations described below.
 
 !!! note "Passive support in the Newton system"
     Passive support forces mobilize with the soil and carry a factor $1/F$, which makes the force sums

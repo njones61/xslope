@@ -25,8 +25,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   at 8°. On the steep face of a large dump, where the answer stood at 35° to 55°,
   it missed from there and fell back to a sweep of every inclination, about
   5 seconds per circle, and one search ran well past 30 minutes. It now starts at
-  the surface's average base inclination, and that search takes 7 seconds. No
-  factor of safety in the test suite changed.
+  the surface's average base inclination, and that search takes 7 seconds. Every
+  factor of safety in the test suite still matches its reference value.
 
 ### Changed
 

@@ -127,6 +127,9 @@ pip install "xslope[gui]"         # add Studio itself
 pip install "xslope[gui,fem,ai]"  # everything, including the AI assistant
 ```
 
+The `ai` extra needs Python 3.14 or earlier, because litellm, the library the
+assistant uses to reach the model, does not support Python 3.15 yet.
+
 The `gui` extra registers a console command that opens the same window the
 installers do:
 

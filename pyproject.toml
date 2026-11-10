@@ -46,7 +46,11 @@ dependencies = [
 fem = ["gmsh>=4.15"]             # 4.14 quad8 meshes ignore embedded bars and piles
 cad = ["ezdxf"]                  # DXF import/export (xslope.cad)
 gui = ["PySide6", "pyobjc-framework-Cocoa; sys_platform == 'darwin'", "ezdxf"]
-ai = ["litellm[mcp]", "keyring"]   # litellm imports mcp for any request with tools
+# litellm imports mcp for any request with tools. 1.106 is the oldest litellm the
+# installers have shipped; the floor also makes pip on a Python litellm does not
+# support yet (3.15) stop with a clear message instead of falling back to 1.83.7,
+# which has no mcp extra (issue #10).
+ai = ["litellm[mcp]>=1.106", "keyring"]
 
 [project.scripts]
 xslope-studio = "studio.app:main"

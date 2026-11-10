@@ -31,6 +31,11 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   the model check says to enter `H`, or `D` and `S` for Ito and Matsui. The row
   used to be taken as a pile with no force, and the factor of safety came out as
   the slope's without it, with no message. Finite element runs are not affected.
+- On Python 3.15, `pip install "xslope[ai]"` now stops with pip's message that no
+  version of litellm fits, instead of falling back to the older litellm 1.83.7
+  and trying to build its dependencies from source, which can fail. litellm, the
+  library the assistant uses to reach the model, does not support Python 3.15
+  yet; the assistant needs Python 3.14 or earlier until it does.
 
 ### Changed
 
@@ -100,12 +105,13 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
-- The assistant in XSLOPE Studio works again. In 1.0.6 every request failed with
-  "No module named 'mcp'": the installer picked up a new release of litellm, the
-  library the assistant uses to reach the model, and that release needs the mcp
-  package for any request that offers tools without installing it. The same error
-  met anyone who installed `xslope[ai]` with pip. Both now install mcp, and the
-  installer build sends a test request with tools before it ships.
+- The assistant in XSLOPE Studio works again. In 1.0.4 through 1.0.6 every
+  request failed with "No module named 'mcp'": the installer picked up a new
+  release of litellm, the library the assistant uses to reach the model, and that
+  release needs the mcp package for any request that offers tools without
+  installing it. The same error met anyone who installed `xslope[ai]` with pip.
+  Both now install mcp, and the installer build sends a test request with tools
+  before it ships.
 - The material shading in the seepage solution and the mesh plots no longer shows
   faint lines inside the elements. Each 6-node triangle was shaded as four smaller
   triangles, and the edges between them showed through, so a solution looked as if

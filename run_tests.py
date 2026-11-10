@@ -3178,6 +3178,42 @@ def _check_bottom_elevation_roundtrip(source, template):
     return problems
 
 
+def _excel_order_problems(path):
+    """Rows or cells out of order in any worksheet of the workbook at ``path``.
+
+    Excel requires each sheet's rows in ascending order and each row's cells in
+    column order; a file that breaks either opens with "We found a problem with
+    some content" and an offer to repair it. load_slope_data reads such a file
+    without complaint, so the round trip alone cannot see it: from template v19
+    to the fix, every file the writer saved had the main sheet's run options
+    (D14:D21) appended after columns F and G.
+    """
+    import zipfile
+
+    def col(ref):
+        n = 0
+        for ch in re.match(r'[A-Z]+', ref).group(0):
+            n = n * 26 + ord(ch) - 64
+        return n
+
+    problems = []
+    with zipfile.ZipFile(path) as z:
+        for part in sorted(n for n in z.namelist()
+                           if re.match(r'xl/worksheets/sheet\d+\.xml$', n)):
+            xml_text = z.read(part).decode('utf-8', 'replace')
+            prev = 0
+            for m in re.finditer(r'<row\s+r="(\d+)"[^>]*?(?:/>|>(.*?)</row>)',
+                                 xml_text, re.DOTALL):
+                r = int(m.group(1))
+                cols = [col(c) for c in re.findall(r'<c\s+r="([A-Z]+)\d+"', m.group(2) or '')]
+                if r <= prev:
+                    problems.append(f"{part}: row {r} after row {prev}")
+                elif cols != sorted(cols) or len(cols) != len(set(cols)):
+                    problems.append(f"{part}: row {r} cells out of column order")
+                prev = r
+    return problems
+
+
 def run_roundtrip_test(test):
     """Verify save_slope_data_to_xlsx round-trips a file: load -> save into a
     blank template -> reload must reproduce every input category.
@@ -3210,6 +3246,8 @@ def run_roundtrip_test(test):
         save_slope_data_to_xlsx(d1, tmp,
                                 template=test.get('template', ROUNDTRIP_TEMPLATE))
         d2 = load_slope_data(tmp)
+        # The written file must open in Excel without a repair prompt.
+        order_problems = _excel_order_problems(tmp)
         # A Max depth DECLARED on a polygon model. The comparison above sees only
         # the corpus files' own value, which on every polygon-native file is None,
         # so it could not see the writer skipping the profile sheet entirely on
@@ -3228,6 +3266,7 @@ def run_roundtrip_test(test):
 
     mismatches = _check_bottom_elevation_roundtrip(
         d1, test.get('template', ROUNDTRIP_TEMPLATE))
+    mismatches += order_problems
     if md_back is not _NOT_CHECKED and md_back != POLYGON_MAX_DEPTH:
         mismatches.append(f"max_depth declared on a polygon model came back "
                           f"{md_back!r}, not {POLYGON_MAX_DEPTH}")
@@ -3274,11 +3313,12 @@ def run_v19_roundtrip_test(test):
     try:
         save_slope_data_to_xlsx(d1, tmp, template=template)
         d2 = load_slope_data(tmp)
+        order_problems = _excel_order_problems(tmp)
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
 
-    problems = []
+    problems = list(order_problems)
     for k, v in V19_ROUNDTRIP_VALUES.items():
         got = d2.get(k)
         # tension_srf is a tri-state: False must come back False, never None.

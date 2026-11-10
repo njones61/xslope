@@ -4131,15 +4131,42 @@ def _modify_sheet_xml(xml_bytes, cells):
                     row_content = (row_content[:cell_match.start()] +
                                    new_cell + row_content[cell_match.end():])
                 else:
-                    row_content = row_content + _build_new_cell(ref, value)
+                    row_content = _insert_in_column_order(
+                        row_content, col_num, _build_new_cell(ref, value))
             new_row = row_open + row_content + row_close
             xml_text = xml_text[:row_match.start()] + new_row + xml_text[row_match.end():]
         else:
             cells_xml = ''.join(_build_new_cell(ref, value) for ref, _, value in row_cells)
             new_row = f'<row r="{row_num}">{cells_xml}</row>'
-            sd_close = xml_text.rfind('</sheetData>')
-            xml_text = xml_text[:sd_close] + new_row + xml_text[sd_close:]
+            # Rows go in ascending order: the first existing row below this one, or
+            # the end of sheetData when there is none.
+            later = next((m for m in re.finditer(r'<row\s+r="(\d+)"', xml_text)
+                          if int(m.group(1)) > row_num), None)
+            at = later.start() if later else xml_text.rfind('</sheetData>')
+            xml_text = xml_text[:at] + new_row + xml_text[at:]
     return xml_text.encode('utf-8')
+
+
+# One <c> element: self-closing, or with its content up to its own </c> (a cell
+# never contains another cell, so the lazy match stops at the right tag).
+_CELL_ELEMENT_RE = re.compile(r'<c\s[^>]*?/>|<c\s[^>]*?>.*?</c>', re.DOTALL)
+
+
+def _insert_in_column_order(row_content, col_num, new_cell):
+    """Put a new cell before the first existing cell to its right in the row.
+
+    Excel requires the cells of a row in column order and treats a row out of
+    order as damaged: it reports a problem with the file and offers to repair it.
+    The template leaves the main sheet's run options (D14:D21) out of rows that
+    already hold cells in columns F and G, so appending the new cell to the end of
+    the row, as this writer did from template v19 on, put every saved file in
+    that state.
+    """
+    for m in _CELL_ELEMENT_RE.finditer(row_content):
+        ref = re.match(r'<c\s+r="([A-Z]+\d+)"', m.group(0))
+        if ref and _parse_cell_ref(ref.group(1))[1] > col_num:
+            return row_content[:m.start()] + new_cell + row_content[m.start():]
+    return row_content + new_cell
 
 
 def _reset_view(xml_bytes):

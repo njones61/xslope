@@ -27,6 +27,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   5 seconds per circle, and one search ran well past 30 minutes. It now starts at
   the surface's average base inclination, and that search takes 7 seconds. Every
   factor of safety in the test suite still matches its reference value.
+- A pile row with both `H` and `D` blank now stops a limit equilibrium run, and
+  the model check says to enter `H`, or `D` and `S` for Ito and Matsui. The row
+  used to be taken as a pile with no force, and the factor of safety came out as
+  the slope's without it, with no message. Finite element runs are not affected.
 
 ### Changed
 

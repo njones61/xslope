@@ -36,6 +36,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   and trying to build its dependencies from source, which can fail. litellm, the
   library the assistant uses to reach the model, does not support Python 3.15
   yet; the assistant needs Python 3.14 or earlier until it does.
+- Models saved from XSLOPE Studio now open in Excel without a repair prompt.
+  Since 0.2.1, Excel reported a problem with every model Studio saved and offered
+  to repair it, because XSLOPE stored the main sheet's run options (LEM method,
+  number of slices, and the others in column D) out of order inside the file.
+  XSLOPE read these files correctly, and no result was affected. To fix a file
+  saved before this release, open it in Studio and save it again.
 
 ### Changed
 

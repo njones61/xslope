@@ -4106,6 +4106,16 @@ def _expand_shared_formulas(xml_bytes, refs):
 
 
 def _modify_sheet_xml(xml_bytes, cells):
+    """Write ``cells`` ({ref: value}) into one worksheet's XML, keeping it in order.
+
+    Excel requires a sheet's rows in ascending order and each row's cells in column
+    order, and treats a sheet that breaks either as damaged: it reports a problem
+    with the file and offers to repair it. A cell the row lacks goes before the
+    first cell to its right (and before the row's extLst, which must come last); a
+    row the sheet lacks goes before the first row below it. The row and cell tags
+    are found whatever the order of their attributes, a self-closing row is opened
+    to take its cells, and an empty self-closing sheetData is opened to take rows.
+    """
     xml_text = xml_bytes.decode('utf-8')
     rows_data = {}
     for ref, value in cells.items():
@@ -4114,18 +4124,19 @@ def _modify_sheet_xml(xml_bytes, cells):
     for row_num in rows_data:
         rows_data[row_num].sort(key=lambda x: x[1])
     for row_num, row_cells in sorted(rows_data.items()):
-        row_pattern = re.compile(
-            r'(<row\s+r="%d"[^>]*>)(.*?)(</row>)' % row_num, re.DOTALL)
-        row_match = row_pattern.search(xml_text)
-        if row_match:
-            row_open = row_match.group(1)
-            row_content = row_match.group(2)
-            row_close = row_match.group(3)
+        start = re.compile(r'<row\b(?=[^>]*\sr="%d")[^>]*?(/?)>' % row_num).search(xml_text)
+        if start:
+            if start.group(1):                       # <row .../>: an empty row
+                row_open = start.group(0)[:-2].rstrip() + '>'
+                row_content, end = '', start.end()
+            else:
+                close = xml_text.find('</row>', start.end())
+                row_open = start.group(0)
+                row_content, end = xml_text[start.end():close], close + len('</row>')
             for ref, col_num, value in row_cells:
-                cell_pattern = re.compile(
-                    r'<c\s+r="%s"(?:\s[^>]*)*/>' % re.escape(ref) +
-                    r'|<c\s+r="%s"(?:\s[^>]*)?>.*?</c>' % re.escape(ref), re.DOTALL)
-                cell_match = cell_pattern.search(row_content)
+                cell_match = re.compile(
+                    r'<c\b(?=[^>]*\sr="%s")[^>]*?(?:/>|>.*?</c>)' % re.escape(ref),
+                    re.DOTALL).search(row_content)
                 if cell_match:
                     new_cell = _modify_existing_cell(cell_match.group(0), value)
                     row_content = (row_content[:cell_match.start()] +
@@ -4133,23 +4144,34 @@ def _modify_sheet_xml(xml_bytes, cells):
                 else:
                     row_content = _insert_in_column_order(
                         row_content, col_num, _build_new_cell(ref, value))
-            new_row = row_open + row_content + row_close
-            xml_text = xml_text[:row_match.start()] + new_row + xml_text[row_match.end():]
+            xml_text = (xml_text[:start.start()] + row_open + row_content + '</row>'
+                        + xml_text[end:])
         else:
             cells_xml = ''.join(_build_new_cell(ref, value) for ref, _, value in row_cells)
             new_row = f'<row r="{row_num}">{cells_xml}</row>'
             # Rows go in ascending order: the first existing row below this one, or
             # the end of sheetData when there is none.
-            later = next((m for m in re.finditer(r'<row\s+r="(\d+)"', xml_text)
+            later = next((m for m in _ROW_START_RE.finditer(xml_text)
                           if int(m.group(1)) > row_num), None)
-            at = later.start() if later else xml_text.rfind('</sheetData>')
+            if later:
+                at = later.start()
+            elif '</sheetData>' in xml_text:
+                at = xml_text.rfind('</sheetData>')
+            else:                                    # <sheetData/>: no rows yet
+                empty = re.search(r'<sheetData\b([^>]*?)\s*/>', xml_text)
+                xml_text = (xml_text[:empty.start()] + f'<sheetData{empty.group(1)}></sheetData>'
+                            + xml_text[empty.end():])
+                at = xml_text.rfind('</sheetData>')
             xml_text = xml_text[:at] + new_row + xml_text[at:]
     return xml_text.encode('utf-8')
 
 
+# A <row> start tag and its row number, wherever the r attribute sits.
+_ROW_START_RE = re.compile(r'<row\b[^>]*?\sr="(\d+)"[^>]*?/?>')
 # One <c> element: self-closing, or with its content up to its own </c> (a cell
 # never contains another cell, so the lazy match stops at the right tag).
 _CELL_ELEMENT_RE = re.compile(r'<c\s[^>]*?/>|<c\s[^>]*?>.*?</c>', re.DOTALL)
+_CELL_REF_RE = re.compile(r'<c\b[^>]*?\sr="([A-Z]+\d+)"')
 
 
 def _insert_in_column_order(row_content, col_num, new_cell):
@@ -4157,15 +4179,19 @@ def _insert_in_column_order(row_content, col_num, new_cell):
 
     Excel requires the cells of a row in column order and treats a row out of
     order as damaged: it reports a problem with the file and offers to repair it.
-    The template leaves the main sheet's run options (D14:D21) out of rows that
+    The template leaves the main sheet's run options (D14:D22) out of rows that
     already hold cells in columns F and G, so appending the new cell to the end of
     the row, as this writer did from template v19 on, put every saved file in
-    that state.
+    that state. With no cell to its right, the new cell still goes before the
+    row's extLst, which the schema puts after every cell.
     """
     for m in _CELL_ELEMENT_RE.finditer(row_content):
-        ref = re.match(r'<c\s+r="([A-Z]+\d+)"', m.group(0))
+        ref = _CELL_REF_RE.match(m.group(0))
         if ref and _parse_cell_ref(ref.group(1))[1] > col_num:
             return row_content[:m.start()] + new_cell + row_content[m.start():]
+    ext = row_content.find('<extLst')
+    if ext != -1:
+        return row_content[:ext] + new_cell + row_content[ext:]
     return row_content + new_cell
 
 

@@ -3186,13 +3186,14 @@ def _excel_order_problems(path):
     some content" and an offer to repair it. load_slope_data reads such a file
     without complaint, so the round trip alone cannot see it: from template v19
     to the fix, every file the writer saved had the main sheet's run options
-    (D14:D21) appended after columns F and G.
+    (D14:D22) after columns F and G. Tags are matched whatever the order of their
+    attributes, and a cell whose reference names another row counts as damage.
     """
     import zipfile
 
-    def col(ref):
+    def col(letters):
         n = 0
-        for ch in re.match(r'[A-Z]+', ref).group(0):
+        for ch in letters:
             n = n * 26 + ord(ch) - 64
         return n
 
@@ -3202,16 +3203,105 @@ def _excel_order_problems(path):
                            if re.match(r'xl/worksheets/sheet\d+\.xml$', n)):
             xml_text = z.read(part).decode('utf-8', 'replace')
             prev = 0
-            for m in re.finditer(r'<row\s+r="(\d+)"[^>]*?(?:/>|>(.*?)</row>)',
+            for m in re.finditer(r'<row\b[^>]*?\sr="(\d+)"[^>]*?(?:/>|>(.*?)</row>)',
                                  xml_text, re.DOTALL):
                 r = int(m.group(1))
-                cols = [col(c) for c in re.findall(r'<c\s+r="([A-Z]+)\d+"', m.group(2) or '')]
+                refs = re.findall(r'<c\b[^>]*?\sr="([A-Z]+)(\d+)"', m.group(2) or '')
+                cols = [col(c) for c, _ in refs]
                 if r <= prev:
                     problems.append(f"{part}: row {r} after row {prev}")
                 elif cols != sorted(cols) or len(cols) != len(set(cols)):
                     problems.append(f"{part}: row {r} cells out of column order")
+                elif any(int(n) != r for _, n in refs):
+                    problems.append(f"{part}: row {r} holds a cell of another row")
                 prev = r
     return problems
+
+
+def _install_save_order_check():
+    """Check every workbook the suite writes, not only the round trips'.
+
+    Wraps xslope.fileio.write_cells_to_xlsx, the code under every save
+    (save_slope_data_to_xlsx, Studio's Save, the vendor importers, the DXF path),
+    so a save that leaves a sheet out of order fails the test that made it. It
+    runs at import, so the spawned workers install it too.
+    """
+    import xslope.fileio as xf
+    if getattr(xf.write_cells_to_xlsx, '_order_checked', False):
+        return
+    write = xf.write_cells_to_xlsx
+
+    def checked(filepath, updates):
+        write(filepath, updates)
+        problems = _excel_order_problems(filepath)
+        if problems:
+            raise AssertionError("workbook written out of order (Excel would offer "
+                                 "to repair it): " + "; ".join(problems[:3]))
+    checked._order_checked = True
+    xf.write_cells_to_xlsx = checked
+
+
+_install_save_order_check()
+
+
+def run_xlsx_order_test(test):
+    """The writer keeps every sheet in order on layouts the template does not use yet.
+
+    Each case is one worksheet's XML and the cells to write into it: a run option
+    between columns C and F, a self-closing row, an empty self-closing sheetData,
+    tags whose r attribute is not first, a row ending in extLst, two-letter
+    columns, new rows among far-apart ones, and an inline string holding escaped
+    tag text. The written XML must keep its rows ascending, each row's cells in
+    column order and in their own row, every written cell present, and any extLst
+    after the cells.
+    """
+    from xslope.fileio import _modify_sheet_xml
+    pre, post = '<worksheet><sheetData>', '</sheetData></worksheet>'
+    cases = {
+        'run option mid-row': (pre + '<row r="14" spans="3:7"><c r="C14" t="s"><v>1</v></c>'
+                               '<c r="F14"/><c r="G14"/></row>' + post, {'D14': 'spencer'}),
+        'self-closing row': (pre + '<row r="14" spans="1:7"/><row r="15"><c r="A15"/></row>'
+                             + post, {'D14': 1.0}),
+        'empty sheetData': ('<worksheet><sheetData/></worksheet>', {'B3': 2.0, 'A2': 'x'}),
+        'r not first': (pre + '<row spans="1:7" r="14" ht="15"><c s="2" r="C14"/>'
+                        '<c t="s" r="F14"><v>3</v></c></row>' + post, {'D14': 1.0, 'C14': 5.0}),
+        'row with extLst': (pre + '<row r="14"><c r="A14"/><extLst><ext uri="x"/></extLst>'
+                            '</row>' + post, {'D14': 7.0}),
+        'two-letter columns': (pre + '<row r="2"><c r="B2"/><c r="AA2"/></row>' + post,
+                               {'Z2': 1.0, 'AB2': 2.0, 'A2': 0.0}),
+        'new rows': (pre + '<row r="1"><c r="A1"/></row><row r="140"><c r="A140"/></row>'
+                     + post, {'B14': 1.0, 'A20': 2.0, 'C200': 3.0}),
+        'escaped tag text': (pre + '<row r="5"><c r="A5" t="inlineStr"><is><t>&lt;c r="Z5"/&gt;'
+                             '</t></is></c><c r="E5"/></row>' + post, {'C5': 'a<b'}),
+    }
+
+    def col(letters):
+        n = 0
+        for ch in letters:
+            n = n * 26 + ord(ch) - 64
+        return n
+
+    failed = []
+    for name, (xml, cells) in cases.items():
+        out = _modify_sheet_xml(xml.encode(), cells).decode()
+        nums = []
+        ok = True
+        for m in re.finditer(r'<row\b[^>]*?\sr="(\d+)"[^>]*?(?:/>|>(.*?)</row>)', out, re.DOTALL):
+            r = int(m.group(1))
+            nums.append(r)
+            refs = re.findall(r'<c\b[^>]*?\sr="([A-Z]+)(\d+)"', m.group(2) or '')
+            cols = [col(c) for c, _ in refs]
+            ok = ok and cols == sorted(cols) and len(cols) == len(set(cols)) \
+                and all(int(n) == r for _, n in refs)
+        ok = ok and nums == sorted(nums) and len(nums) == len(set(nums))
+        ok = ok and all(f'r="{ref}"' in out for ref in cells)
+        if '<extLst' in xml:
+            ok = ok and out.index('<extLst') > max(out.index(f'r="{ref}"') for ref in cells)
+        if not ok:
+            failed.append(name)
+    if failed:
+        return None, "sheet written out of order: " + ", ".join(failed)
+    return 0.0, None
 
 
 def run_roundtrip_test(test):
@@ -15924,6 +16014,8 @@ def _dispatch_test(test):
         return run_roundtrip_test(test)
     if test_type == 'v19_roundtrip':
         return run_v19_roundtrip_test(test)
+    if test_type == 'xlsx_order':
+        return run_xlsx_order_test(test)
     if test_type == 'ssr_zone_roundtrip':
         return run_ssr_zone_roundtrip_test(test)
     if test_type == 'surface_family_roundtrip':
@@ -16212,7 +16304,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -17325,6 +17417,9 @@ def main():
                                   'method': f'v{legacy_version}',
                                   'source': 'roundtrip'})
                     n_rt += 1
+            tests.append({'type': 'xlsx_order', 'file': '(synthetic sheets)', 'method': '-',
+                          'source': 'roundtrip'})
+            n_rt += 1
             if Path(V19_ROUNDTRIP_BASE).exists():
                 tests.append({'type': 'v19_roundtrip', 'file': V19_ROUNDTRIP_BASE,
                               'template': ROUNDTRIP_TEMPLATE, 'method': '-',

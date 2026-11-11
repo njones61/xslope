@@ -228,6 +228,19 @@ SPENCER_THRUST_OUT_DISPUTED = 0.65
 SPENCER_SWEEP_GRID = (18, 7)
 SPENCER_SWEEP_MAX_NFEV = 200
 
+#: The size of mass at which Spencer's residual bar `tol` stops tightening. The two
+#: residuals are a force (R1, the sum of the interslice resultants) and a moment
+#: (R2), in the model's own units, so a fixed bar is a different precision on every
+#: model: on an ordinary slope, whose vertical forces sum to thousands of lb or kN
+#: per unit width, 1e-4 is a part in 1e7 or finer, and on a 0.33 ft sliver weighing
+#: 0.009 lb/ft it was 1% of the weight. Newton stopped there 2.4% short of the root:
+#: LEM-10's shallow search reported 1.268 on a dry sand face whose infinite-slope
+#: limit, tan(phi)/tan(beta), is 1.299, and Bishop, OMS, Janbu and Morgenstern-Price
+#: all return 1.299 on the same slices. Below this size (force units for R1, force
+#: times length for R2) the bar shrinks in proportion to the mass; at and above it
+#: the bar is `tol` itself, so every model of real size solves exactly as before.
+SPENCER_TOL_REF = 1.0
+
 
 def _thrust_outside_fraction(y_lt, y_lb, yt_l):
     """The fraction of interior boundaries whose line of thrust leaves the slice.
@@ -2280,6 +2293,17 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         - (pa_my - y_b * pa_cx) + (pa_mx - x_b * pa_cy) \
         - LL * np.sin(ll_b) * (ll_y - y_b) - LL * np.cos(ll_b) * (ll_x - x_b)  # Eq (3) + pile/axial/line-load moments
     
+    # The residual bars, scaled to the mass when it is small (SPENCER_TOL_REF):
+    # R1 against the sum of the vertical forces, R2 against that times the
+    # surface's own length. Both factors are 1 on any model of real size.
+    _force_size = float(np.sum(np.abs(Fv)))
+    _moment_size = _force_size * float(max(np.ptp(x_b), np.ptp(y_b), 1e-12))
+    if np.isfinite(_force_size) and _force_size > 0:
+        r1_fac = min(1.0, _force_size / SPENCER_TOL_REF)
+        r2_fac = min(1.0, _moment_size / SPENCER_TOL_REF)
+    else:
+        r1_fac = r2_fac = 1.0
+
     # ========== BEGIN SOLUTION ==========
 
     def compute_Q_and_yQ(F, theta_rad):
@@ -2401,7 +2425,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
                 else:
                     print(f"Iteration {iteration + 1} - Updated: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
 
-            if abs(R1) < tol and abs(R2) < tol:
+            if abs(R1) < tol * r1_fac and abs(R2) < tol * r2_fac:
                 if debug_level >= 1:
                     print(f"Converged in {iteration + 1} iterations, R1 = {R1:.6e}, R2 = {R2:.6e}")
                 return True, F, theta_rad, iteration
@@ -2691,7 +2715,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
                 F_c = float(sol.x[0])
                 th_c = _theta_of(F_c, sol.x[1])
                 R1_c, R2_c, _, _ = compute_residuals(F_c, th_c)
-                if not (abs(R1_c) < tol and abs(R2_c) < tol):
+                if not (abs(R1_c) < tol * r1_fac and abs(R2_c) < tol * r2_fac):
                     continue
                 if any(_same_root((F_c, th_c), cr) for cr in crossings):
                     continue
@@ -2842,7 +2866,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
 
         The verdict is only returned when h's extremum stands clear of the
         acceptance tolerance by a wide margin. F is not quite pinned: the solver
-        accepts |R2| < tol, which admits |sum n_i| < tol / R and so lets 1/F move
+        accepts |R2| < tol * r2_fac (r2_fac = 1 but on a tiny mass, SPENCER_TOL_REF), which admits |sum n_i| < tol / R and so lets 1/F move
         by tol / (R sum(c dl)), shifting h by at most tol * max(sec) / R. The
         margin below is 1e4 times that bound, so no surface that could have been
         accepted is ever refused. Anything short of it returns False and the
@@ -2866,7 +2890,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
             return False                     # an admissible root exists: solvable
         k = int(np.argmax(h)) if h.max() < 0 else int(np.argmin(h))
         extremum = float(h[k])
-        shift = tol * float(np.max(np.abs(sec[k]))) / Rr
+        shift = tol * r2_fac * float(np.max(np.abs(sec[k]))) / Rr
         if abs(extremum) <= 1e4 * max(shift, 1e-30):
             return False                     # too close to call: let the solver try
         elsewhere = (
@@ -2946,13 +2970,13 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         if not np.isfinite(floor):
             return False
         # The bar is set by what the solver ACCEPTS, not by a round number: a
-        # solution is taken at |R1| < tol, which in these normalized terms is
-        # tol / w_scale, and the verdict is only given when the reachable floor
+        # solution is taken at |R1| < tol * r1_fac, which in these normalized terms
+        # is tol * r1_fac / w_scale, and the verdict is only given when the reachable floor
         # stands a thousandfold above that. (Measured floors on the corpus run
         # 2e-4 to 8e-3 — four to five orders above acceptance — with no natural
         # gap in them, which is exactly why the bar is anchored to the tolerance
         # rather than cut through that continuum at a chosen fraction.)
-        bar = max(NO_SOLUTION_FLOOR, NO_SOLUTION_MARGIN * (tol / w_scale))
+        bar = max(NO_SOLUTION_FLOOR, NO_SOLUTION_MARGIN * (tol * r1_fac / w_scale))
         if floor <= bar:
             return False
         _no_solution_detail[:] = [

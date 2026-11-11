@@ -10261,6 +10261,12 @@ MODULE_CHECKS = {
         "Morgenstern-Price read 5.87. Theta is bounded to the band, the roots "
         "passed over are named, and the two benchmarks whose answers stand past "
         "45 degrees are pinned so no fixed cap can come back."),
+    'spencer_sliver': (
+        'spencer_sliver_check.py',
+        "Spencer's residual bar is a force and a moment in the model's units, so a "
+        "fixed 1e-4 was 1% of the weight of LEM-10's 0.33 ft sliver and stopped "
+        "Newton at 1.268 under the 1.299 infinite-slope limit; it now scales with "
+        "the mass below 1 unit, and a model of real size solves as before."),
 }
 
 
@@ -16799,6 +16805,11 @@ def main():
         tests.append({'type': 'spencer_disclosure',
                       'file': 'Spencer insoluble surfaces + search disclosure',
                       'method': 'spencer', 'source': 'spencer_disclosure'})
+        # Spencer's residual bar scaled to the mass: LEM-10's shallow searches
+        # reach the infinite-slope limit, and a model of real size is untouched.
+        tests.append({'type': 'spencer_sliver',
+                      'file': 'Spencer on a sliver: the residual bar scales with the mass',
+                      'method': 'spencer', 'source': 'spencer_sliver'})
         # Interslice tension used to be judged on three severities — refused
         # above 30% by Morgenstern-Price, above 50% by force_equilibrium, only
         # warned about by Spencer — so the same interslice state could be an

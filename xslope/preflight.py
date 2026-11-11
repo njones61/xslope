@@ -3355,6 +3355,42 @@ def _seep_field_no_consumer(ctx):
             "seepage run was not meant to feed this analysis.")
 
 
+@rule("seep_field.material_reads_line", WARNING, ("lem",),
+      "A material left at u = piezo beside materials at u = seep reads the line, "
+      "not the seepage solution.")
+def _seep_field_material_reads_line(ctx):
+    # The gap between the two rules around it (Norm, 2026-11-11, 232b). A model
+    # built with a piezometric line and then given a seepage solution keeps its
+    # line, so a material whose u is not switched from piezo to seep goes on
+    # reading the line. piezo.line_missing catches it once the line is deleted, and
+    # seep_field.no_consumer once NO material reads the field; with the line kept
+    # and only some materials switched, nothing else speaks. A WARNING, since a
+    # mix can be meant: a line can stand for pressures the seepage model leaves
+    # out. FEM refuses mixed u options outright (fem.py), so this is LEM only.
+    if len(ctx.piezo) < 2 or not (ctx.uses_piezo and ctx.uses_seep_u):
+        return None
+    on = {"piezo": [], "seep": []}
+    for i, m in ctx.strength_materials():
+        u = str(m.get("u", "")).strip().lower()
+        if u in on:
+            on[u].append(ctx.mat_label(i))
+
+    def _list(names):
+        if len(names) <= 2:
+            return " and ".join(names)
+        return ", ".join(names[:-1]) + ", and " + names[-1]
+
+    p, s = on["piezo"], on["seep"]
+    one = len(p) == 1
+    return (f"{_list(p)} take{'s' if one else ''} pore pressure from the "
+            f"piezometric line (u = piezo), while {_list(s)} take"
+            f"{'s' if len(s) == 1 else ''} it from the seepage solution (u = seep). "
+            f"A model keeps its piezometric line when a seepage solution is added, "
+            f"so a material left at piezo goes on reading the line. If the seepage "
+            f"solution should govern there, set u = seep on "
+            f"{'that material' if one else 'those materials'} {_AT_MAT}.")
+
+
 @rule("seep_field.missing", ERROR, ("lem",),
       "A material with u = seep needs a solved pore-pressure field.")
 def _seep_field_missing(ctx):

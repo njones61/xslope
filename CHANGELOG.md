@@ -27,6 +27,14 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   5 seconds per circle, and one search ran well past 30 minutes. It now starts at
   the surface's average base inclination, and that search takes 7 seconds. Every
   factor of safety in the test suite still matches its reference value.
+- Spencer's method now solves a very small slip surface, such as a thin sliver
+  on a sand face, to its true factor of safety. It stopped iterating once its
+  force and moment residuals fell below a fixed amount in the model's units,
+  which on a sliver weighing a few thousandths of a pound per foot is about 1%
+  of its weight. One search on a 2.25:1 sand face reported 1.268 where the
+  infinite-slope answer, which Bishop's method also returns, is 1.299. The
+  stopping rule now tightens with the mass of a very small surface, and slopes
+  of ordinary size solve exactly as before.
 - A pile row with both `H` and `D` blank now stops a limit equilibrium run, and
   the model check says to enter `H`, or `D` and `S` for Ito and Matsui. The row
   used to be taken as a pile with no force, and the factor of safety came out as

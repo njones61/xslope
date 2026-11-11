@@ -2946,7 +2946,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                                            kr0=None, h0=None, total_flow=None,
                                            bc_type=None, exit_face_active=None,
                                            vg_a=None, vg_n=None, vg_l=None,
-                                           model=None, flux_nodal=None):
+                                           model=None, flux_nodal=None, q_nodal=None):
     """
     Generates Dirichlet BCs for flow potential φ by integrating the Darcy
     velocity flux along each boundary edge from the owning element's shape
@@ -2957,19 +2957,23 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         Δψ = ∫(-vy·dx + vx·dy) along the edge
     where v = -kr·K·grad(h) is evaluated from the element's shape functions.
 
-    Only edges that carry flow get a Δψ: both corners at a specified head or on
-    an active exit face, or both carrying a specified flux. Every other boundary
-    edge is no-flow, so ψ is held constant along it. The element velocity there
-    is not zero, because the finite element solution meets a no-flow boundary
-    only on average, and near a singularity (a sheet-pile tip, the point where a
-    pool meets a dry slope) that leakage took a sizable share of the total flow and made the flow
-    lines cross the boundary.
+    An edge gets a Δψ when at least one of its corners carries flow: a
+    specified head, an active exit face, or a specified flux. An edge with one
+    such corner keeps its Δψ only when it runs the same way as that node's flow
+    in ``q_nodal``. Every other boundary edge is no-flow, so ψ is held constant
+    along it. The element velocity there is not zero, because the finite
+    element solution meets a no-flow boundary only on average, and near a
+    singularity such as a sheet-pile tip that leakage took a sizable share of
+    the total flow and made the flow lines cross the boundary.
 
     Parameters:
         nodes, elements, element_types: mesh data
         head: (n_nodes,) nodal head solution
         k1_vals, k2_vals, angles: per-element conductivity properties
         kr0, h0: per-element unsaturated parameters (optional)
+        q_nodal: (n_nodes,) nodal flows from the head solve, positive into the
+            domain (optional; without it an edge with one flow-carrying
+            corner always keeps its Δψ)
 
     For quadratic boundary edges, the active seepage or fixed-head interval can
     occupy only half the side when the boundary-condition transition falls at a
@@ -3217,10 +3221,29 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
             v = -kr_elem * Kmat @ grad_h
             segment_flux[c1] = -v[1]*dx + v[0]*dy
 
-    # Step 3b: No-flow edges carry no flow. An edge carries flow only when both
-    # corners are at a specified head or on an active exit face, or both carry a
-    # specified flux; elsewhere the element velocity's normal component is
-    # discretization leakage, which must not enter ψ.
+    # Step 3b: Determine walk orientation from signed area. Counterclockwise,
+    # Δψ = v·n with n the outward normal, so a positive segment_flux leaves the
+    # domain.
+    signed_area = 0.0
+    for i in range(n):
+        c1 = ordered_nodes[i]
+        c2 = ordered_nodes[(i + 1) % n]
+        signed_area += nodes[c1, 0] * nodes[c2, 1] - nodes[c2, 0] * nodes[c1, 1]
+    if signed_area < 0:
+        segment_flux = {k: -v for k, v in segment_flux.items()}
+        midside_flux_from_start = {k: -v for k, v in midside_flux_from_start.items()}
+
+    # Step 4: Keep the flow on the edges that carry it. Water crosses the
+    # boundary only at nodes with a specified head, on an active exit face, or
+    # with a specified flux, and the finite element solution spreads each such
+    # node's flow over the boundary edges beside it. An edge with neither end
+    # carrying flow is no-flow: ψ holds along it, and the element velocity across
+    # it is leakage. An edge with one end carrying flow keeps its flow when that
+    # flow runs the same way as the node's own (q_nodal, positive into the
+    # domain). Where the phreatic surface reaches the toe with no seepage face,
+    # most of the flow leaves across the dry-slope edge beside the toe node, and
+    # this keeps it; a leak on the far side of a node, across a sheet pile below
+    # the ground surface, runs against the node's flow and is dropped.
     if bc_type is not None:
         carries = bc_type == 1
         if exit_face_active is not None:
@@ -3230,19 +3253,14 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         for i in range(n):
             c1 = ordered_nodes[i]
             c2 = ordered_nodes[(i + 1) % n]
-            if not (carries[c1] and carries[c2]):
-                segment_flux[c1] = 0.0
-                midside_flux_from_start.pop(c1, None)
-
-    # Step 4: Determine walk orientation from signed area
-    signed_area = 0.0
-    for i in range(n):
-        c1 = ordered_nodes[i]
-        c2 = ordered_nodes[(i + 1) % n]
-        signed_area += nodes[c1, 0] * nodes[c2, 1] - nodes[c2, 0] * nodes[c1, 1]
-    if signed_area < 0:
-        segment_flux = {k: -v for k, v in segment_flux.items()}
-        midside_flux_from_start = {k: -v for k, v in midside_flux_from_start.items()}
+            if carries[c1] and carries[c2]:
+                continue
+            if carries[c1] or carries[c2]:
+                end = c1 if carries[c1] else c2
+                if q_nodal is None or segment_flux.get(c1, 0.0) * q_nodal[end] < 0.0:
+                    continue
+            segment_flux[c1] = 0.0
+            midside_flux_from_start.pop(c1, None)
 
     # Step 4b: Normalize inflow and outflow separately so the accumulated
     # boundary phi remains single-valued around the closed loop.
@@ -3272,7 +3290,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         segment_flux = scaled_segment_flux
         midside_flux_from_start = scaled_midside_flux
 
-    # Step 5: Find starting point (max inflow)
+    # Step 5: Start the walk at the edge with the largest outflow
     start_idx = max(range(n), key=lambda i: segment_flux.get(ordered_nodes[i], 0))
 
     # Step 6: Accumulate phi at corners
@@ -3885,7 +3903,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             kr0=kr0_per_element, h0=h0_per_element, total_flow=total_flow,
             bc_type=bc_type, exit_face_active=exit_face_active,
             vg_a=vg_a_per_element, vg_n=vg_n_per_element, vg_l=vg_l_per_element,
-            model=model_per_element, flux_nodal=flux_nodal)
+            model=model_per_element, flux_nodal=flux_nodal, q_nodal=q)
         phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types,
                                               vg_a=vg_a_per_element, vg_n=vg_n_per_element, vg_l=vg_l_per_element, model=model_per_element)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
@@ -3898,7 +3916,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
                                                 element_types, flux_nodal=flux_nodal)
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
-            total_flow=total_flow, bc_type=bc_type, flux_nodal=flux_nodal)
+            total_flow=total_flow, bc_type=bc_type, flux_nodal=flux_nodal, q_nodal=q)
         phi = solve_flow_function_confined(nodes, elements, k1, k2, angle, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, element_types=element_types)

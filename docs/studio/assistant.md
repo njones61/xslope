@@ -127,9 +127,7 @@ The assistant needs the provider library, which ships in the `ai` extra. How you
 it depends on how you installed Studio. In the **packaged app** (the macOS `.dmg` or
 the Windows `setup.exe`) the provider library is bundled in the installer, so the
 assistant works out of the box and there is nothing to add. **From Python / pip**,
-add the `ai` extra: `pip install "xslope[gui,ai]"`. The `ai` extra needs Python 3.14
-or earlier, because litellm, the library the assistant uses to reach the model,
-does not support Python 3.15 yet.
+add the `ai` extra: `pip install "xslope[gui,ai]"`.
 
 Either way you still choose a provider and enter credentials in **Settings…**
 (below). Without the library, Studio runs normally but the dock reports that the

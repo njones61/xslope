@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.0.9 — 2026-11-11
+
 ### Fixed
 
 - In the Analysis Report, the Ordinary Method of Slices and Bishop's Simplified
@@ -39,11 +41,6 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   the model check says to enter `H`, or `D` and `S` for Ito and Matsui. The row
   used to be taken as a pile with no force, and the factor of safety came out as
   the slope's without it, with no message. Finite element runs are not affected.
-- On Python 3.15, `pip install "xslope[ai]"` now stops with pip's message that no
-  version of litellm fits, instead of falling back to the older litellm 1.83.7
-  and trying to build its dependencies from source, which can fail. litellm, the
-  library the assistant uses to reach the model, does not support Python 3.15
-  yet; the assistant needs Python 3.14 or earlier until it does.
 - Models saved from XSLOPE Studio now open in Excel without a repair prompt.
   Since 0.2.1, Excel reported a problem with every model Studio saved and offered
   to repair it, because XSLOPE stored the main sheet's run options (LEM method,
@@ -59,6 +56,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   nails as active forces, which gives a different factor of safety; set Appl to
   Passive to keep the old result. A file last saved in Excel keeps Passive,
   because it carries its own copy of the preset table.
+- Studio's editors color their column headers as the input template does: green
+  for a column only the limit equilibrium analysis reads, red for one both the
+  limit equilibrium and finite element analyses read, and blue for finite
+  element only. Red used to mark the limit equilibrium columns, and the shared
+  columns were not colored. Each editor with such columns shows a key to the
+  colors beside its toggles.
 
 ## 1.0.8 — 2026-11-06
 

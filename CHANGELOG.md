@@ -21,6 +21,9 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   the level of the land-side water, now draws its head as one color, with no
   head contours and no flow lines. The plot used to contour the solver's
   round-off, a spread of about 10⁻¹³ m, and draw flow lines from it.
+- When a seepage solve runs out of sweeps before it converges, Studio now says
+  so in the status bar and in the plot's title. It used to report "Seepage
+  done" and draw the last iterate, with the warning only in the log.
 
 ## 1.0.9 — 2026-11-11
 

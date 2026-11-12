@@ -10011,6 +10011,11 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'piezo_editor': (
+        'piezo_editor_check.py',
+        "Studio's Piezometric lines editor shows each line's Type (piezo or "
+        "phreatic), writes the one chosen, writes back what it opened on when OK'd "
+        "untouched, and the Type survives a save to the piezo sheet."),
     'flownet_boundary': (
         'flownet_boundary_check.py',
         "The flow lines follow the solver's velocity, hold one value along every "
@@ -17229,6 +17234,10 @@ def main():
         # rows the user already has. Builds dialogs offscreen and solves nothing.
         tests.append({'type': 'circles_editor', 'file': 'Studio circles editor',
                       'method': '-', 'source': 'circles_editor'})
+        # Studio's Piezometric lines editor carries each line's Type (piezo or
+        # phreatic), the piezo sheet's B3 and E3. Builds dialogs offscreen.
+        tests.append({'type': 'piezo_editor', 'file': 'Studio piezometric lines editor',
+                      'method': '-', 'source': 'piezo_editor'})
         # Guard a second FEM run in one Studio session: OK on an editor, a mesh
         # rebuild or opening a file closes the FEM results view, and the Run menu
         # must still update afterwards. Builds the window offscreen; solves nothing.

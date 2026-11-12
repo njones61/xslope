@@ -6,6 +6,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### New
+
+- Studio's Piezometric lines editor now sets each line's Type, piezo or
+  phreatic, in a box above the line's table. Until now the Type could be set
+  only in the workbook's piezo sheet.
+
 ### Fixed
 
 - Flow nets now carry the flow that leaves an earth dam at its toe. Where the

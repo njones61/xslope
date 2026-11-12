@@ -283,8 +283,10 @@ the three lines stacked down the section:
 
 Click **Piezometric lines**. The editor holds the two lines on tabs — the
 water table on **Line 1**, and **Line 2 (rapid drawdown)**, which stays empty
-here. Press **Add row** eight times and enter the points from the table above,
-left to right.
+here. Leave **Type**, above the table, at *piezo*: the pore pressure under the
+line is then the full static head, γw times the depth below the line. Press
+**Add row** eight times and enter the points from the table above, left to
+right.
 
 ![The piezometric-lines editor holding the water table](images/lem04_studio_piezo.png)
 

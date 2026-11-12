@@ -381,6 +381,8 @@ computed:
   and the phreatic-surface option in XSTABL, and it matters most on steep phreatic lines — on a flat line the two
   types are identical.
 
+In XSLOPE Studio, the **Piezometric lines** editor sets each line's Type in the box above its table.
+
 ![piezo.png](images/piezo.png)
 
 Choosing between them: if the line came from piezometer readings, a flow net, or a seepage analysis, it is a

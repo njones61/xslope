@@ -1478,6 +1478,39 @@ def capture_crossings_pullout():
     return out
 
 
+JOHNSON_SEEP = os.path.join(REPO_ROOT, "docs/seep/files/xslope_johnson_res.xlsx")
+
+
+def _seep_view(kind, name):
+    """The Seep · Data or Seep · Solution view of a real Studio window in Seepage
+    mode, on the Johnson Reservoir sample, whose committed mesh and seepage solution
+    restore with it (so the flow net is the one the shipped solution carries). The
+    sample's saved FEM solution is restored too; its tabs are removed, so the bar
+    shows the views this page describes. Grabbed off the view tabs, bar included."""
+    mw = _main_window(JOHNSON_SEEP)
+    mw.set_mode_index(1)
+    _settle()
+    for i in reversed(range(mw.view_tabs.count())):
+        if mw.view_tabs.tabText(i).startswith("FEM"):
+            mw.view_tabs.removeTab(i)
+    canvas = (mw.seep_data_canvas if kind == "data" else mw.seep_solution_canvas)[1]
+    mw.view_tabs.setCurrentWidget(canvas)
+    _settle()
+    canvas.render_now()
+    _settle()
+    out = os.path.join(OUT_DIR, name)
+    mw.view_tabs.grab().save(out)
+    return out
+
+
+def capture_seep_data_view():
+    return _seep_view("data", "analysis_seep_data.png")
+
+
+def capture_seep_solution_view():
+    return _seep_view("solution", "analysis_seep_solution.png")
+
+
 CROSSING_SHOTS = (capture_crossing_table, capture_lem8_crossings,
                   capture_crossings_pullout)
 
@@ -1530,7 +1563,8 @@ def main():
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,
-               capture_display_dock_fem) + PARAMETRIC_SHOTS + CROSSING_SHOTS:
+               capture_display_dock_fem, capture_seep_data_view,
+               capture_seep_solution_view) + PARAMETRIC_SHOTS + CROSSING_SHOTS:
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     global _MW

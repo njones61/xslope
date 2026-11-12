@@ -2366,7 +2366,15 @@ class MainWindow(QMainWindow):
         canvas = self.seep_solution_canvas.get(bc)
         if canvas is not None:
             self.view_tabs.setCurrentWidget(canvas)
-        self.statusBar().showMessage(f"Seepage done (BC set {bc}).")
+        if bundle["solution"].get("converged") is False:
+            # The field is still drawn and attached, so a stability run can read it,
+            # but the solve ran out of sweeps before it settled, and the user is told
+            # in the status bar and the plot title rather than only in the log.
+            self.statusBar().showMessage(
+                f"Seepage (BC set {bc}) did not converge: the field shown is the "
+                f"solve's last iterate (the log has the sweeps).")
+        else:
+            self.statusBar().showMessage(f"Seepage done (BC set {bc}).")
 
     def _apply_seep_field(self, bundle, bc):
         """Place a steady solution's nodal pore pressures into the model (seep_u for

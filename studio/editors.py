@@ -3074,8 +3074,12 @@ class TabbedTableEditorDialog(QDialog):
 
     def __init__(self, title, tabs, parent=None, help_text=None,
                  preview_draw=None, preview_caption=None, pick_resolve=None,
-                 field_help=None, unit_labels=None):
+                 field_help=None, unit_labels=None, tab_props=None):
         # tabs: list of (tab_title, fields, rows, new_row)
+        # tab_props: None, or one entry per tab, each None or a per-TAB property edited
+        # by a combo above that tab's table: {"label", "items": [(display, value), ...],
+        # "value": the current value, "help": the combo's tooltip}. Read back with
+        # tab_prop(i). The piezometric lines carry their Type this way.
         super().__init__(parent)
         self.setWindowTitle(title)
         self._unit_labels = unit_labels
@@ -3097,10 +3101,34 @@ class TabbedTableEditorDialog(QDialog):
         self._tabs = QTabWidget()
         self._editables = []
         on_change = self._schedule_preview if preview_draw is not None else None
-        for tab_title, fields, rows, new_row in tabs:
+        self._tab_combos = []
+        for i, (tab_title, fields, rows, new_row) in enumerate(tabs):
             et = _EditableTable(fields, rows, new_row, on_change=on_change,
                                 unit_labels=self._unit_labels)
-            self._tabs.addTab(et, tab_title)
+            prop = tab_props[i] if tab_props else None
+            if prop is None:
+                self._tabs.addTab(et, tab_title)
+                self._tab_combos.append(None)
+            else:
+                page = QWidget()
+                col = QVBoxLayout(page)
+                col.setContentsMargins(0, 0, 0, 0)
+                row = QHBoxLayout()
+                row.addWidget(QLabel(prop["label"]))
+                combo = QComboBox()
+                values = [val for _, val in prop["items"]]
+                for display, _val in prop["items"]:
+                    combo.addItem(display)
+                combo.setCurrentIndex(values.index(prop["value"])
+                                      if prop["value"] in values else 0)
+                if prop.get("help"):
+                    combo.setToolTip(prop["help"])
+                row.addWidget(combo)
+                row.addStretch(1)
+                col.addLayout(row)
+                col.addWidget(et, 1)
+                self._tabs.addTab(page, tab_title)
+                self._tab_combos.append((combo, values))
             self._editables.append(et)
         if preview_draw is not None:
             from .canvas import PreviewPane
@@ -3173,6 +3201,15 @@ class TabbedTableEditorDialog(QDialog):
 
     def result_rows(self, index):
         return self._editables[index].result_rows()
+
+    def tab_prop(self, index):
+        """The value chosen in tab ``index``'s property combo, or None for a tab
+        without one."""
+        entry = self._tab_combos[index]
+        if entry is None:
+            return None
+        combo, values = entry
+        return values[combo.currentIndex()]
 
 
 class _BlockListWidget(QWidget):
@@ -6092,6 +6129,16 @@ PIEZO_HELP = {
     "y": "Y-coordinate (elevation) of a point on this piezometric line.",
 }
 
+#: Each line's Type, the piezo sheet's Type cell (B3 for line 1, E3 for line 2):
+#: what the line represents, and so how the pore pressure under it is computed.
+PIEZO_TYPES = [("piezo (u = γw·Δz)", False), ("phreatic (u = γw·Δz·cos²θ)", True)]
+PIEZO_TYPE_HELP = ("What this line represents, which sets the pore pressure under it. "
+                   "piezo (the default): a piezometric line, and u is the full static "
+                   "head, γw times the depth Δz below the line. phreatic: the water table "
+                   "in a slope with seepage along it, and the static head is reduced by "
+                   "cos²θ, with θ the slope of the line directly above the point. The "
+                   "piezo sheet's Type cell.")
+
 
 class PiezoEditor(CategoryEditor):
     label = "Piezometric lines"
@@ -6118,11 +6165,16 @@ class PiezoEditor(CategoryEditor):
                             "active tab's line bold with its points; the other dimmed). "
                             "Click a line to switch to its tab; click a vertex to select it.",
             pick_resolve=lambda x, y, tol, rpt: _pick_piezo(rpt, x, y, tol),
-            field_help=PIEZO_HELP)
+            field_help=PIEZO_HELP,
+            tab_props=[{"label": "Type", "items": PIEZO_TYPES,
+                        "value": bool(slope_data.get(key)), "help": PIEZO_TYPE_HELP}
+                       for key in ("piezo_phreatic", "piezo_phreatic2")])
 
     def apply(self, slope_data, dlg):
         slope_data["piezo_line"] = [(r["x"], r["y"]) for r in dlg.result_rows(0)]
         slope_data["piezo_line2"] = [(r["x"], r["y"]) for r in dlg.result_rows(1)]
+        slope_data["piezo_phreatic"] = bool(dlg.tab_prop(0))
+        slope_data["piezo_phreatic2"] = bool(dlg.tab_prop(1))
 
 
 # --- distributed loads (two sets; each a list of point blocks) -------------- #

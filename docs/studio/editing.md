@@ -20,7 +20,7 @@ open its editor:
 | **Materials** | The material table — name, unit weight, strength option and parameters, and (by mode) hydraulic and elastic properties. |
 | **Profile lines** | The profile-line geometry (master/detail); rebuilds the ground surface and material zones. |
 | **Polygons** | Polygon regions (for polygon-based models) — material zones, SSR overlays, mesh refinement regions, and joint-network regions. |
-| **Piezometric lines** | The two piezometric lines. |
+| **Piezometric lines** | The two piezometric lines, each with its **Type**: *piezo* or *phreatic*. |
 | **Failure surfaces** | Circles (center, radius/depth/intercept) or the non-circular surface (vertex table). |
 | **Distributed loads** | The two distributed-load sets, each load with its direction. |
 | **Reinforcement** | Reinforcement lines (rebuilt into the engine's display format). |

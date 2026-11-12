@@ -1114,6 +1114,11 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         title = "Seepage Solution"
         if variable == "head" and flowrate is not None:
             subtitle = f"Total Flowrate: {_q_fmt(flowrate)}{q_unit}"
+        # A solve that ran out of sweeps still draws its last iterate, and the figure
+        # says so where the flow rate is read. A solution that does not record the
+        # outcome (one read back from a file) is not marked.
+        if solution.get("converged") is False:
+            title += " (did not converge)"
         if frame_time is not None:
             t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
             title += f" — t = {frame_time:g}{t_unit}"

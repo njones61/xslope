@@ -42,6 +42,9 @@ keeps its flow only when it runs the same way as that node's own.
      draws no head contours and no flow lines, and flownet_has_flowlines says so.
      The same model at 30 and 20 still draws both. Before the fix, the level model
      drew both, traced from round-off.
+  F. AN UNCONVERGED SOLVE SAYS SO. The figure of a solution whose solve ran out of
+     sweeps (converged False) is titled "Seepage Solution (did not converge)"; one
+     that converged, or that records no outcome (read back from a file), is not.
 """
 import contextlib
 import io
@@ -204,6 +207,21 @@ def run():
         for k, v in drawn.items():
             if v != want:
                 failures.append(f"E. {label}: {k} {'missing' if want else 'drawn'}")
+
+    # F: the title of an unconverged solve
+    for state in (False, True, None):
+        shown = dict(sol)
+        if state is None:
+            shown.pop("converged", None)
+        else:
+            shown["converged"] = state
+        _quiet(plot_seep_solution, seep, shown)
+        title = " ".join(t.get_text() for t in plt.gcf().axes[0].texts) + " " + plt.gcf().axes[0].get_title()
+        plt.close("all")
+        marked = "did not converge" in title
+        print(f"  {'converged ' + str(state):<36} title marked {marked}")
+        if marked != (state is False):
+            failures.append(f"F. converged {state}: the title is {'marked' if marked else 'not marked'}")
     return failures
 
 

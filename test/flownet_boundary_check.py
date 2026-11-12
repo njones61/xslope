@@ -34,6 +34,14 @@ keeps its flow only when it runs the same way as that node's own.
      dam, which exits at the toe; its committed mesh), johnson_res (its committed
      mesh), sheetpile_s50 (tri6, 4 m), and earth_dam1. Under the both-ends rule the
      book's dam read 35% and johnson_res 18%; counting every edge, 18% and 5%.
+  E. WATER STANDING LEVEL DRAWS NO FLOW NET. With both of sheetpile_s50's heads at
+     30 (tri6, 4 m), nothing flows: the head varies only by round-off. (Preflight
+     refuses two equal heads; a reservoir bound to a time series reaches the same
+     state when its stage matches the other boundary, as the CE 544 levee does at
+     its normal river stage, and so does a transient frame of level water.) The figure
+     draws no head contours and no flow lines, and flownet_has_flowlines says so.
+     The same model at 30 and 20 still draws both. Before the fix, the level model
+     drew both, traced from round-off.
 """
 import contextlib
 import io
@@ -55,7 +63,7 @@ def _quiet(fn, *a, **k):
         return fn(*a, **k)
 
 
-def _solve(name, element_type=None, size=None, flux=None, folder=FILES):
+def _solve(name, element_type=None, size=None, flux=None, folder=FILES, heads=None):
     from xslope.fileio import load_slope_data
     from xslope.mesh import build_mesh_from_polygons, get_material_polygons, import_mesh_from_json
     from xslope.seep import build_seep_data, run_seepage_analysis
@@ -65,11 +73,18 @@ def _solve(name, element_type=None, size=None, flux=None, folder=FILES):
         mesh = import_mesh_from_json(stem + "_mesh.json")
     else:
         mesh = _quiet(build_mesh_from_polygons, get_material_polygons(sd), size, element_type)
+    if heads is not None:
+        bcs = dict(sd["seepage_bc"])
+        bcs["specified_heads"] = [dict(h, head=v) for h, v in zip(bcs["specified_heads"], heads)]
+        sd = dict(sd, seepage_bc=bcs)
     if flux is not None:
         bcs = dict(sd["seepage_bc"])
         bcs["specified_fluxes"] = list(bcs.get("specified_fluxes") or []) + [flux]
         sd = dict(sd, seepage_bc=bcs)
-    seep = _quiet(build_seep_data, mesh, sd)
+    # Preflight refuses two equal head numbers; check E poses level water that way on
+    # purpose, the state a reservoir bound to a time series reaches when its stage
+    # matches the other boundary, which preflight cannot see.
+    seep = _quiet(build_seep_data, mesh, sd, check_inputs=heads is None or len(set(heads)) > 1)
     # the docs' solve settings (tools/make_seep_sidecars.py): the earth dam closes in 525 sweeps
     return mesh, seep, _quiet(run_seepage_analysis, seep, tol=1e-4, max_iter=1000)
 
@@ -170,6 +185,25 @@ def run():
         print(f"  {label:<36} flow lines vs velocity: mismatch {m:.3f}")
         if m > 0.10:
             failures.append(f"D. {label}: the flow lines miss the velocity by {m:.1%}")
+
+    # E: water standing level
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from xslope.plot_seep import flownet_has_flowlines, plot_seep_solution
+    for label, heads, want in [("sheetpile_s50, heads 30 and 30", (30.0, 30.0), False),
+                               ("sheetpile_s50, heads 30 and 20", (30.0, 20.0), True)]:
+        mesh, seep, sol = _solve("xslope_sheetpile_s50", "tri6", 4.0, heads=heads)
+        _quiet(plot_seep_solution, seep, sol)
+        gids = {c.get_gid() for c in plt.gcf().axes[0].get_children()}
+        plt.close("all")
+        drawn = {"head contours": "HEAD_CONTOURS" in gids, "flow lines": "FLOWLINES" in gids,
+                 "flownet_has_flowlines": flownet_has_flowlines(seep, sol)}
+        print(f"  {label:<36} head spread {np.ptp(sol['head']):.1e}, "
+              + ", ".join(f"{k} {v}" for k, v in drawn.items()))
+        for k, v in drawn.items():
+            if v != want:
+                failures.append(f"E. {label}: {k} {'missing' if want else 'drawn'}")
     return failures
 
 

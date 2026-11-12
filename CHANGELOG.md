@@ -17,6 +17,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   dam (`xslope_earth_dam_down_seep.xlsx`) and from 18% to 5% on Johnson
   Reservoir. Heads, pore pressures, flow rates, and factors of safety are
   unchanged.
+- A seepage model in which nothing flows, such as a levee whose river stands at
+  the level of the land-side water, now draws its head as one color, with no
+  head contours and no flow lines. The plot used to contour the solver's
+  round-off, a spread of about 10⁻¹³ m, and draw flow lines from it.
 
 ## 1.0.9 — 2026-11-11
 

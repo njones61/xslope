@@ -10015,7 +10015,8 @@ MODULE_CHECKS = {
         'flownet_boundary_check.py',
         "The flow lines follow the solver's velocity, hold one value along every "
         "no-flow boundary, and span the total flow, so they never cross the base "
-        "or a sheet pile, and the water leaving at a dam's toe leaves there."),
+        "or a sheet pile, and the water leaving at a dam's toe leaves there. "
+        "Water standing level draws no head contours and no flow lines."),
     'pile_symmetry': (
         'pile_symmetry_check.py',
         "A slope and its mirror image must give the same factor of safety. The "

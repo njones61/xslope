@@ -19,6 +19,28 @@ logger = logging.getLogger(__name__)
 # (steady or through-flowing transient) frame has phi range orders of magnitude larger.
 _PHI_FLAT_TOL = 1e-9
 
+# Below this spread, as a fraction of the model's height, the total head is one value:
+# water standing level everywhere, with no flow. The solve's round-off still leaves
+# a spread (6e-13 m on a 14.5 m levee with the river at its normal stage), and
+# contouring it, or the stream function solved from it, draws lines that trace
+# nothing.
+_HEAD_FLAT_TOL = 1e-9
+
+
+def _head_is_flat(seep_data, solution):
+    """Whether the solution's total head varies by less than ``_HEAD_FLAT_TOL`` of
+    the model's height, so that the water stands level and nothing flows."""
+    head = (solution or {}).get("head")
+    nodes = (seep_data or {}).get("nodes")
+    if head is None or nodes is None:
+        return False
+    head = np.asarray(head, dtype=float)
+    nodes = np.asarray(nodes, dtype=float)
+    if not head.size or not nodes.size:
+        return False
+    height = float(np.ptp(nodes[:, 1])) or 1.0
+    return bool(float(np.ptp(head)) <= _HEAD_FLAT_TOL * height)
+
 
 def flownet_has_phreatic(seep_data, solution):
     """Whether :func:`plot_seep_solution` draws a phreatic surface for this
@@ -44,6 +66,16 @@ def flownet_has_phreatic(seep_data, solution):
     return bool(u.size and np.min(u) < 0)
 
 
+def flownet_has_head_contours(seep_data, solution):
+    """Whether :func:`plot_seep_solution` draws head contours for this solution
+    (plotting head). A solution whose head is one value everywhere, water standing
+    level, has none: its spread is round-off.
+
+    Exported so a caption or a paragraph can name what the figure carries.
+    """
+    return not _head_is_flat(seep_data, solution)
+
+
 def flownet_has_flowlines(seep_data, solution):
     """Whether :func:`plot_seep_solution` draws flow LINES for this solution (with
     its default ``flowlines=True``, plotting head).
@@ -53,11 +85,15 @@ def flownet_has_flowlines(seep_data, solution):
     to space them by, and the conductivities the spacing is computed from. A
     solution read back from a file that records no flowrate — or a pore-pressure
     field imported from another program, which carries no stream function at all —
-    has no flow lines, and the figure is head contours alone.
+    has no flow lines, and the figure is head contours alone. Neither has a solution
+    whose head is one value everywhere (water standing level, so nothing flows):
+    its stream function is round-off.
 
     Exported so a caption or a paragraph can name what the figure carries.
     """
     if (seep_data or {}).get("k1_by_mat") is None:
+        return False
+    if _head_is_flat(seep_data, solution):
         return False
     solution = solution or {}
     if solution.get("flowrate") is None:
@@ -738,6 +774,11 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # across panels and a drawdown reads as one continuous story — late frames fade
     # toward uniform rather than re-normalizing into a bullseye. The frame's own data is
     # a subset of a series-wide range, so nothing is clipped.
+    # Water standing level has one head everywhere. Its spread is round-off, so the
+    # field is drawn as the one value it is, with no head contours in it.
+    head_flat = variable == "head" and _head_is_flat(seep_data, solution)
+    if head_flat:
+        contour_data = np.full(len(contour_data), float(np.mean(contour_data)))
     vmin = float(np.min(contour_data)) if vmin is None else float(vmin)
     vmax = float(np.max(contour_data)) if vmax is None else float(vmax)
     # A field with one value everywhere has no contour in it, and np.linspace over a
@@ -746,7 +787,10 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # zero at every node, and asking for either used to raise rather than draw the
     # flat field it is. Widened by an amount that is nothing beside the value it
     # brackets, so no figure with any range in it is touched.
+    # The colorbar of such a field carries the one value it has, as one tick.
+    one_value = None
     if not vmax > vmin:
+        one_value = vmin
         pad = max(abs(vmin), 1.0) * 1e-9
         vmin, vmax = vmin - pad, vmax + pad
     contour_levels = np.linspace(vmin, vmax, levels)
@@ -805,9 +849,10 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # read as a crisp flow net regardless of sign (matplotlib would otherwise dash
     # any negative level via rcParam contour.negative_linestyle — e.g. for signed
     # variables like pore pressure).
-    _cs = ax.tricontour(triang, contour_data, levels=contour_levels, colors="k",
-                        linewidths=0.5, linestyles="solid")
-    _cs.set_gid('HEAD_CONTOURS')
+    if not head_flat:
+        _cs = ax.tricontour(triang, contour_data, levels=contour_levels, colors="k",
+                            linewidths=0.5, linestyles="solid")
+        _cs.set_gid('HEAD_CONTOURS')
 
     # Phreatic surface (pressure head = 0)
     # Only meaningful for UNCONFINED flow. A confined solve is a single saturated
@@ -1114,8 +1159,9 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if has_phreatic:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=2.0, label="Phreatic surface"))
     # Sentence case (capitalize() → "Total head contour") to match "Flow line".
-    leg_handles.append(plt.Line2D([0], [0], color="black", lw=0.5,
-                                  label=f"{variable_label.capitalize()} contour"))
+    if not head_flat:
+        leg_handles.append(plt.Line2D([0], [0], color="black", lw=0.5,
+                                      label=f"{variable_label.capitalize()} contour"))
     if plot_flowlines and has_flowlines:
         leg_handles.append(plt.Line2D([0], [0], color="blue", lw=0.7, label="Flow line"))
     if vectors:
@@ -1192,6 +1238,9 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         # result plots reuse it; behaviour is unchanged for these flow nets.
         from .plot import adaptive_colorbar_ticks
         adaptive_colorbar_ticks(fig, cbar)
+        if one_value is not None:
+            cbar.set_ticks([one_value])
+            cbar.set_ticklabels([f"{one_value:g}"])
 
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('—', '').replace('(', '').replace(')', '')

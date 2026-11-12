@@ -6,6 +6,18 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+### Fixed
+
+- Flow nets now carry the flow that leaves an earth dam at its toe. Where the
+  phreatic surface reaches the toe with no seepage face, most of the flow
+  crosses the dry slope just above the toe. Since 1.0.6 the stream function
+  dropped that flow, so every flow line left through the ground beyond the toe,
+  and some inside the dam ran the wrong way. The flow lines' average mismatch
+  with the computed seepage velocity falls from 35% to 5% on the sample earth
+  dam (`xslope_earth_dam_down_seep.xlsx`) and from 18% to 5% on Johnson
+  Reservoir. Heads, pore pressures, flow rates, and factors of safety are
+  unchanged.
+
 ## 1.0.9 — 2026-11-11
 
 ### Fixed

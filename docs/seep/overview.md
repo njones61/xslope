@@ -500,9 +500,11 @@ magnitude. The phreatic surface is drawn on each.*
 **Flow nets.** Flow lines are **not** integrated particle paths: they are iso-contours of a
 **stream function** $\phi$, obtained from a companion finite-element solve on the same mesh
 using $[K]/\det[K]$ (with the same $k_r$ field on an unconfined problem). Its boundary values
-change only where water enters or leaves (specified heads, the active exit face, and specified
-fluxes) and hold one value along every no-flow boundary, so the base, a sheet pile, and a dry
-slope are flow lines and $\phi$ spans exactly the total flow. The number of flow
+change only where water enters or leaves: at specified heads, on the active exit face, and at
+specified fluxes, including the boundary edge beside such a node, which carries that node's
+flow. Where the phreatic surface reaches a dam's toe with no seepage face, the flow lines meet
+at the toe. Along the rest of the boundary $\phi$ holds one value, so the base and a sheet pile
+are flow lines, and $\phi$ spans exactly the total flow. The number of flow
 channels drawn follows the flow-net rule $q = k \, \Delta h \, N_f / N_d$: with $N_d$ = the
 number of head drops requested through `levels`, the equivalent conductivity
 $k = \sqrt{k_1 k_2}$ of the material named by `base_mat`, and the computed flowrate $q$, the

@@ -10013,9 +10013,9 @@ def run_interslice_admissibility_test(test):
 MODULE_CHECKS = {
     'flownet_boundary': (
         'flownet_boundary_check.py',
-        "The stream function is constant along every no-flow boundary and spans "
-        "the total flow, so flow lines never cross the base, a sheet pile, or a "
-        "dry slope."),
+        "The flow lines follow the solver's velocity, hold one value along every "
+        "no-flow boundary, and span the total flow, so they never cross the base "
+        "or a sheet pile, and the water leaving at a dam's toe leaves there."),
     'pile_symmetry': (
         'pile_symmetry_check.py',
         "A slope and its mirror image must give the same factor of safety. The "

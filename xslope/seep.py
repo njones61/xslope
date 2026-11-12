@@ -899,8 +899,21 @@ _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joi
 #: Read only once the sweep budget is spent unconverged, so a solve that converges
 #: within its budget never reaches it, and a rescue that does not pass the gate leaves
 #: the unconverged answer as the budget left it. It spends at most the budget again.
+#:
+#: A SHARED LOOP. When the swing names two or more elements, they are solved for
+#: together first (:func:`_pinned_set_solve`), and the one-element candidates follow as
+#: before. On the CE 544 rapid drawdown and FEM earth dam keys (kr0 1e-4 at h0 = -1 ft,
+#: tri6 at Studio's 100 divisions, 400 sweeps) two elements at the core's downstream
+#: base share the loop: the first alone crept through the whole budget, and the two
+#: together settle in 40 sweeps and pass the gate on the next. It does not reach
+#: everything: at 125 to 200 divisions the same dams loop over more elements and the
+#: set stalls, a limit left to a different nonlinear method.
 _PIN_MIN_SWING = 0.1     # decades of kr: an element that moved less is not the loop
 _PIN_STEPS = 3           # un-relaxed steps read for candidates, and candidates taken from them
+#: Passes over a pinned SET's elements within one sweep (see _pinned_set_solve), each
+#: bisecting every element's kr against the others' current values; the pass that
+#: moves none of them by 1e-12 decades ends it. Measured: 5 to 12 passes.
+_PIN_SET_PASSES = 50
 #: The pinned sweeps' head tolerance, as a fraction of the gate's. The gate sweep
 #: carries what is left of the element's error at up to the loop's gain (2.7e5
 #: measured), so the inner tolerance sits that far under the gate.
@@ -980,6 +993,97 @@ def _pinned_element_solve(asm, kr_kw, y, h, e, dir_mask, dir_values, f_ext, tol,
             return h_solved, True, sweep
         # The ladder, stepping down only: these sweeps start from a field already
         # near its answer, and a stall on the last rung is the wrong element.
+        if step < best:
+            best, stall = step, 0
+        else:
+            stall += 1
+            if stall >= _LADDER_PATIENCE:
+                if rung + 1 == len(_RELAX_LADDER):
+                    return h, False, sweep
+                rung, best, stall = rung + 1, float('inf'), 0
+        h = h + _RELAX_LADDER[rung] * (h_solved - h)
+    return h, False, max_sweeps
+
+
+def _pinned_set_solve(asm, kr_kw, y, h, elems, dir_mask, dir_values, f_ext, tol,
+                      max_sweeps):
+    """:func:`_pinned_element_solve` for a loop that SEVERAL elements share: every
+    element of ``elems`` has its kr solved for exactly at every sweep, together.
+
+    Two or three neighbors on the wet/dry edge can hold one loop between them, so that
+    solving any one of them exactly leaves the others to carry it on. The update is the
+    same Sherman-Morrison-Woodbury form over the union of their nodes: changing
+    element i's kr by dk_i adds dk_i times its saturated matrix, so the union's nodal
+    heads are a closed form in the vector of their krs. The self-consistent krs are
+    found element by element in turn, each a one-dimensional root bisected in log kr
+    between its floor and 1 against the others' current values, until a pass moves
+    none of them. Same ladder, same return, and a wrong set shows itself the same way:
+    the sweeps stall on the last rung.
+
+    Measured on the CE 544 rapid drawdown and FEM earth dam keys (kr0 1e-4 at
+    h0 = -1 ft, tri6, 100 divisions): the swing names two elements at the core's
+    downstream base, solving the first alone creeps through the whole budget, and the
+    two together settle in 40 sweeps."""
+    info = []
+    for e in elems:
+        g = next(g for g in asm['groups'] if np.any(g['idx'] == e))
+        j = int(np.flatnonzero(g['idx'] == e)[0])
+        conn = g['conn'][j]
+        Kt = np.where(dir_mask[conn][:, None], 0.0, g['ke'][j])
+        kw = {k: None if v is None else v[np.array([e])][:, None] for k, v in kr_kw.items()}
+        info.append((g, conn, Kt, kw))
+    union = sorted({int(n) for _, conn, _, _ in info for n in conn})
+    at = {n: i for i, n in enumerate(union)}
+    local = [np.array([at[int(n)] for n in conn]) for _, conn, _, _ in info]
+    m = len(union)
+
+    def kr_of(i, h_e):
+        g, conn, _, kw = info[i]
+        kr = kr_relative_vec(((h_e - y[conn]) @ g['N_kr'].T)[None, :], **kw)[0]
+        return float(kr @ g['w_kr']) / g['wsum']
+
+    log_floor = [np.log10(max(kr_of(i, y[info[i][1]] - 1e12), 1e-300))
+                 for i in range(len(info))]
+    E = np.zeros((len(h), m))
+    E[union, np.arange(m)] = 1.0
+    eye = np.eye(m)
+    rung, best, stall = 0, float('inf'), 0
+    for sweep in range(1, max_sweeps + 1):
+        data = _assembly_data(asm, p_nodes=h - y, mode='head', **kr_kw)
+        k_now = [kr_of(i, h[info[i][1]]) for i in range(len(info))]
+        A, b = _dirichlet_system(asm, data, dir_mask, dir_values, neumann=f_ext)
+        lu = splu(A.tocsc())
+        h_base = lu.solve(b)
+        Z = lu.solve(E)
+        Zu, hu_base = Z[union], h_base[union]
+
+        def update(log_kr):
+            B = np.zeros((m, m))
+            for i, li in enumerate(local):
+                B[np.ix_(li, li)] += (10.0 ** log_kr[i] - k_now[i]) * info[i][2]
+            return np.linalg.solve(eye + B @ Zu, B @ hu_base)
+
+        x = np.clip(np.log10(np.maximum(k_now, 1e-300)), log_floor, 0.0)
+        for _ in range(_PIN_SET_PASSES):
+            x_before = x.copy()
+            for i, li in enumerate(local):
+                lo, hi = log_floor[i], 0.0
+                while True:
+                    mid = 0.5 * (lo + hi)
+                    if not lo < mid < hi:
+                        break
+                    x[i] = mid
+                    if kr_of(i, (hu_base - Zu @ update(x))[li]) > 10.0 ** mid:
+                        lo = mid
+                    else:
+                        hi = mid
+                x[i] = 0.5 * (lo + hi)
+            if np.max(np.abs(x - x_before)) < 1e-12:
+                break
+        h_solved = h_base - Z @ update(x)
+        step = float(np.max(np.abs(h_solved - h)))
+        if step < tol:
+            return h_solved, True, sweep
         if step < best:
             best, stall = step, 0
         else:
@@ -1619,24 +1723,38 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 log_try.append(np.log10(np.maximum(
                     _element_kr_avg(asm, h_try - y, kr_kw), 1e-300)))
             steps = np.ptp(np.array(log_try), axis=0)
+            # A loop the swing names on two or more elements is shared: they are solved
+            # for together first (see _pinned_set_solve). One element, or none, is the
+            # one-element escape exactly as it was.
+            shared = [int(e) for e in np.argsort(-swing) if swing[e] > _PIN_MIN_SWING]
             pinned = [int(e) for e in np.argsort(-swing)[:1] if swing[e] > _PIN_MIN_SWING]
             pinned += [int(e) for e in np.argsort(-steps)[:_PIN_STEPS]
                        if steps[e] > _PIN_MIN_SWING and int(e) not in pinned]
             pin_left = max_iter     # the rescue spends at most the budget it follows
-            for e in pinned:
+            for e in ([tuple(shared)] if len(shared) > 1 else []) + pinned:
                 if pin_left <= 0:
                     break
                 try:
-                    h_pin, pin_ok, n_pin = _pinned_element_solve(
-                        asm, kr_kw, y, h_new, e, pin_mask, dir_values, f_ext,
-                        eps * _PIN_TOL, pin_left)
+                    if isinstance(e, tuple):
+                        h_pin, pin_ok, n_pin = _pinned_set_solve(
+                            asm, kr_kw, y, h_new, list(e), pin_mask, dir_values, f_ext,
+                            eps * _PIN_TOL, pin_left)
+                    else:
+                        h_pin, pin_ok, n_pin = _pinned_element_solve(
+                            asm, kr_kw, y, h_new, e, pin_mask, dir_values, f_ext,
+                            eps * _PIN_TOL, pin_left)
                 except (np.linalg.LinAlgError, RuntimeError):   # a singular update
                     pin_ok, n_pin = False, 0
                 pin_left -= n_pin
-                print(f"Iteration {iteration}: element {e + 1}'s kr solved for directly "
-                      f"at every sweep — "
-                      + (f"settled in {n_pin} sweeps; one ordinary sweep tests it"
-                         if pin_ok else f"did not settle ({n_pin} sweeps)"))
+                outcome = (f"settled in {n_pin} sweeps; one ordinary sweep tests it"
+                           if pin_ok else f"did not settle ({n_pin} sweeps)")
+                if isinstance(e, tuple):
+                    named = ", ".join(str(i + 1) for i in e)
+                    print(f"Iteration {iteration}: elements {named}'s kr solved for "
+                          f"together at every sweep — {outcome}")
+                else:
+                    print(f"Iteration {iteration}: element {e + 1}'s kr solved for directly "
+                          f"at every sweep — {outcome}")
                 if pin_ok:
                     _pin_saved = (A, data, exit_face_active.copy())
                     h = h_pin.copy()

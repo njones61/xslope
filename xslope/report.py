@@ -7255,7 +7255,8 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     shown = _seep_shown(seep_data, solution)
 
     from .plot_seep import (flownet_base_material, flownet_has_flowlines,
-                            flownet_has_phreatic, seep_has_bc_levels)
+                            flownet_has_head_contours, flownet_has_phreatic,
+                            seep_has_bc_levels)
     # The base material is the zone the net is scaled to. A model solved for more
     # than one boundary condition set scales every one of its nets to the same
     # zone, and every panel of the pair to the same range for that variable, so the
@@ -7274,6 +7275,8 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # flow rate has no flow lines to space, and the head contours alone are not a
     # flow net.
     lines = flownet_has_flowlines(seep_data, shown)
+    # Water standing level has one head everywhere, and its figure has no contours.
+    contours = flownet_has_head_contours(seep_data, shown)
 
     # Each field the solve carries, one to a figure and each at the size every other
     # figure in the report is, rather than three of them stacked into a third of a
@@ -7307,7 +7310,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
                                vmin=vmin, vmax=vmax,
                                style=opts.get("style"))
 
-        caption = (("Flow net" if lines else "Head contours")
+        caption = (("Flow net" if lines else "Head contours" if contours else "Total head")
                    if variable == "head" else panel["caption"])
         if progress:
             progress("the " + caption[0].lower() + caption[1:]
@@ -7362,7 +7365,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
             links = list(links) + mesh_links
     if where:
         drawn = [item for item in
-                 ["the head contours",
+                 ["the head contours" if contours else "",
                   "the phreatic surface"
                   if flownet_has_phreatic(seep_data, shown) else "",
                   "the flow lines" if lines else "",
@@ -7371,9 +7374,12 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
                   # figure was still credited with them.
                   "the water level held by each specified-head boundary"
                   if levels_drawn else ""] if item]
-        # Plural whatever else the figure carries: the head contours are always
-        # on it, and they are contours.
-        text += f" {_shown_in(drawn, where, plural=True)}"
+        # Plural whatever else the figure carries when the head contours are on it,
+        # since they are contours. Level water has none, and its figure may carry
+        # nothing to name.
+        shown_in = _shown_in(drawn, where, plural=True if contours else None)
+        if shown_in:
+            text += f" {shown_in}"
     sub.blocks.append(Prose(text, links=links))
 
     q = _num(solution.get("flowrate"))
@@ -7616,9 +7622,9 @@ def _transient_head_draws(seep_data, frame):
     state releasing water from storage carries no stream function, so there are
     none to name.
     """
-    from .plot_seep import flownet_has_phreatic, seep_has_bc_levels
+    from .plot_seep import flownet_has_head_contours, flownet_has_phreatic, seep_has_bc_levels
     return [item for item in
-            ["the head contours",
+            ["the head contours" if flownet_has_head_contours(seep_data, frame) else "",
              "the phreatic surface"
              if flownet_has_phreatic(seep_data, frame) else "",
              "the water level held by each specified-head boundary"
@@ -7726,7 +7732,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     # A transient state has no flow net, and the head figures below say so before
     # the first of them rather than being left to look like one that lost its flow
     # lines. Said only where a head figure is drawn.
-    from .plot_seep import flownet_base_material
+    from .plot_seep import flownet_base_material, flownet_has_head_contours
     head_drawn = any(panel["variable"] == "head"
                      for _t, frame in drawn
                      for panel in seep_panels(frame, opts))
@@ -7767,7 +7773,8 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
                                    vmin=vmin, vmax=vmax,
                                    style=opts.get("style"))
 
-            caption = ("Head contours" if variable == "head"
+            contours = variable == "head" and flownet_has_head_contours(seep_data, frame)
+            caption = (("Head contours" if contours else "Total head") if variable == "head"
                        else panel["caption"])
             if progress:
                 progress("the " + caption[0].lower() + caption[1:] + f" — {when}")
@@ -7778,14 +7785,14 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
             shows = (_transient_head_draws(seep_data, frame)
                      if variable == "head" else panel["draws"])
             where, links = cite("Figure", figure.number)
-            sub.blocks.append(Prose(
-                _shown_in(shows, where, when=said_when,
-                          tail=(", with the velocity vectors drawn over it"
-                                if panel["vectors"] else ""),
-                          # The head figure's subject opens on the contours,
-                          # however few overlays a given state carries.
-                          plural=True if variable == "head" else None),
-                links=links))
+            shown_in = _shown_in(shows, where, when=said_when,
+                                 tail=(", with the velocity vectors drawn over it"
+                                       if panel["vectors"] else ""),
+                                 # The head figure's subject opens on the contours,
+                                 # however few overlays a given state carries.
+                                 plural=True if contours else None)
+            if shown_in:
+                sub.blocks.append(Prose(shown_in, links=links))
             sub.blocks.append(figure)
 
     # The march itself, over time. The frames are the field at four instants; this

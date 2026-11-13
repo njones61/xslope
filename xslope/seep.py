@@ -896,6 +896,13 @@ _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joi
 #: every gate sweep came in under 2e-6 of the tolerance. The two budgets land on the
 #: same flow rate to eight digits.
 #:
+#: Those measurements were made while a tri6 averaged kr over 3 points. With the
+#: average taken over 7 (see :func:`_kr_sampling`) every one of those meshes, and
+#: every size from 9 to 40 divisions, converges on its own in 30 to 89 sweeps and
+#: never reaches the escape. The solve it is locked on now is vp077a on the tri6 mesh
+#: of 150 divisions (test/seep_cycle_check.py): the swing names the element and it
+#: settles in 343 sweeps.
+#:
 #: Read only once the sweep budget is spent unconverged, so a solve that converges
 #: within its budget never reaches it, and a rescue that does not pass the gate leaves
 #: the unconverged answer as the budget left it. It spends at most the budget again.

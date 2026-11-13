@@ -382,11 +382,15 @@ iteration and no relative conductivity. The domain is saturated by construction,
 pore pressures in a confined solution are not a water table and no phreatic surface is drawn.
 
 **Unconfined** — the conductivity depends on the head through $k_r$, so each iteration
-recomputes the pressure head, evaluates $k_r$ at the element's Gauss points, scales that
-element's saturated stiffness by the quadrature-weighted average, solves, and updates the
-exit-face active set. (Averaging $k_r$ over the element's integration points, rather than
-switching it node by node, smears the phreatic transition over one element instead of
-snapping it.) The iteration is under-relaxed when it needs to be, and the amount is set by
+recomputes the pressure head, evaluates $k_r$ at a set of points inside each element, scales
+that element's saturated stiffness by the weighted average, solves, and updates the
+exit-face active set. The points depend on the element's shape: every triangle (3-node or
+6-node) uses a 7-point rule, and every quadrilateral (4-, 8-, or 9-node) uses 4×4 Gauss
+points. A quadratic element evaluates the pressure head at those points through its own shape
+functions. (Averaging $k_r$ over the element, rather than switching it node by node, smears
+the phreatic transition over one element instead of snapping it.) Each element therefore
+carries one $k_r$, and the velocity, the stream function, and the transient solve all use that
+same value. The iteration is under-relaxed when it needs to be, and the amount is set by
 the **head change** rather than by the sweep number. The relaxation factor starts at 1
 and walks a fixed ladder — 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 — on this rule:
 

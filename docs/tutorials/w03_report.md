@@ -157,8 +157,8 @@ Spencer's method solves for a pair — a factor of safety and an interslice
 inclination θ — at which both the force sum and the moment sum vanish, so it
 prints both sums rather than a single quotient. In the linked report they are on
 the page after the one shown above, and they close at F = 1.276 and θ = −16.53°,
-with residuals of 7.276e-12 and −5.588e-09 against terms coming to 377341 and
-86263968. Every number is printed at a precision the factor of safety can be
+with residuals of 2.001e-11 and −4.657e-09 against terms coming to 377341 and
+86263982. Every number is printed at a precision the factor of safety can be
 rebuilt from: Bishop divides its own two sums, 490801 and 392638, and prints the
 1.250 they give. A report generated on another computer closes at the same F and
 θ; its residuals, which sit at the level of rounding, can differ in their digits.

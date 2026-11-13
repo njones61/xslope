@@ -1408,9 +1408,9 @@ Slide's published Spencer 2.534 is a minimum-depth-5 m noncircular random search
 | Method | XSLOPE | Slide | Baker |
 |---|---|---|---|
 | Spencer (circular) | 7.088 | 7.003 (+1.2%) | 6.98 (+1.5%) |
-| Bishop (circular) | 7.094 | — | — |
+| Bishop (circular) | 7.095 | — | — |
 
-<!-- test: file=files/rocscience/vp046b.xlsx, type=circular_search, num_slices=40, fs_spencer=7.088, fs_bishop=7.094, benchmark=VP46-steady -->
+<!-- test: file=files/rocscience/vp046b.xlsx, type=circular_search, num_slices=40, fs_spencer=7.088, fs_bishop=7.095, benchmark=VP46-steady -->
 
 ![vp046b: stage 2 inputs and representative solution](images/vp046b.png)
 

@@ -859,7 +859,7 @@ _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joi
 #: Pinned-element escape, for a solve the budget leaves unconverged.
 #:
 #: One element on the wet/dry edge can hold a solve in a loop that no relaxation the
-#: solver uses will close. One of the element's kr sampling points sits at the bend of
+#: solver uses will close. The element sits at the bend of
 #: the kr curve: a drier element backs the water up behind it and wets it, a wetter
 #: one drains it, and the element's kr comes back from each sweep hundreds to
 #: hundreds of thousands of times further from its fixed point than it went in.
@@ -896,12 +896,11 @@ _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joi
 #: every gate sweep came in under 2e-6 of the tolerance. The two budgets land on the
 #: same flow rate to eight digits.
 #:
-#: Those measurements were made while a tri6 averaged kr over 3 points. With the
-#: average taken over 7 (see :func:`_kr_sampling`) every one of those meshes, and
-#: every size from 9 to 40 divisions, converges on its own in 30 to 89 sweeps and
-#: never reaches the escape. The solve it is locked on now is vp077a on the tri6 mesh
-#: of 150 divisions (test/seep_cycle_check.py): the swing names the element and it
-#: settles in 343 sweeps.
+#: Those measurements were made while a tri6 averaged kr over 3 points. With each
+#: element's kr its exact area average (:func:`_elements_kr_avg`) every one of those
+#: meshes converges on its own and never reaches the escape. The solve it is locked on
+#: is vp077a on the quad8 mesh of 100 divisions (test/seep_cycle_check.py): the swing
+#: names the element and it settles in 205 sweeps.
 #:
 #: Read only once the sweep budget is spent unconverged, so a solve that converges
 #: within its budget never reaches it, and a rescue that does not pass the gate leaves

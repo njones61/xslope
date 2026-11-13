@@ -79,15 +79,13 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #: ``type=seep`` lock under, and that ``tools/make_seep_sample_figures.py`` draws the
 #: sample flow nets under (tol 1e-4).
 #:
-#: THE 1000-SWEEP CEILING IS JOHNSON_RAPID_KEY'S. Its first boundary set's head field
-#: cycles, and the escape that closes it sees the orbit at sweep 452, so at the
-#: library's own default of 400 the solve stops unconverged before the escape can act;
-#: given 1000 it closes at 472. Every other companion here closes in 400 sweeps or fewer
-#: on its own, or, like the earth dam (escape at 261, closed at 525), inside the sweeps
-#: the escape grants. A change that moves the detection later runs it into the ceiling,
-#: where it reports a flow rate off a field that is still moving, which is the state this
-#: whole registry exists to keep out of the corpus — raise the ceiling with the model,
-#: rather than trimming the model to it.
+#: THE 1000-SWEEP CEILING was set for johnson_rapid_KEY, whose first boundary set
+#: once needed 472 sweeps and an escape that could not act inside the library's default
+#: of 400. Every companion here now closes on its own in 305 sweeps or fewer (vp077a is
+#: the longest), so the ceiling is headroom. A solve that runs into it reports a flow
+#: rate off a field that is still moving, which is the state this whole registry exists
+#: to keep out of the corpus — raise the ceiling with the model, and do not trim the
+#: model to it.
 #: ``vendor`` — the settings the model's own builder solves it at
 #: (``benchmarks/rocscience/build_rs2.py::_build_rs2_28``, ``build_vp038``,
 #: ``build_vp046``), so a rebuild and this script agree.

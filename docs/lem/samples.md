@@ -243,8 +243,8 @@ gradient at which upward flow would carry the clay's whole buoyant weight is
 $(\gamma - \gamma_w)/\gamma_w = (123 - 62.4)/62.4 = 0.97$. Along the base of the
 circle beyond the toe, the seepage pore pressures are 1.65 to 1.74 times the still-water
 pressure the piezometric line gives there. Over the whole base, the water force pushing
-up on the slide mass is 4,400 lb/ft from the seepage solution and 3,160 lb/ft from the
-piezometric line; the soil above the base weighs 6,920 lb/ft.
+up on the slide mass is 4,320 lb/ft from the seepage solution and 3,100 lb/ft from the
+piezometric line; the soil above the base weighs 6,730 lb/ft.
 
 Circle tangent to El. 197:
 

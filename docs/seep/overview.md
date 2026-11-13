@@ -382,15 +382,27 @@ iteration and no relative conductivity. The domain is saturated by construction,
 pore pressures in a confined solution are not a water table and no phreatic surface is drawn.
 
 **Unconfined** — the conductivity depends on the head through $k_r$, so each iteration
-recomputes the pressure head, evaluates $k_r$ at a set of points inside each element, scales
-that element's saturated stiffness by the weighted average, solves, and updates the
-exit-face active set. The points depend on the element's shape: every triangle (3-node or
-6-node) uses a 7-point rule, and every quadrilateral (4-, 8-, or 9-node) uses 4×4 Gauss
-points. A quadratic element evaluates the pressure head at those points through its own shape
-functions. (Averaging $k_r$ over the element, rather than switching it node by node, smears
-the phreatic transition over one element instead of snapping it.) Each element therefore
-carries one $k_r$, and the velocity, the stream function, and the transient solve all use that
-same value. The iteration is under-relaxed when it needs to be, and the amount is set by
+recomputes the pressure head, averages $k_r$ over the area of each element, scales that
+element's saturated stiffness by the average, solves, and updates the exit-face active set.
+For the average, the element is divided into triangles through its nodes and the pressure
+head is taken to vary linearly across each one:
+
+| Element | Triangles |
+|---------|-----------|
+| 3-node triangle | the element itself |
+| 6-node triangle | four: one at each corner and one joining the three midside nodes |
+| 4-node quadrilateral | four: the center joined to each side |
+| 8- and 9-node quadrilateral | eight: the center joined to each half side |
+
+The center of a 9-node quadrilateral is its center node, and the head at the center of a 4- or
+8-node quadrilateral is interpolated from its nodes. Each triangle is weighted by its area in
+the mesh. For the linear-front model the average over a triangle is evaluated in closed form,
+so it is exact and varies smoothly as the phreatic surface moves through the element. The van
+Genuchten and Gardner curves have no closed form and are integrated numerically, at 112
+points per triangle. (Averaging $k_r$ over the element, instead of switching it node by node,
+spreads the phreatic transition over one element.) Each element therefore carries one $k_r$,
+and the velocity, the stream function, and the transient solve all use that same value.
+The iteration is under-relaxed when it needs to be, and the amount is set by
 the **head change** rather than by the sweep number. The relaxation factor starts at 1
 and walks a fixed ladder — 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 — on this rule:
 

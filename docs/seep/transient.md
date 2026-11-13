@@ -60,8 +60,8 @@ Over a step from $t$ to $t + \Delta t$ the finite-element equations are
 where $[K(\{h\})]$ is the head-dependent (through $k_r$) conductivity matrix of the steady solve,
 $\theta$ the time weighting (see [The theta method](#the-theta-method)), and $\{\Delta W\}$ the
 water each node takes up over the step, set out next. The saturated element stiffnesses and the
-$k_r$ sampling operators are formed a single time and reused every step, as are the storage
-sub-triangles and points below.
+triangles $k_r$ is averaged over are formed a single time and reused every step, as are the
+storage sub-triangles and points below.
 
 ### The storage term {#storage-term}
 

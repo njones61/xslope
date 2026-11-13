@@ -898,9 +898,10 @@ _WET_FACE_FORCE_MAX = 3      # times an inactive exit node under pressure is joi
 #:
 #: Those measurements were made while a tri6 averaged kr over 3 points. With each
 #: element's kr its exact area average (:func:`_elements_kr_avg`) every one of those
-#: meshes converges on its own and never reaches the escape. The solve it is locked on
-#: is vp077a on the quad8 mesh of 100 divisions (test/seep_cycle_check.py): the swing
-#: names the element and it settles in 205 sweeps.
+#: meshes converges on its own and never reaches the escape. The last solve it closed
+#: was vp077a on the quad8 mesh of 100 divisions, in 205 sweeps after the budget; with
+#: Newton steps (:data:`_NEWTON_HOLD`) that solve converges in 126 iterations, and no
+#: solve measured since reaches the escape (test/seep_cycle_check.py).
 #:
 #: Read only once the sweep budget is spent unconverged, so a solve that converges
 #: within its budget never reaches it, and a rescue that does not pass the gate leaves
@@ -982,6 +983,144 @@ def _pinned_element_solve(asm, kr_kw, y, h, e, dir_mask, dir_values, f_ext, tol,
         h = h + _RELAX_LADDER[rung] * (h_solved - h)
     return h, False, max_sweeps
 
+
+#: NEWTON STEPS, the main path of the steady unconfined solve once the exit face holds.
+#:
+#: An ordinary iteration freezes every element's kr at the last head field and solves
+#: again. At the solution that map is not a contraction: measured on eight models with
+#: a steep front, one unrelaxed iteration multiplies some error modes by 6 to 27, so
+#: the iteration closes only under relaxation, and at the ladder's last rung (0.01) the
+#: error falls by at most about 1% an iteration. Newton's method removes the cause. Its
+#: matrix is the ordinary one plus, for every element, the gradient of its kr average
+#: in its own nodal heads times its nodal flows (:func:`_newton_residual`), and near
+#: the solution each step squares the error.
+#:
+#: IT STARTS ONCE THE EXIT-FACE SET HAS HELD FOR :data:`_NEWTON_HOLD` ITERATIONS, on
+#: that set, and it is an active-set method from there: a run of steps that settles
+#: has solved the set exactly, the next ordinary iteration tests the set and the gate
+#: on that field, and a node that sheds or joins starts another run as soon as the new
+#: set has held :data:`_NEWTON_REHOLD` iterations. Every step counts as one iteration
+#: against ``max_iter``.
+#:
+#: THE SHORT HOLD ALSO APPLIES ON THE LADDER'S LAST RUNG, where an ordinary iteration
+#: moves the field by a hundredth of its step and a face that is too long sheds one
+#: node every few iterations without ever holding for ten. gw009b on nine-node
+#: quadrilaterals at 250 divisions sheds 57 nodes that way between iterations 68 and
+#: 329; held to ten iterations it starts its first run of steps at 339 and converges
+#: at 397, and held to three on that rung it starts at 67 and converges at 203, on the
+#: same flow rate to 13 figures. Of the 40 runs of vp077a, gw009b, gw012 and gw013
+#: the shorter hold changes five, all for the better, and no flow rate past the 11th
+#: figure.
+#:
+#: IT IS NOT A GLOBAL METHOD, and the ordinary iterations are what carry it to where
+#: it works. Each step is cut back until it lowers the residual (rows scaled by their
+#: saturated diagonal), and far from the solution no useful step exists: on gw013
+#: (tri3, 100 divisions, a 50 ft section) the first step proposed at iteration 11 moves
+#: a head by 10,600 ft, and the residual falls along it only for the first 1e-4 of it.
+#: A run that cannot lower the residual stops, the head stays where its last accepted
+#: step left it, the ordinary iterations go on from there, and the next run waits
+#: another :data:`_NEWTON_HOLD` of them. Both halves of that were measured on gw012
+#: and gw013 on six-node triangles, the two that need them. Discarding a stalled run's
+#: progress leaves gw013 unconverged at 400 iterations where keeping it converges in
+#: 101; doubling the wait after each stall, with the progress kept, converges gw012 in
+#: 345 where the fixed wait converges it in 79. A hold of 5 in place of 10 starts the
+#: runs of steps sooner and stalls more of them, and leaves gw013 unconverged.
+#:
+#: Measured on ten models with a steep front (two CE 544 earth dam keys, the two earth
+#: dam samples, two Johnson Reservoir drawdown models, vp077a, gw009b, gw012, gw013)
+#: rebuilt as tri3, tri6, quad4, quad8 and quad9 at 100, 150 and 250 divisions, at
+#: tol 1e-4 and 400 iterations: 130 of 130 converge, in 23 to 203 iterations, where
+#: the ordinary iterations alone converged 111. On those 111 the flow rate agrees to
+#: the five figures the earlier table carried, and no escape below fires on any of
+#: the 130.
+_NEWTON_HOLD = 10         # iterations the exit-face set must hold before Newton steps
+_NEWTON_REHOLD = 3        # the same, once a run has settled or the ladder is on its last rung
+_NEWTON_STEPS = 50        # Newton steps allowed in one run of them
+_NEWTON_MIN_STEP = 1e-3   # the shortest fraction of a Newton step the line search takes
+_NEWTON_TOL = 1e-10       # the settled step, x the head scale
+
+
+def _newton_residual(asm, kr_kw, y, h, free, f_ext, jacobian=True):
+    """The nodal residual ``K(kr(h)) h - f`` on the free rows (zero on the others),
+    and the COO data of its Jacobian on the assembly's own pattern.
+
+    An element's matrix is its kr average times its saturated matrix, so its share of
+    the Jacobian is that matrix plus a rank-one term: its nodal flows at kr = 1 (the
+    saturated matrix times its heads) times the gradient of its kr average in its
+    nodal heads (:func:`_group_kr_grad`). The second term is what an ordinary
+    iteration leaves out."""
+    res_parts, jac_parts = [], []
+    for g in asm['groups']:
+        h_e = h[g['conn']]
+        p_e = h_e - y[g['conn']]
+        scaled = _group_kr_avg(g, p_e, kr_kw)[:, None, None] * g['ke']
+        res_parts.append(scaled.ravel())
+        if jacobian:
+            flow_sat = np.einsum('eij,ej->ei', g['ke'], h_e)
+            jac_parts.append((scaled + flow_sat[:, :, None]
+                              * _group_kr_grad(g, p_e, kr_kw)[:, None, :]).ravel())
+    F = _coo_matvec(asm, np.concatenate(res_parts), h) - f_ext
+    F[~free] = 0.0
+    return F, (np.concatenate(jac_parts) if jacobian else None)
+
+
+def _newton_solve(asm, kr_kw, y, h, dir_mask, dir_values, f_ext, tol, max_steps,
+                  first_iteration):
+    """Newton's method with a backtracking line search from ``h``, on a fixed
+    exit-face set. Returns ``(head, settled, changes)``, ``changes`` holding the head
+    change of each step taken, at most ``max_steps`` of them. Settled when a step
+    falls under ``tol``; not settled when the line search finds no step that lowers
+    the residual, the matrix is singular, or the steps run out, and the head returned
+    is then the last one a step was accepted at, whose residual is no higher than the
+    starting one's. Each step is reported as iteration ``first_iteration`` onward."""
+    free = ~dir_mask
+    h = np.where(dir_mask, dir_values, h)
+    # Rows are compared on the scale of their own saturated diagonal, so a residual in
+    # a tight soil weighs what the same head error weighs in an open one.
+    row_scale = np.zeros(asm['n_nodes'])
+    for g in asm['groups']:
+        np.add.at(row_scale, g['conn'], np.einsum('eii->ei', g['ke']))
+
+    def norm(F):
+        return float(np.linalg.norm(F[free] / row_scale[free]))
+
+    changes = []
+    F, jac = _newton_residual(asm, kr_kw, y, h, free, f_ext)
+    m = norm(F)
+    for step in range(max_steps):
+        A, _ = _dirichlet_system(asm, jac, dir_mask, dir_values)
+        rhs = -F
+        rhs[dir_mask] = 0.0
+        try:
+            dh = splu(A.tocsc()).solve(rhs)
+        except RuntimeError:        # a singular tangent
+            dh = None
+        if dh is None or not np.all(np.isfinite(dh)):
+            changes.append(float('nan'))
+            return h, False, changes
+        size = float(np.max(np.abs(dh)))
+        if size < tol:
+            changes.append(size)
+            print(f"Iteration {first_iteration + step}: Newton step, residual = {size:.6e}")
+            return h + dh, True, changes
+        t = 1.0
+        while True:
+            h_t = h + t * dh
+            F_t, _ = _newton_residual(asm, kr_kw, y, h_t, free, f_ext, jacobian=False)
+            m_t = norm(F_t)
+            if m_t <= (1.0 - 1e-4 * t) * m:
+                break
+            t *= 0.5
+            if t < _NEWTON_MIN_STEP:
+                changes.append(size)
+                return h, False, changes
+        changes.append(t * size)
+        print(f"Iteration {first_iteration + step}: Newton step, residual = {t * size:.6e}"
+              + ("" if t == 1.0 else f", step shortened to {t:g}"))
+        h, m = h_t, m_t
+        F, jac = _newton_residual(asm, kr_kw, y, h, free, f_ext)
+    return h, False, changes
+
 #: PROGRESS-FED RELAXATION LADDER. The under-relaxation factor walks this ladder, and
 #: it moves on what the head change is DOING, never on the sweep number:
 #:
@@ -1062,14 +1201,21 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     form — both sides of it are round-off — and its closure is 0 (see the no-flow
     rule at the gate).
 
+    NEWTON STEPS TAKE OVER ONCE THE EXIT-FACE SET HOLDS. The ordinary iteration, which
+    freezes every kr at the last head field, runs until the set has been unchanged for
+    ten iterations; the system on that set is then solved by Newton's method with a
+    line search, the next ordinary iteration tests the set and the gate on the result,
+    and a set that changes is solved again (see :data:`_NEWTON_HOLD`). Each Newton
+    step counts as one iteration against ``max_iter``.
+
     THE RELAXATION LADDER MOVES ON PROGRESS, NOT ON THE SWEEP NUMBER: it steps down a
     rung after five consecutive sweeps that made none -- a head change setting no new
     low for the rung, or an iterate returning to a recent one -- holds while progress
     continues, and steps back up a rung after a run of ten consecutive progressing
     sweeps, doubled at each later attempt on that rung (see :data:`_RELAX_LADDER`).
 
-    Two escapes act on a solve that is caught in a cycle rather than converging; both
-    are inert on a solve that is not (see :data:`_CYCLE_PERSIST` and
+    Three escapes remain behind the Newton steps. Two act on a solve that is caught in
+    a cycle rather than converging; both are inert on a solve that is not (see :data:`_CYCLE_PERSIST` and
     :data:`_SET_REVISIT_SWEEP` for the gates and what was measured on the corpus). A
     third is read only once the sweep budget is spent unconverged: it solves for the
     kr of the one element holding the solve in a loop at every sweep, and the field it
@@ -1216,6 +1362,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     _tail_h = deque(maxlen=_CYCLE_LOOKBACK)
     _pin_tried = False
     _pin_saved = None
+
+    # Newton state (see _NEWTON_HOLD): the stable-set count the next run of Newton
+    # steps waits for, and whether the last run settled.
+    _newton_wait = _NEWTON_HOLD
+    _newton_settled = False
 
     budget = max_iter        # raised once, and only where the floor drops
     iteration = 0
@@ -1588,6 +1739,39 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # Update for next iteration
         h = h_new.copy()
         h_last = h_new.copy()
+
+        # NEWTON STEPS (see _NEWTON_HOLD). Once the exit-face set has held, the system
+        # on that set is solved by Newton's method, each step counted as an iteration.
+        # A run that settles leaves the solution of the set as it stands, and the next
+        # ordinary iteration tests the set and the gate on it; a set that then changes
+        # is solved again as soon as it has held _NEWTON_REHOLD iterations, as is one
+        # that changes with the ladder on its last rung. A run that does not settle
+        # leaves the head its last accepted step reached, the ordinary iterations go on
+        # from there, and the next run waits _NEWTON_HOLD more.
+        if not set_stable:
+            _newton_wait = (_NEWTON_REHOLD if _newton_settled
+                            or _rung + 1 == len(_RELAX_LADDER) else _NEWTON_HOLD)
+        if _n_stable >= _newton_wait and budget - iteration - 1 > 0:
+            kr_kw = dict(kr0=kr0, h0=h0, vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
+            newton_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
+            print(f"Iteration {iteration}: exit face unchanged for {_n_stable} "
+                  f"iterations — Newton steps from here")
+            h_nwt, _newton_settled, changes = _newton_solve(
+                asm, kr_kw, y, h_new, newton_mask, np.where(bc_type == 1, bc_values, y),
+                f_ext, _NEWTON_TOL * head_scale,
+                min(_NEWTON_STEPS, budget - iteration - 1), iteration + 1)
+            iteration += len(changes)
+            residuals.extend(changes)
+            _newton_wait = _n_stable + _NEWTON_HOLD
+            print(f"Iteration {iteration}: Newton steps settled; the next iteration "
+                  f"tests the exit face" if _newton_settled else
+                  f"Iteration {iteration}: Newton steps did not settle; ordinary "
+                  f"iterations resume")
+            h = h_nwt.copy()
+            h_last = h_nwt.copy()
+            data = _assembly_data(asm, p_nodes=h_nwt - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
+            _cyc_h, _cyc_a, _cyc_run = [], [], 0
+            _rung_best, _no_low, _new_lows = float('inf'), 0, 0
 
         # ESCAPE 3: one element holds the solve in a loop (see _PIN_MIN_SWING). Read
         # once, when the budget is spent unconverged. The element's kr is solved for
@@ -2209,6 +2393,126 @@ def _lf_tri_kr(U, kr0, h0):
         wet = np.where(band, wet, step)
     kr = kr0 + (1.0 - kr0) * np.clip(wet, 0.0, 1.0)
     return np.where(a >= 0.0, 1.0, np.where(c <= np.where(band, h0, 0.0), kr0, kr))
+
+
+def _ramp_mean_grad(a, b, c):
+    """Gradient of :func:`_ramp_mean` in its sorted vertex values, as three arrays.
+    Each is the mean over the triangle of that vertex's shape function where u is
+    positive, so the three sum to the positive share of the area and each moves
+    continuously with the vertex values, across both bends, on any triangle that is
+    not flat. On a flat one (three equal values at zero) the mean bends, and the
+    gradient returned is the one on the positive side."""
+    third = 1.0 / 3.0
+    up = (c > 0.0) & (b <= 0.0)
+    dn = (a < 0.0) & (b > 0.0)
+    ca = np.where(up | dn, c - a, 1.0)
+    cb = np.where(up, c - b, 1.0)
+    ba = np.where(dn, b - a, 1.0)
+    fu = c * c / (3.0 * ca * cb)
+    fd = a * a / (3.0 * ba * ca)
+    sat = a >= 0.0
+    ga = np.where(sat, third, np.where(up, fu * c / ca,
+                  np.where(dn, third - fd * (3.0 + a / ba + a / ca), 0.0)))
+    gb = np.where(sat, third, np.where(up, fu * c / cb,
+                  np.where(dn, third + fd * a / ba, 0.0)))
+    gc = np.where(sat, third, np.where(up, fu * (3.0 - c / ca - c / cb),
+                  np.where(dn, third + fd * a / ca, 0.0)))
+    return ga, gb, gc
+
+
+def _lf_tri_kr_grad(U, kr0, h0):
+    """Gradient of :func:`_lf_tri_kr` in the vertex heads ``U`` (..., 3), in the
+    order the vertices are given. Zero on a triangle wholly saturated or wholly below
+    h0, as the average there is constant. With h0 >= 0 it is the gradient of the
+    saturated share of the area."""
+    order = np.argsort(U, axis=-1)
+    Us = np.take_along_axis(U, order, axis=-1)
+    a, b, c = Us[..., 0], Us[..., 1], Us[..., 2]
+    band = h0 < 0.0
+    h_safe = np.where(band, h0, -1.0)
+    lo = _ramp_mean_grad(a - h_safe, b - h_safe, c - h_safe)
+    hi = _ramp_mean_grad(a, b, c)
+    wet = [(l - u) / (-h_safe) for l, u in zip(lo, hi)]
+    if not np.all(band):
+        up = (c > 0.0) & (b <= 0.0)
+        dn = (a < 0.0) & (b > 0.0)
+        ca = np.where(up | dn, c - a, 1.0)
+        cb = np.where(up, c - b, 1.0)
+        ba = np.where(dn, b - a, 1.0)
+        fu = c / (ca * cb)
+        fd = a / (ba * ca)
+        step = (np.where(up, fu * c / ca, np.where(dn, -fd * (2.0 + a / ba + a / ca), 0.0)),
+                np.where(up, fu * c / cb, np.where(dn, fd * a / ba, 0.0)),
+                np.where(up, fu * (2.0 - c / ca - c / cb), np.where(dn, fd * a / ca, 0.0)))
+        wet = [np.where(band, w, s) for w, s in zip(wet, step)]
+    flat = (a >= 0.0) | (c <= np.where(band, h0, 0.0))
+    scale = np.where(flat, 0.0, 1.0 - kr0)
+    out = np.empty(np.broadcast_shapes(U.shape, scale.shape + (3,)))
+    np.put_along_axis(out, order, np.stack([scale * w for w in wet], axis=-1), axis=-1)
+    return out
+
+
+def _kr_slope_vec(p, vg_a, vg_n, vg_l=None, model=None, kr_min=1e-8):
+    """Slope of the van Genuchten (:func:`kr_vg_vec`) and Gardner
+    (:func:`kr_gardner_vec`) relative permeability in the pressure head ``p``, per
+    element by ``model``. Zero where the head is not negative and where the curve
+    sits on its floor ``kr_min``."""
+    psi = np.abs(np.minimum(p, 0.0))
+    dry = psi > 0.0
+    psi_s = np.where(dry, psi, 1.0)
+    out = np.zeros(np.broadcast_shapes(np.shape(p), np.shape(model)))
+    with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
+        if np.any(model == KR_GARD):
+            a = np.asarray(vg_a, dtype=float)
+            n = np.asarray(vg_n, dtype=float)
+            kr = 1.0 / (1.0 + a * psi_s ** n)
+            slope = a * n * psi_s ** (n - 1.0) * kr * kr
+            out = np.where((model == KR_GARD) & dry & (kr > kr_min), slope, out)
+        if np.any(model == KR_VG):
+            n = np.maximum(vg_n, 1.0 + 1e-6)
+            m = 1.0 - 1.0 / n
+            l = 0.5 if vg_l is None else vg_l
+            x = vg_a * psi_s
+            w = 1.0 / (1.0 + x ** n)             # Se^(1/m)
+            Se = w ** m
+            br = 1.0 - (1.0 - w) ** m
+            kr = Se ** l * br * br
+            dw = n * vg_a * x ** (n - 1.0) * w * w            # -dw/dpsi
+            d_se = m * w ** (m - 1.0) * dw                    # -dSe/dpsi
+            d_br = m * (1.0 - w) ** (m - 1.0) * dw            # -dbr/dpsi
+            slope = Se ** (l - 1.0) * br * (l * d_se * br + 2.0 * Se * d_br)
+            ok = (model == KR_VG) & dry & (Se > 0.0) & (kr > kr_min) & (kr < 1.0)
+            out = np.where(ok & np.isfinite(slope), slope, out)
+    return out
+
+
+def _group_kr_grad(g, p_el, kr_kw):
+    """Gradient of each element's kr average (:func:`_group_kr_avg`) in its own nodal
+    pressure heads, (n, nn): the closed form of :func:`_lf_tri_kr_grad` for the linear
+    front, and for van Genuchten and Gardner the dense rule differentiated point by
+    point, the slope of kr at each point times that point's weights on the vertices."""
+    global _KR_DENSE
+    idx, share = g['idx'], g['kr_share']
+    U = (p_el @ g['kr_P'].T)[:, g['kr_tris']]                    # (n, n_tri, 3)
+    kw = {k: None if v is None else np.asarray(v)[idx] for k, v in kr_kw.items()}
+    model = kw.get('model')
+    lf = None if model is None else model == KR_LF
+    dU = np.zeros(U.shape)
+    if lf is None or lf.all():
+        dU = _lf_tri_kr_grad(U, kw['kr0'][:, None], kw['h0'][:, None])
+    else:
+        if lf.any():
+            dU[lf] = _lf_tri_kr_grad(U[lf], kw['kr0'][lf, None], kw['h0'][lf, None])
+        if _KR_DENSE is None:
+            _KR_DENSE = _subtri_rule(_KR_DENSE_K)
+        L, wq = _KR_DENSE
+        nl = np.flatnonzero(~lf & (U.min(axis=(1, 2)) < 0.0))
+        if len(nl):
+            slope = _kr_slope_vec(U[nl] @ L.T, *(None if kw[k] is None else kw[k][nl][:, None, None]
+                                                 for k in ('vg_a', 'vg_n', 'vg_l', 'model')))
+            dU[nl] = np.einsum('etq,q,qv->etv', slope, wq, L)
+    # vertex v of sub-triangle t is the combination kr_P[kr_tris[t, v]] of the nodes
+    return np.einsum('etv,et,tvj->ej', dU, share, g['kr_P'][g['kr_tris']])
 
 
 def _group_kr_avg(g, p_el, kr_kw, rows=None):

@@ -15,8 +15,9 @@ exit-face set unchanged, held for 30 consecutive sweeps -- and lowers the relaxa
 floor once, to 1e-3, granting a bounded extension of the sweep budget from that sweep.
 Four committed-mesh models were rescued this way (earth_dam_rapid, gsat_seep and
 earth_dam_down_seep, which are one field, and johnson_rapid_KEY). With each element's
-kr taken as its exact area average none of them cycles: they converge unaided in 61 and
-49 sweeps, and are locked as that in the inert table.
+kr taken as its exact area average none of them cycles, and with Newton steps taken
+once the exit face holds they converge unaided in 39 and 24 iterations, and are locked
+as that in the inert table.
 
 CLASS B -- the EXIT-FACE ACTIVE SET cycles. earth_dam2 alternated between two sets
 because the all-or-nothing quadratic-edge rule forbids the self-consistent one
@@ -30,8 +31,21 @@ drains and dries itself, and its kr comes back from each sweep far further out t
 went in -- a gain no relaxation the solver uses is fine enough for. Read only when the
 sweep budget is spent unconverged, the escape solves for that element's kr exactly at
 every sweep, against the current kr of every other element, until the field settles,
-and the field must then pass the ordinary gate on one ordinary sweep. vp077a on the
-quad8 mesh Studio builds at 100 divisions is the fixture.
+and the field must then pass the ordinary gate on one ordinary sweep.
+
+THE CLASS C ESCAPE HAS NO FIXTURE NOW EITHER. Its last one, vp077a on the quad8 mesh
+Studio builds at 100 divisions, ended its 400 iterations unconverged and closed on a
+pinned element. Newton steps converge it in 126 iterations, and the escape fired on
+none of the 130 Studio-mesh solves made when they went in (ten models as tri3, tri6,
+quad4, quad8 and quad9 at 100, 150 and 250 divisions), nor on any solve this file
+makes. The leg below locks the fixture as a solve that converges on its own.
+
+NEWTON STEPS (see ``_NEWTON_HOLD`` in ``seep.py``) are why every count in this file is
+what it is: once the exit-face set has held for ten iterations the system on that set
+is solved by Newton's method, each step counted as an iteration, and the count a row
+locks is the total. A row's flow rate is the fully converged one, which sits within
+the solve tolerance of the flow rate the relaxed iterations alone stopped on (the
+largest move among these rows is vp046b's, 2.7e-5 of itself).
 
 THE CLASS A ESCAPE HAS NO FIXTURE NOW, and this file says so. Its four models converge
 without it, and it fired on none of 164 other solves made when the exact kr average
@@ -42,7 +56,7 @@ THE CLASS B ESCAPE NOW GUARDS NOTHING IN THE CORPUS, and this file says so rathe
 than pretending otherwise. The exit-face fix in ``seep.py`` -- a seepage face runs to
 the toe where a specified head claims the corner, and a set with the head standing
 above the ground is not a stable set -- removed the cycle that produced it. earth_dam2
-now converges in 195 sweeps with NEITHER escape firing, so it has moved to the inert
+now converges in 33 iterations with NEITHER escape firing, so it has moved to the inert
 table below, and the escape has no rescued model left. Measured over every steady
 seepage model the suite solves (28 tagged models, plus the 12 committed-mesh solves
 this file makes): the revisit line is printed on none of them. On earth_dam2 the
@@ -53,7 +67,7 @@ _free_edges``, so it can no longer be reached on that model at all.
 THE CLASS B ESCAPE IS NO LONGER REACHED ON THIS CORPUS EVEN WITH ITS GATE LOWERED.
 The face stops revisiting sets before the wet-face rule claims it, at sweep 11: with
 ``_SET_REVISIT_SWEEP`` lowered to 0 no revisit line is printed, and the run is the
-ungated one sweep for sweep (156 sweeps, 1.2744670). The
+ungated one sweep for sweep (33 iterations, 1.2744673). The
 leg below locks that, so a change that makes the escape reachable again shows up. The
 code path has no fixture at all now, which is recorded here and not hidden.
 
@@ -91,17 +105,16 @@ WHAT THIS CHECK LOCKS
    over a flux boundary: held at p = 0 with its own load discarded, the node draws the
    share of that load the soil can still take. It is 1.9% of the throughput here at
    2.8x rain and 21% at 4x.
-5. The class C escape closes vp077a on the quad8 mesh Studio builds at 100 divisions,
-   under Studio's settings: the budget ends unconverged, the swing names an element,
-   it settles, and the gate accepts the field on the next sweep. The drawdown
-   section's two meshes that were once this leg's fixtures (15 and 14 divisions)
-   converge on their own, in 41 and 45 sweeps, and are locked as that: no pinned
-   element, and their flow rates.
+5. The class C escape's three former fixtures converge on their own and are locked as
+   that, with no pinned element and their flow rates: vp077a on the quad8 mesh Studio
+   builds at 100 divisions, under Studio's settings, in 126 iterations, and the
+   drawdown section's two meshes (15 and 14 divisions) in 20 and 19.
 
 WHY THE GATES ARE WHERE THEY ARE (each mutable in one line if a reader wants to see the
 other side of it). THE NUMBERS IN THIS SECTION WERE MEASURED UNDER EARLIER kr RULES
-(3 sampling points on tri6, 7 on tri3) and have not been re-measured with the exact
-element average, under which every model named here follows a different trajectory:
+(3 sampling points on tri6, 7 on tri3), BEFORE NEWTON STEPS, and have not been
+re-measured with the exact element average and those steps, under which every model
+named here follows a different trajectory:
 
 * A period of 1 is NOT a cycle. vp046b and vp077a creep toward their answers for
   hundreds of sweeps, each repeating its previous sweep within tolerance. Replace the
@@ -167,22 +180,23 @@ RESCUED = []
 #: (7 and 9 times), earth_dam_bc2's two BC sets are the plain unconfined case, and
 #: earth_dam2 is the model the class B escape used to rescue.
 #:
-#: Every row carries the exact element kr average. The first four are the models the
-#: class A escape used to close in 525 and 472 sweeps; the three earth-dam rows are one
-#: section, one mesh and one boundary set, so one field.
+#: Every row carries the exact element kr average, and its count is ordinary
+#: iterations plus Newton steps. The first four are the models the class A escape used
+#: to close in 525 and 472 sweeps; the three earth-dam rows are one section, one mesh
+#: and one boundary set, so one field.
 INERT = [
-    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 2.0497696e-03, 61),
-    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 2.0497696e-03, 61),
-    ("docs/lem/files/xslope_earth_dam_down_seep", 1, DOCS, 2.0497696e-03, 61),
-    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8719944, 49),
-    ("docs/verification/files/rocscience/vp046b", 1, VENDOR, 1.2786298e-03, 82),
-    ("docs/verification/files/rocscience/vp077a", 1, DOCS, 8.2228459e-06, 305),
-    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 37.708280, 126),
-    ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 38.771584, 112),
-    ("docs/inputs/seep/xslope_earth_dam_bc2", 1, DOCS, 42.431571, 89),
-    ("docs/inputs/seep/xslope_earth_dam_bc2", 2, DOCS, 11.587495, 14),
-    ("docs/seep/files/xslope_johnson_res", 1, DOCS, 1.9563070, 18),
-    ("docs/seep/files/xslope_earth_dam2", 1, DOCS, 1.2744670, 156),
+    ("docs/lem/files/xslope_earth_dam_rapid", 1, DOCS, 2.0497730e-03, 39),
+    ("docs/lem/files/xslope_gsat_seep", 1, DOCS, 2.0497730e-03, 39),
+    ("docs/lem/files/xslope_earth_dam_down_seep", 1, DOCS, 2.0497730e-03, 39),
+    ("docs/lem/files/xslope_johnson_rapid_KEY", 1, DOCS, 1.8720170, 24),
+    ("docs/verification/files/rocscience/vp046b", 1, VENDOR, 1.2786640e-03, 29),
+    ("docs/verification/files/rocscience/vp077a", 1, DOCS, 8.2228620e-06, 45),
+    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 37.708270, 39),
+    ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 38.771840, 26),
+    ("docs/inputs/seep/xslope_earth_dam_bc2", 1, DOCS, 42.431750, 25),
+    ("docs/inputs/seep/xslope_earth_dam_bc2", 2, DOCS, 11.587490, 14),
+    ("docs/seep/files/xslope_johnson_res", 1, DOCS, 1.9563060, 20),
+    ("docs/seep/files/xslope_earth_dam2", 1, DOCS, 1.2744673, 33),
 ]
 
 #: earth_dam2's exit face settles on 8 of its 97 exit-face nodes.
@@ -194,7 +208,7 @@ EDAM2_WET_SWEEP = 11
 #: earth_dam2 with the class B gate lowered to 0, the one setting that used to reach
 #: the escape: it no longer fires (None), and the run is the ungated one -- the same
 #: sweeps and the same flow rate.
-EDAM2_B_FIRES_AT, EDAM2_B_SWEEPS, EDAM2_B_Q = None, 156, 1.2744670
+EDAM2_B_FIRES_AT, EDAM2_B_SWEEPS, EDAM2_B_Q = None, 33, 1.2744673
 
 #: The dam-infiltration tutorial model: a rain flux over the whole exposed surface,
 #: draining to a 12 m toe drain that is the file's only exit face.
@@ -258,20 +272,20 @@ PIN_MODEL = "docs/lem/files/xslope_earth_dam_rapid.xlsx"
 PIN_POOL = 302.0
 PIN_MAX_ITER = 2000
 PIN_ROWS = [
-    (15.0, 2.0639789e-03, 41),
-    (14.0, 2.0586170e-03, 45),
+    (15.0, 2.0639781e-03, 20),
+    (14.0, 2.0586178e-03, 19),
 ]
 
-#: The pinned-element escape's fixture: vp077a on the quad8 mesh Studio's Build Mesh
-#: makes at 100 divisions (3100 nodes), under Studio's settings. The budget ends
-#: unconverged, the swing names one element, it settles in 205 sweeps, and the gate
-#: accepts the field on sweep 401. The sweep count is held to SWEEP_RTOL like the
-#: others. Of the 131 Studio-mesh solves measured with the exact kr average it is the
-#: one that needs the escape and closes on it.
+#: The pinned-element escape's last fixture: vp077a on the quad8 mesh Studio's Build
+#: Mesh makes at 100 divisions (3100 nodes), under Studio's settings. It used to end
+#: its budget unconverged and close on a pinned element at sweep 401. It converges on
+#: its own in 126 iterations, on the flow rate the pinned element reached, and the row
+#: locks that: no pinned element, the count (held to SWEEP_RTOL like the others) and
+#: the flow rate.
 PIN_STUDIO_MODEL = "docs/verification/files/rocscience/vp077a.xlsx"
 PIN_STUDIO_DIVISIONS, PIN_STUDIO_ELEMENT = 100, "quad8"
 PIN_STUDIO_SETTINGS = dict(tol=1e-4, max_iter=400)
-PIN_STUDIO_Q, PIN_STUDIO_SWEEPS = 8.2072266e-06, 205
+PIN_STUDIO_Q, PIN_STUDIO_SWEEPS = 8.2072266e-06, 126
 
 
 def _solve(stem_rel, bc, settings):
@@ -624,10 +638,9 @@ def _solve_studio_mesh(model_rel, divisions, element_type, settings):
 
 
 def leg_pinned():
-    """The steady state the budget leaves unconverged closes once the one element
-    holding it in its loop is solved for at every sweep, and the ordinary gate accepts
-    the field it settles on; the drawdown section's meshes that used to need that
-    converge on their own."""
+    """The three solves that used to end their budget unconverged and close on a
+    pinned element (the drawdown section's two meshes, and vp077a on Studio's quad8
+    mesh) converge on their own, with no escape."""
     fails = []
     for divisions, q_want, sweeps_want in PIN_ROWS:
         out, log = _solve_pinned(divisions)
@@ -647,26 +660,15 @@ def leg_pinned():
                                   PIN_STUDIO_ELEMENT, PIN_STUDIO_SETTINGS)
     tag = (f"{os.path.basename(PIN_STUDIO_MODEL)}, {PIN_STUDIO_ELEMENT} "
            f"{PIN_STUDIO_DIVISIONS} divisions")
-    outcomes = []
-    for line in log.splitlines():
-        if _PIN_LINE in line:
-            n = int(line.rsplit("(", 1)[1].split()[0] if "did not settle" in line
-                    else line.split("settled in ")[1].split()[0])
-            outcomes.append(("did not settle" not in line, n))
-    budget = PIN_STUDIO_SETTINGS["max_iter"]
     if not sol["converged"]:
         fails.append(f"{tag}: does not converge")
-    if len(outcomes) != 1 or not outcomes[0][0]:
-        fails.append(f"{tag}: pinned elements {outcomes}, not one that settles")
-    elif not _sweeps_close(outcomes[0][1], PIN_STUDIO_SWEEPS):
-        fails.append(f"{tag}: the pinned element settled in {outcomes[0][1]} sweeps "
-                     f"for {PIN_STUDIO_SWEEPS}")
-    if _sweeps(log) != budget + 1:
-        fails.append(f"{tag}: converged on sweep {_sweeps(log)}, not on the one "
-                     f"ordinary sweep after the budget ({budget + 1})")
+    if _fired(log, _PIN_LINE) is not None or _fired(log, _CYCLE_LINE) is not None:
+        fails.append(f"{tag}: an escape fired on a solve that converges without one")
+    if not _sweeps_close(_sweeps(log), PIN_STUDIO_SWEEPS):
+        fails.append(f"{tag}: converged on sweep {_sweeps(log)} for {PIN_STUDIO_SWEEPS}")
     if not _close(float(sol["flowrate"]), PIN_STUDIO_Q):
         fails.append(f"{tag}: flow rate {sol['flowrate']:.7e} for {PIN_STUDIO_Q:.7e}")
-    print(f"  {tag}: pinned {outcomes}, converged {sol['converged']} on sweep "
+    print(f"  {tag}: no escape, converged {sol['converged']} on sweep "
           f"{_sweeps(log)}, q={sol['flowrate']:.7e}")
     return fails
 
@@ -677,7 +679,7 @@ LEGS = [
      leg_class_b_reachable),
     ("models that converge without an escape", leg_inert),
     ("an exit face over a flux boundary", leg_exit_face_over_flux),
-    ("one element holding a steady state in its loop", leg_pinned),
+    ("solves a pinned element used to close", leg_pinned),
 ]
 
 
@@ -699,8 +701,8 @@ def main():
     print("\nPASS: the class B escape stays silent on earth_dam2 with its gate lowered, "
           "every model that converges without the escapes (the four the class A escape "
           "used to rescue among them) takes about the same number of sweeps, the dam "
-          "under rain sheds what it cannot take, and the one steady state that still "
-          "loops on a single element closes on it.")
+          "under rain sheds what it cannot take, and the three solves a pinned element "
+          "used to close converge on their own.")
 
 
 if __name__ == "__main__":

@@ -15653,6 +15653,157 @@ def run_kr_average_test(test):
     return 0.0, None
 
 
+def run_kr_gradient_test(test):
+    """Unit check for the gradient of the element kr average in the nodal heads
+    (xslope.seep._group_kr_grad), which is the term Newton's method adds to the
+    steady unconfined matrix.
+
+    The linear-front closed form (_lf_tri_kr_grad) is held against central
+    differences of the average itself on random triangles, with a sloped front and
+    with the h0 = 0 step. On triangles whose vertex heads coincide or nearly
+    coincide, on and off the two bends, where a difference cannot resolve the
+    triangle, it is held against the definition instead: each component is the mean
+    over the triangle of that vertex's shape function times the slope of kr, taken
+    on a dense rule; it must also be finite, bounded by the slope of the law, and
+    continuous as two vertex heads cross. The van Genuchten and Gardner point slopes
+    are held against differences of the laws, and the element gradient against
+    differences of the element average on one distorted element of every type, with
+    the linear front alone and with the three laws mixed in one group. Returns
+    (0.0, None) on success, else (None, message). No mesh / gmsh needed."""
+    import numpy as np
+    from xslope import seep as S
+    problems = []
+    rng = np.random.default_rng(11)
+
+    def fd_tri(U, kr0, h0, d):
+        out = np.empty(U.shape)
+        for v in range(3):
+            up, dn = U.copy(), U.copy()
+            up[..., v] += d
+            dn[..., v] -= d
+            out[..., v] = (S._lf_tri_kr(up, kr0, h0) - S._lf_tri_kr(dn, kr0, h0)) / (2 * d)
+        return out
+
+    n = 5000
+    U = rng.uniform(-3.0, 2.0, (n, 3))
+    kr0 = 10.0 ** rng.uniform(-5, -1, n)
+    h0 = -(10.0 ** rng.uniform(-0.5, 1, n))
+    err = np.max(np.abs(S._lf_tri_kr_grad(U, kr0, h0) - fd_tri(U, kr0, h0, 1e-6)))
+    if not err < 1e-7:
+        problems.append(f"linear-front gradient is {err:.1e} from central differences "
+                        f"on random triangles")
+    g0 = S._lf_tri_kr_grad(U, kr0, np.zeros(n))
+    err = np.max(np.abs(g0 - fd_tri(U, kr0, np.zeros(n), 1e-7)) / (1.0 + np.abs(g0)))
+    if not err < 1e-6:
+        problems.append(f"h0 = 0 step gradient is {err:.1e} from central differences")
+    # Wholly saturated and wholly dry triangles: the average is constant.
+    Usat, Udry = rng.uniform(0, 50, (200, 3)), rng.uniform(-50, -1, (200, 3))
+    Usat[0], Udry[0] = 0.0, -1.0
+    k4, hm1 = np.full(200, 1e-4), np.full(200, -1.0)
+    if np.any(S._lf_tri_kr_grad(Usat, k4, hm1)) or np.any(S._lf_tri_kr_grad(Udry, k4, hm1)):
+        problems.append("the gradient is not zero on a saturated or a dry triangle")
+
+    # Coincident and nearly coincident vertex heads. The definition, on a dense rule:
+    # the slope of kr is (1 - kr0) / |h0| between h0 and 0 and zero elsewhere.
+    L, w = S._subtri_rule(48)
+    k1, h1 = np.array([1e-4]), np.array([-1.0])
+    slope = (1.0 - 1e-4) / 1.0
+
+    def dense(U):
+        p = U @ L.T
+        return slope * (((p > -1.0) & (p < 0.0)) * w) @ L
+
+    held, finite, bound = [], True, 0.0
+    for eps in (0.0, 1e-16, 1e-13, 1e-10, 1e-7, 1e-4, 1e-2, 0.3):
+        for base in (-7.0, -2.0, -1.0, -1.0 + 1e-9, -0.5, -1e-12, 0.0, 1e-12, 0.7, 5.0):
+            for pat in ((0, 0, 0), (0, 1, 1), (0, 0, 1), (0, 1, -1), (0, 1, 2),
+                        (0, 0, 3e3), (0, 0, -3e3), (0, 1, 3e3), (0, 1, -3e3)):
+                u = base + eps * np.array(pat, dtype=float)
+                for perm in ((0, 1, 2), (2, 0, 1), (1, 2, 0)):
+                    up = u[list(perm)]
+                    g = S._lf_tri_kr_grad(up[None, :], k1, h1)[0]
+                    finite = finite and bool(np.all(np.isfinite(g)))
+                    bound = max(bound, float(np.max(np.abs(g))))
+                    # A flat triangle on a bend has a gradient on each side and the
+                    # dense rule lands on neither; every other one is held to it.
+                    if np.ptp(up) > 1e-14 * max(1.0, abs(base)):
+                        held.append((up, g))
+    worst = float(np.max(np.abs(np.array([g for _, g in held])
+                                - dense(np.array([u for u, _ in held])))))
+    if not finite:
+        problems.append("linear-front gradient is not finite on coincident vertex heads")
+    if not bound <= slope / 3.0 * (1.0 + 1e-9):
+        problems.append(f"a linear-front gradient component reaches {bound:.3g}, over a "
+                        f"third of the slope of the law")
+    if not worst < 0.02 * slope:
+        problems.append(f"linear-front gradient is {worst:.1e} from its definition on "
+                        f"nearly coincident vertex heads")
+    t = np.linspace(-1e-6, 1e-6, 2001)
+    for third in (-0.5, 0.2):
+        sweep = S._lf_tri_kr_grad(np.stack([t, -t, 0 * t + third], 1),
+                                  np.full(2001, 1e-4), np.full(2001, -1.0))
+        # two vertices trade places at the middle of the sweep, so compare sorted
+        jump = np.max(np.abs(np.diff(np.sort(sweep[:, :2], axis=1), axis=0)))
+        if not jump < 1e-3 * slope:
+            problems.append(f"linear-front gradient jumps by {jump:.1e} as two vertex "
+                            f"heads cross (third at {third})")
+
+    # Point slopes of the van Genuchten and Gardner laws.
+    m = 4000
+    p = -(10.0 ** rng.uniform(-2, 2, m))
+    a = 10.0 ** rng.uniform(-2, 0.5, m)
+    nn = rng.uniform(1.2, 5.0, m)
+    for code, name in ((S.KR_VG, 'van Genuchten'), (S.KR_GARD, 'Gardner')):
+        for l in (None, 0.5, -0.4, 2.0):
+            ll = None if l is None else np.full(m, l)
+            mdl = np.full(m, code)
+            kw = dict(kr0=np.zeros(m), h0=np.zeros(m), vg_a=a, vg_n=nn, vg_l=ll, model=mdl)
+            # a wide difference: near saturation the law itself is computed as
+            # 1 - (1 - w)^m and a narrow one has few digits left
+            d = 1e-4 * np.abs(p)
+            lo, hi = S.kr_relative_vec(p - d, **kw), S.kr_relative_vec(p + d, **kw)
+            got = S._kr_slope_vec(p, a, nn, ll, mdl)
+            # off the floor and off kr = 1, where the difference has digits to give
+            ok = (lo > 1e-5) & (hi < 1.0 - 1e-3)
+            err = np.max(np.abs(got - (hi - lo) / (2 * d))[ok] / np.abs(got[ok]))
+            if not err < 1e-4:
+                problems.append(f"{name} slope (l = {l}) is {err:.1e} relative from "
+                                f"central differences")
+    if np.any(S._kr_slope_vec(np.array([0.0, 2.0]), 0.5, 2.0, None, np.array([S.KR_VG, S.KR_GARD]))):
+        problems.append("the kr slope is not zero at a head that is not negative")
+
+    # One distorted element of every type: the gradient in the nodal heads.
+    sq = np.array([[0, 0], [2, 0], [2.3, 1.7], [0, 2], [1, 0], [2.2, 1], [1, 2],
+                   [0, 1], [1.1, 0.9]], float)
+    tr = np.array([[0, 0], [2, 0], [0.3, 2], [1, 0], [1.1, 1], [0.1, 1]], float)
+    ne = 300
+    for et, xy in {3: tr[:3], 6: tr, 4: sq[:4], 8: sq[:8], 9: sq}.items():
+        nodes = np.vstack([xy + [5.0 * i, 0.0] for i in range(ne)])
+        g = S._kr_groups(nodes, np.arange(ne * et).reshape(ne, et), np.full(ne, et))[0]
+        for mixed in (False, True):
+            # n above 2, so the van Genuchten slope stays bounded at zero suction and
+            # a difference across it means something
+            kw = dict(kr0=np.full(ne, 1e-3), h0=np.full(ne, -1.0), vg_a=np.full(ne, 0.8),
+                      vg_n=np.full(ne, 2.5), vg_l=np.full(ne, 0.5),
+                      model=rng.integers(0, 3, ne) if mixed else None)
+            pe = rng.uniform(-2.0, 1.0, (ne, et))
+            got = S._group_kr_grad(g, pe, kw)
+            ref = np.empty_like(got)
+            for j in range(et):
+                up, dn = pe.copy(), pe.copy()
+                up[:, j] += 1e-6
+                dn[:, j] -= 1e-6
+                ref[:, j] = (S._group_kr_avg(g, up, kw) - S._group_kr_avg(g, dn, kw)) / 2e-6
+            err = np.max(np.abs(got - ref))
+            if not err < (1e-5 if mixed else 1e-7):
+                problems.append(f"type {et}{' (mixed laws)' if mixed else ''}: element "
+                                f"gradient is {err:.1e} from central differences")
+
+    if problems:
+        return None, "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_pinchout_lobes_test(test):
     """Guard the self-touching-ring repair in mesh._clean_pinchouts: a material zone
     that buffer(0) resolves into SEVERAL real lobes must keep every one of them.
@@ -16156,6 +16307,8 @@ def _dispatch_test(test):
         return run_vg_kr_test(test)
     if test_type == 'kr_average':
         return run_kr_average_test(test)
+    if test_type == 'kr_gradient':
+        return run_kr_gradient_test(test)
     if test_type == 'roundtrip':
         return run_roundtrip_test(test)
     if test_type == 'v19_roundtrip':
@@ -16450,7 +16603,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average',
+                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average', 'kr_gradient',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -16733,6 +16886,9 @@ def main():
         # The element kr average: closed form, sub-triangles, mixed laws.
         tests.append({'type': 'kr_average', 'file': 'element kr average (unit)',
                       'method': '-', 'source': 'kr_average'})
+        # Its gradient in the nodal heads, which Newton's method uses.
+        tests.append({'type': 'kr_gradient', 'file': 'element kr gradient (unit)',
+                      'method': '-', 'source': 'kr_gradient'})
         # Mesh conforming-edge (T-junction) regression.
         tests.append({'type': 'mesh_conform', 'file': 'conforming edges (mesh)',
                       'method': '-', 'source': 'mesh_conform'})

@@ -106,7 +106,7 @@ The $\tau_{ff}$ is the shear stress on the failure plane at failure. $\sigma'_{1
 
 These two curves are function of the stress anisotropy during the consolidation stage. The $K_c = K_f$ curve with $c'$ and $\phi'$ corresponds to the case where the ratio of $\sigma'_1$ and $\sigma'_3$ is on the verge of failure. The other curve with $d$ and $\psi$ corresponds to the case where $\sigma'_1 = \sigma'_3$ during the consolidation stage. Note that the $c'$ and $\phi'$ values for the $K_c = K_f$ curve can be obtained from a $CU$ triaxial test or they can be obtained from a $CD$ or $\overline{CU}$ triaxial test. The $K_c = 1$ line represents $\tau_{ff}$ vs. $\sigma'_3$ from $CU$ triaxial tests. The $\tau_{ff}$ values are found using the equation in the previous figure above. Thus, both lines can be obtained from one set of $\overline{CU}$ triaxial tests.
 
-When performing rapid drawdown analysis with the **xslope** package, a set of $d$ and $\psi$ values should be entered in the material properties table for each soil with poor drainage and assumed to apply to rapid drawdown conditions. The more freely draining soils are not included in the analysis, and the $d$ and $\psi$ values should be left blank.
+When performing rapid drawdown analysis with the **xslope** package, a set of $d$ and $\psi$ values should be entered in the material properties table for each soil with poor drainage and assumed to apply to rapid drawdown conditions. The more freely draining soils keep their drained strengths $c'$ and $\phi'$ in every stage, and their $d$ and $\psi$ values should be left blank.
 
 ### Anisotropy and K Interpolation
 
@@ -174,6 +174,10 @@ For Stage 3, undrained strengths used for slices in low K zones are compared wit
 Where $N'$ is the effective normal force found in Stage 2 using post-drawdown conditions.
 
 If Stage 3 calculations are required (drained less than undrained in at least one slice), then the FS from Stage 3 = the rapid drawdown FS. If Stage 3 calculations are not required, the FS from Stage 2 = the rapid drawdown FS. Since Stage 3 only substitutes *lower* strengths, its FS never exceeds the Stage 2 FS, so this is the same as taking the lower of the two.
+
+### Surfaces that cross no material with d and ψ {#drained-surfaces}
+
+A slip surface that passes only through free-draining materials is analyzed like any other. No slice takes an undrained strength, so Stage 2 keeps $c'$ and $\phi'$ on every slice under the water after drawdown, Stage 3 is not required, and the rapid drawdown factor of safety is Stage 2's: the drained analysis of that surface with the pool lowered. A circular search keeps these surfaces as ordinary trials, so on a dam with a weak free-draining shell the critical circle can lie in the shell and miss the core entirely. When the critical circle (or the one circle analyzed) crosses no material with $d$ and $\psi$, the Log, the [Analysis Report](../studio/reports.md)'s rapid drawdown section, and the LEM Solution tab in XSLOPE Studio each say so. The [Stage 1 stability requirement](#the-stage-1-slope-must-be-stable) applies to these surfaces too.
 
 ## Inputs and Calculations
 

@@ -135,7 +135,9 @@ Then **one block per method**, under that method's own heading:
   *not required* when none did. Beneath the table are the governing factor of
   safety and the stage it comes from, and, where the
   [negative-stress rule](../lem/rapid.md#negative-stresses) set the undrained
-  strength on any slice, how many slices it applied to.
+  strength on any slice, how many slices it applied to. A surface that
+  [crosses no material with d and ψ](../lem/rapid.md#drained-surfaces) is
+  stated as such, with c′, φ′ in all materials for stage 2.
 - **The slice table** — geometry, forces and strengths on a landscape page, with
   column totals at the foot and a legend beneath defining every column. Columns
   that carry nothing for the model are left out — except a few that print

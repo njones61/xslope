@@ -204,9 +204,10 @@ def run():
         if table is None or table.rows[1][2] != "c′, φ′ in all materials":
             fails.append(f"{where}: the report's stage 2 strengths read "
                          f"{table.rows[1][2] if table else None!r}")
-        elif table.rows[2][3] != "not required":
-            fails.append(f"{where}: the report's stage 3 F reads "
-                         f"{table.rows[2][3]!r}")
+        elif table.rows[2][2:] != ["no slice is in a material with d and ψ",
+                                   "not required"]:
+            fails.append(f"{where}: the report's stage 3 row reads "
+                         f"{table.rows[2][2:]!r}")
         if NO_LOW_K_SENTENCE.format(surface="critical circle") not in prose:
             fails.append(f"{where}: the report does not say the critical circle "
                          f"crosses no material with d and ψ")

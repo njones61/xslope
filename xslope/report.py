@@ -3443,7 +3443,7 @@ def _rapid_section(results, counter, slope_data=None, slice_df=None,
         if low_k is None or n_low < len(low_k):
             strengths2 += "; c′, φ′ elsewhere"
     if n_low == 0:
-        strengths3 = "no low-permeability slices"
+        strengths3 = "no slice is in a material with d and ψ"
     elif drained is not None and n_low is not None:
         n_drained = sum(d for d, k in zip(drained, low_k) if k)
         strengths3 = f"the drained strength on {_slice_share(n_drained, n_low)}"

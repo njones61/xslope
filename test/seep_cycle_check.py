@@ -33,6 +33,17 @@ then pass the ordinary gate on one ordinary sweep. The earth dam's drawdown sect
 the tri6 meshes the transient check builds is the fixture: 11 mesh sizes from 9 to 32
 divisions end their budget unconverged without the escape, and all 11 close with it.
 
+CLASS D -- MORE THAN ONE ELEMENT holds the loop. Pinning one element leaves the rest to
+relaxed Picard, and where a second element's kr comes back a hundred or more times
+further out than it went in, the only rungs that hold it are the last two, at which the
+rest of the field closes 1 to 2% a sweep and the rescue's allowance runs out. The two
+earth dam samples on the tri6 mesh Studio builds at 100 divisions are the fixture: at
+the answer three of the 46 elements on the front carry gains of -3670, -157 and -3.4.
+Read only when the pinned element has not closed the solve, the escape solves the whole
+system on the exit-face set the budget left by Newton's method, whose tangent carries
+the kr slope a Picard sweep leaves out, and the field must then pass the ordinary gate
+on one ordinary sweep.
+
 THE CLASS B ESCAPE NOW GUARDS NOTHING IN THE CORPUS, and this file says so rather
 than pretending otherwise. The exit-face fix in ``seep.py`` -- a seepage face runs to
 the toe where a specified head claims the corner, and a set with the head standing
@@ -92,6 +103,11 @@ WHAT THIS CHECK LOCKS
    (14 divisions). Each pinned element's sweep count, the sweep the gate accepts
    the field on, and the flow rate are locked; the four rescued models and the inert
    table never reach the escape.
+6. The two earth dam samples close on the class D escape on the mesh Studio builds at
+   100 divisions, under Studio's settings: the limit-cycle floor fires, no pinned
+   element settles, Newton's method does, and the gate accepts its field on the next
+   sweep. The flow rate is locked to 1e-4, which admits the two solutions this mesh
+   has (see NEWTON_Q_RTOL). No other leg's model reaches the escape.
 
 MEASURED DURING THE ROUND, NOT LOCKED HERE
 
@@ -282,6 +298,29 @@ PIN_ROWS = [
 ]
 
 
+_NEWTON_LINE = "Newton's method on the full system"
+
+#: The Newton escape (CLASS D above): the two earth dam samples, one section and one
+#: boundary set, on the tri6 mesh Studio's Build Mesh makes at 100 divisions across the
+#: section, at the settings Studio solves with. Their committed meshes close on the
+#: class A escape (RESCUED above); on this one the budget and the pinned elements both
+#: leave them unconverged. Rows: the model and its flow rate.
+NEWTON_DIVISIONS, NEWTON_ELEMENT = 100, "tri6"
+NEWTON_SETTINGS = dict(tol=1e-4, max_iter=400)
+NEWTON_ROWS = [
+    ("docs/lem/files/xslope_earth_dam_rapid.xlsx", 2.0419006e-03),
+    ("docs/lem/files/xslope_earth_dam_down_seep.xlsx", 2.0419007e-03),
+]
+#: Relative tolerance on these flow rates. This mesh's equations have two solutions
+#: within reach of where the sweeps stop, 3.1e-5 apart in flow rate (2.0419006e-03 and
+#: 2.0419641e-03): Newton's method started from the budget's field with noise of
+#: 1e-4 ft at every node lands on the first from 8 seeds of 8, and with 1e-3 or 1e-2 ft
+#: on each from 4 of 8. A machine that rounds 870 cycling sweeps differently can land
+#: on either, and each is a converged answer the gate accepts, so the lock admits both
+#: and nothing further off.
+NEWTON_Q_RTOL = 1e-4
+
+
 def _solve(stem_rel, bc, settings):
     """Solve one BC set on the model's committed mesh. Returns (solution, log)."""
     from xslope.fileio import load_slope_data
@@ -333,6 +372,9 @@ def leg_rescued():
         fired = _fired(log, marker)
         if _fired(log, _PIN_LINE) is not None:
             fails.append(f"{name} bc{bc} reached the pinned-element escape; the class "
+                         f"{which} escape is what closes it")
+        if _fired(log, _NEWTON_LINE) is not None:
+            fails.append(f"{name} bc{bc} reached the Newton escape; the class "
                          f"{which} escape is what closes it")
         if not sol["converged"]:
             fails.append(f"{name} bc{bc} does not converge — the class {which} "
@@ -430,6 +472,9 @@ def leg_inert():
         if pin is not None:
             fails.append(f"{name} bc{bc} converges on its own, but the pinned-element "
                          f"escape fired on it at sweep {pin}")
+        if _fired(log, _NEWTON_LINE) is not None:
+            fails.append(f"{name} bc{bc} converges on its own, but the Newton escape "
+                         f"ran on it")
         if cyc is not None:
             fails.append(f"{name} bc{bc} converges on its own, but the head-cycle "
                          f"escape fired on it at sweep {cyc}")
@@ -622,6 +667,9 @@ def leg_pinned():
                 outcomes.append(("did not settle" not in line, n))
         if not out[5]:
             fails.append(f"{tag}: does not converge")
+        if _fired(log, _NEWTON_LINE) is not None:
+            fails.append(f"{tag}: reached the Newton escape; the pinned element is "
+                         f"what closes it")
         if outcomes != outcomes_want:
             fails.append(f"{tag}: pinned elements {outcomes} for {outcomes_want}")
         if _sweeps(log) != PIN_MAX_ITER + 1:
@@ -634,6 +682,69 @@ def leg_pinned():
     return fails
 
 
+def _solve_studio_mesh(model_rel):
+    """Boundary set 1 on the mesh Studio's Build Mesh makes of the model (its polygons,
+    constraint lines and size regions, sized as the section width over the divisions),
+    under Studio's solver settings. Returns (solution, log)."""
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry, extract_joint_options,
+                             extract_size_regions)
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        d = load_slope_data(os.path.join(_REPO, model_rel))
+        lines, _n_reinf, _n_pile = extract_constraint_line_geometry(d)
+        xs = [x for x, _ in d["ground_surface"].coords]
+        mesh = build_mesh_from_polygons(
+            get_material_polygons(d, reinf_lines=lines),
+            target_size=(max(xs) - min(xs)) / NEWTON_DIVISIONS,
+            element_type=NEWTON_ELEMENT, lines=lines or None,
+            element_size_1d=d.get("element_size_1d"),
+            size_regions=extract_size_regions(d),
+            joint_lines=extract_joint_options(d))
+        sol = run_seepage_analysis(build_seep_data(mesh, d, seep_bc=1), **NEWTON_SETTINGS)
+    return sol, buf.getvalue()
+
+
+def leg_newton():
+    """The steady states neither the budget nor a pinned element closes settle under
+    Newton's method on the whole system, and the ordinary gate accepts the field."""
+    fails = []
+    for model_rel, q_want in NEWTON_ROWS:
+        sol, log = _solve_studio_mesh(model_rel)
+        tag = (f"{os.path.basename(model_rel)}, {NEWTON_ELEMENT} "
+               f"{NEWTON_DIVISIONS} divisions")
+        pins = [line for line in log.splitlines() if _PIN_LINE in line]
+        newton = [line for line in log.splitlines() if _NEWTON_LINE in line]
+        at = _fired(log, _NEWTON_LINE)
+        if not sol["converged"]:
+            fails.append(f"{tag}: does not converge")
+        if _fired(log, _CYCLE_LINE) is None:
+            fails.append(f"{tag}: the limit-cycle floor did not fire, so this row no "
+                         f"longer reaches the escape the way it did")
+        if not pins or any("did not settle" not in line for line in pins):
+            fails.append(f"{tag}: a pinned element settled, so this row no longer "
+                         f"covers the Newton escape")
+        if len(newton) != 1 or "settled in" not in newton[0]:
+            fails.append(f"{tag}: Newton's method ran {len(newton)} time(s) and did "
+                         f"not settle on its first")
+        elif _sweeps(log) != at + 1:
+            fails.append(f"{tag}: converged on sweep {_sweeps(log)}, not on the one "
+                         f"ordinary sweep after Newton's method ({at + 1})")
+        if abs(float(sol["flowrate"]) - q_want) > NEWTON_Q_RTOL * q_want:
+            fails.append(f"{tag}: flow rate {sol['flowrate']:.7e} for {q_want:.7e}")
+        if sol["closure_fraction"] > INFIL_BALANCE_RTOL:
+            fails.append(f"{tag}: inflow and outflow differ by "
+                         f"{sol['closure_fraction']:.1e} of the flow")
+        steps = newton[0].split("settled in ")[1].split()[0] if newton and "settled in" in newton[0] else "-"
+        print(f"  {tag}: {len(pins)} pinned element(s) did not settle, Newton settled "
+              f"in {steps} steps, converged {sol['converged']} on sweep {_sweeps(log)}, "
+              f"q={sol['flowrate']:.7e}")
+    return fails
+
+
 LEGS = [
     ("models rescued from a limit cycle", leg_rescued),
     ("earth_dam2's exit face, and the class B escape's reachability",
@@ -641,6 +752,7 @@ LEGS = [
     ("models that converge without an escape", leg_inert),
     ("an exit face over a flux boundary", leg_exit_face_over_flux),
     ("one element holding a steady state in its loop", leg_pinned),
+    ("more than one element holding a steady state in its loop", leg_newton),
 ]
 
 
@@ -662,8 +774,9 @@ def main():
     print("\nPASS: the four cycling models converge to their own answers, the class B "
           "escape still reaches that answer where its gate can be reached, every model "
           "that converged without the escapes takes about the same number of sweeps, the "
-          "dam under rain sheds what it cannot take, and the drawdown section's "
-          "looping steady states close on the element that holds them.")
+          "dam under rain sheds what it cannot take, the drawdown section's "
+          "looping steady states close on the element that holds them, and the earth "
+          "dam samples on Studio's mesh close under Newton's method.")
 
 
 if __name__ == "__main__":

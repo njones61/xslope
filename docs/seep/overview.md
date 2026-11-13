@@ -435,8 +435,19 @@ when nothing is swinging, the elements a few unrelaxed sweeps would change most,
 at a time). It then solves for that element's $k_r$ directly at every sweep, against the
 current $k_r$ of every other element, until the field stops changing. The settled field
 then has to pass the three tests above on one ordinary, unrelaxed sweep. If it does, the
-run has converged. If no element settles, or the settled field fails the tests, the run
-returns `converged = False`, reports it, and keeps the field the sweep budget left.
+run has converged.
+
+Two or more elements can share the loop, and solving for one of them leaves the others
+cycling. If no element settles, or the settled field fails the tests, the solver makes a last
+attempt with Newton's method on the whole system, holding the exit-face set where the sweeps
+left it. A sweep freezes every element's $k_r$ while it solves for the heads. Newton's method
+also carries the slope of $k_r$ with head in its matrix, so the overshoot that defeats the
+sweeps is part of each linear solve. Every step is shortened until it lowers the residual, and
+where the bends of the $k_r$ curve stall that search, the curve is smoothed over a band of
+pressure head that narrows stage by stage until the unsmoothed system converges. The field
+Newton's method settles on has to pass the same three tests on one ordinary sweep. If it does
+not settle, or its field fails the tests, the run returns `converged = False`, reports it,
+and keeps the field the sweep budget left.
 
 ### Input checks
 

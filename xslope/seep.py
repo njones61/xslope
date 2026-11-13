@@ -991,6 +991,198 @@ def _pinned_element_solve(asm, kr_kw, y, h, e, dir_mask, dir_values, f_ext, tol,
         h = h + _RELAX_LADDER[rung] * (h_solved - h)
     return h, False, max_sweeps
 
+
+#: Newton escape, for a solve the budget and the pinned element both leave unconverged.
+#:
+#: The pinned element closes a loop one element holds. On a steep front in a fine mesh
+#: the loop is shared. Measured at the answer on the earth dam sample
+#: (xslope_earth_dam_rapid, kr0 = 1e-4 at h0 = -1 ft, tri6 at Studio's 100 divisions,
+#: 2407 elements): 46 elements have a kr sampling point between h0 and 0, and the map
+#: one Picard sweep applies to their krs has eigenvalues of -3670, -157 and -3.4, the
+#: rest inside the unit circle. Solving one element exactly removes the first and
+#: leaves -149, which relaxed Picard holds only below 2 / (1 + 149) = 0.013: the
+#: ladder's last rung. At that rung the rest of the field closes about 1% a sweep, and
+#: the pinned sweeps need a step a millionth of the gate's. On a second model of the
+#: same section the element left over carries -99, the pinned sweeps hold at 0.02,
+#: and their step falls from 2.1 ft to 0.0027 ft over the 400 sweeps allowed,
+#: against a target of 1.3e-8 ft. Solving two elements together would leave -3.4 here,
+#: but the count needed grows with the mesh: at 250 divisions the three largest are
+#: -1270, -716 and -175, and two solved together still leave -151.
+#:
+#: Newton's method needs no count. Its tangent is the Picard matrix plus, for every
+#: element, the slope of its kr average in its own nodal heads times its nodal flows:
+#: the term whose omission is the whole of the gain above. Each step is cut back until
+#: it lowers the residual (rows scaled by their saturated diagonal). The linear front
+#: bends at h0 and at 0, and a line search can stall where the iterate straddles a
+#: bend, the step from either side pointing across it. When it does, every kr is
+#: averaged over a band of pressure head, which rounds the bends; Newton's method runs
+#: on that system, then on the true one from where the rounded one left it, and the
+#: band narrows by :data:`_NEWTON_SHRINK` until the true system settles. The settled
+#: field is always a solution of the system as it is. The average is exact for the
+#: linear front (integrated piece by piece between the bends) and its slope is exact
+#: for every model.
+#:
+#: Accepted only by the ordinary gate, on one ordinary sweep at relax 1, as the pinned
+#: field is; a field that fails it leaves the answer the budget left. Solved on the
+#: exit-face set as it stands, which the gate sweep then tests like any other.
+#:
+#: Measured on four models of that dam section (the two samples and two with other
+#: materials), each at 100, 125, 150, 200 and 250 divisions (2137 to 15055 elements),
+#: under Studio's settings. A pinned element closes two of the 20 (the samples at 125
+#: divisions). The other 18 end their budget and their pinned elements unconverged,
+#: and all 18 settle here: 17 on the true system in 4 to 21 steps and one through the
+#: rounded stages in 102, each in seconds. The gate accepts all 18 on the next
+#: sweep, and no exit-face node changes state on it. At 100 divisions the flow rates
+#: are within 0.04% of what the budget left.
+#:
+#: The start does not have to be good. From the field the budget left on 22 meshes
+#: (those sections at 100 to 150 divisions, and the drawdown section's ten), with
+#: noise of 0, 0.001, 0.01 and 0.1 ft (drawn twice) and of 1 ft added at every node:
+#: all 110 starts at 0.1 ft or under settle, and 17 of the 22 at 1 ft. A first width of
+#: :data:`_NEWTON_WIDTH` times the smallest |h0|, halved each stage, is the setting
+#: that leaves none of the 110 unsettled: sixteen times |h0| loses 1, and a width
+#: quartered each stage loses 6, from once |h0| or from four times.
+#:
+#: THE DISCRETE SYSTEM CAN HAVE MORE THAN ONE SOLUTION, and this escape lands on one of
+#: them. With three sampling points to an element and four decades of kr in a foot, a
+#: front can sit on either side of an element and close the equations both ways.
+#: Measured on the second model at 100 divisions: started from the budget's field at
+#: budgets of 360 to 440 sweeps, with and without noise, 14 of 15 starts settle on one
+#: field (to 2e-10 ft) and one on another, 0.68 ft away at the front, its flow rate
+#: lower by 9e-6 of itself. On the drawdown section at 15 divisions the pinned element
+#: closes on 2.0591e-03 and Newton's method, started from the same budget, on
+#: 2.0621e-03. Both pass the gate. Which one a solve lands on is decided by where the
+#: sweeps left it.
+_NEWTON_STEPS = 50        # Newton steps allowed each stage
+_NEWTON_MIN_STEP = 1e-3   # the shortest fraction of a Newton step the line search takes
+_NEWTON_TOL = 1e-10       # the settled step, x the head scale
+_NEWTON_WIDTH = 4.0       # the first mollified width, x the smallest |h0|
+_NEWTON_SHRINK = 0.5      # each mollified stage's width over the one before it
+_NEWTON_MIN_WIDTH = 1e-3  # the last width tried, x the first
+
+_GAUSS3_X, _GAUSS3_W = np.polynomial.legendre.leggauss(3)
+
+
+def _kr_and_slope(p, kw, width):
+    """kr and its slope in the pressure head at ``p``, for the per-element parameter
+    arrays ``kw``. ``width`` > 0 gives both for kr averaged over ``p`` +/- ``width``:
+    the average is integrated piece by piece between the bends at h0 and 0, and its
+    slope is the difference of kr at the two ends over their distance, exactly."""
+    if width <= 0.0:
+        dp = 1e-7 * np.maximum(1.0, np.abs(p))
+        return (kr_relative_vec(p, **kw),
+                (kr_relative_vec(p + dp, **kw) - kr_relative_vec(p - dp, **kw)) / (2 * dp))
+    lo, hi = p - width, p + width
+    bend_1 = np.clip(np.nan_to_num(kw['h0']) + 0.0 * p, lo, hi)
+    bend_2 = np.clip(0.0 * p, lo, hi)
+    total = 0.0
+    for a, b in ((lo, bend_1), (bend_1, bend_2), (bend_2, hi)):
+        half, mid = 0.5 * (b - a), 0.5 * (a + b)
+        for x, w in zip(_GAUSS3_X, _GAUSS3_W):
+            total = total + w * half * kr_relative_vec(mid + half * x, **kw)
+    return (total / (2 * width),
+            (kr_relative_vec(hi, **kw) - kr_relative_vec(lo, **kw)) / (2 * width))
+
+
+def _newton_residual(asm, kr_kw, y, h, free, f_ext, width=0.0, jacobian=True):
+    """The nodal residual ``K(kr(h)) h - f`` on the free rows (zero on the others),
+    and the COO data of its Jacobian on the assembly's own pattern.
+
+    An element's matrix is its kr average times its saturated matrix, so its share of
+    the Jacobian is that matrix plus a rank-one term: its nodal flows at kr = 1 (the
+    saturated matrix times its heads) times the gradient of its kr average in its
+    nodal heads. The second term is what a Picard sweep leaves out."""
+    res_parts, jac_parts = [], []
+    for g in asm['groups']:
+        idx = g['idx']
+        kw = {k: None if v is None else v[idx][:, None] for k, v in kr_kw.items()}
+        h_e = h[g['conn']]
+        kr, slope = _kr_and_slope((h_e - y[g['conn']]) @ g['N_kr'].T, kw, width)
+        kr_avg = (kr @ g['w_kr']) / g['wsum']
+        scaled = kr_avg[:, None, None] * g['ke']
+        res_parts.append(scaled.ravel())
+        if jacobian:
+            d_kr = ((slope * g['w_kr']) @ g['N_kr']) / g['wsum']
+            flow_sat = np.einsum('eij,ej->ei', g['ke'], h_e)
+            jac_parts.append((scaled + flow_sat[:, :, None] * d_kr[:, None, :]).ravel())
+    F = _coo_matvec(asm, np.concatenate(res_parts), h) - f_ext
+    F[~free] = 0.0
+    return F, (np.concatenate(jac_parts) if jacobian else None)
+
+
+def _newton_stage(asm, kr_kw, y, h, dir_mask, dir_values, f_ext, row_scale, tol, width):
+    """Newton's method with a backtracking line search from ``h``, on the system as it
+    is (``width`` 0) or with every kr averaged over +/- ``width`` of pressure head.
+    Returns ``(head, settled, steps)``; not settled when the line search can find no
+    step that lowers the residual, the matrix is singular, or the steps run out."""
+    free = ~dir_mask
+
+    def norm(F):
+        return float(np.linalg.norm(F[free] / row_scale[free]))
+
+    F, jac = _newton_residual(asm, kr_kw, y, h, free, f_ext, width)
+    m = norm(F)
+    for step in range(1, _NEWTON_STEPS + 1):
+        A, _ = _dirichlet_system(asm, jac, dir_mask, dir_values)
+        rhs = -F
+        rhs[dir_mask] = 0.0
+        try:
+            dh = splu(A.tocsc()).solve(rhs)
+        except RuntimeError:        # a singular tangent
+            return h, False, step
+        if not np.all(np.isfinite(dh)):
+            return h, False, step
+        if float(np.max(np.abs(dh))) < tol:
+            return h + dh, True, step
+        t = 1.0
+        while True:
+            h_t = h + t * dh
+            F_t, _ = _newton_residual(asm, kr_kw, y, h_t, free, f_ext, width,
+                                      jacobian=False)
+            m_t = norm(F_t)
+            if m_t <= (1.0 - 1e-4 * t) * m:
+                break
+            t *= 0.5
+            if t < _NEWTON_MIN_STEP:
+                return h, False, step
+        h, m = h_t, m_t
+        F, jac = _newton_residual(asm, kr_kw, y, h, free, f_ext, width)
+    return h, False, _NEWTON_STEPS
+
+
+def _newton_solve(asm, kr_kw, y, h, dir_mask, dir_values, f_ext, tol):
+    """Solve the steady system on a fixed exit-face set by Newton's method from ``h``
+    (see :data:`_NEWTON_STEPS`). Returns ``(head, settled, steps)``. The settled field
+    solves the system as it is: the mollified stages only carry the iterate to where
+    Newton's method on the system itself converges."""
+    h = np.where(dir_mask, dir_values, h)
+    # Rows are compared on the scale of their own saturated diagonal, so a residual in
+    # the core weighs what the same head error weighs in the shell.
+    row_scale = np.zeros(asm['n_nodes'])
+    for g in asm['groups']:
+        np.add.at(row_scale, g['conn'], np.einsum('eii->ei', g['ke']))
+    args = (dir_mask, dir_values, f_ext, row_scale, tol)
+    h_new, settled, steps = _newton_stage(asm, kr_kw, y, h, *args, width=0.0)
+    if settled:
+        return h_new, True, steps
+    # The band starts at a multiple of the sharpest linear front's h0, or, on a model
+    # with no linear front, of a hundredth of the mesh height.
+    bends = np.abs(kr_kw['h0'][np.isfinite(kr_kw['h0']) & (kr_kw['h0'] != 0.0)
+                               & (True if kr_kw['model'] is None
+                                  else kr_kw['model'] == KR_LF)])
+    width_0 = _NEWTON_WIDTH * (float(np.min(bends)) if len(bends)
+                               else 0.01 * max(float(np.ptp(y)), 1.0))
+    width = width_0
+    while width >= _NEWTON_MIN_WIDTH * width_0:
+        h, _, n = _newton_stage(asm, kr_kw, y, h, *args, width=width)
+        steps += n
+        h_new, settled, n = _newton_stage(asm, kr_kw, y, h, *args, width=0.0)
+        steps += n
+        if settled:
+            return h_new, True, steps
+        width *= _NEWTON_SHRINK
+    return h, False, steps
+
 #: PROGRESS-FED RELAXATION LADDER. The under-relaxation factor walks this ladder, and
 #: it moves on what the head change is DOING, never on the sweep number:
 #:
@@ -1082,7 +1274,9 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     :data:`_SET_REVISIT_SWEEP` for the gates and what was measured on the corpus). A
     third is read only once the sweep budget is spent unconverged: it solves for the
     kr of the one element holding the solve in a loop at every sweep, and the field it
-    settles on is then held to the ordinary gate (see :data:`_PIN_MIN_SWING`).
+    settles on is then held to the ordinary gate (see :data:`_PIN_MIN_SWING`). Where
+    that element does not close the solve, a fourth solves the whole system by Newton's
+    method, and its field is held to the same gate (see :data:`_NEWTON_STEPS`).
 
     Parameters:
         element_types : (n_elements,) array indicating:
@@ -1225,6 +1419,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     _tail_h = deque(maxlen=_CYCLE_LOOKBACK)
     _pin_tried = False
     _pin_saved = None
+    _newton_tried = False    # see _NEWTON_STEPS
 
     budget = max_iter        # raised once, and only where the floor drops
     iteration = 0
@@ -1623,6 +1818,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             pinned += [int(e) for e in np.argsort(-steps)[:_PIN_STEPS]
                        if steps[e] > _PIN_MIN_SWING and int(e) not in pinned]
             pin_left = max_iter     # the rescue spends at most the budget it follows
+            _pin_settled = False
             for e in pinned:
                 if pin_left <= 0:
                     break
@@ -1639,12 +1835,41 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                          if pin_ok else f"did not settle ({n_pin} sweeps)"))
                 if pin_ok:
                     _pin_saved = (A, data, exit_face_active.copy())
+                    _pin_settled = True
                     h = h_pin.copy()
                     h_last = h_pin.copy()
                     data = _assembly_data(asm, p_nodes=h_pin - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
                     _rung, _cycle_floor = 0, None
                     budget += 1
                     break
+            if _pin_settled:
+                continue
+
+        # ESCAPE 4: Newton's method on the full system (see _NEWTON_STEPS). Reached
+        # only where the budget is spent and the pinned element has not closed the
+        # solve: no element settled, or the field one settled on failed its gate
+        # sweep. It starts from the last iterate, on the exit-face set as it stands,
+        # and its field gets one ordinary sweep at relax 1, as the pinned field does:
+        # the gate decides.
+        if iteration >= budget and not _newton_tried:
+            _newton_tried = True
+            if _pin_saved is None:
+                _pin_saved = (A, data, exit_face_active.copy())
+            kr_kw = dict(kr0=kr0, h0=h0, vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
+            newton_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
+            dir_values = np.where(bc_type == 1, bc_values, y)
+            h_nwt, nwt_ok, n_nwt = _newton_solve(
+                asm, kr_kw, y, h_new, newton_mask, dir_values, f_ext,
+                _NEWTON_TOL * head_scale)
+            print(f"Iteration {iteration}: Newton's method on the full system — "
+                  + (f"settled in {n_nwt} steps; one ordinary sweep tests it"
+                     if nwt_ok else f"did not settle ({n_nwt} steps)"))
+            if nwt_ok:
+                h = h_nwt.copy()
+                h_last = h_nwt.copy()
+                data = _assembly_data(asm, p_nodes=h_nwt - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
+                _rung, _cycle_floor = 0, None
+                budget += 1
 
     else:
         # The sweeps actually run, which is max_iter unless an escape extended it.
@@ -1656,7 +1881,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
 
     if not converged and _pin_saved is not None:
-        # The pinned field failed its gate sweep: the answer is the one the budget left.
+        # The rescued field failed its gate sweep: the answer is the one the budget left.
         A, data, exit_face_active = _pin_saved
 
     # Final consistency solve: q was computed before the last exit face update,

@@ -1102,7 +1102,7 @@ compared node for node (`benchmarks/run_seep2d_compare.py --gw`).
 
 **The release point agrees.** It is identical on gw004, gw006a and gw010; both codes leave
 the face fully drained on gw012 and gw013; and gw009a differs by one element at that mesh.
-The head fields agree to a relative RMS of order 10⁻⁴ throughout. Where this corpus sits
+The head fields agree to a relative RMS of about 10⁻⁴ on gw004 through gw010 and about 10⁻³ on gw012 and gw013. Where this corpus sits
 above a published profile, the difference is therefore between the SEEP2D family and the
 reference code's exit-face convention, not an XSLOPE defect, so those problems are checked on
 XSLOPE's own values with the offset reported.

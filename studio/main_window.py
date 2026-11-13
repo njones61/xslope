@@ -178,6 +178,33 @@ class _FittedTable(QTableWidget):
         return self._hint if self._hint is not None else super().sizeHint()
 
 
+def _drained_rapid_note(bundle):
+    """The sentence a rapid drawdown result carries when its surface crossed no
+    material with d and ψ, or ``""`` — the Log's own line, for the LEM Solution
+    tab and the status bar (:data:`xslope.advanced.NO_LOW_K_SENTENCE`)."""
+    from xslope.advanced import no_low_k_sentence
+    from xslope.search import analyzed_surface_noun
+    results = (bundle or {}).get("results")
+    circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
+    return no_low_k_sentence(results,
+                             analyzed_surface_noun(bool(bundle.get("search")),
+                                                   circular))
+
+
+def lem_done_message(bundle):
+    """The status-bar line a finished LEM run leaves: the method and its factor of
+    safety, and, for a rapid drawdown whose surface crossed no material with d
+    and ψ, the first clause of :func:`_drained_rapid_note` — the status bar is
+    one line, and the LEM Solution tab carries the whole sentence."""
+    res = bundle["results"]
+    message = f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}"
+    drained = _drained_rapid_note(bundle)
+    if drained:
+        clause = drained.split(", so ")[0]
+        message += f"; {clause[:1].lower()}{clause[1:]}"
+    return message
+
+
 class SolutionView(QWidget):
     """The LEM Solution tab: an admissibility-warning strip stacked above the
     result canvas.
@@ -201,6 +228,10 @@ class SolutionView(QWidget):
     plot draws the forces without numbers, and the slice table totals them per
     slice without saying which line each came from. A model without
     reinforcement lines never shows the table.
+
+    A rapid drawdown whose surface crosses no material with d and ψ gets a note
+    above the plot (:meth:`set_note`): every stage of it was a drained analysis,
+    which the Log says in a line a user reading only the plot would not see.
 
     The view quacks like the ``MplCanvas`` it wraps for the two calls the main
     window makes on a result view — ``render_solution`` and ``ensure_fitted`` — so
@@ -232,6 +263,21 @@ class SolutionView(QWidget):
             " }")
         self._warning.setVisible(False)
 
+        # A neutral note — a statement about how the result was computed, not a
+        # warning about it — in the blue-gray of an information strip.
+        self._note = QLabel()
+        self._note.setWordWrap(True)
+        self._note.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._note.setStyleSheet(
+            "QLabel {"
+            " background-color: #eaf2fa;"
+            " color: #24435c;"
+            " border: 1px solid #b7cde3;"
+            " border-radius: 4px;"
+            " padding: 6px 10px;"
+            " }")
+        self._note.setVisible(False)
+
         self._crossings_title = QLabel()
         self._crossings_title.setWordWrap(True)
         self._crossings_title.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -256,6 +302,7 @@ class SolutionView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
+        layout.addWidget(self._note)           # how the result was computed
         layout.addWidget(self._warning)        # strip above the plot
         layout.addWidget(self.canvas, 1)       # canvas takes the remaining height
         layout.addWidget(self._crossings_box)  # crossing table below it
@@ -272,6 +319,16 @@ class SolutionView(QWidget):
 
     def ensure_fitted(self):
         self.canvas.ensure_fitted()
+
+    def set_note(self, title, text):
+        """Show ``title`` over ``text`` above the plot, or hide the note when
+        ``text`` is empty."""
+        if not text:
+            self._note.setVisible(False)
+            self._note.clear()
+            return
+        self._note.setText(f"<b>{html.escape(title)}</b><br>{html.escape(text)}")
+        self._note.setVisible(True)
 
     def _set_warnings(self, results):
         warns = list(results.get("warnings") or []) if isinstance(results, dict) else []
@@ -3090,9 +3147,7 @@ class MainWindow(QMainWindow):
         lead = (self.search_canvas if bundle.get("search") else self.solution_canvas)
         if lead is not None:
             self.view_tabs.setCurrentWidget(lead)
-        res = bundle["results"]
-        self.statusBar().showMessage(
-            f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
+        self.statusBar().showMessage(lem_done_message(bundle))
 
     def _on_lem_failed(self, message):
         QMessageBox.warning(self, "LEM run failed", message)
@@ -3469,6 +3524,8 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(self.solution_canvas)
         if (bundle and panel and self.solution_canvas is not None
                 and isinstance(bundle.get("results"), dict)):
+            self.solution_canvas.set_note("Rapid drawdown",
+                                          _drained_rapid_note(bundle))
             try:
                 self.solution_canvas.render_solution(
                     self.doc.slope_data, bundle["slice_df"],

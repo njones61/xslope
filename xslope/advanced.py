@@ -15,6 +15,34 @@
 import numpy as np
 
 
+#: What every place that shows a rapid drawdown result says when the surface
+#: crosses no material with d and ψ — the Log, the Analysis Report and Studio's
+#: LEM Solution tab — so the three say it in the same words. ``surface`` is the
+#: noun for the surface analyzed: "critical circle", "circle", "surface", ...
+NO_LOW_K_SENTENCE = ("The {surface} crosses no material with d and ψ, so stages 1 "
+                     "and 2 used drained strengths (c′, φ′) and stage 3 was not "
+                     "required.")
+
+
+def crosses_no_low_k(results):
+    """True when a rapid drawdown result's surface crossed no material with d and
+    ψ, so every stage was a drained analysis.
+
+    Read from the per-slice record :func:`rapid_drawdown` leaves on its result
+    (``rapid_low_k``); False for any other result, and for a rapid drawdown
+    result made before that record existed.
+    """
+    if not isinstance(results, dict) or "stage1_FS" not in results:
+        return False
+    flags = results.get("rapid_low_k")
+    return flags is not None and not any(flags)
+
+
+def no_low_k_sentence(results, surface):
+    """:data:`NO_LOW_K_SENTENCE` for ``surface`` where it applies, else ``""``."""
+    return NO_LOW_K_SENTENCE.format(surface=surface) if crosses_no_low_k(results) else ""
+
+
 def validate_rapid_drawdown(slope_data):
     """
     Validates that slope_data has the required inputs for rapid drawdown analysis.
@@ -77,7 +105,10 @@ def rapid_drawdown(df, method_name, debug_level=1):
               envelopes instead of interpolating between them.
             - stage3_drained: per slice, True where the drained strength was
               lower and replaced the undrained one in Stage 3.
-        The per-slice lists are plain bools in slice-table order.
+        The per-slice lists are plain bools in slice-table order. A surface that
+        crosses no material with d or psi is a drained analysis in every stage:
+        rapid_low_k is all False, stage3_run is False, and the factor of safety
+        is Stage 2's (see :func:`crosses_no_low_k`).
     """
     # Curved-envelope materials are incompatible with the staged strength
     # overrides of the drawdown procedure (both mutate per-slice c/phi); refuse
@@ -102,10 +133,17 @@ def rapid_drawdown(df, method_name, debug_level=1):
     caller_df = df
     df = df.copy()
 
-    # Validate that d and psi parameters are present for at least some slices
-    if (df['d'] == 0).all() and (df['psi'] == 0).all():
-        return False, "Rapid drawdown requires d and psi parameters for low-K materials. All values are zero — check your input template."
-
+    # A surface that crosses no low-permeability material (no slice with a
+    # nonzero d or psi) is still a surface: every material it cuts drains during
+    # the drawdown, so its answer is the drained analysis under the water after
+    # drawdown. It runs through the same three stages — Stage 2 finds no slice to
+    # give an undrained strength and keeps c', phi' throughout, and Stage 3 has
+    # nothing to substitute, so it is not required — and the governing factor is
+    # Stage 2's. Refusing it, as this function once did, made a search discard
+    # such circles as unsolved trials and miss a critical surface in a weak
+    # free-draining shell. Whether the MODEL carries any d/psi material at all
+    # is a separate question, refused up front by validate_rapid_drawdown and by
+    # preflight (rapid.no_low_k_material).
     if debug_level >= 1:
         print("=== RAPID DRAWDOWN ANALYSIS ===")
     
@@ -158,7 +196,11 @@ def rapid_drawdown(df, method_name, debug_level=1):
     
     # Stage 2: Post-drawdown conditions with undrained strengths
     if debug_level >= 1:
-        print("Stage 2: Post-drawdown conditions with undrained strengths...")
+        if ((df['d'] > 0) | (df['psi'] > 0)).any():
+            print("Stage 2: Post-drawdown conditions with undrained strengths...")
+        else:
+            print("Stage 2: Post-drawdown conditions; no slice is in a material "
+                  "with d and ψ, so every slice keeps c′, φ′...")
    
     # Update pore pressures and distributed loads for stage 2
     df['u'] = df['u2']

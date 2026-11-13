@@ -3376,7 +3376,8 @@ def _slice_share(n, total):
     return f"{n} of the {total} low-permeability slices"
 
 
-def _rapid_section(results, counter, slope_data=None, slice_df=None):
+def _rapid_section(results, counter, slope_data=None, slice_df=None,
+                   surface="surface"):
     """The three-stage rapid drawdown detail, when the run was one.
 
     One row per stage — the water it stands under, the strengths it uses and
@@ -3385,6 +3386,10 @@ def _rapid_section(results, counter, slope_data=None, slice_df=None):
     than undrained, and its row says "not required" where it did not run: the
     solver repeats stage 2's factor under stage 3's name in that case, and
     printed as stage 3's it read as a stage that ran and happened to agree.
+
+    ``surface`` names the surface analyzed — "critical circle", "specified
+    surface" — for the sentence that says when it crosses no material with d
+    and ψ, where every stage was a drained analysis.
     """
     if not results or "stage1_FS" not in results:
         return None
@@ -3430,8 +3435,7 @@ def _rapid_section(results, counter, slope_data=None, slice_df=None):
                 if (_num(m.get("d")) or 0) > 0 or (_num(m.get("psi")) or 0) > 0]
     names = [str(m.get("name") or "") for _i, m in mats]
     if n_low == 0:
-        strengths2 = ("c′, φ′ in all materials; the surface crosses no "
-                      "low-permeability material")
+        strengths2 = "c′, φ′ in all materials"
     else:
         undrained = "undrained (τ_ff from d, ψ and c′, φ′)"
         strengths2 = (f"{undrained} in {_join(names)}" if names else
@@ -3482,6 +3486,11 @@ def _rapid_section(results, counter, slope_data=None, slice_df=None):
     if attributed:
         governing += f" — stage {lower}"
     sub.blocks.append(KeyValues([(governing, f"{results['FS']:.3f}")]))
+
+    # A surface through free-draining materials only: every stage was drained.
+    if n_low == 0:
+        from .advanced import NO_LOW_K_SENTENCE
+        sub.blocks.append(Prose(NO_LOW_K_SENTENCE.format(surface=surface)))
 
     # The negative-stress rule, wherever it decided a stage 2 strength.
     if fallback is not None and low_k is not None:
@@ -6782,7 +6791,11 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
     # --- rapid drawdown ---
     if opts["lem_rapid"]:
-        rapid = _rapid_section(results, counter, slope_data, slice_df)
+        family = _surface_family(slice_df, slope_data)
+        rapid = _rapid_section(
+            results, counter, slope_data, slice_df,
+            surface=(f"{'critical' if searched else 'specified'} "
+                     f"{'circle' if family == 'circular' else 'surface'}"))
         if rapid is not None:
             sec.children.append(rapid)
 

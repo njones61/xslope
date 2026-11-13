@@ -20,7 +20,7 @@ import numpy as np
 from shapely.geometry import LineString, Point
 
 from . import solve
-from .advanced import rapid_drawdown, validate_rapid_drawdown
+from .advanced import no_low_k_sentence, rapid_drawdown, validate_rapid_drawdown
 # Re-exported beside the search it feeds: a starting set for a model that carries
 # no circles is a search input, and a caller reaching for one is already here.
 # The implementation lives in generators.py, which stays free of search's imports
@@ -1610,6 +1610,15 @@ def _attach_crest_tension_note(results, slice_df, slope_data):
     return note
 
 
+def analyzed_surface_noun(searched, circular):
+    """What a result calls the surface it was solved on: "critical circle" or
+    "critical surface" for a search's answer, "circle" or "surface" for a
+    single-surface run. The Log, the report and Studio's LEM Solution tab name
+    the surface with it, so a sentence about it reads the same in all three."""
+    return (("critical " if searched else "")
+            + ("circle" if circular else "surface"))
+
+
 def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circular",
                      num_slices=40, rapid=False, composite=False, grid_seed=False,
                      diagnostic=False, cancel_check=None, fs_tol=None, tol=None,
@@ -1745,6 +1754,10 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                       f"Stage 1 FS = {results['stage1_FS']:.4f}, "
                       f"Stage 2 FS = {results['stage2_FS']:.4f}, "
                       f"Stage 3 FS = {s3_txt}")
+                drained = no_low_k_sentence(
+                    results, analyzed_surface_noun(True, circular))
+                if drained:
+                    print(drained)
             mass = _sliding_mass_line(critical.get("slices"), slope_data)
             if mass:
                 print(mass)
@@ -1808,6 +1821,10 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         print(line)
     if bundle["results"] is not None and announce:
         print(f"FS = {bundle['results'].get('FS'):.3f}")
+        drained = no_low_k_sentence(bundle["results"],
+                                    analyzed_surface_noun(False, circular))
+        if drained:
+            print(drained)
         mass = _sliding_mass_line(slice_df, slope_data)
         if mass:
             print(mass)

@@ -74,10 +74,16 @@ as the pool falls and the drawdown is not rapid for it; below 3 it does not, and
 the material has to be carried through the drawdown at an undrained strength.
 
 The test is applied per material, not per dam, so the zones of an embankment
-can give different results. This dam's sand shell and silty-sand foundation
-drain freely over a 45-day drawdown; its compacted-clay core does not. So the
-core is the one zone that arrives at the end of the drawdown still holding the
-reservoir's head, and it is the zone that governs.
+can give different results. On this dam the sand shell and the silty-sand
+foundation are treated as free-draining over a 45-day drawdown, and they keep
+their drained strength through it. The compacted-clay core does not drain, so it
+is the one zone given an undrained strength. The rubric decides which strength a
+zone takes. It says nothing about how much water the zone still holds when the
+pool reaches its residual level, and here the core and the foundation under the
+upstream slope are both still draining at that point.
+[Part 3](#the-third-answer) shows that the water still in the drained zones,
+mostly in the foundation, separates the transient answer from the steady ones,
+and that the core's water does not.
 
 ### The three-stage procedure
 
@@ -584,9 +590,9 @@ stage-1 effective stresses — and 1.196 against 1.210 is what is left of it.
 
 Two independent steady solutions describe two equilibrium states. What they do
 not describe is the passage between them: Set 2 is the dam *long after* the
-drawdown, when the core has finished giving up the head the full reservoir left
-in it. On a core with a conductivity of 0.001 ft/day that is a long time, and the
-drawdown itself is over by day 50 — five days at full pool, then 45 days of
+drawdown, when the core and the foundation have finished giving up the head the
+full reservoir left in them. On a core with a conductivity of 0.001 ft/day that
+is a long time, and the drawdown itself is over by day 50 — five days at full pool, then 45 days of
 lowering. A
 transient seepage run resolves that directly — it is a history of pore-pressure
 fields as the reservoir is lowered on a schedule, so the two stage fields are two
@@ -696,16 +702,16 @@ the steady run — and then prints a line per saved frame:
   t=200: frame saved (steps so far=122, mass-balance closure=1.65e-04)
   t=300: frame saved (steps so far=133, mass-balance closure=1.56e-04)
   t=400: frame saved (steps so far=145, mass-balance closure=1.50e-04)
-  t=600: frame saved (steps so far=175, mass-balance closure=1.46e-04)
-  t=800: frame saved (steps so far=208, mass-balance closure=1.43e-04)
-  t=1000: frame saved (steps so far=230, mass-balance closure=1.42e-04)
+  t=600: frame saved (steps so far=176, mass-balance closure=1.46e-04)
+  t=800: frame saved (steps so far=210, mass-balance closure=1.43e-04)
+  t=1000: frame saved (steps so far=232, mass-balance closure=1.42e-04)
 ```
 
 **Twelve frames** come out of the run, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
 600, 800 and 1000: the union of the save-interval grid, the extra
 save times, the schedule's own breakpoints, and the two stage times. The run
-took **230 steps**, and their distribution shows where the field changes:
-**59 of them, 26%, are inside the first 50 days**, which are 5% of the run's
+took **232 steps**, and their distribution shows where the field changes:
+**59 of them, 25%, are inside the first 50 days**, which are 5% of the run's
 duration. The field moves while the pool is falling and barely at all afterward.
 
 The two frames the drawdown will read are the first and the fourth. The
@@ -730,16 +736,22 @@ solution above: inflow and outflow both read 1.960 ft³/day per ft, Set 1's
 discharge. At **stage 2**, t = 50, the pool has reached elevation 110 — the
 upstream water level marker has dropped 50 ft — and inflow has fallen to zero
 while 15.447 ft³/day per ft still leaves the section, every bit of it drained
-storage. The upstream shell has followed the pool partway down, with the
-foundation beneath the upstream slope beginning to unload. The core has barely
-moved. It still holds a pocket of head near 150 ft, in the middle of the section,
-exactly where every critical surface on this page crosses it. That pocket is what
-distinguishes this route from the two steady solves, in which the same
-region has come back to within a few feet of the pool.
+storage. The upstream shell has followed the pool partway down, and the
+foundation beneath the upstream slope lags behind it, still holding head above
+the re-equilibrated field of Set 2, most of all next to the core. The core has
+barely moved. It still holds a pocket of head near 150 ft in the middle of the
+section, where every critical surface on this page crosses it. In the two steady
+solves both regions have come back to within a few feet of the pool.
+
+The drawdown run reads only one of these two excesses. Stage 2 gives each core
+slice the undrained strength its envelope assigns from the stage-1 stresses,
+with φ = 0, so the core's pore pressure at day 50 does not enter its strength.
+The foundation has no undrained envelope. It keeps its drained strength, and its
+day-50 pore pressures go straight into the answer.
 
 ### The drawdown run on the transient frames {#the-third-answer}
 
-The drawdown run reads that pocket next. We switch to **LEM** and run
+We switch to **LEM** and run
 **Run → Run LEM…** once more — Spencer, Auto search, 40 slices, Rapid drawdown
 ticked. The form now has the group the schedule adds:
 
@@ -776,8 +788,10 @@ two numbers are the two searches settling on two circles.
 
 The gap between the two answers opens at stage 2, where the peak pore pressure on
 the slice bases reaches **2698 psf** on the slice table's `u` column against the
-two-steady route's 1719 — the core's undissipated head, read straight off the
-frame.
+two-steady route's 1719. Both peaks sit on foundation slices under the upstream
+slope, at x = 268 and x = 242. The core's slices carry up to 2480 psf on this
+route and 447 psf on the other, and stage 2 sets the core's strength without
+reading either value.
 
 **Stage 3 ran here, and it governs.** Three of the 14 core slices the same table
 counts came out stronger undrained than drained at these stresses, so the drained
@@ -835,25 +849,38 @@ is gone, and the pore pressures under the drawn-down pool are lower. The load
 removal is the larger effect, so the net result is a lower factor of safety. That
 is the long-term condition the dam settles into months after the drawdown.
 
-**The core's retained water costs a further 0.27.** Holding the day-50 pore
+**The water still held on day 50 costs a further 0.27.** Holding the day-50 pore
 pressures instead of the re-equilibrated ones, still at drained strength, moves
 1.333 to 1.058. Nothing about the strengths differs between those two runs.
+Under the critical surface that water sits mostly in the core and in the
+foundation beneath the upstream slope, and a drained run reads all of it.
 
 **The undrained strength costs 0.12 on one field and 0.02 on the other.** A
 drawdown hurts a clay core in two ways. The core keeps the pore pressure the full
-reservoir put into it — the *retained* pressure — and, being contractive, it
-generates more pore pressure when it is sheared without draining — the
-*shear-induced* pressure. The undrained envelope stands in for both. On the
-re-equilibrated field the pore pressures include neither, so the envelope supplies
-both and the answer moves 1.333 to 1.210. On the day-50 transient field the
-retained pressure is already in the pore pressures, so the envelope adds only the
-shear-induced part, and the answer moves 1.058 to 1.037. On this core that part is
-small — its undrained strength sits close to its drained strength at these
-stresses, which is the same fact the [sweep](#the-governing-stage-flip)
-below measures; a more contractive core would show a larger step even on the
-transient field. Where the water is read decides how much the strength choice
+reservoir put into it, the *retained* pressure. Being contractive, it also
+generates more pore pressure when it is sheared without draining, the
+*shear-induced* pressure. The undrained envelope stands in for both. Stage 2 gives
+each core slice the strength the envelope assigns from the stage-1 stresses, with
+φ = 0, and both drawdown routes start from the same full-pool field, so on any one
+surface the core carries the same strength on both. On the re-equilibrated field
+the drained core strength includes neither pressure, and the envelope moves the
+answer from 1.333 to 1.210. On the day-50 field the core's
+retained water has already brought its drained strength close to what the
+envelope gives, so the answer moves only from 1.058 to 1.037. Three core slices
+come out weaker drained than undrained at the day-50 pressures, and stage 3 gives
+them their drained strength. That moves the answer by 0.0002, and it is the only
+way the core's day-50 pore pressures reach the drawdown answer. A more
+contractive core, with a lower undrained envelope, would show a larger step on
+either field. Where the water is read decides how much the strength choice
 changes, which is why the three sources cannot be compared without saying which
 field each was read on.
+
+**The foundation's water separates the two drawdown answers.** With the core's
+strength the same on both routes, what differs between them, apart from those
+three slices, is the pore pressure on the slices that keep their drained
+strength. Under the upstream slope nearly all of those are in the foundation,
+which on day 50 is still draining, and the two-steady route assumes it has
+finished.
 
 ---
 
@@ -891,17 +918,23 @@ it. On this dam that reads **1.037**.
 
 **Two steady solutions state a limiting case, and on this model it is the
 optimistic one.** Set 2 describes the dam after the pore pressures have fully
-caught up with the pool, arrived at instantaneously — the classic
-hand-calculation route, and on a section whose whole difficulty is a core that
-does not drain it answers a different question. It reads **1.210**, 17% high.
-It is appropriate on a section with no low-conductivity zone to hold water.
+caught up with the pool, arrived at instantaneously, which is the classic
+hand-calculation route. For the core that costs nothing here, because the
+undrained envelope stands in for the water the core keeps. It also assumes the
+free-draining zones have finished draining, and on this dam the foundation under
+the upstream slope has not by day 50. It reads **1.210**, 17% high. It is
+appropriate where every zone that keeps its drained strength drains as fast as
+the pool falls.
 
 **The piezometric pair inherits whatever state Line 2 was sketched from.** Line 2
-on this file follows the re-equilibrated surface, so the pair reads **1.196**;
-redrawn with the core still holding 150 ft of head — the same six-point line with
-its two points through the core lifted to elevations 150 and 120 rather than 107
-and 103, and searched the same way — it reads **1.055**, 0.02 above the
-transient answer. Its use is where there is no seepage model to solve — an
+on this file follows the re-equilibrated surface, so the pair reads **1.196**.
+Redrawn to show the core still holding its head, with its points at x = 360 and
+x = 410 lifted to elevations 150 and 120 instead of 107 and 103, and searched the
+same way, it reads **1.055**, 0.02 above the transient answer. The lifted segment
+runs from (220, 110) up to (360, 150), so it raises the pore pressure on the
+foundation slices under the upstream slope as well as on the core's, and stage 2
+reads only the foundation's. Its use is where there is no seepage model to
+solve — an
 existing dam with piezometers in it, a preliminary check, a section that cannot be
 meshed — and not in preference to a solution that can be had.
 
@@ -932,8 +965,10 @@ This tutorial covered:
   steady seepage solutions, two frames of a transient run — reading 1.196, 1.210,
   and 1.037, the first two governed by stage 2 and the third by stage 3.
 - What the spread is made of: 0.19 for the load removal alone, a further 0.27 for
-  the head the core has not released by day 50, and 0.12 or 0.02 for the undrained
-  strength depending on which field it is applied to.
+  the water the foundation and the core still hold on day 50, and 0.12 or 0.02 for
+  the undrained strength depending on which field it is applied to. Stage 2 reads
+  no pore pressure on the core, so the transient and two-steady answers differ
+  through the water still in the drained zones, mostly the foundation's.
 - The ranking of the three: run the transient analysis where it can be had, take two steady
   solves as the long-term case, and read a piezometric pair as the state Line 2
   was drawn from.

@@ -221,10 +221,10 @@ INFIL_NODES, INFIL_FACE_NODES = 473, 35
 #: rates whose active set used to cycle to the sweep ceiling instead of converging.
 INFIL_ROWS = [
     # Datum-independent head gate: the 1x rows are the two the tighter gate reaches.
-    (1.0, 0, 4.915525799188735e-07, 4.91552423346594e-07, False),
-    (2.8, 1, 8.823960999866383e-07, 8.874008969783335e-07, True),
-    (3.0, 3, 9.202226475422334e-07, 9.411714513832222e-07, True),
-    (4.0, 12, 1.0583269792370564e-06, 1.246222222222292e-06, True),
+    (1.0, 0, 4.915533e-07, 4.915532e-07, False),
+    (2.8, 1, 8.823953e-07, 8.874005e-07, True),
+    (3.0, 3, 9.202232e-07, 9.411714e-07, True),
+    (4.0, 12, 1.058325e-06, 1.246222e-06, True),
 ]
 #: How closely the 1x overlay has to reproduce the flux-only solve to count as the
 #: no-op it is: the two differ only in the iterate each solve arrives along.

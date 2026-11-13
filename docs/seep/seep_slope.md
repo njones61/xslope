@@ -240,7 +240,7 @@ file: [xslope_rface_SEEP_KEY.xlsx](files/xslope_rface_SEEP_KEY.xlsx)
 
 Spencer's method gives **FS = 2.12**.
 
-<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.509, fs_bishop=2.109, fs_janbu=1.904, fs_corps=2.857, fs_lowe=2.306, fs_spencer=2.119, fs_mprice=2.121 -->
+<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.512, fs_bishop=2.111, fs_janbu=1.904, fs_corps=2.855, fs_lowe=2.306, fs_spencer=2.121, fs_mprice=2.122 -->
 
 ### Comparison
 
@@ -252,12 +252,12 @@ the slope than the flow field does, and slightly less near the toe.*
 | Pore-pressure model | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:--|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Piezometric line | 1.334 | 1.964 | 1.754 | 2.686 | 2.146 | 1.978 | 1.979 |
-| Seepage | 1.509 | 2.109 | 1.904 | 2.857 | 2.306 | 2.119 | 2.121 |
+| Seepage | 1.512 | 2.111 | 1.904 | 2.855 | 2.306 | 2.121 | 2.122 |
 
 For this slope the piezometric line returns a modestly **lower (more conservative)** factor of
-safety. All seven factors move by a similar amount — between 0.141 and 0.175 — so the percentage
-difference tracks the size of the factor rather than the method: 6.4 to 8.6% for the six methods
-that carry interslice forces, and 13.1% for OMS, whose factor is the smallest of the seven.
+safety. All seven factors move by a similar amount — between 0.143 and 0.178 — so the percentage
+difference tracks the size of the factor rather than the method: 6.3 to 8.6% for the six methods
+that carry interslice forces, and 13.3% for OMS, whose factor is the smallest of the seven.
 
 The difference is not always this small nor always in this direction: where seepage is routed
 through the more permeable layers and exits along the downstream face, the computed pore

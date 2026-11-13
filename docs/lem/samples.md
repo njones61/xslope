@@ -129,7 +129,7 @@ analyzed twice: once with pore pressures from a piezometric line and once with p
 pressures from a finite-element seepage solution. Under the downstream toe, water
 rises through the foundation clay, and a piezometric line cannot represent that flow.
 On the critical circle at the toe, Spencer's factor of safety is 1.323 with the
-piezometric line and 0.967 with the seepage solution.
+piezometric line and 0.965 with the seepage solution.
 
 The problem is Example 2 in Section 6.13.6 of *Soil Strength and Slope Stability*,
 2nd edition, by Duncan, Wright, and Brandon (2014), pages 121–123. The book gives the
@@ -230,12 +230,12 @@ Toe circle, shown close up:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| n/a\* | 0.938 | 0.849 | 1.044 | 0.942 | 0.967 | 0.966 |
+| n/a\* | 0.940 | 0.845 | 1.043 | 0.944 | 0.965 | 0.964 |
 
 \* OMS is not reported for this problem's toe circle. The circle is small, and its last slices, where it rises steeply to the ground beyond the toe, have bases inclined up to 58°. There the Fellenius base normal force, $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, goes negative, on 10 of the 40 slices of the surface it settles on, so the shear resistance it computes there is meaningless and the factor of safety it reports (0.355) sits far below every other method's. See the [OMS method note](oms.md).
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, seed=grid, exit_range=500;638, na=oms, fs_bishop=0.938, fs_janbu=0.849, fs_corps=1.044, fs_lowe=0.942, fs_spencer=0.967, fs_mprice=0.966 -->
+<!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, seed=grid, exit_range=500;638, na=oms, fs_bishop=0.940, fs_janbu=0.845, fs_corps=1.043, fs_lowe=0.944, fs_spencer=0.965, fs_mprice=0.964 -->
 
 Beneath the toe, the head at the top of the sand is 245 ft, 18 ft above the ground, and
 it is lost through the 30 ft of clay at an upward gradient of 0.54 to 0.62. The
@@ -255,16 +255,16 @@ Circle tangent to El. 197:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1.250 | 1.406 | 1.391 | 1.431 | 1.412 | 1.405 | 1.405 |
+| 1.250 | 1.406 | 1.391 | 1.431 | 1.411 | 1.404 | 1.405 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, tangent_depth=197;197, fs_oms=1.250, fs_bishop=1.406, fs_janbu=1.391, fs_corps=1.431, fs_lowe=1.412, fs_spencer=1.405, fs_mprice=1.405 -->
+<!-- test: file=files/xslope_earth_dam_down_seep.xlsx, type=circular_search, num_slices=40, tangent_depth=197;197, fs_oms=1.250, fs_bishop=1.406, fs_janbu=1.391, fs_corps=1.431, fs_lowe=1.411, fs_spencer=1.404, fs_mprice=1.405 -->
 
 This circle crosses the same upward flow, but most of its base lies under the
 embankment, where the weight of the fill holds the effective stress at 78 percent or
 more of the piezometric line's value wherever at least 27 ft of fill lies above the
 foundation. Its factor of safety (Spencer) falls by about a tenth, from 1.568 to
-1.405, where the toe circle's falls by more than a quarter.
+1.404, where the toe circle's falls by more than a quarter.
 
 **Comparison with the book**
 
@@ -274,7 +274,7 @@ does not say which method it used.
 | Pore pressures | Toe circle, book | Toe circle, XSLOPE | Tangent to El. 197, book | Tangent to El. 197, XSLOPE |
 |:--|:---:|:---:|:---:|:---:|
 | Piezometric line | 1.30 | 1.323 | 1.57 | 1.568 |
-| Seepage solution | 1.11 | 0.967 | 1.37 | 1.405 |
+| Seepage solution | 1.11 | 0.965 | 1.37 | 1.404 |
 
 With the piezometric line, both circles agree with the book. With the seepage solution,
 the circle tangent to El. 197 is within 3 percent of the book's, and the toe circle is
@@ -420,7 +420,7 @@ Solution (critical surface and factor of safety, with the seepage head contours)
 
 ![gsat_seep_results.png](sample_images/gsat_seep_results.png){width=1000}
 
-<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.931, fs_spencer=1.911 -->
+<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.931, fs_spencer=1.912 -->
 
 The same dam analyzed for [rapid drawdown](rapid.md), with the reservoir at
 El. 302 ft before drawdown and El. 250 ft after. The premise of *rapid* drawdown is

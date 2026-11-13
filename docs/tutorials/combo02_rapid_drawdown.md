@@ -318,7 +318,7 @@ Searching for the critical circular surface with SPENCER (rapid drawdown)…
 [↻ iteration 1] center=(251.00, 235.00), FS=1.2026, grid=22.7578
 [↻ iteration 8] center=(248.16, 239.27), FS=1.1981, grid=1.4224
 [↻ iteration 13] center=(246.38, 242.11), FS=1.1962, grid=0.3556
-[✓ converged] Iter=13, FS=1.1962 (ΔFS<0.0005) at (x=246.38, y=242.11, depth=82.05), elapsed time=106.69 seconds
+[✓ converged] Iter=13, FS=1.1962 (ΔFS<0.0005) at (x=246.38, y=242.11, depth=82.05), elapsed time=33.86 seconds
 [! unsolved trials] Spencer could not solve 5 of 711 trial surfaces
 Critical FS = 1.196
 Rapid drawdown stages on the critical surface: Stage 1 FS = 1.4978, Stage 2 FS = 1.1962, Stage 3 FS = not required

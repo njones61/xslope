@@ -43,7 +43,7 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.692e-06, tolerance=0.05, benchmark=GW6b-q -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.5688;26:2:6.7452;26:4:7.2663;26:6:7.8577, tolerance=0.05, benchmark=GW6b-h -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.880e-08, tolerance=0.05, benchmark=GW6c-q -->
-<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7966;26:2:5.7860;26:4:6.3611;26:6:7.0788, tolerance=0.05, benchmark=GW6c-h -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7968;26:2:5.7863;26:4:6.3613;26:6:7.0788, tolerance=0.05, benchmark=GW6c-h -->
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.737e-07, tolerance=0.05, benchmark=GW6d-q -->
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.8970;26:2:7.9161;26:4:8.0363;26:6:8.1847;26:8:8.4101;26:10:8.6738;26:12:9.1446, tolerance=0.05, benchmark=GW6d-h -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.777e-07, tolerance=0.05, benchmark=GW6e-q -->
@@ -1097,8 +1097,8 @@ compared node for node (`benchmarks/run_seep2d_compare.py --gw`).
 | gw006a | van Genuchten | 0.000 | 0.000 (0.0) | 0.0000 | 0–10 |
 | gw009a | van Genuchten | 8.846 | 8.462 (+0.384) | 0.0026 | 0–18.5 |
 | gw010 | van Genuchten | 4.872 | 4.872 (0.000) | 0.0006 | 2–10 |
-| gw012 | linear front | face dry | face dry | 0.034 | 0–50 |
-| gw013 | linear front | face dry | face dry | 0.070 | 0–50 |
+| gw012 | linear front | face dry | face dry | 0.040 | 0–50 |
+| gw013 | linear front | face dry | face dry | 0.075 | 0–50 |
 
 **The release point agrees.** It is identical on gw004, gw006a and gw010; both codes leave
 the face fully drained on gw012 and gw013; and gw009a differs by one element at that mesh.

@@ -36,7 +36,7 @@ Approximate values of $c_v$ are as follows:
 | Silty Sand   | 10 - 1000      |
 | Silt         | 0.5 - 100      |
 | Compacted Clay | 0.05 - 5       |
-| Soft Clay    | < 0.02         |
+| Soft Clay    | < 0.2          |
 
 _(Taken from Duncan et al, 1992)_
 
@@ -44,7 +44,7 @@ For example, consider the following levee. The maximum drainage distance for por
 
 ![example1.png](rapid_images/example1.png)
 
-Since T = 0.09 < 3.0, we assume rapid drawdown applies.
+Since T = 0.08 < 3.0, we assume rapid drawdown applies.
 
 Here is another example involving a dam with a high permeability shell and a low permeability core. In this case, we need to examine the core and the shell separately. The core consists of compacted clay with a maximum drainage distance of 14 ft and a coefficient of consolidation of 2 ft²/day. The shell consists of fine sand with a maximum drainage distance of 31 ft and a coefficient of consolidation of 200 ft²/day. If the pool is lowered over 50 days, we can calculate T for each soil as follows:
 

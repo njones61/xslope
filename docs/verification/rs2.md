@@ -1199,8 +1199,8 @@ moves the deep value from 1.521 at the 12.4 ft mesh (2,223 tri6) to 1.487 at 8 f
 **The finite-element seepage case** runs [vp077a.xlsx](files/rocscience/vp077a.xlsx), the file the
 limit-equilibrium side is scored on ([VP77](rocscience.md#vp77)): it solves the model's own
 boundary set on the 12.4 ft tri6 mesh and reduces the strengths on that mesh and field. It reads
-**1.590**, +4.6% on RS2's 1.52; excluding everything shallower than 30 ft returns the same
-**1.590**, so there is no shallow skin to exclude on this case.
+**1.590**, +4.6% on RS2's 1.52; excluding everything shallower than 30 ft raises it by one
+bisection step, to **1.607**, so the shallow skin carries little weight on this case.
 
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=12.4, expected_elements=2223, benchmark=RS2-40-mesh -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=8.0, expected_elements=5220, benchmark=RS2-40-mesh-fine -->
@@ -1212,7 +1212,7 @@ boundary set on the 12.4 ft tri6 mesh and reduces the strengths on that mesh and
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.583, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep, f_stand=1.5125, f_fail=1.5296875, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, seep=steady, benchmark=RS2-40-seep, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
-<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.607, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30, f_stand=1.5984375, f_fail=1.615625, check=edges, expected_elements=2223, expected_nodes=4656 -->
 
 **Filter off — the saturated downstream face skin (vp077b)**
 

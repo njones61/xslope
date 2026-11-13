@@ -729,7 +729,7 @@ def main():
             print(f"  {f}")
         raise SystemExit(1)
     print("\nPASS: the four cycling models converge to their own answers, the class B "
-          "escape still reaches that answer where its gate can be reached, every model "
+          "escape stays silent on earth_dam2 with its gate lowered, every model "
           "that converged without the escapes takes about the same number of sweeps, the "
           "dam under rain sheds what it cannot take, and the one steady state that "
           "still loops on a single element closes on it.")

@@ -1613,8 +1613,9 @@ def _attach_crest_tension_note(results, slice_df, slope_data):
 def analyzed_surface_noun(searched, circular):
     """What a result calls the surface it was solved on: "critical circle" or
     "critical surface" for a search's answer, "circle" or "surface" for a
-    single-surface run. The Log, the report and Studio's LEM Solution tab name
-    the surface with it, so a sentence about it reads the same in all three."""
+    single-surface run. The Log and Studio's LEM Solution tab name the surface
+    with it, so a sentence about it reads the same in both; the Analysis Report
+    says "specified circle" for a single surface."""
     return (("critical " if searched else "")
             + ("circle" if circular else "surface"))
 

@@ -151,7 +151,7 @@ Warnings](../lem/spencer.md#interpreting-the-admissibility-warnings). A clean
 solution shows no strip.
 
 A rapid drawdown whose surface crosses no material with d and ψ gets a blue
-note above the plot saying so: every stage of it used drained strengths (c′, φ′),
+note above the plot saying so: stages 1 and 2 used drained strengths (c′, φ′),
 and stage 3 was not required. The status bar repeats the first part of the note
 when the run finishes. See
 [Surfaces that cross no material with d and ψ](../lem/rapid.md#drained-surfaces).

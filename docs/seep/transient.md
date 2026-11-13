@@ -444,18 +444,18 @@ rule, and a step that converges the ordinary way never reaches this path.
 
 Marching in time needs a head field at $t = 0$. By default XSLOPE computes it as a **steady
 solve at the $t = 0$ boundary configuration**: the series are evaluated at $t = 0$ and the
-ordinary steady solver is run — one linear solve for a confined problem, the steady exit-face
-Picard solver for an unconfined one. The transient run therefore begins from a genuine steady state
+ordinary steady solver is run — one linear solve for a confined problem, the steady unconfined
+iteration for an unconfined one. The transient run therefore begins from a genuine steady state
 rather than a guess. An explicit initial head field may be supplied instead when one is known.
 
-The unconfined branch is an iteration and carries a sweep budget, `max_iter`, which defaults to
+The unconfined branch is an iteration and carries an iteration limit, `max_iter`, which defaults to
 2000 — the one convergence parameter of the initial condition a caller sets, and the same key the
 steady runners take for the same solve. It is spent once, before the transient run starts, and has nothing to do
 with the time steps. Raising it is the remedy for a model whose steady state is slow to reach; a
 tall unsaturated column draining at unit gradient is the usual such model, and it converges
 monotonically, just slowly. That solve uses the ordinary
-[unconfined iteration](overview.md#confined-and-unconfined-problems), relaxation ladder and all,
-at the tighter head tolerance the initial condition uses — 1e-6 of the model's head scale, against
+[unconfined iteration](overview.md#confined-and-unconfined-problems), relaxation ladder,
+Newton steps and all, at the tighter head tolerance the initial condition uses — 1e-6 of the model's head scale, against
 the 1e-4 a steady run takes. The outcome of that solve is part of the run's result: an initial
 condition that does not close within the budget leaves `converged` False on the returned dictionary,
 the same flag a force-accepted time step clears, so a transient run begun from a field that is not a

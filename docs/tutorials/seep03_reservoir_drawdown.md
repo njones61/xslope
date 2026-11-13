@@ -355,13 +355,20 @@ Iteration 3: residual = 4.334327e+00, closure = 1.460e+01, relax = 1.000, 3/30 e
 Iteration 4: residual = 4.159624e+00, closure = 9.860e+00, relax = 1.000, 1/30 exit face active
 Iteration 5: residual = 3.232851e+00, closure = 5.411e+00, relax = 1.000, 0/30 exit face active
 ...
-Iteration 35: residual = 2.065269e-03, closure = 1.230e-02, relax = 0.200, 0/30 exit face active
-Converged in 39 iterations (residual = 7.848e-04, closure = 8.672e-04, exit face stable)
+Iteration 15: exit face unchanged for 10 iterations — Newton steps from here
+Iteration 16: Newton step, residual = 6.761394e-01, step shortened to 0.5
+...
+Iteration 22: Newton step, residual = 5.121811e-11
+Iteration 22: Newton steps settled; the next iteration tests the exit face
+Converged in 23 iterations (residual = 4.441e-14, closure = 1.011e-11, exit face stable)
 ```
 
 The last column is the number of active exit-face nodes, and on this dam it
 ends at **zero**. The iteration starts by holding 12 of the 30 nodes wet,
-sheds them over four sweeps, and from sweep 5 to the end holds **0 of 30**. The
+sheds them over four iterations, and from iteration 5 to the end holds **0 of 30**.
+Once that set has been unchanged for ten iterations the solver finishes with
+[Newton steps](../seep/overview.md#newton-steps), seven of them here, each counted
+as an iteration, and one ordinary iteration then confirms the result. The
 downstream slope never develops a seepage face on this model: the core drops the
 head far enough that the phreatic surface stays inside the dam, below the dry
 face, and comes out at the tailwater. The exit face was still the right boundary
@@ -541,8 +548,8 @@ and then prints a line per saved frame:
 
 ```text
 Building seepage data (transient, BC set 1)…
-Running transient seepage analysis… (initial condition: up to 2000 sweeps)
-  t=2: frame saved (steps so far=6, mass-balance closure=1.37e-07)
+Running transient seepage analysis… (initial condition: up to 2000 iterations)
+  t=2: frame saved (steps so far=6, mass-balance closure=1.38e-07)
   t=15: frame saved (steps so far=53, mass-balance closure=7.12e-05)
   t=30: frame saved (steps so far=136, mass-balance closure=6.37e-05)
   t=47: frame saved (steps so far=261, mass-balance closure=4.87e-05)
@@ -742,7 +749,7 @@ nothing left to drain.
 The solver also keeps a running ledger of the whole run, which is the transient
 counterpart of the steady solver's flow-closure check. Over the 360 days,
 **106.946 m³ per m of dam crossed the boundary outward**, and the soil released
-**106.951 m³ per m** from storage. Those two are the same volume counted two
+**106.950 m³ per m** from storage. Those two are the same volume counted two
 ways, so their difference is a measure of how well the run conserved water: over
 the whole run it comes to **0.004% of the volume transferred**. That difference is
 the `mass-balance closure` printed on each frame line of the log — a running

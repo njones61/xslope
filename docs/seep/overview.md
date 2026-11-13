@@ -265,7 +265,7 @@ Which nodes are in which state is found by an **active set** iteration following
 boundary node is held saturated at atmospheric pressure unless its head would fall below its
 own elevation, or the boundary reaction would have to push water *into* the domain — either of
 which releases it to no-flow. An inactive node is taken back into the face when its pressure
-climbs back to zero and the sweep is no longer pushing water in. The iteration repeats until
+climbs back to zero and the iteration is no longer pushing water in. The iteration repeats until
 the set stops changing, which is also one of the convergence conditions below.
 
 On quadratic meshes (`tri6`, `quad8`, `quad9`) the active set is tracked **per boundary
@@ -381,9 +381,11 @@ any exit-face nodes is **unconfined** and is solved iteratively; one without the
 iteration and no relative conductivity. The domain is saturated by construction, so negative
 pore pressures in a confined solution are not a water table and no phreatic surface is drawn.
 
-**Unconfined** — the conductivity depends on the head through $k_r$, so each iteration
-recomputes the pressure head, averages $k_r$ over the area of each element, scales that
-element's saturated stiffness by the average, solves, and updates the exit-face active set.
+**Unconfined** — the conductivity depends on the head through $k_r$, so the solve is an
+iteration. An ordinary iteration recomputes the pressure head, averages $k_r$ over the area
+of each element, scales that element's saturated stiffness by the average, solves, and
+updates the exit-face active set. Once the active set has stopped changing, the solver
+switches to [Newton steps](#newton-steps), which converge much faster.
 For the average, the element is divided into triangles through its nodes and the pressure
 head is taken to vary linearly across each one:
 
@@ -402,11 +404,12 @@ Genuchten and Gardner curves have no closed form and are integrated numerically,
 points per triangle. (Averaging $k_r$ over the element, instead of switching it node by node,
 spreads the phreatic transition over one element.) Each element therefore carries one $k_r$,
 and the velocity, the stream function, and the transient solve all use that same value.
-The iteration is under-relaxed when it needs to be, and the amount is set by
-the **head change** rather than by the sweep number. The relaxation factor starts at 1
+
+The ordinary iteration is under-relaxed when it needs to be, and the amount is set by
+the **head change** rather than by the iteration number. The relaxation factor starts at 1
 and walks a fixed ladder — 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 — on this rule:
 
-- **Step down** one rung after five consecutive sweeps on which the largest head change
+- **Step down** one rung after five consecutive iterations on which the largest head change
   set no new low for the rung. A solve that is stalling or oscillating sets no new lows;
   one that is merely noisy on its way down keeps setting them, which is why the test is a
   new low and not simply a fall.
@@ -416,10 +419,60 @@ and walks a fixed ladder — 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 — on this rule
   right for it later, and the doubling keeps the factor from alternating between two rungs
   while still letting it climb back to the coarsest one that works.
 
-An under-relaxed sweep is a small step, so a factor finer than the problem needs costs
-sweeps rather than accuracy. Basing the steps on the head change avoids that cost: the tall unsaturated column of the heap model closes in 337 sweeps where a
-fixed schedule that reached 0.01 by sweep 121 and stayed there took 739, and lands on the
-same field.
+An under-relaxed iteration is a small step, so a factor finer than the problem needs costs
+iterations rather than accuracy, and basing the steps on the head change avoids that cost.
+
+#### Newton steps
+
+An ordinary iteration holds every element's $k_r$ at the value the last head field gave it
+while it solves for the next one, so the conductivity is always one step behind the heads.
+On a steep $k_r$ curve that lag limits the iteration. It converges only when heavily
+under-relaxed, and at a relaxation factor of 0.01 each iteration removes about 1% of the
+remaining error.
+
+Newton's method solves for the heads and the conductivities together. Its matrix is the
+ordinary one plus, for every element, the rate at which the element's average $k_r$ changes
+with each of its nodal heads, multiplied by the flow through the element. For the linear
+front that rate is evaluated in closed form, and for van Genuchten and Gardner it is the
+derivative of the same 112-point rule. Close to the answer each step roughly squares the
+error, so a handful of steps does what hundreds of relaxed iterations would.
+
+Ordinary iterations find the exit-face active set, and Newton steps solve the equations on
+it:
+
+1. Ordinary iterations run until the exit-face active set has been unchanged for ten
+   iterations.
+2. Newton steps then solve the equations for that active set. Each step is shortened, by
+   halves, until it lowers the flow imbalance at the nodes.
+3. When the steps settle, one ordinary iteration tests the active set against the result,
+   so an active node that would have to draw water in is released, and an inactive node
+   under pressure joins the face. It also applies the three convergence conditions below.
+4. If the set changed, Newton steps run again once the new set has held for three
+   iterations, and the cycle repeats until the set stops changing.
+
+Newton's method needs a starting point reasonably close to the answer. Far from it, no
+shortened step lowers the imbalance, and the steps stop. The ordinary iterations then
+continue from the heads the last successful step reached, and Newton steps are tried again
+ten iterations later. On the bottom rung of the relaxation ladder, where an ordinary
+iteration moves the heads least, the wait in step 1 is three iterations as well.
+
+Every Newton step counts as one iteration toward `max_iter` and is labeled `Newton step`
+in the log:
+
+```text
+Iteration 19: exit face unchanged for 10 iterations — Newton steps from here
+Iteration 20: Newton step, residual = 2.249550e-02
+Iteration 21: Newton step, residual = 3.009914e-04
+Iteration 22: Newton step, residual = 3.424886e-08
+Iteration 23: Newton step, residual = 2.332616e-11
+Iteration 23: Newton steps settled; the next iteration tests the exit face
+Converged in 24 iterations (residual = 4.451e-11, closure = 9.698e-10, exit face stable)
+```
+
+The `residual` on each line is the largest head change of that iteration, in the model's
+length units.
+
+#### Convergence
 
 Convergence is a **hybrid** test — all three conditions must hold at once:
 
@@ -443,16 +496,14 @@ Convergence is a **hybrid** test — all three conditions must hold at once:
    boundary.
 
 A run that reaches `max_iter` (default 400) without satisfying all three gets one more
-attempt. The usual cause is a single element at the edge of the wet zone. When it is dry it
-backs water up behind it and wets itself, and when it is wet the water drains away and it
-dries again, so every sweep overshoots its $k_r$ by more than any rung of the ladder can
-damp. The solver picks out that element, the one whose $k_r$ has been swinging most (or,
-when nothing is swinging, the elements a few unrelaxed sweeps would change most, tried one
-at a time). It then solves for that element's $k_r$ directly at every sweep, against the
-current $k_r$ of every other element, until the field stops changing. The settled field
-then has to pass the three tests above on one ordinary, unrelaxed sweep. If it does, the
-run has converged. If no element settles, or the settled field fails the tests, the run
-returns `converged = False`, reports it, and keeps the field the sweep budget left.
+attempt. The solver picks out a single element at the edge of the wet zone, the one whose
+$k_r$ has been swinging most (or, when nothing is swinging, the elements a few unrelaxed
+iterations would change most, tried one at a time). It then solves for that element's
+$k_r$ directly at every iteration, against the current $k_r$ of every other element, until
+the field stops changing. The settled field then has to pass the three tests above on one
+ordinary, unrelaxed iteration. If it does, the run has converged. If no element settles, or
+the settled field fails the tests, the run returns `converged = False`, reports it, and
+keeps the field the iteration limit left.
 
 ### Input checks
 

@@ -138,14 +138,16 @@ seepage dialog. Click **Run → Run Seep…**
 The **Model checks** panel shows the preflight report for this run, and on this
 model it reports **No problems found for this run.** Leave **Convergence tol** at
 `0.0001` and **Max iterations** at `400`, and click **Run**. The unconfined
-iteration settles in **22 sweeps**, and the run is over almost as soon as it
-starts. The Log pane's closing lines show the last sweep and the convergence it
-reached:
+iteration settles in **24 iterations**, the last of them
+[Newton steps](../seep/overview.md#newton-steps), and the run is over almost as
+soon as it starts. The Log pane's closing lines show the last Newton step and the
+convergence it reached:
 
 ```text
-Iteration 20: residual = 6.383504e-02, closure = 2.889e-05, relax = 0.500, 1/52 exit face active
-Converged in 22 iterations (residual = 1.599e-02, closure = 9.181e-06, exit face stable)
-Flow closure check: inflow = 6.506577e-01, outflow = 6.506577e-01, error = 2.581083e-09
+Iteration 23: Newton step, residual = 1.306733e-12
+Iteration 23: Newton steps settled; the next iteration tests the exit face
+Converged in 24 iterations (residual = 2.302e-12, closure = 5.964e-11, exit face stable)
+Flow closure check: inflow = 6.506577e-01, outflow = 6.506577e-01, error = 6.782352e-13
 ```
 
 ![The seepage solution](images/combo01_seepage.png){width=1000}

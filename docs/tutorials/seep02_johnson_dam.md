@@ -458,7 +458,7 @@ to the same 0.018 ft whether its base is drawn at elevation 0 or at 1000.
 Because the tolerance is a fraction of the model's own scale rather than a length,
 one default works on a 10 m sheetpile section and on a 180 ft dam.
 
-The run finishes in **17 iterations**. In the **Display** panel, tick
+The run finishes in **20 iterations**. In the **Display** panel, tick
 **Filled contours** — useful on a zoned section, where the wash shows the
 core carrying the drop. **Base material** already reads `3: foundation`: the
 selector opens on the zone whose conductivity makes the flow lines legible; in
@@ -556,7 +556,10 @@ Each sweep recomputes the pressure head from the current head field, averages
 stiffness by the average, solves the resulting linear system, and updates the
 exit-face active set. Averaging *k<sub>r</sub>* over the element rather than
 switching it node by node spreads the wet-to-dry transition over one element
-instead of snapping it across a node.
+instead of snapping it across a node. Once the active set has held for ten
+iterations, the solver finishes with Newton steps, which solve for the heads and
+the conductivities together and count as iterations like the others
+([Newton steps](../seep/overview.md#newton-steps)).
 
 The phreatic surface is resolved to
 about one element — 6.25 ft here — so a phreatic elevation quoted to better than
@@ -759,9 +762,9 @@ surface changes.
 
 | Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 |
 | --- | :---: | :---: | :---: |
-| `lf` | 1.9553 | 17 | 8.9% |
-| `vg` | 1.8642 | 32 | 7.6% |
-| `gard` | 1.8651 | 25 | 7.7% |
+| `lf` | 1.9553 | 20 | 8.9% |
+| `vg` | 1.8642 | 26 | 7.6% |
+| `gard` | 1.8651 | 27 | 7.7% |
 
 The two calibrated models agree with each other to **0.05%** in discharge, and
 both sit **4.6 to 4.7% below** the linear front. That gap is all that the
@@ -772,9 +775,9 @@ On the phreatic surface it changes less still:
 ![The phreatic surface under each model](images/seep02_phreatic_models.png){width=1000}
 
 At section scale the three surfaces are one line. Read station by station, the
-linear front and van Genuchten differ by at most **1.03 ft**, the linear front and
-Gardner by at most **0.93 ft**, and van Genuchten and Gardner by at most
-**0.10 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
+linear front and van Genuchten differ by at most **1.04 ft**, the linear front and
+Gardner by at most **0.92 ft**, and van Genuchten and Gardner by at most
+**0.11 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
 6.25 ft.
 
 These are differences between three runs on one mesh, so the discretization error
@@ -807,10 +810,9 @@ effect, and its floor value controls most of the result.
 
 ## What the unsaturated parameters cost in convergence
 
-Pushing the floor down cost iterations as well as discharge: the runs at
-*kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 42 and 53 sweeps
-against the shipped model's 17, and are the only two in the sweep on which the
-solver cut its step below half of each new solve, to a tenth and a twentieth.
+Pushing the floor down cost a few iterations as well as discharge: the runs at
+*kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 28 and 27 iterations
+against the shipped model's 20.
 
 ### The three conditions
 
@@ -830,20 +832,22 @@ discharge computed while nodes are still switching between seeping and no-flow
 belongs to no one set of boundary conditions.
 
 The head tolerance is the only one of the three the dialog exposes, and it turns
-out to control the iteration count rather than the answer:
+out to change the answer hardly at all:
 
 | Convergence tol | Scaled to (ft) | q | Iterations |
 | :---: | :---: | :---: | :---: |
 | 0.001 | 0.18 | 1.955288 | 14 |
-| 0.0001 | 0.018 | 1.955288 | 17 |
-| 0.00001 | 0.0018 | 1.955287 | 19 |
-| 0.000001 | 0.00018 | 1.955287 | 27 |
+| 0.0001 | 0.018 | 1.955287 | 20 |
+| 0.00001 | 0.0018 | 1.955287 | 20 |
+| 0.000001 | 0.00018 | 1.955287 | 20 |
 
-A thousandfold tightening moves the discharge in the seventh figure and costs thirteen
-extra sweeps. The reason is the flow-closure condition: whichever head tolerance is
-asked for, the run does not stop until the conductivity field has stopped lagging
-the head field to within 0.1% of the inflow, and by then the head has stopped
-moving anyway. Leave the dialog's tolerance at its default. Whether a run
+A thousandfold tightening moves the discharge in the seventh figure and costs six
+extra iterations, all of them between the loosest setting and the default. The
+flow-closure condition holds every run until the conductivity field has stopped
+lagging the head field to within 0.1% of the inflow, whichever head tolerance is
+asked for, and the Newton steps that finish the run carry the heads far inside any
+of these tolerances within a few steps, so the three tighter runs take the same 20
+iterations. Leave the dialog's tolerance at its default. Whether a run
 finishes depends on the steepness of the conductivity curve; the next section
 shows a curve steep enough that the run does not converge within the default
 iteration limit.
@@ -894,9 +898,9 @@ polyline itself, stays exactly as it was:
 
 | Core k (ft/day) | q (ft³/day per ft) | Exit-face nodes wet | Highest wet node | Iterations |
 | :---: | :---: | :---: | :---: | :---: |
-| 0.001 | 1.9553 | 1 of 31 | (544.5, 102.6) | 17 |
-| 0.01 | 2.2274 | 1 of 31 | (544.5, 102.6) | 19 |
-| 0.1 | 4.3498 | 2 of 31 | (539.0, 105.2) | 22 |
+| 0.001 | 1.9553 | 1 of 31 | (544.5, 102.6) | 20 |
+| 0.01 | 2.2274 | 1 of 31 | (544.5, 102.6) | 20 |
+| 0.1 | 4.3497 | 2 of 31 | (539.0, 105.2) | 22 |
 | 1 | 10.3009 | 8 of 31 | (506.1, 120.6) | 7 |
 
 ![The phreatic surface and its exit point as the core's conductivity rises](images/seep02_core_sweep.png){width=1000}

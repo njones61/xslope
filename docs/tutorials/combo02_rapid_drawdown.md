@@ -494,7 +494,7 @@ The **Seep · Solution** tab:
 
 ![Set 1's steady solution, full pool](images/combo02_seep_set1.png){width=1000}
 
-**Set 1** settles in **45 unconfined sweeps** to a total discharge of
+**Set 1** settles in **22 iterations** to a total discharge of
 **1.9598 ft³/day per ft** of dam, printed on the figure as 1.960. The head runs
 from 100.000 to 160.000 ft, the two boundary values and nothing outside them.
 The heavy black line traces the phreatic surface: nearly
@@ -514,7 +514,7 @@ The **Seep · Solution 2** tab:
 
 ![Set 2's steady solution, drawn-down pool](images/combo02_seep_set2.png){width=1000}
 
-**Set 2** settles in **8 sweeps** to **0.2697 ft³/day per ft**, a seventh of
+**Set 2** settles in **8 iterations** to **0.2697 ft³/day per ft**, a seventh of
 Set 1's discharge on a sixth of the head difference. The head runs from 100.000 to
 110.000 ft, and the phreatic surface leaves the residual pool at elevation 110,
 gives up about a foot crossing the upstream shell, drops 6 ft through the core,

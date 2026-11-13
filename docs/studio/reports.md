@@ -127,8 +127,15 @@ Then **one block per method**, under that method's own heading:
   falls on, the tension available there, the force applied, and what limits it,
   with the lines the surface misses named above the table
   ([Forces at the Crossings](../reinforcement/lem.md#forces-at-the-crossings)).
-- **Rapid drawdown** — the three stage factors of safety and which one governs,
-  for a [rapid drawdown](../lem/rapid.md) run.
+- **Rapid drawdown**, for a [rapid drawdown](../lem/rapid.md) run — a table
+  with one row per stage: the water the stage reads (Piezometric Line 1 or 2,
+  the seepage solution for boundary set 1 or 2, or the transient solution at the
+  stage time), the strengths it uses, and its factor of safety. The stage 3 row
+  counts the low-permeability slices that took the drained strength, and reads
+  *not required* when none did. Beneath the table are the governing factor of
+  safety and the stage it comes from, and, where the
+  [negative-stress rule](../lem/rapid.md#negative-stresses) set the undrained
+  strength on any slice, how many slices it applied to.
 - **The slice table** — geometry, forces and strengths on a landscape page, with
   column totals at the foot and a legend beneath defining every column. Columns
   that carry nothing for the model are left out — except a few that print

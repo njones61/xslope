@@ -648,8 +648,8 @@ t (day)  stage 1  stage 2       stage 3      FS  governs      Xo      Yo       R
     170   1.5612   1.1754  not required  1.1754        2  245.31  244.96  163.06
     220   1.5612   1.1890  not required  1.1890        2  245.31  244.96  163.06
     300   1.5612   1.1991  not required  1.1991        2  245.31  244.96  163.06
-    400   1.5612   1.2043  not required  1.2043        2  245.31  244.96  163.06
-    500   1.5612   1.2066  not required  1.2066        2  245.31  244.96  163.06
+    400   1.5612   1.2044  not required  1.2044        2  245.31  244.96  163.06
+    500   1.5612   1.2067  not required  1.2067        2  245.31  244.96  163.06
 Lowest factor of safety 1.0366 at t = 50 day (20 instant(s), 0 without a result).
 ```
 
@@ -693,8 +693,8 @@ stage factors of safety, the one that governs, and the critical circle at each:
 | 170 | 1.5612 | 1.1754 | — | 1.1754 | 2 | (245.31, 244.96) | 163.06 |
 | 220 | 1.5612 | 1.1890 | — | 1.1890 | 2 | (245.31, 244.96) | 163.06 |
 | 300 | 1.5612 | 1.1991 | — | 1.1991 | 2 | (245.31, 244.96) | 163.06 |
-| 400 | 1.5612 | 1.2043 | — | 1.2043 | 2 | (245.31, 244.96) | 163.06 |
-| 500 | 1.5612 | 1.2066 | — | 1.2066 | 2 | (245.31, 244.96) | 163.06 |
+| 400 | 1.5612 | 1.2044 | — | 1.2044 | 2 | (245.31, 244.96) | 163.06 |
+| 500 | 1.5612 | 1.2067 | — | 1.2067 | 2 | (245.31, 244.96) | 163.06 |
 
 **Day 50 reads 1.0366, the answer we got in COMBO-2.**
 The transient route there reports **1.0366** on a circle at (243.93, 244.90) with a
@@ -730,7 +730,7 @@ minimum and the curve turns at a frame rather than between two.
 
 **The recovery climbs toward COMBO-2's two-steady answer.** From 1.0366 the curve
 rises to 1.1062 by day 80 and 1.1550 by day 130, then slows to 1.1754, 1.1890,
-1.1991, 1.2043, and 1.2066 through day 500, the last two frames together moving it
+1.1991, 1.2044, and 1.2067 through day 500, the last two frames together moving it
 by 0.0023. COMBO-2's **two-steady-solution**
 answer is **1.210**, and the curve is still 0.004 under it at day 500, because by
 then the core has not quite finished draining.
@@ -775,8 +775,8 @@ t (day)      FS      Xo      Yo       R
     170  1.2404  245.31  247.80  165.64
     220  1.2634  245.31  247.80  165.64
     300  1.2836  245.31  244.96  163.06
-    400  1.2970  245.31  244.96  163.06
-    500  1.3050  245.31  244.96  163.06
+    400  1.2971  245.31  244.96  163.06
+    500  1.3051  245.31  244.96  163.06
 ```
 
 Every instant produces a result here, including t = 0, an ordinary full-pool
@@ -787,10 +787,10 @@ Two of these rows repeat the drained bracket runs from COMBO-2: **day 0's
 1.5221** is the full-pool drained figure of **1.522** there, and **day 50's
 1.0578** the day-50 figure of **1.058**.
 The third of those, the long-term
-**1.333**, is not on this curve — day 500 reads 1.3050 and is still climbing,
+**1.333**, is not on this curve — day 500 reads 1.3051 and is still climbing,
 because a run of this length leaves the core part drained.
 
-<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5221;1.0578;1.3050, tolerance=0.005, benchmark=COMBO-3-single -->
+<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5221;1.0578;1.3051, tolerance=0.005, benchmark=COMBO-3-single -->
 
 Studio's result tab holds one curve at a time, so the figure below adds the
 single-stage curve (blue) to the rapid drawdown figure above, on the same axes:
@@ -820,8 +820,8 @@ and the distance between them is not constant:
 | 170 | 1.1754 | 1.2404 | 0.0650 |
 | 220 | 1.1890 | 1.2634 | 0.0744 |
 | 300 | 1.1991 | 1.2836 | 0.0845 |
-| 400 | 1.2043 | 1.2970 | 0.0926 |
-| 500 | 1.2066 | 1.3050 | 0.0984 |
+| 400 | 1.2044 | 1.2971 | 0.0927 |
+| 500 | 1.2067 | 1.3051 | 0.0984 |
 
 **The gap is narrowest where the slope is weakest.** Across the bottom of the dip
 — days 40 to 50 — the two analyses run 0.021 to 0.023 apart, about 2% of the
@@ -853,8 +853,8 @@ more contractive core or a faster drawdown would open that gap well beyond
 0.02.
 
 **Long after the fall, read the single-stage curve.** By day 500 the core has
-largely drained and 1.3050 is what the slope actually has. The rapid drawdown
-curve's 1.2066 at that instant still answers "what if the pool fell from full to
+largely drained and 1.3051 is what the slope actually has. The rapid drawdown
+curve's 1.2067 at that instant still answers "what if the pool fell from full to
 here", the long-term drawdown state COMBO-2's two steady solutions compute, which
 applies only if the reservoir is filled and drawn down again.
 

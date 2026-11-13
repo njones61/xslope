@@ -716,7 +716,7 @@ before, because the file has a `tseep` sheet. Set it to **Transient
 defaults, and click **Run**.
 
 The run reports **28 saved frames** — t = 0, the 24 times on the 25-day grid, and
-the three series breakpoints that do not fall on it — reached in **113 steps**. The
+the three series breakpoints that do not fall on it — reached in **119 steps**. The
 step size is chosen from how fast the field is moving, so the low count shows
 that the dam changes slowly for most of the 600 days.
 
@@ -775,7 +775,7 @@ alone takes 370 to bring it back down.
   zero.)
 
 <!-- Transient regression: total head at three interior stations at the end of the storm's hold (day 200 = 1.728e7 sec), re-solved through the run_tests tseep_head path (tri3, target_size=1.0). Built by tools/build_seep04_transient.py, which asserts the same three values. -->
-<!-- test: file=files/xslope_dam_infiltration_storm.xlsx, type=tseep_head, target_size=1.0, time=17280000, points=26:8:8.4242;26:4:8.0568;34:2:5.3144, tolerance=0.05 -->
+<!-- test: file=files/xslope_dam_infiltration_storm.xlsx, type=tseep_head, target_size=1.0, time=17280000, points=26:8:8.4252;26:4:8.0578;34:2:5.3155, tolerance=0.05 -->
 
 ---
 

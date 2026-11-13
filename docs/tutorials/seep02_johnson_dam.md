@@ -458,7 +458,7 @@ to the same 0.018 ft whether its base is drawn at elevation 0 or at 1000.
 Because the tolerance is a fraction of the model's own scale rather than a length,
 one default works on a 10 m sheetpile section and on a 180 ft dam.
 
-The run finishes in **47 iterations**. In the **Display** panel, tick
+The run finishes in **17 iterations**. In the **Display** panel, tick
 **Filled contours** — useful on a zoned section, where the wash shows the
 core carrying the drop. **Base material** already reads `3: foundation`: the
 selector opens on the zone whose conductivity makes the flow lines legible; in
@@ -467,23 +467,23 @@ through what that control does and why the other two choices fail here:
 
 ![The seepage solution](images/seep02_solution.png){width=1000}
 
-**The total discharge is 1.9546 ft³/day per ft** — per foot of dam measured along
+**The total discharge is 1.9553 ft³/day per ft** — per foot of dam measured along
 its axis, the convention every quantity a two-dimensional analysis reports carries.
 The [SEEP2D cross-check](../verification/seep.md#verification-seep2d-johnson) on the verification page solves this same
 mesh with the USACE SEEP2D program, on the identical topology, and SEEP2D
 returns 1.9544.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, element_type=tri3, size_divisions=120, expected_flowrate=1.9546, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, element_type=tri3, size_divisions=120, expected_flowrate=1.9553, tolerance=0.005 -->
 
 The head ranges from **100.000 ft to 160.000 ft**, which is the two boundary values
 and nothing outside them, because a region with no sources or sinks inside it can
 have no interior maximum or minimum of head.
 
-The pore pressure runs from **−2,577.9 psf to 9,971.1 psf**. The negative end
+The pore pressure runs from **−2,569.5 psf to 9,971.1 psf**. The negative end
 differs from SEEP-1: a confined solution cannot produce a pore pressure
 below zero anywhere, and here the whole upper part of the downstream half of the
 dam stands above the phreatic surface and is in suction. The largest suction is
-**41.31 ft** — a pressure head of −41.31 ft — at (401.9, 169.7), on the downstream
+**41.18 ft** — a pressure head of −41.18 ft — at (401.9, 169.7), on the downstream
 slope about 10 ft below the crest, where the slope stands well above the phreatic
 surface and the flow through the unsaturated soil is slowest.
 
@@ -501,16 +501,16 @@ the zones.
 
 **The core carries the head drop.** At elevation 110 the core runs from x = 326 to
 x = 414, so reading the solved head at x = 315 and x = 425 straddles it with about
-10 ft of shell either side. Those two readings are **159.32 ft** and **113.18 ft**:
+10 ft of shell either side. Those two readings are **159.32 ft** and **113.19 ft**:
 the core absorbs **46.13 ft of the 60 ft** total drop — 77% of it, across 88 ft of
 a 750 ft section. The shell either side of it stands at nearly the full reservoir
 head or nearly the full tailwater head, and the steep hydraulic gradient that would
 otherwise run through the embankment is confined to a zone built to take it.
 
 **The key does not stop the underseepage.** Integrating Darcy's horizontal velocity
-up the dam centerline at x = 370 gives **1.9619 ft³/day per ft** crossing that
+up the dam centerline at x = 370 gives **1.9624 ft³/day per ft** crossing that
 section, which is the total discharge to within the discretization. Of it,
-**1.7672 — 90.1% — passes below elevation 60**, the bottom of the cutoff key,
+**1.7670 — 90.0% — passes below elevation 60**, the bottom of the cutoff key,
 through foundation the key does not reach. Only a tenth of the water that reaches
 the tailwater goes through the core itself. The key reaches 40 ft into a 100 ft
 foundation, leaving 60 ft of foundation open beneath it, so this dam's discharge is
@@ -523,12 +523,12 @@ surface, in the downstream shell where the unsaturated zone is thickest:
 
 | Section | q across it (ft³/day per ft) | Phreatic surface (ft) | Above it | Share |
 | :---: | :---: | :---: | :---: | :---: |
-| x = 400 | 1.9531 | 124.98 | 0.0998 | 5.1% |
-| x = 450 | 1.8955 | 112.31 | 0.0846 | 4.5% |
-| x = 500 | 2.0676 | 108.84 | 0.2139 | 10.3% |
+| x = 400 | 1.9554 | 124.97 | 0.1020 | 5.2% |
+| x = 450 | 1.9463 | 112.32 | 0.1154 | 5.9% |
+| x = 500 | 1.9902 | 108.85 | 0.1766 | 8.9% |
 
 Each of those section integrals reproduces the reported total discharge only to
-within 6% — x = 400 comes out 0.1% low, x = 450 3.0% low, x = 500 5.8% high — so
+within 2% — x = 400 to within 0.1%, x = 450 0.5% low, x = 500 1.8% high — so
 the shares beside them are good to a few points rather than to the tenth. Between
 about a twentieth and a tenth of the flow crossing the downstream shell travels
 through unsaturated soil. The share is small but not zero, so the choice of
@@ -551,18 +551,18 @@ the solved pressure-head field, drawn afterward by the plotting routine on any
 solution whose pore pressure goes negative somewhere.
 
 The solver iterates on the two things that make the problem nonlinear.
-Each sweep recomputes the pressure head from the current head field, evaluates
-*k<sub>r</sub>*(ψ) at each element's integration points and scales that element's
-saturated stiffness by the average, solves the resulting linear system, and updates
-the exit-face active set. Averaging *k<sub>r</sub>* over an element's integration
-points rather than switching it node by node smears the wet-to-dry transition over
-one element instead of snapping it across a node.
+Each sweep recomputes the pressure head from the current head field, averages
+*k<sub>r</sub>*(ψ) over the area of each element, scales that element's saturated
+stiffness by the average, solves the resulting linear system, and updates the
+exit-face active set. Averaging *k<sub>r</sub>* over the element rather than
+switching it node by node spreads the wet-to-dry transition over one element
+instead of snapping it across a node.
 
 The phreatic surface is resolved to
 about one element — 6.25 ft here — so a phreatic elevation quoted to better than
 that is quoting the interpolation rather than the physics. The surface is a consequence of the head field, so it moves only when the head field moves: in the
 next section we run three different unsaturated models and find the surface
-moving by less than half a foot between them.
+moving by about a foot between them.
 
 ---
 
@@ -599,7 +599,7 @@ drops of 3.158 ft each, and a 60 ft head drop:
 | base_mat | Zone | k (ft/day) | N<sub>f</sub> = q·N<sub>d</sub>/(k·Δh) | φ contour levels requested |
 | :---: | --- | :---: | :---: | :---: |
 | 1 | shell | 1 | 0.62 | 2 |
-| 2 | core | 0.001 | 618.96 | 620 |
+| 2 | core | 0.001 | 619.17 | 620 |
 | 3 | foundation | 0.1 | 6.19 | 7 |
 
 ![The same solution with each zone as the base material](images/seep02_base_mat.png){width=1000}
@@ -625,7 +625,7 @@ channels and 19 head drops in the foundation, so
 
 $$ q = 0.1 \times 60 \times \frac{6}{19} = 1.895 \text{ ft³/day per ft} $$
 
-against the computed 1.9546 — 3.1% low, and the whole of that gap is the rounding
+against the computed 1.9553 — 3.1% low, and the whole of that gap is the rounding
 of 6.19 channels down to the 6 that can actually be drawn.
 
 ---
@@ -759,12 +759,12 @@ surface changes.
 
 | Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 |
 | --- | :---: | :---: | :---: |
-| `lf` | 1.9546 | 47 | 10.3% |
-| `vg` | 1.8641 | 40 | 8.2% |
-| `gard` | 1.8654 | 29 | 8.6% |
+| `lf` | 1.9553 | 17 | 8.9% |
+| `vg` | 1.8642 | 32 | 7.6% |
+| `gard` | 1.8651 | 25 | 7.7% |
 
-The two calibrated models agree with each other to **0.07%** in discharge, and
-both sit **4.6% below** the linear front. That gap is all that the
+The two calibrated models agree with each other to **0.05%** in discharge, and
+both sit **4.6 to 4.7% below** the linear front. That gap is all that the
 choice of model changes in this dam's total discharge.
 
 On the phreatic surface it changes less still:
@@ -772,9 +772,9 @@ On the phreatic surface it changes less still:
 ![The phreatic surface under each model](images/seep02_phreatic_models.png){width=1000}
 
 At section scale the three surfaces are one line. Read station by station, the
-linear front and van Genuchten differ by at most **0.44 ft**, the linear front and
-Gardner by at most **0.41 ft**, and van Genuchten and Gardner by at most
-**0.04 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
+linear front and van Genuchten differ by at most **1.03 ft**, the linear front and
+Gardner by at most **0.93 ft**, and van Genuchten and Gardner by at most
+**0.10 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
 6.25 ft.
 
 These are differences between three runs on one mesh, so the discretization error
@@ -789,17 +789,17 @@ analysis are the ones *below* the phreatic surface, and those are set by the
 saturated conductivities and the boundary conditions. If the deliverable is a factor of
 safety, any of the three gives it. If the deliverable is a discharge — a seepage
 collection design, a reservoir loss estimate, a comparison against a measured
-tailwater flow — a 4.6% spread matters, and the model whose parameters can be
+tailwater flow — a 4.7% spread matters, and the model whose parameters can be
 defended from measurements is the one to use.
 
-The 4.6% gap comes from the floor. The linear front holds *k<sub>r</sub>* at its
+The gap comes from the floor. The linear front holds *k<sub>r</sub>* at its
 floor of 0.01 through the deep unsaturated zone, far above the conductivity the
 other two models leave there — and rerunning it with *kr<sub>0</sub>* lowered to
 10<sup>−4</sup>, which the shell's van Genuchten curve is already below at five
-feet of suction, brings its discharge to 1.8707, against van Genuchten's 1.8641 and Gardner's
-1.8654: 93% of the gap closes on that one parameter. The curve's shape barely matters by
-comparison — sweeping *h<sub>0</sub>* twentyfold moves the discharge by the same
-4.6% — because on a dam whose unsaturated zone stands tens of feet above the
+feet of suction, brings its discharge to 1.8706, against van Genuchten's 1.8642 and Gardner's
+1.8651: 93% of the gap closes on that one parameter. The curve's shape barely matters by
+comparison — sweeping *h<sub>0</sub>* twentyfold moves the discharge by a similar
+4.5% — because on a dam whose unsaturated zone stands tens of feet above the
 water inside it, what the curve does in its first foot of suction has little
 effect, and its floor value controls most of the result.
 
@@ -808,9 +808,9 @@ effect, and its floor value controls most of the result.
 ## What the unsaturated parameters cost in convergence
 
 Pushing the floor down cost iterations as well as discharge: the runs at
-*kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 103 and 83 sweeps
-against the shipped model's 47, and are the only two in the sweep on which the
-solver dropped its step to a hundredth of each new solve.
+*kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 42 and 53 sweeps
+against the shipped model's 17, and are the only two in the sweep on which the
+solver cut its step below half of each new solve, to a tenth and a twentieth.
 
 ### The three conditions
 
@@ -834,12 +834,12 @@ out to control the iteration count rather than the answer:
 
 | Convergence tol | Scaled to (ft) | q | Iterations |
 | :---: | :---: | :---: | :---: |
-| 0.001 | 0.18 | 1.954617 | 44 |
-| 0.0001 | 0.018 | 1.954616 | 47 |
-| 0.00001 | 0.0018 | 1.954616 | 49 |
-| 0.000001 | 0.00018 | 1.954616 | 55 |
+| 0.001 | 0.18 | 1.955288 | 14 |
+| 0.0001 | 0.018 | 1.955288 | 17 |
+| 0.00001 | 0.0018 | 1.955287 | 19 |
+| 0.000001 | 0.00018 | 1.955287 | 27 |
 
-A thousandfold tightening moves the discharge in the seventh figure and costs eleven
+A thousandfold tightening moves the discharge in the seventh figure and costs thirteen
 extra sweeps. The reason is the flow-closure condition: whichever head tolerance is
 asked for, the run does not stop until the conductivity field has stopped lagging
 the head field to within 0.1% of the inflow, and by then the head has stopped
@@ -858,7 +858,7 @@ and run it. The solver uses all 400 sweeps its default ceiling allows and then
 stops:
 
 ```text
-Iteration 400: residual = 9.826698e-03, closure = 2.287e-01, relax = 0.010, 1/31 exit face active
+Iteration 400: residual = 1.610612e-02, closure = 2.991e-01, relax = 0.010, 1/31 exit face active
 Warning: Did not converge in 400 iterations
 …
 WARNING: seepage solution did not converge — flowrate is unreliable (solution['converged'] is False).
@@ -868,11 +868,11 @@ Nothing is wrong with the model — this combination of parameters simply needs
 more iterations than the default allows. A steep conductivity curve converges
 slowly: each sweep computes conductivities from heads and heads from
 conductivities, and the steeper the curve, the more sweeps the two take to agree.
-Set **Max iterations** on the **Run Seepage** dialog to `1000` and the same run
-converges, in **900 iterations**, at *q* = **1.9755**.
+Set **Max iterations** on the **Run Seepage** dialog to `3000` and the same run
+converges, in **2,142 iterations**, at *q* = **1.9760**.
 
 Check `converged` before quoting a flowrate: a run
-that hits the ceiling still returns one — 1.9733 here, only 0.11% from the
+that hits the ceiling still returns one — 1.9854 here, only 0.48% from the
 converged answer, with nothing about the number to say so. Prefer a gentler
 relative-conductivity curve when nothing about the result depends on its shape,
 which on a stability model is the usual case.
@@ -894,10 +894,10 @@ polyline itself, stays exactly as it was:
 
 | Core k (ft/day) | q (ft³/day per ft) | Exit-face nodes wet | Highest wet node | Iterations |
 | :---: | :---: | :---: | :---: | :---: |
-| 0.001 | 1.9546 | 1 of 31 | (544.5, 102.6) | 47 |
-| 0.01 | 2.2257 | 1 of 31 | (544.5, 102.6) | 18 |
-| 0.1 | 4.3501 | 2 of 31 | (539.0, 105.2) | 20 |
-| 1 | 10.2959 | 8 of 31 | (506.1, 120.6) | 8 |
+| 0.001 | 1.9553 | 1 of 31 | (544.5, 102.6) | 17 |
+| 0.01 | 2.2274 | 1 of 31 | (544.5, 102.6) | 19 |
+| 0.1 | 4.3498 | 2 of 31 | (539.0, 105.2) | 22 |
+| 1 | 10.3009 | 8 of 31 | (506.1, 120.6) | 7 |
 
 ![The phreatic surface and its exit point as the core's conductivity rises](images/seep02_core_sweep.png){width=1000}
 
@@ -937,12 +937,12 @@ The one thing that has to be decided before the seepage run, rather than after, 
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
 before it can be used for one. That is why that copy's shipped mesh is quadratic —
-3,362 nodes and 1,605 `tri6` elements — and it returns 1.9554 ft³/day per ft
-against the 1.9546 of the linear tri3 mesh built above.
+3,362 nodes and 1,605 `tri6` elements — and it returns 1.9563 ft³/day per ft
+against the 1.9553 of the linear tri3 mesh built above.
 
 [Seepage and Slope Stability](../seep/seep_slope.md#worked-example) carries this
 same dam through the rest of the workflow: a Spencer search on the seepage-derived
-pore pressures at **FS = 1.27**, and a finite element strength-reduction analysis on
+pore pressures at **FS = 1.28**, and a finite element strength-reduction analysis on
 the same mesh and the same field at **FS = 1.28**.
 
 ---
@@ -960,7 +960,7 @@ This tutorial covered:
 - Scaling the flow net to the zone that carries the through-flow — the one base
   material that gives a readable net on a zoned section.
 - The three unsaturated conductivity models, which moved the discharge by under
-  5% and the phreatic surface by less than half a foot; the linear front is the
+  5% and the phreatic surface by about a foot; the linear front is the
   simplest and the right default for stability work.
 - What a run that fails to converge looks like, and the habits that matter:
   check `converged` before quoting a flowrate, and raise **Max iterations**

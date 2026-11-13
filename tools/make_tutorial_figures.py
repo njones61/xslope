@@ -2577,7 +2577,7 @@ SEEP02_KR0_SWEEP = (0.1, 0.03, 0.01, 0.003, 0.001, 0.0003, 0.0001)
 #: over 10 ft of suction, which is the shape of a van Genuchten curve drawn with
 #: straight lines. It does not converge inside the default iteration ceiling.
 SEEP02_HARD = {"kr0": 1e-4, "h0": -10.0}
-SEEP02_HARD_MAX_ITER = 1000
+SEEP02_HARD_MAX_ITER = 3000
 #: Core conductivities for the seepage-face study, from the model's own 0.001 ft/day
 #: up to the shell's 1.0 — a core, a poor core, a fill and no core at all.
 SEEP02_CORE_KS = (0.001, 0.01, 0.1, 1.0)

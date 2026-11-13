@@ -847,39 +847,44 @@ flow-closure condition holds every run until the conductivity field has stopped
 lagging the head field to within 0.1% of the inflow, whichever head tolerance is
 asked for, and the Newton steps that finish the run carry the heads far inside any
 of these tolerances within a few steps, so the three tighter runs take the same 20
-iterations. Leave the dialog's tolerance at its default. Whether a run
-finishes depends on the steepness of the conductivity curve; the next section
-shows a curve steep enough that the run does not converge within the default
-iteration limit.
+iterations. Leave the dialog's tolerance at its default. The number of iterations a
+run needs depends on the steepness of the conductivity curve. The next section runs a
+steeper curve, which needs several times as many, and shows what happens when the
+iteration limit stops it short.
 
 ### A run that does not converge {#the-run-that-does-not-finish}
 
 An example of potentially problematic input is a more extreme linear front:
 the floor lowered from 0.01 to 10<sup>−4</sup>, and reached at 10 ft of suction
 instead of 1 ft.
-Set `unsat` to `lf` with `kr0` = `0.0001` and `h0` = `-10` on all three materials
-and run it. The solver uses all 400 sweeps its default ceiling allows and then
-stops:
+Set `unsat` to `lf` with `kr0` = `0.0001` and `h0` = `-10` on all three materials.
+Set **Max iterations** on the **Run Seepage** dialog to `50` and run it. The solver
+uses all 50 iterations and then stops:
 
 ```text
-Iteration 400: residual = 1.610612e-02, closure = 2.991e-01, relax = 0.010, 1/31 exit face active
-Warning: Did not converge in 400 iterations
+Iteration 50: residual = 1.965940e+00, closure = 7.708e+00, relax = 0.200, 1/31 exit face active
+Iteration 50: element 434's kr solved for directly at every sweep — did not settle (50 sweeps)
+Warning: Did not converge in 50 iterations
 …
 WARNING: seepage solution did not converge — flowrate is unreliable (solution['converged'] is False).
 ```
 
-Nothing is wrong with the model — this combination of parameters simply needs
-more iterations than the default allows. A steep conductivity curve converges
-slowly: each sweep computes conductivities from heads and heads from
-conductivities, and the steeper the curve, the more sweeps the two take to agree.
-Set **Max iterations** on the **Run Seepage** dialog to `3000` and the same run
-converges, in **2,142 iterations**, at *q* = **1.9760**.
+The solver writes the second line when it reaches the limit and makes the one
+further attempt described under [Convergence](../seep/overview.md#convergence) on
+the seepage overview. Here that attempt does not settle either.
 
-Check `converged` before quoting a flowrate: a run
-that hits the ceiling still returns one — 1.9854 here, only 0.48% from the
-converged answer, with nothing about the number to say so. Prefer a gentler
-relative-conductivity curve when nothing about the result depends on its shape,
-which on a stability model is the usual case.
+This combination of parameters needs more than 50 iterations, though nothing is
+wrong with the model. A steep conductivity curve converges slowly: each ordinary iteration
+computes conductivities from heads and heads from conductivities, and the steeper
+the curve, the more iterations the two take to come close enough to the answer for
+the Newton steps to finish the run. Set **Max iterations** back to its default of
+`400` and the same run converges, in **75 iterations**, at *q* = **1.9760**. The
+shipped model takes 20.
+
+Check `converged` before quoting a flowrate. A run that hits the limit still
+returns one, 1.9288 here, 2.4% from the converged answer, with nothing about the
+number to say so. Prefer a gentler relative-conductivity curve when nothing about
+the result depends on its shape, which on a stability model is the usual case.
 
 ---
 
@@ -968,7 +973,7 @@ This tutorial covered:
   simplest and the right default for stability work.
 - What a run that fails to converge looks like, and the habits that matter:
   check `converged` before quoting a flowrate, and raise **Max iterations**
-  rather than loosening the tolerance when a steep curve needs more sweeps.
+  rather than loosening the tolerance when a steep curve needs more iterations.
 
 **Where to go next:** [Tutorial SEEP-3](seep03_reservoir_drawdown.md) is the
 next seepage tutorial — a reservoir drawn down through a cored dam, where the

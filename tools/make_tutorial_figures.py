@@ -2575,9 +2575,13 @@ SEEP02_FIT_CLIP = 1e-4
 SEEP02_KR0_SWEEP = (0.1, 0.03, 0.01, 0.003, 0.001, 0.0003, 0.0001)
 #: The linear-front pair that makes this dam hard: a floor four decades down reached
 #: over 10 ft of suction, which is the shape of a van Genuchten curve drawn with
-#: straight lines. It does not converge inside the default iteration ceiling.
+#: straight lines. It converges inside the default iteration limit, but takes several
+#: times the shipped model's iterations to do it.
 SEEP02_HARD = {"kr0": 1e-4, "h0": -10.0}
-SEEP02_HARD_MAX_ITER = 3000
+#: The iteration limit the page has the reader set on the Run Seepage dialog for that
+#: pair. The run stops short of it unconverged, which is the log the page quotes, and
+#: the page then raises the limit back to the default 400, where the run converges.
+SEEP02_HARD_MAX_ITER = 50
 #: Core conductivities for the seepage-face study, from the model's own 0.001 ft/day
 #: up to the shell's 1.0 — a core, a poor core, a fill and no core at all.
 SEEP02_CORE_KS = (0.001, 0.01, 0.1, 1.0)
@@ -3223,14 +3227,17 @@ def seep02_plots():
                                    st["iterations"],
                                    _seep02_relax_at(st["iterations"])))
 
-    print("   -- the run that does not converge inside the default ceiling")
+    print("   -- the run that does not converge inside a low iteration limit")
     hard = _seep02_materials(sd, [dict(unsat="lf", **SEEP02_HARD)] * 3)
-    _, sol_hard, hlog = _seep02_solve(hard, mesh)
+    _, sol_hard, hlog = _seep02_solve(hard, mesh, max_iter=SEEP02_HARD_MAX_ITER)
+    # The lines the page quotes: the last iteration's, the solver's one further
+    # attempt at the limit, and the two warnings. The convergence history the solver
+    # prints after the first warning is indented, so it does not match.
     tail = [ln for ln in hlog.strip().splitlines()
-            if ln.startswith("Iteration 400") or ln.startswith("Warning")
-            or ln.startswith("WARNING")]
-    print("   default cap q %.4f · converged %s"
-          % (sol_hard["flowrate"], sol_hard.get("converged")))
+            if ln.startswith("Iteration %d:" % SEEP02_HARD_MAX_ITER)
+            or ln.startswith("Warning") or ln.startswith("WARNING")]
+    print("   cap %d      q %.4f · converged %s"
+          % (SEEP02_HARD_MAX_ITER, sol_hard["flowrate"], sol_hard.get("converged")))
     # WHICH of the three conditions failed is the lesson, so the sweep the head
     # test started passing on is measured rather than eyeballed off the figure.
     # The log prints every fifth sweep after the sixth, so this is the first
@@ -3255,10 +3262,10 @@ def seep02_plots():
     for line in tail:
         print("     %s" % line)
     histories.append(("lf, kr₀ = 1e−4, h₀ = −10 ft", _seep02_history(hlog)))
-    _, sol_long, llog = _seep02_solve(hard, mesh, max_iter=SEEP02_HARD_MAX_ITER)
+    _, sol_long, llog = _seep02_solve(hard, mesh)
     st_long = _seep02_log_stats(llog)
-    print("   cap %d     q %.4f · %s iterations · relax down to %.2f · converged %s"
-          % (SEEP02_HARD_MAX_ITER, sol_long["flowrate"], st_long["iterations"],
+    print("   cap 400     q %.4f · %s iterations · relax down to %.2f · converged %s"
+          % (sol_long["flowrate"], st_long["iterations"],
              st_long["relax_min"], sol_long.get("converged")))
     print("   the truncated answer is %.2f%% from the converged one"
           % (100.0 * abs(sol_hard["flowrate"] - sol_long["flowrate"])

@@ -2129,41 +2129,35 @@ def _element_kmats(n_el, k1_vals, k2_vals, angles, flow=False):
 
 def _kr_sampling(et):
     """(N, w) for the kr average of element type et: N is (n_pts, nn) shape
-    functions at the sampling points, w the quadrature weights. Identical
-    points/weights to the per-element *_stiffness_matrix_kr functions."""
-    if et == 3:
-        # 7-point symmetric triangle rule (degree 5), linear N = (L1, L2, L3)
+    functions at the sampling points, w the quadrature weights.
+
+    The rule goes by the element's shape and not by its order: every triangle
+    averages kr over the 7-point symmetric rule of degree 5, and every quadrilateral
+    over 4x4 Gauss (the rule SEEP2D's qdflow samples kr at). A quadratic element's
+    pressure head is evaluated at those points through its own shape functions."""
+    if et in (3, 6):
         a1, b1 = 0.059715871789770, 0.470142064105115
         a2, b2 = 0.797426985353087, 0.101286507323456
         w0, w1, w2 = 0.1125, 0.066197076394253, 0.062969590272414
         pts = [(1/3, 1/3, 1/3, w0),
                (a1, b1, b1, w1), (b1, a1, b1, w1), (b1, b1, a1, w1),
                (a2, b2, b2, w2), (b2, a2, b2, w2), (b2, b2, a2, w2)]
-        N = np.array([[L1, L2, L3] for L1, L2, L3, _ in pts])
+        if et == 3:
+            N = np.array([[L1, L2, L3] for L1, L2, L3, _ in pts])
+        else:
+            N = np.array([[L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
+                           4*L1*L2, 4*L2*L3, 4*L3*L1] for L1, L2, L3, _ in pts])
         w = np.array([p[3] for p in pts])
-    elif et == 6:
-        pts = [(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)]
-        N = np.array([[L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
-                       4*L1*L2, 4*L2*L3, 4*L3*L1] for L1, L2, L3 in pts])
-        w = np.full(3, 1/3)
-    elif et == 4:
-        # 4x4 rule (matching SEEP2D's qdflow kr sampling)
+    elif et in (4, 8, 9):
         p1 = [-0.86113631, -0.33998104, 0.33998104, 0.86113631]
         w1 = [0.34785485, 0.65214516, 0.65214516, 0.34785485]
         N, w = [], []
         for i, xi in enumerate(p1):
             for j, eta in enumerate(p1):
-                N.append([0.25*(1-xi)*(1-eta), 0.25*(1+xi)*(1-eta),
-                          0.25*(1+xi)*(1+eta), 0.25*(1-xi)*(1+eta)])
-                w.append(w1[i] * w1[j])
-        N, w = np.array(N), np.array(w)
-    elif et in (8, 9):
-        p1 = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
-        w1 = [5/9, 8/9, 5/9]
-        N, w = [], []
-        for i, xi in enumerate(p1):
-            for j, eta in enumerate(p1):
-                if et == 8:
+                if et == 4:
+                    N.append([0.25*(1-xi)*(1-eta), 0.25*(1+xi)*(1-eta),
+                              0.25*(1+xi)*(1+eta), 0.25*(1-xi)*(1+eta)])
+                elif et == 8:
                     N.append([0.25*(1-xi)*(1-eta)*(-xi-eta-1),
                               0.25*(1+xi)*(1-eta)*(xi-eta-1),
                               0.25*(1+xi)*(1+eta)*(xi+eta-1),
@@ -2181,6 +2175,24 @@ def _kr_sampling(et):
     else:
         raise ValueError(f"Unknown element type {et}")
     return N, w
+
+
+def _elements_kr_avg(elements, element_types, p_nodes, kr0, h0, vg_a=None, vg_n=None,
+                     vg_l=None, model=None):
+    """Each element's kr averaged over its rule (:func:`_kr_sampling`), in element
+    order, from per-element parameter arrays: the one number :func:`_assembly_data`
+    scales the element's saturated matrix by. Whatever else needs an element's kr
+    (the velocity recovery, the flow-net boundary flux) reads it here, so the flux it
+    reports is the flux the head solve balanced."""
+    out = np.ones(len(elements))
+    for et in np.unique(element_types):
+        idx = np.where(element_types == et)[0]
+        N, w = _kr_sampling(int(et))
+        kr = kr_relative_vec(
+            p_nodes[elements[idx][:, :int(et)]] @ N.T, kr0[idx][:, None], h0[idx][:, None],
+            *(None if a is None else a[idx][:, None] for a in (vg_a, vg_n, vg_l, model)))
+        out[idx] = (kr @ w) / w.sum()
+    return out
 
 
 def _quad_gauss(et):
@@ -3038,6 +3050,14 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         return None
 
     # Step 3: For each boundary segment, compute Δψ from element-level velocity
+    n_el = len(elements)
+    if kr0 is not None and h0 is not None:
+        kr_avg = _elements_kr_avg(
+            np.asarray(elements), np.asarray(element_types), p_nodes,
+            *(None if a is None else np.broadcast_to(np.asarray(a), (n_el,))
+              for a in (kr0, h0, vg_a, vg_n, vg_l, model)))
+    else:
+        kr_avg = np.ones(n_el)
     segment_flux = {}
     midside_flux_from_start = {}
     for i in range(n):
@@ -3060,22 +3080,8 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         R = np.array([[cs, sn], [-sn, cs]])
         Kmat = R.T @ np.diag([k1, k2]) @ R
 
-        # kr factor
-        kr_elem = 1.0
-        if kr0 is not None and h0 is not None:
-            if et == 6:
-                p_elem = compute_tri6_centroid_pressure(p_nodes, en)
-            elif et in (3, 4):
-                p_elem = np.mean(p_nodes[en[:3 if et == 3 else 4]])
-            else:
-                p_elem = np.mean(p_nodes[en[:4]])
-            kr_e0 = kr0[elem_idx] if hasattr(kr0, '__len__') else kr0
-            h0_e0 = h0[elem_idx] if hasattr(h0, '__len__') else h0
-            vga_e0 = vg_a[elem_idx] if hasattr(vg_a, '__len__') else vg_a
-            vgn_e0 = vg_n[elem_idx] if hasattr(vg_n, '__len__') else vg_n
-            vgl_e0 = vg_l[elem_idx] if hasattr(vg_l, '__len__') else vg_l
-            mdl_e0 = model[elem_idx] if hasattr(model, '__len__') else (model or KR_LF)
-            kr_elem = kr_relative(p_elem, kr_e0, h0_e0, vga_e0, vgn_e0, vgl_e0, mdl_e0)
+        # The element's kr average, the kr its conductivity was assembled with
+        kr_elem = kr_avg[elem_idx]
 
         # Edge tangent
         dx = nodes[c2, 0] - nodes[c1, 0]
@@ -3127,17 +3133,11 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                 # Third coordinate = 0 (on the edge)
                 return L[0], L[1], L[2]
 
-            # 2-point Gauss quadrature on an edge interval [t_start, t_end]
-            # with per-Gauss-point kr. For quadratic edges, this lets us set
-            # midside phi from the integrated half-edge flux instead of
-            # forcing it to the average of the corner values.
-            p_elem_nodes = p_nodes[en[:6]]
-            kr_e0 = kr0[elem_idx] if hasattr(kr0, '__len__') else kr0
-            h0_e0 = h0[elem_idx] if hasattr(h0, '__len__') else h0
-            vga_e0 = vg_a[elem_idx] if hasattr(vg_a, '__len__') else vg_a
-            vgn_e0 = vg_n[elem_idx] if hasattr(vg_n, '__len__') else vg_n
-            vgl_e0 = vg_l[elem_idx] if hasattr(vg_l, '__len__') else vg_l
-            mdl_e0 = model[elem_idx] if hasattr(model, '__len__') else (model or KR_LF)
+            # 2-point Gauss quadrature on an edge interval [t_start, t_end],
+            # the head gradient taken at each point and scaled by the element's
+            # kr average. For quadratic edges, this lets us set midside phi from
+            # the integrated half-edge flux instead of forcing it to the average
+            # of the corner values.
             gp = [0.5 - 0.5 / np.sqrt(3), 0.5 + 0.5 / np.sqrt(3)]
 
             def integrate_edge_interval(t_start, t_end):
@@ -3148,8 +3148,6 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                     L1, L2, L3 = area_coords(t)
                     N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
                                   4*L1*L2, 4*L2*L3, 4*L3*L1])
-                    p_gp = N @ p_elem_nodes
-                    kr_gp = kr_relative(p_gp, kr_e0, h0_e0, vga_e0, vgn_e0, vgl_e0, mdl_e0) if kr0 is not None else 1.0
                     dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
                     dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
                     dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
@@ -3158,7 +3156,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                         gradN[0, ii] = dN_dL1[ii]*dL1_dx + dN_dL2[ii]*dL2_dx + dN_dL3[ii]*dL3_dx
                         gradN[1, ii] = dN_dL1[ii]*dL1_dy + dN_dL2[ii]*dL2_dy + dN_dL3[ii]*dL3_dy
                     grad_h = gradN @ h_elem
-                    v = -kr_gp * Kmat @ grad_h
+                    v = -kr_elem * Kmat @ grad_h
                     total += -v[1]*dx + v[0]*dy
                 return total * 0.5 * interval
 
@@ -3422,7 +3420,8 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
 def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, h0=None, element_types=None, vg_a=None, vg_n=None, vg_l=None, model=None):
     """
     Compute nodal velocities by averaging element-wise Darcy velocities.
-    If kr0 and h0 are provided, compute kr_elem using kr_frontal; otherwise, kr_elem = 1.0.
+    If kr0 and h0 are provided, each element's velocity is scaled by its kr average
+    (:func:`_elements_kr_avg`), the kr its conductivity was assembled with; otherwise by 1.
     Supports both triangular and quadrilateral elements.
     For quads, velocity is computed at Gauss points and averaged to nodes.
     
@@ -3463,7 +3462,9 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             vg_l = np.broadcast_to(np.asarray(vg_l, dtype=float), (n_el,))
         if model is not None:
             model = np.broadcast_to(np.asarray(model), (n_el,))
-    p_all = head - nodes[:, 1]
+    kr_avg = (_elements_kr_avg(elements, element_types, head - nodes[:, 1], kr0, h0,
+                               vg_a, vg_n, vg_l, model)
+              if use_kr else np.ones(n_el))
 
     for et in np.unique(element_types):
         idx = np.where(element_types == et)[0]
@@ -3472,6 +3473,7 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
         coords = nodes[conn]              # (n_e, nn, 2)
         h_el = head[conn]                 # (n_e, nn)
         K = Kmats[idx]
+        kr_e = kr_avg[idx]
 
         if et == 3:
             x, y = coords[:, :, 0], coords[:, :, 1]
@@ -3483,38 +3485,12 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             gamma = np.stack([x[:, 2]-x[:, 1], x[:, 0]-x[:, 2], x[:, 1]-x[:, 0]], axis=1)
             grad = np.stack([beta, gamma], axis=1) / (2 * a_safe)[:, None, None]
             grad_h = np.einsum('exn,en->ex', grad, h_el)
-            if use_kr:
-                kr_e = kr_relative_vec(p_all[conn].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(vg_l, idx), _idx_or_none(model, idx))
-            else:
-                kr_e = np.ones(len(idx))
             v_e = -kr_e[:, None] * np.einsum('exy,ey->ex', K, grad_h)
             v_e[~ok] = 0.0
             np.add.at(velocity, conn.ravel(), np.repeat(v_e, 3, axis=0))
             np.add.at(count, conn.ravel(), np.repeat(ok.astype(float), 3))
 
         elif et in (4, 8, 9):
-            if use_kr:
-                # One kr per element, from the mean pressure at its four CORNER
-                # nodes. For quad4 that is every node it has. For quad8 and quad9
-                # it is an APPROXIMATION and is exact for nothing unsaturated: a
-                # serendipity quad8 centroid weights corners -1/4 and midsides
-                # +1/2, and a Lagrange quad9 centroid is its centre node alone, so
-                # neither equals the corner average, and neither matches what the
-                # assembly does either -- _assembly_data averages kr over the same
-                # 3x3 Gauss points it integrates on. Recovering kr at those Gauss
-                # points, so the scaling here is the scaling the stiffness was
-                # built with, is the consistent fix and a known follow-up. No corpus
-                # model is on a quad mesh, and the guard runs saturated, where kr is
-                # 1 and the choice cannot bite -- but quad meshing is a user option,
-                # so the size of the error was measured rather than assumed. On the
-                # two seepage sample models, one confined and one with a free
-                # surface, quad8 and quad9 put the section flowrate within 0.3% of
-                # the tri6 answer on the same geometry (sheetpile 40.100 / 39.886
-                # against 40.058; earth dam 38.673 / 38.672 against 38.695), which
-                # is inside the 5% tolerance those rows lock at.
-                kr_e = kr_relative_vec(p_all[conn[:, :4]].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(vg_l, idx), _idx_or_none(model, idx))
-            else:
-                kr_e = np.ones(len(idx))
             v_sum = np.zeros((len(idx), 2))
             n_ok = np.zeros(len(idx))
             for xi, eta, _w in _quad_gauss(et):
@@ -3546,13 +3522,6 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             Ji01 = -(y[:, 0]-y[:, 2]) / d_safe
             Ji10 = -(x[:, 1]-x[:, 2]) / d_safe
             Ji11 = (x[:, 0]-x[:, 2]) / d_safe
-            if use_kr:
-                # kr at the element centroid via quadratic shape functions
-                Nc = np.array([1/3*(2/3-1)]*3 + [4/9]*3)
-                p_c = (p_all[conn] * Nc[None, :]).sum(axis=1)
-                kr_e = kr_relative_vec(p_c, kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(vg_l, idx), _idx_or_none(model, idx))
-            else:
-                kr_e = np.ones(len(idx))
             w_total = np.zeros(len(idx))
             v_sum = np.zeros((len(idx), 2))
             for (L1, L2, L3), w in zip([(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)],

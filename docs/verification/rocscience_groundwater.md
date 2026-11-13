@@ -51,8 +51,8 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.3069e-05, tolerance=0.05, benchmark=GW9a-q -->
 <!-- test: file=files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2824e-06, tolerance=0.05, benchmark=GW9b-q -->
 <!-- test: file=files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
-<!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
-<!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.086e-02, tolerance=0.05, benchmark=GW13-q -->
+<!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
+<!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, expected_flowrate=2.086e-02, tolerance=0.05, benchmark=GW13-q -->
 
 Problems 1–13 are steady-state; problems 15–21 are **transient**, solved with XSLOPE's
 [transient seepage solver](../seep/transient.md). Problems 1, 7 and 8 apply a uniform
@@ -677,8 +677,8 @@ XSLOPE sits above both.
 | Trapezoidal: bulb half-width | ≈42 | 41 (+1) | 40 (+2) |
 | Triangular: Q per half | 2.086×10⁻² | 2.050×10⁻² (+1.8%) | 2.0×10⁻² (+4.3%) |
 
-The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (the
-`max_iter` tag key); the default 400 is not enough for these geometries.
+Both runs converge within the default limit of 400 iterations, the trapezoidal ditch in
+102 and the triangular one in 198.
 
 ![gw012: mesh and solved heads](images/gw012.png)
 

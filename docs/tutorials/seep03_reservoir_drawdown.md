@@ -206,8 +206,8 @@ fourteen times slower, because the core's conductivity is a hundred times smalle
 while its drainable porosity is only seven times smaller. The pool falls 16 m in
 45 days, which is 0.36 m/day: the shell can keep up with that at six times over,
 and the core, at half the pool's rate, cannot. The solution further down bears the
-estimate out — inside the core the water table falls from 16.4 m to 10.6 m
-between day 2 and day 47, 5.8 m in 45 days, which is 0.13 m/day.
+estimate out — inside the core the water table falls from 16.5 m to 10.6 m
+between day 2 and day 47, 5.9 m in 45 days, which is 0.13 m/day.
 
 Click **OK**.
 
@@ -349,14 +349,14 @@ Number of fixed-head nodes: 33
 Number of exit face nodes: 30
 Starting unsaturated flow iteration...
 Convergence tolerance: 2.200000e-03
-Iteration 1: residual = 1.354351e+01, closure = 2.308e+02, relax = 1.000, 12/30 exit face active
-Iteration 2: residual = 7.600912e+00, closure = 6.006e+00, relax = 1.000, 7/30 exit face active
-Iteration 3: residual = 4.241461e+00, closure = 1.432e+01, relax = 1.000, 3/30 exit face active
-Iteration 4: residual = 4.136706e+00, closure = 9.756e+00, relax = 1.000, 1/30 exit face active
-Iteration 5: residual = 3.224142e+00, closure = 5.469e+00, relax = 1.000, 0/30 exit face active
+Iteration 1: residual = 1.354351e+01, closure = 2.473e+02, relax = 1.000, 12/30 exit face active
+Iteration 2: residual = 7.229218e+00, closure = 5.609e+00, relax = 1.000, 7/30 exit face active
+Iteration 3: residual = 4.334327e+00, closure = 1.460e+01, relax = 1.000, 3/30 exit face active
+Iteration 4: residual = 4.159624e+00, closure = 9.860e+00, relax = 1.000, 1/30 exit face active
+Iteration 5: residual = 3.232851e+00, closure = 5.411e+00, relax = 1.000, 0/30 exit face active
 ...
-Iteration 35: residual = 3.168099e-03, closure = 1.311e-03, relax = 0.500, 0/30 exit face active
-Converged in 36 iterations (residual = 1.753e-03, closure = 6.346e-04, exit face stable)
+Iteration 35: residual = 2.065269e-03, closure = 1.230e-02, relax = 0.200, 0/30 exit face active
+Converged in 39 iterations (residual = 7.848e-04, closure = 8.672e-04, exit face stable)
 ```
 
 The last column is the number of active exit-face nodes, and on this dam it
@@ -380,11 +380,11 @@ head drop happens inside it, so the net is readable only there. Leave it.
 
 **The total discharge is 0.165 m³/day per m** — per meter of dam measured along
 its axis. The head ranges from **2.000 m to 18.000 m**, the two boundary values
-and nothing outside them. The pore pressure runs from **−78.6 kPa to 176.6 kPa**;
+and nothing outside them. The pore pressure runs from **−78.2 kPa to 176.6 kPa**;
 the negative end is the unsaturated soil above the phreatic surface, where
 the pressure head ψ = *h* − *z* (*z* the elevation) is negative.
 
-<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=seep, element_type=tri3, size_divisions=64, expected_flowrate=0.16488, tolerance=0.005 -->
+<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=seep, element_type=tri3, size_divisions=64, expected_flowrate=0.16531, tolerance=0.005 -->
 
 The heavy black line is the phreatic surface, and the flow lines crowding into the
 core show the same pattern. Read across the section, the surface stands at
@@ -542,17 +542,17 @@ and then prints a line per saved frame:
 ```text
 Building seepage data (transient, BC set 1)…
 Running transient seepage analysis… (initial condition: up to 2000 sweeps)
-  t=2: frame saved (steps so far=6, mass-balance closure=2.04e-07)
-  t=15: frame saved (steps so far=58, mass-balance closure=6.56e-05)
-  t=30: frame saved (steps so far=149, mass-balance closure=6.87e-05)
-  t=47: frame saved (steps so far=282, mass-balance closure=4.93e-05)
-  t=60: frame saved (steps so far=364, mass-balance closure=4.67e-05)
-  t=80: frame saved (steps so far=486, mass-balance closure=4.19e-05)
-  t=120: frame saved (steps so far=583, mass-balance closure=3.85e-05)
-  t=180: frame saved (steps so far=603, mass-balance closure=3.88e-05)
-  t=240: frame saved (steps so far=614, mass-balance closure=3.85e-05)
-  t=300: frame saved (steps so far=618, mass-balance closure=3.85e-05)
-  t=360: frame saved (steps so far=631, mass-balance closure=3.83e-05)
+  t=2: frame saved (steps so far=6, mass-balance closure=1.37e-07)
+  t=15: frame saved (steps so far=53, mass-balance closure=7.12e-05)
+  t=30: frame saved (steps so far=136, mass-balance closure=6.37e-05)
+  t=47: frame saved (steps so far=261, mass-balance closure=4.87e-05)
+  t=60: frame saved (steps so far=349, mass-balance closure=4.53e-05)
+  t=80: frame saved (steps so far=464, mass-balance closure=4.06e-05)
+  t=120: frame saved (steps so far=553, mass-balance closure=3.75e-05)
+  t=180: frame saved (steps so far=573, mass-balance closure=3.89e-05)
+  t=240: frame saved (steps so far=584, mass-balance closure=3.88e-05)
+  t=300: frame saved (steps so far=589, mass-balance closure=3.86e-05)
+  t=360: frame saved (steps so far=594, mass-balance closure=3.83e-05)
 Transient seepage complete — 12 saved frame(s).
 ```
 
@@ -564,10 +564,10 @@ dropped, leaving 0, 2, 15, 30, 47, 60, 80, 120, 180, 240, 300 and 360.
 in full. Nothing on this file contributes stage times, since those fields were
 left blank.
 
-**The run took 631 steps to produce those 12 frames**, and the running count in
-the log shows where they were spent. It reaches day 47 on step 282 — **the first 47 days are
-13% of the run's duration but take 45% of its steps** — and it covers the last 180 days in
-**28 steps**. The step size is chosen from how fast the field is moving, so the step
+**The run took 594 steps to produce those 12 frames**, and the running count in
+the log shows where they were spent. It reaches day 47 on step 261 — **the first 47 days are
+13% of the run's duration but take 44% of its steps** — and it covers the last 180 days in
+**21 steps**. The step size is chosen from how fast the field is moving, so the step
 count shows how fast the field changes: the dam is changing quickly while the pool is falling
 and barely at all by the end.
 
@@ -586,7 +586,7 @@ below:
 `|<` and `>|` jump to the first and last frame, `<` and `>` step one at a time,
 **Play** animates through them at the **Speed** multiplier, and the **t =** box
 takes a typed time and jumps to the nearest saved frame. The title shows the
-frame's time, and the subtitle shows **Inflow 0 / Outflow 1.666 m³/day per m**
+frame's time, and the subtitle shows **Inflow 0 / Outflow 1.668 m³/day per m**
 — two numbers where a steady solution reports one, because under storage exchange
 the water entering and the water leaving are no longer the same.
 
@@ -664,32 +664,32 @@ three solid traces are the nodes. The table gives the values at four instants:
 
 | t (day) | pool (m) | core *h* (m) | shell *h* (m) | core ψ (m) | shell ψ (m) |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| 0 | 18.00 | 13.56 | 17.98 | +4.65 | +9.06 |
-| 30 | 8.04 | 10.50 | 9.85 | +1.59 | +0.94 |
-| 47 | 2.00 | 9.34 | 6.59 | +0.44 | −2.32 |
-| 120 | 2.00 | 3.10 | 2.71 | −5.80 | −6.21 |
+| 0 | 18.00 | 13.55 | 17.98 | +4.65 | +9.06 |
+| 30 | 8.04 | 10.51 | 9.85 | +1.60 | +0.94 |
+| 47 | 2.00 | 9.33 | 6.59 | +0.43 | −2.32 |
+| 120 | 2.00 | 3.06 | 2.71 | −5.85 | −6.21 |
 
-<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=tseep_head, element_type=tri3, size_divisions=64, time=47, points=54.5:8.9:9.344;30.7:8.9:6.593;75.3:6.8:3.155, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_drawdown.xlsx, type=tseep_head, element_type=tri3, size_divisions=64, time=47, points=54.5:8.9:9.335;30.7:8.9:6.591;75.3:6.8:3.154, tolerance=0.05 -->
 
 At full pool the shell node stands at **17.98 m** and the core node at
-**13.56 m** — the shell is **4.42 m higher**, which is just the steady picture
+**13.55 m** — the shell is **4.42 m higher**, which is just the steady picture
 again: the core is what the head drops across, so a point inside it is already
 partway down.
 
 Over the 45 days of drawdown the two exchange places. The shell node loses
 **11.39 m** of head, nearly three quarters of the 16 m the pool itself dropped.
-The core node loses **4.21 m**, little more than a quarter of it. The traces cross
+The core node loses **4.22 m**, little more than a quarter of it. The traces cross
 at **t ≈ 25 day**, marked on the figure, and by
-the end of the drawdown the core stands **2.75 m above** the shell it began 4.42 m
+the end of the drawdown the core stands **2.74 m above** the shell it began 4.42 m
 below. They do not come back together until about day 180.
 
 The pressure head ψ in the last two columns shows what that means for the soil.
 At day 47 the shell node has gone **unsaturated**, at ψ = −2.32 m, while
 the core node 24 m away at the same elevation is **still saturated** at
-ψ = +0.44 m. The water table has passed below one and not the other.
+ψ = +0.43 m. The water table has passed below one and not the other.
 
 The downstream shell node changes little: its head falls just over a meter —
-from 4.21 m to 3.15 m — over the whole drawdown. The core takes most of the head
+from 4.22 m to 3.15 m — over the whole drawdown. The core takes most of the head
 drop, so this node was never supplied directly by the reservoir, and removing
 the reservoir has little effect on it.
 
@@ -702,21 +702,21 @@ where the water in those frames came from. Each saved frame reports the flow acr
 
 | t (day) | pool (m) | inflow (m³/day per m) | outflow (m³/day per m) |
 | :---: | :---: | :---: | :---: |
-| 0 | 18.00 | 0.16488 | 0.16488 |
-| 2 | 18.00 | 0.16488 | 0.16488 |
-| 15 | 13.38 | 0.00000 | 1.27662 |
-| 30 | 8.04 | 0.00000 | 1.66615 |
-| 47 | 2.00 | 0.00000 | 1.45778 |
-| 60 | 2.00 | 0.00000 | 0.83890 |
-| 80 | 2.00 | 0.00000 | 0.43647 |
-| 120 | 2.00 | 0.00000 | 0.16580 |
-| 180 | 2.00 | 0.00000 | 0.05385 |
-| 240 | 2.00 | 0.00000 | 0.01928 |
-| 300 | 2.00 | 0.00000 | 0.00786 |
+| 0 | 18.00 | 0.16531 | 0.16531 |
+| 2 | 18.00 | 0.16531 | 0.16531 |
+| 15 | 13.38 | 0.00000 | 1.26953 |
+| 30 | 8.04 | 0.00000 | 1.66821 |
+| 47 | 2.00 | 0.00000 | 1.45921 |
+| 60 | 2.00 | 0.00000 | 0.83959 |
+| 80 | 2.00 | 0.00000 | 0.43714 |
+| 120 | 2.00 | 0.00000 | 0.16491 |
+| 180 | 2.00 | 0.00000 | 0.05392 |
+| 240 | 2.00 | 0.00000 | 0.01937 |
+| 300 | 2.00 | 0.00000 | 0.00757 |
 | 360 | 2.00 | 0.00000 | 0.00298 |
 
 The first two rows are the check the two-day hold was entered for: inflow equals
-outflow at **0.16488**, which is the steady discharge computed at full pool, and it
+outflow at **0.16531**, which is the steady discharge computed at full pool, and it
 is unchanged on day 2. The run starts from a genuine steady state and stays in it
 until the pool begins to fall.
 
@@ -724,7 +724,7 @@ until the pool begins to fall.
 the upstream face stops being a source. The first frame to record that is t = 15,
 and from there to the end of the run — 345 days — nothing enters the dam at all.
 
-**The outflow peaks at 1.6662 on day 30**, which is **ten times** the steady
+**The outflow peaks at 1.6682 on day 30**, which is **ten times** the steady
 discharge the same dam passed under a full reservoir. Every bit of that is water
 the soil is giving up: it cannot be water arriving from the reservoir, because
 there is none. This water is released from storage, which is why a
@@ -733,7 +733,7 @@ steady solve at elevation 2 would report a small discharge and no lag at all.
 
 **Late in the run the outflow decays toward the new steady state.** It drops by
 roughly a factor of two and a half between successive frames at the end of the
-run — 0.05385, 0.01928, 0.00786, 0.00298 — which is what a diffusive relaxation
+run — 0.05392, 0.01937, 0.00757, 0.00298 — which is what a diffusive relaxation
 looks like, and
 finishes at **0.18% of the peak**. That decay and the 0.05 m of remaining lag from
 the frames are the same statement made two ways: by day 360 there is almost
@@ -741,13 +741,13 @@ nothing left to drain.
 
 The solver also keeps a running ledger of the whole run, which is the transient
 counterpart of the steady solver's flow-closure check. Over the 360 days,
-**106.958 m³ per m of dam crossed the boundary outward**, and the soil released
-**106.962 m³ per m** from storage. Those two are the same volume counted two
+**106.946 m³ per m of dam crossed the boundary outward**, and the soil released
+**106.951 m³ per m** from storage. Those two are the same volume counted two
 ways, so their difference is a measure of how well the run conserved water: over
 the whole run it comes to **0.004% of the volume transferred**. That difference is
 the `mass-balance closure` printed on each frame line of the log — a running
 figure, the imbalance accumulated up to that instant rather than the frame's own.
-It stays below 0.01% for the whole run, largest at **0.007%** on day 30, while the
+It stays below 0.01% for the whole run, largest at **0.007%** on day 15, while the
 pool is still falling.
 It is defined under [The ledger](../seep/transient.md#mass-balance-ledger).
 
@@ -782,6 +782,6 @@ problem and its seepage face from scratch, and in
 boundary type, a specified flux.
 
 <!-- Transient regression on the same dam with the stage times set (xslope_earth_dam_tseep.xlsx): total head sampled at interior stations at three saved times (early drawdown / end of drawdown / quasi-equilibrium), re-solved through the run_tests tseep_head path (tri3, target_size=2.0). -->
-<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.647;40:8:13.970;55:5:10.776, tolerance=0.05 -->
-<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.455;40:8:7.036;55:5:7.290, tolerance=0.05 -->
-<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.011;40:8:2.012;55:5:2.027, tolerance=0.05 -->
+<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.651;40:8:13.980;55:5:10.755, tolerance=0.05 -->
+<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.455;40:8:7.039;55:5:7.291, tolerance=0.05 -->
+<!-- test: file=../seep/files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.014;40:8:2.015;55:5:2.035, tolerance=0.05 -->

@@ -68,7 +68,7 @@ the report will run whatever methods we tick. Still, a quick run confirms the
 model arrived intact. Switch the mode strip to **LEM** (`Ctrl+1`) and click
 **Run → Run LEM…**. Leave **Method** on **Spencer**, **Analysis** on
 **Auto search** and **Number of slices** at 40, and click **Run**. The search
-returns **FS = 1.277**, COMBO-1's own answer on this model.
+returns **FS = 1.276**, COMBO-1's own answer on this model.
 
 ---
 
@@ -132,12 +132,12 @@ records that each searched for a surface of its own.
 
 | Analysis | Where the answer came from | Result |
 | --- | --- | :---: |
-| Seepage | attached to the file | 1.948 ft³/day per ft |
-| Bishop's Simplified Method | searched by the report | 1.251 |
-| Spencer's method | the search we ran | 1.277 |
-| Strength reduction | attached to the file | 1.270 |
+| Seepage | attached to the file | 1.951 ft³/day per ft |
+| Bishop's Simplified Method | searched by the report | 1.250 |
+| Spencer's method | the search we ran | 1.276 |
+| Strength reduction | attached to the file | 1.262 |
 
-<!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, num_slices=40, fs_bishop=1.251, fs_spencer=1.277, tolerance=0.005 -->
+<!-- test: file=files/xslope_johnson_res_solved.xlsx, type=circular_search, num_slices=40, fs_bishop=1.250, fs_spencer=1.276, tolerance=0.005 -->
 
 The seepage section states the conductivities and the mesh it was solved on, then
 the four fields the solution contains: the flow net, pore pressure, velocity
@@ -156,11 +156,11 @@ in it.
 Spencer's method solves for a pair — a factor of safety and an interslice
 inclination θ — at which both the force sum and the moment sum vanish, so it
 prints both sums rather than a single quotient. In the linked report they are on
-the page after the one shown above, and they close at F = 1.277 and θ = −16.53°,
-with residuals of −9.095e-12 and 2.328e-09 against terms coming to 377241 and
-86237852. Every number is printed at a precision the factor of safety can be
-rebuilt from: Bishop divides its own two sums, 490996 and 392613, and prints the
-1.251 they give. A report generated on another computer closes at the same F and
+the page after the one shown above, and they close at F = 1.276 and θ = −16.53°,
+with residuals of 7.276e-12 and −5.588e-09 against terms coming to 377341 and
+86263968. Every number is printed at a precision the factor of safety can be
+rebuilt from: Bishop divides its own two sums, 490801 and 392638, and prints the
+1.250 they give. A report generated on another computer closes at the same F and
 θ; its residuals, which sit at the level of rounding, can differ in their digits.
 
 ### Check its work
@@ -168,11 +168,11 @@ rebuilt from: Bishop divides its own two sums, 490996 and 392613, and prints the
 - **Open the document.** Its contents page lists the sections with a page number
   against each; headings without them mean the finishing step did not run, and
   Word rebuilds them with F9.
-- **Section 4 contains both methods** — §4.5 Bishop at 1.251 and §4.6 Spencer at
-  1.277, with §4.4 *Factors of Safety* comparing them. A method missing means its
+- **Section 4 contains both methods** — §4.5 Bishop at 1.250 and §4.6 Spencer at
+  1.276, with §4.4 *Factors of Safety* comparing them. A method missing means its
   box was never ticked.
 - **The seepage and finite element sections state the attached solutions'
-  numbers**, 1.948 ft³/day per ft and 1.270. Numbers that differ mean something
+  numbers**, 1.951 ft³/day per ft and 1.262. Numbers that differ mean something
   was solved again.
 - **The traceability stamp names the file the numbers came from**, with its
   SHA-256 digest. A digest that does not match the workbook means the report

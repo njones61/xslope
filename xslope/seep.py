@@ -914,19 +914,6 @@ _PIN_STEPS = 3           # un-relaxed steps read for candidates, and candidates 
 _PIN_TOL = 1e-6
 
 
-def _element_kr_avg(asm, p_nodes, kr_kw):
-    """Each element's kr averaged at its sampling points, in element order: the factor
-    :func:`_assembly_data` scales the element's saturated matrix by in head mode."""
-    out = np.empty(sum(len(g['idx']) for g in asm['groups']))
-    for g in asm['groups']:
-        idx = g['idx']
-        p_gp = p_nodes[g['conn']] @ g['N_kr'].T
-        kr = kr_relative_vec(p_gp, **{k: None if v is None else v[idx][:, None]
-                                      for k, v in kr_kw.items()})
-        out[idx] = (kr @ g['w_kr']) / g['wsum']
-    return out
-
-
 def _pinned_element_solve(asm, kr_kw, y, h, e, dir_mask, dir_values, f_ext, tol,
                           max_sweeps):
     """Steady sweeps from ``h`` with element ``e``'s kr solved for exactly at every
@@ -943,12 +930,10 @@ def _pinned_element_solve(asm, kr_kw, y, h, e, dir_mask, dir_values, f_ext, tol,
     conn = g['conn'][j]
     nn = len(conn)
     Kt = np.where(dir_mask[conn][:, None], 0.0, g['ke'][j])
-    one = np.array([e])
-    kw_e = {k: None if v is None else v[one][:, None] for k, v in kr_kw.items()}
+    one = np.array([j])
 
     def kr_e(h_e):
-        kr = kr_relative_vec(((h_e - y[conn]) @ g['N_kr'].T)[None, :], **kw_e)[0]
-        return float(kr @ g['w_kr']) / g['wsum']
+        return float(_group_kr_avg(g, (h_e - y[conn])[None, :], kr_kw, rows=one)[0])
 
     log_floor = np.log10(max(kr_e(y[conn] - 1e12), 1e-300))
     E = np.zeros((len(h), nn))
@@ -1615,7 +1600,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             pin_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
             dir_values = np.where(bc_type == 1, bc_values, y)
             log_kr = np.log10(np.maximum(
-                [_element_kr_avg(asm, t - y, kr_kw) for t in _tail_h], 1e-300))
+                [_elements_kr_avg(asm['groups'], t - y, **kr_kw) for t in _tail_h], 1e-300))
             swing = log_kr.max(axis=0) - log_kr.min(axis=0)
             h_try, log_try = h_new, [log_kr[-1]]
             for _ in range(_PIN_STEPS):
@@ -1624,7 +1609,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                                                  neumann=f_ext)
                 h_try = spsolve(A_try, b_try)
                 log_try.append(np.log10(np.maximum(
-                    _element_kr_avg(asm, h_try - y, kr_kw), 1e-300)))
+                    _elements_kr_avg(asm['groups'], h_try - y, **kr_kw), 1e-300)))
             steps = np.ptp(np.array(log_try), axis=0)
             pinned = [int(e) for e in np.argsort(-swing)[:1] if swing[e] > _PIN_MIN_SWING]
             pinned += [int(e) for e in np.argsort(-steps)[:_PIN_STEPS]
@@ -2134,71 +2119,146 @@ def _element_kmats(n_el, k1_vals, k2_vals, angles, flow=False):
     return K
 
 
-def _kr_sampling(et):
-    """(N, w) for the kr average of element type et: N is (n_pts, nn) shape
-    functions at the sampling points, w the quadrature weights.
+def _kr_cells(et):
+    """Sub-triangles of the parent element that its kr is averaged over, the pressure
+    head carried linearly across each.
 
-    The rule goes by the element's shape and not by its order: every triangle
-    averages kr over the 7-point symmetric rule of degree 5, and every quadrilateral
-    over 4x4 Gauss (the rule SEEP2D's qdflow samples kr at). A quadratic element's
-    pressure head is evaluated at those points through its own shape functions."""
-    if et in (3, 6):
-        a1, b1 = 0.059715871789770, 0.470142064105115
-        a2, b2 = 0.797426985353087, 0.101286507323456
-        w0, w1, w2 = 0.1125, 0.066197076394253, 0.062969590272414
-        pts = [(1/3, 1/3, 1/3, w0),
-               (a1, b1, b1, w1), (b1, a1, b1, w1), (b1, b1, a1, w1),
-               (a2, b2, b2, w2), (b2, a2, b2, w2), (b2, b2, a2, w2)]
-        if et == 3:
-            N = np.array([[L1, L2, L3] for L1, L2, L3, _ in pts])
-        else:
-            N = np.array([[L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
-                           4*L1*L2, 4*L2*L3, 4*L3*L1] for L1, L2, L3, _ in pts])
-        w = np.array([p[3] for p in pts])
-    elif et in (4, 8, 9):
-        p1 = [-0.86113631, -0.33998104, 0.33998104, 0.86113631]
-        w1 = [0.34785485, 0.65214516, 0.65214516, 0.34785485]
-        N, w = [], []
-        for i, xi in enumerate(p1):
-            for j, eta in enumerate(p1):
-                if et == 4:
-                    N.append([0.25*(1-xi)*(1-eta), 0.25*(1+xi)*(1-eta),
-                              0.25*(1+xi)*(1+eta), 0.25*(1-xi)*(1+eta)])
-                elif et == 8:
-                    N.append([0.25*(1-xi)*(1-eta)*(-xi-eta-1),
-                              0.25*(1+xi)*(1-eta)*(xi-eta-1),
-                              0.25*(1+xi)*(1+eta)*(xi+eta-1),
-                              0.25*(1-xi)*(1+eta)*(-xi+eta-1),
-                              0.5*(1-xi*xi)*(1-eta), 0.5*(1+xi)*(1-eta*eta),
-                              0.5*(1-xi*xi)*(1+eta), 0.5*(1-xi)*(1-eta*eta)])
-                else:
-                    N.append([0.25*xi*(xi-1)*eta*(eta-1), 0.25*xi*(xi+1)*eta*(eta-1),
-                              0.25*xi*(xi+1)*eta*(eta+1), 0.25*xi*(xi-1)*eta*(eta+1),
-                              0.5*(1-xi*xi)*eta*(eta-1), 0.5*xi*(xi+1)*(1-eta*eta),
-                              0.5*(1-xi*xi)*eta*(eta+1), 0.5*xi*(xi-1)*(1-eta*eta),
-                              (1-xi*xi)*(1-eta*eta)])
-                w.append(w1[i] * w1[j])
-        N, w = np.array(N), np.array(w)
-    else:
-        raise ValueError(f"Unknown element type {et}")
-    return N, w
+    Returns ``(P, tris)``: ``P`` (n_pts, nn) gives the head at each sub-point from
+    the nodal heads, and ``tris`` (n_tri, 3) the sub-points of each sub-triangle.
+    tri3 is its own sub-triangle; tri6 is cut at its nodes into three corner
+    triangles and a center one; a quadrilateral is cut into triangles that join a
+    center point to each edge (quad4) or half-edge (quad8, quad9). The center is the
+    element's own interpolation there: the center node of quad9, the corner mean of
+    quad4, and on quad8 half the midside sum less a quarter of the corner sum."""
+    P, tris = _storage_cells(et)
+    if et == 8:
+        P = P.copy()
+        P[8] = _shape_N(8, 0.0, 0.0)
+    return P, tris
 
 
-def _elements_kr_avg(elements, element_types, p_nodes, kr0, h0, vg_a=None, vg_n=None,
-                     vg_l=None, model=None):
-    """Each element's kr averaged over its rule (:func:`_kr_sampling`), in element
-    order, from per-element parameter arrays: the one number :func:`_assembly_data`
-    scales the element's saturated matrix by. Whatever else needs an element's kr
-    (the velocity recovery, the flow-net boundary flux) reads it here, so the flux it
-    reports is the flux the head solve balanced."""
-    out = np.ones(len(elements))
+#: The van Genuchten and Gardner laws have no closed-form average over a triangle, so
+#: each sub-triangle is cut into k x k equal parts, each sampled by the 7-point rule:
+#: 112 points per sub-triangle at k = 4. Measured against the converged average on
+#: the solved fields of a van Genuchten dam (alpha 0.2835 1/m, n 2.765; elements of
+#: 0.3 m), the element kr is within 1.2e-5 on tri3 and 2.1e-6 on tri6 and
+#: quadrilaterals (7.4e-4 and 1.1e-4 at k = 1). The error grows as the curve steepens
+#: against the element: over random triangles with alpha times the head difference
+#: across the triangle up to 2, it reaches 8e-4 for Gardner and, for van Genuchten at
+#: n = 1.1, where kr has a cusp at zero suction, 3e-2.
+_KR_DENSE_K = 4
+_KR_DENSE = None
+
+
+def _kr_groups(nodes, elements, element_types):
+    """One group per element type, carrying what the element kr average needs: the
+    connectivity, the sub-triangles (:func:`_kr_cells`), and each sub-triangle's
+    share of the element's area, measured on the element as it lies in the mesh."""
+    elements = np.asarray(elements)
+    element_types = np.asarray(element_types)
+    groups = []
     for et in np.unique(element_types):
         idx = np.where(element_types == et)[0]
-        N, w = _kr_sampling(int(et))
-        kr = kr_relative_vec(
-            p_nodes[elements[idx][:, :int(et)]] @ N.T, kr0[idx][:, None], h0[idx][:, None],
-            *(None if a is None else a[idx][:, None] for a in (vg_a, vg_n, vg_l, model)))
-        out[idx] = (kr @ w) / w.sum()
+        conn = elements[idx][:, :int(et)]
+        P, tris = _kr_cells(int(et))
+        X = np.einsum('pn,enx->epx', P, nodes[conn])[:, tris]    # (n_e, n_tri, 3, 2)
+        d1, d2 = X[:, :, 1] - X[:, :, 0], X[:, :, 2] - X[:, :, 0]
+        area = 0.5 * np.abs(d1[..., 0] * d2[..., 1] - d1[..., 1] * d2[..., 0])
+        total = area.sum(axis=1, keepdims=True)
+        share = np.where(total > 0.0, area / np.where(total > 0.0, total, 1.0),
+                         1.0 / len(tris))
+        groups.append({'et': int(et), 'idx': idx, 'conn': conn,
+                       'kr_P': P, 'kr_tris': tris, 'kr_share': share})
+    return groups
+
+
+def _ramp_mean(a, b, c):
+    """Area mean of max(u, 0) over a triangle on which u is linear, from its vertex
+    values sorted a <= b <= c. Every quotient is of a cube by two differences no
+    smaller than its base, so vertex values that coincide cost no accuracy."""
+    mean = (a + b + c) / 3.0
+    up = (c > 0.0) & (b <= 0.0)          # a small triangle at c above zero
+    dn = (a < 0.0) & (b > 0.0)           # all but a small triangle at a
+    ca = np.where(up | dn, c - a, 1.0)
+    cb = np.where(up, c - b, 1.0)
+    ba = np.where(dn, b - a, 1.0)
+    return np.where(a >= 0.0, mean,
+                    np.where(up, c ** 3 / (3.0 * ca * cb),
+                             np.where(dn, mean - a ** 3 / (3.0 * ba * ca), 0.0)))
+
+
+def _lf_tri_kr(U, kr0, h0):
+    """Exact area average of the linear-front kr over triangles on which the pressure
+    head is linear. ``U`` (..., 3) holds the vertex heads; ``kr0`` and ``h0``
+    broadcast against U[..., 0].
+
+    The law is kr0 + (1 - kr0) [max(p - h0, 0) - max(p, 0)] / (-h0), so its average
+    is two ramp means (:func:`_ramp_mean`). A triangle wholly saturated returns 1 and
+    one wholly below h0 returns kr0, both exactly. With h0 >= 0 the law is a step at
+    p = 0 and the average is kr0 plus (1 - kr0) times the saturated share of the area."""
+    Us = np.sort(U, axis=-1)
+    a, b, c = Us[..., 0], Us[..., 1], Us[..., 2]
+    band = h0 < 0.0
+    h_safe = np.where(band, h0, -1.0)
+    wet = (_ramp_mean(a - h_safe, b - h_safe, c - h_safe) - _ramp_mean(a, b, c)) / (-h_safe)
+    if not np.all(band):
+        up = (c > 0.0) & (b <= 0.0)
+        dn = (a < 0.0) & (b > 0.0)
+        ca = np.where(up | dn, c - a, 1.0)
+        step = np.where(up, c * c / (ca * np.where(up, c - b, 1.0)),
+                        np.where(dn, 1.0 - a * a / (np.where(dn, b - a, 1.0) * ca), 0.0))
+        wet = np.where(band, wet, step)
+    kr = kr0 + (1.0 - kr0) * np.clip(wet, 0.0, 1.0)
+    return np.where(a >= 0.0, 1.0, np.where(c <= np.where(band, h0, 0.0), kr0, kr))
+
+
+def _group_kr_avg(g, p_el, kr_kw, rows=None):
+    """kr average of the elements of one :func:`_kr_groups` group, from their nodal
+    pressure heads ``p_el`` (n, nn). ``kr_kw`` holds the per-element kr parameters in
+    mesh element order; ``rows`` picks elements of the group (all of them by default).
+
+    Each sub-triangle's average is exact for the linear-front law
+    (:func:`_lf_tri_kr`) and a :data:`_KR_DENSE_K` rule for van Genuchten and
+    Gardner; the element's is their sum weighted by area share. Elements of one group
+    may follow different laws."""
+    global _KR_DENSE
+    idx = g['idx'] if rows is None else g['idx'][rows]
+    share = g['kr_share'] if rows is None else g['kr_share'][rows]
+    U = (p_el @ g['kr_P'].T)[:, g['kr_tris']]                    # (n, n_tri, 3)
+    kw = {k: None if v is None else np.asarray(v)[idx] for k, v in kr_kw.items()}
+    model = kw.get('model')
+    lf = None if model is None else model == KR_LF
+    if lf is None or lf.all():
+        return (_lf_tri_kr(U, kw['kr0'][:, None], kw['h0'][:, None]) * share).sum(axis=1)
+    out = np.empty(len(idx))
+    if lf.any():
+        out[lf] = (_lf_tri_kr(U[lf], kw['kr0'][lf, None], kw['h0'][lf, None])
+                   * share[lf]).sum(axis=1)
+    if _KR_DENSE is None:
+        _KR_DENSE = _subtri_rule(_KR_DENSE_K)
+    L, wq = _KR_DENSE
+    out[~lf] = 1.0                      # kr is 1 wherever the element is saturated
+    nl = np.flatnonzero(~lf & (U.min(axis=(1, 2)) < 0.0))
+    if len(nl):
+        kr = kr_relative_vec(U[nl] @ L.T, **{k: None if v is None else v[nl][:, None, None]
+                                             for k, v in kw.items()})
+        out[nl] = np.einsum('etq,q,et->e', kr, wq, share[nl])
+    return out
+
+
+def _elements_kr_avg(groups, p_nodes, kr0, h0, vg_a=None, vg_n=None, vg_l=None,
+                     model=None):
+    """Each element's kr, in element order: the area average of kr over the element
+    with the pressure head carried linearly across its sub-triangles
+    (:func:`_group_kr_avg`), from per-element parameter arrays and the groups of
+    :func:`_kr_groups`. It is the one number the element's saturated matrix is scaled
+    by, and everything else that needs an element's kr (the velocity recovery, the
+    flow-net boundary flux, the stream function, the transient stepper) reads it
+    here, so the flux it reports is the flux the head solve balanced."""
+    kr_kw = dict(kr0=kr0, h0=h0, vg_a=vg_a, vg_n=vg_n, vg_l=vg_l, model=model)
+    out = np.ones(sum(len(g['idx']) for g in groups))
+    for g in groups:
+        out[g['idx']] = _group_kr_avg(g, p_nodes[g['conn']], kr_kw)
     return out
 
 
@@ -2321,23 +2381,18 @@ def _build_assembly(nodes, elements, element_types, k1_vals, k2_vals, angles,
                     flow=False):
     """Precompute everything reusable across assemblies of one mesh.
 
-    Returns a dict with per-element-type groups (saturated ke stacks, kr
-    sampling matrices, connectivity) plus the concatenated COO row/col index
+    Returns a dict with per-element-type groups (saturated ke stacks, the kr
+    sub-triangles of :func:`_kr_groups`, connectivity) plus the concatenated COO row/col index
     arrays. Build once per solve; each assembly is then a kr scaling plus a
     single coo_matrix construction."""
     elements = np.asarray(elements)
     element_types = np.asarray(element_types)
     n_el = len(elements)
     Kmats = _element_kmats(n_el, k1_vals, k2_vals, angles, flow=flow)
-    groups, rows_all, cols_all = [], [], []
-    for et in np.unique(element_types):
-        idx = np.where(element_types == et)[0]
-        nn = int(et)
-        conn = elements[idx][:, :nn]
-        ke = _batched_ke_sat(int(et), nodes[conn], Kmats[idx])
-        N_kr, w_kr = _kr_sampling(int(et))
-        groups.append({'et': int(et), 'idx': idx, 'conn': conn, 'ke': ke,
-                       'N_kr': N_kr, 'w_kr': w_kr, 'wsum': w_kr.sum()})
+    groups, rows_all, cols_all = _kr_groups(nodes, elements, element_types), [], []
+    for g in groups:
+        conn, nn = g['conn'], g['et']
+        g['ke'] = _batched_ke_sat(nn, nodes[conn], Kmats[g['idx']])
         rows_all.append(np.repeat(conn, nn, axis=1).ravel())
         cols_all.append(np.tile(conn, (1, nn)).ravel())
     return {'groups': groups, 'n_nodes': len(nodes),
@@ -2349,30 +2404,16 @@ def _assembly_data(asm, p_nodes=None, kr0=None, h0=None, mode='head',
     """Concatenated COO data for the global matrix.
 
     p_nodes=None -> saturated assembly. Otherwise each element's ke is scaled
-    by factor(kr_avg) with kr averaged at the type-specific sampling points
-    (mode='head': kr_avg; mode='stream': 1/kr_avg, guarded). ``model``/``vg_a``/
-    ``vg_n``/``vg_l`` (per-element) select the unsaturated model; with ``model``
-    None the kr is the linear-front function exactly as before."""
-    parts = []
-    for g in asm['groups']:
-        if p_nodes is None:
-            parts.append(g['ke'].ravel())
-            continue
-        idx = g['idx']
-        p_gp = p_nodes[g['conn']] @ g['N_kr'].T              # (n_e, n_pts)
-        kr = kr_relative_vec(
-            p_gp, kr0[idx][:, None], h0[idx][:, None],
-            None if vg_a is None else vg_a[idx][:, None],
-            None if vg_n is None else vg_n[idx][:, None],
-            None if vg_l is None else vg_l[idx][:, None],
-            None if model is None else model[idx][:, None])
-        kr_avg = (kr @ g['w_kr']) / g['wsum']
-        if mode == 'head':
-            factor = kr_avg
-        else:
-            factor = np.where(kr_avg > 1e-12, 1.0 / np.maximum(kr_avg, 1e-300), 1e10)
-        parts.append((factor[:, None, None] * g['ke']).ravel())
-    return np.concatenate(parts)
+    by its kr average (:func:`_elements_kr_avg`) in mode='head', and by its
+    reciprocal, guarded, in mode='stream'. ``model``/``vg_a``/``vg_n``/``vg_l``
+    (per-element) select the unsaturated model; ``model`` None is the linear front."""
+    if p_nodes is None:
+        return np.concatenate([g['ke'].ravel() for g in asm['groups']])
+    factor = _elements_kr_avg(asm['groups'], p_nodes, kr0, h0, vg_a, vg_n, vg_l, model)
+    if mode != 'head':
+        factor = np.where(factor > 1e-12, 1.0 / np.maximum(factor, 1e-300), 1e10)
+    return np.concatenate([(factor[g['idx']][:, None, None] * g['ke']).ravel()
+                           for g in asm['groups']])
 
 
 def _csr_from_data(asm, data):
@@ -3060,7 +3101,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
     n_el = len(elements)
     if kr0 is not None and h0 is not None:
         kr_avg = _elements_kr_avg(
-            np.asarray(elements), np.asarray(element_types), p_nodes,
+            _kr_groups(nodes, elements, element_types), p_nodes,
             *(None if a is None else np.broadcast_to(np.asarray(a), (n_el,))
               for a in (kr0, h0, vg_a, vg_n, vg_l, model)))
     else:
@@ -3469,8 +3510,8 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             vg_l = np.broadcast_to(np.asarray(vg_l, dtype=float), (n_el,))
         if model is not None:
             model = np.broadcast_to(np.asarray(model), (n_el,))
-    kr_avg = (_elements_kr_avg(elements, element_types, head - nodes[:, 1], kr0, h0,
-                               vg_a, vg_n, vg_l, model)
+    kr_avg = (_elements_kr_avg(_kr_groups(nodes, elements, element_types),
+                               head - nodes[:, 1], kr0, h0, vg_a, vg_n, vg_l, model)
               if use_kr else np.ones(n_el))
 
     for et in np.unique(element_types):

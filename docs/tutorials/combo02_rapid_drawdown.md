@@ -315,41 +315,41 @@ Click **Run**. The Log pane follows the search:
 
 ```text
 Searching for the critical circular surface with SPENCER (rapid drawdown)…
-[↻ iteration 1] center=(251.00, 235.00), FS=1.2021, grid=22.7578
-[↻ iteration 8] center=(248.16, 239.27), FS=1.1977, grid=1.4224
-[↻ iteration 14] center=(246.38, 242.82), FS=1.1956, grid=0.3556
-[✓ converged] Iter=14, FS=1.1956 (ΔFS<0.0005) at (x=246.38, y=242.82, depth=82.13), elapsed time=19.85 seconds
-[! unsolved trials] Spencer could not solve 5 of 729 trial surfaces
+[↻ iteration 1] center=(251.00, 235.00), FS=1.2026, grid=22.7578
+[↻ iteration 8] center=(248.16, 239.27), FS=1.1981, grid=1.4224
+[↻ iteration 13] center=(246.38, 242.11), FS=1.1962, grid=0.3556
+[✓ converged] Iter=13, FS=1.1962 (ΔFS<0.0005) at (x=246.38, y=242.11, depth=82.05), elapsed time=106.69 seconds
+[! unsolved trials] Spencer could not solve 5 of 711 trial surfaces
 Critical FS = 1.196
-Rapid drawdown stages on the critical surface: Stage 1 FS = 1.4967, Stage 2 FS = 1.1956, Stage 3 FS = not required
-Sliding mass = 1,145,263.9 lb/ft over 258.16 ft of failure surface
+Rapid drawdown stages on the critical surface: Stage 1 FS = 1.4978, Stage 2 FS = 1.1962, Stage 3 FS = not required
+Sliding mass = 1,144,043.9 lb/ft over 258.24 ft of failure surface
 ```
 
 The `unsolved trials` line counts the trial surfaces Spencer's method could not
-solve, 5 of the 729 the search tried. The search skips them.
+solve, 5 of the 711 the search tried. The search skips them.
 
 Every trial surface in that search received a full three-stage analysis, and the
 last lines of the log give the three stages of the critical surface:
 
 | Stage | | FS |
 | :---: | --- | :---: |
-| 1 | full pool, drained | 1.4967 |
-| 2 | drawn down, undrained core | **1.1956** |
+| 1 | full pool, drained | 1.4978 |
+| 2 | drawn down, undrained core | **1.1962** |
 | 3 | drawn down, drained | not required |
 
 **The rapid-drawdown factor of safety is 1.196**, on a circle centered at
-(246.38, 242.82) with a radius of 160.70 ft — 29 ft upstream of where the search
+(246.38, 242.11) with a radius of 160.06 ft — 29 ft upstream of where the search
 started, with its tangent 7 ft higher, at elevation 82.1 rather than 75. It
 daylights just past the crest at x = 392 and toes on the upstream foreshore at
 x = 173.
 
 **Stage 3 was not required.** The slicer puts a slice boundary wherever the
 surface crosses a material boundary, and of the 40 slices it returns,
-**twelve cut the core** — a count the
-analysis report's slice table gives. On all 12 the drained strength at the
+**thirteen cut the core** — a count the
+analysis report's slice table gives. On all 13 the drained strength at the
 stage-2 stresses came out higher than the undrained strength stage 2 used, so
 there was nothing lower to substitute. Stage 2 governs, and the drawdown costs
-this slope 0.30 against its own full-pool stage-1 figure of 1.497.
+this slope 0.30 against its own full-pool stage-1 figure of 1.498.
 
 <!-- test: file=files/xslope_johnson_rapid_start.xlsx, type=circular_search, method=spencer, rapid=true, num_slices=40, expected_fs=1.196, tolerance=0.005 -->
 
@@ -357,7 +357,7 @@ this slope 0.30 against its own full-pool stage-1 figure of 1.497.
 
 The figure is the governing stage's own state, not stage 1's: the pale blue band
 under the failure surface is the stage-2 pore pressure on each slice base,
-reaching 1705 psf on the slice table's `u` column, and the green hatched band
+reaching 1711 psf on the slice table's `u` column, and the green hatched band
 above it is the effective normal stress the stage-2 strengths were computed from.
 Both water loads are drawn on the upstream face — the stage-1 reservoir as well
 as the residual pool — because
@@ -494,8 +494,8 @@ The **Seep · Solution** tab:
 
 ![Set 1's steady solution, full pool](images/combo02_seep_set1.png){width=1000}
 
-**Set 1** settles in **20 unconfined sweeps** to a total discharge of
-**1.9566 ft³/day per ft** of dam, printed on the figure as 1.957. The head runs
+**Set 1** settles in **45 unconfined sweeps** to a total discharge of
+**1.9598 ft³/day per ft** of dam, printed on the figure as 1.960. The head runs
 from 100.000 to 160.000 ft, the two boundary values and nothing outside them.
 The heavy black line traces the phreatic surface: nearly
 flat across the upstream shell at reservoir level, falling about three-quarters of the 60 ft
@@ -506,7 +506,7 @@ face. The contours crowd where head falls fastest, and each channel between two
 flow lines carries an equal share of the discharge. Three-quarters of the head loss
 is in the core, which is what a cutoff key is for.
 (In [COMBO-1](combo01_seepage_stability.md#solving-it) the same boundary set
-reads 1.948 on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
+reads 1.951 on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
 than 2,080, because quadratic elements add a node on every edge. The 0.45%
 difference between the two answers comes from that discretization.)
 
@@ -514,7 +514,7 @@ The **Seep · Solution 2** tab:
 
 ![Set 2's steady solution, drawn-down pool](images/combo02_seep_set2.png){width=1000}
 
-**Set 2** settles in **8 sweeps** to **0.2695 ft³/day per ft**, a seventh of
+**Set 2** settles in **8 sweeps** to **0.2697 ft³/day per ft**, a seventh of
 Set 1's discharge on a sixth of the head difference. The head runs from 100.000 to
 110.000 ft, and the phreatic surface leaves the residual pool at elevation 110,
 gives up about a foot crossing the upstream shell, drops 6 ft through the core,
@@ -545,33 +545,34 @@ run if either field is missing.
 
 Now we run **Run → Run LEM…** again with the same settings — Spencer, Auto
 search, 40 slices, Rapid drawdown ticked. The search leaves the same starting circle and
-settles a little upstream of where the pair's did, at (245.31, 243.53) with a
-radius of 161.82 ft:
+settles a little upstream of where the pair's did, at (243.89, 250.65) with a
+radius of 168.78 ft:
 
 | Stage | | FS |
 | :---: | --- | :---: |
-| 1 | full pool, drained | 1.5610 |
-| 2 | drawn down, undrained core | **1.2103** |
+| 1 | full pool, drained | 1.5646 |
+| 2 | drawn down, undrained core | **1.2104** |
 | 3 | drawn down, drained | not required |
 
 ![The three-stage answer from two steady solutions](images/combo02_solution_steady.png){width=1000}
 
 **The rapid-drawdown factor of safety is 1.210**, against 1.196 from the
-piezometric pair. Stage 2 governs again, on all 12 core slices the slice table
-counts, and the pale blue band under the surface peaks at 1727 psf on its `u`
-column against the pair's 1705.
+piezometric pair. Stage 2 governs again, on all 13 core slices the slice table
+counts, and the pale blue band under the surface peaks at 1719 psf on its `u`
+column against the pair's 1711.
 
 <!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=steady, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.210, tolerance=0.005, benchmark=COMBO-2-steady -->
 
-The two surfaces sit about 1 ft apart. Both daylight just past the crest at
-x = 392 and toe on the upstream foreshore within 3 ft of each other, at x = 171 against
-x = 173 for the pair, so only the water separates the two answers. Dropping the
+The two surfaces nearly coincide. Their lowest points are 0.2 ft apart in
+elevation, both daylight just past the crest, at x = 394 and x = 392, and they toe
+on the upstream foreshore at x = 168 against x = 173 for the pair, so only the water
+separates the two answers. Dropping the
 undrained envelope shows that most clearly. Run as ordinary drained problems —
 **Rapid drawdown** unticked, each searching for itself — the drawn-down state
-gives 1.3344 from Line 2 and 1.3327 from Set 2, within 0.01 of each other,
+gives 1.3349 from Line 2 and 1.3328 from Set 2, within 0.01 of each other,
 because Line 2 was traced off Set 2's own phreatic surface. At full
 pool — the same two drained searches, run from Line 1 and from Set 1 — the pair
-gives 1.4796 and 1.5214, and the sketch comes out 2.7% lower: a static column
+gives 1.4805 and 1.5222, and the sketch comes out 2.7% lower: a static column
 measured down from Line 1 puts more pore pressure deep in the section than the
 solved field does. That full-pool difference reaches the
 drawdown answer, because stage 2 computes its undrained strengths from the
@@ -669,7 +670,7 @@ constant. Nothing else is needed to make a boundary time-varying.
 
 Nothing about the numbers already computed changes. A steady solve reads a
 series-bound value at t = 0, so Set 1 with `pool` bound to it solves at 160 and
-returns the same 1.9566 ft³/day per ft as before, and reports this in its log —
+returns the same 1.9598 ft³/day per ft as before, and reports this in its log —
 *"Series 'pool' read at t = 0 for the steady solve: reservoir value 160"*.
 
 ### Running the transient seepage analysis
@@ -687,24 +688,24 @@ The run solves its initial condition first — the same unconfined iteration as
 the steady run — and then prints a line per saved frame:
 
 ```text
-  t=5: frame saved (steps so far=6, mass-balance closure=3.90e-08)
-  t=35: frame saved (steps so far=41, mass-balance closure=1.93e-04)
-  t=50: frame saved (steps so far=57, mass-balance closure=1.45e-04)
-  t=80: frame saved (steps so far=78, mass-balance closure=1.47e-04)
-  t=150: frame saved (steps so far=100, mass-balance closure=1.36e-04)
-  t=200: frame saved (steps so far=113, mass-balance closure=1.31e-04)
-  t=300: frame saved (steps so far=121, mass-balance closure=1.25e-04)
-  t=400: frame saved (steps so far=134, mass-balance closure=1.20e-04)
-  t=600: frame saved (steps so far=165, mass-balance closure=1.16e-04)
-  t=800: frame saved (steps so far=198, mass-balance closure=1.14e-04)
-  t=1000: frame saved (steps so far=224, mass-balance closure=1.13e-04)
+  t=5: frame saved (steps so far=6, mass-balance closure=6.19e-08)
+  t=35: frame saved (steps so far=39, mass-balance closure=1.72e-04)
+  t=50: frame saved (steps so far=59, mass-balance closure=1.62e-04)
+  t=80: frame saved (steps so far=77, mass-balance closure=1.72e-04)
+  t=150: frame saved (steps so far=99, mass-balance closure=1.65e-04)
+  t=200: frame saved (steps so far=122, mass-balance closure=1.65e-04)
+  t=300: frame saved (steps so far=133, mass-balance closure=1.56e-04)
+  t=400: frame saved (steps so far=145, mass-balance closure=1.50e-04)
+  t=600: frame saved (steps so far=175, mass-balance closure=1.46e-04)
+  t=800: frame saved (steps so far=208, mass-balance closure=1.43e-04)
+  t=1000: frame saved (steps so far=230, mass-balance closure=1.42e-04)
 ```
 
 **Twelve frames** come out of the run, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
 600, 800 and 1000: the union of the save-interval grid, the extra
 save times, the schedule's own breakpoints, and the two stage times. The run
-took **224 steps**, and their distribution shows where the field changes:
-**57 of them, 25%, are inside the first 50 days**, which are 5% of the run's
+took **230 steps**, and their distribution shows where the field changes:
+**59 of them, 26%, are inside the first 50 days**, which are 5% of the run's
 duration. The field moves while the pool is falling and barely at all afterward.
 
 The two frames the drawdown will read are the first and the fourth. The
@@ -725,10 +726,10 @@ waterlines with apex-down markers give the reservoir and tailwater levels the
 frame stands at.
 
 At **stage 1**, t = 0, the reservoir is full and the frame reproduces the steady
-solution above: inflow and outflow both read 1.957 ft³/day per ft, Set 1's
+solution above: inflow and outflow both read 1.960 ft³/day per ft, Set 1's
 discharge. At **stage 2**, t = 50, the pool has reached elevation 110 — the
 upstream water level marker has dropped 50 ft — and inflow has fallen to zero
-while 15.454 ft³/day per ft still leaves the section, every bit of it drained
+while 15.447 ft³/day per ft still leaves the section, every bit of it drained
 storage. The upstream shell has followed the pool partway down, with the
 foundation beneath the upstream slope beginning to unload. The core has barely
 moved. It still holds a pocket of head near 150 ft, in the middle of the section,
@@ -761,32 +762,32 @@ pool the schedule has reached at t = 50 — elevation 110, 624 psf at its deepes
 
 | Stage | | FS |
 | :---: | --- | :---: |
-| 1 | full pool, drained | 1.5641 |
-| 2 | drawn down, undrained core | 1.0363 |
-| 3 | drawn down, drained | **1.0361** |
+| 1 | full pool, drained | 1.5654 |
+| 2 | drawn down, undrained core | 1.0368 |
+| 3 | drawn down, drained | **1.0366** |
 
 ![The three-stage answer from the transient frames](images/combo02_solution_transient.png){width=1000}
 
-**The rapid-drawdown factor of safety is 1.036**, on a circle at (243.93, 244.90)
-with a radius of 163.64 ft — 2 ft again from the two-steady route's. Stage 1
-reads 1.5641 against that route's 1.5610, on the same field: the frame at t = 0
-*is* the steady solution of Set 1, and the three thousandths between the two
-numbers are the two searches settling on two circles.
+**The rapid-drawdown factor of safety is 1.037**, on a circle at (243.93, 244.90)
+with a radius of 163.64 ft, its lowest point 0.6 ft below the two-steady route's.
+Stage 1 reads 1.5654 against that route's 1.5646, on the same field: the frame at
+t = 0 *is* the steady solution of Set 1, and the eight ten-thousandths between the
+two numbers are the two searches settling on two circles.
 
 The gap between the two answers opens at stage 2, where the peak pore pressure on
 the slice bases reaches **2698 psf** on the slice table's `u` column against the
-two-steady route's 1727 — the core's undissipated head, read straight off the
+two-steady route's 1719 — the core's undissipated head, read straight off the
 frame.
 
-**Stage 3 ran here, and it governs.** Three of the 12 core slices the same table
+**Stage 3 ran here, and it governs.** Three of the 14 core slices the same table
 counts came out stronger undrained than drained at these stresses, so the drained
-strength was substituted on them and the reported answer is stage 3's 1.0361 rather than
-stage 2's 1.0363. Two ten-thousandths separate the two. In the
+strength was substituted on them and the reported answer is stage 3's 1.0366 rather than
+stage 2's 1.0368. Two ten-thousandths separate the two. In the
 [sweep below](#the-governing-stage-flip) we find why they are this close: the
-core's own $d$ of 250 psf sits 14 psf above the value at which the first slice
+core's own $d$ of 250 psf sits 9 psf above the value at which the first slice
 crosses over.
 
-<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.036, tolerance=0.005, benchmark=COMBO-2-transient -->
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.037, tolerance=0.005, benchmark=COMBO-2-transient -->
 
 ---
 
@@ -798,35 +799,36 @@ each run searched from that circle for the surface its own water made critical:
 
 | Part | Two water states from | Critical circle | Stage 1 | Stage 2 | Stage 3 | **FS** |
 | :---: | --- | :---: | :---: | :---: | :---: | :---: |
-| 1 | Piezometric Lines 1 and 2 | (246.4, 242.8) R 160.7 | 1.4967 | 1.1956 | not required | **1.196** |
-| 2 | Two steady seepage solutions | (245.3, 243.5) R 161.8 | 1.5610 | 1.2103 | not required | **1.210** |
-| 3 | Two frames of a transient run | (243.9, 244.9) R 163.6 | 1.5641 | 1.0363 | 1.0361 | **1.036** |
+| 1 | Piezometric Lines 1 and 2 | (246.4, 242.1) R 160.1 | 1.4978 | 1.1962 | not required | **1.196** |
+| 2 | Two steady seepage solutions | (243.9, 250.7) R 168.8 | 1.5646 | 1.2104 | not required | **1.210** |
+| 3 | Two frames of a transient run | (243.9, 244.9) R 163.6 | 1.5654 | 1.0368 | 1.0366 | **1.037** |
 
-The three centers span 3 ft and the three radii 3 ft; all three surfaces daylight
-just past the crest at x = 392 and toe on the upstream foreshore between x = 168 and
-x = 173. So the spread across the answers — 0.174, 17% of the lowest — comes from
+The three centers lie within 9 ft of one another and the three radii within 9 ft,
+but the surfaces nearly coincide: their lowest points lie within a foot of one
+another in elevation, all three daylight just past the crest, between x = 392 and
+x = 394, and they toe on the upstream foreshore between x = 168 and x = 173. So the spread across the answers — 0.174, 17% of the lowest — comes from
 the water and not from the geometry, and almost all of it separates the transient
 route from the other two. Ordinary drained searches at each end of the drawdown
 put that spread in context:
 
 | Run | Core strength | Pore pressures | FS |
 | --- | --- | --- | :---: |
-| Full pool | drained | full-pool field | 1.521 |
+| Full pool | drained | full-pool field | 1.522 |
 | Drawn down, long term | drained | re-equilibrated field | 1.333 |
 | Drawn down, long term | **undrained** | re-equilibrated field | **1.210** |
-| Drawn down, day 50 | drained | transient frame | 1.057 |
-| Drawn down, day 50 | **undrained** | transient frame | **1.036** |
+| Drawn down, day 50 | drained | transient frame | 1.058 |
+| Drawn down, day 50 | **undrained** | transient frame | **1.037** |
 
 The two bold rows are the two-steady and transient drawdown answers; the other
 three are ordinary drained runs from the same starting circle, each reporting a
 critical surface of its own, and between them they separate the drawdown into its
 parts.
 
-<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.521, tolerance=0.005, benchmark=COMBO-2-drained-full -->
-<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=transient, seep_time=50, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.057, tolerance=0.005, benchmark=COMBO-2-drained-day50 -->
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.522, tolerance=0.005, benchmark=COMBO-2-drained-full -->
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=transient, seep_time=50, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.058, tolerance=0.005, benchmark=COMBO-2-drained-day50 -->
 
 **The lowered pool costs 0.19 in the long run.** Taking 50 ft of reservoir off
-the dam and letting its pore pressures fully catch up moves the slope from 1.521
+the dam and letting its pore pressures fully catch up moves the slope from 1.522
 to 1.333, at drained strength throughout. Two things change between those runs
 and they pull in opposite directions: the water load that was holding the face up
 is gone, and the pore pressures under the drawn-down pool are lower. The load
@@ -835,7 +837,7 @@ is the long-term condition the dam settles into months after the drawdown.
 
 **The core's retained water costs a further 0.27.** Holding the day-50 pore
 pressures instead of the re-equilibrated ones, still at drained strength, moves
-1.333 to 1.057. Nothing about the strengths differs between those two runs.
+1.333 to 1.058. Nothing about the strengths differs between those two runs.
 
 **The undrained strength costs 0.12 on one field and 0.02 on the other.** A
 drawdown hurts a clay core in two ways. The core keeps the pore pressure the full
@@ -845,7 +847,7 @@ generates more pore pressure when it is sheared without draining — the
 re-equilibrated field the pore pressures include neither, so the envelope supplies
 both and the answer moves 1.333 to 1.210. On the day-50 transient field the
 retained pressure is already in the pore pressures, so the envelope adds only the
-shear-induced part, and the answer moves 1.057 to 1.036. On this core that part is
+shear-induced part, and the answer moves 1.058 to 1.037. On this core that part is
 small — its undrained strength sits close to its drained strength at these
 stresses, which is the same fact the [sweep](#the-governing-stage-flip)
 below measures; a more contractive core would show a larger step even on the
@@ -869,8 +871,8 @@ drained strength, so the stage-2 curve climbs while the stage-3 curve flattens
 onto the ordinary drained answer at the day-50 pore pressures. The run reports the
 lower of the two at every value.
 
-**The governing stage changes at d = 236 psf**, 14 psf *below* the value on the file, which is
-why the model as shipped already reports stage 3. Below 236 psf every core slice
+**The governing stage changes at d = 241 psf**, 9 psf *below* the value on the file, which is
+why the model as shipped already reports stage 3. Below 241 psf every core slice
 is stronger undrained than drained, so stage 3 is not run and only the stage-2
 curve is drawn. Past the crossover a stronger envelope changes almost nothing — the
 drained strength has become the limit — and when a run reports stage 3 as its
@@ -885,7 +887,7 @@ The three answers on this dam are not equally reliable.
 **The transient frames are the most faithful statement of a drawdown.** They carry
 the actual lowering rate and the actual elapsed time, so the stage-2 field is how
 far dissipation has genuinely progressed by day 50 rather than an assumption about
-it. On this dam that reads **1.036**.
+it. On this dam that reads **1.037**.
 
 **Two steady solutions state a limiting case, and on this model it is the
 optimistic one.** Set 2 describes the dam after the pore pressures have fully
@@ -928,7 +930,7 @@ This tutorial covered:
   a second statement of where the water is, and **Water loads** on `auto`.
 - Three sources for that second statement on one dam — a piezometric pair, two
   steady seepage solutions, two frames of a transient run — reading 1.196, 1.210,
-  and 1.036, the first two governed by stage 2 and the third by stage 3.
+  and 1.037, the first two governed by stage 2 and the third by stage 3.
 - What the spread is made of: 0.19 for the load removal alone, a further 0.27 for
   the head the core has not released by day 50, and 0.12 or 0.02 for the undrained
   strength depending on which field it is applied to.
@@ -936,7 +938,7 @@ This tutorial covered:
   solves as the long-term case, and read a piezometric pair as the state Line 2
   was drawn from.
 - The governing stage as a property of the material rather than the method:
-  control passes from stage 2 to stage 3 at an undrained intercept of 236 psf,
+  control passes from stage 2 to stage 3 at an undrained intercept of 241 psf,
   below the 250 psf this core has.
 
 **Where to go next:** [Rapid drawdown analysis](../lem/rapid.md) gives the
@@ -946,4 +948,4 @@ model from scratch; in [SEEP-2](seep02_johnson_dam.md) we build this dam, and in
 [COMBO-1](combo01_seepage_stability.md) we run it under a standing pool. The
 [tutorials index](index.md) lists the series.
 
-<!-- test: file=../lem/files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.271, fs_bishop=1.465, fs_janbu=1.390, fs_corps=1.756, fs_lowe=1.576, fs_spencer=1.524, fs_mprice=1.535 -->
+<!-- test: file=../lem/files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.272, fs_bishop=1.465, fs_janbu=1.390, fs_corps=1.756, fs_lowe=1.577, fs_spencer=1.524, fs_mprice=1.535 -->

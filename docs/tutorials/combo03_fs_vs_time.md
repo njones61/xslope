@@ -62,6 +62,16 @@ includes the mesh and the transient seepage solution (all nineteen time steps),
 so the seepage work is already done; only the strengths are missing. We will open the file, look at what came with it,
 type the strengths in, run one instant, and then sweep all nineteen.
 
+A drained analysis is right only for a zone that drains as fast as the pool
+falls, which the [time factor](../lem/rapid.md#when-does-rapid-drawdown-apply)
+tests zone by zone. A clay core lowered over 45 days may not drain in time. The
+strength it can mobilize while the pool falls is then its undrained strength,
+set by the stresses it consolidated under at full pool, and Part 1's drained
+curve credits it with strength it may not have. That case needs a rapid
+drawdown analysis at each time step, which
+[Part 2](#part-2-rapid-drawdown-analysis-at-each-time-step) runs on a dam whose
+core has an undrained envelope.
+
 ### The dam and the drawdown
 
 The section is 110 m long and 22 m tall at the crest, on rock at elevation 0,

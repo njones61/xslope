@@ -708,8 +708,11 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content",
     HEADER is not part of that floor — "Head movement (ft)" over a column of
     five-character displacements is meant to wrap, and a header that could not
     would set the width of the whole table from the longest thing written at the
-    top of it. The set can still be scaled bodily if even the floors do not fit,
-    which is the one case left where a table cannot hold what it is given.
+    top of it. The header's longest WORD is, though: a header wraps between its
+    words and never inside one, and "Stage" over a column of single digits, held
+    to the width of a digit, printed as "Sta" over "ge". The set can still be
+    scaled bodily if even the floors do not fit, which is the one case left
+    where a table cannot hold what it is given.
 
     ``fit`` decides what happens to a table that does not need the whole page.
     Under ``"content"`` it keeps the width its content asked for and the table
@@ -740,10 +743,14 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content",
                            default=0.0)
         longest_word = max((_text_width(w, family, size_pt)
                             for t in texts for w in t.split()), default=0.0)
+        header_word = max((_text_width(w, family, size_pt)
+                           for t in texts[:header_rows] for w in t.split()),
+                          default=0.0)
         want.append(widest + pad)
         # An empty column is still a column: one em is the narrowest that reads
         # as one rather than as a line.
-        unbreakable = max(widest_value if flags[j] else longest_word,
+        unbreakable = max(max(widest_value, header_word) if flags[j]
+                          else longest_word,
                           size_pt * TWIPS_PER_PT) + pad
         floor.append(unbreakable if flags[j] else min(unbreakable, fair_share))
         # A column can be asked for less than it can be given: a "#" column of

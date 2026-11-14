@@ -1984,6 +1984,265 @@ def test_rapid_drawdown_names_the_governing_stage():
     return fails
 
 
+#: COMBO-2's two rapid drawdown routes on the Johnson dam. The starter file
+#: carries two piezometric lines; the full file is run as the tutorial runs it,
+#: meshing and marching its own transient seepage and staging the frames at the
+#: tseep sheet's stage_1 and stage_2 times.
+RAPID_START_XLSX = os.path.join(_REPO, "docs", "tutorials", "files",
+                                "xslope_johnson_rapid_start.xlsx")
+RAPID_TRANSIENT_XLSX = os.path.join(_REPO, "docs", "tutorials", "files",
+                                    "xslope_johnson_rapid.xlsx")
+#: The tutorial's COMBO-2-transient lock, as a run_tests tag: the route that
+#: puts the transient frames into the model.
+RAPID_TRANSIENT_TAG = {"file": RAPID_TRANSIENT_XLSX, "seep": "transient",
+                       "rapid": "true", "element_type": "tri3",
+                       "size_divisions": 100}
+#: The critical circles the tutorial's Spencer searches (40 slices) settle on,
+#: solved here directly so the check costs one solve per route rather than a
+#: search. On the starter's circle no core slice is weaker drained, so stage 3
+#: is not required; on the transient one three are, and stage 3 governs.
+RAPID_START_CIRCLE = {"Xo": 246.3773193359375, "Yo": 242.11181640625,
+                      "Depth": 82.05196142196655}
+RAPID_TRANSIENT_CIRCLE = {"Xo": 243.5787353515625, "Yo": 246.6619873046875,
+                          "Depth": 81.28668785095215}
+
+
+def _rapid_case(which):
+    """``(slope_data, slice_df, results)`` for one COMBO-2 route, solved once.
+
+    ``"start"`` is the two-piezometric-line file; ``"transient"`` stages the full
+    file's own transient march first (about twenty seconds: a mesh and a march).
+    """
+    key = f"rapid_{which}"
+    if key in _SOLVED:
+        return _SOLVED[key]
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        if which == "start":
+            slope_data = load_slope_data(RAPID_START_XLSX)
+            circle = RAPID_START_CIRCLE
+        else:
+            import run_tests
+            slope_data = load_slope_data(RAPID_TRANSIENT_XLSX)
+            err = run_tests._stage_seep_fields(slope_data, RAPID_TRANSIENT_TAG)
+            if err:
+                raise RuntimeError(f"COMBO-2's transient route: {err}")
+            circle = RAPID_TRANSIENT_CIRCLE
+        # A circle tangent at Depth: its radius is Yo - Depth, as the
+        # search's own trial circles are built.
+        ok, out = generate_slices(
+            slope_data, circle=dict(circle, R=circle["Yo"] - circle["Depth"]),
+            num_slices=40)
+        if not ok:
+            raise RuntimeError(f"COMBO-2 ({which}) would not slice: {out}")
+        slice_df, _surface = out
+        results = solve_selected("spencer", slice_df, rapid=True)
+    if not isinstance(results, dict):
+        raise RuntimeError(f"COMBO-2 ({which}) would not solve: {results}")
+    _SOLVED[key] = (slope_data, slice_df, results)
+    return _SOLVED[key]
+
+
+def test_rapid_drawdown_stage_table():
+    """One row per rapid drawdown stage: the water it stands under, the
+    strengths it uses and its factor of safety, read from the run itself.
+
+    Stage 3 runs only where some low-permeability slice is weaker drained than
+    undrained. Where it did not run the solver still reports stage 2's factor
+    under stage 3's name, and the block printed it as stage 3's, which read as a
+    stage that ran and happened to agree. The row says "not required" instead,
+    and the strengths cell counts the slices that took the drained strength.
+
+    Checked on COMBO-2's two routes, where the two outcomes occur: the starter's
+    piezometric pair, where stage 3 is not required, and the staged transient
+    march, where three core slices take the drained strength and stage 3
+    governs.
+    """
+    fails = []
+    from xslope.report import _Counter, _rapid_section
+
+    def block(sub, kind):
+        return [b for b in sub.blocks if b.kind == kind]
+
+    expect_head = ["Stage", "Water", "Strengths", "F"]
+    for which in ("start", "transient"):
+        sd, df, res = _rapid_case(which)
+        where = f"COMBO-2 ({which})"
+        n = len(df)
+        # The solver's per-slice record: one flag per slice, plain bools.
+        for key in ("rapid_low_k", "stage2_fallback", "stage3_drained"):
+            flags = res.get(key)
+            if (not isinstance(flags, list) or len(flags) != n
+                    or not all(type(f) is bool for f in flags)):
+                fails.append(f"{where}: {key} is not one bool per slice: "
+                             f"{flags!r}")
+        if fails:
+            continue
+        core = [i for i, m in enumerate(sd["materials"], 1)
+                if m.get("name") == "core"][0]
+        in_core = [int(m) == core for m in df["mat"]]
+        if res["rapid_low_k"] != in_core:
+            fails.append(f"{where}: the low-permeability slices are not the "
+                         f"core's: {res['rapid_low_k']} against {in_core}")
+        n_low = sum(in_core)
+        n_drained = sum(res["stage3_drained"])
+        if any(d and not k for d, k in zip(res["stage3_drained"],
+                                           res["rapid_low_k"])):
+            fails.append(f"{where}: a free-draining slice is recorded as "
+                         f"taking the drained strength in stage 3")
+        if any(res["stage2_fallback"]):
+            fails.append(f"{where}: the negative-stress rule is recorded on "
+                         f"{sum(res['stage2_fallback'])} slices, where COMBO-2 "
+                         f"has none")
+
+        sub = _rapid_section(res, _Counter(), sd, df)
+        tables = block(sub, "table")
+        if len(tables) != 1:
+            fails.append(f"{where}: the block carries {len(tables)} tables")
+            continue
+        table = tables[0]
+        if table.headers != expect_head:
+            fails.append(f"{where}: the stage table is headed "
+                         f"{table.headers}")
+        if [r[0] for r in table.rows] != ["1", "2", "3"]:
+            fails.append(f"{where}: the stage table's rows are "
+                         f"{[r[0] for r in table.rows]}")
+            continue
+        cited = " ".join(b.text for b in block(sub, "prose"))
+        if f"Table {table.number}" not in cited:
+            fails.append(f"{where}: the stage table is not cited by number")
+        s1, s2, s3 = (res[f"stage{k}_FS"] for k in (1, 2, 3))
+        strengths = [r[2] for r in table.rows]
+        if strengths[0] != "c′, φ′ in all materials":
+            fails.append(f"{where}: stage 1's strengths read {strengths[0]!r}")
+        want2 = "undrained (τ_ff from d, ψ and c′, φ′) in core; c′, φ′ elsewhere"
+        if strengths[1] != want2:
+            fails.append(f"{where}: stage 2's strengths read {strengths[1]!r}")
+        governing = [label for kv in block(sub, "keyvalues")
+                     for label, _v in kv.items if "Governing" in label]
+
+        if which == "start":
+            water = ["Piezometric Line 1", "Piezometric Line 2",
+                     "Piezometric Line 2"]
+            if res.get("stage3_run") is not False or n_drained:
+                fails.append(f"{where}: stage 3 ran on the starter "
+                             f"({n_drained} slices drained), so the outcome "
+                             f"this case is here for is not being checked")
+            want3 = (f"the drained strength on none of the {n_low} "
+                     f"low-permeability slices")
+            fs = [f"{s1:.3f}", f"{s2:.3f}", "not required"]
+            want_gov, bold = "stage 2", [1]
+        else:
+            water = ["Transient seepage at t = 0 days",
+                     "Transient seepage at t = 50 days",
+                     "Transient seepage at t = 50 days"]
+            if not res.get("stage3_run") or not n_drained:
+                fails.append(f"{where}: stage 3 did not run on the transient "
+                             f"route, so the outcome this case is here for is "
+                             f"not being checked")
+            want3 = (f"the drained strength on {n_drained} of the {n_low} "
+                     f"low-permeability slices; stage 2 strengths elsewhere")
+            # The two drawn-down stages agree to three decimals here, so the
+            # table carries four: printed at three, the stage that governs
+            # would show the same number as the one that does not.
+            digits = 4 if f"{s2:.3f}" == f"{s3:.3f}" else 3
+            fs = [f"{s:.{digits}f}" for s in (s1, s2, s3)]
+            want_gov, bold = "stage 3", [2]
+        if [r[1] for r in table.rows] != water:
+            fails.append(f"{where}: the Water column reads "
+                         f"{[r[1] for r in table.rows]}, expected {water}")
+        if strengths[2] != want3:
+            fails.append(f"{where}: stage 3's strengths read "
+                         f"{strengths[2]!r}, expected {want3!r}")
+        if [r[3] for r in table.rows] != fs:
+            fails.append(f"{where}: the F column reads "
+                         f"{[r[3] for r in table.rows]}, expected {fs}")
+        if len(governing) != 1 or want_gov not in governing[0]:
+            fails.append(f"{where}: the governing line reads {governing}, "
+                         f"expected it to name {want_gov}")
+        if table.bold_rows != bold:
+            fails.append(f"{where}: rows {table.bold_rows} are set in bold, "
+                         f"expected the governing stage's {bold}")
+        if "zero or negative" in cited:
+            fails.append(f"{where}: the negative-stress sentence prints on a "
+                         f"run that never used the rule")
+        printed = " ".join(
+            [cited, table.caption] + table.headers
+            + [c for r in table.rows for c in r]
+            + [s for kv in block(sub, "keyvalues") for pair in kv.items
+               for s in pair])
+        for word in ("stage3_run", "use_fallback", "rapid_low_k",
+                     "stage2_fallback", "stage3_drained", "_FS"):
+            if word in printed:
+                fails.append(f"{where}: the block prints the internal name "
+                             f"{word!r}")
+    return fails
+
+
+def test_rapid_drawdown_stage_table_edges():
+    """The parts of the stage table COMBO-2 does not reach: the negative-stress
+    sentence, a model that takes its water from more than one source, and the
+    steady two-solution route.
+
+    Built from the starter's solved run with its record or its model altered,
+    so nothing here solves again.
+    """
+    fails = []
+    import copy as _copy
+
+    from xslope.report import _Counter, _rapid_section
+
+    sd, df, res = _rapid_case("start")
+    low = [i for i, k in enumerate(res["rapid_low_k"]) if k]
+    n_low = len(low)
+
+    # The negative-stress rule on two low-permeability slices: one sentence,
+    # with the count, naming the lower envelope.
+    altered = dict(res)
+    altered["stage2_fallback"] = [i in low[:2] for i in range(len(df))]
+    sub = _rapid_section(altered, _Counter(), sd, df)
+    said = [b.text for b in sub.blocks
+            if b.kind == "prose" and "zero or negative" in b.text]
+    if len(said) != 1:
+        fails.append(f"the negative-stress rule on two slices printed "
+                     f"{len(said)} sentences about it")
+    elif (f"2 of the {n_low} low-permeability slices" not in said[0]
+          or "lower of the two envelopes" not in said[0]):
+        fails.append(f"the negative-stress sentence does not give the count "
+                     f"and the envelope used: {said[0]!r}")
+
+    # Two sources of pore pressure: each is named with the materials it serves.
+    mixed = _copy.deepcopy({k: sd[k] for k in ("materials", "piezo_line",
+                                               "piezo_line2")})
+    for m in mixed["materials"]:
+        if m["name"] == "foundation":
+            m["u"] = "ru"
+    sub = _rapid_section(res, _Counter(), mixed, df)
+    rows = next(b for b in sub.blocks if b.kind == "table").rows
+    want = ("Piezometric Line 1 in shell and core; pore pressure ratio r_u in "
+            "foundation")
+    if rows[0][1] != want:
+        fails.append(f"a model mixing piezometric and r_u pore pressures reads "
+                     f"{rows[0][1]!r} for stage 1, expected {want!r}")
+
+    # The steady route: the two stages read the two boundary sets' solutions.
+    steady = _copy.deepcopy({k: sd[k] for k in ("materials",)})
+    for m in steady["materials"]:
+        m["u"] = "seep"
+    steady["seep_u"] = [0.0]
+    steady["seep_u2"] = [0.0]
+    sub = _rapid_section(res, _Counter(), steady, df)
+    rows = next(b for b in sub.blocks if b.kind == "table").rows
+    water = [r[1] for r in rows]
+    if water != ["Seepage, boundary set 1", "Seepage, boundary set 2",
+                 "Seepage, boundary set 2"]:
+        fails.append(f"the steady two-solution route reads {water}")
+    return fails
+
+
 def test_fs_summary_reaches_the_document():
     """The summary the tree holds is the summary the document prints: the
     documented methods, and no others.
@@ -21073,6 +21332,10 @@ CHECKS = [
      test_a_method_that_is_not_run_says_why),
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
+    ("the rapid drawdown stage table (COMBO-2's two routes)",
+     test_rapid_drawdown_stage_table),
+    ("the rapid drawdown stage table's other cases",
+     test_rapid_drawdown_stage_table_edges),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("the inputs an engine reads are stated where it is documented",
      test_the_inputs_an_engine_reads_are_stated_where_it_is_documented),

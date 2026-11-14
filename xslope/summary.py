@@ -97,7 +97,11 @@ def print_rapid_drawdown_summary(results):
         print(f"=== RAPID DRAWDOWN SUMMARY (Critical Surface) ===")
         print(f"Stage 1 FS = {results['stage1_FS']:.4f}")
         print(f"Stage 2 FS = {results['stage2_FS']:.4f}")
-        print(f"Stage 3 FS = {results['stage3_FS']:.4f}")
+        # stage3_FS repeats stage 2's when stage 3 was not needed; say so, as
+        # the search's own log line does, rather than print it as stage 3's.
+        s3 = ("not required" if not results.get('stage3_run', True)
+              else f"{results['stage3_FS']:.4f}")
+        print(f"Stage 3 FS = {s3}")
         print(f"Final rapid drawdown FS = {results['FS']:.4f}")
 
 

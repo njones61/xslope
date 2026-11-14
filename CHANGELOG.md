@@ -30,6 +30,28 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - When a seepage solve runs out of sweeps before it converges, Studio now says
   so in the status bar and in the plot's title. It used to report "Seepage
   done" and draw the last iterate, with the warning only in the log.
+- A rapid drawdown analysis no longer refuses a slip surface that crosses no
+  material with d and ψ. Such a surface is analyzed with drained strengths
+  (c′, φ′) under the water before and after drawdown, stage 3 is not required,
+  and its factor of safety is stage 2's. The search used to discard these
+  circles, so on a dam with a weak free-draining shell it could miss the
+  critical surface. When the critical or analyzed circle is one of them, the
+  Log, the Analysis Report, and Studio's LEM Solution tab say so, and the status
+  bar notes it when the run finishes.
+
+### Changed
+
+- The Analysis Report's Rapid Drawdown section now gives one row per stage: the
+  water the stage reads (Piezometric Line 1 or 2, a seepage boundary set's
+  solution, or the transient solution at the stage time), the strengths it
+  uses, and its factor of safety, followed by the governing factor of safety and
+  the stage it comes from. When stage 3 is not needed its row reads "not
+  required"; the report used to print stage 2's factor of safety as stage 3's,
+  as though stage 3 had run and agreed. The stage 3 row counts the
+  low-permeability slices that took the drained strength, and a sentence counts
+  any slices where the negative-stress rule set the stage 2 strength. The
+  `main_lem.py` summary also prints "not required" for stage 3. Factors of
+  safety are unchanged.
 
 ## 1.0.9 — 2026-11-11
 

@@ -10011,6 +10011,13 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'rapid_drained_surface': (
+        'rapid_drained_surface_check.py',
+        "A rapid drawdown surface that crosses no material with d and psi is the "
+        "drained analysis, not a refused one: on a dam with a weak free-draining "
+        "shell the search finds the shell circle (1.144) the old refusal threw "
+        "away, and the Log, the report and Studio each say every stage was "
+        "drained."),
     'piezo_editor': (
         'piezo_editor_check.py',
         "Studio's Piezometric lines editor shows each line's Type (piezo or "
@@ -16367,6 +16374,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
+              'rapid_drained_surface': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
@@ -16769,6 +16777,12 @@ def main():
         if Path(DRAWDOWN_GUARD_FILE).exists():
             tests.append({'type': 'drawdown_guard', 'file': DRAWDOWN_GUARD_FILE,
                           'method': 'stage1 FS>=1', 'source': 'drawdown_guard'})
+        # A rapid-drawdown surface through free-draining materials only is a
+        # drained analysis, and the search must keep it: the weak-shell dam's
+        # critical circle misses the core. One search (~35 s) and four solves.
+        tests.append({'type': 'rapid_drained_surface',
+                      'file': 'test/fixtures/xslope_johnson_rapid_weak_shell.xlsx',
+                      'method': 'spencer', 'source': 'rapid_drained_surface'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
         # ponded water into. File-less (builds on xslope_acads_simple).

@@ -1,6 +1,6 @@
 """Build the Johnson Reservoir rapid-drawdown workbooks from one parameter block.
 
-Five files come out of the single set of constants below, so the rapid-drawdown
+Six files come out of the single set of constants below, so the rapid-drawdown
 family cannot drift apart:
 
   ``docs/lem/files/xslope_johnson_rapid_KEY.xlsx``
@@ -45,6 +45,13 @@ family cannot drift apart:
       transient march reads neither of its stages from it, and left on the file it
       raises ``rapid.stage2_bc_ignored`` on every run of the sweep.
 
+  ``test/fixtures/xslope_johnson_rapid_weak_shell.xlsx``
+      A test input, not a tutorial file: COMBO-2's starter with a weaker,
+      free-draining upstream shell (``WEAK_SHELL_C`` / ``WEAK_SHELL_PHI``) and one
+      starting circle in that shell. Its critical rapid-drawdown circle runs
+      through the shell and misses the core, so every stage of it is drained —
+      the case ``test/rapid_drained_surface_check.py`` locks.
+
 Everything is built deterministically from the committed transient **seepage**
 sample ``docs/seep/files/xslope_johnson_res_tseep.xlsx``, so the cross-section,
 zones, conductivities, storage properties, saved-frame schedule and stage times
@@ -56,12 +63,13 @@ the tailwater datum. The docs sample additionally pins the unsaturated and elast
 block it was solved under (``SAMPLE_KR0`` / ``SAMPLE_E``), because it ships solved
 fields and a locked sweep count that were produced with those values.
 
-Run:  PYTHONPATH=. python3 tools/build_johnson_rapid.py           # all five
-      PYTHONPATH=. python3 tools/build_johnson_rapid.py sample    # the docs sample
-      PYTHONPATH=. python3 tools/build_johnson_rapid.py fs_time   # the solved set
+Run:  PYTHONPATH=. python3 tools/build_johnson_rapid.py             # all six
+      PYTHONPATH=. python3 tools/build_johnson_rapid.py sample      # the docs sample
+      PYTHONPATH=. python3 tools/build_johnson_rapid.py fs_time     # the solved set
+      PYTHONPATH=. python3 tools/build_johnson_rapid.py weak_shell  # the test input
 
 The solved set carries the transient march, so it takes a few minutes; the other
-four are written in seconds.
+five are written in seconds.
 """
 
 from __future__ import annotations
@@ -79,6 +87,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEEP_FILES = os.path.join(REPO_ROOT, "docs", "seep", "files")
 LEM_FILES = os.path.join(REPO_ROOT, "docs", "lem", "files")
 TUT_FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
+TEST_FIXTURES = os.path.join(REPO_ROOT, "test", "fixtures")
 
 BASE = os.path.join(SEEP_FILES, "xslope_johnson_res_tseep.xlsx")
 
@@ -307,6 +316,42 @@ def build_tutorial_starter():
     return _save(sd, os.path.join(TUT_FILES, "xslope_johnson_rapid_start.xlsx"))
 
 
+#: The weak-shell test input's upstream shell: a silty sand, still free-draining
+#: (no d/psi), weak enough that a circle through the shell alone falls below the
+#: deep circle through the core under the drawdown. At c' = 100, phi' = 35 the
+#: shell circles stand near 1.9 and the core circle governs at 1.196; at these
+#: values the shell circle reads about 1.14 against the core circle's 1.19.
+WEAK_SHELL_C, WEAK_SHELL_PHI = 25.0, 28.0
+
+#: Its one starting circle, in the upstream shell: tangent at elevation 120,
+#: 15 ft below the face at x = 270, and clear of the core. The search launches
+#: from here; from the deep circle the other files carry, it stays in that
+#: circle's own local minimum through the core.
+WEAK_SHELL_START = dict(Xo=270.0, Yo=220.0, R=100.0, Depth=120.0)
+
+
+def build_weak_shell():
+    """The test input whose critical rapid-drawdown circle misses the core:
+    COMBO-2's starter with the weaker shell and the shell starting circle."""
+    sd = _base()
+    sd["piezo_line"] = list(PIEZO_1)
+    sd["piezo_line2"] = list(PIEZO_2)
+    for m in sd["materials"]:
+        m["u"] = "piezo"
+    shell = sd["materials"][0]
+    assert shell["name"] == "shell", shell["name"]
+    shell["c"], shell["phi"] = WEAK_SHELL_C, WEAK_SHELL_PHI
+    empty = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
+    sd["seepage_bc"] = copy.deepcopy(empty)
+    sd["seepage_bc2"] = copy.deepcopy(empty)
+    sd["has_seepage_bc2"] = False
+    sd["tseep"] = None
+    sd["circles"] = [dict(WEAK_SHELL_START)]
+    os.makedirs(TEST_FIXTURES, exist_ok=True)
+    return _save(sd, os.path.join(TEST_FIXTURES,
+                                  "xslope_johnson_rapid_weak_shell.xlsx"))
+
+
 def _quiet(fn, *a, **k):
     with contextlib.redirect_stdout(io.StringIO()):
         return fn(*a, **k)
@@ -383,11 +428,14 @@ def build(which=None):
         return [build_tutorial_fs_time()]
     if which in ("sample", "key"):
         return [build_lem_sample()]
+    if which == "weak_shell":
+        return [build_weak_shell()]
     return [build_lem_sample(),
             build_lem_worked_example(),
             build_tutorial_starter(),
             build_tutorial_completed(),
-            build_tutorial_fs_time()]
+            build_tutorial_fs_time(),
+            build_weak_shell()]
 
 
 if __name__ == "__main__":

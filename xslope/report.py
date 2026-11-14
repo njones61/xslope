@@ -3267,18 +3267,192 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
     return sub
 
 
-def _rapid_section(results, counter):
-    """The three-stage rapid drawdown detail, when the run was one."""
+#: The documentation page the rapid drawdown section points a reader to, and the
+#: part of it that states the negative-stress rule.
+RAPID_DOC_PAGE = "lem/rapid.md"
+RAPID_NEGATIVE_STRESS_ANCHOR = "#negative-stresses"
+
+
+def _rapid_flags(results, slice_df, key):
+    """One of the solver's per-slice stage records, as a list of bools, or None.
+
+    :func:`xslope.advanced.rapid_drawdown` records, in slice order, which slices
+    are low-permeability (``rapid_low_k``), which fell back to the lower envelope
+    in stage 2 (``stage2_fallback``), and which took the drained strength in
+    stage 3 (``stage3_drained``). A result from before those were recorded has
+    none of them; the low-permeability set can still be read off the slice
+    table's own d and ψ, and the other two are unknown.
+    """
+    flags = (results or {}).get(key)
+    if flags is not None:
+        return [bool(f) for f in flags]
+    if (key == "rapid_low_k" and slice_df is not None
+            and {"d", "psi"} <= set(slice_df.columns)):
+        return [bool(d > 0 or p > 0)
+                for d, p in zip(slice_df["d"], slice_df["psi"])]
+    return None
+
+
+def _slice_materials(slope_data, slice_df, keep=None):
+    """``[(index, material), ...]`` for the base materials of the slices, once
+    each and in materials order; ``keep`` is a per-slice mask that limits them.
+
+    The surface is what decides which materials a stage reads: a material the
+    surface never cuts takes no part in it. A bundle with no slice table falls
+    back to every material the geometry uses.
+    """
+    materials = (slope_data or {}).get("materials") or []
+    if slice_df is None or "mat" not in slice_df.columns:
+        return referenced_materials(slope_data or {})
+    wanted = set()
+    for i, mat in enumerate(slice_df["mat"]):
+        if keep is not None and not (i < len(keep) and keep[i]):
+            continue
+        n = _num(mat)
+        if n is not None and 1 <= int(n) <= len(materials):
+            wanted.add(int(n))
+    return [(i, materials[i - 1]) for i in sorted(wanted)]
+
+
+def _rapid_water(slope_data, slice_df, stage):
+    """What one rapid drawdown stage's pore pressures were read from.
+
+    Named the way the workbook and Studio name the source: a piezometric line by
+    its sheet heading, a steady seepage solution by its boundary set, a transient
+    one by the moment the field was read at. Stage 1 is the water before
+    drawdown; stages 2 and 3 both read the water after it. Each material says
+    where its own pore pressure comes from, so a model that mixes sources names
+    each with the materials that use it.
+    """
+    from .water import STAGE2_TIME_KEY
+
+    sd = slope_data or {}
+
+    def source(u):
+        if u == "piezo":
+            if stage == 1:
+                return "Piezometric Line 1"
+            if len(sd.get("piezo_line2") or []) >= 2:
+                return "Piezometric Line 2"
+            return "none (the model has no Piezometric Line 2)"
+        if u == "seep":
+            key = "seep_u_time" if stage == 1 else STAGE2_TIME_KEY
+            t = _num(sd.get(key))
+            if t is not None:
+                return (f"Transient seepage at "
+                        f"{_time_phrase(sd, t, plural=True)}")
+            if stage == 1:
+                return "Seepage, boundary set 1"
+            if sd.get("seep_u2") is not None:
+                return "Seepage, boundary set 2"
+            return "none (boundary set 2 has no seepage solution)"
+        if u == "ru":
+            return "pore pressure ratio r_u"
+        return "none"
+
+    groups = {}
+    for _i, m in _slice_materials(sd, slice_df):
+        u = str(m.get("u") or "none").strip().lower()
+        groups.setdefault(source(u), []).append(str(m.get("name") or ""))
+    if not groups:
+        return ""
+    if len(groups) == 1:
+        text = next(iter(groups))
+    else:
+        text = "; ".join(f"{src} in {_join(names)}"
+                         for src, names in groups.items())
+    return text[:1].upper() + text[1:]
+
+
+def _slice_share(n, total):
+    """``"3 of the 14 low-permeability slices"``, read out for any count."""
+    if total == 1:
+        return ("the one low-permeability slice" if n
+                else "no low-permeability slice")
+    if n == total:
+        return f"all {total} low-permeability slices"
+    if n == 0:
+        return f"none of the {total} low-permeability slices"
+    return f"{n} of the {total} low-permeability slices"
+
+
+def _rapid_section(results, counter, slope_data=None, slice_df=None,
+                   surface="surface"):
+    """The three-stage rapid drawdown detail, when the run was one.
+
+    One row per stage — the water it stands under, the strengths it uses and
+    its factor of safety — then the governing factor and the stage it comes
+    from. Stage 3 runs only where some low-permeability slice is weaker drained
+    than undrained, and its row says "not required" where it did not run: the
+    solver repeats stage 2's factor under stage 3's name in that case, and
+    printed as stage 3's it read as a stage that ran and happened to agree.
+
+    ``surface`` names the surface analyzed — "critical circle", "specified
+    surface" — for the sentence that says when it crosses no material with d
+    and ψ, where every stage was a drained analysis.
+    """
     if not results or "stage1_FS" not in results:
         return None
     sub = Section("Rapid Drawdown")
+    s1, s2, s3 = (results[f"stage{n}_FS"] for n in (1, 2, 3))
+    ran3 = bool(results.get("stage3_run", True))
+    low_k = _rapid_flags(results, slice_df, "rapid_low_k")
+    fallback = _rapid_flags(results, slice_df, "stage2_fallback")
+    drained = _rapid_flags(results, slice_df, "stage3_drained")
+    n_low = sum(low_k) if low_k is not None else None
+
+    table_number = counter.next_table()
+    where, links = cite("Table", table_number)
+    url = docs_url(RAPID_DOC_PAGE)
+    procedure = "three-stage procedure of Duncan, Wright, and Wong (1990)"
+    links = [(procedure, url)] + links
     sub.blocks.append(Prose(
-        "The surface was analyzed for rapid drawdown by the three-stage procedure "
-        "of Duncan, Wright and Wong. Stage 1 establishes the consolidation "
-        "stresses under the full pool, stage 2 applies undrained strengths to the "
-        "drawn-down section, and stage 3 re-checks the same section with drained "
-        "strengths where those are lower. The reported factor of safety is the "
-        "lower of stages 2 and 3."))
+        f"The surface was analyzed for rapid drawdown by the {procedure}. "
+        f"Stage 1 solves the section under the water before drawdown, with the "
+        f"drained strength (c′, φ′) in every material, and gives the effective "
+        f"normal and shear stress on each slice base at the end of "
+        f"consolidation. Stage 2 solves it under the water after drawdown, with "
+        f"an undrained strength τ_ff on each slice whose base is in a "
+        f"low-permeability material (one with a nonzero d or ψ). That strength "
+        f"is interpolated from the slice's stage 1 stresses between the "
+        f"K_c = 1 envelope (d, ψ) and the K_c = K_f envelope (c′, φ′); "
+        f"free-draining materials keep c′, φ′. Stage 3 is solved only when the "
+        f"drained strength of some low-permeability slice, at its stage 2 "
+        f"stresses, is lower than its undrained strength: those slices take the "
+        f"drained strength and the factor of safety F is computed again. The "
+        f"factor of safety reported is the lower of stages 2 and 3. {where} "
+        f"gives the water, the strengths, and F for each stage.",
+        links=links))
+
+    # The strengths each stage uses, by material and by slice.
+    if (slope_data and low_k is not None and slice_df is not None
+            and "mat" in slice_df.columns):
+        mats = _slice_materials(slope_data, slice_df, keep=low_k)
+    else:
+        # No slice table to read the surface's own materials off: every
+        # low-permeability material the geometry uses.
+        mats = [(i, m) for i, m in referenced_materials(slope_data or {})
+                if (_num(m.get("d")) or 0) > 0 or (_num(m.get("psi")) or 0) > 0]
+    names = [str(m.get("name") or "") for _i, m in mats]
+    if n_low == 0:
+        strengths2 = "c′, φ′ in all materials"
+    else:
+        undrained = "undrained (τ_ff from d, ψ and c′, φ′)"
+        strengths2 = (f"{undrained} in {_join(names)}" if names else
+                      f"{undrained} in the low-permeability materials")
+        if low_k is None or n_low < len(low_k):
+            strengths2 += "; c′, φ′ elsewhere"
+    if n_low == 0:
+        strengths3 = "no slice is in a material with d and ψ"
+    elif drained is not None and n_low is not None:
+        n_drained = sum(d for d, k in zip(drained, low_k) if k)
+        strengths3 = f"the drained strength on {_slice_share(n_drained, n_low)}"
+        if 0 < n_drained < len(low_k):
+            strengths3 += "; stage 2 strengths elsewhere"
+    else:
+        strengths3 = ("the drained strength where it is lower than the "
+                      "undrained strength; stage 2 strengths elsewhere")
+
     # Which of the two drawn-down stages the reported factor came from. Three
     # stage factors above one unattributed number left the reader to work out
     # which stage it was — and that is the engineering answer, since stage 2
@@ -3286,15 +3460,52 @@ def _rapid_section(results, counter):
     # drained ones do. Named only where the reported factor IS that stage's, to
     # the precision both are printed at; a number that matches neither is left
     # unattributed rather than assigned to the nearer stage.
-    lower = 2 if results["stage2_FS"] <= results["stage3_FS"] else 3
+    lower = 2 if (not ran3 or s2 <= s3) else 3
+    attributed = f"{results['FS']:.3f}" == f"{results[f'stage{lower}_FS']:.3f}"
+
+    # Three decimals, as every factor of safety in the report is printed —
+    # unless stage 3 ran and the two drawn-down stages agree to three, where the
+    # row that governs would print the same number as the one that does not.
+    digits = 4 if ran3 and f"{s2:.3f}" == f"{s3:.3f}" else 3
+    rows = [["1", _rapid_water(slope_data, slice_df, 1),
+             "c′, φ′ in all materials", f"{s1:.{digits}f}"],
+            ["2", _rapid_water(slope_data, slice_df, 2), strengths2,
+             f"{s2:.{digits}f}"],
+            ["3", _rapid_water(slope_data, slice_df, 3), strengths3,
+             f"{s3:.{digits}f}" if ran3 else "not required"]]
+    # The F column is numbers with one phrase among them, which the inferred
+    # alignment would range left; it is a column of factors of safety, centered
+    # as every such column in the report is.
+    sub.blocks.append(Table(
+        ["Stage", "Water", "Strengths", "F"], rows,
+        "Factor of safety at each stage of the rapid drawdown analysis",
+        table_number, bold_rows=[lower - 1] if attributed else [],
+        align=["c", "l", "l", "c"]))
+
     governing = "Governing factor of safety"
-    if f"{results['FS']:.3f}" == f"{results[f'stage{lower}_FS']:.3f}":
+    if attributed:
         governing += f" — stage {lower}"
-    items = [("Stage 1 — full pool, drained", f"{results['stage1_FS']:.3f}"),
-             ("Stage 2 — drawn down, undrained", f"{results['stage2_FS']:.3f}"),
-             ("Stage 3 — drawn down, drained", f"{results['stage3_FS']:.3f}"),
-             (governing, f"{results['FS']:.3f}")]
-    sub.blocks.append(KeyValues(items))
+    sub.blocks.append(KeyValues([(governing, f"{results['FS']:.3f}")]))
+
+    # A surface through free-draining materials only: every stage was drained.
+    if n_low == 0:
+        from .advanced import NO_LOW_K_SENTENCE
+        sub.blocks.append(Prose(NO_LOW_K_SENTENCE.format(surface=surface)))
+
+    # The negative-stress rule, wherever it decided a stage 2 strength.
+    if fallback is not None and low_k is not None:
+        n_fallback = sum(f for f, k in zip(fallback, low_k) if k)
+        if n_fallback:
+            rule = "the lower of the two envelopes"
+            sub.blocks.append(Prose(
+                f"On {_slice_share(n_fallback, n_low)}, the minor principal "
+                f"effective stress at the end of consolidation computes as zero "
+                f"or negative on one of the two envelopes, which leaves the "
+                f"interpolation for τ_ff undefined; stage 2 used {rule}, "
+                f"K_c = 1 (d, ψ) or "
+                f"K_c = K_f (c′, φ′), on "
+                f"{'that slice' if n_fallback == 1 else 'those slices'}.",
+                links=[(rule, url + RAPID_NEGATIVE_STRESS_ANCHOR)]))
     return sub
 
 
@@ -6580,7 +6791,11 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
     # --- rapid drawdown ---
     if opts["lem_rapid"]:
-        rapid = _rapid_section(results, counter)
+        family = _surface_family(slice_df, slope_data)
+        rapid = _rapid_section(
+            results, counter, slope_data, slice_df,
+            surface=(f"{'critical' if searched else 'specified'} "
+                     f"{'circle' if family == 'circular' else 'surface'}"))
         if rapid is not None:
             sec.children.append(rapid)
 

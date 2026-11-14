@@ -852,8 +852,8 @@ is the long-term condition the dam settles into months after the drawdown.
 **The water still held on day 50 costs a further 0.27.** Holding the day-50 pore
 pressures instead of the re-equilibrated ones, still at drained strength, moves
 1.333 to 1.058. Nothing about the strengths differs between those two runs.
-Under the critical surface that water sits mostly in the core and in the
-foundation beneath the upstream slope, and a drained run reads all of it.
+Under the critical surface that water sits mostly in the foundation beneath
+the upstream slope and in the core, and a drained run reads all of it.
 
 **The undrained strength costs 0.12 on one field and 0.02 on the other.** A
 drawdown hurts a clay core in two ways. The core keeps the pore pressure the full

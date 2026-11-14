@@ -14,8 +14,10 @@ figures into ``docs/lem/rapid_images/``:
                                  the critical upstream slip circle drawn over it. Between
                                  the panels the reservoir has been drawn all the way down,
                                  but the low-permeability core still holds an elevated
-                                 head pocket — the retained pore pressure that governs
-                                 Stage 2.
+                                 head pocket, and the foundation beneath the upstream
+                                 slope still holds head. Stage 2 reads the foundation's;
+                                 the core takes its undrained strength (phi = 0) and does
+                                 not read its own.
   johnson_res_rapid_solution.png The limit-equilibrium solution: the slope, the material
                                  zones, the critical upstream circle and its slices, and
                                  the full-pool head contours, titled with the rapid-

@@ -257,7 +257,7 @@ Soil below the full-pool (Stage 1) phreatic surface weighs $\gamma_{sat}$ in all
 
 Excel input file: [xslope_johnson_res_rapid.xlsx](files/xslope_johnson_res_rapid.xlsx). Every material uses `u = seep`; the two stage pore-pressure fields are supplied from the transient frames in memory, so no `_seep.csv` / `_seep2.csv` companions are shipped.
 
-**The two staged pore-pressure fields.** Staging pulls the frame at `stage_1` (full pool) and the frame at `stage_2` (end of drawdown) straight from the transient history. Between them the reservoir head has drained away on the upstream side, but the low-permeability core still holds a zone of elevated head where the slip circle crosses it, and that retained pore pressure enters the Stage 2 analysis.
+**The two staged pore-pressure fields.** Staging pulls the frame at `stage_1` (full pool) and the frame at `stage_2` (end of drawdown) straight from the transient history. Between them the pool has been drawn down, but the dam has not caught up with it. The low-permeability core still holds a zone of elevated head where the slip circle crosses it, and the foundation beneath the upstream slope still holds head that a re-equilibrated field would not. Stage 2 reads only the foundation's. Each core slice takes the undrained strength its envelope assigns from the Stage 1 stresses, with $\phi = 0$, so the core's pore pressure does not enter its strength. The foundation keeps its drained strength, so its Stage 2 pore pressures go straight into the answer.
 
 ![johnson_res_rapid_stages.png](rapid_images/johnson_res_rapid_stages.png)
 
@@ -288,11 +288,11 @@ _, (slice_df, failure_surface) = generate_slices(
 results = solve_selected("spencer", slice_df, rapid=True)
 ```
 
-**Result.** The full-pool slope is comfortably stable (Stage 1 FS = 2.07). Removing the reservoir load while the core holds its undrained strength drops the Stage 2 factor of safety to 1.34, and Stage 3 confirms the drained strength is not lower anywhere on the surface, so it does not reduce the result further. The rapid-drawdown factor of safety is **1.34** (Spencer); Morgenstern–Price agrees at 1.35, and the simpler methods bracket it, from 1.10 (OMS) to 1.50 (Corps of Engineers).
+**Result.** The full-pool slope is comfortably stable (Stage 1 FS = 2.08). Removing the reservoir load while the core holds its undrained strength drops the Stage 2 factor of safety to 1.34, and Stage 3 confirms the drained strength is not lower anywhere on the surface, so it does not reduce the result further. The rapid-drawdown factor of safety is **1.34** (Spencer); Morgenstern–Price agrees at 1.35, and the simpler methods bracket it, from 1.11 (OMS) to 1.52 (Corps of Engineers).
 
 ![johnson_res_rapid_solution.png](rapid_images/johnson_res_rapid_solution.png)
 
-Because the Stage 2 field is the transient frame at t = 50 day rather than a re-equilibrated steady state, it still carries the core's undissipated pore pressure, so this factor of safety is more conservative — and more physically faithful to the 45-day drawdown — than two independent steady solves would give.
+Because the Stage 2 field is the transient frame at t = 50 day rather than a re-equilibrated steady state, it carries the head the foundation has not yet given up, and the drained foundation slices read all of it. That makes this factor of safety lower, and more faithful to the 45-day drawdown, than one read on a re-equilibrated field. The core's retained head does not change it. [Tutorial COMBO-2](../tutorials/combo02_rapid_drawdown.md) compares the transient route with two steady solutions on the same dam.
 
 ### See also
 

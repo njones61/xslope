@@ -110,9 +110,11 @@ When performing rapid drawdown analysis with the **xslope** package, a set of $d
 
 ### Anisotropy and K Interpolation
 
-For the stresses on the base of each slice, the actual $K$ ratio should vary somewhere between $K_c = 1$ and $K_c = K_f$. For example, if $K_c = 2$, the middle line in this figure would apply.
+For the stresses on the base of each slice, the actual consolidation ratio $K_c$ lies somewhere between $K_c = 1$ and $K_c = K_f$, and each ratio has its own envelope. Measuring them all would take anisotropically consolidated undrained tests, which are slow and difficult. Wong et al. (1983) found that interpolating linearly on $K$ between the two extreme envelopes gives very nearly the same strengths as those tests, so the isotropically consolidated tests are enough. At a slice's $\sigma'_{fc}$, $K$ runs evenly from 1 on the $K_c = 1$ envelope to $K_f$ on the other, and the slice's strength lies where its own ratio, $K_1$, falls:
 
 ![k_interp.png](rapid_images/k_interp.png){width=720px}
+
+The interpolation works the same way on both sides of the point where the envelopes cross; to the left, the $K_c = 1$ envelope is the higher one. When $c' > 0$, $K_f$ itself changes with $\sigma'_{fc}$ (equation 6), so each bar in the figure has its own scale, and the envelope for a fixed $K$ between the two is a curve rather than a straight line.
 
 If we define $K_1$ as the stress ratio on the failure plane at the end of stage 1, we interpolate the two curves and extract the appropriate $\tau_{ff}$ value to use in the Stage 2 calculations. First of all, we compute $K_1$ as follows:
 
@@ -136,9 +138,9 @@ In this case, we use the lower of the $K_c = 1$  and $K_c = K_f$  curves. Negati
 
 >>$\sigma'_{3c} = \sigma'_{fc} + \tau_{fc} \dfrac{\sin \phi' - 1}{\cos \phi'}  \qquad (7)$ (for the $K_c = 1$ envelope)
 
->>$\sigma'_{3c} = (\sigma'_{fc} - c' \cos \phi') \dfrac{1 - \sin \phi'}{\cos^2 \phi'}  \qquad (8)$ (for the $K_c = K_f$ envelope)  
+>>$\sigma'_{3f} = (\sigma'_{fc} - c' \cos \phi') \dfrac{1 - \sin \phi'}{\cos^2 \phi'}  \qquad (8)$ (for the $K_c = K_f$ envelope)  
 
-If either is negative **or zero**, no interpolation is required and we use the lower of the two strength values coming from the two curves. Zero must be excluded as well as negatives, because $\sigma'_{3c}$ from equation (7) is precisely the *denominator* of $K_1$ in equation (4).
+If either is negative **or zero**, no interpolation is required and we use the lower of the two strength values coming from the two curves. Zero must be excluded as well as negatives, because $\sigma'_{3c}$ from equation (7) is precisely the *denominator* of $K_1$ in equation (4). Only these slices skip the interpolation. Everywhere else, on either side of the crossing, the strength is interpolated with equation (5); where the $K_c = 1$ envelope is the higher one, at low stress where compacted fill dilates, Stage 3 checks the result against the drained strength.
 
 These two equations go negative for different reasons, and only one of them involves cohesion:
 

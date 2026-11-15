@@ -20,7 +20,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 |:---:|:-:|---|---|---|
 | [1](#verification-confined-radial) | 🟢 | Confined radial flow (quarter annulus) | Discharge q 28.5961 vs the exact Thiem solution 28.5960 (<0.01%) · max nodal head error 0.004 (0.02% of the total drop) | quad8 and tri3 agree |
 | [2](#verification-sheetpile) | 🟢 | Partially penetrating sheetpile | s/T = 0.50: q 5.010 vs Pavlovsky's exact 5.000 (+0.2%) · s/T = 0.75: q 3.412 vs exact 3.403 (+0.3%) · wall-plane head below the tip 25.0000 vs exact 25 (0.0%) | |
-| [3](#verification-seep2d-johnson) | 🟢 | SEEP2D cross-check — Johnson Reservoir | Total discharge 1.9546 vs SEEP2D 1.9544 ft³/day per ft (+0.0%) · nodal-head RMS Δh 0.037 ft (0.1% of the 60 ft head range) | identical-mesh cross-check |
+| [3](#verification-seep2d-johnson) | 🟢 | SEEP2D cross-check — Johnson Reservoir | Total discharge 1.9553 vs SEEP2D 1.9544 ft³/day per ft (+0.0%) · nodal-head RMS Δh 0.052 ft (0.1% of the 60 ft head range) | identical-mesh cross-check |
 
 </div>
 
@@ -112,12 +112,12 @@ Fortran program (Tracy, USACE Waterways Experiment Station). The export is made 
 
 | Quantity | XSLOPE | SEEP2D | Note |
 |---|---|---|---|
-| Total discharge q (ft³/day per ft) | 1.9546 | 1.9544 (+0.0%) | |
-| Nodal heads | RMS Δh = 0.037 ft | — | 0.1% of a 60-ft head range |
+| Total discharge q (ft³/day per ft) | 1.9553 | 1.9544 (+0.0%) | |
+| Nodal heads | RMS Δh = 0.052 ft | — | 0.1% of a 60-ft head range |
 
 To three decimals, the XSLOPE discharge is 1.955 ft³/day per ft.
 
-The largest local head difference (0.56 ft) occurs adjacent to the free surface,
+The largest local head difference (0.67 ft) occurs adjacent to the free surface,
 where the two codes' unsaturated relative-permeability treatments differ in
 detail. Both codes release the free surface from the downstream face at the same
 elevation, el. 102.58.

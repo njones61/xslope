@@ -43,7 +43,7 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.692e-06, tolerance=0.05, benchmark=GW6b-q -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.5688;26:2:6.7452;26:4:7.2663;26:6:7.8577, tolerance=0.05, benchmark=GW6b-h -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.880e-08, tolerance=0.05, benchmark=GW6c-q -->
-<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7966;26:2:5.7860;26:4:6.3611;26:6:7.0788, tolerance=0.05, benchmark=GW6c-h -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7968;26:2:5.7863;26:4:6.3613;26:6:7.0788, tolerance=0.05, benchmark=GW6c-h -->
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.737e-07, tolerance=0.05, benchmark=GW6d-q -->
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.8970;26:2:7.9161;26:4:8.0363;26:6:8.1847;26:8:8.4101;26:10:8.6738;26:12:9.1446, tolerance=0.05, benchmark=GW6d-h -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.777e-07, tolerance=0.05, benchmark=GW6e-q -->
@@ -51,8 +51,8 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.3069e-05, tolerance=0.05, benchmark=GW9a-q -->
 <!-- test: file=files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2824e-06, tolerance=0.05, benchmark=GW9b-q -->
 <!-- test: file=files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
-<!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
-<!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.086e-02, tolerance=0.05, benchmark=GW13-q -->
+<!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
+<!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, expected_flowrate=2.086e-02, tolerance=0.05, benchmark=GW13-q -->
 
 Problems 1–13 are steady-state; problems 15–21 are **transient**, solved with XSLOPE's
 [transient seepage solver](../seep/transient.md). Problems 1, 7 and 8 apply a uniform
@@ -677,8 +677,8 @@ XSLOPE sits above both.
 | Trapezoidal: bulb half-width | ≈42 | 41 (+1) | 40 (+2) |
 | Triangular: Q per half | 2.086×10⁻² | 2.050×10⁻² (+1.8%) | 2.0×10⁻² (+4.3%) |
 
-The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (the
-`max_iter` tag key); the default 400 is not enough for these geometries.
+Both runs converge within the default limit of 400 iterations, the trapezoidal ditch in
+102 and the triangular one in 198.
 
 ![gw012: mesh and solved heads](images/gw012.png)
 
@@ -1097,12 +1097,12 @@ compared node for node (`benchmarks/run_seep2d_compare.py --gw`).
 | gw006a | van Genuchten | 0.000 | 0.000 (0.0) | 0.0000 | 0–10 |
 | gw009a | van Genuchten | 8.846 | 8.462 (+0.384) | 0.0026 | 0–18.5 |
 | gw010 | van Genuchten | 4.872 | 4.872 (0.000) | 0.0006 | 2–10 |
-| gw012 | linear front | face dry | face dry | 0.034 | 0–50 |
-| gw013 | linear front | face dry | face dry | 0.070 | 0–50 |
+| gw012 | linear front | face dry | face dry | 0.040 | 0–50 |
+| gw013 | linear front | face dry | face dry | 0.075 | 0–50 |
 
 **The release point agrees.** It is identical on gw004, gw006a and gw010; both codes leave
 the face fully drained on gw012 and gw013; and gw009a differs by one element at that mesh.
-The head fields agree to a relative RMS of order 10⁻⁴ throughout. Where this corpus sits
+The head fields agree to a relative RMS of about 10⁻⁴ on gw004 through gw010 and about 10⁻³ on gw012 and gw013. Where this corpus sits
 above a published profile, the difference is therefore between the SEEP2D family and the
 reference code's exit-face convention, not an XSLOPE defect, so those problems are checked on
 XSLOPE's own values with the offset reported.

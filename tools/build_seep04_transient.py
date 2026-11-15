@@ -98,9 +98,9 @@ ELEMENT_TYPE = "tri3"
 #: The page's lock: total head at three interior stations in the peak frame, day
 #: 200. Literals, matched to the tag in seep04_dam_infiltration.md.
 LOCK_TIME_DAYS = 200.0
-LOCK_POINTS = [(26.0, 8.0, 8.4242),      # crest centerline, just above the water table
-               (26.0, 4.0, 8.0568),      # crest centerline, deep in the saturated zone
-               (34.0, 2.0, 5.3144)]      # downstream, between the crest and the drain
+LOCK_POINTS = [(26.0, 8.0, 8.4252),      # crest centerline, just above the water table
+               (26.0, 4.0, 8.0578),      # crest centerline, deep in the saturated zone
+               (34.0, 2.0, 5.3155)]      # downstream, between the crest and the drain
 LOCK_TOL = 0.05
 
 

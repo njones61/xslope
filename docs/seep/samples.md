@@ -52,7 +52,7 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=38.761, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=38.760, tolerance=0.05 -->
 <!-- Element-type coverage (unsaturated/unconfined, linear-front): tri3, tri6, quad4, quad8, quad9. -->
 <!-- The linear front spans |h0| = 0.3 m, so the element size has to resolve it: at a 2 m -->
 <!-- target the quad8 solve stalls on the unresolved front. 0.6 m is two elements across it -->
@@ -71,7 +71,7 @@ The solution should look something like this:
 
 The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front result of Problem 2 (≈38.8): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow. This agrees with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
 
-<!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=37.848, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=37.836, tolerance=0.05 -->
 
 ### 4. Earth Dam with Core and Filter
 
@@ -216,5 +216,5 @@ change in storage
 ![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=1000px}
 
 <!-- Transient regression: total head sampled at interior stations at end of drawdown and quasi-equilibrium, re-solved through the run_tests tseep_head path (tri3, target_size=15.0). -->
-<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:131.345;350:115:148.802;400:110:122.074, tolerance=0.05 -->
-<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.800;350:115:118.814;400:110:112.533, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:131.353;350:115:148.811;400:110:122.103, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.828;350:115:118.881;400:110:112.454, tolerance=0.05 -->

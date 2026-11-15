@@ -496,7 +496,7 @@ class SeepRunner(RunnerThread):
             ic_max_iter = int(self._options.get("max_iter")
                               or TRANSIENT_IC_MAX_ITER_DEFAULT)
             print(f"Running transient seepage analysis… "
-                  f"(initial condition: up to {ic_max_iter} sweeps)")
+                  f"(initial condition: up to {ic_max_iter} iterations)")
             time_unit = sd.get("time_unit")
 
             def _progress(t, duration):

@@ -1199,8 +1199,8 @@ moves the deep value from 1.521 at the 12.4 ft mesh (2,223 tri6) to 1.487 at 8 f
 **The finite-element seepage case** runs [vp077a.xlsx](files/rocscience/vp077a.xlsx), the file the
 limit-equilibrium side is scored on ([VP77](rocscience.md#vp77)): it solves the model's own
 boundary set on the 12.4 ft tri6 mesh and reduces the strengths on that mesh and field. It reads
-**1.590**, +4.6% on RS2's 1.52; excluding everything shallower than 30 ft returns the same
-**1.590**, so there is no shallow skin to exclude on this case.
+**1.590**, +4.6% on RS2's 1.52; excluding everything shallower than 30 ft raises it by one
+bisection step, to **1.607**, so the shallow skin carries little weight on this case.
 
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=12.4, expected_elements=2223, benchmark=RS2-40-mesh -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=mesh_elements, element_type=tri6, target_size=8.0, expected_elements=5220, benchmark=RS2-40-mesh-fine -->
@@ -1212,7 +1212,7 @@ boundary set on the 12.4 ft tri6 mesh and reduces the strengths on that mesh and
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.583, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep, f_stand=1.5125, f_fail=1.5296875, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, seep=steady, benchmark=RS2-40-seep, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
-<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.607, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30, f_stand=1.5984375, f_fail=1.615625, check=edges, expected_elements=2223, expected_nodes=4656 -->
 
 **Filter off — the saturated downstream face skin (vp077b)**
 
@@ -2584,7 +2584,7 @@ The paper states every input the dry strength reduction needs, so its own finite
 Bishop value.
 
 <!-- test: file=files/rocscience/vp102a.xlsx, type=fem_ssrm, expected_fs=2.470, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.9, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102, f_stand=2.4625, f_fail=2.4765625, check=edges, expected_elements=1118, expected_nodes=2403 -->
-<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.724, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2, f_stand=1.71875, f_fail=1.7296875, check=edges, expected_elements=1118, expected_nodes=2403 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.713, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2, f_stand=1.7078125, f_fail=1.71875, check=edges, expected_elements=1118, expected_nodes=2403 -->
 <!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.987, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2, f_stand=1.98125, f_fail=1.9921875, check=edges, expected_elements=1118, expected_nodes=2403 -->
 <!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.304, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c2, f_stand=2.2984375, f_fail=2.309375, check=edges, expected_elements=1118, expected_nodes=2403 -->
 <!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.779, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c3, f_stand=1.7734375, f_fail=1.784375, check=edges, expected_elements=1118, expected_nodes=2403 -->
@@ -2600,7 +2600,7 @@ s·tan φ<sup>b</sup>.
 
 | Stage | Case 2 XSLOPE (φ<sup>b</sup> = 0°) | Case 2 RS2 SSR | Case 3 XSLOPE (φ<sup>b</sup> = 37°) | Case 3 RS2 SSR |
 |---|---|---|---|---|
-| 60 h | 1.724 | 1.77 | 1.779 | 1.82 |
+| 60 h | 1.713 | 1.77 | 1.779 | 1.82 |
 | 300 h | 1.987 | 2.06 | 2.173 | 2.14 |
 | 1500 h | 2.304 | 2.29 | 2.687 | 2.48 |
 

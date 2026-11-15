@@ -14,6 +14,23 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- Steady unconfined seepage converges on fine meshes, and in far fewer
+  iterations. Each element's relative conductivity, kr, is now its exact area
+  average over the element, in closed form for the linear-front model and on a
+  dense grid for van Genuchten and Gardner. Velocities, flow nets, and transient
+  steps use the same value. kr used to be sampled at a few points per element,
+  three on six-node triangles, so an element straddling a steep wetting front
+  could flip between wet and dry from one iteration to the next. Once the exit
+  face has stopped changing, the solver now finishes with Newton steps, which
+  solve for the heads and the conductivities together; each step counts as one
+  iteration toward Max iterations. XSLOPE's sample earth dams and Johnson
+  Reservoir rapid drawdown model converge at 100 to 250 mesh divisions on every
+  element type, in 23 to 70 iterations; on six-node triangles many of them did
+  not converge at all. The SEEP-2 tutorial's steep example, with kr falling to
+  10⁻⁴ over 10 ft of suction, converges in 75 iterations, where it took 900.
+  Confined models are unchanged. Unconfined flow rates move by 0.3% or less,
+  limit equilibrium factors of safety by 0.004 or less, and strength reduction
+  factors by up to 0.017.
 - Flow nets now carry the flow that leaves an earth dam at its toe. Where the
   phreatic surface reaches the toe with no seepage face, most of the flow
   crosses the dry slope just above the toe. Since 1.0.6 the stream function

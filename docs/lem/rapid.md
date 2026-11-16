@@ -1,151 +1,244 @@
 # Rapid Drawdown Analysis
 
-The design of a dam or levee must consider the potential for rapid drawdown of the water level. This can occur due to various factors such as dam failure, sluice gate operation, or other emergency situations. When the water level drops rapidly, it can lead to significant changes in the forces acting on the structure, potentially causing instability or failure. Specifically, the rapid drawdown eliminates the hydrostatic pressure on the upstream side of the structure, removing the buoyancy effect of the water, which can lead to a sudden increase in effective stress and shearing under undrained conditions.
+When the pool behind a dam or levee is lowered quickly, the slope it leaves behind can fail even though it stood safely while the pool was full. The water standing against the upstream face pushes on it and helps hold it up. When the pool comes down, that support goes. A soil that drains freely loses its pore pressure as fast as the pool falls, and its strength rises with its effective stress. A low-permeability soil can't drain that fast. It keeps much of the pore pressure the full pool put into it while the load that balanced that pressure is gone, so the shear stress needed for equilibrium rises and the strength doesn't follow. Pilarcitos Dam and Walter Bouldin Dam both slid this way.
 
-![pool_normal.png](rapid_images/pool_normal.png)
+![The same sliding mass at full pool, buoyed up, and after the pool is drawn down, at its full weight](rapid_images/rapid_pools.png){width=860px}
 
-![pool_lowered.png](rapid_images/pool_lowered.png)
+_Drawing after France and Winckler (2008)._
 
-To simulate this scenario, we utilize a "multi-stage" approach in our analysis. In the first stage, we apply the initial conditions with the water level at its full height and use the consolidation stresses resulting from these conditions to determine the undrained strength of the soils. In the second stage, we use these undrained strengths and the loading conditions corresponding to the lowered water level and determine the factor of safety for rapid drawdown conditions. The **xslope** package provides a convenient way to perform this analysis using the `rapid_drawdown` function. The equations and methodology used in this function are described in the following sections.
+At full pool the sliding mass is under water and drives the slide with its buoyant weight, $W' = \gamma' V$, where $\gamma' = \gamma - \gamma_w$ is about half of $\gamma$. That is why a submerged slope is rarely the critical case. With the pool down, the same mass drives with its full weight, $W = \gamma V$, nearly twice as much, while nothing about the soil has changed.
+
+Lowering the pool in the model and running an ordinary drained analysis would assume that the pore pressures in every soil came down with the pool. That is right for a free-draining sand or gravel. It is wrong for a clay that is sheared before its pore pressure can dissipate: the clay's undrained strength may govern, and a drained analysis at the low pool credits it with strength it doesn't have yet. **xslope** analyzes this case with the three-stage method of Duncan, Wright, and Wong (1990), described below and run by the `rapid_drawdown` function. The first question is which soils drain in time.
 
 ## Conditions for Rapid Drawdown {#when-does-rapid-drawdown-apply}
 
-Rapid drawdown occurs when the pool is lowered rapidly enough that pore water pressures in some of the soils cannot dissipate quickly enough to maintain stability. To determine when rapid drawdown may apply, Duncan, et al. (1992) suggested using the dimensionless time factor, T, from consolidation theory. T is defined as:
+Rapid drawdown applies to a soil when the pool is lowered rapidly enough that its pore water pressures cannot dissipate. Duncan et al. (1992) suggested judging that with the dimensionless time factor, T, from consolidation theory:
 
 >>$T = \dfrac{c_v t}{D^2}   \qquad (1)$
 
 where:
 
 >> $c_v$ = coefficient of consolidation [L²/t]<br>
-$t$ = time since the pool was lowered [t]<br>
-$D$ = maximum drainage distance [L]
+$t$ = time for the drawdown [t]<br>
+$D$ = maximum drainage distance, the longest path the pore water travels to leave the zone [L]
 
-Then, we use the following rubric:
+Then:
 
-|  T   | Rapid Drawdown Applicable?                         |
+|  T   | Rapid drawdown applicable?                         |
 |:----:|----------------------------------------------------|
-| >3.0 | Drainage should be sufficient - not rapid drawdown |  
-| <3.0 | Assume rapid drawdown                              |
+| > 3.0 | Drainage should be sufficient: not rapid drawdown. By $T = 3$, more than 98% of the pore pressure change has dissipated. |
+| < 3.0 | Assume rapid drawdown                              |
 
-Approximate values of $c_v$ are as follows:
+Approximate values of $c_v$:
 
-| Soil Type    | $c_v$ [ft²/day] |
+| Soil type    | $c_v$ [ft²/day] |
 |--------------|----------------|
-| Coarse Sand  | > 10,000       |
-| Fine Sand    | 100 - 10,000   |
-| Silty Sand   | 10 - 1000      |
-| Silt         | 0.5 - 100      |
-| Compacted Clay | 0.05 - 5       |
-| Soft Clay    | < 0.2          |
+| Coarse sand  | > 10,000       |
+| Fine sand    | 100 – 10,000   |
+| Silty sand   | 10 – 1,000     |
+| Silt         | 0.5 – 100      |
+| Compacted clay | 0.05 – 5     |
+| Soft clay    | < 0.2          |
 
-_(Taken from Duncan et al, 1992)_
+_(Duncan et al., 1992)_
 
-For example, consider the following levee. The maximum drainage distance for pore pressures to dissipate is 35 ft, and the coefficient of consolidation for the compacted clay is 2 ft²/day. If the pool is lowered over 50 days, we can calculate T as follows:
+A rule of thumb in permeability terms: soils with a hydraulic conductivity of 10⁻⁴ cm/s or more can be assumed to drain at normal rates of drawdown (Duncan, Wright, and Brandon 2014).
 
-![example1.png](rapid_images/example1.png)
+The test is applied zone by zone. Consider first a homogeneous embankment of compacted clay, 50 ft high, with a toe drain. The coefficient of consolidation is 2 ft²/day, and the drainage distance from the point shown to the upstream face is 35 ft.
 
-Since T = 0.08 < 3.0, we assume rapid drawdown applies.
+![A homogeneous compacted-clay embankment with a toe drain, at normal and lowered pool, and its 35 ft drainage distance](rapid_images/rapid_example1.png){width=860px}
 
-Here is another example involving a dam with a high permeability shell and a low permeability core. In this case, we need to examine the core and the shell separately. The core consists of compacted clay with a maximum drainage distance of 14 ft and a coefficient of consolidation of 2 ft²/day. The shell consists of fine sand with a maximum drainage distance of 31 ft and a coefficient of consolidation of 200 ft²/day. If the pool is lowered over 50 days, we can calculate T for each soil as follows:
+If the pool is lowered over 50 days, T = 2 × 50 / 35² = 0.08 < 3.0, so rapid drawdown applies, and the clay keeps nearly all of its pore pressure through the drawdown.
 
-![example2.png](rapid_images/example2.png)
+Now a zoned dam: a compacted clay core inside a shell of fine sand. The core drains into the shell on either side, so its drainage distance is 14 ft; the shell's is 31 ft.
 
-In this case T for the core = 0.5 < 3.0, so we assume rapid drawdown applies to the core. T for the shell = 10.4 > 3.0, so we  assume rapid drawdown does not apply to the shell.
+![A zoned dam with a fine-sand shell and a compacted-clay core, with their drainage distances](rapid_images/rapid_example2.png){width=860px}
+
+Over the same 50-day drawdown, T for the core = 2 × 50 / 14² = 0.5 < 3.0, so rapid drawdown applies to the core. T for the shell = 200 × 50 / 31² = 10.4 > 3.0, so the shell drains as the pool falls. In the same dam the shell is analyzed drained and the core undrained.
+
+## Why Undrained Strengths {#why-undrained-strengths}
+
+The alternative to an undrained strength is an effective stress analysis, and its strength parameters are easy to get: $c'$ and $\phi'$ come from isotropically consolidated undrained triaxial tests with the pore pressures measured. Its difficulty is the pore pressure during drawdown. That depends on the change in stress from the changing water loads, which can be estimated, and on how the soil responds as it is sheared undrained, which is much harder: well-compacted fill dilates as it is sheared, lowering its pore pressure and raising its strength, while poorly compacted fill contracts, with the opposite effect.
+
+A seepage analysis cannot supply that second part. Flow nets and finite element seepage solutions, steady or transient, give the pore pressures that come from flow, and a transient run follows the partial drainage while the pool falls, but none contains the pore pressure changes caused by shearing the soil. Duncan, Wright, and Brandon (2014, Sections 9.3 and 9.4) consider an effective stress analysis built on predicted drawdown pore pressures beyond the current state of practice for that reason.
+
+Most effective stress analyses have assumed, after Bishop (1954) and Morgenstern (1963), that the pore pressure at each point drops by the weight of the water removed above it. That treats loose and dense fill alike and does not always err on the safe side: Wong et al. (1983) analyzed Walter Bouldin and Pilarcitos Dams that way and got factors of safety of 1.0 and 1.2, and Pilarcitos slid. The undrained-strength method on this page gives 1.04 and 1.05 for the same two dams (Duncan, Wright, and Wong 1990), both close to 1, as a dam that failed should be. An undrained strength carries the shear-induced part because it is measured in tests in which the soil generates its own pore pressure as it is sheared.
+
+## Which Strength When {#which-strength-when}
+
+A dam passes through several conditions, and each takes its own strengths:
+
+| Condition | Free-draining soils | Poorly draining soils |
+|-----------|---------------------|-----------------------|
+| End of construction | Effective stresses: $c'$ and $\phi'$ | UU strengths, at the water content set by compaction |
+| Long term | Drained: $c'$ and $\phi'$, with steady-seepage pore pressures | Drained: $c'$ and $\phi'$, with steady-seepage pore pressures |
+| Drawdown during or at the end of construction | Effective stresses, with the pore pressures after drawdown | UU strengths |
+| **Drawdown after the dam has consolidated** | Effective stresses, with the pore pressures after drawdown | **CU strengths**: consolidated under the full-pool stresses, sheared undrained when the pool drops |
+
+The last row is the case the three-stage method handles. The consolidation stresses vary from point to point along a slip surface, and so does the undrained strength they give.
 
 ## Three-Stage Analysis
 
-In xslope, we use the three-stage analysis method developed by Duncan, Wright, and Wong (1990) to analyze rapid drawdown conditions. This technique is described in detail in Soil Strength and Slope Stability, 2nd Edition, Duncan, Wright, and Brandon. The three stages are:
+**xslope** uses the three-stage method of Duncan, Wright, and Wong (1990), described in detail in *Soil Strength and Slope Stability*, 2nd edition (Duncan, Wright, and Brandon 2014), Chapter 9. In one sentence: the full pool sets the strength, and the lowered pool sets the load.
 
->>1) Compute effective stresses based on pre-drawdown conditions<br>
-2) Compute FS for post-drawdown conditions using total stress analysis. Undrained strength is a function of effective stress from stage 1.<br>
-3) Compute FS for post-drawdown conditions using drained strengths
+![The three-stage method in four boxes, each tied to its stage](rapid_images/rapid_logic.png){width=860px}
 
-Stage 3 only ever *lowers* a slice's strength — it swaps in the drained strength where that is smaller than the undrained one — so its FS can never exceed the Stage 2 FS. The final FS for rapid drawdown is therefore the Stage 3 value when Stage 3 runs, and the Stage 2 value when it is not needed. Equivalently, and how xslope computes it: the lower of the two.
+- **Box 1, Stage 1:** an ordinary effective stress analysis of the slope at full pool. It provides the stresses on the base of each slice, $\sigma'_{fc}$ and $\tau_{fc}$: the stresses the soil consolidated under.
+- **Box 2, the first half of Stage 2:** from those two stresses, the undrained strength $\tau_{ff}$ of each slice in a low-permeability soil.
+- **Box 3, the rest of Stage 2:** lower the pool. The full weight of the sliding mass and the lowered water drive failure, and $\tau_{ff}$ resists it on the low-permeability slices, with drained strengths in the free-draining soils. That gives a factor of safety.
+- **Box 4, Stage 3:** the drained check. Where a slice's drained strength after drawdown is below its undrained strength, the drained strength replaces it and the factor of safety is computed again.
+
+All three stages are run on every trial slip surface. The method combines two earlier ideas: Lowe and Karafiath's (1959), that the undrained strength depends on how the soil was consolidated (box 2), and the U.S. Army Corps of Engineers' (1970), that the drained strength may be the lower one (box 4).
+
+Stage 3 only ever *lowers* a slice's strength, so its factor of safety can never exceed Stage 2's. The rapid drawdown factor of safety is therefore the Stage 3 value when Stage 3 runs and the Stage 2 value when it is not needed; equivalently, and how **xslope** computes it, the lower of the two.
+
+### Reading the subscripts {#subscripts}
+
+Most stresses in the method carry two subscripts. The first says which plane or direction the stress acts on: $f$ for the failure plane, or 1 and 3 for the major and minor principal directions. The second says when: $c$ for the end of consolidation, before drawdown, and $f$ for at failure.
+
+| Symbol | Plane or direction | Time | What it is |
+|--------|--------------------|------|------------|
+| $\sigma'_{fc}$ | failure plane | end of consolidation | effective normal stress from Stage 1; Stage 2 starts from it |
+| $\tau_{fc}$ | failure plane | end of consolidation | shear stress from Stage 1 |
+| $\tau_{ff}$ | failure plane | at failure | the undrained strength, from Stage 2 |
+| $\sigma'_{3c}$ | minor principal | end of consolidation | minor principal effective stress before drawdown |
+| $\sigma'_{1f}$, $\sigma'_{3f}$ | major, minor principal | at failure | the ends of the Mohr's circle at failure |
+
+The stress ratios follow the same idea: $K_c = \sigma'_{1c}/\sigma'_{3c}$ is the ratio of the principal stresses at the end of consolidation, $K_f$ the ratio at failure, and $K_1$ is $K_c$ worked out from the Stage 1 stresses (its 1 is the stage, not a direction).
 
 ### Stage 1: Pre-Drawdown Conditions
 
-Stage 1 analysis is performed for conditions prior to drawdown. The objective is to estimate the effective stresses along the slip surface prior to drawdown. This is also referred to as the consolidation stage.
+Stage 1 is performed for the conditions before drawdown: the full pool, with steady seepage through the dam. It is an ordinary effective stress stability analysis, on the same trial slip surface the later stages use. Its objective is the effective stresses along the slip surface before drawdown, the stresses the soil consolidated under; the factor of safety it returns is used only to get the shear stress, $\tau_{fc}$.
 
 ![stage1.png](rapid_images/stage1.png)
 
-To get the consolidation stresses, we perform a normal slope stability analysis using the conditions corresponding to the pool at the full level. The objective of this stage of the analysis is not the factor of safety, but the effective normal stresses on the base of each slice, which is one of the products of the slope stability functions (oms, bishop, spencer, etc.).
-
 ![slice_forces.png](rapid_images/slice_forces.png){width=300px}
 
-Using the normal force ($N$) found by the solution, we can calculate the effective normal stress on the failure plane at the end of the consolidation stage as:
+From the normal force on the base of each slice, the effective normal stress on the failure plane at the end of consolidation is
 
->>$\sigma_{fc} = \dfrac{N}{\Delta \ell} - u$
+>>$\sigma'_{fc} = \dfrac{N}{\Delta \ell} - u$
 
-Since the values returned by the solvers are actually effective normal forces ($N'$), we can also calculate as follows:
+The solvers return the effective normal force $N'$ directly, so equivalently
 
 >>$\sigma'_{fc} = \dfrac{N'}{\Delta \ell}   \qquad (2)$
 
-The precise mechanics of how $N'$ is computed vary according to the solver used. The equations and methodology for computing $N'$ is described in the **Methods** section of this documentation.
-
-Likewise, the shear stress on the failure plane at the end of the consolidation stage is:
+How $N'$ is computed depends on the solver; the **Methods** section of this documentation describes each. The shear stress on the failure plane at the end of consolidation is the shear force on the base over its length, which is the strength mobilized at the Stage 1 factor of safety, $F$:
 
 >>$\tau_{fc} = \dfrac{S}{\Delta \ell}$
 
 >>$\tau_{fc} = \dfrac{1}{F}(c' + \sigma'_{fc} \tan \phi')   \qquad (3)$
 
-Note that this is the mobilized shear strength and $F$ is the factor of safety returned by the solver in the Stage 1 solution.
-
 ## Stage 2 - Compute FS for Post-Drawdown Conditions
 
-In Stage 2, we perform a total stress analysis using undrained shear strengths for the low-K zones. The undrained strengths are estimated using the consolidation stresses computed in Stage 1, and the driving forces are calculated using post-drawdown conditions.
+Stage 2 is a total stress analysis with undrained strengths for the low-permeability zones. The undrained strengths come from the consolidation stresses of Stage 1, and the driving forces from the conditions after drawdown.
 
 ![stage2.png](rapid_images/stage2.png)
 
-The process of finding the appropriate undrained strength for the Stage 2 analysis based on the consolidation stresses from Stage 1, involves a variation of the Mohr-Coulomb failure envelope. Consider the following diagram:
+### The undrained strength is set by the full pool {#full-pool}
 
-![mc_tauff.png](rapid_images/mc_tauff.png){width=610px}
+Before the drawdown, the dam has stood at full pool long enough for the clay to consolidate under the full-pool stresses. When the pool comes down quickly, the clay is sheared undrained. That is what a consolidated undrained triaxial test does, and the $\overline{CU}$ test also measures the pore pressure as the sample is sheared.
 
-The $\tau_{ff}$ is the shear stress on the failure plane at failure. $\sigma'_{1f}$ and $\sigma'_{3f}$ are major and minor principal effective stresses at failure. For our application, we need to correlate $\tau_{ff}$ with $\sigma'_{fc}$. To do this, we create a new plot as follows:
+![CU-bar tests on samples from three points on a slip surface, and the line of tau_ff against sigma'_fc they give](rapid_images/rapid_cu_tests.png){width=860px}
+
+Take a sample from each of three points on a slip surface at full pool, A, B, and C, and consolidate each isotropically at its own $\sigma'_c$. Sheared undrained, each sample tries to contract, the pore pressure builds, and its effective stress circle drifts left as it grows, until it touches the effective stress envelope, $c'$ and $\phi'$. The shear stress on the failure plane at failure, where the circle touches, is
+
+>>$\tau_{ff} = \dfrac{\sigma_{1f} - \sigma_{3f}}{2} \cos \phi'$
+
+Carry each $\tau_{ff}$ to a new plot, above the stress the sample was consolidated at. Its horizontal axis is $\sigma'_{fc}$, the effective normal stress on the failure plane at consolidation, which for an isotropically consolidated sample is $\sigma'_c$. A test program fits a line through the points, with an intercept $d$ and a slope $\psi$. This is not a Mohr diagram: $\sigma'_{fc}$ is from before shearing and $\tau_{ff}$ from failure. That is what makes the plot useful. Stage 1 gives $\sigma'_{fc}$ on each slice, and a line like this turns it into the strength after drawdown.
+
+These samples were consolidated under equal principal stresses. Soil in a slope is not: it carries shear stress at full pool, and the line depends on how it was consolidated.
+
+### The stress ratio K {#stress-ratio}
+
+![Triaxial samples consolidated isotropically, anisotropically, and at failure](rapid_images/rapid_stress_ratio.png){width=653px}
+
+$K_c$ is the ratio of the major to the minor principal effective stress during consolidation. $K_c = 1$ is isotropic consolidation, the usual $\overline{CU}$ test. $K_c > 1$ is anisotropic consolidation, the way soil in a slope consolidates, carrying shear stress before it is ever sheared. $K_f$ is the ratio at failure, and $K_c = K_f$ is a sample consolidated at the verge of failure.
+
+### Why the stress ratio matters {#why-k-matters}
+
+![Three samples with the same sigma'_fc, consolidated at K_c = 1, between 1 and K_f, and at K_f, sheared undrained to three different strengths](rapid_images/rapid_three_samples.png){width=860px}
+
+Three samples with the same $\sigma'_{fc}$, each sheared undrained against the same effective stress envelope:
+
+- **$K_c = 1$:** the sample starts as a point, with no shear stress. It has the whole way to go to failure and builds pore pressure the whole way, so its circle drifts left and touches the envelope low.
+- **$1 < K_c < K_f$:** the sample starts as a circle, part of the way to failure. Less shearing is left, so less pore pressure builds, and $\tau_{ff}$ is higher.
+- **$K_c = K_f$:** the sample starts on the envelope. No shearing is left, so no pore pressure builds, and $\tau_{ff} = \tau_{fc}$: the drained strength.
+
+The closer the soil starts to failure, the higher its undrained strength. That holds for a soil that contracts as it is sheared; a compacted fill at low stress dilates instead, and there it runs the other way.
+
+### One line for each K<sub>c</sub> {#kc-lines}
+
+![The lines of tau_ff against sigma'_fc for K_c = 1, 2, 3, 4, 5, and K_f](rapid_images/rapid_kc_lines.png){width=790px}
+
+Test a set of samples all consolidated at one $K_c$, over a range of $\sigma'_{fc}$, and $\tau_{ff}$ against $\sigma'_{fc}$ gives a line. Every $K_c$ has its own, and they all lie between two extremes: $K_c = 1$, consolidated isotropically, and $K_c = K_f$, consolidated at failure. The lines of high $K_c$ end on the $K_c = K_f$ line, because a sample can't be consolidated past failure. Each slice in a slope was consolidated at its own $K_c$, so each slice needs the line for its own $K_c$. Measuring one takes anisotropically consolidated undrained (ACU) tests at that $K_c$, which are slow and difficult, so testing every line is impractical.
+
+### Two envelopes from one set of tests {#two-envelopes}
+
+The method needs only the two extremes, and one set of $\overline{CU}$ tests gives both. Plotting each test's $\tau_{ff}$ against the stress it was consolidated at gives the $K_c = 1$ envelope, $d$ and $\psi$. The same tests' effective stress circles at failure, from the measured pore pressures, give $c'$ and $\phi'$, which is the $K_c = K_f$ envelope: a sample consolidated at failure has no shearing left to do, so its undrained strength is its drained strength. Both appear in the figure under [The undrained strength is set by the full pool](#full-pool).
 
 ![tauff_vs_sigmafc.png](rapid_images/tauff_vs_sigmafc.png)
 
-These two curves are function of the stress anisotropy during the consolidation stage. The $K_c = K_f$ curve with $c'$ and $\phi'$ corresponds to the case where the ratio of $\sigma'_1$ and $\sigma'_3$ is on the verge of failure. The other curve with $d$ and $\psi$ corresponds to the case where $\sigma'_1 = \sigma'_3$ during the consolidation stage. Note that the $c'$ and $\phi'$ values for the $K_c = K_f$ curve can be obtained from a $CU$ triaxial test or they can be obtained from a $CD$ or $\overline{CU}$ triaxial test. The $K_c = 1$ line represents $\tau_{ff}$ vs. $\sigma'_3$ from $CU$ triaxial tests. The $\tau_{ff}$ values are found using the equation in the previous figure above. Thus, both lines can be obtained from one set of $\overline{CU}$ triaxial tests.
+The two envelopes usually cross. To the right of the crossing, at higher stress, the soil contracts as it is sheared and the $K_c = 1$ envelope is the lower one. To the left, at low stress, compacted fill dilates and the $K_c = 1$ envelope is the higher one; Stage 3 guards against counting on that dilation.
 
-When performing rapid drawdown analysis with the **xslope** package, a set of $d$ and $\psi$ values should be entered in the material properties table for each soil with poor drainage and assumed to apply to rapid drawdown conditions. The more freely draining soils keep their drained strengths $c'$ and $\phi'$ in every stage, and their $d$ and $\psi$ values should be left blank.
+For a rapid drawdown analysis in **xslope**, enter $d$ and $\psi$ in the material properties for each soil that does not drain during the drawdown. The free-draining soils keep their drained strengths, $c'$ and $\phi'$, in every stage, and their $d$ and $\psi$ are left blank.
 
-### Anisotropy and K Interpolation
+### Anisotropy and K Interpolation {#anisotropy-and-k-interpolation}
 
-For the stresses on the base of each slice, the actual consolidation ratio $K_c$ lies somewhere between $K_c = 1$ and $K_c = K_f$, and each ratio has its own envelope. Measuring them all would take anisotropically consolidated undrained tests, which are slow and difficult. Wong et al. (1983) found that interpolating linearly on $K$ between the two extreme envelopes gives very nearly the same strengths as those tests, so the isotropically consolidated tests are enough. At a slice's $\sigma'_{fc}$, $K$ runs evenly from 1 on the $K_c = 1$ envelope to $K_f$ on the other, and the slice's strength lies where its own ratio, $K_1$, falls:
+Wong et al. (1983) showed how to get the line for any $K_c$ from the two envelopes: interpolate between them. They found that interpolating linearly on $K$ gives very nearly the same strengths as anisotropically consolidated tests at each $K_c$, so the two envelopes from one set of $\overline{CU}$ tests stand in for all of those tests.
 
-![k_interp.png](rapid_images/k_interp.png){width=720px}
+![Interpolating between the two envelopes: K_c spaced evenly along a bar at each sigma'_fc, and the lines of constant K_c through those points](rapid_images/rapid_interpolation.png){width=790px}
 
-The interpolation works the same way on both sides of the point where the envelopes cross; to the left, the $K_c = 1$ envelope is the higher one. When $c' > 0$, $K_f$ itself changes with $\sigma'_{fc}$ (equation 6), so each bar in the figure has its own scale, and the envelope for a fixed $K$ between the two is a curve rather than a straight line.
+At a slice's $\sigma'_{fc}$, go straight up: the two envelopes give the strengths for $K_c = 1$ and $K_c = K_f$. Along the bar between them, the interpolation spaces $K_c$ evenly, so the strength for a given $K_c$ lies $(K_c - 1)/(K_f - 1)$ of the way from the $K_c = 1$ envelope to the $K_c = K_f$ envelope. Doing the same at every $\sigma'_{fc}$ draws the line for each $K_c$.
 
-If we define $K_1$ as the stress ratio on the failure plane at the end of stage 1, we interpolate the two curves and extract the appropriate $\tau_{ff}$ value to use in the Stage 2 calculations. First of all, we compute $K_1$ as follows:
+$K_f$ changes with $\sigma'_{fc}$ when $c' > 0$. The $K_c = K_f$ envelope is a straight line, but it is not a line of one $K$, the way the others are: each point on it is a sample consolidated at whatever ratio puts it at failure, and with cohesion that ratio is large at low stress and falls toward $\tan^2(45 + \phi'/2)$ at high stress. In the figure, the right bar runs from $K_c = 1$ to about 3.6 and the left bar from 1 to about 5.4. At $\sigma'_{fc} = c' \cos \phi'$, $K_f$ is infinite, and every line meets the $K_c = 1$ envelope there.
+
+For a slice, the ratio is $K_1$, computed from the Stage 1 stresses:
 
 >>$K_1 = \dfrac{\sigma'_{fc} + \tau_{fc}[(\sin \phi' + 1) / \cos \phi']}{\sigma'_{fc} + \tau_{fc}[(\sin \phi' - 1) / \cos \phi']}   \qquad (4)$
 
-Where $\sigma'_{fc}$ and $\tau_{fc}$ are the effective normal and shear stresses on the shear plane at the end of consolidation and are found using equations (2) and (3) above. Equation (4) assumes that the orientation of the principal stresses at the end of consolidation is the same as the orientation of the principal stresses at failure. Values of the undrained shear strength for the effective consolidation stress $\sigma'_{fc}$ and a consolidation ratio $K_c = K_1$ are obtained by interpolating the $K_c = 1$  and $K_c = K_f$  failure envelopes using the following equation:
+where $\sigma'_{fc}$ and $\tau_{fc}$ come from equations (2) and (3). Equation (4) assumes that the principal stresses at the end of consolidation and at failure have the same orientation. The undrained strength for the consolidation stress $\sigma'_{fc}$ and consolidation ratio $K_c = K_1$ is interpolated between the two envelopes:
 
 >>$\tau_{ff} = \dfrac{(K_f - K_1) \tau_{ff(K_c=1)} + (K_1 - 1) \tau_{ff(K_c=K_f)}}{K_f - 1}  \qquad (5)$
 
-The two $\tau_{ff}$ values are found by evaluating the two envelopes using the $\sigma'_{fc}$ found from stage 1. The $K_f$ value used in this equation can be found from:
+The two $\tau_{ff}$ values come from the two envelopes at the slice's $\sigma'_{fc}$, and $K_f$ from:
 
 >>$K_f = \dfrac{(\sigma'_{fc} + c' \cos \phi')(1 + \sin \phi')}{(\sigma'_{fc} - c' \cos \phi')(1 - \sin \phi')}   \qquad (6)$
 
-### Negative Stresses
+### One slice, step by step {#one-slice}
 
-The $\sigma'_3$ values can become negative, leading to a negative (and meaningless) $K$ value.
+Here is the whole calculation on one real slice: slice 2 of the 41 slices on the critical circle of [Walter Bouldin Dam](#walter-bouldin), at the toe of the upstream slope, in a clayey silty sand under about 24 ft of water at full pool. The sand has $c' = 240$ psf and $\phi' = 32.7°$, and its $K_c = 1$ envelope has $d = 750$ psf and $\psi = 15°$.
 
-![k_interp_neg.png](rapid_images/k_interp_neg.png)
+| Step | | Slice 2 |
+|------|---|--------:|
+| Stage 1 stresses, equations (2) and (3) | $N' = 1{,}611$ lb/ft, $S = 1{,}193$ lb/ft, $\Delta\ell = 3.14$ ft | $\sigma'_{fc} = 514$ psf, $\tau_{fc} = 381$ psf |
+| The two stress ratios, equations (4) and (6) | | $K_1 = 3.96$, $K_f = 7.69$ |
+| The two envelopes at $\sigma'_{fc}$ | $d + \sigma'_{fc} \tan \psi$; $c' + \sigma'_{fc} \tan \phi'$ | 888 psf ($K_c = 1$); 570 psf ($K_c = K_f$) |
+| Interpolate, equation (5) | 44% of the way from 888 toward 570 | $\tau_{ff} = 747$ psf |
 
-In this case, we use the lower of the $K_c = 1$  and $K_c = K_f$  curves. Negative effective stresses can be checked using the following two equations:
+![Slice 2 on the clayey silty sand's envelopes, to scale: straight up from sigma'_fc = 514 psf to the K_c = 3.96 line, tau_ff = 747 psf](rapid_images/rapid_slice2.png){width=700px}
 
->>$\sigma'_{3c} = \sigma'_{fc} + \tau_{fc} \dfrac{\sin \phi' - 1}{\cos \phi'}  \qquad (7)$ (for the $K_c = 1$ envelope)
+Slice 2 sits left of where the two envelopes cross, at about 1,360 psf, so its $K_c = 1$ envelope is the higher one; the interpolation works the same way on either side of the crossing. The same steps give every low-permeability slice on the circle its own $\tau_{ff}$.
 
->>$\sigma'_{3f} = (\sigma'_{fc} - c' \cos \phi') \dfrac{1 - \sin \phi'}{\cos^2 \phi'}  \qquad (8)$ (for the $K_c = K_f$ envelope)  
+### Negative Stresses {#negative-stresses}
 
-If either is negative **or zero**, no interpolation is required and we use the lower of the two strength values coming from the two curves. Zero must be excluded as well as negatives, because $\sigma'_{3c}$ from equation (7) is precisely the *denominator* of $K_1$ in equation (4). Only these slices skip the interpolation. Everywhere else, on either side of the crossing, the strength is interpolated with equation (5); where the $K_c = 1$ envelope is the higher one, at low stress where compacted fill dilates, Stage 3 checks the result against the drained strength.
+The interpolation needs both stress ratios to mean something, and that fails when a minor principal effective stress is zero or negative. The two are checked with:
 
-These two equations go negative for different reasons, and only one of them involves cohesion:
+>>$\sigma'_{3c} = \sigma'_{fc} + \tau_{fc} \dfrac{\sin \phi' - 1}{\cos \phi'}  \qquad (7)$ (behind $K_1$, at the end of consolidation)
 
-- Equation (8) carries the $c' \cos \phi'$ term, so a **significant cohesion** drives it negative. This is the case illustrated above.
-- Equation (7) has **no cohesion term at all**. It goes negative when $\tau_{fc}$ is large — and since $\tau_{fc} = \frac{1}{F}(c' + \sigma'_{fc} \tan \phi')$, that means a **low Stage 1 factor of safety**.
+>>$\sigma'_{3f} = (\sigma'_{fc} - c' \cos \phi') \dfrac{1 - \sin \phi'}{\cos^2 \phi'}  \qquad (8)$ (behind $K_f$, on the $K_c = K_f$ envelope)
+
+If either is negative **or zero**, the slice is not interpolated: it takes the lower of the two envelopes' strengths. Zero is excluded as well as negatives because $\sigma'_{3c}$ from equation (7) is the *denominator* of $K_1$ in equation (4). Only these slices skip the interpolation; everywhere else, on either side of the crossing, the strength comes from equation (5).
+
+The two equations go negative for different reasons, and only one involves cohesion:
+
+- Equation (8) carries the $c' \cos \phi'$ term: $\sigma'_{3f}$ is negative for every slice with $\sigma'_{fc} < c' \cos \phi'$, the point where all the lines of constant $K_c$ meet. Left of it $K_f$ comes out negative.
+- Equation (7) has **no cohesion term**. It goes negative when $\tau_{fc}$ is large, and since $\tau_{fc} = \frac{1}{F}(c' + \sigma'_{fc} \tan \phi')$, that means a **low Stage 1 factor of safety**.
+
+Slice 40 of the same circle, near the crest, is such a slice. Stage 1 gives it $\sigma'_{fc} = 178$ psf and $\tau_{fc} = 237$ psf: little normal stress and a lot of shear for it. Equation (7) gives $\sigma'_{3c} = 49$ psf, but equation (8) gives $\sigma'_{3f} = -15$ psf, since 178 psf is below $c' \cos \phi' = 202$ psf for this sand. The slice takes the lower envelope, here $K_c = K_f$, and $\tau_{ff} = 354$ psf; the $K_c = 1$ envelope would have given 798 psf.
+
+![Slice 40 in the strip where sigma'_3f is negative: no interpolation, the lower envelope, tau_ff = 354 psf](rapid_images/rapid_slice40.png){width=700px}
+
+**xslope** makes this check on every slice and switches to the lower envelope on its own; on the Walter Bouldin circle it did so on slices 40 and 41.
 
 ### Stage 1 stability requirement {#the-stage-1-slope-must-be-stable}
 
@@ -157,25 +250,46 @@ $K_1$ increases monotonically with $\tau_{fc}$, and $\tau_{fc} \propto 1/F$. Sub
 
 >> $K_1 > K_f \iff F < 1$ in Stage 1
 
-In other words, the full-pool slope is already failing. Its mobilized shear stress lies above the failure envelope, so there is no equilibrium consolidation stress state for Stage 2 to use, and equation (5) would extrapolate beyond $K_c = K_f$ rather than interpolate. Note this condition is not caught by the negative-stress check above — $\sigma'_{3c}$ from equation (7) remains positive well below $F = 1$.
+In other words, the full-pool slope is already failing. Its mobilized shear stress lies above the failure envelope, so there is no equilibrium consolidation stress state for Stage 2 to use, and equation (5) would extrapolate beyond $K_c = K_f$ rather than interpolate. This condition is not caught by the negative-stress check above: $\sigma'_{3c}$ from equation (7) remains positive well below $F = 1$.
 
-Because $F$ is a single global value, $K_1 > K_f$ holds for every slice at once. xslope therefore checks the Stage 1 factor of safety directly, and `rapid_drawdown` returns an error rather than a factor of safety when $F < 1$. Rapid drawdown presupposes a slope that is stable before the pool is lowered.
+Because $F$ is a single global value, $K_1 > K_f$ holds for every slice at once. **xslope** therefore checks the Stage 1 factor of safety directly, and `rapid_drawdown` returns an error rather than a factor of safety when $F < 1$. Rapid drawdown presupposes a slope that is stable before the pool is lowered.
 
 ### FS Calculations
 
-After the undrained strengths are computed for low K zones, the factor of safety ($FS$) is calculated. Drained strengths are used for high K zones, and driving forces (based on weight of slices) are calculated using post-drawdown conditions. 
+With an undrained strength for each low-permeability slice, Stage 2 computes the factor of safety: each of those slices gets a cohesion equal to its $\tau_{ff}$ and a friction angle of zero, and the free-draining slices keep $c'$ and $\phi'$. Everything that drives the slide is computed for the conditions after drawdown: the weight of the slices with the buoyancy of the full pool gone, the lowered pool's water load on the face, and, for the free-draining zones, the pore pressures after drawdown.
 
 ## Stage 3 - Check Drained Strengths
 
-For Stage 3, undrained strengths used for slices in low K zones are compared with drained strengths. If drained strength is lower than the undrained strength, the drained strength is assigned to that slice and the FS is re-calculated. Note that some slices may used drained strength while others may use undrained. If drained > undrained for all slices, there is no need to re-calculate FS. For the drained strength calculations:
+Stage 3 is the dilation check. At low confining stress, a compacted clay tends to dilate when it is sheared undrained: its pore pressure drops and its effective stress and strength go up, so its undrained strength can come out higher than its drained strength. That negative pore pressure can't be counted on, since given time water flows in and the clay loses it. So the drained strength caps the undrained strength, slice by slice.
+
+For each low-permeability slice, the drained strength after drawdown is computed from the Stage 2 solution:
 
 >>$\sigma' = \dfrac{N'}{\Delta \ell}   \qquad (9)$
 
 >>$\tau = c' + \sigma' \tan \phi'   \qquad (10)$
 
-Where $N'$ is the effective normal force found in Stage 2 using post-drawdown conditions.
+where $N'$ is the effective normal force from Stage 2, with the pore pressures after drawdown. Where the drained strength is lower than the undrained strength, the drained strength is assigned to that slice and the factor of safety is recalculated; some slices may use the drained strength while others use the undrained. If the drained strength is greater on every slice, there is no need to recalculate.
 
-If Stage 3 calculations are required (drained less than undrained in at least one slice), then the FS from Stage 3 = the rapid drawdown FS. If Stage 3 calculations are not required, the FS from Stage 2 = the rapid drawdown FS. Since Stage 3 only substitutes *lower* strengths, its FS never exceeds the Stage 2 FS, so this is the same as taking the lower of the two.
+If Stage 3 calculations are required (drained less than undrained on at least one slice), the factor of safety from Stage 3 is the rapid drawdown factor of safety. If they are not required, the factor of safety from Stage 2 is. Since Stage 3 only substitutes *lower* strengths, this is the same as taking the lower of the two.
+
+The drained strength tends to be the smaller one at shallow depths and the undrained strength at deeper ones, so shallow surfaces tend to be drained-critical and deep ones undrained-critical, and a slip surface that spans a range of depths can be governed by the drained strength on some slices and the undrained strength on others.
+
+### Walter Bouldin Dam, the whole circle {#walter-bouldin}
+
+Walter Bouldin Dam, a rolled earthfill dam, slid during a 32 ft drawdown in 1975, with the pool going from elevation 47 to 15. The section below is **xslope**'s verification problem [VP98](../verification/rocscience.md#vp98), with the $K_c = 1$ envelopes from Duncan, Wright, and Wong (1990), and the circle is the critical one from a rapid drawdown search with Spencer's method, cut into 41 slices. Every slice has its base in a low-permeability soil: the clayey silty sand at both ends, and the clay and the micaceous sand between.
+
+![Walter Bouldin Dam's critical circle, its slices colored by what governed each one](rapid_images/rapid_bouldin_circle.png){width=860px}
+
+The colors say what governed each slice. Most interpolated their undrained strength, as slice 2 did, and kept it, because their drained strength after drawdown was higher. At both ends of the circle the drained strength came out lower in Stage 3 and replaced the undrained one; that includes slice 2, whose $\tau_{ff}$ of 747 psf gave way to a drained strength of 715 psf. Slices 40 and 41 at the crest took the lower envelope in Stage 2, as slice 40 did above, and then the drained strength in Stage 3 as well: shallow ends drained-critical, the deep middle undrained-critical.
+
+| Stage | Factor of safety |
+|-------|-----------------:|
+| 1, full pool | 1.498 |
+| 2, after drawdown | 1.097 |
+| **3, ten slices drained** | **1.048** |
+| Published (Duncan, Wright, and Wong 1990) | 1.04 |
+
+The search on the verification page, with 40 slices, gives 1.047.
 
 ### Surfaces that cross no material with d and ψ {#drained-surfaces}
 
@@ -183,51 +297,61 @@ A slip surface that passes only through free-draining materials is analyzed like
 
 ## Inputs and Calculations
 
-To perform a rapid drawdown analysis, the following additional inputs must be provided in the input template Excel file:
+A rapid drawdown analysis needs these inputs beyond an ordinary one:
 
-| Category | Description |
-|----------|-------------|
-| Material Properties| $d$ and $\psi$ for all materials to be analyzed using multi-stage approach. |
-| Pore Pressures | Two piezometric lines: one for Stage 1 and one for Stage 2 |
-| Distributed Loads | Two sets of distributed loads, one for Stage 1 (full pool) and one for Stage 2 (lowered pool) |
+| Input | Where | Notes |
+|-------|-------|-------|
+| The $K_c = 1$ envelope, $d$ and $\psi$ | the `mat` sheet, columns J and K; Studio: Materials, with LEM parameters shown | For each material that does not drain during the drawdown. Blank or zero means free-draining: the material keeps $c'$ and $\phi'$ in all three stages. A material needs both or neither. If the lab reports an R envelope ($c_R$, $\phi_R$) instead, convert it to $d$ and $\psi$ with Duncan, Wright, and Brandon's (2014) Eqs. 9.6 to 9.9 before entering it. |
+| The water before and after drawdown | one of three sources, below | The water before drawdown feeds Stage 1; the water after drawdown feeds Stages 2 and 3. |
+| The water load on the face | Water loads in the `main` sheet (cell D24) or Studio's Global parameters | **auto**, the default and the recommended setting, derives the full-pool load for Stage 1 and the lowered-pool load for Stages 2 and 3 from whichever water source the model uses. With **manual**, enter both: the `dloads` and `dloads (2)` sheets, or the Set 1 and Set 2 (rapid drawdown) tabs of Studio's Distributed loads. |
+
+The two water states can come from three sources:
+
+1. **Two piezometric lines**: Line 1 for the full pool and Line 2 for after drawdown, on the `piezo` sheet. Quick, and how published cases are usually given, but only as good as the sketch of Line 2.
+2. **Two steady seepage solutions**, one at each pool level, from boundary sets `seep bc` and `seep bc (2)`, saved next to the workbook as `{base}_seep.csv` (full pool) and `{base}_seep2.csv` (lowered pool). This is the standard instantaneous drawdown: the second solution is the dam after its pore pressures have come to equilibrium with the lowered pool.
+3. **A transient seepage run**, with the pool lowered on a schedule and two times read out of it; see [Rapid Drawdown from a Transient Solution](#transient-solution). The pool drives a `reservoir` boundary on the upstream face, bound to the schedule's pool series.
+
+In Studio, run it with Run → Run LEM…, with Rapid drawdown ticked; on a model with a pool schedule the dialog also shows the two stage times. The Log reports the factor of safety of each stage, and the [Analysis Report](../studio/reports.md) has a rapid drawdown section with one row per stage. [Tutorial COMBO-2](../tutorials/combo02_rapid_drawdown.md) runs one dam with all three water sources, step by step, with the screens.
 
 In summary, the calculations are done in the following process:
 
 **Stage 1**
 
-1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factor of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice. If this Stage 1 FS is less than 1, the slope is already failing at full pool and the analysis is halted — see [Stage 1 stability requirement](#the-stage-1-slope-must-be-stable).<br>
+1. Using the drained strengths ($c'$ and $\phi'$) for all materials and the water and loads for the full pool, calculate the factor of safety with the selected solver. This returns a factor of safety and the effective normal force ($N'$) on the base of each slice. If this Stage 1 factor of safety is less than 1, the slope is already failing at full pool and the analysis is halted; see [Stage 1 stability requirement](#the-stage-1-slope-must-be-stable).<br>
 
-2.  Calculate $\sigma'_{fc}$ and $\tau_{fc}$ using equations (2) and (3).<br>
+2. Calculate $\sigma'_{fc}$ and $\tau_{fc}$ with equations (2) and (3).<br>
 
 **Stage 2**
 
-3. Calculate $K_1$ via equation (4), using $\sigma'_{fc}$ and $\tau_{fc}$ from step 2.<br>
+3. Calculate $K_1$ with equation (4), from $\sigma'_{fc}$ and $\tau_{fc}$.<br>
 
-4. Using $\sigma'_{fc}$ from step 2, calculate $\tau_{ff(K_c=1)}$ from the $d - \psi$ curve and $\tau_{ff(K_c=K_f)}$ from the $c - \phi$ curve.<br>
+4. At $\sigma'_{fc}$, calculate $\tau_{ff(K_c=1)}$ from the $d$, $\psi$ envelope and $\tau_{ff(K_c=K_f)}$ from the $c'$, $\phi'$ envelope.<br>
 
-5. Calculate $K_f$ using equation (6) and $\sigma'_{fc}$ from step 2.<br>
+5. Calculate $K_f$ with equation (6).<br>
 
-6. Calculate $\tau_{ff}$ from equation (5)<br>
+6. Check equations (7) and (8). If either is zero or negative, use the lower of the two envelope strengths; otherwise calculate $\tau_{ff}$ with equation (5).<br>
 
-7. Steps 3-6 are performed for each low K soil. For each of these soils, set $c$ = $\tau_{ff}$ and set $\phi = 0$. For the high K soils, use the normal $c - \phi$ values.
+7. Steps 3 to 6 are performed for each low-permeability slice, which then gets $c = \tau_{ff}$ and $\phi = 0$. The free-draining slices keep $c'$ and $\phi'$.
 
-8. Using the strengths from step 7 and the pore pressures and distributed loads corresponding to drawdown (lowered pool) conditions, calculate $FS$ using the selected solver. This is the $FS$ for Stage 2.
+8. With those strengths and the water and loads after drawdown, calculate the factor of safety with the selected solver. This is the Stage 2 factor of safety.
 
 **Stage 3**
 
-9. For each slice with a low K soil at the bottom, use the $N'$ values calculated in Stage 2 and calculate the drained shear strength ($\tau$) using equations (9) and (10). Compare this value to the $\tau_{ff}$ value used in Stage 2. If the drained strength is smaller for any slice, replace the undrained strength values with the original $c - \phi$ values and recompute $FS$. This is the $FS$ for Stage 3.
+9. For each low-permeability slice, calculate the drained strength from the Stage 2 $N'$ with equations (9) and (10), and compare it with the slice's $\tau_{ff}$. If the drained strength is smaller on any slice, use it there and recompute the factor of safety. This is the Stage 3 factor of safety.
 
-10. Compare the $FS$ for Stages 2 & 3. The smaller of the two is the final $FS$ for rapid drawdown conditions.
+10. The smaller of the Stage 2 and Stage 3 factors of safety is the rapid drawdown factor of safety.
 
 ## Rapid Drawdown from a Transient Solution {#transient-solution}
 
-The three-stage method needs two pore-pressure fields along the slip surface: one for the pre-drawdown, full-pool consolidation state used in [Stage 1](#stage-1-pre-drawdown-conditions), and one for the drawn-down state used in [Stage 2](#stage-2-compute-fs-for-post-drawdown-conditions). The [Inputs and Calculations](#inputs-and-calculations) summary supplies these from two piezometric lines, and a finite-element workflow can instead supply them from two steady seepage solutions saved next to the workbook as `{base}_seep.csv` (full pool) and `{base}_seep2.csv` (lowered pool). A [**transient** seepage solve](../seep/transient.md) is a third source: a transient run produces a time history of pore-pressure fields as the reservoir is lowered on a schedule, and the two stage fields are two frames read from that history.
+The three-stage method needs two pore-pressure fields along the slip surface: one for the pre-drawdown, full-pool consolidation state used in [Stage 1](#stage-1-pre-drawdown-conditions), and one for the drawn-down state used in [Stage 2](#stage-2-compute-fs-for-post-drawdown-conditions). Two piezometric lines or two steady seepage solutions supply them as described under [Inputs and Calculations](#inputs-and-calculations). A [**transient** seepage solve](../seep/transient.md) is the third source: a transient run produces a time history of pore-pressure fields as the reservoir is lowered on a schedule, and the two stage fields are two frames read from that history.
 
 ### Stage times on the tseep sheet
 
 A transient run is driven by the [**tseep** sheet](../usage/input_template.md#worksheet-tseep), which carries two optional control times, **stage_1** and **stage_2** (with `stage_1 < stage_2`). They tag the two frames the drawdown analysis will use — for instance the full-reservoir steady state at `stage_1` and the drawn-down state at `stage_2`. Both times are forced into the transient solver's saved-frame schedule, so each is a *computed* frame, never interpolated between steps. Set both or neither; setting one without the other is an error, as is a `stage_1` at or after `stage_2`.
 
 The stage times only select which two instants are read out of the transient solution. They change nothing about how that solution is computed, since the drawdown schedule itself is set in the boundary conditions. XSLOPE Studio therefore lets them be set where they are used, in the [Run LEM dialog](../studio/analysis.md#stage-times), as well as in the transient inputs editor; the file stores them either way. Stage times at instants that a solved transient run did not save cause the transient seepage analysis to be rerun with those times added to the save schedule.
+
+The pool reaches the solution through the boundary on the upstream face: in boundary set `seep bc` (Studio: Seep BC, Set 1), that head's type is `reservoir` and its value is the name of the pool series. A [`reservoir` boundary](../seep/transient.md#head-types-head-and-reservoir) holds the face below the pool at the pool's level, makes the face the pool uncovers an exit face, and leaves the face the pool never reached no-flow. Boundary set 2 is not used.
 
 ### In-memory staging
 
@@ -299,6 +423,17 @@ results = solve_selected("spencer", slice_df, rapid=True)
 ![johnson_res_rapid_solution.png](rapid_images/johnson_res_rapid_solution.png)
 
 Because the Stage 2 field is the transient frame at t = 50 day rather than a re-equilibrated steady state, it carries the head the foundation has not yet given up, and the drained foundation slices read all of it. That makes this factor of safety lower, and more faithful to the 45-day drawdown, than one read on a re-equilibrated field. The core's retained head does not change it. [Tutorial COMBO-2](../tutorials/combo02_rapid_drawdown.md) compares the transient route with two steady solutions on the same dam.
+
+## Verification {#verification}
+
+**xslope**'s three-stage analysis is checked against published analyses of four dams, two of which failed in rapid drawdown:
+
+| Dam | xslope (Spencer) | Published |
+|-----|-----------------:|----------:|
+| [VP96](../verification/rocscience.md#vp96): USACE EM 1110-2-1902 example | 1.434 | 1.44, USACE (2003) |
+| [VP97](../verification/rocscience.md#vp97): Pilarcitos Dam (failed) | 1.044 | 1.05, Duncan, Wright, and Wong (1990) |
+| [VP98](../verification/rocscience.md#vp98): Walter Bouldin Dam (failed) | 1.047 | 1.04, Duncan, Wright, and Wong (1990) |
+| [VP99](../verification/rocscience.md#vp99): pumped-storage dam | 1.527 | 1.56, Duncan, Wright, and Wong (1990) |
 
 ### See also
 

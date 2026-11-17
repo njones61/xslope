@@ -258,6 +258,8 @@ Because $F$ is a single global value, $K_1 > K_f$ holds for every slice at once.
 
 With an undrained strength for each low-permeability slice, Stage 2 computes the factor of safety: each of those slices gets a cohesion equal to its $\tau_{ff}$ and a friction angle of zero, and the free-draining slices keep $c'$ and $\phi'$. Everything that drives the slide is computed for the conditions after drawdown: the weight of the slices with the buoyancy of the full pool gone, the lowered pool's water load on the face, and, for the free-draining zones, the pore pressures after drawdown.
 
+**Unit weights.** Each slice is weighed once, against the full-pool (Stage 1) water table, and keeps that weight in all three stages: soil below that water table weighs $\gamma_{sat}$ and soil above it $\gamma$. The low-permeability zones stay saturated while their pore pressures fall, which is the premise of rapid drawdown, and a free-draining zone between the two pool levels keeps its saturated weight too. With Duncan, Wright, and Wong's (1990) dry and saturated rockfill weights on their pumped-storage dam ([VP99](../verification/rocscience.md#vp99)), this gives 1.53 against their published 1.56; weighing the drained rockfill by the lowered water table in Stages 2 and 3 instead moves the result well above the published value.
+
 ## Stage 3 - Check Drained Strengths
 
 Stage 3 is the dilation check. At low confining stress, a compacted clay tends to dilate when it is sheared undrained: its pore pressure drops and its effective stress and strength go up, so its undrained strength can come out higher than its drained strength. That negative pore pressure can't be counted on, since given time water flows in and the clay loses it. So the drained strength caps the undrained strength, slice by slice.
@@ -381,7 +383,7 @@ The Johnson Reservoir zoned earth dam is the [transient drawdown seepage sample]
 | Core (compacted clay) | 125 | 130 | 400 | 18 | 250 | 14 | **undrained** |
 | Foundation (silty sand) | 127 | 132 | 100 | 27 | — | — | drained |
 
-Soil below the full-pool (Stage 1) phreatic surface weighs $\gamma_{sat}$ in all three stages, since rapid drawdown presumes the soil stays saturated while the pore pressures fall.
+As everywhere in the analysis, soil below the full-pool (Stage 1) phreatic surface weighs $\gamma_{sat}$ in all three stages (see [unit weights](#fs-calculations)).
 
 **Loads and slip surface.** The full-pool reservoir standing against the upstream face is the Stage 1 distributed load (3744 psf at the toe, tapering to zero at the elevation-160 pool line). At Stage 2 the pool has been drawn all the way down to the elevation-100 datum, so no water remains on the upstream slope. Removing that load is the main cause of the loss of stability in rapid drawdown. The critical surface is a circle on the upstream (reservoir) face, located by a rapid-drawdown circular search: it toes near the upstream base, daylights just past the crest, and cuts twelve slices of core so the undrained zone governs Stage 2.
 

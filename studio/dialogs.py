@@ -1406,6 +1406,27 @@ class BuildMeshDialog(QDialog):
         }
 
 
+class _WrappedNote(QLabel):
+    """A word-wrapped label that reserves the height its text needs at the width
+    it is given.
+
+    A form budgets a wrapped label's height from its size hint, before the label
+    knows how wide it will be, and a note that wraps to two lines gets one: its
+    second line is drawn under the next row. Each time the width changes this
+    reserves the wrapped height as the label's minimum, the way the editors and
+    the canvas caption reserve theirs."""
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setWordWrap(True)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        wanted = self.heightForWidth(event.size().width())
+        if wanted > 0 and wanted != self.minimumHeight():
+            self.setMinimumHeight(wanted)
+
+
 class RunLemDialog(QDialog):
     """Options for an LEM solve (single surface or auto-search; circular or not).
 
@@ -1439,10 +1460,9 @@ class RunLemDialog(QDialog):
         self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
         form.addRow("Analysis", self.analysis)
 
-        note = QLabel("Single surface analyzes the first circle / the non-circular "
-                      "surface as entered. Auto-search refines from there to the "
-                      "critical surface.")
-        note.setWordWrap(True)
+        note = _WrappedNote("Single surface analyzes the first circle / the "
+                            "non-circular surface as entered. Auto-search refines "
+                            "from there to the critical surface.")
         form.addRow(note)
 
         # The surface-family selector appears when the deck carries BOTH families —
@@ -1516,24 +1536,24 @@ class RunLemDialog(QDialog):
             "Works with Two-stage seismic. The result is solved at k = k_y, so its "
             "factor of safety is 1.")
 
-        # The seismic options in a group of their own. The yield coefficient is a
-        # choice of its own, with or without the two-stage analysis, so it comes
-        # first; the stage 2 strength belongs to the two-stage analysis and sits
-        # under it, indented to its checkbox's text (the style's indicator width
-        # plus its label spacing).
-        self.seismic_group = QGroupBox("Seismic")
-        sg = QVBoxLayout(self.seismic_group)
-        sg.addWidget(self.ky)
-        sg.addWidget(self.seismic2)
-        strength_row = QHBoxLayout()
+        # The seismic options, in the same column as every other run option and
+        # under one row label. The yield coefficient comes first: it is a choice of
+        # its own, with or without the two-stage analysis. The stage 2 strength
+        # belongs to the two-stage analysis and sits under it, indented so its label
+        # starts where the checkbox's text does (the style's indicator width plus
+        # its label spacing).
+        form.addRow("Seismic", self.ky)
+        form.addRow("", self.seismic2)
+        strength_row = QWidget()
+        sr = QHBoxLayout(strength_row)
+        sr.setContentsMargins(0, 0, 0, 0)
         style = self.seismic2.style()
-        strength_row.addSpacing(style.pixelMetric(QStyle.PM_IndicatorWidth, None, self.seismic2)
-                                + style.pixelMetric(QStyle.PM_CheckBoxLabelSpacing, None,
-                                                    self.seismic2))
-        strength_row.addWidget(self.seismic2_strength_label)
-        strength_row.addWidget(self.seismic2_strength, 1)
-        sg.addLayout(strength_row)
-        form.addRow(self.seismic_group)
+        sr.addSpacing(style.pixelMetric(QStyle.PM_IndicatorWidth, None, self.seismic2)
+                      + style.pixelMetric(QStyle.PM_CheckBoxLabelSpacing, None,
+                                          self.seismic2))
+        sr.addWidget(self.seismic2_strength_label)
+        sr.addWidget(self.seismic2_strength, 1)
+        form.addRow("", strength_row)
 
         # Composite surfaces: let a circle be truncated at the bottom of the model
         # and run along it. Off by default — the floor of a profile-line model is

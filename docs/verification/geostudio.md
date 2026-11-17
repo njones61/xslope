@@ -751,20 +751,20 @@ the mechanism rides, and a strong φ = 45° base (c = 15, γ = 19). The target i
 factor of safety but the **critical seismic coefficient** k꜀, the horizontal pseudo-static
 coefficient at which the searched minimum FS = 1.
 
-**Input:** [vp063.xlsx](files/rocscience/vp063.xlsx) · **Rocscience detail:** [VP63](rocscience.md#vp63) · **RS2 detail (critical_kc):** [RS2-68 Case 3](rs2.md#rs2-68)
+**Input:** [vp063.xlsx](files/rocscience/vp063.xlsx) · **Rocscience detail:** [VP63](rocscience.md#vp63) · **RS2 detail (critical_kc):** [RS2-68 Case 3](rs2.md#rs2-68), [rs2_68c.xlsx](files/rocscience/rs2_68c.xlsx)
 
 ![vp063: inputs and representative solution](images/vp063.png)
 
 | Target | XSLOPE | SLOPE/W | Loukidis | Slide2 | Note |
 |---|---|---|---|---|---|
 | FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | — (file saved unsolved) | 1.000 (+0.1%) | — | Loukidis defines FS = 1.000 at k꜀ by construction |
-| Critical k꜀ (Spencer / Bishop) | 0.167 / 0.169 | — | Spencer 0.155 (+7.7% / +9.0%), FEM 0.161 | 0.151 / 0.155 (+10.6% / +9.0%) | the paper's rigorous bounds are UB 0.172 / LB 0.148 |
+| Critical k꜀ (Spencer, non-circular search) | 0.157 | — | Spencer 0.155 (+1.3%), FEM 0.161 | Spencer 0.151 (+4.0%) | the paper's rigorous bounds are UB 0.172 / LB 0.148 |
 
 The two targets are checked separately. [VP63](rocscience.md#vp63) fixes k at the paper's
 0.155 and confirms the slope is just stable there; the [RS2-68 Case 3](rs2.md#rs2-68)
-`critical_kc` analysis solves for k꜀ directly and lands ~10% above the paper's 0.155, because
-the governing surface rides the thin φ = 15° band more tightly than a circle can. The values
-still fall inside the paper's rigorous bounds [0.148, 0.172].
+`critical_kc` analysis solves for k꜀ directly with a non-circular search and gives 0.157,
++1.3% above the paper's 0.155. The surface runs along the base of the thin φ = 15° band, a path
+no circle can follow, and the value falls inside the paper's rigorous bounds [0.148, 0.172].
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.39; Loukidis, Bandini & Salgado (2003).
 

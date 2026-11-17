@@ -443,7 +443,8 @@ def _section_locks(lines, sec, page_bank, corpus):
         except Exception:
             tol = Decimal("0.01")
         for k, v in kv.items():
-            if not _wanted(k, ("expected_fs*", "fs_*", "expected")):
+            if not _wanted(k, ("expected_fs*", "fs_*", "expected",
+                               "expected_kc")):
                 continue
             slots = _identity(k, kv)
             for part in str(v).split(";"):

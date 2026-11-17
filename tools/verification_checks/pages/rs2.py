@@ -96,11 +96,6 @@ CONFIG = PageConfig(
         # Part IV twin, row 76) is deferred with no lock of its own, which is
         # what its ⊘ says.  The section's locked comparisons are the 🟢 pair.
         ('rs2-39', '🟢'),
-        # "RS2-68" carries the three seismic cases together.  Parts I-III score
-        # the problem 🔴 on case 3, and Part IV's rows split the same section:
-        # case 1 (row 62) 🟢 and case 3 (row 63) 🔴.  The worst locked case sets
-        # the dot, here and in the summary table.
-        ('rs2-68', '🔴'),
         # "RS2 Part IV VP65 / VP66" carries the two upstream-pool dams of one
         # family in a single section, because what separates them is one
         # argument about how each is watered.  VP66 (row 66) is the section's

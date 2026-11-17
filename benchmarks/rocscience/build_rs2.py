@@ -1466,7 +1466,14 @@ def rs2_68a():
     Published k_c (Slide2 LEM columns are the XSLOPE targets): Slide2 Bishop 0.118,
     Spencer 0.132; RS2 SSR 0.125; reference FEM 0.132 / Bishop 0.127 / Spencer 0.131
     / log-spiral 0.132; limit-analysis UB 0.145 / LB 0.126. Geometry transcribed
-    from the RS2 vendor model 'slope stability #068_01.fez'."""
+    from the RS2 vendor model 'slope stability #068_01.fez'.
+
+    Loukidis ran Spencer's method on irregular (non-circular) trial surfaces, and
+    Slide2's VP62 ran a non-circular path search through the toe, so the file
+    carries a non-circular starting surface for the Spencer k_c: the critical
+    circle at k_c sampled at sixteen points, toe to crest, which the search then
+    reshapes. The scored Spencer k_c is the lower of the circular and non-circular
+    searches. Bishop's simplified method stays on the circles, as Loukidis ran it."""
     poly = [(0.0, 0.0), (0.0, 25.0), (35.0, 25.0), (110.0, 50.0), (300.0, 50.0),
             (300.0, 0.0)]
     sd = _poly_slope_data(
@@ -1475,6 +1482,11 @@ def rs2_68a():
                         E=1.0e5, nu=0.3, u='ru', ru=0.5)],
         circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
         max_depth=0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((34.9, 25.0), (40.6, 23.8), (46.4, 23.0), (52.1, 22.6),
+                       (57.8, 22.5), (63.6, 22.8), (69.3, 23.5), (75.0, 24.5),
+                       (80.8, 26.0), (86.5, 27.8), (92.2, 30.1), (98.0, 32.8),
+                       (103.7, 36.1), (109.4, 40.0), (115.2, 44.6), (120.9, 50.0))]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68a.xlsx'))
     return 'rs2_68a.xlsx'
 
@@ -1487,7 +1499,10 @@ def rs2_68b():
     Published k_c: Slide2 Bishop 0.425, Spencer 0.431; RS2 SSR 0.413; reference FEM
     0.433 / Bishop 0.426 / Spencer 0.431 / log-spiral 0.432; UB 0.454 / LB 0.423.
     Geometry from 'slope stability #068_02.fez' (200 m wide domain vs Case 1's
-    300 m; the critical mechanism is near the slope, so the extra width is inert)."""
+    300 m; the critical mechanism is near the slope, so the extra width is inert).
+
+    The non-circular starting surface is this case's critical circle at k_c,
+    sampled the same way (see rs2_68a)."""
     poly = [(0.0, 0.0), (0.0, 25.0), (35.0, 25.0), (110.0, 50.0), (200.0, 50.0),
             (200.0, 0.0)]
     sd = _poly_slope_data(
@@ -1496,6 +1511,11 @@ def rs2_68b():
                         E=1.0e5, nu=0.3, u='none')],
         circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
         max_depth=0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((34.6, 25.0), (40.6, 24.4), (46.6, 24.1), (52.5, 24.0),
+                       (58.5, 24.3), (64.5, 24.9), (70.5, 25.8), (76.4, 27.0),
+                       (82.4, 28.5), (88.4, 30.4), (94.3, 32.6), (100.3, 35.2),
+                       (106.3, 38.2), (112.3, 41.6), (118.2, 45.5), (124.2, 50.0))]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68b.xlsx'))
     return 'rs2_68b.xlsx'
 

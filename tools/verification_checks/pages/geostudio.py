@@ -24,7 +24,6 @@ CONFIG = PageConfig(
         ('+372', 'too much weight'),
         ('+0.01', 'to within 0.01%, and the Baker'),
         ('+0.004', "Total sliding weight matches SLOPE/W's to"),
-        ('+10', "above the paper's 0.155"),
         # the reinforced-fill residuals: quoted at the precision of the
         # measurement in prose, at one decimal in the table.  Neither operand
         # is published — the base is SLOPE/W's own reinforced factor of safety
@@ -46,9 +45,6 @@ CONFIG = PageConfig(
         # un-reversed residuals reconcile from the same paragraph unaided)
         ('−3.7', "moves XSLOPE's residuals against them from", '6.059', '6.293'),
         ('+9.3', "moves XSLOPE's residuals against them from", '11.561', '10.576'),
-        # vp063 critical k_c: the Spencer / Bishop pair shares one cell, so the
-        # delta against Slide2's Spencer needs its two operands named
-        ('+10.6', '| Critical k꜀ (Spencer / Bishop) |', '0.167', '0.151'),
         # gs2_45: the Note cell and the paragraph below restate the row's −0.1%
         # to two decimals, from the same two factors the row prints
         ('−0.09', 'the two agree to −0.09%', '1.173', '1.174'),

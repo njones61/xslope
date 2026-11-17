@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMessageBox, QPushButton, QRadioButton, QSpinBox, QStackedWidget,
+    QMessageBox, QPushButton, QRadioButton, QSpinBox, QStackedWidget, QStyle,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -1486,7 +1486,6 @@ class RunLemDialog(QDialog):
             "slice in a material with d and ψ an undrained strength from those "
             "stresses and adds the seismic force kW; its factor of safety is the "
             "answer. Materials without d and ψ stay drained.")
-        form.addRow("", self.seismic2)
         self.seismic2_strength = self._combo(
             SEISMIC2_STRENGTH_CHOICES,
             _s2 if isinstance(_s2, str) else "interpolated")
@@ -1497,7 +1496,8 @@ class RunLemDialog(QDialog):
             "rapid drawdown. This is the procedure the book's text describes.\n\n"
             "Kc = 1 envelope: τff = d + σ′fc tan ψ at the stage 1 stresses, with no "
             "interpolation. This is how the book's Table 10.4 was computed.")
-        form.addRow("Stage 2 strength", self.seismic2_strength)
+        self.seismic2_strength_label = QLabel("Stage 2 strength")
+        self.seismic2_strength_label.setToolTip(self.seismic2_strength.toolTip())
 
         # The seismic yield coefficient (Duncan, Wright & Brandon 2014, Sec. 10.1.3):
         # the run finds k instead of using the model's. Not with a rapid drawdown,
@@ -1515,7 +1515,25 @@ class RunLemDialog(QDialog):
             "both surfaces.\n\n"
             "Works with Two-stage seismic. The result is solved at k = k_y, so its "
             "factor of safety is 1.")
-        form.addRow("", self.ky)
+
+        # The seismic options in a group of their own. The yield coefficient is a
+        # choice of its own, with or without the two-stage analysis, so it comes
+        # first; the stage 2 strength belongs to the two-stage analysis and sits
+        # under it, indented to its checkbox's text (the style's indicator width
+        # plus its label spacing).
+        self.seismic_group = QGroupBox("Seismic")
+        sg = QVBoxLayout(self.seismic_group)
+        sg.addWidget(self.ky)
+        sg.addWidget(self.seismic2)
+        strength_row = QHBoxLayout()
+        style = self.seismic2.style()
+        strength_row.addSpacing(style.pixelMetric(QStyle.PM_IndicatorWidth, None, self.seismic2)
+                                + style.pixelMetric(QStyle.PM_CheckBoxLabelSpacing, None,
+                                                    self.seismic2))
+        strength_row.addWidget(self.seismic2_strength_label)
+        strength_row.addWidget(self.seismic2_strength, 1)
+        sg.addLayout(strength_row)
+        form.addRow(self.seismic_group)
 
         # Composite surfaces: let a circle be truncated at the bottom of the model
         # and run along it. Off by default — the floor of a profile-line model is
@@ -1816,7 +1834,9 @@ class RunLemDialog(QDialog):
 
     def _sync_seismic2(self, *_):
         """The stage 2 strength choice means something only for a two-stage run."""
-        self.seismic2_strength.setEnabled(self.seismic2.isChecked())
+        on = self.seismic2.isChecked()
+        self.seismic2_strength.setEnabled(on)
+        self.seismic2_strength_label.setEnabled(on)
 
     def _sync_seep_time(self):
         """A rapid drawdown reads its two stage times, not a single instant, so the

@@ -808,6 +808,14 @@ def run_lem_test(test):
     if _mat_err:
         return None, _mat_err
 
+    # `noncirc_order=reversed` lists the file's non-circular points right to left,
+    # as a user drawing a surface from the crest of a right-facing slope down to its
+    # toe would enter them. The search must find the same surface either way
+    # (search.noncirc_left_to_right); before it did, every move was refused and the
+    # starting surface came back as the answer.
+    if str(test.get('noncirc_order', '')).strip().lower() == 'reversed':
+        slope_data['non_circ'] = list(reversed(slope_data.get('non_circ') or []))
+
     # `tcrack_depth=<ft|m>` and `tcrack_water=<ft|m>` override main!D11/D12, the
     # tension crack depth and the depth of water standing in it. They exist for a
     # tutorial that runs its shipped (uncracked) workbook with a crack added — LEM-1's

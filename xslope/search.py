@@ -546,6 +546,21 @@ SEARCH_WINDOW_KEYS = ('entry_x_min', 'entry_x_max', 'exit_x_min', 'exit_x_max',
                       'max_tangent_depth', 'min_slip_depth')
 
 
+def noncirc_left_to_right(non_circ):
+    """The non-circular surface's points in order of increasing x, each with its
+    own Movement flag.
+
+    The order the points are entered in says nothing about the surface: a
+    surface drawn from the crest down to the toe of a right-facing slope is the
+    same surface listed the other way. The search needs them left to right,
+    because it moves each point only between its neighbors' x.
+    """
+    pts = list(non_circ or [])
+    if len(pts) >= 2 and float(pts[0]['X']) > float(pts[-1]['X']):
+        pts.reverse()
+    return pts
+
+
 def file_search_window(slope_data, already=()):
     """The model's own search window as :func:`circular_search` keyword arguments.
 
@@ -1279,8 +1294,9 @@ def noncircular_search(slope_data, method_name, rapid=False, seismic2=False, dia
         
         return FS, df_slices, failure_surface, solver_result, fs_cache
 
-    # Get initial surface from non_circ data
-    non_circ = slope_data['non_circ']
+    # Get initial surface from non_circ data, left to right: each point moves only
+    # between its neighbors' x, so points listed right to left could never move.
+    non_circ = noncirc_left_to_right(slope_data['non_circ'])
     points = np.array([[p['X'], p['Y']] for p in non_circ])
     movements = [p['Movement'] for p in non_circ]
     ground_surface = slope_data['ground_surface']

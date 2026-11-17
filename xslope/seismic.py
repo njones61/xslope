@@ -259,7 +259,7 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
         solution, or the surface cannot be built.
     """
     from .search import (AnalysisError, analyzed_surface_noun,
-                         run_lem_analysis)
+                         noncirc_left_to_right, run_lem_analysis)
 
     if analysis not in ("auto_search", "single_surface"):
         raise ValueError(f"Unknown analysis {analysis!r}. Use 'auto_search' or "
@@ -277,7 +277,8 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
                   "ky": True, "composite": composite, "grid_seed": grid_seed,
                   "diagnostic": diagnostic, "fs_tol": fs_tol, "tol": tol,
                   "max_iter": max_iter, "min_slip_depth": min_slip_depth}
-    movement = [p.get("Movement") for p in (slope_data.get("non_circ") or [])]
+    # The search returns its points left to right; pair each with its own flag.
+    movement = [p.get("Movement") for p in noncirc_left_to_right(slope_data.get("non_circ"))]
 
     def say(text):
         if announce:

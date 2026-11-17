@@ -4430,8 +4430,11 @@ MATERIALS_HELP = {
     "phi": "Friction angle φ, degrees (mc option).",
     "cp": "Rate of undrained-strength increase per unit elevation below r-elev (cp option).",
     "r_elev": "Reference elevation; at or above it the strength equals c (cp option).",
-    "d": "Rapid-drawdown R-envelope cohesion intercept (LEM rapid-drawdown only).",
-    "psi": "Rapid-drawdown R-envelope friction angle (LEM rapid-drawdown only).",
+    "d": ("Intercept d of the Kc = 1 envelope (τff against σ′fc), for a material "
+          "that does not drain: LEM rapid drawdown and two-stage seismic only."),
+    "psi": ("Slope ψ of the Kc = 1 envelope (τff against σ′fc), degrees, for a "
+            "material that does not drain: LEM rapid drawdown and two-stage seismic "
+            "only."),
     "phi_b": ("Fredlund unsaturated friction angle φ_b, degrees — credits matric-"
               "suction strength above the water line (mc/pow/hb; LEM & FEM — in the "
               "FEM/SSRM the suction term is reduced by F alongside tan φ'). Blank = no "
@@ -4775,7 +4778,8 @@ class MaterialsEditor(CategoryEditor):
     # `applies` tags mirror the template's analysis usage (input_template.md):
     # the strength block (g, gsat, option, c, f, c/p, r-elev, the pow_* power-curve
     # and hb_* Hoek-Brown envelope parameters, u, ru, phi_b/s_cap) is shared by LEM+FEM;
-    # d/psi are rapid-drawdown (LEM); s(...) reliability; k1..vg_n seepage; t_cut/E/nu FEM.
+    # d/psi are the Kc = 1 envelope (LEM rapid drawdown and two-stage seismic); s(...)
+    # reliability; k1..vg_n seepage; t_cut/E/nu FEM.
     # gsat is optional (blank -> fall back to g), so it reads back as None when
     # left empty rather than 0.0. The alternate-envelope columns (pow_*/hb_*) are
     # always shown; option-driven show/hide grouping is a later UX pass.

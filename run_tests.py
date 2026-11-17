@@ -5464,6 +5464,9 @@ PREFLIGHT_BASE_BOTH = _repo('docs/verification/files/rocscience/vp042.xlsx')
 PREFLIGHT_BASE_TSEEP = _repo('docs/seep/files/xslope_earth_dam_tseep.xlsx')
 PREFLIGHT_BASE_RAPID = _repo('docs/verification/files/rocscience/vp096.xlsx')
 PREFLIGHT_BASE_RAPID_MULTI = _repo('docs/verification/files/rocscience/vp099.xlsx')
+#: The two-stage seismic base: DWB Table 10.4's dry slope, k = 0.15, its one zone
+#: in a material with d and psi.
+PREFLIGHT_BASE_SEISMIC2 = _repo('docs/verification/files/published/dwb_t10_4_dry.xlsx')
 #: The one file that can be run as EITHER rapid-drawdown route: the Johnson
 #: Reservoir dam carries boundary set 1 bound to a pool schedule, boundary set 2 as
 #: a constant drawn-down state, and the stage times that couple the drawdown to the
@@ -6608,6 +6611,27 @@ PREFLIGHT_RULE_SPECS = [
          mode='dict', analysis='rapid',
          mutation=lambda sd: _pf_mats(sd, option='pow'),
          expect='rapid drawdown does not support'),
+    # --- two-stage seismic ---------------------------------------------------
+    dict(rule='seismic2.no_low_k_material', base=PREFLIGHT_BASE_SEISMIC2, mode='excel',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, d=0.0, psi=0.0),
+         expect='no undrained strength to give any slice'),
+    dict(rule='seismic2.d_psi_incomplete', base=PREFLIGHT_BASE_SEISMIC2, mode='excel',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, psi=0.0),
+         expect='carries d but not psi'),
+    dict(rule='seismic2.cp_ignores_d_psi', base=PREFLIGHT_BASE_SEISMIC2, mode='dict',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, option='cp', c=1000.0, cp=0.3),
+         expect='option = cp'),
+    dict(rule='seismic2.curved_envelope_unsupported', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='dict', analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, option='pow'),
+         expect='two-stage seismic analysis does not support'),
+    dict(rule='seismic2.no_seismic_coefficient', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='dict', analysis='seismic2',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.0),
+         expect='stage 2 adds no seismic force'),
     dict(rule='rapid.pool_rises', base=PREFLIGHT_BASE_RAPID, mode='dict',
          analysis='rapid',
          mutation=lambda sd: _pf_set(sd, piezo_line2=[
@@ -7041,7 +7065,7 @@ PREFLIGHT_RULE_SPECS = [
          selection={'param': 'mat:Shell:d'},
          control_selection={'param': 'mat:Shell:gamma'},
          mutation=lambda sd: sd,
-         expect='read only by the rapid drawdown analysis'),
+         expect='read only by the rapid drawdown analysis and the two-stage seismic'),
     dict(rule='sensitivity.range_crosses_zero', base=PREFLIGHT_BASE_LEM,
          mode='dict', analysis='sensitivity',
          selection={'param': 'mat:Shell:gamma', 'values': [-10.0, 0.0, 10.0]},
@@ -7269,7 +7293,7 @@ def _preflight_eval(sd, spec, selection_key='selection'):
     if sel is None:
         sel = spec.get('selection')
     if sel is None:
-        sel = {'surface': 'circular'} if analysis in ('lem', 'rapid') else {}
+        sel = {'surface': 'circular'} if analysis in ('lem', 'rapid', 'seismic2') else {}
     report = preflight(sd, analysis, sel,
                        include_availability=spec.get('availability', False))
     return [f for f in report.findings if f.rule_id == spec['rule']]

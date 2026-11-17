@@ -162,10 +162,11 @@ def _at_dloads(stage):
     return _AT_DLOADS if stage == 1 else _AT_DLOADS2
 
 
-#: Every analysis type the registry knows. ``rapid``, ``sensitivity`` and
-#: ``reliability`` are *composite*: they inherit a base analysis's requirements and
-#: add their own (see :func:`expand_analysis`).
-ANALYSES = ("lem", "rapid", "seep", "tseep", "fem", "ssrm",
+#: Every analysis type the registry knows. ``rapid``, ``seismic2`` (the two-stage
+#: pseudostatic seismic analysis), ``sensitivity`` and ``reliability`` are
+#: *composite*: they inherit a base analysis's requirements and add their own (see
+#: :func:`expand_analysis`).
+ANALYSES = ("lem", "rapid", "seismic2", "seep", "tseep", "fem", "ssrm",
             "sensitivity", "reliability")
 
 #: Composition. A composite analysis satisfies every rule of the analyses it
@@ -174,6 +175,7 @@ ANALYSES = ("lem", "rapid", "seep", "tseep", "fem", "ssrm",
 #: ``selection={"base": "fem"}`` (default ``lem``).
 _INHERITS = {
     "rapid": ("lem",),
+    "seismic2": ("lem",),
     "tseep": ("seep",),
     "ssrm": ("fem",),
 }
@@ -233,7 +235,7 @@ REMEDIES = {
 #: is evaluated once per option with that option pinned into the selection, and a
 #: rule that fires makes the option unavailable with its message as the reason.
 CAPABILITY_GROUPS = {
-    "analysis": ("lem", "rapid", "seep", "tseep", "fem", "ssrm",
+    "analysis": ("lem", "rapid", "seismic2", "seep", "tseep", "fem", "ssrm",
                  "sensitivity", "reliability"),
     "lem_method": LEM_METHOD_OPTIONS,
 }
@@ -5121,6 +5123,88 @@ def _rapid_stage2_repeat(ctx):
 
 
 # ---------------------------------------------------------------------------
+# Family: two-stage seismic
+#
+# The two-stage pseudostatic analysis (advanced.seismic_two_stage; Duncan, Wright
+# & Brandon 2014, Sec. 10.4.2) inherits every limit-equilibrium rule. Its stage 2
+# gives every slice in a material with d and psi an undrained strength from the
+# stage 1 stresses, so it needs the same Kc = 1 envelope rapid drawdown does and
+# refuses the curved envelopes for the same reason; and it is a pseudostatic
+# analysis, so a model with no seismic coefficient is worth a word.
+# ---------------------------------------------------------------------------
+
+def _has_d_psi(m):
+    return (_num(m.get("d")) or 0.0) != 0.0 or (_num(m.get("psi")) or 0.0) != 0.0
+
+
+@rule("seismic2.no_low_k_material", ERROR, ("seismic2",),
+      "The two-stage seismic analysis needs at least one material with a Kc = 1 "
+      "envelope.")
+def _seismic2_no_low_k(ctx):
+    mats = list(ctx.strength_materials())
+    if not mats or any(_has_d_psi(m) for _, m in mats):
+        return None
+    return ("No material carries the d / psi pair, so stage 2 has no undrained "
+            "strength to give any slice, and the two-stage analysis would only "
+            "repeat a single-stage pseudostatic analysis with drained strengths. "
+            "Enter d and psi for the materials that do not drain during the "
+            "earthquake, or clear Two-stage seismic to run the single-stage "
+            f"analysis {_AT_MAT}.")
+
+
+@rule("seismic2.d_psi_incomplete", ERROR, ("seismic2",),
+      "The Kc = 1 envelope needs BOTH d and psi.")
+def _seismic2_d_psi(ctx):
+    for i, m in ctx.strength_materials():
+        d, psi = _num(m.get("d")) or 0.0, _num(m.get("psi")) or 0.0
+        if (d != 0.0) == (psi != 0.0):
+            continue
+        have, missing = ("d", "psi") if d != 0.0 else ("psi", "d")
+        yield (f"{ctx.mat_label(i)} carries {have} but not {missing}. Stage 2 of "
+               f"the two-stage seismic analysis takes its undrained strength from "
+               f"the Kc = 1 envelope, which needs both. Fill both, or clear both to "
+               f"leave the material drained through the earthquake {_AT_MAT}.")
+
+
+@rule("seismic2.cp_ignores_d_psi", WARNING, ("seismic2",),
+      "An undrained (option = cp) material cannot also carry a Kc = 1 envelope.")
+def _seismic2_cp(ctx):
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "cp" or not _has_d_psi(m):
+            continue
+        yield (f"{ctx.mat_label(i)} uses option = cp, so its d / psi are not read: "
+               f"its strength in both stages is the undrained strength c/p gives "
+               f"{_AT_MAT}.")
+
+
+@rule("seismic2.curved_envelope_unsupported", ERROR, ("seismic2",),
+      "option = pow and option = hb are not supported in the two-stage seismic "
+      "analysis.")
+def _seismic2_curved(ctx):
+    for i, m in ctx.strength_materials():
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in ("pow", "hb"):
+            continue
+        name = "power-curve" if opt == "pow" else "Hoek-Brown"
+        yield (f"{ctx.mat_label(i)} uses option = {opt} ({name}), which the "
+               f"two-stage seismic analysis does not support: stage 2 overwrites "
+               f"each slice's c and f, and the curved envelope computes them itself, "
+               f"so the run is refused {_AT_MAT}.")
+
+
+@rule("seismic2.no_seismic_coefficient", WARNING, ("seismic2",),
+      "A two-stage seismic analysis with k = 0 is an undrained static analysis.",
+      fields=("k_seismic",))
+def _seismic2_k_zero(ctx):
+    k = _num(ctx.sd.get("k_seismic"))
+    if k is None or k != 0.0:
+        return None            # a blank k is the global rule's to report
+    return ("The seismic coefficient is 0, so stage 2 adds no seismic force: the "
+            "result is the static factor of safety with undrained strengths, not a "
+            f"pseudostatic one. Enter k {_at_global('D13')}.")
+
+
+# ---------------------------------------------------------------------------
 # Family: seismic direction -- one cell, two meanings
 #
 # The limit-equilibrium engine takes the MAGNITUDE of k and orients it itself
@@ -7322,7 +7406,8 @@ def _sens_ru_no_consumer(ctx):
 
 
 @rule("sensitivity.rapid_only_field", ERROR, ("sensitivity",), capability="analysis",
-      summary="d and psi only act in a rapid drawdown analysis, which a sweep cannot run.")
+      summary="d and psi only act in the rapid drawdown and two-stage seismic analyses, "
+              "which a sweep cannot run.")
 def _sens_rapid_only(ctx):
     field = ctx.swept_field
     if field not in ("d", "psi"):
@@ -7331,7 +7416,8 @@ def _sens_rapid_only(ctx):
     where = ctx.mat_label(i) if i is not None else "the materials table"
     label = "d" if field == "d" else "psi"
     return (f"The sweep varies {label} on {where}. That parameter is read only by "
-            f"the rapid drawdown analysis, and a parametric study evaluates the "
+            f"the rapid drawdown analysis and the two-stage seismic analysis, and a "
+            f"parametric study evaluates the "
             f"single-stage model -- probed at d = 0, 10 and 100 (and psi = 0, 10 "
             f"and 40) the factor of safety is identical at every value {_AT_MAT}.")
 

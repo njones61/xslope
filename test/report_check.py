@@ -1984,6 +1984,85 @@ def test_rapid_drawdown_names_the_governing_stage():
     return fails
 
 
+#: Duncan, Wright & Brandon's Table 10.4 dry slope: k = 0.15, one zone in a
+#: material with d and psi (Soil 1, the Pilarcitos fill).
+SEISMIC2_XLSX = os.path.join(_REPO, "docs", "verification", "files", "published",
+                             "dwb_t10_4_dry.xlsx")
+
+
+def test_seismic2_section():
+    """The two-stage seismic block: one row per stage, stage 2's factor reported,
+    the strength choice named, and nothing for a run that was not two-stage.
+
+    Solved on the starting circle of the Table 10.4 slope, once per stage 2
+    strength choice, and once with d and psi cleared, where both stages are
+    drained and the block says so.
+    """
+    fails = []
+    import contextlib
+    import io
+    from xslope.fileio import load_slope_data
+    from xslope.report import _Counter, _seismic2_section
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    def block(sub, kind):
+        return [b for b in sub.blocks if b.kind == kind]
+
+    def _solve(sd, strength):
+        ok, (df, _surf) = generate_slices(sd, circle=sd["circles"][0], num_slices=40)
+        with contextlib.redirect_stdout(io.StringIO()):
+            res = solve_selected("spencer", df, seismic2=strength)
+        return df, res
+
+    sd = load_slope_data(SEISMIC2_XLSX)
+    for strength, phrase in (("kc1", "from the K_c = 1 envelope at its stage 1 stresses"),
+                             ("interpolated", "interpolated from its stage 1 stresses")):
+        where = f"two-stage seismic ({strength})"
+        df, res = _solve(sd, strength)
+        sub = _seismic2_section(res, _Counter(), sd, df, surface="specified circle")
+        if sub is None:
+            fails.append(f"{where}: no block for a two-stage result")
+            continue
+        tables = block(sub, "table")
+        if len(tables) != 1 or [r[0] for r in tables[0].rows] != ["1", "2"]:
+            fails.append(f"{where}: the stage table is not one table of stages 1 and 2")
+            continue
+        rows = tables[0].rows
+        if rows[0][3] != f"{res['seismic_stage1_FS']:.3f}" or \
+                rows[1][3] != f"{res['FS']:.3f}":
+            fails.append(f"{where}: the stage factors read {rows[0][3]}, {rows[1][3]} "
+                         f"against {res['seismic_stage1_FS']:.3f}, {res['FS']:.3f}")
+        if rows[0][1] != "none" or rows[1][1] != "k = 0.15":
+            fails.append(f"{where}: the seismic force column reads "
+                         f"{rows[0][1]!r}, {rows[1][1]!r}")
+        prose = " ".join(b.text for b in block(sub, "prose"))
+        if phrase not in prose:
+            fails.append(f"{where}: the procedure does not say {phrase!r}")
+        if f"Table {tables[0].number}" not in prose:
+            fails.append(f"{where}: the stage table is not cited by number")
+        kv = [v for b in block(sub, "keyvalues") for _l, v in b.items]
+        if kv != [f"{res['FS']:.3f}"]:
+            fails.append(f"{where}: the reported factor reads {kv}")
+
+    # Not a two-stage result: no block.
+    df, res = _solve(sd, False)
+    if _seismic2_section(res, _Counter(), sd, df) is not None:
+        fails.append("a single-stage result drew a two-stage block")
+
+    # A surface in no material with d and psi: both stages drained, said once.
+    drained = load_slope_data(SEISMIC2_XLSX)
+    for m in drained["materials"]:
+        m["d"], m["psi"] = 0.0, 0.0
+    df, res = _solve(drained, "interpolated")
+    sub = _seismic2_section(res, _Counter(), drained, df, surface="specified circle")
+    prose = " ".join(b.text for b in block(sub, "prose")) if sub else ""
+    if "crosses no material with d and ψ" not in prose:
+        fails.append("a surface with no d/ψ material did not say both stages were "
+                     "drained")
+    return fails
+
+
 #: COMBO-2's two rapid drawdown routes on the Johnson dam. The starter file
 #: carries two piezometric lines; the full file is run as the tutorial runs it,
 #: meshing and marching its own transient seepage and staging the frames at the
@@ -21330,6 +21409,7 @@ CHECKS = [
      test_a_report_run_method_is_run_at_the_analysis_discretization),
     ("a method that is not run says why",
      test_a_method_that_is_not_run_says_why),
+    ("the two-stage seismic block", test_seismic2_section),
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
     ("the rapid drawdown stage table (COMBO-2's two routes)",

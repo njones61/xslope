@@ -948,7 +948,7 @@ class PythonKernel:
             return sd.get("ground_surface")
 
         def run_lem(method=None, num_slices=40, rapid=False, plot=True,
-                    slope_data=None, search=False, seep_time=None):
+                    slope_data=None, search=False, seep_time=None, seismic2=False):
             """Run an LEM analysis on the loaded project and return the result dict
             (includes 'FS'). `method` is one of oms, bishop, janbu, spencer, corps,
             lowe, mprice; left out, it is THE METHOD THE MODEL DECLARES (main!D14 —
@@ -976,6 +976,13 @@ class PythonKernel:
             stage times are staged instead, exactly as the Run LEM dialog stages
             them. It is stated in the log which instant was used; for the whole
             curve rather than one instant, `fs_vs_time()`.
+
+            `seismic2` runs the two-stage pseudostatic seismic analysis (Duncan,
+            Wright & Brandon 2014, Sec. 10.4.2) with the model's seismic coefficient:
+            `'interpolated'` (or True) takes stage 2's undrained strengths the rapid
+            drawdown way, `'kc1'` from the Kc = 1 envelope alone. Not with `rapid`.
+            The result carries 'seismic_stage1_FS' (static) and 'seismic_stage2_FS'
+            (the pseudostatic factor of safety, the same as 'FS').
 
             The returned dict is the solver's, plus the surface it was solved on:
             'Xo', 'Yo', 'R', 'Depth' (the circle, None on a non-circular surface)
@@ -1010,7 +1017,7 @@ class PythonKernel:
                         sd, method,
                         analysis="auto_search" if search else "single_surface",
                         surface=family, num_slices=num_slices, rapid=rapid,
-                        announce=False)
+                        seismic2=seismic2, announce=False)
             except AnalysisError as exc:
                 raise RuntimeError(str(exc)) from None
             result = bundle.get("results")

@@ -722,7 +722,7 @@ def circular_search(slope_data, method_name, rapid=False, seismic2=False, tol=1e
     # requirements, which is exactly what validate_rapid_drawdown below only
     # PRINTS -- and only on this path.
     _refuse_two_staged(rapid, seismic2)
-    preflight(slope_data, 'rapid' if rapid else 'lem',
+    preflight(slope_data, 'rapid' if rapid else ('seismic2' if seismic2 else 'lem'),
               {'surface': 'circular', 'search': True,
                'method': method_name, 'seismic2': seismic2}).raise_for_errors()
 
@@ -1159,7 +1159,7 @@ def noncircular_search(slope_data, method_name, rapid=False, seismic2=False, dia
     # what turns "the starting surface is not viable" into the real reason when the
     # method cannot use a non-circular surface at all.
     _refuse_two_staged(rapid, seismic2)
-    preflight(slope_data, 'rapid' if rapid else 'lem',
+    preflight(slope_data, 'rapid' if rapid else ('seismic2' if seismic2 else 'lem'),
               {'surface': 'noncircular', 'search': True,
                'method': method_name, 'seismic2': seismic2}).raise_for_errors()
 
@@ -1785,7 +1785,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                 if drained:
                     print(drained)
             if "seismic_stage1_FS" in results:
-                print(seismic_stages_line(results, "the critical surface"))
+                print(seismic_stages_line(
+                    results, "the " + analyzed_surface_noun(True, circular)))
             mass = _sliding_mass_line(critical.get("slices"), slope_data)
             if mass:
                 print(mass)
@@ -1855,7 +1856,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         if drained:
             print(drained)
         if "seismic_stage1_FS" in bundle["results"]:
-            print(seismic_stages_line(bundle["results"], "the surface"))
+            print(seismic_stages_line(
+                bundle["results"], "the " + analyzed_surface_noun(False, circular)))
         mass = _sliding_mass_line(slice_df, slope_data)
         if mass:
             print(mass)

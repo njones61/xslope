@@ -34,6 +34,13 @@ from .preflight_panel import (
 # the checkbox and the mesh build can never disagree about what "off" means.
 from .runners import REFINE_THIN_ZONES_DEFAULT, TRANSIENT_IC_MAX_ITER_DEFAULT
 
+#: The two-stage seismic analysis's stage 2 strength choices, in
+#: :data:`xslope.advanced.SEISMIC2_STRENGTHS`'s keys.
+SEISMIC2_STRENGTH_CHOICES = [
+    ("interpolated", "Interpolated (as in rapid drawdown)"),
+    ("kc1", "Kc = 1 envelope"),
+]
+
 LEM_METHODS = [
     ("oms", "Ordinary Method of Slices (OMS)"),
     ("bishop", "Bishop's Simplified"),
@@ -1465,6 +1472,33 @@ class RunLemDialog(QDialog):
         self.rapid.setChecked(bool(defaults.get("rapid", False)))
         form.addRow("", self.rapid)
 
+        # The two-stage pseudostatic seismic analysis (Duncan, Wright & Brandon 2014,
+        # Sec. 10.4.2). A run is a rapid drawdown or a two-stage seismic analysis,
+        # never both, so ticking one clears the other.
+        _s2 = defaults.get("seismic2")
+        self.seismic2 = QCheckBox("Two-stage seismic")
+        self.seismic2.setChecked(bool(_s2) and not self.rapid.isChecked())
+        self.seismic2.setToolTip(
+            "The two-stage pseudostatic analysis for a slope that has consolidated "
+            "under its own weight (Duncan, Wright & Brandon 2014, Sec. 10.4.2).\n\n"
+            "Stage 1 solves the slope with no seismic force and drained strengths, "
+            "which gives each slice its consolidation stresses. Stage 2 gives every "
+            "slice in a material with d and ψ an undrained strength from those "
+            "stresses and adds the seismic force kW; its factor of safety is the "
+            "answer. Materials without d and ψ stay drained.")
+        form.addRow("", self.seismic2)
+        self.seismic2_strength = self._combo(
+            SEISMIC2_STRENGTH_CHOICES,
+            _s2 if isinstance(_s2, str) else "interpolated")
+        self.seismic2_strength.setToolTip(
+            "How stage 2 takes the undrained strength.\n\n"
+            "Interpolated: between the Kc = 1 envelope (d, ψ) and the drained "
+            "envelope (c′, φ′) by each slice's consolidation stress ratio, as in "
+            "rapid drawdown. This is the procedure the book's text describes.\n\n"
+            "Kc = 1 envelope: τff = d + σ′fc tan ψ at the stage 1 stresses, with no "
+            "interpolation. This is how the book's Table 10.4 was computed.")
+        form.addRow("Stage 2 strength", self.seismic2_strength)
+
         # Composite surfaces: let a circle be truncated at the bottom of the model
         # and run along it. Off by default — the floor of a profile-line model is
         # max_depth, a search bound rather than a real impenetrable boundary.
@@ -1584,7 +1618,8 @@ class RunLemDialog(QDialog):
         # The model checks, beside the controls: warnings inform the decision instead
         # of annotating the regret, and an error refuses before anything is started.
         self.preflight = PreflightPanel(
-            analysis=lambda: "rapid" if self.rapid.isChecked() else "lem",
+            analysis=lambda: ("rapid" if self.rapid.isChecked() else
+                              "seismic2" if self.seismic2.isChecked() else "lem"),
             slope_data=slope_data, document=document,
             selection_fn=self._selection, notes=(SEISMIC_NOTE_LEM,), parent=self)
 
@@ -1594,8 +1629,13 @@ class RunLemDialog(QDialog):
             self.surface.currentIndexChanged.connect(self._sync_tols)
         self.min_slip_on.toggled.connect(self._sync_tols)
         self.method.currentIndexChanged.connect(self._recheck)
+        self.rapid.toggled.connect(self._exclusive_from_rapid)
+        self.seismic2.toggled.connect(self._exclusive_from_seismic2)
         self.rapid.toggled.connect(self._recheck)
         self.rapid.toggled.connect(self._sync_seep_time)
+        self.seismic2.toggled.connect(self._sync_seismic2)
+        self.seismic2.toggled.connect(self._recheck)
+        self._sync_seismic2()
         # The seepage time is part of what the checks are told (it names the frame
         # that will be staged), so a change to it re-evaluates them as well as the
         # button — otherwise the panel would go on naming the previous instant.
@@ -1735,6 +1775,20 @@ class RunLemDialog(QDialog):
     def _recheck(self):
         self.preflight.refresh()
 
+    def _exclusive_from_rapid(self, on):
+        """Rapid drawdown ticked: the run cannot also be two-stage seismic."""
+        if on and self.seismic2.isChecked():
+            self.seismic2.setChecked(False)
+
+    def _exclusive_from_seismic2(self, on):
+        """Two-stage seismic ticked: the run cannot also be a rapid drawdown."""
+        if on and self.rapid.isChecked():
+            self.rapid.setChecked(False)
+
+    def _sync_seismic2(self, *_):
+        """The stage 2 strength choice means something only for a two-stage run."""
+        self.seismic2_strength.setEnabled(self.seismic2.isChecked())
+
     def _sync_seep_time(self):
         """A rapid drawdown reads its two stage times, not a single instant, so the
         single-time selector steps aside while Rapid drawdown is ticked and the stage
@@ -1791,6 +1845,9 @@ class RunLemDialog(QDialog):
             "surface": self._surface_value(),
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
+            # False, or the stage 2 strength choice ("interpolated" / "kc1").
+            "seismic2": (self.seismic2_strength.currentData()
+                         if self.seismic2.isChecked() else False),
             "composite": self.composite.isChecked(),
             "grid_seed": self.grid_seed.isChecked(),
             "diagnostic": self.diagnostic.isChecked(),

@@ -191,6 +191,19 @@ def _drained_rapid_note(bundle):
                                                    circular))
 
 
+def _seismic2_note(bundle):
+    """The stage line a two-stage seismic result carries on the LEM Solution tab,
+    or ``""`` — the Log's own line (:func:`xslope.advanced.seismic_stages_line`)."""
+    from xslope.advanced import seismic_stages_line
+    from xslope.search import analyzed_surface_noun
+    results = (bundle or {}).get("results")
+    if not isinstance(results, dict) or "seismic_stage1_FS" not in results:
+        return ""
+    circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
+    where = "the " + analyzed_surface_noun(bool(bundle.get("search")), circular)
+    return seismic_stages_line(results, where)
+
+
 def lem_done_message(bundle):
     """The status-bar line a finished LEM run leaves: the method and its factor of
     safety, and, for a rapid drawdown whose surface crossed no material with d
@@ -202,6 +215,8 @@ def lem_done_message(bundle):
     if drained:
         clause = drained.split(", so ")[0]
         message += f"; {clause[:1].lower()}{clause[1:]}"
+    if "seismic_stage1_FS" in res:
+        message += f" (two-stage seismic; stage 1 FS = {res['seismic_stage1_FS']:.3f})"
     return message
 
 
@@ -3524,8 +3539,12 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(self.solution_canvas)
         if (bundle and panel and self.solution_canvas is not None
                 and isinstance(bundle.get("results"), dict)):
-            self.solution_canvas.set_note("Rapid drawdown",
-                                          _drained_rapid_note(bundle))
+            seismic2 = _seismic2_note(bundle)
+            if seismic2:
+                self.solution_canvas.set_note("Two-stage seismic", seismic2)
+            else:
+                self.solution_canvas.set_note("Rapid drawdown",
+                                              _drained_rapid_note(bundle))
             try:
                 self.solution_canvas.render_solution(
                     self.doc.slope_data, bundle["slice_df"],

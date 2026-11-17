@@ -829,6 +829,7 @@ DEFAULT_OPTIONS = {
     "lem_slice_key": True,
     "lem_calculations": True,
     "lem_rapid": True,
+    "lem_seismic2": True,
     "seep": True,
     "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
@@ -1305,6 +1306,7 @@ def analysis_options(slope_data, solutions):
            "surface": surface,
            "num_slices": int(slices),
            "rapid": "stage1_FS" in results,
+           "seismic2": results.get("seismic_strength", False),
            "composite": False,
            "grid_seed": False}
     for key in out:
@@ -1779,7 +1781,8 @@ def report_analyses(solutions, opts):
         bundle = select_bundle(solutions, opts.get("method"))
         if bundle is not None:
             results = bundle.get("results") or {}
-            out.append("rapid" if "stage1_FS" in results else "lem")
+            out.append("rapid" if "stage1_FS" in results else
+                       "seismic2" if "seismic_stage1_FS" in results else "lem")
     if opts.get("seep") and seepage_documented(solutions):
         out.append("seep")
     for bundle in (fem_bundles(solutions) if opts.get("fem") else []):
@@ -3506,6 +3509,102 @@ def _rapid_section(results, counter, slope_data=None, slice_df=None,
                 f"K_c = K_f (c′, φ′), on "
                 f"{'that slice' if n_fallback == 1 else 'those slices'}.",
                 links=[(rule, url + RAPID_NEGATIVE_STRESS_ANCHOR)]))
+    return sub
+
+
+#: The documentation page the two-stage seismic section points a reader to.
+SEISMIC2_DOC_PAGE = "seismic/two_stage.md"
+
+
+def _seismic2_section(results, counter, slope_data=None, slice_df=None,
+                      surface="surface"):
+    """The two-stage pseudostatic seismic detail, when the run was one.
+
+    One row per stage — the seismic force it carries, the strengths it uses and
+    its factor of safety — then the factor of safety reported, which is stage
+    2's. ``surface`` names the surface analyzed, for the sentence that says when
+    it crosses no material with d and ψ.
+    """
+    if not results or "seismic_stage1_FS" not in results:
+        return None
+    from .advanced import SEISMIC2_STRENGTHS
+    sub = Section("Two-Stage Seismic Analysis")
+    s1, s2 = results["seismic_stage1_FS"], results["seismic_stage2_FS"]
+    strength = results.get("seismic_strength", "interpolated")
+    low_k = _rapid_flags(results, slice_df, "seismic_low_k")
+    if low_k is None and slice_df is not None and {"d", "psi"} <= set(slice_df.columns):
+        low_k = [bool(d > 0 or p > 0) for d, p in zip(slice_df["d"], slice_df["psi"])]
+    fallback = _rapid_flags(results, slice_df, "seismic_fallback")
+    n_low = sum(low_k) if low_k is not None else None
+    k = _num((slope_data or {}).get("k_seismic"))
+    k_txt = f"k = {abs(k):g}" if k is not None else "the model's seismic coefficient"
+
+    table_number = counter.next_table()
+    where, links = cite("Table", table_number)
+    url = docs_url(SEISMIC2_DOC_PAGE)
+    procedure = "two-stage procedure of Duncan, Wright, and Brandon (2014)"
+    links = [(procedure, url)] + links
+    if strength == "kc1":
+        how = ("from the K_c = 1 envelope at its stage 1 stresses, "
+               "τ_ff = d + σ′_fc tan ψ")
+    else:
+        how = ("interpolated from its stage 1 stresses between the K_c = 1 "
+               "envelope (d, ψ) and the K_c = K_f envelope (c′, φ′), as in rapid "
+               "drawdown")
+    sub.blocks.append(Prose(
+        f"The surface was analyzed for the earthquake by the {procedure}. Stage 1 "
+        f"solves the section with no seismic force and the drained strength "
+        f"(c′, φ′) in every material, and gives the effective normal and shear "
+        f"stress on each slice base before the earthquake. Stage 2 gives each "
+        f"slice whose base is in a material with a nonzero d or ψ an undrained "
+        f"strength τ_ff, {how}; free-draining materials keep c′, φ′. Stage 2 "
+        f"adds the seismic force kW with {k_txt}, and its factor of safety is the "
+        f"one reported. {where} gives the strengths and F for each stage.",
+        links=links))
+
+    if (slope_data and low_k is not None and slice_df is not None
+            and "mat" in slice_df.columns):
+        mats = _slice_materials(slope_data, slice_df, keep=low_k)
+    else:
+        mats = [(i, m) for i, m in referenced_materials(slope_data or {})
+                if (_num(m.get("d")) or 0) > 0 or (_num(m.get("psi")) or 0) > 0]
+    names = [str(m.get("name") or "") for _i, m in mats]
+    if n_low == 0:
+        strengths2 = "c′, φ′ in all materials"
+    else:
+        undrained = ("undrained (τ_ff from d, ψ)" if strength == "kc1"
+                     else "undrained (τ_ff from d, ψ and c′, φ′)")
+        strengths2 = (f"{undrained} in {_join(names)}" if names else
+                      f"{undrained} in the low-permeability materials")
+        if low_k is None or n_low < len(low_k):
+            strengths2 += "; c′, φ′ elsewhere"
+    rows = [["1", "none", "c′, φ′ in all materials", f"{s1:.3f}"],
+            ["2", k_txt, strengths2, f"{s2:.3f}"]]
+    sub.blocks.append(Table(
+        ["Stage", "Seismic force", "Strengths", "F"], rows,
+        "Factor of safety at each stage of the two-stage seismic analysis",
+        table_number, bold_rows=[1], align=["c", "l", "l", "c"]))
+    sub.blocks.append(KeyValues([("Pseudostatic factor of safety — stage 2",
+                                  f"{results['FS']:.3f}")]))
+
+    if n_low == 0:
+        sub.blocks.append(Prose(
+            f"The {surface} crosses no material with d and ψ, so both stages used "
+            f"drained strengths, and stage 2 is a single-stage pseudostatic "
+            f"analysis."))
+
+    if fallback is not None and low_k is not None:
+        n_fallback = sum(f for f, kk in zip(fallback, low_k) if kk)
+        if n_fallback:
+            rule = "the lower of the two envelopes"
+            sub.blocks.append(Prose(
+                f"On {_slice_share(n_fallback, n_low)}, the minor principal "
+                f"effective stress at the end of consolidation computes as zero "
+                f"or negative on one of the two envelopes, which leaves the "
+                f"interpolation for τ_ff undefined; stage 2 used {rule}, "
+                f"K_c = 1 (d, ψ) or K_c = K_f (c′, φ′), on "
+                f"{'that slice' if n_fallback == 1 else 'those slices'}.",
+                links=[(rule, docs_url(RAPID_DOC_PAGE) + RAPID_NEGATIVE_STRESS_ANCHOR)]))
     return sub
 
 
@@ -6798,6 +6897,16 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
                      f"{'circle' if family == 'circular' else 'surface'}"))
         if rapid is not None:
             sec.children.append(rapid)
+
+    # --- two-stage seismic ---
+    if opts["lem_seismic2"]:
+        family = _surface_family(slice_df, slope_data)
+        seismic2 = _seismic2_section(
+            results, counter, slope_data, slice_df,
+            surface=(f"{'critical' if searched else 'specified'} "
+                     f"{'circle' if family == 'circular' else 'surface'}"))
+        if seismic2 is not None:
+            sec.children.append(seismic2)
 
     # --- slice table and calculations ---
     # The calculation is worked out first: it adds the per-slice terms of the

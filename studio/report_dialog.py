@@ -123,6 +123,9 @@ CONTENT_TREE = [
          ("lem_rapid", "Rapid drawdown detail",
           "The three-stage factors of safety, when the run was a rapid "
           "drawdown analysis."),
+         ("lem_seismic2", "Two-stage seismic detail",
+          "The factors of safety of both stages, when the run was a two-stage "
+          "pseudostatic seismic analysis."),
      ]),
     ("seep", "Seepage analysis",
      "The seepage analysis: the mesh and conductivities it was solved on, the "

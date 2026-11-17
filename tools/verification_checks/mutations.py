@@ -131,8 +131,8 @@ MUTATIONS = [
     # A ⊘ row carries one of the status terms index.md#status-terms defines; a
     # retired one ("reported, no lock") in its place must fail.
     ("rs2_joints", "dots", "D4 retired status term on a nodata row",
-     "*unconfirmed* \u2014 the answer moves with the mesh",
-     "*reported, no lock* \u2014 the answer moves with the mesh"),
+     "*no reference value* \u2014 a shear test on a single joint",
+     "*reported, no lock* \u2014 a shear test on a single joint"),
 
     # A caption claiming all four panels of a composite on a figure that is a
     # single axes.  M14 runs the other way (a four-panel figure captioned as
@@ -215,8 +215,8 @@ MUTATIONS = [
      "| 1.80 | the proprietary slip-circle program's **1.7** (0%) |"),
 
     # -------------------------------------------------------------- tags ---
-    # Example 2 prints its 1.341 lock twice — as `| 1.34 |` in the results table
-    # and as "this model's 1.34" in the note below it — so the existential
+    # Example 2 prints its 1.347 lock twice — as `| 1.35 |` in the results table
+    # and as "this model's 1.35" in the note below it — so the existential
     # forward pass finds the value however either one drifts.  The restatement
     # pass reads both: the table cell sits in the XSLOPE column of a row labeled
     # SSRM, which is what the lock's own `type` names, and the note attributes
@@ -228,7 +228,7 @@ MUTATIONS = [
     ("ssrm", "tags", "G1b the same lock drifts in the note instead",
      "against this model's 1.35", "against this model's 1.45"),
     ("geostudio", "tags", "G2 tagged value dropped from its section",
-     "| Janbu | 1.330 | 1.233 |", "| Janbu | — | 1.233 |"),
+     "| Janbu | 1.329 | 1.233 |", "| Janbu | — | 1.233 |"),
     ("rocscience_groundwater", "tags", "G3 scientific-notation tag mantissa drifts",
      "6.070×10⁻⁵", "6.170×10⁻⁵", "all"),
     ("rocscience_groundwater", "tags", "G4 scientific-notation tag exponent drifts",
@@ -263,7 +263,7 @@ MUTATIONS = [
     # the page prints once: the forward pass is existential, so a value the
     # section states twice would still be found on the other statement.
     ("rocscience", "tags", "G11 a slip-surface depth drifts in the tag",
-     "expected_depth=3.142", "expected_depth=3.242"),
+     "expected_depth=3.094", "expected_depth=3.194"),
     ("rocscience", "tags", "G12 a printed slip-surface depth drifts from its tag",
      "| D1/D = 4 | 3.261 |", "| D1/D = 4 | 3.361 |"),
     ("rocscience", "tags", "G13 a back-analyzed support force drifts in the tag",
@@ -322,8 +322,10 @@ VOICE_MUTATIONS = [
 #: move. A fixture anchored in a row's text goes stale the moment that row is
 #: re-cut, which is how C1, C2 and N6 came to be anchored on text the page no
 #: longer carried; the terminations section that held it next moved to
-#: docs/fem/joints.md, which is why it is a methodology sentence now.
-CAP_ANCHOR = "Each row shows the recomputed value beside the one its source prints."
+#: docs/fem/joints.md, which is why it is a methodology sentence now.  The
+#: methodology sentence first chosen was itself reworded away; the anchor is
+#: now the units sentence of the Models bullet.
+CAP_ANCHOR = "The vendor's MPa and MN/m³ are converted to kPa and kN/m³."
 
 CAPABILITY_MUTATIONS = [
     ("rs2_joints", "capabilities", "C1 the line-load claim, restored",
@@ -362,16 +364,16 @@ NEGATIVE = [
      "### \U0001F7E2 Confined Radial Flow {#verification-confined-radial}\n\n"
      "The `us` column and [the note](https://example.org/our/we/us.html) "
      "record it; the firm base now sits at depth D.\n"),
-    # G1's control: a THIRD statement of Example 2's 1.341 lock, correct, in a
+    # G1's control: a THIRD statement of Example 2's 1.347 lock, correct, in a
     # sentence of its own.  Without it, G1 and G1b would be satisfied by a check
     # that flagged every restatement rather than by one that reads whether the
     # restatement agrees.  The sentence names the mesh as well as the method, so
     # it also exercises the narrowing that picks the quad8 lock out of the four
     # the section carries.
     ("ssrm", "tags", "N5 a correct restatement in a sentence of its own",
-     "*Example 1, without the foundation, reads",
-     "XSLOPE's SSRM on the same quad8 mesh reads 1.34 there too.\n\n"
-     "*Example 1, without the foundation, reads"),
+     "A coarse tri6 run of this model reads",
+     "XSLOPE's SSRM on the same quad8 mesh reads 1.35 there too.\n\n"
+     "A coarse tri6 run of this model reads"),
     # M5's control: the same planted table with the delta its authority column
     # implies, (0.781 − 0.81) / 0.81 = −3.6%.  Without this, M5 would be
     # satisfied by the check finding no pair at all rather than by the

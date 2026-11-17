@@ -1728,8 +1728,8 @@ Slide #61 / Baker (2003) example problem 3: the same 43°, H = 6 m slope as [#44
 
 ## 🟢 VP62: Slope, homogenous, ru pore pressure, seismic {#vp62}
 
-Slide #62, dry at kc = 0.432 and at ru = 0.5 with kc = 0.132. Slide solves both with a circular
-search, Loukidis with a log-spiral mechanism.
+Slide #62, dry at kc = 0.432 and at ru = 0.5 with kc = 0.132. Slide solves both with circular
+and noncircular surfaces through the toe; the two coefficients are Loukidis's log-spiral values.
 
 **Input files:** [vp062a.xlsx](files/rocscience/vp062a.xlsx), [vp062b.xlsx](files/rocscience/vp062b.xlsx)
 
@@ -1760,13 +1760,15 @@ Also [SLOPE/W §2.38](geostudio.md) — the same problem in the GeoStudio corpus
 Loukidis, Bandini & Salgado (2003)'s second example: a three-layer dry slope (a weak φ = 15°
 middle layer between a light c = 4 kPa cap and a strong φ = 45° base) loaded pseudo-statically at
 the paper's critical seismic coefficient kc = 0.155, at which the factor of safety is exactly 1.
-Loukidis analyzed a log-spiral mechanism and Slide a path search with Monte-Carlo optimization;
-XSLOPE runs its noncircular search from a seed through the layer-2/3 daylight point the manual
-identifies as a point on the critical surface.
+Loukidis found that coefficient with Spencer's method on irregular trial surfaces (their Table
+3, which has no log-spiral value for this example, though the Slide manual describes one), and
+Slide ran a path search with Monte-Carlo optimization; XSLOPE runs its noncircular search from a
+seed through the layer-2/3 daylight point the manual identifies as a point on the critical
+surface.
 
 |  | XSLOPE | Slide | Loukidis et al. |
 |---|---|---|---|
-| Spencer, noncircular search | 1.001 | 0.991 (+1.0%) | 1.000 (log-spiral, by definition of kc) |
+| Spencer, noncircular search | 1.001 | 0.991 (+1.0%) | 1.000 (Spencer, by definition of kc) |
 
 The critical surface enters at the daylight point (35.8, 27.9) and exits on the crest at
 x ≈ 121. The mechanism is genuinely noncircular: a circular search on the same model reads

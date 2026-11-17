@@ -77,6 +77,10 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   ratio is interpolated between them. Two slices of Walter Bouldin Dam are
   worked through, the dam's whole critical circle is shown slice by slice, and
   the inputs table covers all three water sources and automatic water loads.
+  A new section explains the R envelope, the total stress envelope that labs
+  often report instead of the $K_c = 1$ envelope, and gives the equations that
+  convert it to $d$ and $\psi$ for each of the two ways it is drawn, with a
+  figure of both.
 
 ## 1.0.9 — 2026-11-11
 

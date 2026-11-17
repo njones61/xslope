@@ -27,6 +27,10 @@ CONFIG = PageConfig(
         ('+0.1', 'eleven levels of Table E5-8.3'),
         ('+0.3', 'layers the impact check covers'),
         ('+0.1', 'ten levels of Table E7-7'),
+        # Duncan, Wright & Brandon Table 10.4: a bound over the sixteen values,
+        # each re-derived in the entry's own table
+        ('+1.3', 'All 16 values within 1.3%'),
+        ('+0.4', 'dry within 0.4%'),
     ],
 
     worded_ok=[
@@ -51,6 +55,8 @@ CONFIG = PageConfig(
         # the top of FHWA's pullout resistance factor ladder for steel strips,
         # 1.2 + log10(Cu), quoted in prose as the input it is
         ('2.000', 'at 20 ft depth, which for this backfill is'),
+        # Duncan, Wright & Brandon Table 10.4's seismic coefficient, an input
+        ('0.15', 'the slope of Figure 10.7 with k = 0.15'),
     ],
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_pullout',

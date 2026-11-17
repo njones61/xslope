@@ -28,6 +28,8 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 Duncan, Wright & Brandon's Table 10.4 is a textbook's worked comparison rather than
 a hand calculation: the authors computed it with their own program and printed the
 factors of safety, so it is the published answer for the procedure it illustrates.
+Their Figure 10.1 entry is a closed form: the book's two equilibrium equations for a
+mass sliding on a plane, solved for the seismic coefficient at which F = 1.
 
 A worked example frequently publishes one part of a design and defers the rest,
 and where XSLOPE computes a quantity the example does not carry, that quantity is reported as
@@ -43,6 +45,7 @@ XSLOPE's own with no published counterpart and takes no dot.
 | [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.637 has no published counterpart |
 | [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands rather than properties of the reinforcement, so they leave the capacity envelope where it stands, and XSLOPE's searched Spencer 1.542 has no published counterpart |
 | [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.122 has no published counterpart |
+| [DWB 10.1](#dwb-10-1) | 🟢 | Yield coefficient of a rigid wedge (Duncan, Wright & Brandon, Figure 10.1) | k<sub>y</sub> within 0.01% of the closed form for both soils | **built**; Spencer's method finds no solution on the frictional wedge, which the Corps of Engineers and Lowe & Karafiath rows cover |
 | [DWB 10.4](#dwb-10-4) | 🟢 | Pseudostatic slope, single-stage and two-stage (Duncan, Wright & Brandon, Table 10.4) | All 16 values within 1.3%: dry within 0.4%, submerged within 1.3% | **built**; the two-stage columns are XSLOPE's two-stage analysis with the K<sub>c</sub> = 1 envelope; its default interpolated values have no published counterpart |
 
 </div>
@@ -716,3 +719,47 @@ that range of stresses, and the two choices nearly agree.
 <!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.778, tolerance=0.005, benchmark=DWB-10.4-submerged-2-interpolated -->
 <!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.271, tolerance=0.005, benchmark=DWB-10.4-submerged-3-interpolated -->
 <!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=interpolated, num_slices=40, expected_fs=3.255, tolerance=0.005, benchmark=DWB-10.4-submerged-4-interpolated -->
+
+---
+
+## 🟢 DWB Figure 10.1 — yield coefficient of a rigid wedge {#dwb-10-1}
+
+Duncan, Wright & Brandon (2014), Section 10.1.2, Figure 10.1, resolve the forces on a
+mass sliding on a plane inclined at β, with the seismic force kW through its center of
+gravity:
+
+$$N = W\cos\beta - kW\sin\beta, \qquad T = W\sin\beta + kW\cos\beta, \qquad
+F = \frac{cL + N\tan\phi}{T}$$
+
+The book applies them to an infinite slope. They hold exactly for any mass that slides
+on one plane: every slice base lies in that plane, and the interslice forces cancel
+when the slices are summed, so every method that satisfies force equilibrium gives this
+F at any k. Setting F = 1 gives the yield coefficient in closed form,
+
+$$k_y = \frac{cL/W + \cos\beta\tan\phi - \sin\beta}{\cos\beta + \sin\beta\tan\phi},$$
+
+which is tan(φ − β) when c = 0.
+
+**Input:** [dwb_fig10_1_wedge.xlsx](files/published/dwb_fig10_1_wedge.xlsx) · built by
+`benchmarks/published/build_dwb_fig10_1.py`
+
+The slope is 1H:1V and 10 m high, with γ = 20 kN/m³, and dry. The surface is a single
+plane at β = 30° from the toe to the crest, so the wedge weighs W = 732.05 kN/m on a
+base L = 20 m long. The workbook carries two soils, and each run picks one. Every run
+finds k<sub>y</sub> on that surface with 40 slices.
+
+| Soil | Closed form | Spencer | Corps of Engineers | Lowe & Karafiath |
+|---|:-:|:-:|:-:|:-:|
+| c = 10 kPa, φ = 30° | 0.2366 | 0.2366 (0.0%) | 0.2366 (0.0%) | 0.2366 (0.0%) |
+| c = 0, φ = 35° | 0.0875 (tan 5°) | no solution | 0.0875 (0.0%) | 0.0875 (0.0%) |
+
+Spencer's method finds no solution on the frictional wedge at any k tried from 0.02 to
+0.2, a range that contains its k<sub>y</sub>. Morgenstern-Price's finds none on the
+frictional wedge from k = 0.02 or on the c–φ wedge from about k = 0.06. The
+force-equilibrium methods solve at every k.
+
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=spencer, surface=noncircular, search=false, material=c-phi, num_slices=40, expected_kc=0.2366, kc_tol=0.0005, benchmark=DWB-10.1-wedge-cphi-spencer -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=c-phi, num_slices=40, expected_kc=0.2366, kc_tol=0.0005, benchmark=DWB-10.1-wedge-cphi-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=c-phi, num_slices=40, expected_kc=0.2366, kc_tol=0.0005, benchmark=DWB-10.1-wedge-cphi-lowe -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=frictional, num_slices=40, expected_kc=0.0875, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=frictional, num_slices=40, expected_kc=0.0875, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-lowe -->

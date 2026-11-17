@@ -2063,6 +2063,97 @@ def test_seismic2_section():
     return fails
 
 
+#: The rigid wedge of Duncan, Wright & Brandon's Figure 10.1, whose yield
+#: coefficient has a closed form (docs/verification/published.md#dwb-10-1).
+KY_WEDGE_XLSX = os.path.join(_REPO, "docs", "verification", "files", "published",
+                             "dwb_fig10_1_wedge.xlsx")
+
+
+def test_ky_section():
+    """The yield coefficient block and the rest of a k_y report.
+
+    A single surface (the Figure 10.1 wedge, whose k_y is 0.2366 in closed form):
+    the coefficients tried, the last bold and solved to F = 1, k_y reported, the
+    table cited. A search, from a hand-made record: one row for the search with no
+    seismic force and one per confirming search, the row that found k_y in bold,
+    and the unsettled case said. Then the comparison table and the analysis
+    options, which a report that reruns a method reads.
+    """
+    fails = []
+    import contextlib
+    import io
+    from xslope.fileio import load_slope_data
+    from xslope.report import (_Counter, _fs_table, _ky_section, analysis_options)
+    from xslope.search import run_lem_analysis
+
+    def block(sub, kind):
+        return [b for b in sub.blocks if b.kind == kind]
+
+    sd = load_slope_data(KY_WEDGE_XLSX)
+    keep = [m for m in sd["materials"] if m["name"] == "c-phi"][0]
+    sd["materials"] = [dict(keep) for _ in sd["materials"]]
+    with contextlib.redirect_stdout(io.StringIO()):
+        b = run_lem_analysis(sd, "spencer", analysis="single_surface",
+                             surface="noncircular", num_slices=40, ky=True)
+    info = b.get("yield") or {}
+    if abs(info.get("k_y", 0.0) - 0.23660) > 5e-5:
+        fails.append(f"the wedge's k_y is {info.get('k_y')}, against 0.23660 in "
+                     f"closed form")
+    if abs(b["results"]["FS"] - 1.0) > 1e-3:
+        fails.append(f"the k_y bundle has F = {b['results']['FS']:.4f}, not 1")
+    if b["options"].get("ky") is not True:
+        fails.append("the k_y bundle does not record ky=True among its options")
+    sub = _ky_section(info, b["results"], _Counter(), noun="surface")
+    if sub is None:
+        return fails + ["no yield coefficient block for a k_y result"]
+    tables = block(sub, "table")
+    trace = info.get("trace") or []
+    if len(tables) != 1 or len(tables[0].rows) != len(trace):
+        fails.append("the single-surface block is not one row per coefficient tried")
+    elif tables[0].bold_rows != [len(trace) - 1]:
+        fails.append(f"the bold row is {tables[0].bold_rows}, not the last")
+    prose = " ".join(x.text for x in block(sub, "prose"))
+    if tables and f"Table {tables[0].number}" not in prose:
+        fails.append("the coefficient table is not cited by number")
+    kv = [v for x in block(sub, "keyvalues") for _l, v in x.items]
+    if not kv or kv[0] != f"{info['k_y']:.3f}":
+        fails.append(f"the reported k_y reads {kv[:1]}")
+
+    # A search, from a record: static, then two confirming searches, the first
+    # of which found the k_y surface.
+    rec = {"k_y": 0.1445, "FS_k0": 1.375, "search": True, "converged": True,
+           "static": {"FS": 1.372, "k_y": 0.1457, "surface": None},
+           "rounds": [{"k": 0.1457, "FS": 0.9975, "k_y": 0.1445},
+                      {"k": 0.1445, "FS": 1.0003, "k_y": None}],
+           "confirm_tol": 0.002}
+    sub = _ky_section(rec, {"FS": 1.0}, _Counter(), noun="circle")
+    rows = block(sub, "table")[0].rows
+    if [r[0] for r in rows] != ["1", "2", "3"] or rows[0][1] != "0 (no seismic force)":
+        fails.append(f"the search table's rows read {[r[:2] for r in rows]}")
+    if block(sub, "table")[0].bold_rows != [1]:
+        fails.append("the row that found k_y is not the bold one")
+    if rows[2][3] != "—":
+        fails.append("a search that found nothing below F = 1 shows a k_y")
+    if "did not settle" in " ".join(x.text for x in block(sub, "prose")):
+        fails.append("a settled search says it did not settle")
+    sub = _ky_section(dict(rec, converged=False), {"FS": 1.0}, _Counter(),
+                      noun="circle")
+    if "did not settle" not in " ".join(x.text for x in block(sub, "prose")):
+        fails.append("an unsettled search does not say so")
+    if _ky_section(None, {"FS": 1.2}, _Counter()) is not None:
+        fails.append("a result with no k_y drew a yield coefficient block")
+
+    # The comparison table and the options a rerun is made under.
+    sols = {"lem": [dict(b, method="spencer"),
+                    dict(b, method="corps", **{"yield": dict(info, k_y=0.2366)})]}
+    table = _fs_table(sd, sols, {"method": ["spencer", "corps"]}, _Counter())
+    if table is None or table.headers[1] != "Yield coefficient k_y":
+        fails.append("the comparison table of a k_y run does not list k_y")
+    if analysis_options(sd, {"lem": [b]}).get("ky") is not True:
+        fails.append("a report rerunning a method would not find k_y")
+    return fails
+
+
 #: COMBO-2's two rapid drawdown routes on the Johnson dam. The starter file
 #: carries two piezometric lines; the full file is run as the tutorial runs it,
 #: meshing and marching its own transient seepage and staging the frames at the
@@ -21410,6 +21501,7 @@ CHECKS = [
     ("a method that is not run says why",
      test_a_method_that_is_not_run_says_why),
     ("the two-stage seismic block", test_seismic2_section),
+    ("the yield coefficient block", test_ky_section),
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
     ("the rapid drawdown stage table (COMBO-2's two routes)",

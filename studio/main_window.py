@@ -204,12 +204,41 @@ def _seismic2_note(bundle):
     return seismic_stages_line(results, where)
 
 
+def _yield_note(bundle):
+    """The k_y sentence a yield coefficient result carries on the LEM Solution
+    tab, or ``""`` — the Log's own last line (:func:`xslope.seismic.yield_line`)."""
+    from xslope.seismic import yield_line
+    from xslope.search import analyzed_surface_noun
+    info = (bundle or {}).get("yield")
+    if not info:
+        return ""
+    circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
+    return yield_line(info, analyzed_surface_noun(bool(info.get("search")), circular))
+
+
+def _at_k(slope_data, k):
+    """The model as a view should draw it for a run made at coefficient ``k``:
+    a yield coefficient run is solved at k_y, not at the model's own k, and the
+    seismic arrow on the plot says which."""
+    if k is None:
+        return slope_data
+    sd = dict(slope_data)
+    sd["k_seismic"] = k
+    return sd
+
+
 def lem_done_message(bundle):
     """The status-bar line a finished LEM run leaves: the method and its factor of
     safety, and, for a rapid drawdown whose surface crossed no material with d
     and ψ, the first clause of :func:`_drained_rapid_note` — the status bar is
     one line, and the LEM Solution tab carries the whole sentence."""
     res = bundle["results"]
+    info = bundle.get("yield")
+    if info:
+        message = f"LEM done — {res.get('method')} k_y = {info['k_y']:.3f}"
+        if "seismic_stage1_FS" in res:
+            message += " (two-stage seismic)"
+        return message
     message = f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}"
     drained = _drained_rapid_note(bundle)
     if drained:
@@ -3315,7 +3344,9 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(self.search_canvas)
         if search and panel and self.search_canvas is not None:
             try:
-                self.search_canvas.render_search(self.doc.slope_data, search,
+                self.search_canvas.render_search(_at_k(self.doc.slope_data,
+                                                       search.get("k_seismic")),
+                                                 search,
                                                  panel.options(), style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
@@ -3540,14 +3571,20 @@ class MainWindow(QMainWindow):
         if (bundle and panel and self.solution_canvas is not None
                 and isinstance(bundle.get("results"), dict)):
             seismic2 = _seismic2_note(bundle)
-            if seismic2:
+            ky = _yield_note(bundle)
+            if ky:
+                self.solution_canvas.set_note(
+                    "Yield coefficient", " ".join(t for t in (ky, seismic2) if t))
+            elif seismic2:
                 self.solution_canvas.set_note("Two-stage seismic", seismic2)
             else:
                 self.solution_canvas.set_note("Rapid drawdown",
                                               _drained_rapid_note(bundle))
+            info = bundle.get("yield")
             try:
                 self.solution_canvas.render_solution(
-                    self.doc.slope_data, bundle["slice_df"],
+                    _at_k(self.doc.slope_data, info["k_y"] if info else None),
+                    bundle["slice_df"],
                     bundle["failure_surface"], bundle["results"], panel.options(),
                     style=self.doc.style or None)
             except Exception:

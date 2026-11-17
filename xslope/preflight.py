@@ -1536,7 +1536,8 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
         reading it from the sheet), ``search`` (bool), ``base`` (the underlying
         analysis for a sensitivity or reliability run), ``seep_frame`` (a transient
         seepage frame this run will stage into ``seep_u`` before the solver starts;
-        see :attr:`_Ctx.seep_frame`).
+        see :attr:`_Ctx.seep_frame`), ``ky`` (bool -- the run finds the seismic
+        yield coefficient, so the model's own k is not used).
     ids : iterable of str, optional
         Evaluate only these rule ids -- for testing one rule in isolation.
     skip : iterable of str, optional
@@ -5196,6 +5197,8 @@ def _seismic2_curved(ctx):
       "A two-stage seismic analysis with k = 0 is an undrained static analysis.",
       fields=("k_seismic",))
 def _seismic2_k_zero(ctx):
+    if ctx.selection.get("ky"):
+        return None            # a yield coefficient run sets k itself
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k != 0.0:
         return None            # a blank k is the global rule's to report

@@ -126,6 +126,9 @@ CONTENT_TREE = [
          ("lem_seismic2", "Two-stage seismic detail",
           "The factors of safety of both stages, when the run was a two-stage "
           "pseudostatic seismic analysis."),
+         ("lem_ky", "Yield coefficient detail",
+          "How the yield coefficient k_y was found, when the run found one: each "
+          "search and its k_y, or the coefficients tried on a single surface."),
      ]),
     ("seep", "Seepage analysis",
      "The seepage analysis: the mesh and conductivities it was solved on, the "

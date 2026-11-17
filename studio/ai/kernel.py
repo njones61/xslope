@@ -948,7 +948,8 @@ class PythonKernel:
             return sd.get("ground_surface")
 
         def run_lem(method=None, num_slices=40, rapid=False, plot=True,
-                    slope_data=None, search=False, seep_time=None, seismic2=False):
+                    slope_data=None, search=False, seep_time=None, seismic2=False,
+                    ky=False):
             """Run an LEM analysis on the loaded project and return the result dict
             (includes 'FS'). `method` is one of oms, bishop, janbu, spencer, corps,
             lowe, mprice; left out, it is THE METHOD THE MODEL DECLARES (main!D14 —
@@ -984,6 +985,13 @@ class PythonKernel:
             The result carries 'seismic_stage1_FS' (static) and 'seismic_stage2_FS'
             (the pseudostatic factor of safety, the same as 'FS').
 
+            `ky=True` finds the seismic yield coefficient instead (Duncan, Wright &
+            Brandon 2014, Sec. 10.1.3): the k at which F = 1, on the model's own
+            surface, or with `search=True` the lowest over the search. The model's
+            k is not used, and `seismic2` may be set as well. The result is solved
+            at k = k_y (its 'FS' is 1) and carries 'k_y'; with `search=True` it also
+            carries 'k_y_static', k_y on the critical surface with no seismic force.
+
             The returned dict is the solver's, plus the surface it was solved on:
             'Xo', 'Yo', 'R', 'Depth' (the circle, None on a non-circular surface)
             and 'x_entry' / 'x_exit', the crest-side and toe-side ends of the trace.
@@ -1017,7 +1025,7 @@ class PythonKernel:
                         sd, method,
                         analysis="auto_search" if search else "single_surface",
                         surface=family, num_slices=num_slices, rapid=rapid,
-                        seismic2=seismic2, announce=False)
+                        seismic2=seismic2, ky=ky, announce=False)
             except AnalysisError as exc:
                 raise RuntimeError(str(exc)) from None
             result = bundle.get("results")
@@ -1032,7 +1040,14 @@ class PythonKernel:
                 where = (f" on the circle Xo={surface['Xo']:.2f}, "
                          f"Yo={surface['Yo']:.2f}, R={surface['R']:.2f}")
             head = f"{method} (auto search, {family})" if search else method
-            print(f"{head}: FS = {result['FS']:.3f}{where}")
+            ky_info = bundle.get("yield")
+            if ky_info:
+                from xslope.seismic import yield_line
+                from xslope.search import analyzed_surface_noun
+                print(f"{head}: " + yield_line(
+                    ky_info, analyzed_surface_noun(search, family == "circular")))
+            else:
+                print(f"{head}: FS = {result['FS']:.3f}{where}")
             info = bundle.get("search") or {}
             unsolved = (info.get("unsolved") or {}) if info else {}
             if unsolved.get("sentence"):
@@ -1060,9 +1075,15 @@ class PythonKernel:
             if plot:
                 from xslope.plot import plot_solution
                 import matplotlib.pyplot as plt
-                plot_solution(sd, bundle["slice_df"], bundle["failure_surface"],
+                plot_solution(dict(sd, k_seismic=ky_info["k_y"]) if ky_info else sd,
+                              bundle["slice_df"], bundle["failure_surface"],
                               result, fig=plt.figure(figsize=(11, 6)))
-            return dict(result, **surface)
+            out = dict(result, **surface)
+            if ky_info:
+                out["k_y"] = ky_info["k_y"]
+                if ky_info.get("static"):
+                    out["k_y_static"] = ky_info["static"]["k_y"]
+            return out
 
         def _ensure_mesh(sd, quiet=False):
             """The model's finite-element mesh, building one from the FILE'S OWN

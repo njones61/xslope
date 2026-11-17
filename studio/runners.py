@@ -781,6 +781,7 @@ class LemRunner(RunnerThread):
                 num_slices=o.get("num_slices", 40),
                 rapid=o.get("rapid", False),
                 seismic2=o.get("seismic2", False),
+                ky=o.get("ky", False),
                 composite=o.get("composite", False),
                 grid_seed=o.get("grid_seed", False),
                 diagnostic=o.get("diagnostic", False),

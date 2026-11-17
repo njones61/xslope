@@ -1643,7 +1643,7 @@ def analyzed_surface_noun(searched, circular):
 
 def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circular",
                      num_slices=40, rapid=False, composite=False, grid_seed=False,
-                     seismic2=False,
+                     seismic2=False, ky=False,
                      diagnostic=False, cancel_check=None, fs_tol=None, tol=None,
                      max_iter=None, min_slip_depth=None, announce=True):
     """Run ONE method on this model and return the bundle every consumer reads.
@@ -1662,6 +1662,14 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         Which family to run over, for a model that defines both.
     num_slices, rapid, composite, grid_seed, diagnostic
         The run options, under the names Studio's Run LEM dialog gives them.
+    seismic2 : bool or str
+        The two-stage pseudostatic analysis (:func:`xslope.advanced.seismic_two_stage`):
+        False, or the stage 2 strength (True or ``"interpolated"``, ``"kc1"``).
+    ky : bool
+        Find the seismic yield coefficient instead of the factor of safety at the
+        model's k (:func:`xslope.seismic.yield_coefficient`): on the specified
+        surface, or the minimum over the search. The bundle is solved at k = k_y
+        and carries the answer under ``"yield"``. Not with ``rapid``.
     cancel_check : callable, optional
         Polled at iteration boundaries; raises :class:`AnalysisCancelled`.
     fs_tol, tol, max_iter, min_slip_depth
@@ -1708,6 +1716,17 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     method = str(method or "").lower()
     circular = surface != "noncircular"
     _refuse_two_staged(rapid, seismic2)
+    if ky:
+        if rapid:
+            raise ValueError("A yield coefficient is found for a pseudostatic "
+                             "analysis, not a rapid drawdown.")
+        from .seismic import yield_coefficient
+        return yield_coefficient(
+            slope_data, method, analysis=analysis, surface=surface,
+            num_slices=num_slices, seismic2=seismic2, composite=composite,
+            grid_seed=grid_seed, diagnostic=diagnostic, cancel_check=cancel_check,
+            fs_tol=fs_tol, tol=tol, max_iter=max_iter,
+            min_slip_depth=min_slip_depth, announce=announce)
     tag = (" (rapid drawdown)" if rapid else
            " (two-stage seismic, K_c = 1 envelope)" if seismic2_strength(seismic2) == "kc1" else
            " (two-stage seismic)" if seismic2 else "")
@@ -1716,7 +1735,7 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     made_under = {"analysis": analysis,
                   "surface": "circular" if circular else "noncircular",
                   "num_slices": num_slices, "rapid": rapid, "seismic2": seismic2,
-                  "composite": composite, "grid_seed": grid_seed,
+                  "ky": False, "composite": composite, "grid_seed": grid_seed,
                   "diagnostic": diagnostic, "fs_tol": fs_tol, "tol": tol,
                   "max_iter": max_iter, "min_slip_depth": min_slip_depth}
     if analysis == "auto_search":

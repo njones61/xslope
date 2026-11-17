@@ -487,7 +487,7 @@ def parse_test_tags(md_path):
 
         # Convert numeric fields
         for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'f_stand', 'f_fail', 'beta', 'k0',
-                    'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor',
+                    'expected_kc', 'fs_tol', 'kc_tol', 'refine_factor',
                     'expected_pf', 'pf_tol',
                     'expected_depth', 'depth_x', 'depth_datum',
                     'expected_force', 'target_fs', 'force_elev', 'grid',
@@ -695,6 +695,23 @@ def _stage_seep_fields(slope_data, test):
             f"boundary set(s)) or 'transient' (march and stage the frames)")
 
 
+def _apply_material_tag(slope_data, test):
+    """`material=<name>` makes every row of the materials table a copy of the named
+    row, so a one-zone model runs that soil. It exists for Duncan, Wright and
+    Brandon's Table 10.4, which runs eight strength sets (four soils, each as a
+    two-stage d/psi material and as an R envelope) on one geometry: one workbook per
+    water case carries all eight, and the tag picks the row. Returns an error
+    message, or None (also when the tag names no material)."""
+    name = str(test.get('material', '')).strip()
+    if not name:
+        return None
+    named = [m for m in slope_data.get('materials', []) if m.get('name') == name]
+    if len(named) != 1:
+        return f"material={name!r} names {len(named)} rows of the materials table, not one"
+    slope_data['materials'] = [dict(named[0]) for _ in slope_data['materials']]
+    return None
+
+
 def run_lem_test(test):
     """Run a single LEM test (single_circle, circular_search, or noncircular_search)."""
     from xslope.fileio import load_slope_data
@@ -787,17 +804,9 @@ def run_lem_test(test):
         for m in slope_data.get('materials', []):
             m['u'] = u_option
 
-    # `material=<name>` makes every row of the materials table a copy of the named
-    # row, so a one-zone model runs that soil. It exists for Duncan, Wright and
-    # Brandon's Table 10.4, which runs eight strength sets (four soils, each as a
-    # two-stage d/psi material and as an R envelope) on one geometry: one workbook per
-    # water case carries all eight, and the tag picks the row.
-    _mat_name = str(test.get('material', '')).strip()
-    if _mat_name:
-        _named = [m for m in slope_data.get('materials', []) if m.get('name') == _mat_name]
-        if len(_named) != 1:
-            return None, f"material={_mat_name!r} names {len(_named)} rows of the materials table, not one"
-        slope_data['materials'] = [dict(_named[0]) for _ in slope_data['materials']]
+    _mat_err = _apply_material_tag(slope_data, test)
+    if _mat_err:
+        return None, _mat_err
 
     # `tcrack_depth=<ft|m>` and `tcrack_water=<ft|m>` override main!D11/D12, the
     # tension crack depth and the depth of water standing in it. They exist for a
@@ -1315,92 +1324,39 @@ def run_support_force_test(test):
 
 
 def run_critical_kc_test(test):
-    """Find the CRITICAL seismic coefficient k_c — the horizontal pseudo-static
-    coefficient at which the searched minimum factor of safety equals 1.0 — and
-    compare it to the published k_c. This is the verification target for RS2 #68
-    (Loukidis, Bandini & Salgado 2003), which publishes k_c, not an FS.
+    """Find the seismic yield coefficient k_y (the critical seismic coefficient
+    k_c, at which the factor of safety is 1) and compare it to the published one.
+    This is the verification target for RS2 #68 (Loukidis, Bandini & Salgado
+    2003) and Slide2 VP104, which publish k_c rather than a factor of safety.
 
-    Tag keys: file, method, expected_kc, k_min, k_max, num_slices (default 40),
-    fs_tol (confirming-search FS band, default 0.005), kc_tol (the comparison
-    tolerance, via _expected_and_tol), max_outer (default 3).
+    The work is the package's own :func:`xslope.seismic.yield_coefficient`,
+    reached the way Studio's Run LEM reaches it (``run_lem_analysis(ky=True)``),
+    so the tags test the code a user runs. Its bracket is found automatically.
 
-    Algorithm (cheap and honest): FS decreases monotonically as k rises, so k_c is
-    a single crossing. A full circular search at the bracket midpoint fixes a near-
-    critical circle; k is then bisected on that FIXED circle with fast single-circle
-    solves (~0.1 s each) until FS = 1; a confirming FULL search at that k re-checks
-    that the true minimum surface there is also FS ≈ 1. If a more critical surface
-    has emerged (the critical circle migrates with k), it is adopted and the inner
-    bisection repeats — so the result converges to the search-minimised k_c from
-    above, at the cost of ~2 full searches rather than one per bisection step.
-    Returns the k_c (compared to expected_kc within kc_tol by the framework)."""
+    Tag keys: file, method, expected_kc, kc_tol (the comparison tolerance, via
+    _expected_and_tol), num_slices (default 40), surface (``circular`` or
+    ``noncircular``, default circular), search (``false`` for k_y on the file's
+    own surface; default true, the minimum k_y by search), seismic2
+    (``interpolated`` or ``kc1``), material (see :func:`_apply_material_tag`)."""
     from xslope.fileio import load_slope_data
-    from xslope.slice import generate_slices
-    from xslope.solve import solve_selected
-    from xslope.search import circular_search
-
-    method = test['method']
-    num_slices = int(test.get('num_slices', 40))
-    k_min = float(test['k_min'])
-    k_max = float(test['k_max'])
-    fs_tol = float(test.get('fs_tol', 0.005))
-    max_outer = int(test.get('max_outer', 3))
+    from xslope.search import AnalysisError, run_lem_analysis
 
     slope_data = load_slope_data(test['file'])
-
-    def search_min(k):
-        """Full circular search at coefficient k → (min_FS, critical circle)."""
-        slope_data['k_seismic'] = k
-        fs_cache, _conv, _path, _cc = circular_search(
-            slope_data, method, num_slices=num_slices)
-        if not fs_cache or fs_cache[0]['FS'] >= 9999:
-            return None, None
-        b = fs_cache[0]
-        return b['FS'], {'Xo': b['Xo'], 'Yo': b['Yo'], 'Depth': b['Depth'],
-                         'R': b['Yo'] - b['Depth']}
-
-    def fs_on(circle, k):
-        """FS on a FIXED circle at coefficient k (one single_circle solve)."""
-        slope_data['k_seismic'] = k
-        ok, res = generate_slices(slope_data, circle=circle, num_slices=num_slices)
-        if not ok:
-            return None
-        slice_df, _fs = res
-        out = solve_selected(method, slice_df)
-        if isinstance(out, str):
-            return None
-        return out['FS']
-
-    _fs_mid, circle = search_min(0.5 * (k_min + k_max))
-    if circle is None:
-        return None, f"circular search found no surface at k={0.5*(k_min+k_max):.4f}"
-
-    kc = 0.5 * (k_min + k_max)
-    for _outer in range(max_outer):
-        lo, hi = k_min, k_max
-        fs_lo, fs_hi = fs_on(circle, lo), fs_on(circle, hi)
-        if fs_lo is None or fs_hi is None:
-            return None, "fixed-circle solve failed at a bracket endpoint"
-        if not (fs_hi <= 1.0 <= fs_lo):
-            return None, (f"k_c is not bracketed on the critical circle: "
-                          f"FS({lo})={fs_lo:.3f}, FS({hi})={fs_hi:.3f} "
-                          f"(need FS(k_min)>=1>=FS(k_max)) — widen k_min/k_max")
-        fs = fs_hi
-        for _inner in range(50):
-            kc = 0.5 * (lo + hi)
-            fs = fs_on(circle, kc)
-            if fs > 1.0:
-                lo = kc            # too stable — raise k
-            else:
-                hi = kc            # unstable — lower k
-            if abs(fs - 1.0) <= 1e-4:
-                break
-        fs_chk, circle_chk = search_min(kc)
-        if circle_chk is None:
-            return None, f"confirming search found no surface at k={kc:.4f}"
-        if abs(fs_chk - 1.0) <= fs_tol:
-            return kc, None        # the true minimum surface at k_c is also FS≈1
-        circle = circle_chk        # critical circle migrated — adopt and re-bisect
-    return kc, None                # best estimate after max_outer iterations
+    err = _apply_material_tag(slope_data, test)
+    if err:
+        return None, err
+    search = str(test.get('search', 'true')).strip().lower() not in ('false', '0', 'no')
+    try:
+        bundle = run_lem_analysis(
+            slope_data, test['method'],
+            analysis='auto_search' if search else 'single_surface',
+            surface=str(test.get('surface', 'circular')).strip().lower(),
+            num_slices=int(test.get('num_slices', 40)),
+            seismic2=str(test.get('seismic2', '')).strip().lower() or False,
+            ky=True, announce=False)
+    except AnalysisError as e:
+        return None, str(e)
+    return bundle['yield']['k_y'], None
 
 
 def run_design_test(test):
@@ -7474,6 +7430,16 @@ def run_preflight_corpus_test(test):
         # would have no corpus regression at all.
         if analysis == 'lem' and str(t.get('rapid', '')).strip().lower() == 'true':
             analysis = 'rapid'
+        # Likewise : the two-stage seismic run the tag makes.
+        if analysis == 'lem' and str(t.get('seismic2', '')).strip():
+            analysis = 'seismic2'
+        # A yield coefficient tag states its own surface family and whether it
+        # searches (run_critical_kc_test), so it is checked as that run.
+        if t.get('type') == 'critical_kc':
+            sel = dict(sel, ky=True,
+                       surface=str(t.get('surface', 'circular')).strip().lower(),
+                       search=str(t.get('search', 'true')).strip().lower()
+                       not in ('false', '0', 'no'))
         # A tag that builds its own seepage field at run time (`seep=steady`,
         # `seep=transient`, `march=file`) is checked as the run that follows it:
         # the field the shipped file lacks is exactly what the route produces.

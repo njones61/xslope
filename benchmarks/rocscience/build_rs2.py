@@ -1510,7 +1510,13 @@ def rs2_68c():
 
     Published k_c: Slide2 Bishop 0.155, Spencer 0.151; RS2 SSR 0.161; reference FEM
     0.161 / Bishop 0.155 / UB 0.172 / LB 0.148. Zone polygons transcribed from the
-    RS2 vendor model 'slope stability #068_03.fez' via the .fez zone polygonizer."""
+    RS2 vendor model 'slope stability #068_03.fez' via the .fez zone polygonizer.
+
+    The file also carries a non-circular starting surface for the yield coefficient
+    search on that family: from the upper crest down through rock1 into the weak
+    band, along the band just above its base, and out on the face where the
+    critical circle at k_c exits. Neither the manual nor the paper gives one; it is
+    a starting point the search moves, placed on the mechanism the circles find."""
     zones = [
         (0, [(74.693, 41.077), (109.5, 55.0), (150.0, 55.0), (150.0, 44.5),
              (74.693, 41.077)]),                                        # rock1 (upper)
@@ -1531,6 +1537,11 @@ def rs2_68c():
         ],
         circle={'Xo': 78.0, 'Yo': 82.0, 'Depth': 27.0, 'R': 55.0},
         max_depth=0.0)
+    # Left to right: the non-circular search moves each point only between its
+    # neighbors' x, so points listed right to left can never move.
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((39.0, 29.5), (50.0, 29.3), (70.0, 30.2), (95.0, 31.5),
+                       (108.0, 38.0), (123.0, 55.0))]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68c.xlsx'))
     return 'rs2_68c.xlsx'
 

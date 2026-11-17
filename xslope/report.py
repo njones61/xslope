@@ -830,6 +830,7 @@ DEFAULT_OPTIONS = {
     "lem_calculations": True,
     "lem_rapid": True,
     "lem_seismic2": True,
+    "lem_ky": True,
     "seep": True,
     "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
@@ -1307,6 +1308,7 @@ def analysis_options(slope_data, solutions):
            "num_slices": int(slices),
            "rapid": "stage1_FS" in results,
            "seismic2": results.get("seismic_strength", False),
+           "ky": bool(ref.get("yield")),
            "composite": False,
            "grid_seed": False}
     for key in out:
@@ -2435,7 +2437,7 @@ FEM_ANCHOR = "fem"
 
 
 def _loads_section(slope_data, feats, counter, seismic=True, already=0,
-                   water_stated=False, source_stated=False):
+                   water_stated=False, source_stated=False, ky=False):
     """The loads an engine applies, as a section of that engine's own inputs.
 
     A distributed load is not a property of the section: it is something an
@@ -2446,7 +2448,8 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     general table that belongs to neither.
 
     ``seismic`` prints the pseudo-static coefficient, which only the limit
-    equilibrium analysis applies. ``already`` is the number of a loads table an
+    equilibrium analysis applies; ``ky`` says the analysis found the coefficient
+    (the yield coefficient) rather than reading it from the model. ``already`` is the number of a loads table an
     earlier section has printed: the blocks are identical — same points, same
     pressures — so the second engine points at the first table rather than
     setting the same numbers twice, where two copies could disagree. That
@@ -2519,7 +2522,13 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     else:
         sub.blocks.append(Prose("The model carries no distributed loads."))
     k = _num(slope_data.get("k_seismic"))
-    if seismic and k:
+    if seismic and ky:
+        sub.blocks.append(Prose(
+            "A pseudo-static seismic force kW acts horizontally toward the toe on "
+            "every slice, at the seismic coefficient the analysis finds: the yield "
+            "coefficient k_y, at which the factor of safety is 1."
+            + (f" The model's own coefficient, k = {k:g}, is not used." if k else "")))
+    elif seismic and k:
         sub.blocks.append(Prose(
             f"A pseudo-static seismic coefficient of k = {k:g} is applied, "
             f"acting horizontally toward the toe on every slice."))
@@ -3185,6 +3194,13 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
         items.append(("Trial surfaces evaluated", f"{len(fs_cache):,}"))
     if path_pts:
         items.append(("Refinement stages", str(len(path_pts))))
+    # A search made while finding the yield coefficient ran at a coefficient of
+    # its own (xslope.seismic.yield_coefficient), and its factors of safety are
+    # at that coefficient.
+    k_search = _num(search.get("k_seismic"))
+    if k_search is not None:
+        items.append(("Seismic coefficient of this search", f"{k_search:.4f}"))
+        slope_data = dict(slope_data, k_seismic=k_search)
     valid = [c for c in fs_cache if _num(c.get("FS")) is not None
              and _num(c.get("FS")) < 9000]
     if valid:
@@ -3515,6 +3531,83 @@ def _rapid_section(results, counter, slope_data=None, slice_df=None,
 #: The documentation page the two-stage seismic section points a reader to.
 SEISMIC2_DOC_PAGE = "seismic/two_stage.md"
 
+#: The documentation page the yield coefficient section points a reader to.
+KY_DOC_PAGE = "seismic/yield_coefficient.md"
+
+
+def _ky_section(info, results, counter, noun="surface"):
+    """How the yield coefficient was found, when the run found one.
+
+    On a search, one row per search: the coefficient it was made at, the
+    critical factor of safety it found there, and k_y on that surface. The first
+    is the search with no seismic force, whose critical surface is the first of
+    the candidate surfaces Duncan, Wright, and Brandon (2014) name; the lowest
+    k_y is the second. On a specified surface, the coefficients the root search
+    tried and the factor of safety at each.
+    """
+    if not info:
+        return None
+    from .seismic import zero_k_phrase
+    sub = Section("Yield Coefficient")
+    k_y = info["k_y"]
+    zero = zero_k_phrase(info)
+    table_number = counter.next_table()
+    where, links = cite("Table", table_number)
+    url = docs_url(KY_DOC_PAGE)
+    term = "seismic yield coefficient"
+    links = [(term, url)] + links
+    if info.get("search"):
+        static = info.get("static") or {}
+        sub.blocks.append(Prose(
+            f"The {term} k_y is the seismic coefficient at which the factor of "
+            f"safety is 1 (Duncan, Wright, and Brandon 2014). The critical {noun} "
+            f"{zero} was found first and k_y was found on it. The "
+            f"search was then repeated at that coefficient: a {noun} with a factor "
+            f"of safety below 1 there has a lower k_y, which was found in turn, and "
+            f"the searches stopped when none fell more than "
+            f"{info.get('confirm_tol', 0.002):g} below 1. {where} lists each "
+            f"search.", links=links))
+        rows = [["1", "0 (no seismic force)", f"{static.get('FS', float('nan')):.3f}",
+                 f"{static.get('k_y', float('nan')):.4f}"]]
+        best = 0
+        for i, r in enumerate(info.get("rounds") or []):
+            rows.append([str(i + 2), f"{r['k']:.4f}", f"{r['FS']:.4f}",
+                         "—" if r.get("k_y") is None else f"{r['k_y']:.4f}"])
+            if r.get("k_y") is not None and abs(r["k_y"] - k_y) < 1e-12:
+                best = i + 1
+        sub.blocks.append(Table(
+            ["Search", "Made at k", "Critical F", f"k_y on that {noun}"], rows,
+            "The searches that located the minimum yield coefficient",
+            table_number, bold_rows=[best]))
+        items = [("Yield coefficient k_y", f"{k_y:.3f}"),
+                 (f"F on that {noun} {zero}", f"{info['FS_k0']:.3f}"),
+                 (f"k_y on the critical {noun} {zero}",
+                  f"{static.get('k_y', float('nan')):.3f}")]
+        sub.blocks.append(KeyValues(items))
+        if not info.get("converged"):
+            sub.blocks.append(Prose(
+                f"The searches did not settle in {len(info.get('rounds') or [])} "
+                f"rounds, so k_y is the lowest they found and may not be the "
+                f"minimum."))
+    else:
+        sub.blocks.append(Prose(
+            f"The {term} k_y is the seismic coefficient at which the factor of "
+            f"safety is 1 (Duncan, Wright, and Brandon 2014). It was found on the "
+            f"{noun} specified in the input by solving it at a sequence of "
+            f"coefficients until the factor of safety reached 1. {where} lists "
+            f"them.", links=links))
+        trace = [(k, f) for k, f in (info.get("trace") or [])]
+        rows = [[f"{k:.4f}", "no solution" if f is None else f"{f:.4f}"]
+                for k, f in trace]
+        sub.blocks.append(Table(
+            ["k", "F"], rows,
+            "Factor of safety at each seismic coefficient tried",
+            table_number, bold_rows=[len(rows) - 1] if rows else []))
+        sub.blocks.append(KeyValues([
+            ("Yield coefficient k_y", f"{k_y:.3f}"),
+            (f"F on the {noun} {zero}", f"{info['FS_k0']:.3f}")]))
+    return sub
+
 
 def _seismic2_section(results, counter, slope_data=None, slice_df=None,
                       surface="surface"):
@@ -3687,6 +3780,7 @@ def _fs_table(slope_data, solutions, opts, counter):
             solved[name] = b
 
     rows = []
+    ky = False
     for name in methods:
         bundle = solved.get(name) or {}
         # Every row is a method that RAN — for this analysis or for this report,
@@ -3696,12 +3790,23 @@ def _fs_table(slope_data, solutions, opts, counter):
         res = bundle.get("results")
         res = res if isinstance(res, dict) else {}
         fs = _num(res.get("FS"))
+        info = bundle.get("yield")
+        if info:
+            ky = True
+            rows.append([method_label(name), f"{info['k_y']:.3f}",
+                         _solution_parameters(res)])
+            continue
         rows.append([method_label(name),
                      "did not converge" if fs is None else f"{fs:.3f}",
                      "" if fs is None else _solution_parameters(res)])
 
     if not rows:
         return None
+    if ky:
+        # A yield coefficient run has F = 1 on every row by construction; the
+        # answer each method gives is its k_y.
+        return Table(["Method", "Yield coefficient k_y", "Solution parameters at k_y"],
+                     rows, "Computed yield coefficients", counter.next_table())
     return Table(["Method", "Factor of safety", "Solution parameters"],
                  rows, "Computed factors of safety", counter.next_table())
 
@@ -6810,6 +6915,10 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
     results = bundle.get("results") or {}
     slice_df = bundle.get("slice_df")
+    # A yield coefficient run was solved at k = k_y, and its figures say so.
+    ky_info = bundle.get("yield")
+    sd_run = (dict(slope_data, k_seismic=ky_info["k_y"]) if ky_info
+              else slope_data)
 
     # --- the search that found THIS method's surface ---
     if opts["lem_search"] and bundle.get("search"):
@@ -6835,7 +6944,7 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
         def draw(fig):
             from .plot import plot_solution
-            plot_solution(slope_data, slice_df, bundle.get("failure_surface"),
+            plot_solution(sd_run, slice_df, bundle.get("failure_surface"),
                           results, fig=fig, show_title=False,
                           style=opts.get("style"))
 
@@ -6852,7 +6961,18 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     where, links = cite("Figure", figure.number if figure is not None else 0)
 
     fs = _num(results.get("FS"))
-    if fs is not None:
+    if fs is not None and ky_info:
+        surface = f"the {named} of {where}" if where else f"the {named}"
+        k_y = f"{ky_info['k_y']:.3f}"
+        text = (f"{label} gives a seismic yield coefficient of k_y = {k_y} on "
+                f"{surface}, where the factor of safety is {fs:.3f} at k = k_y.")
+        if not searched:
+            text += (" No search was performed: this yield coefficient is for the "
+                     "surface entered in the input and is not a minimum over any "
+                     "family of surfaces.")
+        res.blocks.append(Prose(
+            text + (f" {note}" if note else ""), bold=[k_y], links=links))
+    elif fs is not None:
         surface = f"the {named} of {where}" if where else f"the {named}"
         text = f"{label} gives a factor of safety of {fs:.3f} on {surface}."
         if not searched:
@@ -6902,11 +7022,20 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     if opts["lem_seismic2"]:
         family = _surface_family(slice_df, slope_data)
         seismic2 = _seismic2_section(
-            results, counter, slope_data, slice_df,
+            results, counter, sd_run, slice_df,
             surface=(f"{'critical' if searched else 'specified'} "
                      f"{'circle' if family == 'circular' else 'surface'}"))
         if seismic2 is not None:
             sec.children.append(seismic2)
+
+    # --- the yield coefficient ---
+    if opts["lem_ky"] and ky_info:
+        family = _surface_family(slice_df, slope_data)
+        ky_sec = _ky_section(
+            ky_info, results, counter,
+            noun="circle" if family == "circular" else "surface")
+        if ky_sec is not None:
+            sec.children.append(ky_sec)
 
     # --- slice table and calculations ---
     # The calculation is worked out first: it adds the per-slice terms of the
@@ -7015,6 +7144,10 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     methods = featured_methods(solutions, opts)
 
     sec = Section("Limit Equilibrium Analysis", anchor=section_anchor(LEM_ANCHOR))
+    # A yield coefficient run finds k instead of reading it, and its factor of
+    # safety is 1 by construction: the inputs, the loads, and the comparison
+    # table all say so.
+    ky = bool(bundle.get("yield"))
     # The definition is the ratio the LEM overview publishes — F = s/τ, the
     # available strength over the shear the surface has to carry to stand. A
     # factor the strength is DIVIDED by until the mass fails is the strength
@@ -7063,7 +7196,12 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     k = _num(slope_data.get("k_seismic"))
     items.append(("Surface", "located by search" if any_search
                   else "specified in the input; no search was performed"))
-    items.append(("Seismic coefficient", f"{k:g}" if k else "none"))
+    if ky:
+        items.append(("Seismic coefficient",
+                      "found by the analysis (the yield coefficient k_y)"
+                      + (f"; the model's k = {k:g} is not used" if k else "")))
+    else:
+        items.append(("Seismic coefficient", f"{k:g}" if k else "none"))
     tc = _num(slope_data.get("tcrack_depth"))
     if tc:
         items.append(("Tension crack depth", f"{tc:g}"))
@@ -7195,7 +7333,7 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     if opts["lem_loads"]:
         loads = _loads_section(
             slope_data, feats, counter,
-            source_stated=bool(opts.get("_water_source_stated")))
+            source_stated=bool(opts.get("_water_source_stated")), ky=ky)
         sec.children.append(loads)
         printed = [b.number for b in loads.blocks if b.kind == "table"]
         if printed:
@@ -7218,14 +7356,24 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # surfaces; each method's block carries its own search.
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
-        sub_fs = Section("Factors of Safety")
+        sub_fs = Section("Yield Coefficients" if ky else "Factors of Safety")
         searched = [m for m in methods if method_searched(solutions, m)]
         where, links = cite("Table", table.number)
         # Three provenances, and exactly one of them is true of any one table.
         # Saying that every method finds its own surface AND that no search was
         # performed said both at once, on a report where the second was the true
         # one.
-        if searched and len(searched) == len(methods):
+        if ky:
+            text = (f"The seismic yield coefficient k_y found by each method, the "
+                    f"coefficient at which its factor of safety is 1, is listed in "
+                    f"{where}.")
+            if searched and len(searched) == len(methods):
+                text += (" Each method searched for the surface with its own "
+                         "lowest k_y.")
+            elif not searched:
+                text += (" Each was found on the surface specified in the input, "
+                         "which is not a minimum over any family.")
+        elif searched and len(searched) == len(methods):
             # Separate searches usually settle on different surfaces, but not
             # always: on some models two methods land on the same circle, and the
             # sentence has to say which happened.

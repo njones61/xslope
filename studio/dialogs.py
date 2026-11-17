@@ -1499,6 +1499,24 @@ class RunLemDialog(QDialog):
             "interpolation. This is how the book's Table 10.4 was computed.")
         form.addRow("Stage 2 strength", self.seismic2_strength)
 
+        # The seismic yield coefficient (Duncan, Wright & Brandon 2014, Sec. 10.1.3):
+        # the run finds k instead of using the model's. Not with a rapid drawdown,
+        # which is not a pseudostatic analysis, so ticking one clears the other.
+        self.ky = QCheckBox("Find the yield coefficient k_y")
+        self.ky.setChecked(bool(defaults.get("ky")) and not self.rapid.isChecked())
+        self.ky.setToolTip(
+            "Find the seismic coefficient at which the factor of safety is 1, the "
+            "yield coefficient k_y (Duncan, Wright & Brandon 2014, Sec. 10.1.3). "
+            "The model's own k is not used.\n\n"
+            "Single surface: k_y on the first circle or the non-circular surface.\n\n"
+            "Auto-search: the surface with the lowest k_y. The run searches with no "
+            "seismic force, finds k_y on that critical surface, and searches again "
+            "at that k until no surface falls below F = 1. The Log reports k_y on "
+            "both surfaces.\n\n"
+            "Works with Two-stage seismic. The result is solved at k = k_y, so its "
+            "factor of safety is 1.")
+        form.addRow("", self.ky)
+
         # Composite surfaces: let a circle be truncated at the bottom of the model
         # and run along it. Off by default — the floor of a profile-line model is
         # max_depth, a search bound rather than a real impenetrable boundary.
@@ -1631,6 +1649,8 @@ class RunLemDialog(QDialog):
         self.method.currentIndexChanged.connect(self._recheck)
         self.rapid.toggled.connect(self._exclusive_from_rapid)
         self.seismic2.toggled.connect(self._exclusive_from_seismic2)
+        self.ky.toggled.connect(self._exclusive_from_ky)
+        self.ky.toggled.connect(self._recheck)
         self.rapid.toggled.connect(self._recheck)
         self.rapid.toggled.connect(self._sync_seep_time)
         self.seismic2.toggled.connect(self._sync_seismic2)
@@ -1731,6 +1751,7 @@ class RunLemDialog(QDialog):
                 # checks are handed the whole run description, seeding included.
                 "grid_seed": (self.grid_seed.isChecked()
                               if hasattr(self, "grid_seed") else False),
+                "ky": self.ky.isChecked() if hasattr(self, "ky") else False,
                 "seep_frame": self._seep_frame()}
 
     def _seep_frame(self):
@@ -1776,9 +1797,17 @@ class RunLemDialog(QDialog):
         self.preflight.refresh()
 
     def _exclusive_from_rapid(self, on):
-        """Rapid drawdown ticked: the run cannot also be two-stage seismic."""
+        """Rapid drawdown ticked: the run cannot also be two-stage seismic, or
+        find a yield coefficient."""
         if on and self.seismic2.isChecked():
             self.seismic2.setChecked(False)
+        if on and self.ky.isChecked():
+            self.ky.setChecked(False)
+
+    def _exclusive_from_ky(self, on):
+        """Yield coefficient ticked: the run cannot also be a rapid drawdown."""
+        if on and self.rapid.isChecked():
+            self.rapid.setChecked(False)
 
     def _exclusive_from_seismic2(self, on):
         """Two-stage seismic ticked: the run cannot also be a rapid drawdown."""
@@ -1848,6 +1877,7 @@ class RunLemDialog(QDialog):
             # False, or the stage 2 strength choice ("interpolated" / "kc1").
             "seismic2": (self.seismic2_strength.currentData()
                          if self.seismic2.isChecked() else False),
+            "ky": self.ky.isChecked(),
             "composite": self.composite.isChecked(),
             "grid_seed": self.grid_seed.isChecked(),
             "diagnostic": self.diagnostic.isChecked(),

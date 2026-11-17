@@ -182,6 +182,24 @@ The two envelopes usually cross. To the right of the crossing, at higher stress,
 
 For a rapid drawdown analysis in **xslope**, enter $d$ and $\psi$ in the material properties for each soil that does not drain during the drawdown. The free-draining soils keep their drained strengths, $c'$ and $\phi'$, in every stage, and their $d$ and $\psi$ are left blank.
 
+### When the lab reports an R envelope {#r-envelope}
+
+$\overline{CU}$ test results are often reported as an R envelope instead of the $K_c = 1$ envelope. R is the U.S. Army Corps of Engineers' name for the consolidated-undrained test, between its Q (unconsolidated-undrained) and S (drained) tests, and the R envelope is also called the total stress envelope. It is drawn on a Mohr diagram with one circle for each test. Each circle starts at the sample's effective consolidation pressure, $\sigma'_{3c}$, and its diameter is the principal stress difference at failure, $\sigma_{1f} - \sigma_{3f}$. The envelope's intercept and slope are $c_R$ and $\phi_R$.
+
+![The same three tests drawn as an R envelope two ways: tangent to the circles, and through the points that give the stresses on the failure plane](rapid_images/rapid_r_envelope.png){width=630px}
+
+The R envelope and the $K_c = 1$ envelope come from the same tests and look alike, but they are different lines, and **xslope** needs $d$ and $\psi$. Duncan, Wright, and Brandon (2014) give a conversion for each of the two ways an R envelope is drawn. If it is drawn tangent to the circles, as in the top of the figure:
+
+>>$d = c_R \dfrac{\cos \phi_R \cos \phi'}{1 - \sin \phi_R} \qquad \psi = \arctan \dfrac{\sin \phi_R \cos \phi'}{1 - \sin \phi_R}$
+
+If it is drawn through the points that give the stresses on the failure plane, as in the bottom of the figure:
+
+>>$d = \dfrac{c_R}{1 + (\sin \phi' - 1) \tan \phi_R / \cos \phi'} \qquad \psi = \arctan \dfrac{\tan \phi_R}{1 + (\sin \phi' - 1) \tan \phi_R / \cos \phi'}$
+
+These are their Eqs. 9.6 to 9.9. Both pairs need $\phi'$, because the failure plane lies at $45° + \phi'/2$ from the major principal plane. The first pair follows from the equation for $\tau_{ff}$ under [The undrained strength is set by the full pool](#full-pool). A circle's radius is half the principal stress difference at failure, $\tau_{ff}$ is that radius times $\cos \phi'$, and for an isotropically consolidated sample $\sigma'_{fc} = \sigma'_{3c}$. Setting each circle tangent to the R envelope makes $\tau_{ff}$ a straight line in $\sigma'_{fc}$, with intercept $d$ and slope $\tan \psi$ as above. Before converting, find out from the lab report which way the envelope was drawn; the two pairs give different values for the same $c_R$ and $\phi_R$.
+
+For Pilarcitos Dam, verification problem [VP97](../verification/rocscience.md#vp97) converts $c_R = 60$ psf and $\phi_R = 23°$, with $\phi' = 45°$, to $d = 64.1$ psf and $\psi = 24.4°$ by the first pair.
+
 ### Anisotropy and K Interpolation {#anisotropy-and-k-interpolation}
 
 Wong et al. (1983) showed how to get the line for any $K_c$ from the two envelopes: interpolate between them. They found that interpolating linearly on $K$ gives very nearly the same strengths as anisotropically consolidated tests at each $K_c$, so the two envelopes from one set of $\overline{CU}$ tests stand in for all of those tests.
@@ -303,7 +321,7 @@ A rapid drawdown analysis needs these inputs beyond an ordinary one:
 
 | Input | Where | Notes |
 |-------|-------|-------|
-| The $K_c = 1$ envelope, $d$ and $\psi$ | the `mat` sheet, columns J and K; Studio: Materials, with LEM parameters shown | For each material that does not drain during the drawdown. Blank or zero means free-draining: the material keeps $c'$ and $\phi'$ in all three stages. A material needs both or neither. If the lab reports an R envelope ($c_R$, $\phi_R$) instead, convert it to $d$ and $\psi$ with Duncan, Wright, and Brandon's (2014) Eqs. 9.6 to 9.9 before entering it. |
+| The $K_c = 1$ envelope, $d$ and $\psi$ | the `mat` sheet, columns J and K; Studio: Materials, with LEM parameters shown | For each material that does not drain during the drawdown. Blank or zero means free-draining: the material keeps $c'$ and $\phi'$ in all three stages. A material needs both or neither. If the lab reports an R envelope ($c_R$, $\phi_R$) instead, convert it first, as described under [When the lab reports an R envelope](#r-envelope). |
 | The water before and after drawdown | one of three sources, below | The water before drawdown feeds Stage 1; the water after drawdown feeds Stages 2 and 3. |
 | The water load on the face | Water loads in the `main` sheet (cell D24) or Studio's Global parameters | **auto**, the default and the recommended setting, derives the full-pool load for Stage 1 and the lowered-pool load for Stages 2 and 3 from whichever water source the model uses. With **manual**, enter both: the `dloads` and `dloads (2)` sheets, or the Set 1 and Set 2 (rapid drawdown) tabs of Studio's Distributed loads. |
 

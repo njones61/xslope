@@ -20,7 +20,7 @@ from scipy.optimize import minimize_scalar, root_scalar, newton
 from shapely.geometry import LineString, Point
 from tabulate import tabulate
 
-from .advanced import rapid_drawdown
+from .advanced import rapid_drawdown, seismic_two_stage
 from .hoekbrown import hb_tangent
 from .preflight import method_surface_reason
 
@@ -335,7 +335,7 @@ def _driving_load(slice_df):
     return total
 
 
-def solve_selected(method_name, slice_df, rapid=False):
+def solve_selected(method_name, slice_df, rapid=False, seismic2=False):
     """
     Executes a specified limit equilibrium solution method and displays results.
 
@@ -351,6 +351,11 @@ def solve_selected(method_name, slice_df, rapid=False):
     rapid : bool, optional
         If True, performs rapid drawdown analysis using the specified method.
         Default is False.
+    seismic2 : bool or str, optional
+        If set, performs the two-stage pseudostatic seismic analysis
+        (:func:`xslope.advanced.seismic_two_stage`) with the specified method:
+        True or ``"interpolated"`` for the rapid drawdown interpolation, ``"kc1"``
+        for the K_c = 1 envelope alone. Default is False. Not with ``rapid``.
 
     Returns
     -------
@@ -369,8 +374,12 @@ def solve_selected(method_name, slice_df, rapid=False):
 
     func = globals()[method_name]
 
+    if rapid and seismic2:
+        raise ValueError("Choose rapid drawdown or the two-stage seismic analysis, not both.")
     if rapid:
         success, result = rapid_drawdown(slice_df, method_name)
+    elif seismic2:
+        success, result = seismic_two_stage(slice_df, method_name, strength=seismic2)
     else:
         success, result = func(slice_df)
     if not success:

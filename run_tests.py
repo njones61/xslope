@@ -709,6 +709,9 @@ def run_lem_test(test):
     # `rapid=true` runs the 3-stage rapid-drawdown analysis (needs the seep solution
     # + dloads/seep-bc stage-2 data in the input). Works with any test type.
     rapid = str(test.get('rapid', 'false')).strip().lower() in ('true', '1', 'yes')
+    # `seismic2=interpolated|kc1` runs the two-stage pseudostatic seismic analysis
+    # (advanced.seismic_two_stage) with that stage 2 strength. Absent -> none.
+    seismic2 = str(test.get('seismic2', '')).strip().lower() or False
     # `composite=true` lets a circle be truncated at the bottom of the model and run
     # along it (slice.CompositeSurface). Only for problems whose base is a real
     # impenetrable boundary; off by default.
@@ -784,6 +787,18 @@ def run_lem_test(test):
         for m in slope_data.get('materials', []):
             m['u'] = u_option
 
+    # `material=<name>` makes every row of the materials table a copy of the named
+    # row, so a one-zone model runs that soil. It exists for Duncan, Wright and
+    # Brandon's Table 10.4, which runs eight strength sets (four soils, each as a
+    # two-stage d/psi material and as an R envelope) on one geometry: one workbook per
+    # water case carries all eight, and the tag picks the row.
+    _mat_name = str(test.get('material', '')).strip()
+    if _mat_name:
+        _named = [m for m in slope_data.get('materials', []) if m.get('name') == _mat_name]
+        if len(_named) != 1:
+            return None, f"material={_mat_name!r} names {len(_named)} rows of the materials table, not one"
+        slope_data['materials'] = [dict(_named[0]) for _ in slope_data['materials']]
+
     # `tcrack_depth=<ft|m>` and `tcrack_water=<ft|m>` override main!D11/D12, the
     # tension crack depth and the depth of water standing in it. They exist for a
     # tutorial that runs its shipped (uncracked) workbook with a crack added — LEM-1's
@@ -833,7 +848,7 @@ def run_lem_test(test):
             if not success:
                 return None, f"generate_slices failed: {result}"
             slice_df, failure_surface = result
-            solver_result = solve_selected(method, slice_df, rapid=rapid)
+            solver_result = solve_selected(method, slice_df, rapid=rapid, seismic2=seismic2)
             if isinstance(solver_result, str):
                 return None, f"solve failed: {solver_result}"
             return solver_result['FS'], None
@@ -854,7 +869,7 @@ def run_lem_test(test):
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
-        solver_result = solve_selected(method, slice_df, rapid=rapid)
+        solver_result = solve_selected(method, slice_df, rapid=rapid, seismic2=seismic2)
         if isinstance(solver_result, str):
             return None, f"solve failed: {solver_result}"
         # Regression guard: rapid drawdown must write the winning stage's stresses
@@ -866,7 +881,8 @@ def run_lem_test(test):
 
     elif test_type == 'circular_search':
         fs_cache, converged, search_path, circle_cache = circular_search(
-            slope_data, method, num_slices=num_slices, rapid=rapid, composite=composite,
+            slope_data, method, num_slices=num_slices, rapid=rapid, seismic2=seismic2,
+            composite=composite,
             seed=seed, center_box=center_box, entry_range=entry_range,
             exit_range=exit_range, tangent_depth=tangent_depth
         )
@@ -887,14 +903,14 @@ def run_lem_test(test):
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
-        solver_result = solve_selected(method, slice_df, rapid=rapid)
+        solver_result = solve_selected(method, slice_df, rapid=rapid, seismic2=seismic2)
         if isinstance(solver_result, str):
             return None, f"solve failed: {solver_result}"
         return solver_result['FS'], None
 
     elif test_type == 'noncircular_search':
         fs_cache, converged, search_path = noncircular_search(
-            slope_data, method, num_slices=num_slices, rapid=rapid
+            slope_data, method, num_slices=num_slices, rapid=rapid, seismic2=seismic2
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "noncircular_search found no valid surface"

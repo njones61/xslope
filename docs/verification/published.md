@@ -25,6 +25,10 @@ shared [References](references.md) page.
 Match dots and status terms follow the shared [definitions](index.md#status-terms) and
 [scoring](index.md#how-the-match-dots-are-scored).
 
+Duncan, Wright & Brandon's Table 10.4 is a textbook's worked comparison rather than
+a hand calculation: the authors computed it with their own program and printed the
+factors of safety, so it is the published answer for the procedure it illustrates.
+
 A worked example frequently publishes one part of a design and defers the rest,
 and where XSLOPE computes a quantity the example does not carry, that quantity is reported as
 XSLOPE's own with no published counterpart and takes no dot.
@@ -39,6 +43,7 @@ XSLOPE's own with no published counterpart and takes no dot.
 | [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.637 has no published counterpart |
 | [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands rather than properties of the reinforcement, so they leave the capacity envelope where it stands, and XSLOPE's searched Spencer 1.542 has no published counterpart |
 | [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.122 has no published counterpart |
+| [DWB 10.4](#dwb-10-4) | 🟢 | Pseudostatic slope, single-stage and two-stage (Duncan, Wright & Brandon, Table 10.4) | All 16 values within 1.3%: dry within 0.4%, submerged within 1.3% | **built**; the two-stage columns are XSLOPE's two-stage analysis with the K<sub>c</sub> = 1 envelope; its default interpolated values have no published counterpart |
 
 </div>
 
@@ -623,3 +628,91 @@ E7-11 to E7-14) (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e7.xlsx, type=pullout_envelope, expected_pullout=7.69:1374;7.69:2000;7.69:4390;7.69:5535;7.69:3216;6.76:3867;5.26:4642;3.76:3542;2.26:4296;0.76:5243, expected_envelope=7.69:1374;7.69:2000;7.69:4136;7.69:4136;7.69:3216;6.76:3867;5.26:4642;3.76:3542;2.26:4296;0.76:5243, tolerance=0.002, benchmark=FHWA-E7 -->
 <!-- test: file=files/published/fhwa_e7.xlsx, type=circular_search, method=spencer, expected_fs=1.122, num_slices=30, benchmark=FHWA-E7-global -->
+
+---
+
+## 🟢 DWB Table 10.4 — pseudostatic slope, single-stage and two-stage {#dwb-10-4}
+
+Duncan, Wright & Brandon (2014), Section 10.4.2, compare the two ways of giving a
+pseudostatic analysis undrained strengths for a slope that has consolidated under its
+own weight. The **single-stage** analysis enters the R envelope's c<sub>R</sub> and
+φ<sub>R</sub> as an ordinary c and φ, with the pore pressures from before the
+earthquake. The **two-stage** analysis first solves the slope with no seismic force
+and drained strengths, which gives each slice's consolidation stresses
+σ′<sub>fc</sub> and τ<sub>fc</sub>; the second stage gives every slice its undrained
+strength from those stresses and adds the seismic force. Their Table 10.4 runs both on
+the slope of Figure 10.7 with k = 0.15, for the four soils of Table 10.3, dry and
+submerged.
+
+**Input:** [dwb_t10_4_dry.xlsx](files/published/dwb_t10_4_dry.xlsx) ·
+[dwb_t10_4_submerged.xlsx](files/published/dwb_t10_4_submerged.xlsx) · built by
+`benchmarks/published/build_dwb_t10_4.py`
+
+The slope is 2.5H:1V and 30 ft high, with γ = 135 pcf throughout. Each workbook carries
+all eight strength sets of Table 10.3, each soil once with c′, φ′, d, and ψ for the
+two-stage analysis and once with c<sub>R</sub> and φ<sub>R</sub> for the single-stage
+analysis; the profile line points at the soil being run. The figure gives no foundation
+depth and no water depth, so the model sets the base 30 ft (one slope height) below the
+toe and, in the submerged case, the water 15 ft above the crest. The dry results do not
+depend on the base, because their critical circles stay above it. In the submerged case
+the critical circles for soils 2 and 4 reach the base: with the base 60 ft down instead
+of 30, those four values come out 2.1 to 2.8% below the book's instead of 0.1 to 1.3%.
+
+Every run is Spencer's method, a circular search, and 40 slices.
+
+| Soil | Dry, single-stage | Dry, two-stage | Submerged, single-stage | Submerged, two-stage |
+|:-:|:-:|:-:|:-:|:-:|
+| 1 | 0.946 vs 0.95 (-0.4%) | 1.056 vs 1.06 (-0.4%) | 0.829 vs 0.83 (-0.1%) | 0.949 vs 0.95 (-0.1%) |
+| 2 | 1.557 vs 1.56 (-0.2%) | 1.764 vs 1.77 (-0.3%) | 1.570 vs 1.59 (-1.3%) | 1.776 vs 1.79 (-0.8%) |
+| 3 | 1.068 vs 1.07 (-0.2%) | 1.192 vs 1.19 (+0.2%) | 1.086 vs 1.10 (-1.3%) | 1.209 vs 1.21 (-0.1%) |
+| 4 | 2.759 vs 2.76 (-0.0%) | 3.416 vs 3.42 (-0.1%) | 2.815 vs 2.83 (-0.5%) | 3.486 vs 3.49 (-0.1%) |
+
+Each cell is XSLOPE against the book. The worst difference is −1.3%, and XSLOPE
+reproduces the book's finding that the single-stage analysis gives 80 to 90 percent of
+the two-stage factor of safety.
+
+The book's text says to estimate the undrained strengths in the second stage "using the
+same procedures as for rapid drawdown", which interpolates between the K<sub>c</sub> = 1
+envelope and the drained envelope according to each slice's consolidation stress ratio
+K<sub>c</sub>. Its Table 10.4 was computed from the K<sub>c</sub> = 1 envelope alone,
+τ<sub>ff</sub> = d + σ′<sub>fc</sub> tan ψ, and XSLOPE matches the table only that way.
+The two-stage analysis offers both. The table's two-stage columns above use the
+K<sub>c</sub> = 1 choice; the default interpolated choice gives these values, which are
+XSLOPE's own with no published counterpart:
+
+| Soil | Dry, K<sub>c</sub> = 1 | Dry, interpolated | Submerged, K<sub>c</sub> = 1 | Submerged, interpolated |
+|:-:|:-:|:-:|:-:|:-:|
+| 1 | 1.056 | 1.287 | 0.949 | 1.117 |
+| 2 | 1.764 | 1.773 | 1.776 | 1.778 |
+| 3 | 1.192 | 1.314 | 1.209 | 1.271 |
+| 4 | 3.416 | 3.039 | 3.486 | 3.255 |
+
+Where the K<sub>c</sub> = 1 envelope lies below the drained envelope over the stresses
+on the surface (soils 1 and 3), the interpolation raises the strength; where it lies
+above (soil 4), the interpolation lowers it. For soil 2 the two envelopes cross within
+that range of stresses, and the two choices nearly agree.
+
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 1 R envelope, num_slices=40, expected_fs=0.946, tolerance=0.005, benchmark=DWB-10.4-dry-1-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 2 R envelope, num_slices=40, expected_fs=1.557, tolerance=0.005, benchmark=DWB-10.4-dry-2-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 3 R envelope, num_slices=40, expected_fs=1.068, tolerance=0.005, benchmark=DWB-10.4-dry-3-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 4 R envelope, num_slices=40, expected_fs=2.759, tolerance=0.005, benchmark=DWB-10.4-dry-4-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.056, tolerance=0.005, benchmark=DWB-10.4-dry-1-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.764, tolerance=0.005, benchmark=DWB-10.4-dry-2-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.192, tolerance=0.005, benchmark=DWB-10.4-dry-3-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=kc1, num_slices=40, expected_fs=3.416, tolerance=0.005, benchmark=DWB-10.4-dry-4-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.287, tolerance=0.005, benchmark=DWB-10.4-dry-1-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.773, tolerance=0.005, benchmark=DWB-10.4-dry-2-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.314, tolerance=0.005, benchmark=DWB-10.4-dry-3-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=interpolated, num_slices=40, expected_fs=3.039, tolerance=0.005, benchmark=DWB-10.4-dry-4-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 1 R envelope, num_slices=40, expected_fs=0.829, tolerance=0.005, benchmark=DWB-10.4-submerged-1-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 R envelope, num_slices=40, expected_fs=1.570, tolerance=0.005, benchmark=DWB-10.4-submerged-2-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 R envelope, num_slices=40, expected_fs=1.086, tolerance=0.005, benchmark=DWB-10.4-submerged-3-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 R envelope, num_slices=40, expected_fs=2.815, tolerance=0.005, benchmark=DWB-10.4-submerged-4-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=kc1, num_slices=40, expected_fs=0.949, tolerance=0.005, benchmark=DWB-10.4-submerged-1-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.776, tolerance=0.005, benchmark=DWB-10.4-submerged-2-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.209, tolerance=0.005, benchmark=DWB-10.4-submerged-3-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=kc1, num_slices=40, expected_fs=3.486, tolerance=0.005, benchmark=DWB-10.4-submerged-4-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.117, tolerance=0.005, benchmark=DWB-10.4-submerged-1-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.778, tolerance=0.005, benchmark=DWB-10.4-submerged-2-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.271, tolerance=0.005, benchmark=DWB-10.4-submerged-3-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=interpolated, num_slices=40, expected_fs=3.255, tolerance=0.005, benchmark=DWB-10.4-submerged-4-interpolated -->

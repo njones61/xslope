@@ -69,6 +69,14 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   any slices where the negative-stress rule set the stage 2 strength. The
   `main_lem.py` summary also prints "not required" for stage 3. Factors of
   safety are unchanged.
+- The Rapid Drawdown Analysis documentation page is rewritten and illustrated.
+  It now explains why a drawn-down slope fails and why the method uses
+  undrained strengths, which strength applies in each condition, and the three
+  stages one step at a time: how consolidated undrained tests give the two
+  envelopes, why the stress ratio matters, and how the strength for any stress
+  ratio is interpolated between them. Two slices of Walter Bouldin Dam are
+  worked through, the dam's whole critical circle is shown slice by slice, and
+  the inputs table covers all three water sources and automatic water loads.
 
 ## 1.0.9 — 2026-11-11
 

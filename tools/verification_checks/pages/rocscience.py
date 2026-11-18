@@ -28,7 +28,6 @@ CONFIG = PageConfig(
         ('+0.3', 'Spencer within 0.3% on both'),
         ('−2.7', 'runs from −2.7% to +0.2%'),
         ('+0.2', 'runs from −2.7% to +0.2%'),
-        ('−0.5', "benchmark diagnostic (−0.5% at Slide2's K"),
         ('−3.0', 'with the plain static-head `u=piezo`'),
         ('+0.3', 'and it lands within 0.3% of Slide on both circles'),
         ('+1.0', 'within 1.0% of Bishop'),
@@ -121,7 +120,8 @@ CONFIG = PageConfig(
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_beta', 'expected_kc',
                     'expected_flowrate*', 'expected_head*', 'points',
-                    'expected', 'expected_depth', 'expected_force'],
+                    'expected', 'expected_depth', 'expected_force',
+                    'expected_d'],
     tag_round_dp=2,
     locked_value_re=None,
 

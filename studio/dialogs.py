@@ -3583,3 +3583,156 @@ class UnpackPackageDialog(QDialog):
     def chosen(self):
         """``(destination folder, "extract" | "existing")``."""
         return self.dest.text(), self._mode
+
+
+class NewmarkDialog(QDialog):
+    """Run → Newmark…: the permanent displacement of the sliding mass under an
+    acceleration record (:func:`xslope.seismic.newmark_displacement`).
+
+    The record is a file the dialog reads when it is picked (a PEER ``.AT2``, or
+    two columns of time in s and acceleration in g), and its header line, length,
+    time step and peak are shown before anything runs. It may be used as recorded,
+    scaled by a factor, or scaled to a target peak acceleration. k_y comes from
+    the last yield coefficient run when there is one, and can be typed over.
+
+    :meth:`options` returns the record dict, the scale factor, k_y, and a phrase
+    saying where k_y came from, for the Log and the report.
+    """
+
+    def __init__(self, parent=None, ky=None, ky_source=None, units="si",
+                 last_path=""):
+        super().__init__(parent)
+        from xslope.seismic import DISPLACEMENT_UNIT
+        self.setWindowTitle("Newmark displacement")
+        self._record = None
+        self._ky_run = ky
+        self._ky_source = ky_source
+        unit = DISPLACEMENT_UNIT.get(units, ("cm", 100.0))[0]
+
+        layout = QVBoxLayout(self)
+        note = QLabel(
+            "The sliding mass is taken as a rigid block that slides whenever the "
+            "ground acceleration exceeds k_y·g. The record is run both ways, with "
+            "its positive and with its negative accelerations pushing the block "
+            "downslope, and the larger displacement is reported, in "
+            f"{unit} for this model.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        form = QFormLayout()
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        self.path = QLineEdit(last_path or "")
+        self.path.setReadOnly(True)
+        self.path.setPlaceholderText("No record chosen")
+        self.path.setMinimumWidth(self.path.fontMetrics().horizontalAdvance("n" * 40))
+        browse = QPushButton("Browse…")
+        browse.clicked.connect(self._browse)
+        row.addWidget(self.path, 1)
+        row.addWidget(browse)
+        holder = QWidget()
+        holder.setLayout(row)
+        form.addRow("Record", holder)
+        self.info = QLabel("")
+        self.info.setWordWrap(True)
+        form.addRow("", self.info)
+
+        self.scale_as_is = QRadioButton("As recorded")
+        self.scale_factor_btn = QRadioButton("Scale factor")
+        self.scale_pga_btn = QRadioButton("Target peak acceleration (g)")
+        self.scale_group = QButtonGroup(self)
+        for b in (self.scale_as_is, self.scale_factor_btn, self.scale_pga_btn):
+            self.scale_group.addButton(b)
+        self.scale_as_is.setChecked(True)
+        self.factor = QDoubleSpinBox()
+        self.factor.setDecimals(3)
+        self.factor.setRange(0.001, 100.0)
+        self.factor.setValue(1.0)
+        self.target = QDoubleSpinBox()
+        self.target.setDecimals(3)
+        self.target.setRange(0.001, 10.0)
+        self.target.setSingleStep(0.05)
+        self.target.setValue(0.3)
+        for label, button, field in (("Scaling", self.scale_as_is, None),
+                                     ("", self.scale_factor_btn, self.factor),
+                                     ("", self.scale_pga_btn, self.target)):
+            r = QHBoxLayout()
+            r.setContentsMargins(0, 0, 0, 0)
+            r.addWidget(button)
+            if field is not None:
+                r.addWidget(field)
+            r.addStretch(1)
+            w = QWidget()
+            w.setLayout(r)
+            form.addRow(label, w)
+        self.scale_group.buttonToggled.connect(self._sync)
+
+        self.ky = QDoubleSpinBox()
+        self.ky.setDecimals(4)
+        self.ky.setRange(0.0001, 2.0)
+        self.ky.setSingleStep(0.005)
+        self.ky.setValue(ky if ky else 0.1)
+        form.addRow("Yield coefficient k_y", self.ky)
+        self.ky_note = QLabel(
+            f"From the last k_y run ({ky_source})." if ky
+            else "No k_y run in this session: type the yield coefficient, or run "
+                 "LEM with “Find the yield coefficient k_y” first.")
+        self.ky_note.setWordWrap(True)
+        form.addRow("", self.ky_note)
+        layout.addLayout(form)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.button(QDialogButtonBox.Ok).setText("Run")
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+        if last_path and os.path.exists(last_path):
+            self._load(last_path)
+        self._sync()
+
+    def _browse(self):
+        start = os.path.dirname(self.path.text()) if self.path.text() else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose an acceleration record", start,
+            "Acceleration records (*.AT2 *.at2 *.txt *.csv *.dat);;All files (*)")
+        if path:
+            self._load(path)
+            self._sync()
+
+    def _load(self, path):
+        from xslope.seismic import read_record
+        self.path.setText(path)
+        try:
+            self._record = read_record(path)
+        except (OSError, ValueError) as e:
+            self._record = None
+            self.info.setText(f"<span style='color:#b00020'>{e}</span>")
+            return
+        r = self._record
+        step = (f"dt = {r['dt']:g} s" if r["dt"] is not None
+                else "uneven time steps")
+        self.info.setText(f"{r['description']}<br>{r['npts']:,} points, {step}, "
+                          f"{r['duration']:.2f} s, peak {r['pga']:.3f} g")
+        self.target.setValue(round(r["pga"], 3))
+
+    def _sync(self, *args):
+        self.factor.setEnabled(self.scale_factor_btn.isChecked())
+        self.target.setEnabled(self.scale_pga_btn.isChecked())
+        self.buttons.button(QDialogButtonBox.Ok).setEnabled(self._record is not None)
+
+    def scale(self):
+        from xslope.seismic import scale_for_pga
+        if self.scale_factor_btn.isChecked():
+            return float(self.factor.value())
+        if self.scale_pga_btn.isChecked() and self._record is not None:
+            return scale_for_pga(self._record, self.target.value())
+        return 1.0
+
+    def options(self):
+        ky = float(self.ky.value())
+        typed = not (self._ky_run and abs(ky - round(self._ky_run, 4)) < 5e-5)
+        source = "typed in" if typed else self._ky_source
+        return {"record": self._record, "path": self.path.text(),
+                "scale": self.scale(), "ky": self._ky_run if not typed else ky,
+                "ky_source": source}

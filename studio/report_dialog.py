@@ -129,6 +129,9 @@ CONTENT_TREE = [
          ("lem_ky", "Yield coefficient detail",
           "How the yield coefficient k_y was found, when the run found one: each "
           "search and its k_y, or the coefficients tried on a single surface."),
+         ("lem_newmark", "Newmark displacement",
+          "The last Newmark run, when there is one: the record and its scaling, "
+          "k_y, the displacement each way, and the three histories."),
      ]),
     ("seep", "Seepage analysis",
      "The seepage analysis: the mesh and conductivities it was solved on, the "

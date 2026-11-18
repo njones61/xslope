@@ -37,7 +37,8 @@ from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
     MAX_ITERATIONS_LIMIT as _MAX_ITERATIONS_LIMIT,
-    RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
+    NewmarkDialog, RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog,
+    Slide2ImportDialog,
     UnpackPackageDialog,
 )
 from .display_panels import (
@@ -214,6 +215,22 @@ def _yield_note(bundle):
         return ""
     circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
     return yield_line(info, analyzed_surface_noun(bool(info.get("search")), circular))
+
+
+def _ky_of_run(bundle, method=None):
+    """``(k_y, phrase)`` from a yield coefficient run, for the Newmark dialog: the
+    coefficient, and the method and surface it was found on. ``(None, None)``
+    when the run found no k_y."""
+    from xslope.report import method_label
+    from xslope.search import analyzed_surface_noun
+    info = (bundle or {}).get("yield")
+    if not info:
+        return None, None
+    circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
+    name = method_label(method or (bundle.get("results") or {}).get("method")
+                        or bundle.get("method"))
+    noun = analyzed_surface_noun(bool(info.get("search")), circular)
+    return info["k_y"], f"{name}, on the {noun}, k_y = {info['k_y']:.4f}"
 
 
 def _at_k(slope_data, k):
@@ -477,6 +494,10 @@ class SweepCanvas(MplCanvas):
         self._draw(lambda fig: plot_sensitivity(df, target_fs=target_fs, fig=fig),
                    dxf=False)
 
+    def render_newmark(self, result):
+        from xslope.plot import plot_newmark
+        self._draw(lambda fig: plot_newmark(result, fig=fig), dxf=False)
+
     def render_fs_vs_time(self, result, slope_data=None):
         from xslope.plot import plot_fs_vs_time
         self._draw(lambda fig: plot_fs_vs_time(result, slope_data=slope_data,
@@ -565,6 +586,7 @@ class MainWindow(QMainWindow):
         self.search_canvas = None
         self.solution_canvas = None
         self.reliability_canvas = None
+        self.newmark_canvas = None
         self.reliability_hist_canvas = None      # Monte Carlo FS histogram
         # Sensitivity / design study result tabs.
         self.sens_canvas = None            # tornado
@@ -900,6 +922,8 @@ class MainWindow(QMainWindow):
                                        triggered=self.run_sensitivity)
         self.act_reliability = QAction("&Reliability…", self, enabled=False,
                                        triggered=self.run_reliability)
+        self.act_newmark = QAction("&Newmark…", self, enabled=False,
+                                   triggered=self.run_newmark)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
         self.act_report = QAction("&Generate Report…", self, enabled=False,
@@ -938,6 +962,7 @@ class MainWindow(QMainWindow):
         m_run.addAction(self.act_run)
         m_run.addAction(self.act_sensitivity)
         m_run.addAction(self.act_reliability)
+        m_run.addAction(self.act_newmark)
 
         m_view = mb.addMenu("&View")
         m_view.addAction(self.inputs_dock.toggleViewAction())
@@ -984,6 +1009,9 @@ class MainWindow(QMainWindow):
         # Reliability is a sibling of Parametric: deterministic what-ifs vs the
         # probabilistic (β / probability-of-failure) study.
         tb.addAction(self.act_reliability)
+        # Newmark follows a yield coefficient run, and is rerun with each record
+        # and scale, so it is one click away like the studies beside it.
+        tb.addAction(self.act_newmark)
         # The report is the end of the workflow, so it sits at the end of the strip.
         tb.addSeparator()
         tb.addAction(self.act_report)
@@ -1965,6 +1993,10 @@ class MainWindow(QMainWindow):
             self.act_reliability.setEnabled(open_ and has_mesh and not busy)
             self.act_reliability.setToolTip(
                 "" if has_mesh else "Build a mesh first (Build Mesh…).")
+        # Newmark integrates a limit equilibrium yield coefficient, so it is an
+        # LEM tool; it runs in the GUI thread in a fraction of a second.
+        self.act_newmark.setVisible(mode == "lem")
+        self.act_newmark.setEnabled(open_ and not busy and mode == "lem")
         if mode == "lem":
             self.act_run.setEnabled(open_ and not busy)
             self.act_run.setToolTip("")
@@ -2199,7 +2231,7 @@ class MainWindow(QMainWindow):
             return
         single = ["search_canvas", "solution_canvas", "reliability_canvas",
                   "sens_canvas", "sens_curve_canvas", "design_canvas",
-                  "fs_time_canvas",
+                  "fs_time_canvas", "newmark_canvas",
                   "fem_data_canvas", "fem_results_canvas"]
         if clear_mesh:
             single.append("mesh_canvas")
@@ -2230,7 +2262,8 @@ class MainWindow(QMainWindow):
         self.seep_solution_canvas = {}
         self.transient_seep_view = None
         for key in ("lem_solution", "seep_solutions", "transient_seep",
-                    "fem_solution", "design", "sensitivity", "fs_vs_time"):
+                    "fem_solution", "design", "sensitivity", "fs_vs_time",
+                    "newmark"):
             self.doc.results.pop(key, None)
         if clear_mesh:
             self.doc.slope_data["mesh"] = None
@@ -3246,6 +3279,9 @@ class MainWindow(QMainWindow):
         fem = self.doc.results.get("fem_solution")
         if fem:
             out["fem"] = [fem]
+        newmark = self.doc.results.get("newmark")
+        if newmark:
+            out["newmark"] = [newmark]
         return out
 
     def generate_report(self):
@@ -3411,6 +3447,64 @@ class MainWindow(QMainWindow):
             try:
                 self.reliability_hist_canvas.render_reliability_histogram(
                     rel, panel.options())
+            except Exception:
+                traceback.print_exc()
+
+    # --- Newmark ----------------------------------------------------------
+    def run_newmark(self):
+        """Run → Newmark…: integrate an acceleration record as a rigid sliding
+        block at the yield coefficient (:func:`xslope.seismic.newmark_displacement`).
+
+        k_y comes from the last LEM run when that run found one. The record is
+        read when the dialog picks it, and the integration takes a fraction of a
+        second, so it runs here rather than on a worker thread.
+        """
+        from xslope.seismic import newmark_displacement, newmark_line
+        from xslope.units import infer_system_from_gamma_water, normalize_unit_system
+        if not self.doc.is_open or self._mode != "lem":
+            return
+        sd = self.doc.slope_data
+        ky, source = _ky_of_run(self.doc.results.get("lem_solution"),
+                                (self._last_lem_opts or {}).get("method"))
+        units = (normalize_unit_system(sd.get("unit_system"))
+                 or infer_system_from_gamma_water(sd.get("gamma_water")) or "si")
+        last = self.settings.value("newmark_last_record", "") or ""
+        dlg = NewmarkDialog(self, ky=ky, ky_source=source, units=units,
+                            last_path=last)
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self.settings.setValue("newmark_last_record", opts["path"])
+        try:
+            result = newmark_displacement(opts["record"], opts["ky"],
+                                          scale=opts["scale"], units=units)
+        except ValueError as e:
+            QMessageBox.warning(self, "Newmark", str(e))
+            return
+        result["ky_source"] = opts["ky_source"]
+        self.doc.results["newmark"] = result
+        print(newmark_line(result))
+        self._show_newmark()
+        self.view_tabs.setCurrentWidget(self.newmark_canvas)
+        self.statusBar().showMessage(
+            f"Newmark done — D = {result['D']:.2f} {result['D_unit']} at "
+            f"k_y = {result['ky']:.3f}")
+        self._update_run_actions()       # the report now has a run to document
+
+    def _show_newmark(self):
+        if self.newmark_canvas is None:
+            self.newmark_canvas = SweepResultView(SweepCanvas(self), self)
+            self.view_tabs.addTab(self.newmark_canvas, "LEM · Newmark")
+        self._rerender_newmark()
+
+    def _rerender_newmark(self):
+        from .sweep_table import newmark_table
+        result = self.doc.results.get("newmark")
+        if result and self.newmark_canvas is not None:
+            try:
+                self.newmark_canvas.render_newmark(result)
+                self._fill_result_table(self.newmark_canvas, newmark_table(result))
+                self.newmark_canvas.show_plot()
             except Exception:
                 traceback.print_exc()
 
@@ -3860,7 +3954,7 @@ class MainWindow(QMainWindow):
         single = ("mesh_canvas", "search_canvas", "solution_canvas",
                   "reliability_canvas", "reliability_hist_canvas", "sens_canvas",
                   "sens_curve_canvas", "design_canvas", "fs_time_canvas",
-                  "fem_data_canvas", "fem_results_canvas")
+                  "newmark_canvas", "fem_data_canvas", "fem_results_canvas")
         # The seep canvases are per-BC dicts; flatten them in with the rest, along
         # with the transient view (frames + play bar) when present.
         canvases = [getattr(self, a) for a in single]

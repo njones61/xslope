@@ -1675,7 +1675,12 @@ def check_usage_accumulates():
 #: and the rule is what stops the assistant answering a capability question out of
 #: memory. The brief is prompt-cached and read once per completion, so the cost of
 #: the raise is small beside a wrong "no" on a shipped feature.
-BRIEF_TOKEN_BOUND = 7000  # offline counter; ~1.48x low against the billed count, so ~10.1k billed
+#: Raised from 7,000 to 7,150 for the seismic analyses: run_lem's `seismic2` and
+#: `ky` options and the `newmark` helper (+146 offline tokens over the 6,951 the
+#: brief stood at, leaving it at 7,097). The brief tells the model not to inspect
+#: helpers at run time, so an option it does not list is one the assistant never
+#: uses.
+BRIEF_TOKEN_BOUND = 7150  # offline counter; ~1.48x low against the billed count, so ~10.6k billed
 
 
 def check_the_brief_ships():

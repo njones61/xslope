@@ -8,10 +8,20 @@ holds what is computed FROM them:
 - :func:`yield_coefficient`: the seismic yield coefficient k_y, the seismic
   coefficient at which the factor of safety is exactly 1 (Duncan, Wright, and
   Brandon 2014, Sec. 10.1.3), on a given surface or by search.
+- :func:`newmark_displacement`: the permanent displacement of the sliding mass
+  under an acceleration record, as a rigid block that slides whenever the
+  ground acceleration exceeds k_y·g (Newmark 1965; Duncan, Wright, and Brandon
+  2014, Sec. 10.1.3), with :func:`read_record` to load the record.
 
-Reference: Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014), *Soil Strength
-and Slope Stability*, 2nd ed., Wiley, Chapter 10.
+References: Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014), *Soil Strength
+and Slope Stability*, 2nd ed., Wiley, Chapter 10. Newmark, N.M. (1965), "Effects
+of earthquakes on dams and embankments," *Géotechnique* 15(2), 139–160.
 """
+import os
+import re
+
+import numpy as np
+
 from . import solve
 from .advanced import seismic2_strength, seismic_two_stage
 from .slice import generate_slices
@@ -425,3 +435,303 @@ def yield_line(info, surface_noun):
                  f"{len(info.get('rounds') or [])} rounds; this is the lowest "
                  f"k_y they found.")
     return text
+
+
+# ---------------------------------------------------------------------------
+# Newmark sliding-block displacement
+# ---------------------------------------------------------------------------
+
+#: The acceleration of gravity in each unit system's length per second squared.
+GRAVITY = {"si": 9.81, "imperial": 32.174}
+
+#: The unit a Newmark displacement is reported in, and how many of it make one
+#: of the model's length units.
+DISPLACEMENT_UNIT = {"si": ("cm", 100.0), "imperial": ("in", 12.0)}
+
+#: A number as a record file writes it: a sign, digits with or without a point,
+#: and a Fortran exponent (E or D). Matched rather than split, because some
+#: fixed-width record files run negative values together with no space between.
+_NUMBER = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[EeDd][-+]?\d+)?")
+
+#: The sample-count line of a PEER .AT2 file: "NPTS=  5862, DT=   .0050 SEC"
+#: (NGA-West2), or "5862   .0050   NPTS, DT" (the older PEER format).
+_AT2_NEW = re.compile(r"NPTS\s*=\s*(\d+)\s*,?\s*DT\s*=\s*([-+.\dEe]+)", re.I)
+_AT2_OLD = re.compile(r"^\s*(\d+)\s+([-+.\dEe]+)\s+NPTS\s*,\s*DT", re.I)
+
+
+def _float(text):
+    return float(text.replace("D", "E").replace("d", "e"))
+
+
+def _record_out(path, fmt, header, time, accel, description=None):
+    time = np.asarray(time, dtype=float)
+    accel = np.asarray(accel, dtype=float)
+    if len(time) < 2:
+        raise ValueError(f"{os.path.basename(path)}: an acceleration record needs "
+                         f"at least two samples.")
+    steps = np.diff(time)
+    if np.any(steps <= 0):
+        i = int(np.argmax(steps <= 0)) + 1
+        raise ValueError(f"{os.path.basename(path)}: the times must increase; "
+                         f"sample {i + 1} is at {time[i]:g} s, after "
+                         f"{time[i - 1]:g} s.")
+    mean = float(steps.mean())
+    uniform = bool(np.all(np.abs(steps - mean) <= 1e-6 * mean))
+    header = [h for h in (header or []) if h]
+    return {"name": os.path.basename(path), "path": os.path.abspath(path),
+            "format": fmt, "header": header,
+            "description": description or (header[0] if header else
+                                            os.path.basename(path)),
+            "time": time, "accel": accel, "npts": len(time),
+            "dt": mean if uniform else None,
+            "duration": float(time[-1] - time[0]),
+            "pga": float(np.max(np.abs(accel)))}
+
+
+def read_record(path):
+    """Load a horizontal acceleration record, in g.
+
+    Two formats are read:
+
+    - a PEER ``.AT2`` file (the NGA databases): header lines, a line stating the
+      number of points and the time step (``NPTS=  5862, DT=   .0050 SEC``, or
+      the older ``5862  .0050  NPTS, DT``), then the accelerations in g, several
+      to a line;
+    - a text file of two columns, time in s and acceleration in g, separated by
+      spaces, tabs, or commas. Lines before the first pair of numbers are its
+      header (a leading ``#`` is dropped), and ``#`` lines after it are skipped.
+      The times need not be evenly spaced.
+
+    Returns a dict: ``name``, ``path``, ``format`` (``"AT2"`` or ``"text"``),
+    ``header`` (the header lines), ``description`` (the line that names the
+    record: an AT2 file's event and station line, else the first header line,
+    else the file name), ``time`` and ``accel`` (arrays, s and g), ``npts``,
+    ``dt`` (the time step, or None when the steps are uneven), ``duration``,
+    and ``pga`` (the largest absolute acceleration, in g).
+    """
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        lines = fh.read().splitlines()
+    name = os.path.basename(path)
+
+    # --- PEER .AT2 ---
+    for i, line in enumerate(lines[:12]):
+        m = _AT2_NEW.search(line) or _AT2_OLD.search(line)
+        if not m:
+            continue
+        npts, dt = int(m.group(1)), _float(m.group(2))
+        header = [h.strip() for h in lines[:i]]
+        units = " ".join(header).upper()
+        if re.search(r"UNITS OF\s+(?:CM|MM|M|IN|FT)\b|CM/S|M/S", units):
+            raise ValueError(f"{name}: the record is not in g ({units.strip()}); "
+                             f"XSLOPE reads accelerations in g.")
+        values = [_float(v) for ln in lines[i + 1:] for v in _NUMBER.findall(ln)]
+        if len(values) < npts:
+            raise ValueError(f"{name}: the header states {npts} points and the "
+                             f"file holds {len(values)}.")
+        if dt <= 0:
+            raise ValueError(f"{name}: the header's time step is {dt:g} s.")
+        # Both PEER layouts open with the database's title and name the event,
+        # date, station, and component on the second line.
+        desc = header[1] if len(header) > 1 else (header[0] if header else name)
+        return _record_out(path, "AT2", header, np.arange(npts) * dt,
+                           values[:npts], description=desc)
+
+    # --- two columns: time (s), acceleration (g) ---
+    header, time, accel = [], [], []
+    for n, line in enumerate(lines, start=1):
+        text = line.strip()
+        if not text:
+            continue
+        if text.startswith("#"):
+            if not time:
+                header.append(text.lstrip("#").strip())
+            continue
+        parts = [p for p in re.split(r"[\s,;]+", text) if p]
+        try:
+            t, a = _float(parts[0]), _float(parts[1])
+        except (IndexError, ValueError):
+            if not time:
+                header.append(text)
+                continue
+            raise ValueError(f"{name}, line {n}: expected a time and an "
+                             f"acceleration, found {text!r}.")
+        time.append(t)
+        accel.append(a)
+    if not time:
+        raise ValueError(f"{name}: no samples found. A record is a PEER .AT2 "
+                         f"file, or two columns of time (s) and acceleration (g).")
+    return _record_out(path, "text", header, time, accel)
+
+
+def scale_for_pga(record, target_pga):
+    """The scale factor that brings ``record``'s peak acceleration to
+    ``target_pga`` (both in g)."""
+    pga = float(record["pga"])
+    if pga <= 0:
+        raise ValueError("The record's peak acceleration is zero.")
+    return float(target_pga) / pga
+
+
+def _slide(time, accel, ky, g, sign):
+    """One direction of a rigid-block integration.
+
+    The block slides downslope when ``sign * accel`` exceeds ``ky`` (both in g):
+    its acceleration relative to the ground is then ``g * (sign * a - ky)``, and
+    once moving it keeps moving until its relative velocity returns to zero. It
+    never slides back. The record is taken as linear between samples, and each
+    step is integrated exactly on that line, the moments sliding starts and stops
+    included, so a record sampled at the corners of a piecewise-linear history
+    gives that history's displacement whatever its time step.
+
+    Returns the relative velocity and the displacement at every sample (model
+    length per s, and model length), and the number of times the block started
+    sliding.
+    """
+    n = len(time)
+    v_out = np.zeros(n)
+    d_out = np.zeros(n)
+    v = d = 0.0
+    sliding = False
+    episodes = 0
+    a_all = sign * np.asarray(accel, dtype=float)
+    for i in range(1, n):
+        h = time[i] - time[i - 1]
+        a0, a1 = a_all[i - 1], a_all[i]
+        if not sliding and a0 <= ky and a1 <= ky:
+            v_out[i], d_out[i] = 0.0, d
+            continue
+        slope = (a1 - a0) / h            # g per s along the step
+        s = 0.0                          # time into the step
+        while s < h:
+            if not sliding:
+                a_s = a0 + slope * s
+                if a_s > ky:
+                    pass                 # sliding from here
+                elif a1 > ky:
+                    s = (ky - a0) / slope    # where the line crosses ky
+                else:
+                    break                # stuck for the rest of the step
+                sliding = True
+                episodes += 1
+            # Relative acceleration on [s, h], linear: r(w) = r0 + q w, w = time
+            # since s; velocity v + r0 w + q w²/2; the block stops at its first
+            # positive root.
+            r0 = g * (a0 + slope * s - ky)
+            q = g * slope
+            span = h - s
+            w_stop = None
+            A, B, C = 0.5 * q, r0, v
+            if abs(A) < 1e-300:
+                if B < 0:
+                    w_stop = C / -B
+            else:
+                disc = B * B - 4.0 * A * C
+                if disc >= 0.0:
+                    root = disc ** 0.5
+                    qq = -0.5 * (B + (root if B >= 0 else -root))
+                    roots = [qq / A] + ([C / qq] if qq != 0.0 else [])
+                    tiny = 1e-12 * h
+                    pos = [w for w in roots if w > tiny]
+                    if pos:
+                        w_stop = min(pos)
+            if w_stop is not None and w_stop <= span:
+                w = w_stop
+                d += v * w + 0.5 * r0 * w * w + q * w ** 3 / 6.0
+                v = 0.0
+                sliding = False
+                s += w
+                continue
+            w = span
+            d += v * w + 0.5 * r0 * w * w + q * w ** 3 / 6.0
+            v = v + r0 * w + 0.5 * q * w * w
+            s = h
+        v_out[i], d_out[i] = v, d
+    return v_out, d_out, episodes
+
+
+def newmark_displacement(record, ky, scale=1.0, units="si"):
+    """Permanent displacement of a rigid sliding block (Newmark 1965).
+
+    The sliding mass is a rigid block on the ground. Whenever the ground
+    acceleration exceeds the yield acceleration k_y·g it slides downslope, and it
+    keeps sliding until its velocity relative to the ground returns to zero
+    (Duncan, Wright, and Brandon 2014, Fig. 10.3). It never slides back up.
+
+    Nothing in a record says which way its positive accelerations point on the
+    slope being analyzed: its sign is the compass direction of the instrument's
+    axis where it was recorded. So the record is run both ways — once with its
+    positive accelerations pushing the block downslope, once with its negative
+    ones — and the larger displacement is the answer.
+
+    Parameters
+    ----------
+    record : dict
+        From :func:`read_record`, or any dict carrying ``time`` (s) and
+        ``accel`` (g).
+    ky : float
+        The yield coefficient, in g (:func:`yield_coefficient`).
+    scale : float
+        Multiplies every acceleration (:func:`scale_for_pga` gives the factor
+        for a target peak).
+    units : {"si", "imperial"}
+        The model's unit system: it sets g (9.81 m/s² or 32.174 ft/s²) and the
+        unit the displacement is reported in (cm or in).
+
+    Returns
+    -------
+    dict
+        ``D`` (the larger of the two directions) and ``D_unit``; ``governing``
+        (+1 or −1, the sign of the accelerations that push the block in the
+        governing direction); ``directions``, keyed +1 and −1, each with ``D``,
+        ``episodes``, ``v_max``, and the histories ``v`` and ``d`` (in D_unit
+        per s and D_unit); ``time`` and ``accel`` (the scaled record, g);
+        ``ky``, ``scale``, ``pga`` (scaled, g), ``units``, ``g``; and
+        ``record`` (the record's name, path, format, description, npts, dt,
+        duration, and unscaled pga).
+    """
+    if units not in GRAVITY:
+        raise ValueError(f"units must be one of {sorted(GRAVITY)}, not {units!r}.")
+    ky = float(ky)
+    if not ky > 0:
+        raise ValueError(f"k_y must be positive; got {ky:g}.")
+    scale = float(scale)
+    if not scale > 0:
+        raise ValueError(f"The scale factor must be positive; got {scale:g}.")
+    time = np.asarray(record["time"], dtype=float)
+    accel = scale * np.asarray(record["accel"], dtype=float)
+    g = GRAVITY[units]
+    unit, per = DISPLACEMENT_UNIT[units]
+    directions = {}
+    for sign in (+1, -1):
+        v, d, episodes = _slide(time, accel, ky, g, sign)
+        directions[sign] = {"D": float(d[-1] * per), "episodes": episodes,
+                            "v_max": float(v.max() * per), "v": v * per,
+                            "d": d * per}
+    governing = +1 if directions[+1]["D"] >= directions[-1]["D"] else -1
+    meta = {k: record.get(k) for k in ("name", "path", "format", "description",
+                                       "header", "npts", "dt", "duration", "pga")}
+    return {"D": directions[governing]["D"], "D_unit": unit,
+            "governing": governing, "directions": directions,
+            "time": time, "accel": accel, "ky": ky, "scale": scale,
+            "pga": float(np.max(np.abs(accel))), "units": units, "g": g,
+            "record": meta}
+
+
+def direction_phrase(sign):
+    """How a result names a direction of the record."""
+    return ("its positive accelerations pushing the block downslope" if sign > 0
+            else "its negative accelerations pushing the block downslope")
+
+
+def newmark_line(result):
+    """The sentence a Newmark result is reported in: the Log, the results tab,
+    and the report's summary."""
+    u = result["D_unit"]
+    gov = result["governing"]
+    other = result["directions"][-gov]
+    main = result["directions"][gov]
+    return (f"Newmark displacement D = {result['D']:.2f} {u} at k_y = "
+            f"{result['ky']:.3f} under {result['record']['name']} "
+            f"(peak {result['pga']:.3f} g), with {direction_phrase(gov)} "
+            f"({main['episodes']} slip episodes); the other way it is "
+            f"{other['D']:.2f} {u}.")

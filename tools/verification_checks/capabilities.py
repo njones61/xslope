@@ -112,10 +112,6 @@ ABSENT = [
     Absent("the Corps of Engineers 2-stage drawdown procedure",
            "rocscience", "*not supported* — Corps 2-stage",
            "as above"),
-    Absent("permanent-displacement (Newmark) analysis from a yield acceleration",
-           "rocscience", "reads no XSLOPE model",
-           "no newmark / yield-acceleration / displacement-analysis hit anywhere "
-           "in xslope/*.py; the seismic input is a coefficient, not a record"),
 
     # ------------------------------------------------------------------- water
     Absent("an exponential unsaturated conductivity law",

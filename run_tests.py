@@ -492,7 +492,8 @@ def parse_test_tags(md_path):
                     'expected_depth', 'depth_x', 'depth_datum',
                     'expected_force', 'target_fs', 'force_elev', 'grid',
                     'refine_grid', 'min_depth',
-                    'expected_tilt', 'k_stand', 'k_fail']:
+                    'expected_tilt', 'k_stand', 'k_fail',
+                    'expected_d', 'ky', 'scale', 'target_pga']:
             if key in params:
                 params[key] = float(params[key])
         for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index',
@@ -1365,6 +1366,37 @@ def run_critical_kc_test(test):
     except AnalysisError as e:
         return None, str(e)
     return bundle['yield']['k_y'], None
+
+
+def run_newmark_test(test):
+    """Integrate an acceleration record as a rigid sliding block and compare the
+    permanent displacement to the published or closed-form one.
+
+    The work is the package's own :func:`xslope.seismic.read_record` and
+    :func:`xslope.seismic.newmark_displacement`, the calls Studio's Newmark
+    dialog makes.
+
+    Tag keys: file (the record), ky (in g), expected_d (in cm, or in inches with
+    ``units=imperial``), tolerance (absolute, default 0.005), scale or
+    target_pga (default: the record as written), direction (``both``, the
+    larger of the two and the default; ``positive`` or ``negative``, the one
+    with that sign of acceleration pushing the block downslope)."""
+    from xslope.seismic import newmark_displacement, read_record, scale_for_pga
+    try:
+        record = read_record(test['file'])
+    except (OSError, ValueError) as e:
+        return None, str(e)
+    scale = test.get('scale', 1.0)
+    if 'target_pga' in test:
+        scale = scale_for_pga(record, test['target_pga'])
+    result = newmark_displacement(record, test['ky'], scale=scale,
+                                  units=str(test.get('units', 'si')).strip().lower())
+    direction = str(test.get('direction', 'both')).strip().lower()
+    if direction == 'both':
+        return result['D'], None
+    if direction not in ('positive', 'negative'):
+        return None, f"direction={direction}: expected both, positive, or negative"
+    return result['directions'][+1 if direction == 'positive' else -1]['D'], None
 
 
 def run_design_test(test):
@@ -10064,6 +10096,14 @@ MODULE_CHECKS = {
         "A surcharge that starts at the crest of a wall stays on the crest: a "
         "slice straddling a face drawn leaning by 0.001 takes its load from the "
         "ground under it, not along the chord up the face."),
+    'newmark_record': (
+        'newmark_record_check.py',
+        "Every way a record file is written (two columns, an NGA-West2 .AT2, an "
+        "older PEER .AT2, run-together fixed-width values) reads to the same "
+        "record and the same Newmark displacement; records in cm/s², with "
+        "backward times, or short of their stated count are refused; reversing "
+        "the record swaps the two directions; D scales with g between unit "
+        "systems."),
     'circle_arc': (
         'circle_arc_check.py',
         "The base of a slice on a circle is as long as the arc it follows: on a "
@@ -16577,6 +16617,8 @@ def _dispatch_test(test):
         return run_design_callable_test(test)
     elif test_type == 'critical_kc':
         return run_critical_kc_test(test)
+    elif test_type == 'newmark':
+        return run_newmark_test(test)
     elif test_type == 'slip_depth':
         return run_slip_depth_test(test)
     elif test_type == 'support_force':
@@ -16600,6 +16642,10 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type == 'critical_kc':
         expected = test.get('expected_kc')
         tol = test.get('kc_tol', 0.01)
+    elif test_type == 'newmark':
+        # ABSOLUTE, in the displacement's own unit (cm, or in for imperial).
+        expected = test.get('expected_d')
+        tol = test.get('tolerance', 0.005)
     elif test_type == 'fem_tilt':
         # ABSOLUTE, in degrees: the tilt the two coefficients bracket.
         expected = test.get('expected_tilt')
@@ -17194,6 +17240,11 @@ def main():
         tests.append({'type': 'circle_arc',
                       'file': 'a phi = 0 circle meeting the crest vertically',
                       'method': 'OMS, Bishop, Spencer', 'source': 'circle_arc'})
+        # A record file is read the same way whichever layout it is in, and
+        # the Newmark integration treats both directions alike.
+        tests.append({'type': 'newmark_record',
+                      'file': 'the VP104 record in every layout',
+                      'method': 'Newmark', 'source': 'newmark_record'})
         # Bishop scored against an implementation written from the published
         # equations and nothing else.
         tests.append({'type': 'indep_bishop',

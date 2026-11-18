@@ -167,6 +167,10 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp104a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.372, benchmark=VP104-noseismic -->
 <!-- test: file=files/rocscience/vp104b.xlsx, type=circular_search, num_slices=40, fs_spencer=0.989, benchmark=VP104-k015 -->
 <!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.144, kc_tol=0.01, num_slices=40, benchmark=VP104-kc -->
+<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.139, expected_d=5.036, tolerance=0.005, benchmark=VP104-newmark -->
+<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.139, direction=positive, expected_d=4.007, tolerance=0.005, benchmark=VP104-newmark-positive -->
+<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.140, expected_d=4.928, tolerance=0.005, benchmark=VP104-newmark-uni -->
+<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.144, expected_d=4.521, tolerance=0.005, benchmark=VP104-newmark-xslope-ky -->
 <!-- test: file=files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.532, benchmark=VP82 -->
 <!-- test: file=files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
@@ -302,7 +306,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
 | [102](#vp102) | 🟢 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.731 vs Slide 1.745 (−0.8%) · drawdown at 100 h: Spencer 1.817 vs Slide 1.867 (−2.7%) | the 100 h frame is the widest of the 60–1500 h transient series, which runs from −2.7% to +0.2% against the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause of the early-frame shortfall and is worth a small fraction of it. |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | 4 files, both mechanisms; the deep→shallow switch lands in Slide2's own interval |
-| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | 3 of 4 scenarios; the Newmark displacement is reproduced by a benchmark diagnostic (−0.5% at Slide2's K<sub>y</sub>), not an XSLOPE mode |
+| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) · Newmark D 5.036 cm vs Slide2 MMO 5.042 cm (−0.1%) | all 4 scenarios; the Newmark displacement is run at Slide2's own K<sub>y</sub> 0.139 |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
 | [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · D1/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · D1/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · D1/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · D1/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | 5 cases; the Ito & Matsui limit pressure is auto-computed. The paper's three-dimensional finite-element results are compared separately, as a [diagnostic of the 2D pile idealization](#vp106-fem) that carries no dot |
 | [107](#vp107) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Spencer 1.397 vs Slide 1.386 (+0.8%) · mesh supports: Spencer 1.397 vs Slide 1.392 (+0.4%) |  |
@@ -2431,54 +2435,52 @@ c = 7.2 kPa, φ = 20°; all γ = 19.5 kN/m³), dry, with no external loads. The 
 scenarios twice, once with multi-modal Particle Swarm plus Surface Altering optimization and once
 with the ordinary uni-modal search, and prints both columns in Table 104.1. The two published
 columns agree to about 0.1%, and the uni-modal column is what an ordinary circular search targets,
-so three of the four scenarios reproduce directly.
+so the first three scenarios reproduce directly. The fourth is run at Slide2's own K<sub>y</sub>
+(below).
 
 **Input files:** [vp104a.xlsx](files/rocscience/vp104a.xlsx) (no seismic) ·
-[vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15)
+[vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15) ·
+[vp104_record.txt](files/rocscience/vp104_record.txt) (the acceleration record)
 
 | Scenario | XSLOPE (Spencer) | Slide2 uni-modal | Slide2 MMO |
 |---|---|---|---|
 | No seismic | 1.372 | 1.360 (+0.9%) | 1.359 (+1.0%) |
 | Seismic coefficient k = 0.15 | 0.989 | 0.980 (+0.9%) | 0.978 (+1.1%) |
 | Critical acceleration | K<sub>y</sub> = 0.144 | K<sub>y</sub> = 0.140 (+2.9%) | K<sub>y</sub> = 0.139 (+3.6%) |
-| Newmark displacement | — *diagnostic, below* | 5.081 cm | 5.042 cm |
+| Newmark displacement | *below* | 5.081 cm | 5.042 cm |
 
 *All three built scenarios run about +0.9% high, in the same direction and by the same amount:
 Slide2's Surface Altering optimization refines the surface away from a circle and so finds a
 slightly lower minimum than a circular search can, and the critical acceleration follows from
 that. The critical-acceleration row compares a yield acceleration, not a factor of safety.*
 
-**The fourth scenario — permanent Newmark displacement — is reproduced as a diagnostic.**
-The seismic record it needs is not printed in the verification manual but ships with the product:
-the tutorial model the problem is built on (`Tutorial 28 Seismic.slmd`) stores the whole time
-history inside its *Newmark Displacement* scenario — 5862 samples at dt = 0.005 s spanning 0 to
-29.305 s, labeled *Mammoth Lakes-1 1980: CVK-090*. `benchmarks/rocscience/newmark_vp104.py`
-carries that record and integrates it with the textbook rigid-block scheme: while the driving
-acceleration exceeds the yield acceleration K<sub>y</sub> the block accelerates relative to the
-ground at (a − K<sub>y</sub>)·g, one-way, and the relative velocity is integrated to a permanent
-displacement.
+**The fourth scenario: permanent Newmark displacement.** The acceleration record it needs is
+not printed in the verification manual, but it ships with the product: the tutorial model the
+problem is built on (`Tutorial 28 Seismic.slmd`) stores the whole history in its *Newmark
+Displacement* scenario, 5862 samples at dt = 0.005 s spanning 0 to 29.305 s, labeled *Mammoth
+Lakes-1 1980: CVK-090*. The record file carries it as two columns of time and acceleration.
+XSLOPE's Newmark analysis treats the sliding mass as a rigid block that slides whenever the
+ground acceleration exceeds K<sub>y</sub>·g, runs the record once with each sign pushing the
+block downslope, and reports the larger displacement.
 
-| K<sub>y</sub> | Rigid-block integration | Slide2 published |
+| K<sub>y</sub> | XSLOPE | Slide2 published |
 |---|---|---|
-| 0.139 — Slide2 MMO | 5.015 cm | 5.042 cm (−0.5%) |
-| 0.140 — Slide2 uni-modal | 4.906 cm | 5.081 cm (−3.4%) |
-| 0.144 — XSLOPE `critical_kc` | 4.496 cm | — |
+| 0.139 — Slide2 MMO | 5.036 cm | 5.042 cm (−0.1%) |
+| 0.140 — Slide2 uni-modal | 4.928 cm | 5.081 cm (−3.0%) |
+| 0.144 — XSLOPE's own K<sub>y</sub> | 4.521 cm | — |
 
-The published pair is **non-monotone in K<sub>y</sub>** — the larger yield acceleration is printed
-with the larger displacement — which no single integration of one record can produce, since
+The record's negative accelerations govern. With its positive ones pushing the block, K<sub>y</sub>
+= 0.139 gives 4.007 cm.
+
+The published pair is **non-monotone in K<sub>y</sub>**: the larger yield acceleration is printed
+with the larger displacement, which no integration of one record can produce, since the
 displacement falls as K<sub>y</sub> rises. The two columns are two different critical surfaces whose
-K<sub>y</sub> is printed rounded to three decimals, and inverting each published displacement back
-through the integration shows that only the multi-modal row's value is consistent with its printed
-K<sub>y</sub>, and it agrees to −0.5%. Displacement is also far more sensitive to the yield
-acceleration than the factor of safety is: XSLOPE's K<sub>y</sub> runs +2.9% high because a circular
-search cannot follow Slide2's surface-altering optimization, and carried through the same
-integration that 2.9% removes about 11% of the displacement. That amplification is why the yield
-acceleration, not the displacement, is the compared quantity.
-
-**Scope.** XSLOPE's seismic modeling is pseudo-static: a seismic coefficient in the
-limit-equilibrium solve, plus the `critical_kc` search for the k at which the searched minimum
-factor of safety reaches 1. Displacement integration is not an analysis mode — the script above
-takes a yield acceleration as an input and reads no XSLOPE model — so that row is a diagnostic and carries no match.
+K<sub>y</sub> is printed to three decimals, and inverting each published displacement through the
+integration shows that only the multi-modal row's is consistent with its printed K<sub>y</sub>.
+The displacement is also far more sensitive to the yield acceleration than the factor of safety
+is: carried through the same record, XSLOPE's K<sub>y</sub> gives 4.521 cm against 4.928 cm at
+Slide2's uni-modal K<sub>y</sub> (−8.3%). The displacement is therefore scored at Slide2's own
+K<sub>y</sub>, and XSLOPE's K<sub>y</sub> is scored in the table above.
 
 ![vp104a: no-seismic inputs and Spencer critical surface](images/vp104a.png)
 

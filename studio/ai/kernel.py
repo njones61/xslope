@@ -1085,6 +1085,58 @@ class PythonKernel:
                     out["k_y_static"] = ky_info["static"]["k_y"]
             return out
 
+        def newmark(record, ky=None, scale=1.0, target_pga=None):
+            """Newmark's permanent displacement under an acceleration record
+            (:func:`xslope.seismic.newmark_displacement`), as Run → Newmark…
+            computes it.
+
+            `record` is a PEER .AT2 file or two columns of time (s) and
+            acceleration (g); a relative path is taken from the project's folder,
+            then the working directory. `ky` defaults to the yield coefficient of
+            the session's last `run_lem(ky=True)`. `scale` multiplies the record;
+            `target_pga` (g) scales it to that peak instead. The record is run
+            with each sign pushing the block downslope, and the larger
+            displacement governs. The run is stored where the dialog stores it,
+            so the LEM · Newmark tab shows it and the report documents it.
+            """
+            import os as _os
+            from xslope.seismic import (newmark_displacement, newmark_line,
+                                        read_record, scale_for_pga)
+            from xslope.units import (infer_system_from_gamma_water,
+                                      normalize_unit_system)
+            path = str(record)
+            if not _os.path.isabs(path):
+                base = _os.path.dirname(getattr(doc, "path", "") or "")
+                cand = _os.path.join(base, path) if base else path
+                path = cand if _os.path.exists(cand) else _os.path.abspath(path)
+            rec = read_record(path)
+            source = "given"
+            if ky is None:
+                info = (doc.results.get("lem_solution") or {}).get("yield")
+                if not info:
+                    raise RuntimeError("No yield coefficient: run "
+                                       "run_lem(ky=True, search=True) first, or "
+                                       "pass ky=.")
+                ky = info["k_y"]
+                source = f"the session's last k_y run, k_y = {ky:.4f}"
+            if target_pga is not None:
+                scale = scale_for_pga(rec, target_pga)
+            sd = doc.slope_data
+            units = (normalize_unit_system(sd.get("unit_system"))
+                     or infer_system_from_gamma_water(sd.get("gamma_water"))
+                     or "si")
+            result = newmark_displacement(rec, ky, scale=scale, units=units)
+            result["ky_source"] = source
+            print(newmark_line(result))
+            _store_result("newmark", result, show=[("_show_newmark", ())],
+                          lead="newmark_canvas")
+            d = result["directions"]
+            return {"D": result["D"], "D_unit": result["D_unit"],
+                    "D_positive": d[+1]["D"], "D_negative": d[-1]["D"],
+                    "episodes": d[result["governing"]]["episodes"],
+                    "ky": result["ky"], "scale": result["scale"],
+                    "pga": result["pga"]}
+
         def _ensure_mesh(sd, quiet=False):
             """The model's finite-element mesh, building one from the FILE'S OWN
             declared settings if it carries none.
@@ -2264,6 +2316,7 @@ class PythonKernel:
                     "text": doc["text"]}
 
         return {"run_lem": run_lem, "run_seep": run_seep, "run_fem": run_fem,
+                "newmark": newmark,
                 "run_tseep": run_tseep, "fs_vs_time": fs_vs_time,
                 "transient_solution": transient_solution,
                 "corpus_index": corpus_index,

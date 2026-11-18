@@ -831,6 +831,7 @@ DEFAULT_OPTIONS = {
     "lem_rapid": True,
     "lem_seismic2": True,
     "lem_ky": True,
+    "lem_newmark": True,              # the last Newmark run, when there is one
     "seep": True,
     "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
@@ -3533,6 +3534,89 @@ SEISMIC2_DOC_PAGE = "seismic/two_stage.md"
 
 #: The documentation page the yield coefficient section points a reader to.
 KY_DOC_PAGE = "seismic/yield_coefficient.md"
+
+
+#: The documentation page the Newmark section points a reader to.
+NEWMARK_DOC_PAGE = "seismic/newmark.md"
+
+
+def newmark_bundles(solutions):
+    """The Newmark runs, as a list. A bundle is what
+    :func:`xslope.seismic.newmark_displacement` returns, with ``ky_source``
+    added: where the yield coefficient came from."""
+    return engine_bundles(solutions, "newmark")
+
+
+def _newmark_section(solutions, opts, counter, figure_dir, progress=None):
+    """The permanent displacement of the last Newmark run: the record, its
+    scaling, the yield coefficient, the displacement each way, and the three
+    histories."""
+    runs = newmark_bundles(solutions)
+    if not runs:
+        return None
+    from .seismic import direction_phrase
+    r = runs[-1]
+    rec = r.get("record") or {}
+    unit = r["D_unit"]
+    gov = r["governing"]
+    sec = Section("Newmark Displacement")
+    term = "sliding-block method"
+    url = docs_url(NEWMARK_DOC_PAGE)
+    g_text = (f"g = {r['g']:g} m/s²" if r["units"] == "si"
+              else f"g = {r['g']:g} ft/s²")
+    sec.blocks.append(Prose(
+        f"The permanent displacement of the sliding mass during the earthquake "
+        f"was estimated by Newmark's (1965) {term}. The mass above the failure "
+        f"surface is treated as a rigid block that slides downslope whenever the "
+        f"ground acceleration exceeds the yield acceleration k_y·g and keeps "
+        f"sliding until its velocity relative to the ground returns to zero "
+        f"(Duncan, Wright, and Brandon 2014). The yield coefficient k_y is held "
+        f"constant, so the method does not apply to a slope that loses "
+        f"significant strength during shaking. The sign of a recorded "
+        f"acceleration follows the recording instrument's axis and not the "
+        f"slope, so the record was run twice, once with its positive and once "
+        f"with its negative accelerations pushing the block downslope, and the "
+        f"larger displacement governs. The record is taken as linear between "
+        f"samples, with {g_text}.", links=[(term, url)]))
+    step = (f"{rec['dt']:g} s" if rec.get("dt") else "uneven")
+    scale = r.get("scale", 1.0)
+    items = [("Record file", rec.get("name") or ""),
+             ("Record", rec.get("description") or ""),
+             ("Samples and time step", f"{rec.get('npts', 0):,}, {step}"),
+             ("Duration", f"{rec.get('duration', 0.0):.2f} s"),
+             ("Peak acceleration as recorded", f"{rec.get('pga', 0.0):.3f} g")]
+    if abs(scale - 1.0) > 1e-12:
+        items += [("Scale factor", f"{scale:.4g}"),
+                  ("Peak acceleration as analyzed", f"{r['pga']:.3f} g")]
+    items.append(("Yield coefficient k_y", f"{r['ky']:.4f}"
+                  + (f" ({r['ky_source']})" if r.get("ky_source") else "")))
+    for sign in (gov, -gov):
+        info = r["directions"][sign]
+        word = "positive" if sign > 0 else "negative"
+        items.append((f"Displacement, {word} accelerations pushing downslope",
+                      f"{info['D']:.2f} {unit} ({info['episodes']} slip episodes)"))
+    sec.blocks.append(KeyValues(items))
+    sec.blocks.append(Prose(
+        f"The permanent displacement is D = {r['D']:.2f} {unit}, with "
+        f"{direction_phrase(gov)}.", bold=[f"D = {r['D']:.2f} {unit}"]))
+    path = os.path.join(figure_dir, "newmark.png")
+
+    def draw(fig):
+        from .plot import plot_newmark
+        plot_newmark(r, fig=fig, show_title=False)
+
+    if progress:
+        progress("the Newmark histories")
+    if _render(draw, path, opts, figsize=(7.5, 7.0)):
+        number = counter.next_figure()
+        where, links = cite("Figure", number)
+        sec.blocks.append(Prose(
+            f"{where} shows the ground acceleration with ±k_y, and the "
+            f"block's velocity relative to the ground and its displacement "
+            f"for each direction.", links=links))
+        sec.blocks.append(Figure(path, "Newmark sliding-block histories",
+                                 number, source="newmark"))
+    return sec
 
 
 def _ky_section(info, results, counter, noun="surface"):
@@ -10521,6 +10605,8 @@ def planned_figures(slope_data, solutions, opts):
                 n += 1
             if _diagram_is_printed(slope_data, solutions, name, opts):
                 n += 1
+    if opts["lem"] and opts["lem_newmark"] and newmark_bundles(solutions):
+        n += 1
     return n
 
 
@@ -10611,6 +10697,9 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
             ``{"fem_data", "solution", "FS", "analysis", "failure_solution"}``,
             where ``analysis`` is ``"ssrm"`` for a strength reduction run and
             ``"single"`` for one trial at a stated factor.
+        ``"newmark"``
+            What :func:`xslope.seismic.newmark_displacement` returns, plus
+            ``ky_source``. The last one is documented.
 
         An engine that is absent gets no section.
     options : dict, optional
@@ -10683,6 +10772,10 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
                            progress)
         if lem is not None:
             report.sections.append(lem)
+    if opts["lem"] and opts["lem_newmark"]:
+        newmark = _newmark_section(solutions, opts, counter, figure_dir, progress)
+        if newmark is not None:
+            report.sections.append(newmark)
     if opts["fem"]:
         fem = _fem_section(slope_data, solutions, opts, counter, figure_dir,
                            progress)

@@ -5822,3 +5822,83 @@ def plot_mc_rank_correlation(result, figsize=(8, 5), save_png=False, dpi=300,
     if save_png:
         fig.savefig('mc_rank_correlation.png', dpi=dpi, bbox_inches='tight')
     return fig
+
+
+def plot_newmark(result, figsize=(9.0, 7.5), save_png=False, dpi=300, fig=None,
+                 show_title=True, show_legend=True):
+    """The three histories of a Newmark sliding-block analysis
+    (:func:`xslope.seismic.newmark_displacement`), stacked on one time axis the
+    way Duncan, Wright, and Brandon (2014) draw them in Fig. 10.3.
+
+    Top, the ground acceleration (scaled, in g) with the yield acceleration
+    marked on both sides: the block slides one way when the record rises above
+    +k_y and the other way when it falls below −k_y. Middle and bottom, the
+    block's velocity relative to the ground and its accumulated displacement,
+    one curve for each sign of the record, the governing one drawn solid.
+    """
+    from .seismic import direction_phrase
+
+    own_fig = fig is None
+    if own_fig:
+        fig = plt.figure(figsize=figsize)
+    else:
+        fig.clear()
+    ax_a, ax_v, ax_d = fig.subplots(3, 1, sharex=True)
+
+    t = np.asarray(result["time"], dtype=float)
+    a = np.asarray(result["accel"], dtype=float)
+    ky = float(result["ky"])
+    unit = result["D_unit"]
+    gov = result["governing"]
+    colors = {gov: "#1f4e9c", -gov: "#d9822b"}
+
+    ax_a.plot(t, a, color="0.35", linewidth=0.6)
+    for sign in (+1, -1):
+        ax_a.axhline(sign * ky, color=colors[sign], linestyle="--", linewidth=1.1)
+    ax_a.axhline(0.0, color="0.6", linewidth=0.5)
+    ax_a.set_ylabel("Ground\nacceleration (g)")
+    span = max(float(np.max(np.abs(a))), ky) * 1.15
+    ax_a.set_ylim(-span, span)
+    ax_a.text(0.995, 0.97, f"±k$_y$ = {ky:.3f} g", transform=ax_a.transAxes,
+              ha="right", va="top", fontsize=8,
+              bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.8))
+
+    for sign in (-gov, gov):                      # the governing one on top
+        info = result["directions"][sign]
+        style = "-" if sign == gov else (0, (4, 2))
+        width = 1.5 if sign == gov else 1.1
+        label = (f"{direction_phrase(sign)[4:].capitalize()}: "
+                 f"D = {info['D']:.2f} {unit}")
+        ax_v.plot(t, info["v"], color=colors[sign], linestyle=style,
+                  linewidth=width)
+        ax_d.plot(t, info["d"], color=colors[sign], linestyle=style,
+                  linewidth=width, label=label)
+    ax_v.set_ylabel(f"Relative\nvelocity ({unit}/s)")
+    ax_d.set_ylabel(f"Displacement\n({unit})")
+    ax_d.set_xlabel("Time (s)")
+    ax_v.set_ylim(bottom=0.0)
+    ax_d.set_ylim(bottom=0.0)
+    ax_d.set_xlim(float(t[0]), float(t[-1]))
+    for ax in (ax_a, ax_v, ax_d):
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(labelsize=8)
+
+    if show_legend:
+        # The governing direction first; the curves end high, so the lower right
+        # is clear of them.
+        handles, labels = ax_d.get_legend_handles_labels()
+        ax_d.legend(handles[::-1], labels[::-1], loc="lower right", fontsize=8,
+                    framealpha=0.9)
+    if show_title:
+        rec = result.get("record") or {}
+        scale = result.get("scale", 1.0)
+        scaled = "" if abs(scale - 1.0) < 1e-12 else f", scaled ×{scale:.3g}"
+        ax_a.set_title(f"Newmark displacement D = {result['D']:.2f} {unit} at "
+                       f"k$_y$ = {ky:.3f}\n{rec.get('description') or rec.get('name') or ''}"
+                       f" (peak {result['pga']:.3f} g{scaled})", fontsize=11)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig("plot_newmark.png", dpi=dpi, bbox_inches="tight")
+    if own_fig:
+        plt.show()
+    return fig

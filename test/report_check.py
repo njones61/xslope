@@ -2154,6 +2154,80 @@ def test_ky_section():
     return fails
 
 
+NEWMARK_RECORD = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
+                              "vp104_record.txt")
+
+
+def test_newmark_section():
+    """The Newmark section of a report that carries a Newmark run.
+
+    VP104's record at k_y = 0.139, scaled by 1.2: the record named and described,
+    its scaling and both peaks, k_y and where it came from, the displacement each
+    way with the governing one first and stated in bold, and the histories figure
+    drawn and cited. The figure count a build plans includes it, a report with
+    the option off or with no run has no such section, and a report of nothing
+    but a Newmark run still carries it.
+    """
+    import tempfile
+    fails = []
+    from xslope.fileio import load_slope_data
+    from xslope.report import (_Counter, _newmark_section, build_report,
+                               planned_figures, resolve_options)
+    from xslope.seismic import newmark_displacement, read_record
+
+    r = newmark_displacement(read_record(NEWMARK_RECORD), 0.139, scale=1.2)
+    r["ky_source"] = "Spencer's Method, on the critical circle, k_y = 0.1390"
+    opts = resolve_options({})
+    with tempfile.TemporaryDirectory() as tmp:
+        sec = _newmark_section({"newmark": [r]}, opts, _Counter(), tmp)
+        if sec is None:
+            return ["no Newmark section for a Newmark run"]
+        kv = dict(item for b in sec.blocks if b.kind == "keyvalues"
+                  for item in b.items)
+        want = {"Record file": "vp104_record.txt",
+                "Record": "Mammoth Lakes-1 1980: CVK-090",
+                "Scale factor": "1.2",
+                "Peak acceleration as recorded": "0.416 g",
+                "Peak acceleration as analyzed": f"{0.41648 * 1.2:.3f} g"}
+        for k, v in want.items():
+            if kv.get(k) != v:
+                fails.append(f"{k} reads {kv.get(k)!r}, not {v!r}")
+        if "Spencer's Method" not in kv.get("Yield coefficient k_y", ""):
+            fails.append("k_y does not say where it came from")
+        labels = [k for k in kv if k.startswith("Displacement")]
+        gov = "negative" if r["governing"] < 0 else "positive"
+        if len(labels) != 2 or gov not in labels[0]:
+            fails.append(f"the displacements read {labels}, governing {gov} first")
+        prose = [b for b in sec.blocks if b.kind == "prose"]
+        stated = f"D = {r['D']:.2f} cm"
+        if not any(stated in b.text and stated in b.bold for b in prose):
+            fails.append(f"{stated} is not stated in bold")
+        figs = [b for b in sec.blocks if b.kind == "figure"]
+        if len(figs) != 1 or not os.path.exists(figs[0].path):
+            fails.append("the histories figure was not drawn")
+        elif not any(f"Figure {figs[0].number}" in b.text for b in prose):
+            fails.append("the histories figure is not cited by number")
+
+    sd = load_slope_data(KY_WEDGE_XLSX)
+    n_with = planned_figures(sd, {"newmark": [r]}, opts)
+    n_off = planned_figures(sd, {"newmark": [r]}, resolve_options({"lem_newmark": False}))
+    if n_with - n_off != 1:
+        fails.append(f"the planned figures change by {n_with - n_off} with the "
+                     f"Newmark run, not 1")
+    with tempfile.TemporaryDirectory() as tmp:
+        heads = [x.title for x in build_report(sd, {"newmark": [r]}, {}, tmp).sections]
+        if "Newmark Displacement" not in heads:
+            fails.append(f"a report of a Newmark run alone has sections {heads}")
+        off = [x.title for x in build_report(sd, {"newmark": [r]},
+                                             {"lem_newmark": False}, tmp).sections]
+        if "Newmark Displacement" in off:
+            fails.append("the Newmark section is there with its option off")
+        none = [x.title for x in build_report(sd, {}, {}, tmp).sections]
+        if "Newmark Displacement" in none:
+            fails.append("a report with no Newmark run has a Newmark section")
+    return fails
+
+
 #: COMBO-2's two rapid drawdown routes on the Johnson dam. The starter file
 #: carries two piezometric lines; the full file is run as the tutorial runs it,
 #: meshing and marching its own transient seepage and staging the frames at the
@@ -21502,6 +21576,7 @@ CHECKS = [
      test_a_method_that_is_not_run_says_why),
     ("the two-stage seismic block", test_seismic2_section),
     ("the yield coefficient block", test_ky_section),
+    ("the Newmark section", test_newmark_section),
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
     ("the rapid drawdown stage table (COMBO-2's two routes)",

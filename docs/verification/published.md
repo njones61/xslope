@@ -47,6 +47,7 @@ XSLOPE's own with no published counterpart and takes no dot.
 | [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.122 has no published counterpart |
 | [DWB 10.1](#dwb-10-1) | 🟢 | Yield coefficient of a rigid wedge (Duncan, Wright & Brandon, Figure 10.1) | c–φ wedge: k<sub>y</sub> 0.2366 vs closed form 0.2366 (0.0%) · frictional wedge: k<sub>y</sub> 0.0875 vs closed form 0.0875 (0.0%) | **built**; Spencer's method finds no solution on the frictional wedge, which the Corps of Engineers and Lowe & Karafiath rows cover |
 | [DWB 10.4](#dwb-10-4) | 🟢 | Pseudostatic slope, single-stage and two-stage (Duncan, Wright & Brandon, Table 10.4) | All 16 values within 1.3%: dry within 0.4%, submerged within 1.3% | **built**; the two-stage columns are XSLOPE's two-stage analysis with the K<sub>c</sub> = 1 envelope; its default interpolated values have no published counterpart |
+| [Newmark](#newmark-1965) | 🟢 | Rigid sliding block under a rectangular pulse (Newmark 1965) | k<sub>y</sub> = 0.1: D 73.575 cm vs closed form 73.575 cm (0.0%) · k<sub>y</sub> = 0.2: D 18.394 cm vs closed form 18.394 cm (0.0%) · imperial: D 28.957 in vs closed form 28.957 in (0.0%) | **built**; the record's other sign never pushes the block, so that direction stays at zero |
 
 </div>
 
@@ -766,3 +767,39 @@ that range of stresses, and the two choices nearly agree.
 <!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.778, tolerance=0.005, benchmark=DWB-10.4-submerged-2-interpolated -->
 <!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.271, tolerance=0.005, benchmark=DWB-10.4-submerged-3-interpolated -->
 <!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=interpolated, num_slices=40, expected_fs=3.255, tolerance=0.005, benchmark=DWB-10.4-submerged-4-interpolated -->
+
+---
+
+## 🟢 Newmark (1965) — rigid sliding block under a rectangular pulse {#newmark-1965}
+
+Newmark (1965) treats the mass above a failure surface as a rigid block on an inclined
+base, which slides whenever the base acceleration exceeds the block's yield acceleration
+k<sub>y</sub>·g. His first case is a base given one rectangular pulse of acceleration
+A·g lasting t<sub>0</sub>. While the pulse lasts, the block gains velocity relative to the
+base at (A − k<sub>y</sub>)·g; when it ends, the block slows at k<sub>y</sub>·g until it
+stops. The displacement is
+
+$$D = \frac{g\,t_0^2}{2}\,\frac{A\,(A - k_y)}{k_y},$$
+
+which is Newmark's V²/(2gN)·(1 − N/A) with V = A·g·t<sub>0</sub> and N = k<sub>y</sub>.
+
+**Input:** [newmark_pulse.txt](files/published/newmark_pulse.txt) · built by
+`benchmarks/published/build_newmark_pulse.py`
+
+The record is a pulse of A = 0.3 g for t<sub>0</sub> = 0.5 s, then zero to 3 s, written as
+two columns of time and acceleration every 0.01 s. The pulse ends between a sample at
+0.5 s holding 0.3 g and one a nanosecond later holding zero, so the record is the
+rectangle to within that nanosecond. XSLOPE takes a record as linear between samples and
+integrates each step exactly on that line, so the displacement does not depend on the
+time step. It runs the record both ways, and its negative sign is zero throughout, so
+only the positive pulse moves the block.
+
+| k<sub>y</sub> | Units | XSLOPE | closed form |
+|:-:|:-:|:-:|:-:|
+| 0.1 | SI (g = 9.81 m/s²) | 73.575 cm | 73.575 cm (0.0%) |
+| 0.2 | SI (g = 9.81 m/s²) | 18.394 cm | 18.394 cm (0.0%) |
+| 0.1 | imperial (g = 32.174 ft/s²) | 28.957 in | 28.957 in (0.0%) |
+
+<!-- test: file=files/published/newmark_pulse.txt, type=newmark, ky=0.1, expected_d=73.575, tolerance=0.001, benchmark=Newmark-1965-k0.1 -->
+<!-- test: file=files/published/newmark_pulse.txt, type=newmark, ky=0.2, expected_d=18.394, tolerance=0.001, benchmark=Newmark-1965-k0.2 -->
+<!-- test: file=files/published/newmark_pulse.txt, type=newmark, ky=0.1, units=imperial, expected_d=28.957, tolerance=0.001, benchmark=Newmark-1965-imperial -->

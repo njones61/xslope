@@ -61,7 +61,7 @@ CONFIG = PageConfig(
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_pullout',
                     'expected_envelope', 'expected_beta', 'expected_kc',
-                    'points', 'expected'],
+                    'points', 'expected', 'expected_d'],
     # the summary rows quote a bound over a table of resistances in lb/ft rather
     # than a fixed 3-dp factor of safety, so there is no locked-value pattern to
     # sweep back against the tags

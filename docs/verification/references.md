@@ -227,6 +227,8 @@ Engineers).
   using shear strength reduction finite element method. In *Landslides and
   Engineered Slopes* (Proc. 10th Int. Symp. on Landslides), Taylor & Francis,
   p. 851. [doi:10.1201/9780203885284-c107](https://doi.org/10.1201/9780203885284-c107). *(End page not fully verified.)*
+- Newmark, N.M. (1965). Effects of earthquakes on dams and embankments.
+  *Géotechnique* 15(2), 139–160. [doi:10.1680/geot.1965.15.2.139](https://doi.org/10.1680/geot.1965.15.2.139)
 - Ng, C.W.W. & Shi, Q. (1998). A numerical investigation of the stability of
   unsaturated soil slopes subjected to transient seepage. *Computers and
   Geotechnics* 22(1), 1–28. [doi:10.1016/S0266-352X(97)00036-0](https://doi.org/10.1016/S0266-352X(97)00036-0).

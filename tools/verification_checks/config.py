@@ -91,7 +91,7 @@ class PageConfig:
                                  'expected_head*', 'points', 'expected',
                                  'expected_elements', 'expected_nodes',
                                  'expected_depth', 'expected_force',
-                                 'expected_tilt'])
+                                 'expected_tilt', 'expected_d'])
 
     #: Decimal places a section may restate a tag value to.  ``None`` demands
     #: the tag value verbatim (the rs2 convention: the page prints the lock).

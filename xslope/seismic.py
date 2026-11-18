@@ -225,7 +225,14 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
         seismic force, finds k_y on it, then searches again at that k. A search
         that finds a surface below F = 1 there moves the answer to that surface,
         and the rounds repeat until a search finds nothing more than
-        ``confirm_tol`` below F = 1.
+        ``confirm_tol`` below F = 1. A circular search starts every round from
+        the model's circles. A non-circular search is a local one, so each
+        round after the first searches twice, from the surface the last round
+        found and from the model's entered surface, and keeps the lower: started
+        only from the last surface, the rounds settled on RS2-68 Case 2 at
+        k_y = 0.4366 where the entered surface leads to 0.4318, and started only
+        from the entered surface they settle on VP104 at 0.1452 where the last
+        surface leads to 0.1436.
     surface : {"circular", "noncircular"}
     num_slices, seismic2, composite, grid_seed, diagnostic, cancel_check,
     fs_tol, tol, max_iter, min_slip_depth, announce
@@ -307,17 +314,30 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
         return k, f0, F.trace
 
     def search_at(k):
-        sd = dict(slope_data)
-        sd["k_seismic"] = k
+        # A non-circular round searches from the last surface found and, once
+        # that is no longer the entered one, from the entered surface as well,
+        # and keeps the lower (see the docstring).
+        starts = [None]
         if not circular:
-            sd["non_circ"] = current_nc
-        b = run_lem_analysis(sd, method, analysis="auto_search",
-                             surface=surface, num_slices=num_slices,
-                             seismic2=seismic2, composite=composite,
-                             grid_seed=grid_seed, diagnostic=diagnostic,
-                             cancel_check=cancel_check, fs_tol=fs_tol, tol=tol,
-                             max_iter=max_iter, min_slip_depth=min_slip_depth,
-                             announce=False)
+            starts = [current_nc]
+            if current_nc is not slope_data.get("non_circ"):
+                starts.append(slope_data.get("non_circ"))
+        b = None
+        for start in starts:
+            sd = dict(slope_data)
+            sd["k_seismic"] = k
+            if not circular:
+                sd["non_circ"] = start
+            found = run_lem_analysis(sd, method, analysis="auto_search",
+                                     surface=surface, num_slices=num_slices,
+                                     seismic2=seismic2, composite=composite,
+                                     grid_seed=grid_seed, diagnostic=diagnostic,
+                                     cancel_check=cancel_check, fs_tol=fs_tol,
+                                     tol=tol, max_iter=max_iter,
+                                     min_slip_depth=min_slip_depth,
+                                     announce=False)
+            if b is None or found["results"]["FS"] < b["results"]["FS"]:
+                b = found
         entry = b["search"]["fs_cache"][0]
         # The coefficient the search ran at, so a view that draws it can say so.
         b["search"]["k_seismic"] = k

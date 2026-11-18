@@ -63,9 +63,10 @@ SLIDE2_PUBLISHED = {
     "multi-modal (MMO)": (0.139, 5.042),
 }
 
-# XSLOPE's own yield acceleration for this slope, from the VP104-kc lock on
-# docs/verification/files/rocscience/vp104a.xlsx (critical_kc, Spencer).
-XSLOPE_KY = 0.144
+# XSLOPE's own yield acceleration for this slope, the lower of its circular and
+# non-circular searches on docs/verification/files/rocscience/vp104a.xlsx: the
+# VP104-kc-noncirc lock (critical_kc, Spencer). The circles give 0.1445 (VP104-kc).
+XSLOPE_KY = 0.1436
 
 
 # --- re-extraction from the vendor model -----------------------------------
@@ -162,7 +163,7 @@ def main(argv):
 
     print()
     r = newmark_displacement(rec, XSLOPE_KY)
-    print("XSLOPE's own K_y = %.3f (VP104-kc) -> %.3f cm" % (XSLOPE_KY, r["D"]))
+    print("XSLOPE's own K_y = %.4f (VP104-kc-noncirc) -> %.3f cm" % (XSLOPE_KY, r["D"]))
     return 0
 
 

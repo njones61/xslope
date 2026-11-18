@@ -146,7 +146,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are shown beside it. |
 | [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, worst case (h₁ = 4, 6 and 8 m): SSRM 1.031 vs closed form 1.050 (−1.8%) · thinnest and thickest bands (h₁ = 2 and 10 m): SSRM 1.044 vs 1.050 (−0.6%) | Two mechanisms, both scored across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.169 at h₁ = 2 and 4 m, 1.044–1.094 at 6, 8 and 10 m) is shown beside RS2's SSR column: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. |
 | [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.502 vs RS2 SSR 2.48 (+0.9%) · Case 2 (steady): SSRM 1.695 vs RS2 SSR 1.70 (−0.3%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.023 vs RS2 SSR 2.04 (−0.8%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.7%) | (6 of 6) Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
-| [68](#rs2-68) | 🟢 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.433 vs Loukidis Spencer 0.431 (+0.5%) · Case 3 Spencer: k꜀ 0.157 vs Loukidis Spencer 0.155 (+1.3%) | The target is a **critical seismic coefficient** k꜀, not a factor of safety, found by XSLOPE's yield coefficient search. Loukidis searched Spencer's method on irregular surfaces, so each Spencer k꜀ is the lower of XSLOPE's circular and non-circular searches; on Case 3 only the non-circular surface can follow the weak band. Every input class verifies against the vendor `#068_03` model; RS2's own SSRM k꜀ 0.161 is a strength-reduction number and stays a cross-bearing. |
+| [68](#rs2-68) | 🟢 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.432 vs Loukidis Spencer 0.431 (+0.2%) · Case 3 Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) | The target is a **critical seismic coefficient** k꜀, not a factor of safety, found by XSLOPE's yield coefficient search. Loukidis searched Spencer's method on irregular surfaces, so each Spencer k꜀ is the lower of XSLOPE's circular and non-circular searches; on Case 3 only the non-circular surface can follow the weak band. Every input class verifies against the vendor `#068_03` model; RS2's own SSRM k꜀ 0.161 is a strength-reduction number and stays a cross-bearing. |
 
 </div>
 
@@ -189,7 +189,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | SSRM 1.009 vs RS2 SSRM 0.98 (+3.0%) | Own SSRM build with five passive nail rows rooted in the vertical wall face, just under XSLOPE's own Spencer 1.010. GOLD-NAIL 0.91 / UTEXAS4 1.02. |
 | [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | M-C: SSRM 1.373 vs RS2 SSRM 1.38 (−0.5%) · power curve: SSRM 1.497 vs RS2 SSRM 1.47 (+1.8%) | Same build as [RS2-34](#rs2-34). Part IV publishes RS2 SSRM 1.34 / 1.45; Baker 1.35 / 1.48. |
 | [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Same build as [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
-| [63](#rs2-68) | 🟢 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Spencer: k꜀ 0.157 vs Loukidis Spencer 0.155 (+1.3%) | Same build as [RS2-68](#rs2-68), Case 3, on a non-circular search. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
+| [63](#rs2-68) | 🟢 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) | Same build as [RS2-68](#rs2-68), Case 3, on a non-circular search. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
 | [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.406 vs RS2 SSRM 2.37 (+1.5%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is thinner than the corpus mesh and is not carried. |
 | [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *unconfirmed* — own SSRM build, unconstrained, at 1.909 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor thinner than the corpus mesh, so the two are not a pairing. Ref 2.71. |
 | [66](#p4-vp65) | 🟢 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | SSRM 2.172 vs RS2 SSRM 2.22 (−2.2%) | Own SSRM build, ponded on both faces as the vendor model is. USACE 2.30. |
@@ -2131,8 +2131,8 @@ on a surface, confirmed by a full search at that coefficient.
 Loukidis solved Bishop's simplified method on circles and Spencer's method on irregular surfaces
 of any shape, and Slide2 searched non-circular surfaces. Each file therefore carries a
 non-circular starting surface beside its circles, and XSLOPE's Spencer k꜀ is the lower of its
-circular and non-circular searches. On Cases 1 and 2 the two searches land on nearly the same
-value, and the circles give the lower one. On Case 3 the non-circular surface runs along the base
+circular and non-circular searches. On Cases 1 and 2 the two searches land within 0.001 of each
+other, and the non-circular search gives the lower value. On Case 3 the non-circular surface runs along the base
 of the weak band and leaves the face at the band's lower corner, a path no circle can follow.
 Near FS = 1 the factor of safety falls slowly as k rises, so the circles' small excess in FS
 becomes a larger one in k꜀.
@@ -2142,13 +2142,13 @@ becomes a larger one in k꜀.
 | Case | Method | XSLOPE k꜀ | Scored search (the other one) | Slide2 | Loukidis (same method) |
 |---|---|---|---|---|---|
 | 1 (r<sub>u</sub> = 0.5) | Bishop | 0.127 | circles | 0.118 (+7.6%) | 0.127 (0.0%) |
-| 1 (r<sub>u</sub> = 0.5) | Spencer | 0.132 | circles (non-circular 0.132) | 0.132 (0.0%) | 0.131 (+0.8%) |
+| 1 (r<sub>u</sub> = 0.5) | Spencer | 0.132 | non-circular (circles 0.132) | 0.132 (0.0%) | 0.131 (+0.8%) |
 | 2 (dry) | Bishop | 0.426 | circles | 0.425 (+0.2%) | 0.426 (0.0%) |
-| 2 (dry) | Spencer | 0.433 | circles (non-circular 0.434) | 0.431 (+0.5%) | 0.431 (+0.5%) |
-| 3 (3-layer) | Spencer | 0.157 | non-circular (circles 0.167) | 0.151 (+4.0%) | 0.155 (+1.3%) |
+| 2 (dry) | Spencer | 0.432 | non-circular (circles 0.433) | 0.431 (+0.2%) | 0.431 (+0.2%) |
+| 3 (3-layer) | Spencer | 0.156 | non-circular (circles 0.167) | 0.151 (+3.3%) | 0.155 (+0.6%) |
 
 The governing authority is Loukidis's own same-method k꜀. The largest governing difference is
-Case 3's +1.3%, and it sets the dot. Case 3 has no Bishop row. Loukidis's Table 3 publishes
+Case 1's Spencer +0.8%, and it sets the dot. Case 3 has no Bishop row. Loukidis's Table 3 publishes
 Spencer's method only (the RS2 manual's table places that value in a Bishop column), and Slide2,
 whose Bishop k꜀ is 0.155, searches this slope with non-circular paths ([VP63](rocscience.md#vp63)).
 XSLOPE solves Bishop's simplified method on circles only, and its Case 3 Bishop k꜀ of 0.169 on
@@ -2181,23 +2181,23 @@ on this problem is scored.
 
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=bishop, expected_kc=0.127, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-bishop -->
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=spencer, expected_kc=0.132, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-spencer -->
-<!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.132, kc_tol=0.005, num_slices=40, benchmark=RS2-68a-spencer-noncirc -->
+<!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.132, kc_tol=0.001, num_slices=40, benchmark=RS2-68a-spencer-noncirc -->
 <!-- test: file=files/rocscience/rs2_68b.xlsx, type=critical_kc, method=bishop, expected_kc=0.426, kc_tol=0.01, num_slices=40, benchmark=RS2-68b-bishop -->
 <!-- test: file=files/rocscience/rs2_68b.xlsx, type=critical_kc, method=spencer, expected_kc=0.433, kc_tol=0.01, num_slices=40, benchmark=RS2-68b-spencer -->
-<!-- test: file=files/rocscience/rs2_68b.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.434, kc_tol=0.005, num_slices=40, benchmark=RS2-68b-spencer-noncirc -->
+<!-- test: file=files/rocscience/rs2_68b.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.432, kc_tol=0.001, num_slices=40, benchmark=RS2-68b-spencer-noncirc -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=mesh_elements, element_type=tri6, target_size=4.0, expected_elements=1593, benchmark=RS2-68-mesh-coarse -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=mesh_elements, element_type=tri6, target_size=1.5, expected_elements=10803, benchmark=RS2-68-mesh-fine -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=bishop, expected_kc=0.169, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-bishop -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, expected_kc=0.167, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-spencer -->
-<!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.157, kc_tol=0.005, num_slices=40, benchmark=RS2-68c-spencer-noncirc -->
+<!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.156, kc_tol=0.001, num_slices=40, benchmark=RS2-68c-spencer-noncirc -->
 
 **Case 2 — dry homogeneous slope (rs2_68b)**
 
-![RS2-68: seismically loaded slopes (Loukidis et al. 2003), Case 2 dry homogeneous — inputs with the pseudo-static arrow at k꜀ = 0.433 (left) and the Spencer critical seismic surface, a broad arc dipping below the toe, FS = 1.00 (right)](images/rs2_68b.png)
+![RS2-68: seismically loaded slopes (Loukidis et al. 2003), Case 2 dry homogeneous — inputs with the pseudo-static arrow at k꜀ = 0.432 (left) and the Spencer critical non-circular seismic surface, a broad curve from the toe to the crest, FS = 1.00 (right)](images/rs2_68b.png)
 
 **Case 3 — three-layer, band-riding slope (rs2_68c)**
 
-![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical non-circular surface at k꜀ = 0.157, running along the base of the weak φ = 15° middle band and leaving the face at the band's lower corner, FS = 1.00 (right)](images/rs2_68c.png)
+![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical non-circular surface at k꜀ = 0.156, running along the base of the weak φ = 15° middle band and leaving the face at the band's lower corner, FS = 1.00 (right)](images/rs2_68c.png)
 
 ### 🟢 RS2 Part IV VP2: Homogeneous slope with tension crack (ACADS 1b) {#p4-vp2}
 

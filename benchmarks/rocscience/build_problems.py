@@ -5273,10 +5273,10 @@ def vp076b():
 # Table 104.1 publishes BOTH the multi-modal (MMO) and the ordinary uni-modal
 # search columns, and they agree to ~0.1%. XSLOPE has no multi-modal search, but
 # it does not need one to verify this problem: the uni-modal column is exactly
-# what an ordinary circular search targets. The fourth scenario in the table,
-# Newmark seismic DISPLACEMENT, has no XSLOPE equivalent (the seismic capability
-# is the yield-acceleration search, not displacement integration) and is not
-# built.
+# what an ordinary circular search targets. The fourth scenario, the Newmark
+# displacement, needs no model: it integrates the tutorial's acceleration record
+# (docs/verification/files/rocscience/vp104_record.txt) at a yield acceleration
+# (benchmarks/rocscience/newmark_vp104.py).
 # ---------------------------------------------------------------------------
 
 _VP104_ZONES = [                      # (mat_id, polygon vertices)
@@ -5318,8 +5318,18 @@ def _vp104_slope_data(k_seismic=0.0):
 def vp104a():
     """Slide2 #104 scenario 1 (no seismic). Table 104.1: MMO FS = 1.359,
     uni-modal FS = 1.360. Also the base file for the critical-acceleration
-    scenario, whose runner sets k itself (Table 104.1: Ky 0.139 / 0.140)."""
+    scenario, whose runner sets k itself (Table 104.1: Ky 0.139 / 0.140).
+
+    Slide2's multi-modal search reshapes its surfaces away from a circle, so the
+    file carries a non-circular starting surface for XSLOPE's own K_y: the
+    critical circle with no seismic force sampled at eight points, toe to crest,
+    which the search then reshapes. XSLOPE's K_y is the lower of the circular and
+    non-circular searches, as on RS2-68."""
     sd = _vp104_slope_data(k_seismic=0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((29.802, 25.0), (32.811, 24.468), (35.819, 24.445),
+                       (38.827, 24.935), (41.836, 25.98), (44.844, 27.7),
+                       (47.853, 30.38), (50.861, 35.0))]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp104a.xlsx'))
     return 'vp104a.xlsx'
 

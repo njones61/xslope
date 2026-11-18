@@ -166,11 +166,13 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp103c.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=18;30, fs_spencer=1.348, benchmark=VP103c-shallow-circ -->
 <!-- test: file=files/rocscience/vp104a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.372, benchmark=VP104-noseismic -->
 <!-- test: file=files/rocscience/vp104b.xlsx, type=circular_search, num_slices=40, fs_spencer=0.989, benchmark=VP104-k015 -->
-<!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.144, kc_tol=0.01, num_slices=40, benchmark=VP104-kc -->
+<!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.1445, kc_tol=0.001, num_slices=40, benchmark=VP104-kc -->
+<!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.1436, kc_tol=0.001, num_slices=40, benchmark=VP104-kc-noncirc -->
 <!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.139, expected_d=5.036, tolerance=0.005, benchmark=VP104-newmark -->
 <!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.139, direction=positive, expected_d=4.007, tolerance=0.005, benchmark=VP104-newmark-positive -->
 <!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.140, expected_d=4.928, tolerance=0.005, benchmark=VP104-newmark-uni -->
-<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.144, expected_d=4.521, tolerance=0.005, benchmark=VP104-newmark-xslope-ky -->
+<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.1436, expected_d=4.560, tolerance=0.005, benchmark=VP104-newmark-xslope-ky -->
+<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.1445, expected_d=4.473, tolerance=0.005, benchmark=VP104-newmark-xslope-ky-circles -->
 <!-- test: file=files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.532, benchmark=VP82 -->
 <!-- test: file=files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
@@ -306,7 +308,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
 | [102](#vp102) | 🟢 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.731 vs Slide 1.745 (−0.8%) · drawdown at 100 h: Spencer 1.817 vs Slide 1.867 (−2.7%) | the 100 h frame is the widest of the 60–1500 h transient series, which runs from −2.7% to +0.2% against the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause of the early-frame shortfall and is worth a small fraction of it. |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | 4 files, both mechanisms; the deep→shallow switch lands in Slide2's own interval |
-| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) · Newmark D 5.036 cm vs Slide2 MMO 5.042 cm (−0.1%) | all 4 scenarios; the Newmark displacement is run at Slide2's own K<sub>y</sub> 0.139 |
+| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.1436 vs Slide2 uni-modal 0.140 (+2.6%) · Newmark D 5.036 cm vs Slide2 MMO 5.042 cm (−0.1%) | all 4 scenarios; the Newmark displacement is run at Slide2's own K<sub>y</sub> 0.139 |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
 | [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · D1/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · D1/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · D1/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · D1/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | 5 cases; the Ito & Matsui limit pressure is auto-computed. The paper's three-dimensional finite-element results are compared separately, as a [diagnostic of the 2D pile idealization](#vp106-fem) that carries no dot |
 | [107](#vp107) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Spencer 1.397 vs Slide 1.386 (+0.8%) · mesh supports: Spencer 1.397 vs Slide 1.392 (+0.4%) |  |
@@ -2435,8 +2437,10 @@ c = 7.2 kPa, φ = 20°; all γ = 19.5 kN/m³), dry, with no external loads. The 
 scenarios twice, once with multi-modal Particle Swarm plus Surface Altering optimization and once
 with the ordinary uni-modal search, and prints both columns in Table 104.1. The two published
 columns agree to about 0.1%, and the uni-modal column is what an ordinary circular search targets,
-so the first three scenarios reproduce directly. The fourth is run at Slide2's own K<sub>y</sub>
-(below).
+so the first two scenarios reproduce directly. For the critical acceleration the file also carries a
+non-circular starting surface, eight points on the critical circle, and XSLOPE's K<sub>y</sub> is
+the lower of its circular and non-circular searches. The fourth scenario is run at Slide2's own
+K<sub>y</sub> (below).
 
 **Input files:** [vp104a.xlsx](files/rocscience/vp104a.xlsx) (no seismic) ·
 [vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15) ·
@@ -2446,13 +2450,14 @@ so the first three scenarios reproduce directly. The fourth is run at Slide2's o
 |---|---|---|---|
 | No seismic | 1.372 | 1.360 (+0.9%) | 1.359 (+1.0%) |
 | Seismic coefficient k = 0.15 | 0.989 | 0.980 (+0.9%) | 0.978 (+1.1%) |
-| Critical acceleration | K<sub>y</sub> = 0.144 | K<sub>y</sub> = 0.140 (+2.9%) | K<sub>y</sub> = 0.139 (+3.6%) |
+| Critical acceleration | K<sub>y</sub> = 0.1436 (non-circular; circles 0.1445) | K<sub>y</sub> = 0.140 (+2.6%) | K<sub>y</sub> = 0.139 (+3.3%) |
 | Newmark displacement | *below* | 5.081 cm | 5.042 cm |
 
-*All three built scenarios run about +0.9% high, in the same direction and by the same amount:
+*The two factors of safety run +0.9% high, in the same direction and by the same amount:
 Slide2's Surface Altering optimization refines the surface away from a circle and so finds a
-slightly lower minimum than a circular search can, and the critical acceleration follows from
-that. The critical-acceleration row compares a yield acceleration, not a factor of safety.*
+slightly lower minimum than a circular search can. XSLOPE's non-circular search brings its
+K<sub>y</sub> down from 0.1445 on circles to 0.1436, +2.6% above Slide2's uni-modal value. The
+critical-acceleration row compares a yield acceleration, not a factor of safety.*
 
 **The fourth scenario: permanent Newmark displacement.** The acceleration record it needs is
 not printed in the verification manual, but it ships with the product: the tutorial model the
@@ -2467,7 +2472,8 @@ block downslope, and reports the larger displacement.
 |---|---|---|
 | 0.139 — Slide2 MMO | 5.036 cm | 5.042 cm (−0.1%) |
 | 0.140 — Slide2 uni-modal | 4.928 cm | 5.081 cm (−3.0%) |
-| 0.144 — XSLOPE's own K<sub>y</sub> | 4.521 cm | — |
+| 0.1436 — XSLOPE's own K<sub>y</sub> (non-circular) | 4.560 cm | — |
+| 0.1445 — XSLOPE's circles | 4.473 cm | — |
 
 The record's negative accelerations govern. With its positive ones pushing the block, K<sub>y</sub>
 = 0.139 gives 4.007 cm.
@@ -2478,8 +2484,8 @@ displacement falls as K<sub>y</sub> rises. The two columns are two different cri
 K<sub>y</sub> is printed to three decimals, and inverting each published displacement through the
 integration shows that only the multi-modal row's is consistent with its printed K<sub>y</sub>.
 The displacement is also far more sensitive to the yield acceleration than the factor of safety
-is: carried through the same record, XSLOPE's K<sub>y</sub> gives 4.521 cm against 4.928 cm at
-Slide2's uni-modal K<sub>y</sub> (−8.3%). The displacement is therefore scored at Slide2's own
+is: carried through the same record, XSLOPE's K<sub>y</sub> gives 4.560 cm against 4.928 cm at
+Slide2's uni-modal K<sub>y</sub> (−7.5%). The displacement is therefore scored at Slide2's own
 K<sub>y</sub>, and XSLOPE's K<sub>y</sub> is scored in the table above.
 
 ![vp104a: no-seismic inputs and Spencer critical surface](images/vp104a.png)

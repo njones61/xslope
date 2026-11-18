@@ -762,8 +762,8 @@ coefficient at which the searched minimum FS = 1.
 
 The two targets are checked separately. [VP63](rocscience.md#vp63) fixes k at the paper's
 0.155 and confirms the slope is just stable there; the [RS2-68 Case 3](rs2.md#rs2-68)
-`critical_kc` analysis solves for k꜀ directly with a non-circular search and gives 0.157,
-+1.3% above the paper's 0.155. The surface runs along the base of the thin φ = 15° band, a path
+`critical_kc` analysis solves for k꜀ directly with a non-circular search and gives 0.156,
++0.6% above the paper's 0.155. The surface runs along the base of the thin φ = 15° band, a path
 no circle can follow, and the value falls inside the paper's rigorous bounds [0.148, 0.172].
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.39; Loukidis, Bandini & Salgado (2003).

@@ -9,6 +9,7 @@ docs/parametric/ and docs/tutorials/ for test tags of the form:
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.5625, fs_bound=lower, target_size=0.8, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=fem_tilt, k_stand=0.147656, k_fail=0.150391, expected_tilt=8.5, tolerance=0.1, target_size=0.09 -->
+    <!-- test: file=files/foo.xlsx, type=fem_kc, k_stand=0.38, k_fail=0.385, expected_kc=0.3825, kc_tol=0.005, direction=left, target_size=2.0 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=seep_head, points=2:2:4.05;4:2:4.15, tolerance=0.02 -->
@@ -44,6 +45,16 @@ model must STAND, and at ``k_fail``, where it must FAIL, each read the way a
 strength-reduction bracket edge is read; the tilt the two bracket, the mean of
 atan(k_stand) and atan(k_fail) in degrees, must lie within ``tolerance`` (in
 DEGREES, absolute) of ``expected_tilt``. See run_fem_tilt_test.
+
+The fem_kc type locks a CRITICAL SEISMIC COEFFICIENT by the finite element
+method: the largest k under which the model stands at full strength
+(``xslope.seismic.fem_yield_coefficient``). It is the same pair of
+full-strength solves as a tilt row, read the same way, at ``k_stand`` (must
+STAND) and ``k_fail`` (must FAIL), in the ``direction`` the tag names ('left'
+for a slope facing -x, the default, or 'right'); the coefficient the two
+bracket, their mean, must lie within ``kc_tol`` (absolute) of
+``expected_kc``. The gate (``--gate``) re-runs the whole bisection instead.
+See run_fem_kc_test.
 
 The pullout_envelope type locks a published PULLOUT TABLE -- the resistance a
 reinforcement layer develops beyond an assumed failure surface, layer by layer.
@@ -1948,7 +1959,7 @@ def _row_mode(test):
     checked on its two bracket edges, ``'bracket'`` for one re-proved by the
     bisection, ``'tilt'`` for a tilt lock's two full-strength solves, ``'run'``
     for everything else."""
-    if test.get('type') == 'fem_tilt':
+    if test.get('type') in ('fem_tilt', 'fem_kc'):
         return 'tilt'
     if test.get('type') != 'fem_ssrm':
         return 'run'
@@ -1978,7 +1989,7 @@ def _row_tier(test, timings, threshold=GATE_SECONDS):
       to be expensive the measured rule above holds the row on its own.
     """
     mode = _row_mode(test)
-    if test.get('type') in ('fem_ssrm', 'fem_tilt'):
+    if test.get('type') in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
         recorded = (timings or {}).get(_row_key(test), {}).get(mode)
         if recorded is not None and float(recorded) > threshold:
             return 'gate'
@@ -2219,14 +2230,15 @@ def tilt_of(k):
     return math.degrees(math.atan(abs(float(k))))
 
 
-def solve_fem_tilt(slope_data, mesh, k, test):
+def solve_fem_tilt(slope_data, mesh, k, test, sign=-1.0):
     """One solve at FULL STRENGTH with the model pushed by ``k`` toward the face.
     Returns ``(slope_data_as_solved, fem_data, sol)``.
 
     F = 1 and nothing reduced: what a tilt row asks of a coefficient is whether
     the model stands under it, which is the question a tilt table asks and not the
     one a strength reduction answers. The coefficient is applied as
-    ``k_seismic = -|k|`` (the sign is its direction, toward the face). The
+    ``k_seismic = sign * |k|`` (the sign is its direction, toward the face:
+    -1, the default, for a slope facing -x). The
     reference kernel is forced for the reason every suite path forces it: a lock
     is a property of the reference path, not of whether a machine has the
     compiled kernel built.
@@ -2237,7 +2249,7 @@ def solve_fem_tilt(slope_data, mesh, k, test):
     import xslope.fem as _fem
     from xslope.fem import build_fem_data, solve_fem
 
-    sd = {**slope_data, 'k_seismic': -abs(float(k))}
+    sd = {**slope_data, 'k_seismic': float(sign) * abs(float(k))}
     fem_data = build_fem_data(sd, mesh)
     k0 = test.get('k0')
     with _force_fast_kernel(_fem, False):
@@ -2322,6 +2334,103 @@ def run_fem_tilt_test(test):
     if not fails:
         problems.append(_why(kf, vf, df, itf, 'FAILED', 'failing'))
     return None, '; '.join(problems), ('tilt', text)
+
+
+def _kc_sign(test):
+    """The sign a ``fem_kc`` tag's coefficient is applied with: -1 for
+    ``direction=left`` (the default, a slope facing -x), +1 for ``right``."""
+    d = str(test.get('direction', 'left')).strip().lower()
+    if d not in ('left', 'right'):
+        raise ValueError(f"fem_kc: direction must be left or right, not {d!r}")
+    return -1.0 if d == 'left' else 1.0
+
+
+def run_fem_kc_test(test):
+    """One ``fem_kc`` row. Returns ``(k_c, error_msg, annotation)``.
+
+    The finite element critical seismic coefficient, checked the way a tilt row
+    is: the tag's model and mesh are built once (``_fem_case_model``) and solved
+    at full strength at ``k_stand``, where the model must STAND, and at
+    ``k_fail``, where it must FAIL, each read by the strength-reduction edge
+    rule (``_tilt_reading``). When both hold, the computed value is the mean of
+    the two coefficients, which the summary compares with ``expected_kc``
+    inside ``kc_tol``. Under ``--gate`` (``_force_bracket``) the row re-runs the
+    whole bisection (``xslope.seismic.fem_yield_coefficient``) to ``kc_tol`` from
+    no seismic force, on the reference kernel and at the tag's budget, and the
+    computed value is its k_y.
+
+    ``annotation`` is ``('tilt', text)`` naming both coefficients' verdicts, so
+    the row prints like a tilt row."""
+    try:
+        sign = _kc_sign(test)
+    except ValueError as exc:
+        return None, str(exc), None
+    try:
+        slope_data, mesh = _fem_case_model(test)
+    except ValueError as exc:
+        return None, str(exc), None
+
+    if test.get('_force_bracket'):
+        import xslope.fem as _fem
+        from xslope.fem import build_fem_data
+        from xslope.seismic import fem_yield_coefficient
+        k0 = test.get('k0')
+        fem_data = build_fem_data({**slope_data, 'k_seismic': 0.0}, mesh)
+        t0 = time.time()
+        with _force_fast_kernel(_fem, False):
+            res = fem_yield_coefficient(
+                fem_data, direction='left' if sign < 0 else 'right',
+                tol=float(test.get('kc_tol', 0.005)),
+                k0=float(k0) if k0 not in (None, '') else None,
+                max_iterations=int(float(test.get('max_iter', 250000))),
+                tension_srf=str(test.get('tension_srf', '')).lower()
+                in ('true', '1', 'yes'),
+                fast_kernel=False)
+        text = (f"bisection: stands at {res['k_stand']:.4f}, fails at "
+                f"{res['k_fail']:.4f}, {len(res['trials'])} trials, "
+                f"{time.time() - t0:.0f}s")
+        if res['lower_bound']:
+            return None, ("fem_kc bisection ended on an undecided trial: k_c is "
+                          f"only bounded below by {res['k_stand']:.4f}"), ('tilt', text)
+        return res['k_y'], None, ('tilt', text)
+
+    try:
+        k_stand = abs(float(test['k_stand']))
+        k_fail = abs(float(test['k_fail']))
+    except (KeyError, TypeError, ValueError):
+        return None, "fem_kc needs numeric k_stand and k_fail on the tag", None
+    if not k_stand < k_fail:
+        return None, (f"fem_kc: k_stand={k_stand:g} must be below "
+                      f"k_fail={k_fail:g}"), None
+    ceiling = _trial_ceiling(test)
+    readings = []
+    for k in (k_stand, k_fail):
+        t0 = time.time()
+        _sd, _fd, sol = solve_fem_tilt(slope_data, mesh, k, test, sign=sign)
+        verdict, decided = _tilt_reading(sol, ceiling)
+        readings.append((k, verdict, decided, int(sol.get('iterations') or 0),
+                         time.time() - t0))
+    (ks, vs, ds, its, ws), (kf, vf, df, itf, wf) = readings
+    detail = (f"k={ks:g} {vs}, {its} iterations, {ws:.1f}s; "
+              f"k={kf:g} {vf}, {itf} iterations, {wf:.1f}s")
+    stands = ds and vs in ('CONVERGED', 'JOINT_SETTLED')
+    fails = df and vf == 'FAILED'
+    if stands and fails:
+        return 0.5 * (ks + kf), None, ('tilt', f"stands at k={ks:g}, fails at "
+                                              f"k={kf:g} ({detail})")
+    problems = []
+    for k, verdict, decided, iterations, want, verb, ok in (
+            (ks, vs, ds, its, 'CONVERGED or JOINT_SETTLED', 'standing', stands),
+            (kf, vf, df, itf, 'FAILED', 'failing', fails)):
+        if ok:
+            continue
+        if not decided:
+            problems.append(f"the {verb} coefficient k={k:g} is undecided at the "
+                            f"iteration budget ({verdict}, {iterations} iterations)")
+        else:
+            problems.append(f"the {verb} coefficient k={k:g} now reads "
+                            f"{verdict}, not {want}")
+    return None, '; '.join(problems), ('tilt', detail)
 
 
 def _run_fem_ssrm_bracket(test):
@@ -7426,6 +7535,7 @@ PREFLIGHT_TAG_ANALYSIS = {
     # A tilt row is one FEM solve at full strength per coefficient, no strength
     # reduction: the plain FEM analysis, at the sweep budget its tag states.
     'fem_tilt': ('fem', {}),
+    'fem_kc': ('fem', {}),
     'fem_elements': ('fem', {}),
     # A mesh-size lock names no analysis of its own: the file's OTHER tags say
     # what the model is for, and this row only counts what the mesher produced.
@@ -7488,7 +7598,7 @@ def run_preflight_corpus_test(test):
         # joint.iteration_budget_low is a question about exactly that: a jointed row
         # whose tag allows the budget must not be reported as if it did not. Carried
         # into the selection so the corpus is checked as it is actually run.
-        if t.get('type') in ('fem_ssrm', 'fem_tilt'):
+        if t.get('type') in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
             sel = dict(sel)
             if t.get('max_iter'):
                 sel['max_iterations'] = int(float(t['max_iter']))
@@ -9031,7 +9141,7 @@ def run_fem_elastic_units_test(test):
     from xslope.fileio import load_slope_data
 
     tag_re = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
-    fem_types = {'fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'}
+    fem_types = {'fem_ssrm', 'fem_tilt', 'fem_kc', 'fem_elements', 'fem_reliability'}
     root = Path(__file__).parent
     fem_files = set()
     for md in sorted(root.glob('docs/**/*.md')):
@@ -9437,6 +9547,34 @@ def _tilt_pair_problems(t):
     return out
 
 
+def _kc_pair_problems(t):
+    """What is wrong with one ``fem_kc`` tag's coefficient pair (see
+    ``run_lock_edges_test``); empty when nothing is."""
+    name = t.get('benchmark') or Path(str(t.get('file', '?'))).name
+    out = []
+    if any(k in t for k in ('f_stand', 'f_fail', 'check')):
+        out.append(f"{name}: a fem_kc tag carries f_stand/f_fail/check, which "
+                   f"no fem_kc check reads (its pair is k_stand/k_fail)")
+    try:
+        k_stand, k_fail = abs(float(t['k_stand'])), abs(float(t['k_fail']))
+    except (KeyError, TypeError, ValueError):
+        return out + [f"{name}: fem_kc needs numeric k_stand and k_fail"]
+    if not k_stand < k_fail:
+        return out + [f"{name}: k_stand={k_stand:g} is not below k_fail={k_fail:g}"]
+    if t.get('expected_kc') is None:
+        return out + [f"{name}: fem_kc tag with no expected_kc"]
+    expected = float(t['expected_kc'])
+    tol = float(t.get('kc_tol', 0.005))
+    mid = 0.5 * (k_stand + k_fail)
+    if abs(mid - expected) > tol + 1e-12:
+        out.append(f"{name}: k pair brackets {mid:.4f}, more than {tol:g} from "
+                   f"the lock {expected:g}")
+    if (k_fail - k_stand) > 2.0 * tol + 1e-12:
+        out.append(f"{name}: k pair is {k_fail - k_stand:.4g} wide, more than "
+                   f"twice kc_tol {tol:g} — not the bisection's final pair")
+    return out
+
+
 def run_lock_edges_test(test):
     """Guard: every ``check=edges`` tag states a pair of trials that can only be
     true of the lock it carries.
@@ -9476,6 +9614,9 @@ def run_lock_edges_test(test):
         for t in parse_test_tags(md):
             if t.get('type') == 'fem_tilt':
                 problems.extend(_tilt_pair_problems(t))
+                continue
+            if t.get('type') == 'fem_kc':
+                problems.extend(_kc_pair_problems(t))
                 continue
             if t.get('type') != 'fem_ssrm':
                 continue
@@ -10057,6 +10198,12 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'fem_yield_coefficient': (
+        'fem_yield_coefficient_check.py',
+        "The finite element yield coefficient's bisection on k, on a stand-in "
+        "solver: it closes on the answer within its tolerance in the direction "
+        "asked, at full strength from the K0 field, reports an undecided top as "
+        "a lower bound, and refuses a slope that fails with no seismic force."),
     'noncircular_kink': (
         'noncircular_kink_check.py',
         "The non-circular search refuses a trial surface bent back more than 10 "
@@ -16349,6 +16496,8 @@ def run_test(test):
         return _run_fem_ssrm(test)
     if test.get('type', '') == 'fem_tilt':
         return run_fem_tilt_test(test)
+    if test.get('type', '') == 'fem_kc':
+        return run_fem_kc_test(test)
     computed, error_msg = _dispatch_test(test)
     return computed, error_msg, None
 
@@ -16598,6 +16747,9 @@ def _dispatch_test(test):
     if test_type == 'fem_tilt':
         # Unreachable in practice (run_test intercepts it for its annotation).
         return run_fem_tilt_test(test)[:2]
+    if test_type == 'fem_kc':
+        # Unreachable in practice, as fem_tilt above.
+        return run_fem_kc_test(test)[:2]
     if test_type == 'seep_elements':
         return run_seep_elements_test(test)
     if test_type == 'fem_elements':
@@ -16657,6 +16809,10 @@ def _expected_and_tol(test, default_tolerance):
         # ABSOLUTE, in degrees: the tilt the two coefficients bracket.
         expected = test.get('expected_tilt')
         tol = test.get('tolerance', 0.1)
+    elif test_type == 'fem_kc':
+        # ABSOLUTE: the coefficient the two full-strength solves bracket.
+        expected = test.get('expected_kc')
+        tol = test.get('kc_tol', 0.005)
     elif test_type == 'slip_depth':
         # ABSOLUTE, in the model's length units: a depth of zero is a real
         # reading (a surface that grazes the station) and no relative band
@@ -16718,7 +16874,7 @@ def _expected_and_tol(test, default_tolerance):
 
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
-_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_tilt': 4, 'fem_elements': 5,
+_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_tilt': 4, 'fem_kc': 4, 'fem_elements': 5,
               'preflight_corpus': 5, 'preflight_rules': 4, 'corpus_circles': 5,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
               'support_force': 4, 'slip_depth': 2,
@@ -16729,6 +16885,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'rapid_drained_surface': 3, 'noncircular_kink': 3,
+              'fem_yield_coefficient': 1,
               'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
@@ -16933,7 +17090,7 @@ def main():
     for verification_md in sorted(Path(_repo('docs/verification')).glob('*.md')):
         for t in parse_test_tags(verification_md):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'mesh_elements':
@@ -17037,7 +17194,7 @@ def main():
     if seep_slope.exists():
         for t in parse_test_tags(seep_slope):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_tilt'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'seep':
@@ -17059,7 +17216,7 @@ def main():
                         + sorted(Path(_repo('docs/videos')).glob('*.md'))):
         for t in parse_test_tags(tutorial_md):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'mesh_elements':
@@ -17103,7 +17260,7 @@ def main():
                 if not t.get('file'):
                     continue    # a prose example of the tag syntax, not a fixture
                 ttype = t.get('type', '')
-                if ttype in ('fem_ssrm', 'fem_tilt'):
+                if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
                     if run_fem:
                         tests.append(t); n_priv += 1
                 elif ttype == 'seep':
@@ -17148,6 +17305,10 @@ def main():
         tests.append({'type': 'noncircular_kink',
                       'file': 'docs/verification/files/rocscience/vp017.xlsx',
                       'method': 'spencer', 'source': 'noncircular_kink'})
+        # The finite element yield coefficient's bisection on a stand-in solver
+        # (under a second).
+        tests.append({'type': 'fem_yield_coefficient',
+                      'method': 'fem', 'source': 'fem_yield_coefficient'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
         # ponded water into. File-less (builds on xslope_acads_simple).
@@ -18073,7 +18234,7 @@ def main():
         tests = kept
     if gate_run:
         for t in tests:
-            if t.get('type') == 'fem_ssrm':
+            if t.get('type') in ('fem_ssrm', 'fem_kc'):
                 t['_force_bracket'] = True
 
     if not tests:

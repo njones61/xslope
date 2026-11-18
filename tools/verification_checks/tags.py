@@ -153,7 +153,8 @@ def _tag_kv(line):
 #: (run_tests._check_mesh_counts); the page has no reason to print them, where a
 #: mesh_elements tag's counts are the published figure itself.
 GUARD_KEYS = {"fem_ssrm": ("expected_elements", "expected_nodes"),
-              "fem_tilt": ("expected_elements", "expected_nodes")}
+              "fem_tilt": ("expected_elements", "expected_nodes"),
+              "fem_kc": ("expected_elements", "expected_nodes")}
 
 
 def _published(kv, cfg):

@@ -8,6 +8,8 @@ holds what is computed FROM them:
 - :func:`yield_coefficient`: the seismic yield coefficient k_y, the seismic
   coefficient at which the factor of safety is exactly 1 (Duncan, Wright, and
   Brandon 2014, Sec. 10.1.3), on a given surface or by search.
+- :func:`fem_yield_coefficient`: k_y by the finite element method, the largest
+  seismic coefficient under which the slope stands at full strength.
 - :func:`newmark_displacement`: the permanent displacement of the sliding mass
   under an acceleration record, as a rigid block that slides whenever the
   ground acceleration exceeds k_y·g (Newmark 1965; Duncan, Wright, and Brandon
@@ -455,6 +457,184 @@ def yield_line(info, surface_noun):
                  f"{len(info.get('rounds') or [])} rounds; this is the lowest "
                  f"k_y they found.")
     return text
+
+
+# ---------------------------------------------------------------------------
+# The yield coefficient by the finite element method
+# ---------------------------------------------------------------------------
+
+#: The finite element yield coefficient's bisection stops when the bracket on k
+#: is narrower than this.
+FEM_K_TOL = 0.005
+
+#: The first coefficient the finite element bisection tries as its failing edge
+#: when none is given, doubled until a trial fails or K_MAX is passed.
+FEM_K_START = 0.25
+
+
+def _fem_direction(fem_data, direction):
+    """The sign of the seismic body force: -1 drives the model toward -x (a
+    left-facing slope), +1 toward +x. The finite element solver applies k
+    exactly as signed (see the FEM overview page), so the direction is the
+    caller's, or the sign of the model's own coefficient."""
+    if direction in ("left", -1, -1.0):
+        return -1.0
+    if direction in ("right", 1, 1.0):
+        return 1.0
+    if direction is not None:
+        raise ValueError(f"direction must be 'left' or 'right', not {direction!r}")
+    k = float(fem_data.get("k_seismic") or 0.0)
+    if k == 0.0:
+        raise ValueError(
+            "The finite element yield coefficient needs the direction of the "
+            "seismic force: pass direction='left' for a slope that faces -x or "
+            "'right' for one that faces +x, or give the model a signed k.")
+    return float(np.sign(k))
+
+
+def fem_yield_coefficient(fem_data, direction=None, k_stand=0.0, k_fail=None,
+                          tol=FEM_K_TOL, k0=1.0, cancel_check=None,
+                          progress_callback=None, **solve_kwargs):
+    """The seismic yield coefficient k_y by the finite element method: the
+    largest seismic coefficient under which the slope stands at full strength.
+
+    A bisection on k. Each trial is one :func:`xslope.fem.solve_fem` at F = 1,
+    with the seismic body force k·γ acting in ``direction`` and nothing reduced,
+    so a trial asks whether the slope stands under that coefficient. A trial
+    starts from the K0 in-situ field, as every strength-reduction trial does,
+    and is read by the solver's own verdict (the hybrid criterion unless
+    ``failure_criterion`` says otherwise): it stands when the solver reports it
+    stable. It is the strength-reduction bisection run on the load instead of
+    the strength, and each trial is the full-strength solve a ``fem_tilt``
+    verification row locks.
+
+    A trial that ends undecided (an exit in
+    :data:`xslope.fem.SSRM_UNDECIDED_EXITS`) is not counted as a failure. As in
+    the strength-reduction search it becomes the top of the bracket, and where
+    one is still the top when the bracket closes, k_y is reported as a lower
+    bound, the bracket's bottom.
+
+    Parameters
+    ----------
+    fem_data : dict
+        From :func:`xslope.fem.build_fem_data`. Its own seismic coefficient is
+        replaced on every trial; nothing in it is changed.
+    direction : {"left", "right"} or None
+        The way the seismic force drives the slope: "left" for a slope whose
+        face looks toward -x, "right" for +x. None takes the sign of the
+        model's own k.
+    k_stand, k_fail : float
+        The starting bracket, as magnitudes. ``k_stand`` defaults to 0, the
+        static case. With no ``k_fail`` the search tries FEM_K_START and doubles
+        it until a trial fails. A ``k_stand`` above 0 is solved and must stand.
+    tol : float
+        The bisection stops when k_fail - k_stand is below this.
+    k0 : float or None
+        The at-rest ratio of the in-situ field each trial starts from.
+    cancel_check : callable or None
+        Called between trials; True cancels the run
+        (:class:`xslope.search.AnalysisCancelled`).
+    progress_callback : callable or None
+        Called as ``progress_callback(trial_number, k, verdict)`` after each
+        trial.
+    **solve_kwargs
+        Passed to every :func:`xslope.fem.solve_fem` trial (``max_iterations``,
+        ``tension_srf``, ``failure_criterion``, ``fast_kernel``, ...).
+
+    Returns
+    -------
+    dict
+        - ``k_y``: the midpoint of the final bracket, or its bottom where the
+          top trial was undecided.
+        - ``k_stand``, ``k_fail``: the final bracket, as magnitudes.
+        - ``lower_bound``: True where the top trial was undecided.
+        - ``direction``: -1.0 or +1.0.
+        - ``trials``: every trial, in order, as dicts with ``k``, ``verdict``,
+          ``stable``, ``exit_reason``, ``iterations`` and ``max_displacement``.
+        - ``solution``: the solve at ``k_stand`` (None when the bracket's
+          bottom is the static case and was never solved), and
+          ``failure_solution``: the solve at ``k_fail``.
+    """
+    from .fem import solve_fem, SSRM_UNDECIDED_EXITS
+    from .search import AnalysisError, _check_cancel
+
+    sign = _fem_direction(fem_data, direction)
+    trials = []
+    solved = {}
+
+    def run(k):
+        _check_cancel(cancel_check)
+        fd = dict(fem_data)
+        fd["k_seismic"] = sign * float(k)
+        sol = solve_fem(fd, F=1.0, k0=k0, **solve_kwargs)
+        stable = bool(sol.get("stable"))
+        undecided = (not stable
+                     and sol.get("exit_reason") in SSRM_UNDECIDED_EXITS)
+        trials.append({
+            "k": float(k),
+            "verdict": sol.get("verdict"),
+            "stable": stable,
+            "undecided": undecided,
+            "exit_reason": sol.get("exit_reason"),
+            "iterations": int(sol.get("iterations") or 0),
+            "max_displacement": float(sol.get("max_displacement") or 0.0),
+        })
+        solved[float(k)] = sol
+        if progress_callback is not None:
+            progress_callback(len(trials), float(k), sol.get("verdict"))
+        return stable, undecided
+
+    lo = abs(float(k_stand))
+    if lo > 0.0:
+        stands, _ = run(lo)
+        if not stands:
+            raise AnalysisError(
+                f"The slope does not stand at k_stand = {lo:g}; start the "
+                "bracket lower.")
+    hi = None if k_fail is None else abs(float(k_fail))
+    top_undecided = False
+    if hi is None:
+        k = max(FEM_K_START, 2.0 * lo)
+        while True:
+            stands, top_undecided = run(k)
+            if not stands:
+                hi = k
+                break
+            lo = k
+            if k >= K_MAX:
+                raise AnalysisError(
+                    f"The slope still stands at k = {k:g}; its yield "
+                    f"coefficient is above {K_MAX:g}.")
+            k = min(2.0 * k, K_MAX)
+    else:
+        if not hi > lo:
+            raise ValueError(f"k_fail = {hi:g} must be above k_stand = {lo:g}")
+        stands, top_undecided = run(hi)
+        if stands:
+            raise AnalysisError(
+                f"The slope stands at k_fail = {hi:g}; start the bracket "
+                "higher.")
+
+    while hi - lo > tol:
+        mid = 0.5 * (lo + hi)
+        stands, undecided = run(mid)
+        if stands:
+            lo = mid
+        else:
+            hi, top_undecided = mid, undecided
+
+    if lo == 0.0 and 0.0 not in solved:
+        stands, _ = run(0.0)
+        if not stands:
+            raise AnalysisError(
+                "The slope does not stand at full strength with no seismic "
+                "force, so it has no yield coefficient.")
+
+    k_y = lo if top_undecided else 0.5 * (lo + hi)
+    return {"k_y": k_y, "k_stand": lo, "k_fail": hi,
+            "lower_bound": top_undecided, "direction": sign,
+            "trials": trials, "solution": solved.get(lo),
+            "failure_solution": solved.get(hi)}
 
 
 # ---------------------------------------------------------------------------

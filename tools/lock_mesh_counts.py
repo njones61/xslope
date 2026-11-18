@@ -31,7 +31,7 @@ from multiprocessing import get_context
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
-TYPES = ("fem_ssrm", "fem_tilt")
+TYPES = ("fem_ssrm", "fem_tilt", "fem_kc")
 _TAG = re.compile(r"<!--\s*test:\s*(.*?)\s*-->")
 _COUNT = re.compile(r",\s*expected_(elements|nodes)=[\d;]+")
 

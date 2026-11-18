@@ -2122,7 +2122,7 @@ This problem reproduces the two example slopes of
 > Manual, Part III, Problem 68.)*
 
 Its target is a **critical seismic coefficient**, k꜀, rather than a factor of safety. k꜀ is the
-horizontal pseudo-static coefficient that brings the slope's minimum factor of safety down to 1.0.
+pseudo-static coefficient that results in a factor of safety of 1.0.
 
 **The slopes.** Cases 1 and 2 use the paper's first example, a homogeneous slope 25 m high with a
 1V:3H face. The soil has c′ = 25 kPa, φ′ = 30°, and γ = 20 kN/m³, and a firm base lies 25 m below

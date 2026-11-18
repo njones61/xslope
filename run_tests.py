@@ -10011,6 +10011,13 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'noncircular_kink': (
+        'noncircular_kink_check.py',
+        "The non-circular search refuses a trial surface bent back more than 10 "
+        "degrees into the mass: from eight free points on VP17's critical circle "
+        "it lands at 1.337 (circle 1.341, Janbu within 2.5%), where without the "
+        "guard it took 0.456 on an 84-degree notch; an entered bend is kept as "
+        "that vertex's own limit."),
     'rapid_drained_surface': (
         'rapid_drained_surface_check.py',
         "A rapid drawdown surface that crosses no material with d and psi is the "
@@ -16661,7 +16668,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_disclosure': 3, 'interslice_admissibility': 3,
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
-              'rapid_drained_surface': 3,
+              'rapid_drained_surface': 3, 'noncircular_kink': 3,
               'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
@@ -17076,6 +17083,11 @@ def main():
         tests.append({'type': 'rapid_drained_surface',
                       'file': 'test/fixtures/xslope_johnson_rapid_weak_shell.xlsx',
                       'method': 'spencer', 'source': 'rapid_drained_surface'})
+        # The non-circular search's bend-back guard: VP17 from eight free points
+        # on its critical circle, with the guard and without (~2 min).
+        tests.append({'type': 'noncircular_kink',
+                      'file': 'docs/verification/files/rocscience/vp017.xlsx',
+                      'method': 'spencer', 'source': 'noncircular_kink'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
         # ponded water into. File-less (builds on xslope_acads_simple).

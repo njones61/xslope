@@ -146,7 +146,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are shown beside it. |
 | [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, worst case (h₁ = 4, 6 and 8 m): SSRM 1.031 vs closed form 1.050 (−1.8%) · thinnest and thickest bands (h₁ = 2 and 10 m): SSRM 1.044 vs 1.050 (−0.6%) | Two mechanisms, both scored across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.169 at h₁ = 2 and 4 m, 1.044–1.094 at 6, 8 and 10 m) is shown beside RS2's SSR column: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. |
 | [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.502 vs RS2 SSR 2.48 (+0.9%) · Case 2 (steady): SSRM 1.695 vs RS2 SSR 1.70 (−0.3%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.023 vs RS2 SSR 2.04 (−0.8%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.7%) | (6 of 6) Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
-| [68](#rs2-68) | 🟢 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.432 vs Loukidis Spencer 0.431 (+0.2%) · Case 3 Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) | The target is a **critical seismic coefficient** k꜀, not a factor of safety, found by XSLOPE's yield coefficient search. Loukidis searched Spencer's method on irregular surfaces, so each Spencer k꜀ is the lower of XSLOPE's circular and non-circular searches; on Case 3 only the non-circular surface can follow the weak band. Every input class verifies against the vendor `#068_03` model; RS2's own SSRM k꜀ 0.161 is a strength-reduction number and stays a cross-bearing. |
+| [68](#rs2-68) | 🟢 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.432 vs Loukidis Spencer 0.431 (+0.2%) · Case 3 Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) | The target is a **critical seismic coefficient** k꜀, the seismic coefficient at which FS = 1. XSLOPE finds it by limit equilibrium, with its yield coefficient search. Each Spencer k꜀ is the lower of a circular and a non-circular search, since the paper searched irregular surfaces. On Case 3 only a non-circular surface can follow the weak layer. RS2's own strength-reduction k꜀ is listed in the section for comparison. |
 
 </div>
 
@@ -189,7 +189,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | SSRM 1.009 vs RS2 SSRM 0.98 (+3.0%) | Own SSRM build with five passive nail rows rooted in the vertical wall face, just under XSLOPE's own Spencer 1.010. GOLD-NAIL 0.91 / UTEXAS4 1.02. |
 | [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | M-C: SSRM 1.373 vs RS2 SSRM 1.38 (−0.5%) · power curve: SSRM 1.497 vs RS2 SSRM 1.47 (+1.8%) | Same build as [RS2-34](#rs2-34). Part IV publishes RS2 SSRM 1.34 / 1.45; Baker 1.35 / 1.48. |
 | [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Same build as [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
-| [63](#rs2-68) | 🟢 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) | Same build as [RS2-68](#rs2-68), Case 3, on a non-circular search. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
+| [63](#rs2-68) | 🟢 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) | Same build as [RS2-68](#rs2-68), Case 3, on a non-circular search. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example. RS2's own strength-reduction k꜀ is 0.161, listed in the section for comparison. Part IV's 0.99 is RS2's strength-reduction factor of safety at the paper's fixed k = 0.155, not a k꜀. |
 | [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.406 vs RS2 SSRM 2.37 (+1.5%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is thinner than the corpus mesh and is not carried. |
 | [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *unconfirmed* — own SSRM build, unconstrained, at 1.909 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor thinner than the corpus mesh, so the two are not a pairing. Ref 2.71. |
 | [66](#p4-vp65) | 🟢 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | SSRM 2.172 vs RS2 SSRM 2.22 (−2.2%) | Own SSRM build, ponded on both faces as the vendor model is. USACE 2.30. |
@@ -2113,71 +2113,106 @@ beside it.
 
 **Input files:** [rs2_68a.xlsx](files/rocscience/rs2_68a.xlsx) (Case 1, r<sub>u</sub> = 0.5) ·
 [b](files/rocscience/rs2_68b.xlsx) (Case 2, dry) · [c](files/rocscience/rs2_68c.xlsx) (Case 3,
-3-layer)
+three layers)
 
-The one problem on this page whose target is **not a factor of safety** but a
-**critical seismic coefficient** k꜀, after
+This problem reproduces the two example slopes of
 
 > [Loukidis, D., Bandini, P., & Salgado, R. (2003)](https://doi.org/10.1680/geot.2003.53.5.463). "Stability of seismically loaded slopes
 > using limit analysis." *Géotechnique*, 53(5), 463–479. *(RS2 Slope Stability Verification
 > Manual, Part III, Problem 68.)*
 
-k꜀ is the horizontal pseudo-static coefficient for which the searched minimum FS = 1. Three cases
-share a 25 m, 1V:3H slope (c = 25 kPa, φ = 30°): **Case 1** adds r<sub>u</sub> = 0.5, **Case 2** is
-dry, and **Case 3** replaces the body with three dipping bands, the mechanism riding a weak middle
-band at φ = 15°. XSLOPE finds k꜀ with its yield coefficient search: the single crossing of FS = 1
-on a surface, confirmed by a full search at that coefficient.
+Its target is a **critical seismic coefficient**, k꜀, rather than a factor of safety. k꜀ is the
+horizontal pseudo-static coefficient at which the slope is just at failure, so the minimum factor
+of safety at k꜀ is 1.0.
 
-Loukidis solved Bishop's simplified method on circles and Spencer's method on irregular surfaces
-of any shape, and Slide2 searched non-circular surfaces. Each file therefore carries a
-non-circular starting surface beside its circles, and XSLOPE's Spencer k꜀ is the lower of its
-circular and non-circular searches. On Cases 1 and 2 the two searches land within 0.001 of each
-other, and the non-circular search gives the lower value. On Case 3 the non-circular surface runs along the base
-of the weak band and leaves the face at the band's lower corner, a path no circle can follow.
-Near FS = 1 the factor of safety falls slowly as k rises, so the circles' small excess in FS
-becomes a larger one in k꜀.
+**The slopes.** Cases 1 and 2 use the paper's first example, a homogeneous slope 25 m high with a
+1V:3H face. The soil has c′ = 25 kPa, φ′ = 30°, and γ = 20 kN/m³, and a firm base lies 25 m below
+the toe. In Case 1 the pore pressure at every point is half the overburden stress
+(r<sub>u</sub> = 0.5). Case 2 is dry.
 
-**Governing comparisons** — one authority per column, like-for-like on method:
+Case 3 uses the paper's second example, a dry slope 35 m high in three layers. The lower face
+rises at 1V:2H to a 12 m bench 20 m above the toe, and the upper face rises at 1V:2.5H to the
+crest. The two upper layers dip about 2.6° toward the face, and both crop out on it. In the
+figures they are rock1, rock2, and rock3, from the top down:
 
-| Case | Method | XSLOPE k꜀ | Scored search (the other one) | Slide2 | Loukidis (same method) |
+- rock1, the top layer: c′ = 4 kPa, φ′ = 30°, γ = 17 kN/m³.
+- rock2, the weak middle layer: c′ = 25 kPa, φ′ = 15°, γ = 19 kN/m³. It crops out on the lower
+  face and the bench.
+- rock3, the strong bottom layer: c′ = 15 kPa, φ′ = 45°, γ = 19 kN/m³. It extends 40 m below the
+  toe.
+
+The figures show Case 2 and Case 3. The left panel is the model, with the seismic force at k꜀.
+The right panel is XSLOPE's critical Spencer surface at k꜀, where the factor of safety is 1.00.
+
+![RS2-68: seismically loaded slopes (Loukidis et al. 2003), Case 2 dry homogeneous — inputs with the pseudo-static arrow at k꜀ = 0.432 (left) and the Spencer critical non-circular seismic surface, a broad curve from the toe to the crest, FS = 1.00 (right)](images/rs2_68b.png)
+
+![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical non-circular surface at k꜀ = 0.156, running along the base of the weak φ = 15° middle band and leaving the face at the band's lower corner, FS = 1.00 (right)](images/rs2_68c.png)
+
+**How XSLOPE finds k꜀.** XSLOPE's finite element solver can apply a seismic coefficient, but it
+has no search for the coefficient at which the slope fails. XSLOPE therefore solves this problem
+by limit equilibrium, with its yield coefficient search. The search solves for the k at which
+the critical surface's factor of safety is 1.0. It then searches again at that k to check that no
+other surface is weaker, and if one is, it repeats on that surface.
+
+The paper's limit-equilibrium results include Bishop's simplified method on circles and Spencer's
+method on irregular surfaces. XSLOPE runs Bishop's method on circles too. For Spencer's method it
+runs both a circular and a non-circular search and reports the lower k꜀, so each input file
+carries a starting surface of each kind. On Cases 1 and 2 the two searches agree to within 0.001:
+on circles alone, the Spencer k꜀ is 0.132 and 0.433. On Case 3 the non-circular surface runs
+along the base of the weak layer and comes out on the face where that base meets it, 7.8 m above
+the toe. The best circle gives 0.167, because no circle can follow that path.
+
+**Results.** The table compares XSLOPE's k꜀ with the paper's value for the same method, which
+sets the match dot, and with Slide2's value from the RS2 manual.
+
+| Case | Method | Surface | XSLOPE k꜀ | Loukidis (same method) | Slide2 |
 |---|---|---|---|---|---|
-| 1 (r<sub>u</sub> = 0.5) | Bishop | 0.127 | circles | 0.118 (+7.6%) | 0.127 (0.0%) |
-| 1 (r<sub>u</sub> = 0.5) | Spencer | 0.132 | non-circular (circles 0.132) | 0.132 (0.0%) | 0.131 (+0.8%) |
-| 2 (dry) | Bishop | 0.426 | circles | 0.425 (+0.2%) | 0.426 (0.0%) |
-| 2 (dry) | Spencer | 0.432 | non-circular (circles 0.433) | 0.431 (+0.2%) | 0.431 (+0.2%) |
-| 3 (3-layer) | Spencer | 0.156 | non-circular (circles 0.167) | 0.151 (+3.3%) | 0.155 (+0.6%) |
+| 1 (r<sub>u</sub> = 0.5) | Bishop | circular | 0.127 | 0.127 (0.0%) | 0.118 (+7.6%) |
+| 1 (r<sub>u</sub> = 0.5) | Spencer | non-circular | 0.132 | 0.131 (+0.8%) | 0.132 (0.0%) |
+| 2 (dry) | Bishop | circular | 0.426 | 0.426 (0.0%) | 0.425 (+0.2%) |
+| 2 (dry) | Spencer | non-circular | 0.432 | 0.431 (+0.2%) | 0.431 (+0.2%) |
+| 3 (three layers) | Spencer | non-circular | 0.156 | 0.155 (+0.6%) | 0.151 (+3.3%) |
 
-The governing authority is Loukidis's own same-method k꜀. The largest governing difference is
-Case 1's Spencer +0.8%, and it sets the dot. Case 3 has no Bishop row. Loukidis's Table 3 publishes
-Spencer's method only (the RS2 manual's table places that value in a Bishop column), and Slide2,
-whose Bishop k꜀ is 0.155, searches this slope with non-circular paths ([VP63](rocscience.md#vp63)).
-XSLOPE solves Bishop's simplified method on circles only, and its Case 3 Bishop k꜀ of 0.169 on
-circles is not scored.
+The largest difference from the paper is +0.8%, on Case 1 with Spencer's method, and it sets the
+green dot.
 
-**Cross-bearings** — these are context, not governing pairings, and no dot rests on them:
+Case 3 has no Bishop row. The paper publishes only Spencer's k꜀ for this slope, although the RS2
+manual's table lists that value under Bishop. Slide2's Bishop value, 0.155, comes from a
+non-circular search ([VP63](rocscience.md#vp63)), while XSLOPE runs Bishop's method on circles
+only. XSLOPE's Bishop k꜀ of 0.169 on circles therefore has no value to compare with.
 
-| Case | Loukidis FEM | Loukidis log-spiral | Loukidis limit analysis UB / LB | RS2 SSRM |
+**Other published values.** The paper and the RS2 manual also find k꜀ by methods other than
+limit equilibrium. They are listed here for comparison and do not affect the match dot.
+
+| Case | Loukidis FEM | Loukidis log-spiral | Loukidis limit-analysis bounds | RS2 SSRM |
 |---|---|---|---|---|
-| 1 (r<sub>u</sub> = 0.5) | 0.132 | 0.132 | 0.145 / 0.126 | 0.125 |
-| 2 (dry) | 0.433 | 0.432 | 0.454 / 0.423 | 0.413 |
-| 3 (3-layer) | 0.161 | — | 0.172 / 0.148 | 0.161 |
+| 1 (r<sub>u</sub> = 0.5) | 0.132 | 0.132 | 0.126–0.145 | 0.125 |
+| 2 (dry) | 0.433 | 0.432 | 0.423–0.454 | 0.413 |
+| 3 (three layers) | 0.161 | — | 0.148–0.172 | 0.161 |
 
-The three zone polygons, strengths and unit weights of Case 3 match the vendor model `#068_03`,
-and its uniform body force b<sub>x</sub> = −k acts along the same line as XSLOPE's seismic force.
+- **Loukidis FEM:** a finite element analysis in which the horizontal load is raised until the
+  slope collapses.
+- **Loukidis log-spiral:** an upper bound from a block rotating on a log-spiral surface.
+- **Loukidis limit-analysis bounds:** rigorous lower and upper bounds from finite element limit
+  analysis. The exact k꜀ lies between them.
+- **RS2 SSRM:** RS2's own k꜀ from strength reduction.
 
-#### The SSRM cross-check on Case 3 {#rs2-68-ssrm}
+Every XSLOPE value in the results table lies between the paper's bounds.
 
-Part IV fixes k at Loukidis's coefficient and reports the factor of safety there:
+#### Strength reduction on Case 3 {#rs2-68-ssrm}
 
-| Published at k = 0.155 g | RS2 SSR | Slide2 (Spencer / GLE) | Loukidis Spencer |
+Part IV of the RS2 manual runs Case 3 at a fixed k = 0.155, the paper's Spencer k꜀, and reports
+the factor of safety. At this k every method should give a factor close to 1.0.
+
+| At k = 0.155 | RS2 strength reduction | Slide2 Spencer and GLE | Loukidis Spencer |
 |---|---|---|---|
-| RS2 Part IV Table 68.2 | 0.99 | 0.994 | 1.000 |
+| Factor of safety | 0.99 | 0.994 | 1.000 |
 
-On the same `rs2_68c` file at `k_seismic` = 0.155 g, XSLOPE's strength-reduction factor falls at
-every step of refinement from a 4.0 m to a 1.5 m element size (1,593 to 10,803 tri6) and is still
-falling on the finest mesh, crossing RS2's SSR on the way down. The mechanism rides the thin
-φ = 15° band, to which unregularized Mohr-Coulomb gives no thickness, so no strength-reduction value
-on this problem is scored.
+XSLOPE's strength-reduction factor on the same file does not settle. It falls with every
+refinement of the mesh, from 4.0 m elements (1,593 six-node triangles) to 1.5 m elements
+(10,803), and passes RS2's value on the way down. The failure runs through the thin weak layer,
+and a Mohr-Coulomb model sets no width for the shear band, so each finer mesh finds a lower
+factor. No strength-reduction value on this problem is scored.
 
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=bishop, expected_kc=0.127, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-bishop -->
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=spencer, expected_kc=0.132, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-spencer -->
@@ -2190,14 +2225,6 @@ on this problem is scored.
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=bishop, expected_kc=0.169, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-bishop -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, expected_kc=0.167, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-spencer -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.156, kc_tol=0.001, num_slices=40, benchmark=RS2-68c-spencer-noncirc -->
-
-**Case 2 — dry homogeneous slope (rs2_68b)**
-
-![RS2-68: seismically loaded slopes (Loukidis et al. 2003), Case 2 dry homogeneous — inputs with the pseudo-static arrow at k꜀ = 0.432 (left) and the Spencer critical non-circular seismic surface, a broad curve from the toe to the crest, FS = 1.00 (right)](images/rs2_68b.png)
-
-**Case 3 — three-layer, band-riding slope (rs2_68c)**
-
-![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical non-circular surface at k꜀ = 0.156, running along the base of the weak φ = 15° middle band and leaving the face at the band's lower corner, FS = 1.00 (right)](images/rs2_68c.png)
 
 ### 🟢 RS2 Part IV VP2: Homogeneous slope with tension crack (ACADS 1b) {#p4-vp2}
 

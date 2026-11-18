@@ -2434,8 +2434,9 @@ Slide #104 is built on Slide2's own *Tutorial 28 — Seismic Analysis with the N
 the verification manual prints no geometry of its own. The model is a 10 m, 2:1 slope in three
 layers over a horizontal base (soil 1: c = 0, φ = 38°; soil 2: c = 5.3 kPa, φ = 23°; soil 3:
 c = 7.2 kPa, φ = 20°; all γ = 19.5 kN/m³), dry, with no external loads. The manual runs four
-scenarios twice, once with multi-modal Particle Swarm plus Surface Altering optimization and once
-with the ordinary uni-modal search, and prints both columns in Table 104.1. The two published
+scenarios twice: once with the ordinary uni-modal search, which converges on a single critical
+surface, and once with multi-modal optimization (Particle Swarm plus Surface Altering), which looks
+for several separate local minima in one run. Table 104.1 prints both columns. The two published
 columns agree to about 0.1%, and the uni-modal column is what an ordinary circular search targets,
 so the first two scenarios reproduce directly. For the critical acceleration the file also carries a
 non-circular starting surface, eight points on the critical circle, and XSLOPE's K<sub>y</sub> is

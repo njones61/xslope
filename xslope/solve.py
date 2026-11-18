@@ -375,7 +375,9 @@ def solve_selected(method_name, slice_df, rapid=False, seismic2=False):
     func = globals()[method_name]
 
     if rapid and seismic2:
-        raise ValueError("Choose rapid drawdown or the two-stage seismic analysis, not both.")
+        raise ValueError("Rapid drawdown and the two-stage seismic analysis each "
+                         "run their own stages on the same slices, so a run takes "
+                         "one or the other.")
     if rapid:
         success, result = rapid_drawdown(slice_df, method_name)
     elif seismic2:

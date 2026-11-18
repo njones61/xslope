@@ -395,8 +395,9 @@ def _refuse_two_staged(rapid, seismic2):
     before any trial is cut."""
     seismic2_strength(seismic2)
     if rapid and seismic2:
-        raise ValueError("Choose rapid drawdown or the two-stage seismic analysis, "
-                         "not both: each runs its own stages on the same slices.")
+        raise ValueError("Rapid drawdown and the two-stage seismic analysis each "
+                         "run their own stages on the same slices, so a run takes "
+                         "one or the other.")
 
 
 def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
@@ -1734,8 +1735,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     _refuse_two_staged(rapid, seismic2)
     if ky:
         if rapid:
-            raise ValueError("A yield coefficient is found for a pseudostatic "
-                             "analysis, not a rapid drawdown.")
+            raise ValueError("A rapid drawdown analysis has no yield coefficient: "
+                             "k_y is found for a pseudostatic analysis.")
         from .seismic import yield_coefficient
         return yield_coefficient(
             slope_data, method, analysis=analysis, surface=surface,

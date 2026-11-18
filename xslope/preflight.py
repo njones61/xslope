@@ -5202,9 +5202,9 @@ def _seismic2_k_zero(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k != 0.0:
         return None            # a blank k is the global rule's to report
-    return ("The seismic coefficient is 0, so stage 2 adds no seismic force: the "
-            "result is the static factor of safety with undrained strengths, not a "
-            f"pseudostatic one. Enter k {_at_global('D13')}.")
+    return ("The seismic coefficient is 0, so stage 2 adds no seismic force and "
+            "the result is the static factor of safety with undrained strengths. "
+            f"Enter k {_at_global('D13')}.")
 
 
 # ---------------------------------------------------------------------------

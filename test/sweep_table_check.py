@@ -567,6 +567,13 @@ def run():
             fn(failures)
         except Exception as e:                                  # noqa: BLE001
             failures.append(f"{fn.__name__} raised {type(e).__name__}: {e}")
+    # The window's persistent mesh thread is stopped on close or on the
+    # application's quit, and neither happens here: no event loop runs. Left
+    # running, it is destroyed with the window at interpreter exit, which
+    # aborts the process (exit 134) after every check has passed.
+    win = _SHARED.pop('win', None)
+    if win is not None:
+        win.stop_threads()
     return failures
 
 

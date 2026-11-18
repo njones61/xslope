@@ -8414,6 +8414,244 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/dwb_fig10_1_wedge.xlsx",
+      "references": [
+        {
+          "anchor": "dwb-10-1",
+          "checks": [
+            "DWB-10.1-wedge-cphi-corps",
+            "DWB-10.1-wedge-cphi-kv-down",
+            "DWB-10.1-wedge-cphi-kv-none",
+            "DWB-10.1-wedge-cphi-kv-up",
+            "DWB-10.1-wedge-cphi-lowe",
+            "DWB-10.1-wedge-cphi-spencer",
+            "DWB-10.1-wedge-frictional-corps",
+            "DWB-10.1-wedge-frictional-kv-down",
+            "DWB-10.1-wedge-frictional-kv-down-ky-corps",
+            "DWB-10.1-wedge-frictional-kv-down-ky-lowe",
+            "DWB-10.1-wedge-frictional-kv-none",
+            "DWB-10.1-wedge-frictional-kv-up",
+            "DWB-10.1-wedge-frictional-kv-up-ky-corps",
+            "DWB-10.1-wedge-frictional-kv-up-ky-lowe",
+            "DWB-10.1-wedge-frictional-lowe"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "DWB Figure 10.1 — yield coefficient of a rigid wedge",
+          "url": "https://xslope.org/en/latest/verification/published/#dwb-10-1"
+        }
+      ],
+      "topics": [
+        "non-circular"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 8,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.15,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/dwb_t10_4_dry.xlsx",
+      "references": [
+        {
+          "anchor": "dwb-10-4",
+          "checks": [
+            "DWB-10.4-dry-1-interpolated",
+            "DWB-10.4-dry-1-kc1",
+            "DWB-10.4-dry-1-single",
+            "DWB-10.4-dry-2-interpolated",
+            "DWB-10.4-dry-2-kc1",
+            "DWB-10.4-dry-2-single",
+            "DWB-10.4-dry-3-interpolated",
+            "DWB-10.4-dry-3-kc1",
+            "DWB-10.4-dry-3-single",
+            "DWB-10.4-dry-4-interpolated",
+            "DWB-10.4-dry-4-kc1",
+            "DWB-10.4-dry-4-single"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "DWB Table 10.4 — pseudostatic slope, single-stage and two-stage",
+          "url": "https://xslope.org/en/latest/verification/published/#dwb-10-4"
+        }
+      ],
+      "topics": [
+        "seismic"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 8,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.15,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
+      "references": [
+        {
+          "anchor": "dwb-10-4",
+          "checks": [
+            "DWB-10.4-submerged-1-interpolated",
+            "DWB-10.4-submerged-1-kc1",
+            "DWB-10.4-submerged-1-single",
+            "DWB-10.4-submerged-2-interpolated",
+            "DWB-10.4-submerged-2-kc1",
+            "DWB-10.4-submerged-2-single",
+            "DWB-10.4-submerged-3-interpolated",
+            "DWB-10.4-submerged-3-kc1",
+            "DWB-10.4-submerged-3-single",
+            "DWB-10.4-submerged-4-interpolated",
+            "DWB-10.4-submerged-4-kc1",
+            "DWB-10.4-submerged-4-single"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "DWB Table 10.4 — pseudostatic slope, single-stage and two-stage",
+          "url": "https://xslope.org/en/latest/verification/published/#dwb-10-4"
+        }
+      ],
+      "topics": [
+        "seismic",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 1,
@@ -13620,13 +13858,13 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": true,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": false,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -13650,8 +13888,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -13663,20 +13901,23 @@
       "model": "docs/verification/files/rocscience/rs2_68a.xlsx",
       "references": [
         {
-          "anchor": "rs2-68",
+          "anchor": "rs2-68-fem",
           "checks": [
             "RS2-68a-bishop",
-            "RS2-68a-spencer"
+            "RS2-68a-fem-kc",
+            "RS2-68a-spencer",
+            "RS2-68a-spencer-noncirc"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003)",
-          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68"
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
         }
       ],
       "topics": [
+        "non-circular",
         "homogeneous"
       ]
     },
@@ -13688,13 +13929,81 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": true,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": false,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": true,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_68a_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-68-fem",
+          "checks": [
+            "RS2-68a-fem-kc-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -13718,8 +14027,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -13731,20 +14040,23 @@
       "model": "docs/verification/files/rocscience/rs2_68b.xlsx",
       "references": [
         {
-          "anchor": "rs2-68",
+          "anchor": "rs2-68-fem",
           "checks": [
             "RS2-68b-bishop",
-            "RS2-68b-spencer"
+            "RS2-68b-fem-kc",
+            "RS2-68b-spencer",
+            "RS2-68b-spencer-noncirc"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003)",
-          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68"
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
         }
       ],
       "topics": [
+        "non-circular",
         "homogeneous"
       ]
     },
@@ -13755,14 +14067,14 @@
         "dloads": 0,
         "element_type": null,
         "hoek_brown": false,
-        "homogeneous": false,
-        "k0": null,
+        "homogeneous": true,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
         ],
-        "n_materials": 3,
-        "non_circular": false,
+        "n_materials": 1,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -13786,8 +14098,76 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_68b_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-68-fem",
+          "checks": [
+            "RS2-68b-fem-kc-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -13799,22 +14179,93 @@
       "model": "docs/verification/files/rocscience/rs2_68c.xlsx",
       "references": [
         {
-          "anchor": "rs2-68",
+          "anchor": "rs2-68-fem",
           "checks": [
             "RS2-68-mesh-coarse",
             "RS2-68-mesh-fine",
             "RS2-68c-bishop",
-            "RS2-68c-spencer"
+            "RS2-68c-fem-kc",
+            "RS2-68c-spencer",
+            "RS2-68c-spencer-noncirc"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003)",
-          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68"
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
         }
       ],
-      "topics": []
+      "topics": [
+        "non-circular"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_68c_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-68-fem",
+          "checks": [
+            "RS2-68c-fem-kc-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
+        }
+      ],
+      "topics": [
+        "non-circular"
+      ]
     },
     {
       "features": {
@@ -24699,6 +25150,7 @@
           "checks": [
             "VP103a-deep",
             "VP103a-deep-circ",
+            "VP103a-deep-reversed",
             "VP103a-shallow-circ"
           ],
           "level": 2,
@@ -24932,7 +25384,7 @@
           "mc"
         ],
         "n_materials": 3,
-        "non_circular": false,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -24956,7 +25408,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 27,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24972,6 +25424,7 @@
           "anchor": "vp104",
           "checks": [
             "VP104-kc",
+            "VP104-kc-noncirc",
             "VP104-noseismic"
           ],
           "level": 2,
@@ -24982,7 +25435,9 @@
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp104"
         }
       ],
-      "topics": []
+      "topics": [
+        "non-circular"
+      ]
     },
     {
       "features": {
@@ -28385,7 +28840,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 402,
+    "models": 408,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -28430,24 +28885,24 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 673,
+    "tags": 731,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 192,
-      "non-circular": 33,
+      "homogeneous": 194,
+      "non-circular": 41,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
       "reinforcement": 35,
       "seepage-coupled": 76,
-      "seismic": 11,
+      "seismic": 13,
       "soil-nails": 5,
       "tension-cracks": 21,
       "transient-seepage": 25,
-      "zoned-dams": 50
+      "zoned-dams": 51
     },
-    "unloadable": 0
+    "unloadable": 2
   },
   "topic_labels": {
     "anchors-tiebacks": "Anchors & tiebacks",
@@ -28580,7 +29035,9 @@
       "docs/verification/files/rocscience/rs2_67e.xlsx",
       "docs/verification/files/rocscience/rs2_67f.xlsx",
       "docs/verification/files/rocscience/rs2_68a.xlsx",
+      "docs/verification/files/rocscience/rs2_68a_fine.xlsx",
       "docs/verification/files/rocscience/rs2_68b.xlsx",
+      "docs/verification/files/rocscience/rs2_68b_fine.xlsx",
       "docs/verification/files/rocscience/vp010.xlsx",
       "docs/verification/files/rocscience/vp016.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",
@@ -28679,9 +29136,16 @@
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/published/dwb_fig10_1_wedge.xlsx",
       "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
       "docs/verification/files/rocscience/rs2_30.xlsx",
       "docs/verification/files/rocscience/rs2_30_split.xlsx",
+      "docs/verification/files/rocscience/rs2_68a.xlsx",
+      "docs/verification/files/rocscience/rs2_68a_fine.xlsx",
+      "docs/verification/files/rocscience/rs2_68b.xlsx",
+      "docs/verification/files/rocscience/rs2_68b_fine.xlsx",
+      "docs/verification/files/rocscience/rs2_68c.xlsx",
+      "docs/verification/files/rocscience/rs2_68c_fine.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",
@@ -28705,7 +29169,8 @@
       "docs/verification/files/rocscience/vp103a.xlsx",
       "docs/verification/files/rocscience/vp103b.xlsx",
       "docs/verification/files/rocscience/vp103c.xlsx",
-      "docs/verification/files/rocscience/vp103d.xlsx"
+      "docs/verification/files/rocscience/vp103d.xlsx",
+      "docs/verification/files/rocscience/vp104a.xlsx"
     ],
     "piles": [
       "docs/fem/files/xslope_torggler_3a_plate.xlsx",
@@ -28868,6 +29333,8 @@
       "docs/videos/files/xslope_video11_seep_to_lem.xlsx"
     ],
     "seismic": [
+      "docs/verification/files/published/dwb_t10_4_dry.xlsx",
+      "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
       "docs/verification/files/published/fhwa_e7.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64g.xlsx",
@@ -28963,6 +29430,7 @@
       "docs/tutorials/files/xslope_johnson_res_solved.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/geostudio/gs2_wall_none.xlsx",
+      "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
       "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64l_split.xlsx",
@@ -28990,5 +29458,14 @@
       "docs/videos/files/xslope_video14_weak_layer_fem.xlsx"
     ]
   },
-  "unloadable": []
+  "unloadable": [
+    {
+      "model": "docs/verification/files/published/newmark_pulse.txt",
+      "reason": "ValueError: Excel file format cannot be determined, you must specify an engine manually."
+    },
+    {
+      "model": "docs/verification/files/rocscience/vp104_record.txt",
+      "reason": "ValueError: Excel file format cannot be determined, you must specify an engine manually."
+    }
+  ]
 }

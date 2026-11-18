@@ -88,10 +88,15 @@ CONFIG = PageConfig(
 
     locked_value_re=r"(?:SSRM|Spencer|Bishop|k꜀|FS)\s+\**(\d+\.\d{3})",
 
-    # Two section headings are named by summary rows carrying different dots.
-    # In both cases the heading covers more than one row of the manual, so the
+    # Three section headings are named by summary rows carrying different dots.
+    # In each case the heading covers more than one row of the manual, so the
     # dot it opens with is the one the section's own locked comparisons set.
     heading_dot_multi=[
+        # "RS2-68" is Parts I-III problem 68 (row 68) and Part IV's VP62 and VP63
+        # (rows 62 and 63), which share its build.  The Part IV rows score the
+        # limit-equilibrium k꜀ only, 🟢; row 68 also scores the finite element
+        # k꜀ against RS2's, and Case 3's −5.6% makes the section 🟡.
+        ('rs2-68', '🟡'),
         # "RS2-39/41/43" builds problems 41 and 43, both 🟢; problem 39 (and its
         # Part IV twin, row 76) is deferred with no lock of its own, which is
         # what its ⊘ says.  The section's locked comparisons are the 🟢 pair.

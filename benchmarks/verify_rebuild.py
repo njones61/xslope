@@ -66,7 +66,7 @@ _RS2_FAST = ('rs2_56a rs2_56b rs2_56c1 rs2_56c3 rs2_56c4 '
              'rs2_66a rs2_66b rs2_66c rs2_66d rs2_66e '
              'rs2_62a rs2_62b rs2_62c rs2_65 rs2_51 '
              'rs2_67a rs2_67c rs2_67d '
-             'rs2_68a rs2_68b rs2_68c '
+             'rs2_68a rs2_68b rs2_68c rs2_68a_fine rs2_68b_fine rs2_68c_fine '
              'rs2_64a rs2_64b rs2_64c rs2_64d rs2_64e rs2_64f '
              'rs2_64g rs2_64h rs2_64i rs2_64j rs2_64k rs2_64l '
              'rs2_64h_split rs2_64l_split rs2_29clay rs2_9').split()

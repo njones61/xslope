@@ -1446,7 +1446,28 @@ def rs2_51():
     return 'rs2_51.xlsx'
 
 
-def rs2_68a():
+def _rs2_68_fine(sd, name):
+    """Write the refined-mesh twin of an RS2 #68 case as ``name``.
+
+    The twin is the same model with one mesh refinement zone: a band 5 m either
+    side of the file's own non-circular starting surface (the critical surface at
+    k_c on Cases 1 and 2, the path along the base of the weak layer on Case 3),
+    clipped to the model, at 1.0 m. The plain file's FEM k_c rows solve on RS2's
+    own mesh (its rs2_68*_mesh.json, written by rs2_68_vendor_mesh.py); the twin
+    gives the refined value printed beside them. Every case, plain or twin, pins
+    its side boundaries the way RS2's models do."""
+    from shapely.geometry import LineString
+    from shapely.ops import unary_union
+    domain = unary_union([p['polygon'] for p in sd['polygons']])
+    path = LineString([(p['X'], p['Y']) for p in sd['non_circ']])
+    band = path.buffer(5.0).intersection(domain).simplify(0.25)
+    ring = [(round(x, 3), round(y, 3)) for x, y in list(band.exterior.coords)[:-1]]
+    sd['refine_zones'] = [{'polygon': ring, 'size': 1.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, name))
+    return name
+
+
+def rs2_68a(fine=False):
     """RS2 #68 Case 1 (Ru = 0.5, homogeneous) -- Stability of Seismically Loaded
     Slopes, after Loukidis, Bandini & Salgado (2003), Geotechnique 53(5), 463-479.
 
@@ -1479,7 +1500,7 @@ def rs2_68a():
     sd = _poly_slope_data(
         polygons=[(0, poly)],
         materials=[dict(name='rock1', c=25.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
-                        E=1.0e5, nu=0.3, u='ru', ru=0.5)],
+                        E=5.0e4, nu=0.4, u='ru', ru=0.5)],
         circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
         max_depth=0.0)
     sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
@@ -1487,11 +1508,14 @@ def rs2_68a():
                        (57.8, 22.5), (63.6, 22.8), (69.3, 23.5), (75.0, 24.5),
                        (80.8, 26.0), (86.5, 27.8), (92.2, 30.1), (98.0, 32.8),
                        (103.7, 36.1), (109.4, 40.0), (115.2, 44.6), (120.9, 50.0))]
+    sd['side_bc'] = 'fixed'   # RS2's '#068' models pin every edge
+    if fine:
+        return _rs2_68_fine(sd, 'rs2_68a_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68a.xlsx'))
     return 'rs2_68a.xlsx'
 
 
-def rs2_68b():
+def rs2_68b(fine=False):
     """RS2 #68 Case 2 (Ru = 0, homogeneous) -- same 25 m, 1V:3H, c = 25 / phi = 30
     / gamma = 20 slope as Case 1 (rs2_68a) but dry (u = none). Critical seismic
     coefficient k_c is the verification target (see rs2_68a).
@@ -1508,7 +1532,7 @@ def rs2_68b():
     sd = _poly_slope_data(
         polygons=[(0, poly)],
         materials=[dict(name='rock1', c=25.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
-                        E=1.0e5, nu=0.3, u='none')],
+                        E=5.0e4, nu=0.4, u='none')],
         circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
         max_depth=0.0)
     sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
@@ -1516,11 +1540,14 @@ def rs2_68b():
                        (58.5, 24.3), (64.5, 24.9), (70.5, 25.8), (76.4, 27.0),
                        (82.4, 28.5), (88.4, 30.4), (94.3, 32.6), (100.3, 35.2),
                        (106.3, 38.2), (112.3, 41.6), (118.2, 45.5), (124.2, 50.0))]
+    sd['side_bc'] = 'fixed'   # RS2's '#068' models pin every edge
+    if fine:
+        return _rs2_68_fine(sd, 'rs2_68b_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68b.xlsx'))
     return 'rs2_68b.xlsx'
 
 
-def rs2_68c():
+def rs2_68c(fine=False):
     """RS2 #68 Case 3 (Ru = 0, non-homogeneous 3-layer) -- a benched slope in three
     dipping rock bands, dry. Critical seismic coefficient k_c is the target (see
     rs2_68a). Materials (mat_id 0/1/2): rock1 c = 4 / phi = 30 / gamma = 17 (upper
@@ -1549,11 +1576,11 @@ def rs2_68c():
         polygons=zones,
         materials=[
             dict(name='rock1', c=4.0, phi=30.0, gamma=17.0, gamma_sat=17.0,
-                 E=1.0e5, nu=0.3, u='none'),
+                 E=5.0e4, nu=0.4, u='none'),
             dict(name='rock2', c=25.0, phi=15.0, gamma=19.0, gamma_sat=19.0,
-                 E=1.0e5, nu=0.3, u='none'),
+                 E=5.0e4, nu=0.4, u='none'),
             dict(name='rock3', c=15.0, phi=45.0, gamma=19.0, gamma_sat=19.0,
-                 E=1.0e5, nu=0.3, u='none'),
+                 E=5.0e4, nu=0.4, u='none'),
         ],
         circle={'Xo': 78.0, 'Yo': 82.0, 'Depth': 27.0, 'R': 55.0},
         max_depth=0.0)
@@ -1562,8 +1589,26 @@ def rs2_68c():
     sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
                       ((39.0, 29.5), (50.0, 29.3), (70.0, 30.2), (95.0, 31.5),
                        (108.0, 38.0), (123.0, 55.0))]
+    sd['side_bc'] = 'fixed'   # RS2's '#068' models pin every edge
+    if fine:
+        return _rs2_68_fine(sd, 'rs2_68c_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68c.xlsx'))
     return 'rs2_68c.xlsx'
+
+
+def rs2_68a_fine():
+    """RS2 #68 Case 1's refined-mesh twin (see _rs2_68_fine)."""
+    return rs2_68a(fine=True)
+
+
+def rs2_68b_fine():
+    """RS2 #68 Case 2's refined-mesh twin (see _rs2_68_fine)."""
+    return rs2_68b(fine=True)
+
+
+def rs2_68c_fine():
+    """RS2 #68 Case 3's refined-mesh twin (see _rs2_68_fine)."""
+    return rs2_68c(fine=True)
 
 
 # ======================================================================================
@@ -2255,7 +2300,7 @@ if __name__ == '__main__':
                rs2_30, rs2_30_split,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
                rs2_67a, rs2_67b, rs2_67c, rs2_67d, rs2_67e, rs2_67f,
-               rs2_68a, rs2_68b, rs2_68c,
+               rs2_68a, rs2_68b, rs2_68c, rs2_68a_fine, rs2_68b_fine, rs2_68c_fine,
                vp102_transient,
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
                rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,

@@ -36,6 +36,10 @@ flow, and only then searches or reduces strength (see ``_stage_seep_fields``).
 ``size_divisions`` is the Build Mesh dialog's auto-size spinner: the section width
 over that number, so a page is locked at the mesh it actually built.
 
+``mesh=file`` solves an FEM row on the workbook's own mesh file
+(``{base}_mesh.json``) instead of meshing afresh at ``target_size``: the route of a
+row scored on the vendor's own mesh, so that the mesh cannot be the difference.
+
 The fem_tilt type locks a published TILT ANGLE — the angle a tilt table is
 raised to before a model fails, which is what a tilt-table test reports in place
 of a factor of safety. The model is pushed by a horizontal seismic coefficient k
@@ -1508,7 +1512,14 @@ def _fem_case_model(test):
     # silently zeroes the pore pressures if the node count differs.
     uses_seep = any(str(m.get('u', '')).strip().lower() == 'seep'
                     for m in slope_data.get('materials', []))
-    if uses_seep and slope_data.get('mesh') is not None:
+    # `mesh=file` solves on the workbook's own mesh sidecar ({base}_mesh.json) rather
+    # than meshing afresh: the route of a row scored on the vendor's own mesh, where
+    # the comparison has to hold the discretization fixed (RS2-68's FEM k_c).
+    use_file_mesh = str(test.get('mesh', '')).strip().lower() == 'file'
+    if use_file_mesh and slope_data.get('mesh') is None:
+        raise ValueError("mesh=file, but the workbook has no mesh file "
+                         "({base}_mesh.json) beside it")
+    if (uses_seep or use_file_mesh) and slope_data.get('mesh') is not None:
         mesh = slope_data['mesh']
     else:
         # Default mesh size scales with the domain (like the seepage path) rather

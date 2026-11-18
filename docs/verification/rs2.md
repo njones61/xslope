@@ -24,9 +24,9 @@ the shared [References](references.md) page.
 - **Elastic constants and tensile caps** follow the vendor model.
 - **Initial stress** is the at-rest field `k0 = 1` on every strength-reduction row.
 - **Flow rule.** Every strength-reduction row runs ψ = 0.
-- **Mesh.** Every row is meshed at its stated size. A row mentions refinement only where a finer
-  mesh changes its factor, or where a series of mesh sizes is itself one of the row's checked
-  results.
+- **Mesh.** Every row is meshed at its stated size, except [#68](#rs2-68)'s finite element rows,
+  which solve on RS2's own mesh. A row mentions refinement only where a finer mesh changes its
+  factor, or where a series of mesh sizes is itself one of the row's checked results.
 - **Strength-reduction constraints.** A constraint the vendor model states (an SSR search polygon,
   an elastic twin) is carried in the file, or the row says why it is not.
 - **Deep mechanisms.** Where the published mechanism is deeper than the unconstrained one, the row
@@ -146,7 +146,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are shown beside it. |
 | [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, worst case (h₁ = 4, 6 and 8 m): SSRM 1.031 vs closed form 1.050 (−1.8%) · thinnest and thickest bands (h₁ = 2 and 10 m): SSRM 1.044 vs 1.050 (−0.6%) | Two mechanisms, both scored across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.169 at h₁ = 2 and 4 m, 1.044–1.094 at 6, 8 and 10 m) is shown beside RS2's SSR column: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. |
 | [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.502 vs RS2 SSR 2.48 (+0.9%) · Case 2 (steady): SSRM 1.695 vs RS2 SSR 1.70 (−0.3%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.023 vs RS2 SSR 2.04 (−0.8%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.7%) | (6 of 6) Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
-| [68](#rs2-68) | 🟢 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.432 vs Loukidis Spencer 0.431 (+0.2%) · Case 3 Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) | The target is a **critical seismic coefficient** k꜀, the seismic coefficient at which FS = 1. XSLOPE finds it by limit equilibrium, with its yield coefficient search. Each Spencer k꜀ is the lower of a circular and a non-circular search, since the paper searched irregular surfaces. On Case 3 only a non-circular surface can follow the weak layer. RS2's own strength-reduction k꜀ is listed in the section for comparison. |
+| [68](#rs2-68) | 🟡 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.432 vs Loukidis Spencer 0.431 (+0.2%) · Case 3 Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) · Case 1 FEM: k꜀ 0.123 vs RS2 SSR 0.125 (−1.6%) · Case 2 FEM: k꜀ 0.403 vs RS2 SSR 0.413 (−2.4%) · Case 3 FEM: k꜀ 0.152 vs RS2 SSR 0.161 (−5.6%) | The target is a **critical seismic coefficient** k꜀, the seismic coefficient at which FS = 1. XSLOPE finds it two ways. By limit equilibrium, each Spencer k꜀ is the lower of a circular and a non-circular search, since the paper searched irregular surfaces; on Case 3 only a non-circular surface can follow the weak layer. By the finite element method, XSLOPE solves on RS2's own mesh, and its Case 3 comparison sets the dot. |
 
 </div>
 
@@ -2109,11 +2109,14 @@ beside it.
 
 ![RS2-67 Case 3 upstream: RS2's own imported 90 h drawdown field with strength reduction confined to the vendor's upstream Search Area, SSRM 2.023 against RS2 SSR 2.04 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism on the upstream face instead of the weaker downstream one](images/RS2-67d.png)
 
-### 🟢 RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003) {#rs2-68}
+### 🟡 RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003) {#rs2-68}
 
 **Input files:** [rs2_68a.xlsx](files/rocscience/rs2_68a.xlsx) (Case 1, r<sub>u</sub> = 0.5) ·
 [b](files/rocscience/rs2_68b.xlsx) (Case 2, dry) · [c](files/rocscience/rs2_68c.xlsx) (Case 3,
-three layers)
+three layers). RS2's meshes: [rs2_68a_mesh.json](files/rocscience/rs2_68a_mesh.json) ·
+[b](files/rocscience/rs2_68b_mesh.json) · [c](files/rocscience/rs2_68c_mesh.json). Refined
+meshes: [rs2_68a_fine.xlsx](files/rocscience/rs2_68a_fine.xlsx) ·
+[b](files/rocscience/rs2_68b_fine.xlsx) · [c](files/rocscience/rs2_68c_fine.xlsx)
 
 This problem reproduces the two example slopes of
 
@@ -2147,11 +2150,11 @@ The right panel is XSLOPE's critical Spencer surface at k꜀, where the factor o
 
 ![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical non-circular surface at k꜀ = 0.156, running along the base of the weak φ = 15° middle band and leaving the face at the band's lower corner, FS = 1.00 (right)](images/rs2_68c.png)
 
-**How XSLOPE finds k꜀.** XSLOPE's finite element solver can apply a seismic coefficient, but it
-has no search for the coefficient at which the slope fails. XSLOPE therefore solves this problem
-by limit equilibrium, with its yield coefficient search. The search solves for the k at which
-the critical surface's factor of safety is 1.0. It then searches again at that k to check that no
-other surface is weaker, and if one is, it repeats on that surface.
+**How XSLOPE finds k꜀.** XSLOPE finds k꜀ two ways. Its limit-equilibrium yield coefficient search
+solves for the k at which the critical surface's factor of safety is 1.0. It then searches again
+at that k to check that no other surface is weaker, and if one is, it repeats on that surface.
+Its finite element solver finds the largest k under which the slope stands at full strength; that
+comparison, with RS2's own k꜀, is under [Finite element k꜀](#rs2-68-fem).
 
 The paper's limit-equilibrium results include Bishop's simplified method on circles and Spencer's
 method on irregular surfaces. XSLOPE runs Bishop's method on circles too. For Spencer's method it
@@ -2172,31 +2175,64 @@ sets the match dot, and with Slide2's value from the RS2 manual.
 | 2 (dry) | Spencer | non-circular | 0.432 | 0.431 (+0.2%) | 0.431 (+0.2%) |
 | 3 (three layers) | Spencer | non-circular | 0.156 | 0.155 (+0.6%) | 0.151 (+3.3%) |
 
-The largest difference from the paper is +0.8%, on Case 1 with Spencer's method, and it sets the
-green dot.
+The largest difference from the paper is +0.8%, on Case 1 with Spencer's method.
 
 Case 3 has no Bishop row. The paper publishes only Spencer's k꜀ for this slope, although the RS2
 manual's table lists that value under Bishop. Slide2's Bishop value, 0.155, comes from a
 non-circular search ([VP63](rocscience.md#vp63)), while XSLOPE runs Bishop's method on circles
 only. XSLOPE's Bishop k꜀ of 0.169 on circles therefore has no value to compare with.
 
-**Other published values.** The paper and the RS2 manual also find k꜀ by methods other than
-limit equilibrium. They are listed here for comparison and do not affect the match dot.
+**Other published values.** The paper also finds k꜀ by methods other than limit equilibrium.
+They are listed here for comparison and do not affect the match dot.
 
-| Case | Loukidis FEM | Loukidis log-spiral | Loukidis limit-analysis bounds | RS2 SSRM |
-|---|---|---|---|---|
-| 1 (r<sub>u</sub> = 0.5) | 0.132 | 0.132 | 0.126–0.145 | 0.125 |
-| 2 (dry) | 0.433 | 0.432 | 0.423–0.454 | 0.413 |
-| 3 (three layers) | 0.161 | — | 0.148–0.172 | 0.161 |
+| Case | Loukidis FEM | Loukidis log-spiral | Loukidis limit-analysis bounds |
+|:---:|:---:|:---:|:---:|
+| 1 (r<sub>u</sub> = 0.5) | 0.132 | 0.132 | 0.126–0.145 |
+| 2 (dry) | 0.433 | 0.432 | 0.423–0.454 |
+| 3 (three layers) | 0.161 | — | 0.148–0.172 |
 
 - **Loukidis FEM:** a finite element analysis in which the horizontal load is raised until the
   slope collapses.
 - **Loukidis log-spiral:** an upper bound from a block rotating on a log-spiral surface.
 - **Loukidis limit-analysis bounds:** rigorous lower and upper bounds from finite element limit
   analysis. The exact k꜀ lies between them.
-- **RS2 SSRM:** RS2's own k꜀ from strength reduction.
 
 Every XSLOPE value in the results table lies between the paper's bounds.
+
+#### Finite element k꜀ {#rs2-68-fem}
+
+XSLOPE's finite element k꜀ is the largest k under which the model stands at full strength, with
+no strength reduced. A bisection finds it: each trial applies k, the solver decides whether the
+model stands or fails, and the bracket halves until it is narrower than 0.002. RS2 reports its own
+k꜀ from strength reduction.
+
+The scored rows solve [rs2_68a.xlsx](files/rocscience/rs2_68a.xlsx),
+[rs2_68b.xlsx](files/rocscience/rs2_68b.xlsx), and [rs2_68c.xlsx](files/rocscience/rs2_68c.xlsx)
+on RS2's own mesh for each case, read from the vendor model into the mesh file beside each input
+file. The rest of the setup follows RS2's models too: every edge pinned, an at-rest initial
+stress with K<sub>0</sub> = 1, ψ = 0, E = 50,000 kPa, ν = 0.4, and a tensile strength equal to
+each material's cohesion.
+
+RS2's meshes are coarse, and on this problem the finite element k꜀ falls as the mesh is refined.
+The last column gives XSLOPE's k꜀ on each case's refined input file
+([rs2_68a_fine.xlsx](files/rocscience/rs2_68a_fine.xlsx),
+[rs2_68b_fine.xlsx](files/rocscience/rs2_68b_fine.xlsx), and
+[rs2_68c_fine.xlsx](files/rocscience/rs2_68c_fine.xlsx)), which adds a 1.0 m mesh band 5 m
+either side of the limit-equilibrium surface, with 4.0 m elements elsewhere.
+
+| Case | Elements (RS2's mesh) | XSLOPE k꜀ | RS2 k꜀ | XSLOPE k꜀, refined mesh | Elements (refined) |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 1 (r<sub>u</sub> = 0.5) | 3,120 | 0.123 | 0.125 (−1.6%) | 0.102 | 5,385 |
+| 2 (dry) | 2,616 | 0.403 | 0.413 (−2.4%) | 0.372 | 4,597 |
+| 3 (three layers) | 4,193 | 0.152 | 0.161 (−5.6%) | 0.143 | 4,912 |
+
+The largest difference from RS2 is −5.6%, on Case 3, and it sets the yellow dot.
+
+Case 3 also fails differently. On Cases 1 and 2, a trial just above k꜀ fails by running away: the
+displacements grow without bound. On Case 3 it fails by slow creep: the model is still moving,
+slowly, when the solver's iteration limit is reached. The difference from RS2 on Case 3 does not
+come from the mesh, the boundary conditions, the elastic constants, the tensile strengths, or the
+initial stress, because all of them are RS2's here. Its cause is not known.
 
 #### Strength reduction on Case 3 {#rs2-68-ssrm}
 
@@ -2211,7 +2247,7 @@ XSLOPE's strength-reduction factor on the same file does not settle. It falls wi
 refinement of the mesh, from 4.0 m elements (1,593 six-node triangles) to 1.5 m elements
 (10,803), and passes RS2's value on the way down. The failure runs through the thin weak layer,
 and a Mohr-Coulomb model sets no width for the shear band, so each finer mesh finds a lower
-factor. No strength-reduction value on this problem is scored.
+factor. No strength-reduction factor on this problem is scored.
 
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=bishop, expected_kc=0.127, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-bishop -->
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=spencer, expected_kc=0.132, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-spencer -->
@@ -2224,6 +2260,12 @@ factor. No strength-reduction value on this problem is scored.
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=bishop, expected_kc=0.169, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-bishop -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, expected_kc=0.167, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-spencer -->
 <!-- test: file=files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.156, kc_tol=0.001, num_slices=40, benchmark=RS2-68c-spencer-noncirc -->
+<!-- test: file=files/rocscience/rs2_68a.xlsx, type=fem_kc, mesh=file, k_stand=0.121875, k_fail=0.12375, expected_kc=0.123, kc_tol=0.002, direction=left, element_type=tri6, max_iter=16000, k0=1, tension_srf=true, expected_elements=3120, expected_nodes=6513, benchmark=RS2-68a-fem-kc -->
+<!-- test: file=files/rocscience/rs2_68b.xlsx, type=fem_kc, mesh=file, k_stand=0.4025, k_fail=0.40375, expected_kc=0.403, kc_tol=0.002, direction=left, element_type=tri6, max_iter=16000, k0=1, tension_srf=true, expected_elements=2616, expected_nodes=5395, benchmark=RS2-68b-fem-kc -->
+<!-- test: file=files/rocscience/rs2_68c.xlsx, type=fem_kc, mesh=file, k_stand=0.15125, k_fail=0.1525, expected_kc=0.152, kc_tol=0.002, direction=left, element_type=tri6, max_iter=16000, k0=1, tension_srf=true, expected_elements=4193, expected_nodes=8630, benchmark=RS2-68c-fem-kc -->
+<!-- test: file=files/rocscience/rs2_68a_fine.xlsx, type=fem_kc, k_stand=0.10125, k_fail=0.103125, expected_kc=0.102, kc_tol=0.002, direction=left, element_type=tri6, target_size=4.0, max_iter=16000, k0=1, tension_srf=true, expected_elements=5385, expected_nodes=10988, benchmark=RS2-68a-fem-kc-fine -->
+<!-- test: file=files/rocscience/rs2_68b_fine.xlsx, type=fem_kc, k_stand=0.37, k_fail=0.375, expected_kc=0.372, kc_tol=0.003, direction=left, element_type=tri6, target_size=4.0, max_iter=16000, k0=1, tension_srf=true, expected_elements=4597, expected_nodes=9368, benchmark=RS2-68b-fem-kc-fine -->
+<!-- test: file=files/rocscience/rs2_68c_fine.xlsx, type=fem_kc, k_stand=0.141875, k_fail=0.1434375, expected_kc=0.143, kc_tol=0.002, direction=left, element_type=tri6, target_size=4.0, max_iter=16000, k0=1, tension_srf=true, expected_elements=4912, expected_nodes=9995, benchmark=RS2-68c-fem-kc-fine -->
 
 ### 🟢 RS2 Part IV VP2: Homogeneous slope with tension crack (ACADS 1b) {#p4-vp2}
 

@@ -227,7 +227,7 @@ The two $\tau_{ff}$ values come from the two envelopes at the slice's $\sigma'_{
 Here is the whole calculation on one real slice: slice 2 of the 41 slices on the critical circle of [Walter Bouldin Dam](#walter-bouldin), at the toe of the upstream slope, in a clayey silty sand under about 24 ft of water at full pool. The sand has $c' = 240$ psf and $\phi' = 32.7°$, and its $K_c = 1$ envelope has $d = 750$ psf and $\psi = 15°$.
 
 | Step | | Slice 2 |
-|------|---|--------:|
+|------|---|:-------:|
 | Stage 1 stresses, equations (2) and (3) | $N' = 1{,}611$ lb/ft, $S = 1{,}193$ lb/ft, $\Delta\ell = 3.14$ ft | $\sigma'_{fc} = 514$ psf, $\tau_{fc} = 381$ psf |
 | The two stress ratios, equations (4) and (6) | | $K_1 = 3.96$, $K_f = 7.69$ |
 | The two envelopes at $\sigma'_{fc}$ | $d + \sigma'_{fc} \tan \psi$; $c' + \sigma'_{fc} \tan \phi'$ | 888 psf ($K_c = 1$); 570 psf ($K_c = K_f$) |
@@ -303,7 +303,7 @@ Walter Bouldin Dam, a rolled earthfill dam, slid during a 32 ft drawdown in 1975
 The colors say what governed each slice. Most interpolated their undrained strength, as slice 2 did, and kept it, because their drained strength after drawdown was higher. At both ends of the circle the drained strength came out lower in Stage 3 and replaced the undrained one; that includes slice 2, whose $\tau_{ff}$ of 747 psf gave way to a drained strength of 715 psf. Slices 40 and 41 at the crest took the lower envelope in Stage 2, as slice 40 did above, and then the drained strength in Stage 3 as well: shallow ends drained-critical, the deep middle undrained-critical.
 
 | Stage | Factor of safety |
-|-------|-----------------:|
+|-------|:----------------:|
 | 1, full pool | 1.498 |
 | 2, after drawdown | 1.097 |
 | **3, ten slices drained** | **1.048** |
@@ -449,7 +449,7 @@ Because the Stage 2 field is the transient frame at t = 50 day rather than a re-
 **xslope**'s three-stage analysis is checked against published analyses of four dams, two of which failed in rapid drawdown:
 
 | Dam | xslope (Spencer) | Published |
-|-----|-----------------:|----------:|
+|-----|:----------------:|:---------:|
 | [VP96](../verification/rocscience.md#vp96): USACE EM 1110-2-1902 example | 1.434 | 1.44, USACE (2003) |
 | [VP97](../verification/rocscience.md#vp97): Pilarcitos Dam (failed) | 1.044 | 1.05, Duncan, Wright, and Wong (1990) |
 | [VP98](../verification/rocscience.md#vp98): Walter Bouldin Dam (failed) | 1.047 | 1.04, Duncan, Wright, and Wong (1990) |

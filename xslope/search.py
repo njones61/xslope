@@ -43,6 +43,34 @@ MIN_DRIVING_FRAC = 0.01
 # 0-10%; the degenerate high-pore-pressure circles run 40-80%.
 MAX_BASE_TENSION_FRAC = 0.25
 
+#: How far, in degrees, a non-circular trial surface may bend back down at any
+#: vertex: the base inclination, read from the toe end to the crest end, falling
+#: from one segment to the next. A surface that bends back has ground jutting up
+#: into the sliding mass, which cannot slide past it, and it is where a free
+#: non-circular search goes wrong. Started from each model's critical circle with
+#: every point free, the search as it stood took a false minimum in 5 of 20
+#: models (VP3, VP10, VP17, VP104a and VP104b): F of 0.28 to 0.77 against circles
+#: of 0.99 to 1.50, on surfaces bending back 43-84 degrees, where Janbu on the same
+#: slices refuses or reads two to four times higher. Spencer's answer there passes
+#: every test it applies to a root, and a bar on the solved state is no remedy:
+#: refusing roots whose line of thrust leaves more than 65% of the slices sent
+#: VP104a to another notch at F = 0.482 with its thrust line outside on exactly
+#: 65%, and its base-tension and base-angle readings had already stopped just
+#: inside those bars (24.4% against 25%, 62 against 65 degrees). A limit on shape
+#: is checked before anything is solved, so the search cannot ride it the same
+#: way.
+#:
+#: The largest bend in a surface whose methods agree is 7.3 degrees, James Bay's
+#: weak-layer surface (Spencer 1.516, Janbu 1.58, Morgenstern-Price 1.53), with
+#: RS2-25's critical surface at 3.7 and VP20's entered surface at 2.0. At 10
+#: degrees the five false minima land on their circles with Janbu and
+#: Morgenstern-Price within 2.5% of Spencer, and every other search measured -
+#: the other 15 free searches and the corpus's 16 non-circular searches - returns
+#: what it did before. Allowing no bend at all raises James Bay's answer 1.0%,
+#: refuses VP20's entered surface outright, and fails RS2-25 on round-off in its
+#: collinear points; 5 degrees moves VP103c's locked 1.374 to 1.373.
+MAX_KINK_BACK = 10.0
+
 #: Short names for the disclosure sentence, so it reads as a method rather than
 #: as a solver key. Anything not named here is capitalized.
 _METHOD_LABEL = {
@@ -279,6 +307,28 @@ def _too_shallow(df_slices, min_slip_depth):
         return True
     max_depth = float((df_slices['y_ct'] - df_slices['y_cb']).max())
     return max_depth < min_slip_depth
+
+
+def kinks_back(points):
+    """How far a polyline bends back down at each interior vertex, in degrees.
+
+    The segment inclinations are read in order of increasing x, so the measure is
+    the same for a surface entered either way round. A bend back is a fall in
+    inclination from one segment to the next: ground jutting up into the mass
+    above it. Bends the other way read 0, and so does a vertex next to a segment
+    of no length, which has no inclination.
+    """
+    p = np.asarray(points, dtype=float).reshape(-1, 2)
+    if len(p) < 3:
+        return np.zeros(0)
+    if p[0, 0] > p[-1, 0]:
+        p = p[::-1]
+    d = np.diff(p, axis=0)
+    ang = np.degrees(np.arctan2(d[:, 1], d[:, 0]))
+    ang[np.hypot(d[:, 0], d[:, 1]) <= 1e-12] = np.nan
+    with np.errstate(invalid='ignore'):
+        drop = -np.diff(ang)
+    return np.where(np.isfinite(drop), np.maximum(drop, 0.0), 0.0)
 
 
 def _base_tension_too_extensive(df_slices):
@@ -1083,7 +1133,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     _report_unsolved()
     return sorted_fs_cache, converged, search_path, circle_cache
 
-def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, cancel_check=None, min_slip_depth=None):
+def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, max_kink_back=MAX_KINK_BACK, cancel_check=None, min_slip_depth=None):
     """
     Non-circular search using the specified solver.
 
@@ -1091,14 +1141,20 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     an over-steep base segment. Without it the coordinate-descent search drives the
     points into a near-vertical base running up to the toe, which the FORCE-
     EQUILIBRIUM methods score as a spurious low minimum -- Lowe & Karafiath above
-    all, since its interslice inclination follows the base slope. Spencer and
-    Morgenstern-Price do not follow it there: on the non-circular sample both
-    return the same factor of safety at a 65-degree cap and at 89 degrees, on a
-    surface whose steepest segment is about 50 degrees, while Lowe & Karafiath's
-    minimum falls with every relaxation and its winning surface rides the limit.
-    Capping the base inclination keeps the search on physically realistic surfaces.
-    (The convergence criterion itself is kept absolute, but the guard removes the
+    all, since its interslice inclination follows the base slope. On the
+    non-circular sample Spencer and Morgenstern-Price return the same factor of
+    safety at a 65-degree cap and at 89 degrees, on a surface whose steepest
+    segment is about 50 degrees, while Lowe & Karafiath's minimum falls with every
+    relaxation and its winning surface rides the limit. Capping the base
+    inclination keeps the search on physically realistic surfaces. (The
+    convergence criterion itself is kept absolute, but the guard removes the
     degeneracy that blocked refining it.)
+
+    A second guard (`max_kink_back`) rejects trial surfaces that bend back down
+    into the sliding mass, and it is the one that holds Spencer: with every point
+    free, the search otherwise notches the surface until Spencer returns a root
+    that passes its own tests and sits far below the critical circle (VP17: 0.456
+    against 1.341). See :data:`MAX_KINK_BACK`.
 
     Parameters:
     -----------
@@ -1123,6 +1179,11 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         with a steeper base are rejected as inadmissible. Default 65 deg, the
         active-wedge angle (45 + phi/2) for phi ~ 40 deg, near the steep end of
         realistic soils; steeper bases are geometrically unrealistic slip surfaces.
+    max_kink_back : float or None
+        How far (degrees) the surface may bend back down at any vertex
+        (:func:`kinks_back`). A vertex entered with a larger bend keeps that bend
+        as its own limit, so an entered surface is never refused for its shape.
+        Default :data:`MAX_KINK_BACK`; None turns the guard off.
 
     Returns:
     --------
@@ -1213,6 +1274,12 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         if hidden_riser.any():
             return float('inf'), None, None, None, fs_cache
 
+        # A surface bent back down into the mass is refused before it is
+        # sliced or solved (MAX_KINK_BACK): ground jutting up into the sliding
+        # mass, the shape a free search drives toward Spencer's false minima.
+        if kink_limit is not None and np.any(kinks_back(points) > kink_limit + 1e-9):
+            return float('inf'), None, None, None, fs_cache
+
         # Generate slices and compute FS
         success, result = generate_slices(slope_data, non_circ=non_circ,
                                           num_slices=num_slices, check_inputs=False)
@@ -1263,6 +1330,10 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     points = np.array([[p['X'], p['Y']] for p in non_circ])
     movements = [p['Movement'] for p in non_circ]
     ground_surface = slope_data['ground_surface']
+    # Each vertex may bend back as far as the guard allows or as far as it was
+    # entered, whichever is more: the search may not make a bend, or deepen one.
+    kink_limit = (None if max_kink_back is None
+                  else np.maximum(float(max_kink_back), kinks_back(points)))
     
     # Initialize cache and search path
     fs_cache = {}

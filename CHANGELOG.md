@@ -14,6 +14,17 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- The non-circular search no longer settles on a notched surface that gives a
+  false, far-too-low factor of safety. With the surface's points free to move,
+  the search could bend the surface back down into the sliding mass until
+  Spencer's method returned a solution satisfying its equations but describing
+  no possible state of the mass. On five of twenty
+  models searched from their critical circles, it reported 0.28 to 0.77 where
+  the circles gave 0.99 to 1.50. The search now refuses any trial surface that
+  bends back more than 10° at a point (`max_kink_back`), and those five models
+  land on their circles. A point entered with a larger bend keeps that bend as
+  its limit. Non-circular searches that already gave sound answers, including
+  every one in the verification pages and tutorials, are unchanged.
 - Steady unconfined seepage converges on fine meshes, and in far fewer
   iterations. Each element's relative conductivity, kr, is now its exact area
   average over the element, in closed form for the linear-front model and on a

@@ -120,6 +120,8 @@ SLICE_COLUMNS = (
            "horizontal.", "deg", "{:.2f}", True, gated_by="dload"),
     Column("kw", "kW", "Horizontal seismic force on the slice, per unit "
            "thickness.", "force_per_len", "{:.1f}", True),
+    Column("kvw", "k_vW", "Vertical seismic force on the slice, per unit "
+           "thickness, positive downward.", "force_per_len", "{:.1f}", True),
     Column("t", "T_c", "Water force in the tension crack, per unit thickness.",
            "force_per_len", "{:.1f}", True),
     # One column per Appl, under the letters the method derivations use: P is
@@ -438,7 +440,7 @@ def format_residual(value):
 #: statement is ΣQ = 0, and a total under F_h would be a number with no equation
 #: to check it against.
 TOTALLED = frozenset({
-    "dx", "dl", "w", "dload", "kw", "t", "p_active", "p_passive", "h_pile", "n_eff",
+    "dx", "dl", "w", "dload", "kw", "kvw", "t", "p_active", "p_passive", "h_pile", "n_eff",
     "m_res", "m_drv", "f_res", "f_drv", "q_s",
 })
 

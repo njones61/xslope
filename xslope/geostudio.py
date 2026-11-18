@@ -1287,6 +1287,9 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         "tcrack_depth": 0.0,
         "tcrack_water": 0.0,
         "k_seismic": gsz["stability"].get(analysis_id, {}).get("k_seismic", 0.0),
+        # SLOPE/W's vertical coefficient is signed, positive acting downward (it adds
+        # to each slice's weight): xslope's own convention.
+        "k_vertical": gsz["stability"].get(analysis_id, {}).get("k_seismic_v", 0.0),
         "max_depth": None,
         "profile_lines": [],
         "polygons": polygons,
@@ -1596,10 +1599,6 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 f"xslope has no mapping for them; re-enter them or the factor of safety "
                 f"will be wrong")
 
-    if stab.get("k_seismic_v"):
-        caveats.append(
-            f"a vertical seismic coefficient ({stab['k_seismic_v']:g}) is set in "
-            f"GeoStudio — xslope models only the horizontal one, so it was dropped")
 
     # A statement of fact, not a warning. There is nothing to convert and nothing to
     # confirm: xslope has no unit setting anywhere, and an import builds a whole new
@@ -2543,7 +2542,11 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         for i, (x, y) in enumerate(local_pts, start=1):
             L.append(f'        <DataPoint Number="{i}" X="{x:.10g}" Y="{y:.10g}" />')
         L.append('      </DataPoints>')
-    L.append(f'      <Seismic Horizontal="{k:.10g}" Vertical="" />' if k else
+    # SLOPE/W's vertical coefficient is positive downward, as xslope's is.
+    kv = float(slope_data.get("k_vertical") or 0.0)
+    L.append(f'      <Seismic Horizontal="{k:.10g}" Vertical="{kv:.10g}" />'
+             if kv else
+             f'      <Seismic Horizontal="{k:.10g}" Vertical="" />' if k else
              '      <Seismic Horizontal="" Vertical="" />')
     if sc_ids:
         L.append(f'      <Surcharges Len="{len(sc_ids)}">')

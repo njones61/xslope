@@ -216,7 +216,6 @@ without telling you. Read the caveats it returns.
   itself imports; the grouping does not.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
-- **Vertical seismic coefficient.** XSLOPE models only the horizontal one.
 - **Pore pressure that is neither a piezometric surface nor a SEEP/W field.** Ru and
   spatial pore-pressure functions import as zero, and the caveats report this. This is
   one-way: export *writes* a spatial function (it is how a seepage field crosses), but

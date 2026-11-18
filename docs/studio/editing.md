@@ -16,7 +16,7 @@ open its editor:
 
 | Category | What you edit |
 | --- | --- |
-| **Global parameters** | The project's units and time unit, unit weight of water, tension-crack depth/water, seismic coefficient, and the FEM-only tension SRF and K0 initial stress. |
+| **Global parameters** | The project's units and time unit, unit weight of water, tension-crack depth/water, horizontal and vertical seismic coefficients, and the FEM-only tension SRF and K0 initial stress. |
 | **Materials** | The material table — name, unit weight, strength option and parameters, and (by mode) hydraulic and elastic properties. |
 | **Profile lines** | The profile-line geometry (master/detail); rebuilds the ground surface and material zones. |
 | **Polygons** | Polygon regions (for polygon-based models) — material zones, SSR overlays, mesh refinement regions, and joint-network regions. |

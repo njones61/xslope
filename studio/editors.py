@@ -3622,7 +3622,9 @@ class GlobalEditor(CategoryEditor):
         Field("gamma_water", "Unit weight of water", unit="unit_weight"),
         Field("tcrack_depth", "Tension crack depth"),
         Field("tcrack_water", "Water in crack"),
-        Field("k_seismic", "Seismic coefficient k"),
+        Field("k_seismic", "Horizontal seismic coefficient k"),
+        # v28: signed, positive downward, in the LEM and the FEM alike.
+        Field("k_vertical", "Vertical seismic coefficient k_v (+ down)"),
         # v19: K0 initial stress. optfloat so a blank stays None — "unspecified",
         # which is the gravity turn-on initialization, NOT K0 = 0.
         Field("k0", "K0 initial stress (FEM)", "optfloat", usage="fem",

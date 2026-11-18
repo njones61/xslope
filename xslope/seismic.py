@@ -54,15 +54,17 @@ class _OneSurface:
     of the same slices with that column scaled: no re-slicing, and the pore
     pressures, loads, and strengths stay exactly as cut. Every solve starts from
     a fresh copy, because the solvers and the two-stage analysis write into the
-    table they are given. ``trace`` keeps every (k, F) the root search passed
+    table they are given. A vertical seismic force scales with k the same way, at
+    the model's own ratio k_v/k (``kv_ratio``). ``trace`` keeps every (k, F) the root search passed
     through, which is what the Log and the report show.
     """
 
     def __init__(self, slope_data, method, circle, non_circ, num_slices,
-                 composite, seismic2):
+                 composite, seismic2, kv_ratio=0.0):
         from .search import AnalysisError
         sd = dict(slope_data)
         sd["k_seismic"] = 1.0
+        sd["k_vertical"] = kv_ratio
         ok, out = generate_slices(sd, circle=circle, non_circ=non_circ,
                                   num_slices=num_slices, composite=composite,
                                   debug=False)
@@ -70,6 +72,9 @@ class _OneSurface:
             raise AnalysisError(str(out))
         self.df, self.failure_surface = out
         self.kw1 = self.df["kw"].to_numpy(copy=True)
+        # The vertical force at k = 1: k_v/k times the soil weight, signed. It
+        # scales with k as the horizontal one does (see yield_coefficient).
+        self.kvw1 = self.df["kvw"].to_numpy(copy=True)
         self.method = method
         self.strength = seismic2_strength(seismic2)
         self.func = getattr(solve, method)
@@ -79,6 +84,7 @@ class _OneSurface:
         """(F, None) at coefficient k, or (None, the solver's reason)."""
         df = self.df.copy()
         df["kw"] = k * self.kw1
+        df["kvw"] = k * self.kvw1
         if self.strength:
             ok, res = seismic_two_stage(df, self.method, debug_level=0,
                                         strength=self.strength)
@@ -296,6 +302,23 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
                   "ky": True, "composite": composite, "grid_seed": grid_seed,
                   "diagnostic": diagnostic, "fs_tol": fs_tol, "tol": tol,
                   "max_iter": max_iter, "min_slip_depth": min_slip_depth}
+    # A vertical seismic coefficient rides with k at the model's own ratio, the way
+    # Eurocode 8 states it (k_v = ±0.5 k or ±0.33 k), so k_y is the horizontal
+    # coefficient at which F = 1 with k_v = ratio·k_y. The ratio is the entered
+    # k_v over the entered |k|; a k_v entered with no k sets no ratio.
+    kv_ratio = 0.0
+    k_v_in = float(slope_data.get("k_vertical") or 0.0)
+    if k_v_in:
+        k_h_in = abs(float(slope_data.get("k_seismic") or 0.0))
+        if k_h_in == 0.0:
+            raise AnalysisError(
+                f"The model has a vertical seismic coefficient (k_v = {k_v_in:g}) "
+                "and no horizontal one. The yield coefficient search holds k_v at "
+                "the ratio k_v/k as it varies k, so enter the horizontal "
+                "coefficient that ratio belongs to, or set k_v to 0.")
+        kv_ratio = k_v_in / k_h_in
+    made_under["kv_ratio"] = kv_ratio
+
     # The search returns its points left to right; pair each with its own flag.
     movement = [p.get("Movement") for p in noncirc_left_to_right(slope_data.get("non_circ"))]
 
@@ -307,7 +330,7 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
         F = _OneSurface(slope_data, method,
                         surface_def if circular else None,
                         None if circular else surface_def,
-                        num_slices, composite, seismic2)
+                        num_slices, composite, seismic2, kv_ratio)
         k, f0 = _k_at_unity(F, where, hint=hint, cancel_check=cancel_check)
         if diagnostic:
             for kk, ff in F.trace:
@@ -328,6 +351,7 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
         for start in starts:
             sd = dict(slope_data)
             sd["k_seismic"] = k
+            sd["k_vertical"] = kv_ratio * k
             if not circular:
                 sd["non_circ"] = start
             found = run_lem_analysis(sd, method, analysis="auto_search",
@@ -412,6 +436,7 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
     # that read them are exactly those of an ordinary run at that coefficient.
     sd = _on_surface(slope_data, best_surface, circular)
     sd["k_seismic"] = best_k
+    sd["k_vertical"] = kv_ratio * best_k
     bundle = run_lem_analysis(sd, method, analysis="single_surface",
                               surface=surface, num_slices=num_slices,
                               seismic2=seismic2, composite=composite,
@@ -424,7 +449,8 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
     bundle["yield"] = {"k_y": best_k, "FS_k0": best_f0, "trace": best_trace,
                        "search": search, "static": static, "rounds": rounds,
                        "converged": converged, "surface": best_surface,
-                       "confirm_tol": confirm_tol, "strength": strength}
+                       "confirm_tol": confirm_tol, "strength": strength,
+                       "kv_ratio": kv_ratio}
     say(yield_line(bundle["yield"], noun))
     return bundle
 
@@ -457,6 +483,21 @@ def yield_line(info, surface_noun):
                  f"{len(info.get('rounds') or [])} rounds; this is the lowest "
                  f"k_y they found.")
     return text
+
+
+def model_at(slope_data, k):
+    """The model at horizontal seismic coefficient ``k``, as a run made at a
+    coefficient of its own (the yield coefficient, or a confirming search) was
+    solved: a vertical coefficient rides with k at the model's own ratio k_v/|k|,
+    as :func:`yield_coefficient` holds it. A model with no horizontal coefficient
+    sets no ratio and keeps its k_v. A copy; ``slope_data`` is not changed."""
+    sd = dict(slope_data)
+    k_h = abs(float(slope_data.get("k_seismic") or 0.0))
+    k_v = float(slope_data.get("k_vertical") or 0.0)
+    sd["k_seismic"] = k
+    if k_v and k_h:
+        sd["k_vertical"] = k_v / k_h * abs(float(k))
+    return sd
 
 
 # ---------------------------------------------------------------------------

@@ -284,11 +284,14 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
     caller_df = df
     df = df.copy()
     kw = df['kw'].copy()
+    kvw = df['kvw'].copy() if 'kvw' in df.columns else None
 
     if debug_level >= 1:
         print("=== TWO-STAGE SEISMIC ANALYSIS ===")
         print("Stage 1: static, before the earthquake...")
     df['kw'] = 0.0
+    if kvw is not None:
+        df['kvw'] = 0.0
     success, result_stage1 = method_func(df)
     if not success:
         return False, f"Stage 1 failed: {result_stage1}"
@@ -318,6 +321,8 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
     if err:
         return False, err
     df['kw'] = kw.values
+    if kvw is not None:
+        df['kvw'] = kvw.values
     success, result = method_func(df)
     if not success:
         return False, f"Stage 2 failed: {result}"

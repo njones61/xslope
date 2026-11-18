@@ -889,13 +889,19 @@ def ensure_reinforce_pullout(slope_data):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 27
+SUPPORTED_TEMPLATE_VERSION = 28
 
 # The template version that inserted the 1D element size cell at main!D20, pushing
 # every main-sheet run option below it down one row. Files at or above it are read
 # (and written) with that one-row shift; older ones keep their original layout and
 # carry no 1D size at all.
 _ELEMENT_SIZE_1D_TEMPLATE_VERSION = 25
+
+# The template version that inserted the vertical seismic coefficient at main!D14,
+# directly under the horizontal one, pushing every run option (D14 down) one row
+# lower. Files at or above it are read and written with that shift on top of the
+# v25 one; older files carry no vertical coefficient, which reads as 0.
+_VERTICAL_SEISMIC_TEMPLATE_VERSION = 28
 
 # The template version that introduced the water-load mode cell (main!D23). Below it
 # a file cannot say who supplies the weight of standing water, so it always means
@@ -927,9 +933,13 @@ SURFACE_FAMILY_CELL = {'circular': 'circular', 'noncircular': 'non-circular'}
 #: The main sheet's run-option block (column D), by the ``slope_data`` key each cell
 #: holds: the label in column C, the row on the template version that introduced the
 #: cell, and that version. Every row from D20 down moved one row lower at v25, when
-#: the 1D element size was inserted at D20 (:data:`_ELEMENT_SIZE_1D_TEMPLATE_VERSION`)
-#: -- the same one-row shift the loader and writer apply.
+#: the 1D element size was inserted at D20 (:data:`_ELEMENT_SIZE_1D_TEMPLATE_VERSION`),
+#: and every run option moved one more row at v28, when the vertical seismic
+#: coefficient was inserted at D14 (:data:`_VERTICAL_SEISMIC_TEMPLATE_VERSION`) --
+#: the same shifts the loader and writer apply.
 MAIN_SHEET_CELLS = {
+    'k_vertical': ('Vert. seismic coefficient (kv)', 14,
+                   _VERTICAL_SEISMIC_TEMPLATE_VERSION),
     'lem_method': ('LEM method', 14, 19),
     'num_slices': ('Number of slices', 15, 19),
     'k0': ('K0 initial stress (FEM)', 16, 19),
@@ -948,7 +958,8 @@ MAIN_SHEET_CELLS = {
 def main_sheet_cell(key, version=None):
     """The 'main' sheet cell that holds ``slope_data[key]`` on a template of
     ``version`` -- the current template when ``None`` -- e.g.
-    ``main_sheet_cell('water_loads')`` is ``'D24'``, and ``'D23'`` on a v22-v24 file.
+    ``main_sheet_cell('water_loads')`` is ``'D25'``, ``'D24'`` on a v25-v27 file, and
+    ``'D23'`` on a v22-v24 file.
     ``None`` when that version has no such cell.
 
     The one place a message, a remedy or an import note looks up which cell a reader
@@ -963,12 +974,14 @@ def main_sheet_cell(key, version=None):
         return None
     if key != 'element_size_1d' and row >= 20 and v >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
         row += 1
+    if key != 'k_vertical' and v >= _VERTICAL_SEISMIC_TEMPLATE_VERSION:
+        row += 1
     return f"D{row}"
 
 
 def template_main_sheet_cell(label, template=None):
     """The 'main' sheet cell a template itself labels ``label`` (column C, the
-    trailing colon ignored), e.g. ``'D24'`` for ``'Water loads'`` on the current
+    trailing colon ignored), e.g. ``'D25'`` for ``'Water loads'`` on the current
     template; ``None`` when the workbook cannot be read or has no such row.
 
     ``template`` is a workbook path, the bundled template by default. This reads
@@ -1377,6 +1390,9 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # including the cell names the error messages quote, which must name the row the
     # user is actually looking at.
     _shift = 1 if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
+    # v28 inserted the vertical seismic coefficient at main!D14, directly under the
+    # horizontal one, so the whole run-option block moved down one more row.
+    _top = 1 if _tv >= _VERTICAL_SEISMIC_TEMPLATE_VERSION else 0
 
     # === MAIN-SHEET GLOBALS (version-gated positional map) ===
     # v18 inserted two declaration cells at the top of the block and shifted the three
@@ -1413,11 +1429,27 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             tcrack_depth = float(main_df.iloc[10, 3])           # D11
             tcrack_water = float(main_df.iloc[11, 3])           # D12
             k_seismic = float(main_df.iloc[12, 3])              # D13
+            # v28 D14: the vertical seismic coefficient, signed, positive acting
+            # downward (Slide2's and SLOPE/W's convention). Blank is 0, and a file
+            # older than v28 has none.
+            k_vertical = 0.0
+            if _top:
+                _kv_raw = main_df.iloc[13, 3] if main_df.shape[0] > 13 else None
+                if _cell_str(_kv_raw) != '':
+                    try:
+                        k_vertical = float(_kv_raw)
+                    except (TypeError, ValueError):
+                        raise ValueError(
+                            f"The 'main' sheet cell "
+                            f"{main_sheet_cell('k_vertical')} (vertical seismic "
+                            f"coefficient) contains {_kv_raw!r}, which is not a "
+                            "number. Enter 0 or leave it blank for none.")
         else:
             gamma_water = float(main_df.iloc[7, 3])             # D8
             tcrack_depth = float(main_df.iloc[8, 3])            # D9
             tcrack_water = float(main_df.iloc[9, 3])            # D10
             k_seismic = float(main_df.iloc[10, 3])              # D11
+            k_vertical = 0.0
             unit_system = infer_system_from_gamma_water(gamma_water)
     except ValueError:
         raise
@@ -1467,28 +1499,31 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # free text once someone types over the dropdown; an unrecognized value
         # RAISES rather than falling back, so a typo can never silently run a
         # different method than the file says.
-        _lem_raw = _cell_str(main_df.iloc[13, 3]) if main_df.shape[0] > 13 else ''
+        _lem_raw = (_cell_str(main_df.iloc[13 + _top, 3])
+                    if main_df.shape[0] > 13 + _top else '')
         if _lem_raw:
             lem_method = _lem_raw.lower()
             if lem_method not in LEM_METHODS:
                 raise ValueError(
                     f"The 'main' sheet declares an unrecognized LEM method "
-                    f"{_lem_raw!r} in cell D14. Expected one of: "
+                    f"{_lem_raw!r} in cell D{14 + _top}. Expected one of: "
                     f"{', '.join(LEM_METHODS)} (or leave it blank).")
 
         # D15-D22 are read as entered. Whether a value is usable (at least two
         # slices, a positive K0 or mesh size, an increasing SSRM bracket) is a
         # preflight rule for the analysis that reads it.
-        num_slices_opt = _opt_num(14, 'number of slices', integer=True)   # D15
+        num_slices_opt = _opt_num(14 + _top, 'number of slices',
+                                  integer=True)                       # D15
 
         # -- D16 K0. At-rest lateral earth pressure coefficient for the FEM
         # initial stress state. Blank -> None -> gravity turn-on (the historical
         # initialization), so no existing model moves.
-        k0 = _opt_num(15, 'K0 initial stress')
+        k0 = _opt_num(15 + _top, 'K0 initial stress')
 
         # -- D17 Tension SRF. YES/NO/blank -> True/False/None. None is NOT False:
         # it means unspecified, and the engine default (True) applies.
-        _tsrf_raw = _cell_str(main_df.iloc[16, 3]) if main_df.shape[0] > 16 else ''
+        _tsrf_raw = (_cell_str(main_df.iloc[16 + _top, 3])
+                     if main_df.shape[0] > 16 + _top else '')
         if _tsrf_raw:
             _t = _tsrf_raw.strip().lower()
             if _t in ('yes', 'true', 'y'):
@@ -1498,29 +1533,31 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             else:
                 raise ValueError(
                     f"The 'main' sheet has an unrecognized Tension SRF value "
-                    f"{_tsrf_raw!r} in cell D17. Expected YES or NO (or blank).")
+                    f"{_tsrf_raw!r} in cell D{17 + _top}. Expected YES or NO (or "
+                    "blank).")
 
         # -- D18/D19 mesh defaults.
-        _et_raw = _cell_str(main_df.iloc[17, 3]) if main_df.shape[0] > 17 else ''
+        _et_raw = (_cell_str(main_df.iloc[17 + _top, 3])
+                   if main_df.shape[0] > 17 + _top else '')
         if _et_raw:
             element_type = _et_raw.lower()
             if element_type not in MESH_ELEMENT_TYPES:
                 raise ValueError(
                     f"The 'main' sheet declares an unrecognized mesh element type "
-                    f"{_et_raw!r} in cell D18. Expected one of: "
+                    f"{_et_raw!r} in cell D{18 + _top}. Expected one of: "
                     f"{', '.join(MESH_ELEMENT_TYPES)} (or leave it blank).")
-        target_size = _opt_num(18, 'mesh target size')                   # D19
+        target_size = _opt_num(18 + _top, 'mesh target size')            # D19
 
         # -- D20 1D element size (v25). The target edge length along the 1D
         # members -- piles and reinforcement lines. Blank means unspecified, and
         # the mesher's own subdivision applies, so a v24 file (which has no such
         # cell at all) and a v25 file with the cell empty are the same model.
         if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
-            element_size_1d = _opt_num(19, '1D element size')            # D20
+            element_size_1d = _opt_num(19 + _top, '1D element size')     # D20
 
         # -- SSRM bracket (D20/D21 through v24, D21/D22 from v25).
-        ssrm_f_min = _opt_num(19 + _shift, 'SSRM F min')
-        ssrm_f_max = _opt_num(20 + _shift, 'SSRM F max')
+        ssrm_f_min = _opt_num(19 + _shift + _top, 'SSRM F min')
+        ssrm_f_max = _opt_num(20 + _shift + _top, 'SSRM F max')
 
     # === SIDE BOUNDARY CONDITION (v21, main D22) ===
     # How the FEM restrains the left and right truncation boundaries:
@@ -1532,7 +1569,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # untouched cell is the same model as its v20 original.
     side_bc = None
     if _tv >= 21:
-        _sbc_row = 21 + _shift
+        _sbc_row = 21 + _shift + _top
         _sbc_raw = (_cell_str(main_df.iloc[_sbc_row, 3])
                     if main_df.shape[0] > _sbc_row else '')
         if _sbc_raw:
@@ -1558,7 +1595,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # under them would count the reservoir twice.
     water_loads = 'manual'
     if _tv >= 22:
-        _wl_row = 22 + _shift
+        _wl_row = 22 + _shift + _top
         _wl_raw = (_cell_str(main_df.iloc[_wl_row, 3])
                    if main_df.shape[0] > _wl_row else '')
         if _wl_raw:
@@ -1586,7 +1623,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # spells the second one with a hyphen.
     surface_family = None
     if _tv >= 22:
-        _sf_row = 23 + _shift
+        _sf_row = 23 + _shift + _top
         _sf_raw = (_cell_str(main_df.iloc[_sf_row, 3])
                    if main_df.shape[0] > _sf_row else '')
         if _sf_raw:
@@ -2765,6 +2802,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     globals_data["tcrack_depth"] = tcrack_depth
     globals_data["tcrack_water"] = tcrack_water
     globals_data["k_seismic"] = k_seismic
+    globals_data["k_vertical"] = k_vertical
     globals_data["max_depth"] = max_depth
     globals_data["profile_lines"] = profile_lines
     globals_data["polygons"] = polygons
@@ -3184,6 +3222,9 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
     # down one row; the same offset the loader uses, applied to the DESTINATION's
     # layout so an archived template is still written at its own positions.
     _dshift = 1 if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
+    # v28 inserted the vertical seismic coefficient at main!D14 and pushed the whole
+    # run-option block down one more row.
+    _dtop = 1 if _dest_version >= _VERTICAL_SEISMIC_TEMPLATE_VERSION else 0
 
     # === main === (version-gated positional map; see load_slope_data)
     if _dest_version >= 18:
@@ -3193,6 +3234,10 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             'D12': _f(slope_data['tcrack_water']),
             'D13': _f(slope_data['k_seismic']),
         }
+        if _dtop:
+            # v28 vertical seismic coefficient (D14), signed, positive downward.
+            # Written as a number, 0 where the model has none, like k above.
+            main_u['D14'] = _f(slope_data.get('k_vertical') or 0.0)
         # Units selector (D8) and Time selector (D9) are written UNCONDITIONALLY --
         # blank (None) when undeclared -- so the template's pre-filled defaults never
         # leak into a saved file (e.g. a model with no time_unit must not inherit the
@@ -3209,26 +3254,31 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             # the blank template ships with D17 pre-filled 'YES', and a model that
             # declares nothing must not silently inherit it on save.
             _srf = slope_data.get('tension_srf')
-            main_u['D14'] = str(slope_data['lem_method']) if slope_data.get('lem_method') else None
-            main_u['D15'] = (int(slope_data['num_slices'])
-                             if slope_data.get('num_slices') is not None else None)
-            main_u['D16'] = (_f(slope_data['k0'])
-                             if slope_data.get('k0') is not None else None)
-            main_u['D17'] = None if _srf is None else ('YES' if _srf else 'NO')
-            main_u['D18'] = str(slope_data['element_type']) if slope_data.get('element_type') else None
-            main_u['D19'] = (_f(slope_data['target_size'])
-                             if slope_data.get('target_size') is not None else None)
+            main_u[f'D{14 + _dtop}'] = (str(slope_data['lem_method'])
+                                        if slope_data.get('lem_method') else None)
+            main_u[f'D{15 + _dtop}'] = (int(slope_data['num_slices'])
+                                        if slope_data.get('num_slices') is not None
+                                        else None)
+            main_u[f'D{16 + _dtop}'] = (_f(slope_data['k0'])
+                                        if slope_data.get('k0') is not None else None)
+            main_u[f'D{17 + _dtop}'] = (None if _srf is None
+                                        else ('YES' if _srf else 'NO'))
+            main_u[f'D{18 + _dtop}'] = (str(slope_data['element_type'])
+                                        if slope_data.get('element_type') else None)
+            main_u[f'D{19 + _dtop}'] = (_f(slope_data['target_size'])
+                                        if slope_data.get('target_size') is not None
+                                        else None)
             if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
                 # v25 1D element size (D20). Written unconditionally like the rest
                 # of the block: the template ships the cell blank, and a model that
                 # declares no 1D size must save as blank rather than inherit one.
-                main_u['D20'] = (_f(slope_data['element_size_1d'])
+                main_u[f'D{20 + _dtop}'] = (_f(slope_data['element_size_1d'])
                                  if slope_data.get('element_size_1d') is not None
                                  else None)
-            main_u[f'D{20 + _dshift}'] = (
+            main_u[f'D{20 + _dshift + _dtop}'] = (
                 _f(slope_data['ssrm_f_min'])
                 if slope_data.get('ssrm_f_min') is not None else None)
-            main_u[f'D{21 + _dshift}'] = (
+            main_u[f'D{21 + _dshift + _dtop}'] = (
                 _f(slope_data['ssrm_f_max'])
                 if slope_data.get('ssrm_f_max') is not None else None)
         if _dest_version >= 21:
@@ -3236,7 +3286,7 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             # the run options above: the blank template ships D22 pre-filled
             # 'rollers', and a model that declares nothing must not inherit it.
             _sbc = slope_data.get('side_bc')
-            main_u[f'D{22 + _dshift}'] = str(_sbc).lower() if _sbc else None
+            main_u[f'D{22 + _dshift + _dtop}'] = str(_sbc).lower() if _sbc else None
         if _dest_version >= 22:
             # v22 water loads (D23). Written EXPLICITLY, never blank, and this one
             # matters more than the leak cases above: the template ships D23
@@ -3252,9 +3302,9 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 # and the answer decides whether the reservoir is counted once.
                 raise ValueError(
                     f"Cannot save this model: its water-load mode is {_wl!r}, which "
-                    f"is not a value cell D{23 + _dshift} of the 'main' sheet can "
+                    f"is not a value cell D{23 + _dshift + _dtop} of the 'main' sheet can "
                     f"hold. Expected one of: {', '.join(WATER_LOAD_OPTIONS)}.")
-            main_u[f'D{23 + _dshift}'] = _wl
+            main_u[f'D{23 + _dshift + _dtop}'] = _wl
             # v22 amendment: the surface family (D24). Written unconditionally, so a
             # model that states nothing writes a blank cell -- the normal state, and
             # the template ships blank, so there is nothing here to leak. A model that
@@ -3268,12 +3318,12 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 if _sf_key not in SURFACE_FAMILY_CELL:
                     raise ValueError(
                         f"Cannot save this model: its surface family is {_sf!r}, which "
-                        f"is not a value cell D{24 + _dshift} of the 'main' sheet "
+                        f"is not a value cell D{24 + _dshift + _dtop} of the 'main' sheet "
                         f"can hold. Expected one of: "
                         f"{', '.join(SURFACE_FAMILY_OPTIONS)}.")
-                main_u[f'D{24 + _dshift}'] = SURFACE_FAMILY_CELL[_sf_key]
+                main_u[f'D{24 + _dshift + _dtop}'] = SURFACE_FAMILY_CELL[_sf_key]
             else:
-                main_u[f'D{24 + _dshift}'] = None
+                main_u[f'D{24 + _dshift + _dtop}'] = None
         updates['main'] = main_u
     else:
         updates['main'] = {

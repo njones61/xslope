@@ -677,6 +677,45 @@ force-equilibrium methods solve at every k.
 <!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=frictional, num_slices=40, expected_kc=0.0875, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-corps -->
 <!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=frictional, num_slices=40, expected_kc=0.0875, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-lowe -->
 
+**With a vertical seismic force.** A vertical force k<sub>v</sub>W through the same center
+of gravity, positive downward, scales the weight in both equations by 1 + k<sub>v</sub>:
+
+$$N = W(1+k_v)\cos\beta - kW\sin\beta, \qquad T = W(1+k_v)\sin\beta + kW\cos\beta$$
+
+The factor of safety is again exact on the wedge. The yield coefficient search holds
+k<sub>v</sub> at a fixed ratio r = k<sub>v</sub>/k as it varies k, and with that ratio
+
+$$k_y = \frac{cL/W + \cos\beta\tan\phi - \sin\beta}{\cos\beta + \sin\beta\tan\phi
++ r(\sin\beta - \cos\beta\tan\phi)}.$$
+
+On the c–φ wedge φ equals β, so the term in r is zero and k<sub>v</sub> leaves its
+k<sub>y</sub> unchanged. The frictional wedge shows the ratio.
+
+| Soil | Quantity | Closed form | Spencer | Corps of Engineers | Lowe & Karafiath |
+|---|---|:-:|:-:|:-:|:-:|
+| c = 10 kPa, φ = 30° | F at k = 0.1, k<sub>v</sub> = 0.05 down | 1.2579 | 1.2579 (0.0%) | 1.2579 (0.0%) | 1.2579 (0.0%) |
+| c = 10 kPa, φ = 30° | F at k = 0.1, k<sub>v</sub> = 0.05 up | 1.2809 | 1.2809 (0.0%) | 1.2809 (0.0%) | 1.2809 (0.0%) |
+| c = 0, φ = 35° | F at k = 0.1, k<sub>v</sub> = 0.05 down | 0.9838 | no solution | 0.9838 (0.0%) | 0.9838 (0.0%) |
+| c = 0, φ = 35° | F at k = 0.1, k<sub>v</sub> = 0.05 up | 0.9634 | no solution | 0.9634 (0.0%) | 0.9634 (0.0%) |
+| c = 0, φ = 35° | k<sub>y</sub> with k<sub>v</sub> = 0.5k down | 0.0915 | no solution | 0.0915 (0.0%) | 0.0915 (0.0%) |
+| c = 0, φ = 35° | k<sub>y</sub> with k<sub>v</sub> = 0.5k up | 0.0838 | no solution | 0.0838 (0.0%) | 0.0838 (0.0%) |
+
+With k = 0.1 and no vertical force, F is 1.2689 on the c–φ wedge and 0.9741 on the
+frictional wedge. A downward k<sub>v</sub> lowers F on the c–φ wedge and raises it on the
+frictional one, and an upward k<sub>v</sub> does the opposite, so a design check runs both
+directions.
+
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=c-phi, k_seismic=0.1, k_vertical=0.0, num_slices=40, fs_spencer=1.2689, fs_corps=1.2689, fs_lowe=1.2689, benchmark=DWB-10.1-wedge-cphi-kv-none -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=frictional, k_seismic=0.1, k_vertical=0.0, num_slices=40, fs_corps=0.9741, fs_lowe=0.9741, benchmark=DWB-10.1-wedge-frictional-kv-none -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=c-phi, k_seismic=0.1, k_vertical=0.05, num_slices=40, fs_spencer=1.2579, fs_corps=1.2579, fs_lowe=1.2579, benchmark=DWB-10.1-wedge-cphi-kv-down -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=c-phi, k_seismic=0.1, k_vertical=-0.05, num_slices=40, fs_spencer=1.2809, fs_corps=1.2809, fs_lowe=1.2809, benchmark=DWB-10.1-wedge-cphi-kv-up -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=frictional, k_seismic=0.1, k_vertical=0.05, num_slices=40, fs_corps=0.9838, fs_lowe=0.9838, benchmark=DWB-10.1-wedge-frictional-kv-down -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=frictional, k_seismic=0.1, k_vertical=-0.05, num_slices=40, fs_corps=0.9634, fs_lowe=0.9634, benchmark=DWB-10.1-wedge-frictional-kv-up -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=0.1, num_slices=40, expected_kc=0.0915, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-down-ky-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=0.1, num_slices=40, expected_kc=0.0915, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-down-ky-lowe -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=-0.1, num_slices=40, expected_kc=0.0838, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-up-ky-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=-0.1, num_slices=40, expected_kc=0.0838, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-up-ky-lowe -->
+
 ---
 
 ## 🟢 DWB Table 10.4 — pseudostatic slope, single-stage and two-stage {#dwb-10-4}

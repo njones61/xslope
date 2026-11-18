@@ -666,10 +666,9 @@ def slide2_to_slope_data(d, scenario=None):
 
     # --- things reported but not imported ----------------------------------------
     k_seismic = _fnum(md.get("seismic", 0.0))
-    if _fnum(md.get("seismicv", 0.0)):
-        caveats.append(
-            f"a vertical seismic coefficient ({_fnum(md.get('seismicv')):g}) is set in "
-            f"Slide2 — xslope models only the horizontal one, so it was dropped")
+    # Slide2's vertical coefficient is signed, positive acting downward: xslope's own
+    # convention, so it carries over as entered.
+    k_vertical = _fnum(md.get("seismicv", 0.0))
 
     n_anchors = sum(1 for ln in sections.get("anchors", []) if re.match(r"\s*\d+\s+x1:", ln))
     if n_anchors:
@@ -722,6 +721,7 @@ def slide2_to_slope_data(d, scenario=None):
         "tcrack_depth": tcrack_depth,
         "tcrack_water": tcrack_water,
         "k_seismic": k_seismic,
+        "k_vertical": k_vertical,
         "max_depth": None,
         "profile_lines": [],
         "polygons": polygons,

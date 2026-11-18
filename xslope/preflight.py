@@ -2573,7 +2573,8 @@ def _mat_hb_method_convergence(ctx):
                f"Hoek-Brown envelope reaches at the low normal stresses on a "
                f"shallow slice near the crest. Run Spencer's Method or the "
                f"Morgenstern-Price Method, which solve for the inclination "
-               f"(Materials table, mat sheet; Run LEM, main D14).")
+               f"(Materials table, mat sheet; Run LEM, main "
+               f"{_main_cell(ctx, 'lem_method')}).")
 
 
 # ---------------------------------------------------------------------------
@@ -2612,6 +2613,37 @@ def _seismic_magnitude(ctx):
                       f"pseudo-static analysis (typically 0.05-0.3) "
                       f"{_at_global('D13')}.")
     return None
+
+
+@rule("main.seismic_vertical_invalid", ERROR, ("lem", "fem"),
+      "The vertical seismic coefficient k_v must be a number above -1.")
+def _seismic_vertical_invalid(ctx):
+    raw = ctx.sd.get("k_vertical")
+    if raw is None:
+        return None                # a file older than v28 has none: 0
+    if not _finite(raw):
+        return (f"Vertical seismic coefficient k_v is not a number. Enter 0 for "
+                f"none {_at_global(_main_cell(ctx, 'k_vertical'))}.")
+    kv = float(raw)
+    if kv > -1.0:
+        return None
+    return (f"Vertical seismic coefficient k_v = {kv:g}. k_v is signed, positive "
+            f"downward, and scales the soil's weight by 1 + k_v: at {kv:g} the "
+            f"weight is {1.0 + kv:g} times itself, so the soil is lifted off the "
+            f"ground. Enter a fraction of gravity, typically half of k or less "
+            f"{_at_global(_main_cell(ctx, 'k_vertical'))}.")
+
+
+@rule("main.seismic_vertical_magnitude", WARNING, ("lem", "fem"),
+      "A vertical seismic coefficient k_v above 0.5 in magnitude is probably a "
+      "percent/fraction slip.")
+def _seismic_vertical_magnitude(ctx):
+    kv = _num(ctx.sd.get("k_vertical"))
+    if kv is None or abs(kv) <= 0.5 or kv <= -1.0:
+        return None
+    return (f"Vertical seismic coefficient k_v = {kv:g}. k_v is a fraction of "
+            f"gravity, usually a half or a third of k (Eurocode 8) -- enter 0.05 "
+            f"for 5%g {_at_global(_main_cell(ctx, 'k_vertical'))}.")
 
 
 @rule("main.seismic_negative_lem", WARNING, ("lem",),
@@ -2658,7 +2690,7 @@ def _lem_method_unknown(ctx):
         return None
     return (f"LEM method is {m!r}, which is not a method this package implements. "
             f"Choose one of: {', '.join(LEM_METHOD_OPTIONS)}, or 'all' "
-            f"(Run LEM; main D14).")
+            f"(Run LEM; main {_main_cell(ctx, 'lem_method')}).")
 
 
 # ---------------------------------------------------------------------------
@@ -3289,7 +3321,8 @@ def _mesh_element_type_linear(ctx):
             f"(tri3) and +11% (quad4) against the reference on the Griffiths & Lane "
             f"Example 1 benchmark. Use tri6, quad8 or quad9 for a finite element or "
             f"strength-reduction run; tri3 is for seepage, where the field is scalar "
-            f"and nothing can lock (Build mesh; main D18).")
+            f"and nothing can lock (Build mesh; main "
+            f"{_main_cell(ctx, 'element_type')}).")
 
 
 @rule("mesh.material_id_out_of_range", ERROR, ("seep", "fem"),
@@ -3791,7 +3824,7 @@ def _tension_srf_unset(ctx):
             f"tensile cap is divided by the trial strength-reduction factor "
             f"alongside c and tan(φ). {len(capped)} material(s) carry a tensile "
             f"cutoff above zero. Set it to NO to hold the cap at its entered "
-            f"value instead {_at_global('D17')}.")
+            f"value instead {_at_global(_main_cell(ctx, 'tension_srf'))}.")
 
 
 # ---------------------------------------------------------------------------
@@ -3814,7 +3847,7 @@ def _k0_without_zones(ctx):
             "material-zone geometry for the engine to integrate the overburden "
             "through, so the initial stress state cannot be built. Supply the "
             "profile lines or polygons, or leave K0 blank for the gravity turn-on "
-            "initialization (Global parameters; main D16).")
+            f"initialization (Global parameters; main {_main_cell(ctx, 'k0')}).")
 
 
 @rule("fem.k0_pre_equilibration", INFO, ("fem",),
@@ -3830,7 +3863,7 @@ def _k0_pre_equilibration(ctx):
             f"(relief {h:.4g}). The K0 stress field does not equilibrate itself "
             f"there, so the engine runs one extra full-strength solve first and "
             f"hands the settled state to every trial. The factor of safety moves "
-            f"with K0 without any further notice {_at_global('D16')}.")
+            f"with K0 without any further notice {_at_global(_main_cell(ctx, 'k0'))}.")
 
 
 @rule("ssr.zone_contains_no_elements", ERROR, ("fem",),
@@ -3893,14 +3926,14 @@ def _zone_size_not_finer(ctx):
                        f"not finer than the global target element size ({target:g}). "
                        f"The zone is inert -- a refine polygon's only effect is a "
                        f"SMALLER local element size (Polygons, polygon sheet; Build "
-                       f"mesh, main D19).")
+                       f"mesh, main {_main_cell(ctx, 'target_size')}).")
     for n, p in enumerate(ctx.sd.get("polygons") or []):
         s = _num(p.get("size") if isinstance(p, dict) else None)
         if s is not None and s >= target:
             out.append(f"Polygon #{n + 1} declares Size = {s:g}, which is not "
                        f"finer than the global target element size ({target:g}), so "
                        f"it changes nothing (Polygons, polygon sheet; Build mesh, "
-                       f"main D19).")
+                       f"main {_main_cell(ctx, 'target_size')}).")
     return out
 
 
@@ -4122,7 +4155,8 @@ def _thin_zone_unresolved(ctx):
             continue
         out.append(
             f"{label} is about {width:.3g} wide, which is {rows:.1f} element rows at "
-            f"the global target element size ({target:g}, main D19), and the zone "
+            f"the global target element size ({target:g}, main "
+            f"{_main_cell(ctx, 'target_size')}), and the zone "
             f"declares no Size of its own. A zone this thin cannot develop a "
             f"shear band, so the run does not fail on it -- it returns a factor of "
             f"safety that is too high, with nothing in the result to say the mesh "
@@ -7114,7 +7148,8 @@ def _num_slices_few(ctx):
     if n is None or n >= 2:
         return None
     return (f"Number of slices is {_fmt(n)}. Enter at least 2 (30 to 50 is usual), "
-            f"or leave it blank for the default (Run LEM; main D15).")
+            f"or leave it blank for the default (Run LEM; main "
+            f"{_main_cell(ctx, 'num_slices')}).")
 
 
 @rule("fem.k0_nonpositive", ERROR, ("fem",),
@@ -7126,7 +7161,7 @@ def _k0_nonpositive(ctx):
     return (f"K0 initial stress (FEM) is {k0:g}. Enter a positive at-rest "
             f"coefficient (about 1 − sin φ′ for a normally consolidated soil, 1.0 to "
             f"reproduce an RS2 model), or leave it blank for the gravity turn-on "
-            f"initialization {_at_global('D16')}.")
+            f"initialization {_at_global(_main_cell(ctx, 'k0'))}.")
 
 
 def _main_cell(ctx, key):
@@ -7151,11 +7186,11 @@ def _mesh_size_nonpositive(ctx):
     if _bad(sd.get("target_size")):
         yield (f"Target element size is {_fmt(sd.get('target_size'))}. Enter a "
                f"positive size, or leave it blank for the automatic size (Build "
-               f"mesh; main D19).")
+               f"mesh; main {_main_cell(ctx, 'target_size')}).")
     if _bad(sd.get("element_size_1d")):
         yield (f"1D element size is {_fmt(sd.get('element_size_1d'))}. Enter a "
                f"positive size, or leave it blank to follow the target element size "
-               f"(Build mesh; main D20).")
+               f"(Build mesh; main {_main_cell(ctx, 'element_size_1d')}).")
     if sd.get("profile_lines"):
         for k, line in enumerate(sd.get("profile_lines") or []):
             if isinstance(line, dict) and _bad(line.get("size")):

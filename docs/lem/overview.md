@@ -394,6 +394,8 @@ forces. These forces are typically represented as horizontal accelerations actin
 
 The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. That direction follows from the failure surface, so only the magnitude of $k$ is used here; the finite element solver has no failure surface to read it from and uses the signed value instead — see [Seismic forces](../fem/overview.md#seismic-forces).
 
+A vertical seismic coefficient $k_v$ adds a vertical force $k_vW$ through the same center of gravity. It is signed: positive acts downward and adds to the slice weight, negative acts upward and takes it away. Every method uses $W(1+k_v)$ wherever it uses the weight, in force and moment equilibrium alike. The effect depends on the soil. On a frictional slope an upward $k_v$ lowers the factor of safety, because it reduces the normal force that friction depends on. On a cohesive slope a downward one does, because it adds driving weight that cohesion does not match. A run applies $k_v$ in the direction entered, so checking both directions takes two runs.
+
 **Reinforcement:** Reinforcement forces are used to represent the effects of geosynthetics, soil nails, or other 
 structural elements that provide additional stability to slopes. These forces can be modeled as tensile forces acting along the base of the slices, providing resistance to sliding and contributing to the overall stability of the slope.
 

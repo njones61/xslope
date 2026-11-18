@@ -392,6 +392,15 @@ The mirrored slopes below show the horizontal seismic body force in each driving
 A negative $k$ drives the left-facing slope to the left; a positive $k$ drives the right-facing
 slope to the right. The arrows act through the soil mass, not as loads on its surface.
 
+**Vertical seismic coefficient.** A vertical coefficient $k_v$ scales the self weight, so the
+vertical body force becomes
+
+>>$b_{y} = -(1 + k_v)\,\gamma$
+
+with $k_v$ positive downward, as in the limit-equilibrium solvers. It has no direction to choose,
+so both engines read the same signed value the same way. A run applies it in the direction
+entered, so checking both directions takes two runs.
+
 ## Pore pressures {#pore-pressure-options}
 
 Soil strength depends on the effective stress, the part of the total stress carried by the soil

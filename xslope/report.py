@@ -2523,16 +2523,28 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     else:
         sub.blocks.append(Prose("The model carries no distributed loads."))
     k = _num(slope_data.get("k_seismic"))
+    kv = _num(slope_data.get("k_vertical")) or 0.0
+    kv_dir = "downward" if kv > 0 else "upward"
     if seismic and ky:
-        sub.blocks.append(Prose(
-            "A pseudo-static seismic force kW acts horizontally toward the toe on "
-            "every slice, at the seismic coefficient the analysis finds: the yield "
-            "coefficient k_y, at which the factor of safety is 1."
-            + (f" The model's own coefficient, k = {k:g}, is not used." if k else "")))
-    elif seismic and k:
-        sub.blocks.append(Prose(
-            f"A pseudo-static seismic coefficient of k = {k:g} is applied, "
-            f"acting horizontally toward the toe on every slice."))
+        text = ("A pseudo-static seismic force kW acts horizontally toward the toe on "
+                "every slice, at the seismic coefficient the analysis finds: the yield "
+                "coefficient k_y, at which the factor of safety is 1.")
+        if kv and k:
+            text += (f" A vertical seismic force k_v·W acts {kv_dir} with it, held at "
+                     f"the model's ratio k_v/k = {abs(kv) / abs(k):.3g}, so "
+                     f"k_v = {abs(kv) / abs(k):.3g}·k_y.")
+        elif k:
+            text += f" The model's own coefficient, k = {k:g}, is not used."
+        sub.blocks.append(Prose(text))
+    elif seismic and (k or kv):
+        parts = []
+        if k:
+            parts.append(f"A pseudo-static seismic coefficient of k = {k:g} is "
+                         f"applied, acting horizontally toward the toe on every slice.")
+        if kv:
+            parts.append(f"A vertical seismic coefficient of k_v = {abs(kv):g} is "
+                         f"applied, acting {kv_dir} on every slice.")
+        sub.blocks.append(Prose(" ".join(parts)))
     return sub
 
 
@@ -3201,7 +3213,8 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
     k_search = _num(search.get("k_seismic"))
     if k_search is not None:
         items.append(("Seismic coefficient of this search", f"{k_search:.4f}"))
-        slope_data = dict(slope_data, k_seismic=k_search)
+        from .seismic import model_at
+        slope_data = model_at(slope_data, k_search)
     valid = [c for c in fs_cache if _num(c.get("FS")) is not None
              and _num(c.get("FS")) < 9000]
     if valid:
@@ -7001,7 +7014,8 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     slice_df = bundle.get("slice_df")
     # A yield coefficient run was solved at k = k_y, and its figures say so.
     ky_info = bundle.get("yield")
-    sd_run = (dict(slope_data, k_seismic=ky_info["k_y"]) if ky_info
+    from .seismic import model_at
+    sd_run = (model_at(slope_data, ky_info["k_y"]) if ky_info
               else slope_data)
 
     # --- the search that found THIS method's surface ---
@@ -7280,12 +7294,20 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     k = _num(slope_data.get("k_seismic"))
     items.append(("Surface", "located by search" if any_search
                   else "specified in the input; no search was performed"))
+    kv = _num(slope_data.get("k_vertical")) or 0.0
     if ky:
         items.append(("Seismic coefficient",
                       "found by the analysis (the yield coefficient k_y)"
-                      + (f"; the model's k = {k:g} is not used" if k else "")))
+                      + (f"; the model's k = {k:g} is not used" if k and not kv else "")))
+        if kv and k:
+            items.append(("Vertical seismic coefficient",
+                          f"{abs(kv) / abs(k):.3g}·k_y, "
+                          f"{'downward' if kv > 0 else 'upward'}"))
     else:
         items.append(("Seismic coefficient", f"{k:g}" if k else "none"))
+        if kv:
+            items.append(("Vertical seismic coefficient",
+                          f"{abs(kv):g}, {'downward' if kv > 0 else 'upward'}"))
     tc = _num(slope_data.get("tcrack_depth"))
     if tc:
         items.append(("Tension crack depth", f"{tc:g}"))

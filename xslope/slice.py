@@ -585,6 +585,7 @@ def update_slice_materials(slice_df, materials):
         sghy += gs * HYs[:, p] + g * HYm[:, p]
     slice_df['w'] = w
     slice_df['kw'] = abs(mb['k_seismic']) * w
+    slice_df['kvw'] = float(mb.get('k_vertical') or 0.0) * w
     with np.errstate(invalid='ignore', divide='ignore'):
         slice_df['y_cg'] = np.where(sgh > 0, sghy / np.maximum(sgh, 1e-300), np.nan)
 
@@ -1284,6 +1285,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     tcrack_depth = slope_data["tcrack_depth"]
     tcrack_water = slope_data["tcrack_water"]
     k_seismic = slope_data['k_seismic']
+    # Vertical seismic coefficient (v28): signed, positive acting downward, applied
+    # as given -- unlike k, whose magnitude the slicer orients itself.
+    k_vertical = float(slope_data.get('k_vertical') or 0.0)
     # === WATER LOADS (v22 main!D23) ===
     # In automatic mode the weight of standing water is not something the user
     # typed: it is derived here from the model's own water definition -- the
@@ -2211,8 +2215,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             dload2, d_x2, d_y2, beta_d2, qL2, qR2 = _combine(dload2_interp_funcs,
                                                              dload2_vert_funcs)
 
-        # Seismic force
+        # Seismic forces: horizontal, oriented by the surface, and vertical, signed,
+        # positive downward. Both act through the slice's center of gravity.
         kw = abs(k_seismic) * soil_weight
+        kvw = k_vertical * soil_weight
 
         # === BEGIN : "Tension crack water force" ===
 
@@ -2874,6 +2880,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'beta': beta_d,
             'beta2': beta_d2,  # ditto for the stage-2 load (see advanced.rapid_drawdown)
             'kw': kw,   # seismic force
+            'kvw': kvw,  # vertical seismic force, positive downward
             't': t_force,  # tension crack water force
             'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action
             'p': p_sum,   # sum of reinforcement line T values that intersect base of slice (tangent, active).
@@ -2985,6 +2992,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'y_u': np.asarray(mb_y_u, dtype=float),   # where cp strength is read
             'mat_of_poly': _mats_of_poly,
             'k_seismic': k_seismic,
+            'k_vertical': k_vertical,
             'suction': bool(suction_phi_b),
         }
     if facing_note and debug:

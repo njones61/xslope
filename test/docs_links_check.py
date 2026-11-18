@@ -976,7 +976,7 @@ LEM02_DLOAD_TABS = ("Set 1", "Set 2 (rapid drawdown)")
 LEM02_DLOAD_DIRECTION_LABEL = "Direction:"
 
 #: The Global-parameters row LEM-2's seismic section sends the reader to.
-LEM02_GLOBAL_ROW = "Seismic coefficient k"
+LEM02_GLOBAL_ROW = "Horizontal seismic coefficient k"
 
 #: The line-loads table's column headers, in the order the page dictates values
 #: into them (**Label** `footing`, **x** `30`, **y** `20`, **P** `7500`,
@@ -3157,7 +3157,7 @@ def test_main_sheet_cells():
       inserted above the block cannot go unnoticed (D23 became D24 at v25);
     * the writer: a model saved into the current template carries each run option
       in the cell the lookup names;
-    * the messages: no import note, remedy or save refusal spells a cell from D20
+    * the messages: no import note, remedy or save refusal spells a cell from D14
       down as text -- the rows that move -- instead of asking the lookup. A remedy
       label names the cell of the model's own template (D23 on a v23 file).
     """
@@ -3189,7 +3189,7 @@ def test_main_sheet_cells():
                          f"{template_main_sheet_cell(label)}, not "
                          f"{main_sheet_cell(key)}")
 
-    stated = {"lem_method": ("bishop", "bishop"), "num_slices": (33, 33),
+    stated = {"k_vertical": (-0.05, -0.05), "lem_method": ("bishop", "bishop"), "num_slices": (33, 33),
               "k0": (0.6, 0.6), "tension_srf": (False, "NO"),
               "element_type": ("tri6", "tri6"), "target_size": (1.3, 1.3),
               "element_size_1d": (0.7, 0.7), "ssrm_f_min": (1.1, 1.1),
@@ -3211,7 +3211,7 @@ def test_main_sheet_cells():
     finally:
         wb.close()
 
-    moving = re.compile(r"\bD2\d\b")
+    moving = re.compile(r"\bD(?:1[4-9]|2\d)\b")
     for rel in ("xslope/fileio.py", "xslope/geostudio.py", "xslope/slide2.py",
                 "xslope/rs2.py", "xslope/remedies.py", "studio/document.py"):
         tree = ast.parse(open(os.path.join(_REPO, rel), encoding="utf-8").read())

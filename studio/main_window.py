@@ -239,9 +239,10 @@ def _at_k(slope_data, k):
     seismic arrow on the plot says which."""
     if k is None:
         return slope_data
-    sd = dict(slope_data)
-    sd["k_seismic"] = k
-    return sd
+    # A vertical coefficient rides with k at the model's own ratio, so a view drawn
+    # at k_y shows k_v at it too.
+    from xslope.seismic import model_at
+    return model_at(slope_data, k)
 
 
 def lem_done_message(bundle):

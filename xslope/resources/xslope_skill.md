@@ -416,33 +416,39 @@ slope_data = {
                                  #   MAGNITUDE and applies it in the failure-driving direction;
                                  #   the FEM reads the SIGN as direction (+k pushes +x). One cell,
                                  #   two conventions — say which engine's you mean when reporting.
+    'k_vertical':   0.0,         # v28, main!D14. vertical seismic coefficient, SIGNED in both
+                                 #   engines: + acts downward (adds k_v*W to the weight), - upward.
+                                 #   Slide2's and SLOPE/W's convention; RS2's is opposite (the
+                                 #   importer flips it). One run applies one direction — check
+                                 #   both with two runs. A yield coefficient search holds
+                                 #   k_v/|k| fixed as it varies k.
 
     # --- Run options: how this model is meant to be analyzed, carried in the file instead of
     #     living in a dialog. All optional; None = unspecified and the solver default stands.
-    'water_loads':    'auto',    # v22, main!D24 (D23 before v25). 'auto' = the engine derives the ponded-water
+    'water_loads':    'auto',    # v22, main!D25 (D24 v25-v27, D23 before v25). 'auto' = the engine derives the ponded-water
                                  #   load from the model's own water definition at EVERY solve,
                                  #   so the dloads sheets carry NON-water loads only; 'manual' =
                                  #   you enter it there yourself. A new file is 'auto'; every
                                  #   pre-v22 file is 'manual'. See guideline 8 (ponded water).
-    'surface_family': None,      # v22, main!D25 (D24 before v25). 'circular' | 'non-circular'. Only bites on a
+    'surface_family': None,      # v22, main!D26 (D25 v25-v27, D24 before v25). 'circular' | 'non-circular'. Only bites on a
                                  #   file defining BOTH families — it picks which one runs (and
                                  #   sets slope_data['circular'] at load). Leave None otherwise.
-    'lem_method':     None,      # v19, main!D14. one of the seven method names, or 'all'
-    'num_slices':     None,      # v19, main!D15
-    'k0':             None,      # v19, main!D16. FEM at-rest coefficient for the INITIAL stress
+    'lem_method':     None,      # v19, main!D15 (D14 before v28). one of the seven method names, or 'all'
+    'num_slices':     None,      # v19, main!D16 (D15 before v28)
+    'k0':             None,      # v19, main!D17 (D16 before v28). FEM at-rest coefficient for the INITIAL stress
                                  #   state, equilibrated at full strength before any reduction.
                                  #   Blank = plain gravity turn-on. Set 1.0 to reproduce an RS2
                                  #   model (RS2 authors an isotropic field stress). Worth a few
                                  #   percent of FS on reinforced/near-cohesionless sections.
-    'tension_srf':    None,      # v19, main!D17. reduce t_cut along with c and tan(phi)?
-    'element_type':   None,      # v19, main!D18. mesh element type (see Meshing below)
-    'target_size':    None,      # v19, main!D19. global target element size
-    'element_size_1d': None,     # v25, main!D20. target element size ALONG the 1D members (piles
+    'tension_srf':    None,      # v19, main!D18 (D17 before v28). reduce t_cut along with c and tan(phi)?
+    'element_type':   None,      # v19, main!D19 (D18 before v28). mesh element type (see Meshing below)
+    'target_size':    None,      # v19, main!D20 (D19 before v28). global target element size
+    'element_size_1d': None,     # v25, main!D21 (D20 before v28). target element size ALONG the 1D members (piles
                                  #   and reinforcement lines). Blank = the mesher subdivides them
                                  #   on its own, which is what every pre-v25 file does.
-    'ssrm_f_min':     None,      # v19, main!D21/D22 (D20/D21 before v25). the SSRM bracket
+    'ssrm_f_min':     None,      # v19, main!D22/D23 (D21/D22 v25-v27, D20/D21 before v25). the SSRM bracket
     'ssrm_f_max':     None,
-    'side_bc':        None,      # v21, main!D23 (D22 before v25). 'rollers' (the default — a truncation boundary
+    'side_bc':        None,      # v21, main!D24 (D23 v25-v27, D22 before v25). 'rollers' (the default — a truncation boundary
                                  #   is a cut through ground that continues) | 'fixed'. Use
                                  #   'fixed' only to reproduce a program that clamps its sides.
 }
@@ -858,7 +864,7 @@ and you should decide consciously, not miss it by accident.
 A **FEM-only** or seepage-only model needs no circle: leave the sheet empty. Only a
 limit-equilibrium run needs a surface, and preflight refuses that run when there is none.
 
-**A file that defines both families.** `slope_data['surface_family']` (main!D25) — `'circular'`
+**A file that defines both families.** `slope_data['surface_family']` (main!D26) — `'circular'`
 or `'non-circular'` — decides which one runs, and the loader uses it to set
 `slope_data['circular']`, so the run, the plots and the next session all read the same surface.
 Blank is normal and means "whichever family the model defines"; on a file carrying both, the

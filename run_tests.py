@@ -724,6 +724,20 @@ def _apply_material_tag(slope_data, test):
     return None
 
 
+def _apply_seismic_tag(slope_data, test):
+    """`k_seismic=` and `k_vertical=` set the model's seismic coefficients for one
+    row, so a closed form can be run at several coefficients on one workbook (DWB
+    Fig. 10.1's wedge with a vertical coefficient). Returns an error message, or
+    None (also when the tag sets neither)."""
+    for key in ('k_seismic', 'k_vertical'):
+        if key in test:
+            try:
+                slope_data[key] = float(test[key])
+            except (TypeError, ValueError):
+                return f"{key}={test[key]!r} is not a number"
+    return None
+
+
 def run_lem_test(test):
     """Run a single LEM test (single_circle, circular_search, or noncircular_search)."""
     from xslope.fileio import load_slope_data
@@ -816,7 +830,7 @@ def run_lem_test(test):
         for m in slope_data.get('materials', []):
             m['u'] = u_option
 
-    _mat_err = _apply_material_tag(slope_data, test)
+    _mat_err = _apply_material_tag(slope_data, test) or _apply_seismic_tag(slope_data, test)
     if _mat_err:
         return None, _mat_err
 
@@ -1362,7 +1376,7 @@ def run_critical_kc_test(test):
     from xslope.search import AnalysisError, run_lem_analysis
 
     slope_data = load_slope_data(test['file'])
-    err = _apply_material_tag(slope_data, test)
+    err = _apply_material_tag(slope_data, test) or _apply_seismic_tag(slope_data, test)
     if err:
         return None, err
     search = str(test.get('search', 'true')).strip().lower() not in ('false', '0', 'no')
@@ -3546,7 +3560,7 @@ def run_v19_roundtrip_test(test):
 
 
 def run_surface_family_roundtrip_test(test):
-    """Verify the v22 surface-family cell (main D24, D25 from v25) survives save -> load.
+    """Verify the v22 surface-family cell (main D24; D25 from v25, D26 from v28) survives save -> load.
 
     The rare deck defines BOTH a circular and a non-circular surface, and nothing in
     its geometry says which one it means — the circles simply win. The cell is where
@@ -3571,13 +3585,14 @@ def run_surface_family_roundtrip_test(test):
     template = test.get('template', ROUNDTRIP_TEMPLATE)
     problems = []
 
-    # The cell moved down one row at v25, which inserted '1D element size' above it.
-    # Located from the DESTINATION template's own version rather than hardcoded, so
-    # this reads the cell the writer was actually aiming at.
+    # The cell moved down one row at v25 and another at v28, each time a row was
+    # inserted above it. Located from the DESTINATION template's own version through
+    # the loader's lookup, so this reads the cell the writer was actually aiming at.
+    from xslope.fileio import main_sheet_cell
     _twb = openpyxl.load_workbook(template, read_only=True)
     _tv = int(float(_twb['main']['D5'].value))
     _twb.close()
-    SF_CELL = f"D{25 if _tv >= 25 else 24}"
+    SF_CELL = main_sheet_cell('surface_family', _tv)
 
     def _cycle(mutate):
         d1 = load_slope_data(test['file'])
@@ -6121,6 +6136,12 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='main.seismic_negative_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=-0.2),
          expect='is negative'),
+    dict(rule='main.seismic_vertical_invalid', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.2, k_vertical=-1.5),
+         expect='lifted off the ground'),
+    dict(rule='main.seismic_vertical_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.2, k_vertical=0.8),
+         expect='usually a half or a third of k'),
     dict(rule='main.crack_water_deeper_than_crack', base=PREFLIGHT_BASE_LEM,
          mode='excel',
          mutation=lambda sd: _pf_set(sd, tcrack_water=10.0, tcrack_depth=0.0),
@@ -8604,11 +8625,13 @@ def run_auto_water_test(test):
             _remedy_excel(AUTO_WATER_CASES[0][0],
                           lambda sd: dict(sd, water_loads='sometimes'), template)
         except Exception as exc:
-            # The mode cell moved from D23 to D24 at v25, which inserted a row above
-            # it; the refusal names the cell in the destination template's own layout.
+            # The mode cell moved from D23 to D24 at v25 and to D25 at v28, each
+            # time a row was inserted above it; the refusal names the cell in the
+            # destination template's own layout.
             import openpyxl as _opx
+            from xslope.fileio import main_sheet_cell as _msc
             _wbv = _opx.load_workbook(template, read_only=True)
-            _wl_cell = ('D24' if int(float(_wbv['main']['D5'].value)) >= 25 else 'D23')
+            _wl_cell = _msc('water_loads', _wbv['main']['D5'].value)
             _wbv.close()
             if _wl_cell not in str(exc):
                 problems.append(f"an unknown water-load mode was refused without "
@@ -9497,7 +9520,12 @@ def run_tag_k0_test(test):
                         continue
                     sheet = wb['main']
                     version = sheet['D5'].value
-                    cell = sheet['D16'].value
+                    from xslope.fileio import main_sheet_cell as _msc
+                    try:
+                        _k0_cell = _msc('k0', version) or 'D16'
+                    except (TypeError, ValueError):
+                        _k0_cell = 'D16'
+                    cell = sheet[_k0_cell].value
                 finally:
                     wb.close()
             except Exception:
@@ -9507,7 +9535,7 @@ def run_tag_k0_test(test):
                     continue
             except (TypeError, ValueError):
                 continue
-            problems.append(f"{book.name}: declares K0 = {float(cell):g} in main!D16 "
+            problems.append(f"{book.name}: declares K0 = {float(cell):g} in main!{_k0_cell} "
                             f"that no test tag asks for")
 
     if problems:
@@ -10198,6 +10226,12 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'vertical_seismic': (
+        'vertical_seismic_check.py',
+        "The vertical seismic coefficient: on a dry frictional circle every LEM "
+        "method gives F(k, k_v) = F(k/(1 + k_v), 0) exactly, cohesion breaks that "
+        "identity as it must, and the FEM vertical loads are (1 + k_v) times the "
+        "weight with the horizontal ones unchanged."),
     'fem_yield_coefficient': (
         'fem_yield_coefficient_check.py',
         "The finite element yield coefficient's bisection on k, on a stand-in "
@@ -16885,7 +16919,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'rapid_drained_surface': 3, 'noncircular_kink': 3,
-              'fem_yield_coefficient': 1,
+              'fem_yield_coefficient': 1, 'vertical_seismic': 2,
               'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
@@ -17309,6 +17343,10 @@ def main():
         # (under a second).
         tests.append({'type': 'fem_yield_coefficient',
                       'method': 'fem', 'source': 'fem_yield_coefficient'})
+        # The vertical seismic coefficient in every LEM method and the FEM loads
+        # (a few seconds).
+        tests.append({'type': 'vertical_seismic',
+                      'method': 'all', 'source': 'vertical_seismic'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
         # ponded water into. File-less (builds on xslope_acads_simple).

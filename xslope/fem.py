@@ -3857,6 +3857,9 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # acts in +x (right-facing slopes), negative in -x (left-facing). The
     # value is applied exactly as entered.
     k_seismic = slope_data.get("k_seismic", 0.0)
+    # The vertical coefficient is signed, positive downward, in the FEM as in the
+    # LEM: it scales the weight, so it has no direction to choose.
+    k_vertical = float(slope_data.get("k_vertical") or 0.0)
     
     # Construct fem_data dictionary
     fem_data = {
@@ -3974,6 +3977,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "K_global_1d_elems": K_global_1d_elems,
         "unit_weight": unit_weight,
         "k_seismic": k_seismic,
+        "k_vertical": k_vertical,
         "pp_option": pp_option,
         "piezo_line_coords": piezo_line_coords,
         "piezo_phreatic": bool(slope_data.get('piezo_phreatic', False)),
@@ -4830,7 +4834,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     node_has_free = free_dof_mask[node_dof_x] | free_dof_mask[node_dof_y]
 
     _elem_w = np.zeros(n_nodes)
-    _k_fac = float(np.sqrt(1.0 + k_seismic ** 2))
+    _k_fac = float(np.hypot(1.0 + float(fem_data.get("k_vertical") or 0.0), k_seismic))
     for _e in range(n_elements):
         _et = int(element_types[_e])
         _en = [int(v) for v in elements[_e][:_et]]
@@ -18406,6 +18410,14 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
             for i, node in enumerate(elem_nodes):
                 F_gravity[_node_dof_x(node)] += elem_loads[2*i]
                 F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
+
+    # The vertical seismic body force, k_v·γ, signed and positive downward, adds to
+    # gravity: every vertical component above is the soil's weight alone, so the
+    # whole vertical load is (1 + k_v) times it.
+    k_vertical = float((fem_data or {}).get("k_vertical") or 0.0)
+    if k_vertical:
+        for node in range(n_nodes):
+            F_gravity[_node_dof_y(node)] *= 1.0 + k_vertical
 
     return F_gravity
 

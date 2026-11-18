@@ -3734,7 +3734,8 @@ def plot_inputs(
 
     # Seismic coefficient annotation
     k_seismic = slope_data.get('k_seismic', 0.0)
-    if k_seismic and mode in ("lem", "fem"):
+    k_vertical = float(slope_data.get('k_vertical') or 0.0)
+    if (k_seismic or k_vertical) and mode in ("lem", "fem"):
         if mode == "fem":
             # FEM: sign of k directly gives direction (+x → right, -x → left)
             arrow = "\u2192" if k_seismic > 0 else "\u2190"
@@ -3756,7 +3757,11 @@ def plot_inputs(
                     arrow = "\u2190"  # ←  toe on left
             else:
                 arrow = ""
-        k_text = f"k = {abs(k_seismic):g} {arrow}".strip()
+        k_text = f"k = {abs(k_seismic):g} {arrow}".strip() if k_seismic else ""
+        if k_vertical:
+            # Signed, positive downward, in both engines.
+            v_text = f"k_v = {abs(k_vertical):g} {'↓' if k_vertical > 0 else '↑'}"
+            k_text = f"{k_text}, {v_text}" if k_text else v_text
         ax.text(0.98, 0.97, k_text, transform=ax.transAxes,
                 fontsize=10, fontweight='bold', ha='right', va='top',
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',

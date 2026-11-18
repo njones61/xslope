@@ -76,12 +76,13 @@ reinforcement, and boundary conditions to scale.
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks the template format for compatibility. The current version is **27**. xslope rejects a file whose version is newer than the installed version supports, so an older install cannot misread a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
+- **Template version**: Tracks the template format for compatibility. The current version is **28**. xslope rejects a file whose version is newer than the installed version supports, so an older install cannot misread a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial).
 - **Time** (`sec`, `min`, `hr`, `day`, or `yr`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type takes precedence (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
 - **Tension crack parameters**: Depth **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface
-- **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
+- **Horizontal seismic coefficient** (kh) — **[–]**: the horizontal seismic acceleration, as a fraction of gravity, for a pseudo-static analysis. The limit-equilibrium engine takes its magnitude and applies it toward the toe of each failure surface. The finite element engine reads its sign as the direction: positive pushes toward +x, negative toward −x.
+- **Vertical seismic coefficient** (kv) — **[–]**: the vertical seismic acceleration, as a fraction of gravity. It is signed in both engines: positive acts downward and adds k<sub>v</sub>·W to the weight, negative acts upward and takes it away. Each run applies it in the direction entered, so checking both directions, as Eurocode 8 asks, takes two runs. Its effect depends on the soil: on a frictional slope an upward k<sub>v</sub> lowers the factor of safety, and on a cohesive one a downward k<sub>v</sub> does. Blank or 0 means none. A yield coefficient search holds k<sub>v</sub> at the ratio k<sub>v</sub>/k<sub>h</sub> of the two values entered here.
 
 **Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
 brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
@@ -95,7 +96,7 @@ psf, pcf, ft/day.
 
 ### Run options
 
-The cells below the seismic coefficient record **how this model is meant to be
+The cells below the seismic coefficients record **how this model is meant to be
 analyzed**, so the analysis travels with the file instead of living only in a dialog.
 Every one of them is optional, and **blank always means unspecified** — the solver or
 the Studio dialog uses its own default. A choice you make in a Studio dialog always takes
@@ -114,7 +115,7 @@ precedence over the value in the file.
 - **Side BC** (`rollers` or `fixed`) — **[–]**: how the FEM restrains the left and right truncation boundaries of the model. `rollers` (the default, and what every file that leaves this blank gets) fixes horizontal movement and leaves the face free to settle vertically. `fixed` clamps both directions. Rollers are the usual choice: a truncation boundary is an artificial cut through ground that continues, and the ground on the other side of it does not hold the face up. `fixed` adds shear restraint that ground does not have, and stiffens a domain truncated close to the slope; use it to reproduce a program that fixes its side boundaries. The bottom boundary is fully fixed either way.
 
 These global parameters are accessed throughout the analysis. For example, the unit weight of water is used in 
-computing pore pressures from piezometric lines, and the seismic coefficient is used to add horizontal inertial 
+computing pore pressures from piezometric lines, and the seismic coefficients add horizontal and vertical inertial 
 forces to each slice in limit equilibrium calculations. The tension crack parameters allow the simulation of a tension
 crack at the top of the slope for cohesive soils to reduce the likelihood that negative normal forces develop along the 
 face, which are unconservative in the limit equilibrium method. Filling the crack with water adds an extra level of 

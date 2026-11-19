@@ -15,15 +15,22 @@ procedures follow Duncan, Wright, and Brandon (2014), Chapter 10.
 
 Duncan et al. describe three kinds of seismic slope analysis.
 
-- **Comprehensive analysis.** The acceleration history of the site comes from geologists and seismologists, and a
-  dynamic finite element analysis computes the stresses and strains it causes in the slope. From those, the engineer
-  estimates the loss of strength and the rise in pore pressure, computes the stability with the reduced strengths,
-  and computes the permanent displacements. It is used for large embankments and wherever the consequences of failure
-  are high or the soil could lose significant strength. **xslope** does not compute the dynamic response. The
-  stability step is an ordinary limit equilibrium run with the reduced strengths entered.
+- **Comprehensive analysis.** Used for large embankments and wherever the consequences of failure are high or the
+  soil could lose significant strength. Geologists and seismologists determine the acceleration history of the site,
+  and a dynamic finite element analysis computes the stresses and strains it causes in the slope. From those, the
+  engineer estimates the loss of strength and the rise in pore pressure. The stability is then computed by limit
+  equilibrium with the reduced strengths. If the slope is stable, its permanent displacement is computed, by a
+  sliding block analysis if the strength losses are small and by other methods if not.
+
+    **xslope** does not do the dynamic analysis: the stresses, strains, strength losses, and pore pressures must come
+    from another program. It does the last two steps. The stability is an ordinary limit equilibrium run with the
+    reduced strengths entered (see [After the Earthquake](#after-the-earthquake)), and the displacement a
+    [Newmark analysis](newmark.md).
+
 - **Pseudostatic analysis.** The earthquake is a static force on every slice, the soil weight times a seismic
   coefficient. It is less accurate than the other procedures but useful for screening, as long as the soil does not
   lose significant strength.
+
 - **Sliding block analysis.** The sliding mass is a rigid block that slides whenever the ground acceleration exceeds
   its yield acceleration. Integrating the acceleration record gives the permanent displacement (Newmark 1965).
 

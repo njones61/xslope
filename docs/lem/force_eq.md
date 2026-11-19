@@ -150,7 +150,8 @@ where:
 
 >$D$ = distributed load resultant force <br>
 $\beta$ = inclination of the distributed load (perpendicular to slope) <br>
-$kW$ = seismic force for pseudo-static seismic analysis <br>
+$k_hW$ = horizontal seismic force for pseudo-static seismic analysis <br>
+$k_vW$ = vertical seismic force, positive downward <br>
 $c.g.$ = center of gravity of the slice <br>
 $P$ = reinforcement force at point $r$ on the base of the slice, at angle $\psi$ from horizontal ($\psi = \alpha$ for tangent/flexible reinforcement, the default; $\psi$ = the line's own inclination for axial/rigid reinforcement) <br>
 $T$ = tension crack water force <br>
@@ -158,33 +159,33 @@ $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 $L$ = line load at point $f$ on the top of the slice, at angle $\delta$ from horizontal (default $-90°$ = straight down) <br>
 
-Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, $H$, and $L$ are included in the Force Equilibrium method as follows. Because the force-equilibrium method resolves each external force into global horizontal and vertical components, the generalization from tangent to axial reinforcement is immediate: $P\cos(\alpha)$ and $P\sin(\alpha)$ simply become $P\cos(\psi)$ and $P\sin(\psi)$. When Appl = Active (the default) $P$ is not divided by $F$; when Passive, the $P$ terms are divided by $F$ together with the soil strength ($c_m$, $\tan\phi_m$).
+Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $k_hW$, $k_vW$, $P$, $T$, $H$, and $L$ are included in the Force Equilibrium method as follows. Because the force-equilibrium method resolves each external force into global horizontal and vertical components, the generalization from tangent to axial reinforcement is immediate: $P\cos(\alpha)$ and $P\sin(\alpha)$ simply become $P\cos(\psi)$ and $P\sin(\psi)$. When Appl = Active (the default) $P$ is not divided by $F$; when Passive, the $P$ terms are divided by $F$ together with the soil strength ($c_m$, $\tan\phi_m$).
 
 Once again, we begin by summing forces in the x-direction, but now we include the additional forces. The pile force $H$ at angle $\theta_p$ has a horizontal component $H \cos \theta_p$ that resists sliding (same direction as the reinforcement horizontal component $P \cos \psi$), and the line load contributes $L \cos \delta$ (zero for a straight-down load):
 
->>$\sum F_x = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m)\right] \cos (\alpha) + P \cos (\psi) + H \cos \theta_p + L \cos \delta - (N' + u \Delta \ell) \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - kW - T = 0$
+>>$\sum F_x = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m)\right] \cos (\alpha) + P \cos (\psi) + H \cos \theta_p + L \cos \delta - (N' + u \Delta \ell) \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - k_hW - T = 0$
 
->>$c_m \Delta \ell \cos (\alpha) + N' \tan (\phi_m) \cos (\alpha) + P \cos (\psi) + H \cos \theta_p + L \cos \delta - N' \sin (\alpha) - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - kW - T= 0$
+>>$c_m \Delta \ell \cos (\alpha) + N' \tan (\phi_m) \cos (\alpha) + P \cos (\psi) + H \cos \theta_p + L \cos \delta - N' \sin (\alpha) - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - k_hW - T= 0$
 
->>$c_m \Delta \ell \cos (\alpha) + N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] + P \cos (\psi) + H \cos \theta_p + L \cos \delta - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta -kW -T  = 0$
+>>$c_m \Delta \ell \cos (\alpha) + N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] + P \cos (\psi) + H \cos \theta_p + L \cos \delta - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta -k_hW -T  = 0$
 
 Rearranging in terms of our two unknowns ($N'$ and $Z_{i+1}$) gives:
 
->>$N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] - Z_{i+1} \cos (\theta_{i+1}) = - c_m \Delta \ell \cos (\alpha) - P \cos (\psi) - H \cos \theta_p - L \cos \delta + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + kW + T   \qquad (6)$
+>>$N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] - Z_{i+1} \cos (\theta_{i+1}) = - c_m \Delta \ell \cos (\alpha) - P \cos (\psi) - H \cos \theta_p - L \cos \delta + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + k_hW + T   \qquad (6)$
 
 It should be noted that the tension crack water force ($T$) only applies to right side of the top slice on a left-facing slope. For a right-facing slope, the tension crack water force is applied to the left side of the top slice and would act in the opposite direction. Therefore, the sign on $T$ would be negative in that case.
 
 Likewise, we can sum forces in the y-direction. The pile force has a vertical component $H \sin \theta_p$ (upward for positive $\theta_p$), which acts in the same direction as the reinforcement vertical component $P \sin \psi$; the line load contributes $L \sin \delta$ ($= -L$ for a straight-down load, i.e. it adds to the weight):
 
->>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m)\right] \sin (\alpha) + P \sin (\psi) + H \sin \theta_p + L \sin \delta + (N' + u \Delta \ell) \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
+>>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m)\right] \sin (\alpha) + P \sin (\psi) + H \sin \theta_p + L \sin \delta + (N' + u \Delta \ell) \cos (\alpha) - W(1 + k_v) + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
 
->>$c_m \Delta \ell \sin (\alpha) + N' \tan (\phi_m) \sin (\alpha) + P \sin (\psi) + H \sin \theta_p + L \sin \delta + N' \cos (\alpha) + u \Delta \ell \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
+>>$c_m \Delta \ell \sin (\alpha) + N' \tan (\phi_m) \sin (\alpha) + P \sin (\psi) + H \sin \theta_p + L \sin \delta + N' \cos (\alpha) + u \Delta \ell \cos (\alpha) - W(1 + k_v) + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
 
->>$c_m \Delta \ell \sin (\alpha) + N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] + P \sin (\psi) + H \sin \theta_p + L \sin \delta + u \Delta \ell \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
+>>$c_m \Delta \ell \sin (\alpha) + N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] + P \sin (\psi) + H \sin \theta_p + L \sin \delta + u \Delta \ell \cos (\alpha) - W(1 + k_v) + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
 
 Rearranging in terms of our two unknowns ($N'$ and $Z_{i+1}$) gives:
 
->>$N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] - Z_{i+1} \sin (\theta_{i+1}) = -c_m \Delta \ell \sin (\alpha) - P \sin (\psi) - H \sin \theta_p - L \sin \delta - u\Delta \ell \cos (\alpha) + W - Z_{i} \sin (\theta_{i}) + D \cos \beta   \qquad (7)$
+>>$N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] - Z_{i+1} \sin (\theta_{i+1}) = -c_m \Delta \ell \sin (\alpha) - P \sin (\psi) - H \sin \theta_p - L \sin \delta - u\Delta \ell \cos (\alpha) + W(1 + k_v) - Z_{i} \sin (\theta_{i}) + D \cos \beta   \qquad (7)$
 
 Now we can take equations (6) and (7) and rearrange them into a matrix form. We can write the two equations as:
 
@@ -200,7 +201,7 @@ The vector $x$ is given by:
 
 The vector $b$ is given by:
 
->>$b = \begin{bmatrix}- c_m \Delta \ell \cos (\alpha) - P \cos (\psi) - H \cos \theta_p - L \cos \delta + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + kW + T\\-c_m \Delta \ell \sin (\alpha) - P \sin (\psi) - H \sin \theta_p - L \sin \delta - u\Delta \ell \cos (\alpha) + W - Z_{i} \sin (\theta_{i}) + D \cos \beta\end{bmatrix}   \qquad (10)$
+>>$b = \begin{bmatrix}- c_m \Delta \ell \cos (\alpha) - P \cos (\psi) - H \cos \theta_p - L \cos \delta + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + k_hW + T\\-c_m \Delta \ell \sin (\alpha) - P \sin (\psi) - H \sin \theta_p - L \sin \delta - u\Delta \ell \cos (\alpha) + W(1 + k_v) - Z_{i} \sin (\theta_{i}) + D \cos \beta\end{bmatrix}   \qquad (10)$
 
 Note that $A$ and $x$ are the same as before, but $b$ has changed to include the additional forces. The two unknowns ($N'$ and $Z_{i+1}$) follow from the same closed-form recurrence described above.
 
@@ -218,13 +219,13 @@ $Z_{n+1}(F)$ has more than one root on many surfaces. The recurrence divides by 
 
 **The whole-mass force balance.** Summing equation (6) over all $n$ slices telescopes the side force terms: the force $Z_i \cos\theta_i$ that leaves one slice enters the next, so every interior pair cancels, leaving only $Z_1 \cos\theta_1$ and $Z_{n+1} \cos\theta_{n+1}$. The first is zero by definition; the second is zero when the trial $F$ is the solution. What survives is horizontal force equilibrium of the entire sliding mass. As with equations (6) and (7), the support forces $P$ and $H$ below are written for Appl = Active, so they stand at full value; support designated Passive mobilizes with the soil and is divided by $F$, which moves those terms alongside $c_m$ and $\tan\phi_m$:
 
->>$\sum \left[ c_m \Delta \ell \cos\alpha + N' \tan\phi_m \cos\alpha + P \cos\psi + H \cos\theta_p + L \cos\delta + D \sin\beta \right] = \sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T \right]   \qquad (11)$
+>>$\sum \left[ c_m \Delta \ell \cos\alpha + N' \tan\phi_m \cos\alpha + P \cos\psi + H \cos\theta_p + L \cos\delta + D \sin\beta \right] = \sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + k_hW + T \right]   \qquad (11)$
 
 The mobilized base shear and the horizontal components of the support and load forces stand on the left; the horizontal thrust of the base normal, the pore force, the seismic force and the tension crack water force stand on the right. As elsewhere on this page, $T$ contributes on the top slice only.
 
 Substituting $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$ and solving for the factor of safety gives the quotient form, with Passive support again carried in the numerator:
 
->>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan\phi \right) \cos\alpha}{\sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T - P \cos\psi - H \cos\theta_p - L \cos\delta - D \sin\beta \right]}   \qquad (12)$
+>>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan\phi \right) \cos\alpha}{\sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + k_hW + T - P \cos\psi - H \cos\theta_p - L \cos\delta - D \sin\beta \right]}   \qquad (12)$
 
 Equation (12) is not a direct formula for $F$: the factor of safety is already inside the mobilized strength it was derived from, and $N'$ itself comes from the slice-by-slice solution at the trial $F$. It is the balance the converged solution satisfies — (11) and (12) hold at the root found above, not at an arbitrary trial $F$.
 

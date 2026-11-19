@@ -71,7 +71,8 @@ Where:
 
 >>$D$ = distributed load resultant force <br>
 $\beta$ = inclination of the distributed load (perpendicular to slope) <br>
-$kW$ = seismic force for pseudo-static seismic analysis <br>
+$k_hW$ = horizontal seismic force for pseudo-static seismic analysis <br>
+$k_vW$ = vertical seismic force, positive downward <br>
 $c.g.$ = center of gravity of the slice <br>
 $P$ = reinforcement force at point $r$ on the base of the slice, at angle $\psi$ from horizontal ($\psi = \alpha$ for tangent/flexible reinforcement, the default; $\psi$ = the line's own inclination for axial/rigid reinforcement) <br>
 $T$ = tension crack water force <br>
@@ -81,15 +82,15 @@ $L$ = line load at point $f$ on the top of the slice, at angle $\delta$ from hor
 
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The external forces enter in two places: their **vertical** components modify the base normal force (vertical equilibrium of the slice), and their **horizontal** components enter the overall horizontal force balance.
 
-**Effective base normal (vertical equilibrium with external forces).** Adding the vertical components of the distributed load ($D\cos\beta$), reinforcement ($P\sin\psi$), pile force ($H\sin\theta_p$), and line load ($L\sin\delta$) to the vertical equilibrium of equation (1) gives the effective base normal $N'$:
+**Effective base normal (vertical equilibrium with external forces).** Adding the vertical seismic force ($k_vW$, carried with the weight as $W(1 + k_v)$) and the vertical components of the distributed load ($D\cos\beta$), reinforcement ($P\sin\psi$), pile force ($H\sin\theta_p$), and line load ($L\sin\delta$) to the vertical equilibrium of equation (1) gives the effective base normal $N'$:
 
->>$N'  = \dfrac{W + D\cos\beta - P\sin\psi - H\sin\theta_p - L\sin\delta - u\,\Delta\ell\cos\alpha - \dfrac{1}{F}c\,\Delta\ell\sin\alpha}{m_\alpha}  \qquad (6)$
+>>$N'  = \dfrac{W(1 + k_v) + D\cos\beta - P\sin\psi - H\sin\theta_p - L\sin\delta - u\,\Delta\ell\cos\alpha - \dfrac{1}{F}c\,\Delta\ell\sin\alpha}{m_\alpha}  \qquad (6)$
 
 The total base normal is $N = N' + u\,\Delta\ell$, and the mobilized base shear capacity is $c\,\Delta\ell + N'\tan\phi$.
 
-**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces. The seismic force $kW$ and the tension-crack water force $T$ are magnitudes in the direction of sliding and are driving; the reinforcement horizontal component $P\cos\psi$ and the pile horizontal component $H\cos\theta_p$ are resisting. The surface loads are neither: a distributed load carries the force $(D\sin\beta,\,-D\cos\beta)$, so $D\sin\beta$ is a *signed* component measured in the direction of sliding, and the same holds for a line load's $L\cos\delta$. A load applied normal to a slope face has $\beta > 0$ and therefore pushes **into** the slope, resisting the slide — reservoir water standing against an upstream face is the everyday case — while a load leaning downslope has $\beta < 0$ and drives it. Both enter the denominator negated, and their own sign decides which way they act. The reinforcement (when Appl = Active, the default), pile, and line-load forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator. (A Passive reinforcement force is instead divided by $F$ alongside the soil strength.)
+**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces. The seismic force $k_hW$ and the tension-crack water force $T$ are magnitudes in the direction of sliding and are driving; the reinforcement horizontal component $P\cos\psi$ and the pile horizontal component $H\cos\theta_p$ are resisting. The surface loads are neither: a distributed load carries the force $(D\sin\beta,\,-D\cos\beta)$, so $D\sin\beta$ is a *signed* component measured in the direction of sliding, and the same holds for a line load's $L\cos\delta$. A load applied normal to a slope face has $\beta > 0$ and therefore pushes **into** the slope, resisting the slide — reservoir water standing against an upstream face is the everyday case — while a load leaning downslope has $\beta < 0$ and drives it. Both enter the denominator negated, and their own sign decides which way they act. The reinforcement (when Appl = Active, the default), pile, and line-load forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator. (A Passive reinforcement force is instead divided by $F$ alongside the soil strength.)
 
->>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum T - \sum D\sin\beta - \sum P\cos\psi - \sum H\cos\theta_p - \sum L\cos\delta}   \qquad (7)$
+>>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum k_hW + \sum T - \sum D\sin\beta - \sum P\cos\psi - \sum H\cos\theta_p - \sum L\cos\delta}   \qquad (7)$
 
 with $N = N' + u\,\Delta\ell$. As in the basic case, equations (6) and (7) are solved together by iteration on $F$. Note that $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices).
 

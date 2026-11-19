@@ -388,11 +388,11 @@ unit length, which is then
 converted to a force acting on each slice based on its width and the load intensity (see below). 
 
 **Seismic Loads:** In seismically active regions, the stability of slopes can be significantly affected by seismic 
-forces. These forces are typically represented as horizontal accelerations acting on the mass of each slice. The pseudo-static approach is commonly used, where a horizontal acceleration coefficient $k$ is applied to the weight of each slice to calculate the seismic force.
+forces. These forces are typically represented as horizontal accelerations acting on the mass of each slice. The pseudo-static approach is commonly used, where a horizontal acceleration coefficient $k_h$ is applied to the weight of each slice to calculate the seismic force.
 
 ![seismic.png](images/seismic.png)
 
-The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. That direction follows from the failure surface, so only the magnitude of $k$ is used here; the finite element solver has no failure surface to read it from and uses the signed value instead — see [Seismic forces](../fem/overview.md#seismic-forces).
+The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. That direction follows from the failure surface, so only the magnitude of $k_h$ is used here; the finite element solver has no failure surface to read it from and uses the signed value instead — see [Seismic forces](../fem/overview.md#seismic-forces).
 
 A vertical seismic coefficient $k_v$ adds a vertical force $k_vW$ through the same center of gravity. It is signed: positive acts downward and adds to the slice weight, negative acts upward and takes it away. Every method uses $W(1+k_v)$ wherever it uses the weight, in force and moment equilibrium alike. The effect depends on the soil. On a frictional slope an upward $k_v$ lowers the factor of safety, because it reduces the normal force that friction depends on. On a cohesive slope a downward one does, because it adds driving weight that cohesion does not match. A run applies $k_v$ in the direction entered, so checking both directions takes two runs.
 
@@ -416,8 +416,8 @@ as follows:
 ![slice_adv.png](images/slice_adv.png)
 
 The distributed load acting on the top of each slice is converted to a resultant force by multiplying the load 
-intensity by the width of the slice and it acts at point $d$. The seismic force $kW$ acts horizontally at the center 
-of gravity of each slice. The reinforcement force $P$ acts at the point where the line crosses the base of the 
+intensity by the width of the slice and it acts at point $d$. The seismic force $k_hW$ acts horizontally at the center 
+of gravity of each slice, and $k_vW$ acts vertically through the same point. The reinforcement force $P$ acts at the point where the line crosses the base of the 
 slice, in a direction that resists sliding — parallel to the base for tangent (flexible) reinforcement, or along 
 the reinforcement axis for axial (rigid) supports. A line load $L$ acts at its point of application on the top of 
 the slice at angle $\delta$. The load corresponding to water in the tension crack is converted to a single resultant 

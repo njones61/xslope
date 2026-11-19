@@ -81,7 +81,8 @@ Where:
 
 >$D$ = distributed load resultant force <br>
 $\beta$ = inclination of the distributed load (perpendicular to slope) <br>
-$kW$ = seismic force for pseudo-static seismic analysis <br>
+$k_hW$ = horizontal seismic force for pseudo-static seismic analysis <br>
+$k_vW$ = vertical seismic force, positive downward <br>
 $c.g.$ = center of gravity of the slice <br>
 $P$ = reinforcement force at point $r$ on the base of the slice <br>
 $\psi$ = angle of the reinforcement force from horizontal <br>
@@ -95,7 +96,7 @@ The rest of the forces are the same as before.
 
 The **distributed load** resultant force $D$ is calculated from the distributed load input which is defined as a stress along the top of the slope. It is assumed to act perpendicular to the slope, therefore the inclination of the distributed load from a vertical line is equal to the slope angle, $\beta$. The distributed load acts through point $d$ which is often the center of the slice, but it can be offset from the center, depending on how the distributed load is defined. 
 
-The **seismic force** $kW$ is calculated as a horizontal pseudo-static force acting on the slice through the center of gravity of the slice. It is assumed to act in the direction of sliding. It is equal to the seismic coefficient $k$ multiplied by the weight of the slice $W$. The seismic coefficient is a user-defined input, depending on the seismic conditions of the site.
+The **seismic forces** are pseudo-static forces acting through the center of gravity of the slice. The horizontal force $k_hW$ is the horizontal seismic coefficient $k_h$ multiplied by the weight of the slice $W$, and it is assumed to act in the direction of sliding. The vertical force $k_vW$ is the vertical seismic coefficient $k_v$ multiplied by $W$. It is signed: positive acts downward and adds to the weight, negative acts upward and takes it away. Because it acts through the same point as the weight, the equations below carry the two together as $W(1 + k_v)$. Both coefficients are user-defined inputs, depending on the seismic conditions of the site.
 
 The **reinforcement force** $P$ is applied at the point $r = (x_r, y_r)$ where a reinforcement line crosses the base of the slice, in a direction resisting sliding. Its magnitude is the available tensile capacity of the line at the crossing point, interpolated from the line's capacity envelope (tensile strength, pullout development, and end anchorage — see the [reinforcement page](../reinforcement/lem.md)). Its *direction* depends on the line's **Dir** setting in the input:
 
@@ -112,19 +113,19 @@ The **pile force** $H$ acts at point $e$ on the failure surface where a pile or 
 
 ### Normal Force
 
-To revise the factor of safety equation for the OMS method to include the $D$, $kw$, $P$, and $T$ forces, we first need to consider how these forces affect the normal force on the base of the slice. In doing so, we will return to the original equation for the normal force, not the preferred formulation that uses an effective weight. Previously, the normal force on the base of the slice was defined as:
+To revise the factor of safety equation for the OMS method to include the $D$, $k_hW$, $k_vW$, $P$, and $T$ forces, we first need to consider how these forces affect the normal force on the base of the slice. In doing so, we will return to the original equation for the normal force, not the preferred formulation that uses an effective weight. Previously, the normal force on the base of the slice was defined as:
 
 >$N = W \cos \alpha$
 
 This is defined by considering the forces parallel to N, or perpendicular to the base of the slice. But if we include the new forces, the normal force is:
 
->$N = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta)$
+>$N = W(1 + k_v) \cos \alpha + D \cos(\alpha - \beta) - k_hW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta)$
 
 Note that for tangent reinforcement ($\psi = \alpha$) the reinforcement term vanishes — a force parallel to the base has no normal component, which recovers the classical flexible-reinforcement formulation. For axial reinforcement the normal component $P\sin(\alpha - \psi)$ increases the effective stress on the base, adding frictional resistance. Similarly, a straight-down line load ($\delta = -90°$) contributes $L\sin(\alpha + 90°) = L\cos\alpha$, exactly as a weight should.
 
 The effective normal force is:
 
->$N' = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell    \qquad (4)$
+>$N' = W(1 + k_v) \cos \alpha + D \cos(\alpha - \beta) - k_hW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell    \qquad (4)$
 
 This effective normal force is used in the shear force equation in the numerator of the factor of safety equation. The shear force on the base of the slice was originally defined as:
 
@@ -132,7 +133,7 @@ This effective normal force is used in the shear force equation in the numerator
 
 Substituting the new normal force from (4) into this gives:
 
->$S = c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi    \qquad (5)$
+>$S = c' \Delta \ell + (W(1 + k_v) \cos \alpha + D \cos(\alpha - \beta) - k_hW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi    \qquad (5)$
 
 ### Moments
 
@@ -144,11 +145,11 @@ R is the moment arm for both $S$ and $W sin \alpha$. Before, we factored out the
 
 |      Force      | Moment Arm | Calculation                                                                      |
 |:---------------:|:----------:|----------------------------------------------------------------------------------|
-| $W \sin \alpha$ |    $R$     | Radius of the circle                                                             |
+| $W(1 + k_v) \sin \alpha$ |    $R$     | Radius of the circle                                                             |
 |       $S$       |    $R$     | Radius of the circle                                                             |
 | $D \cos \beta$  |  $a_{dx}$  | Horizontal distance from center of circle to point $d$                             |
 | $D \sin \beta$  |  $a_{dy}$  | Vertical distance from center of circle to point $d$                           |
-|      $kW$       |   $a_k$    | Moment arm of the seismic force: vertical distance from center of circle to center of gravity of the slice |
+|      $k_hW$       |   $a_k$    | Moment arm of the seismic force: vertical distance from center of circle to center of gravity of the slice |
 | $P \cos \psi$   |  $a_{ry}$  | Vertical distance from center of circle to point $r$: $Y_o - y_r$                |
 | $P \sin \psi$   |  $a_{rx}$  | Horizontal distance from center of circle to point $r$: $x_r - X_o$              |
 |       $T$       |   $a_t$    | The vertical distance between center of circle and the y-coordinate of point $c$ |
@@ -169,21 +170,21 @@ so the two component terms collapse to the single term $R \sum P$ used in the cl
 
 We can now add these moments to the limit equilibrium equation (6). The mobilized shear force is $S_{mob} = S/F$, where $S$ is the full shear strength. The reinforcement force $P$ (when Appl = Active), the pile force $H$, and the line load $L$ are known applied forces and are **not** factored by $F$. (When Appl = Passive, the $P$ terms join the shear term on the mobilized side and are divided by $F$.) Taking moments about the center of the circle:
 
->$R \sum \dfrac{S}{F} + \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] + \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right] = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_k + T \, a_t   \qquad (7)$
+>$R \sum \dfrac{S}{F} + \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] + \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right] = R \sum W(1 + k_v) \sin \alpha + \sum D \cos \beta \, a_{dx} + k_h\sum W \, a_k + T \, a_t   \qquad (7)$
 
 There is no summation for the term involving $T$ because it only applies to the uppermost slice. The pile terms are summed only over slices that contain a pile (all other $H = 0$), and likewise for the reinforcement and line-load terms.
 
 Isolating the shear term and solving for $F$:
 
->$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_k + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]$
+>$R \sum \dfrac{S}{F} = R \sum W(1 + k_v) \sin \alpha + \sum D \cos \beta \, a_{dx} + k_h\sum W \, a_k + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]$
 
->$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_k + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}$
+>$F = \dfrac{R \sum S}{R \sum W(1 + k_v) \sin \alpha + \sum D \cos \beta \, a_{dx} + k_h\sum W \, a_k + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}$
 
 ### Complete Factor of Safety Equation
 
 Substituting (5) into the numerator and dividing by $R$, we get:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_k + \frac{1}{R} T \, a_t - \frac{1}{R}\sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \frac{1}{R}\sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}   \qquad (8)$
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W(1 + k_v) \cos \alpha + D \cos(\alpha - \beta) - k_hW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi \right]}{\sum W(1 + k_v) \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k_h}{R}\sum W \, a_k + \frac{1}{R} T \, a_t - \frac{1}{R}\sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \frac{1}{R}\sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}   \qquad (8)$
 
 Note that:
 
@@ -203,13 +204,13 @@ for the offsets of the slice base center from the center of rotation, the three 
 
 |         Force          | Moment Arm                                    | Value on a true circle |
 |:----------------------:|:----------------------------------------------|:----------------------:|
-| $W$ (vertical)         | $x_r$                                         |   $R \sin \alpha$      |
+| $W(1 + k_v)$ (vertical)         | $x_r$                                         |   $R \sin \alpha$      |
 | $S$ (along the base)   | $a_S = x_r \sin \alpha - y_r \cos \alpha$     |   $R$                  |
 | $N$ (normal to the base) | $a_N = x_r \cos \alpha + y_r \sin \alpha$   |   $0$                  |
 
 The load and support moments need no generalization — they were always true moments about the center, which is why the classical equation divides them by $R$. Multiplying equation (8) through by $R$ and substituting the general arms:
 
->$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_k + T \, a_t - \ldots}   \qquad (8a)$
+>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W(1 + k_v) x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k_h \sum W \, a_k + T \, a_t - \ldots}   \qquad (8a)$
 
 where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term, so on a true circle equations (8) and (8a) give the same factor of safety.
 

@@ -23,7 +23,8 @@ where:
 > $X_i$ = vertical interslice force on the left side of the slice<br>
 > $E_{i+1}$ = horizontal interslice force on the right side of the slice<br>
 > $X_{i+1}$ = vertical interslice force on the right side of the slice<br>
-> $kW$ = seismic force on the center of gravity (c.g.) of the slice<br>
+> $k_hW$ = horizontal seismic force on the center of gravity (c.g.) of the slice<br>
+> $k_vW$ = vertical seismic force on the center of gravity, positive downward<br>
 > $P$ = normal force on the top of the slice<br>
 > $d$ = point of action for the normal force on the top of the slice<br>
 > $T$ = shear force on the top of the slice<br>
@@ -48,15 +49,15 @@ This page follows the UTEXAS symbol convention, in which $P$ is the distributed-
 
 The equations for Spencer's method are derived from the equilibrium of forces and moments acting on the slice. One of the key features of Spencer's method is how the side forces are represented and lumped to a single force $Q_i$, which will be introduced later. Thus, it is helpful to sum forces and moments using the forces acting on the slice except for the side forces and $N$ and $S$. Summing forces in the horizontal and vertical directions gives:
 
->>$F_h = -kW - V + P \sin \beta + T \cos \beta + R \cos \psi + H \cos \theta_p + L \cos \delta  \qquad (1)$
+>>$F_h = -k_hW - V + P \sin \beta + T \cos \beta + R \cos \psi + H \cos \theta_p + L \cos \delta  \qquad (1)$
 
->>$F_v = - W - P \cos \beta + T \sin \beta + R \sin \psi + H \sin \theta_p + L \sin \delta  \qquad (2)$
+>>$F_v = - W(1 + k_v) - P \cos \beta + T \sin \beta + R \sin \psi + H \sin \theta_p + L \sin \delta  \qquad (2)$
 
 Likewise, summing moments about the center of the base of the slice gives:
 
 >>$\begin{aligned}
 M_o &= - P \sin \beta (y_p - y_b) - P \cos \beta (x_p - x_b) - T \cos \beta (y_p - y_b) \\
-&\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) + V (y_v - y_b) \\
+&\quad + T \sin \beta (x_p - x_b) + k_hW (y_k - y_b) + V (y_v - y_b) \\
 &\quad - H \cos \theta_p (y_e - y_b) + H \sin \theta_p (x_e - x_b) \\
 &\quad - R \cos \psi (y_r - y_b) + R \sin \psi (x_r - x_b) \\
 &\quad - L \cos \delta (y_f - y_b) + L \sin \delta (x_f - x_b)

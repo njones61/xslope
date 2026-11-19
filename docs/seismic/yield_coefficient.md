@@ -98,13 +98,14 @@ The Log reports $k_y$ for both surfaces.
 
 For VP104 the two candidates nearly agree: $k_y$ = 0.1457 for the static critical circle and 0.1445 for the circle
 with the lowest $k_y$. For the slope Duncan et al. use for their Table 10.4 (2.5H:1V, 30 ft high, γ = 135 pcf), with
-soil 2's R envelope ($c_R$ = 700 psf, $\phi_R$ = 15°) and no water, they differ:
+soil 2's R envelope ($c_R$ = 700 psf, $\phi_R$ = 15°) and no water, they differ. The model's crest runs 155 ft back
+from the top of the slope, far enough that neither circle reaches its end:
 
-![The slope of Duncan et al.'s Figure 10.7 with soil 2's R envelope: the static critical circle, with k_y = 0.432 on it, and the circle with the minimum k_y = 0.357, which reaches the base of the model and the end of its crest](images/seismic_ky_surfaces.png){width=1000px}
+![The slope of Duncan et al.'s Figure 10.7 with soil 2's R envelope: the static critical circle, with k_y = 0.432 on it, and the circle with the minimum k_y = 0.351, which reaches the base of the model and comes out on the crest about 140 ft back from the top of the slope](images/seismic_ky_surfaces.png){width=1000px}
 
 The static critical circle is shallow and has $k_y$ = 0.432. The circle with the lowest yield coefficient,
-$k_y$ = 0.357, is far larger. It reaches the bottom of the model and the right end of the crest, and in a larger model
-deeper circles have even lower yield coefficients. This is the unrealistically deep surface Duncan et al. warn about.
+$k_y$ = 0.351, is far larger. It reaches the bottom of the model, 30 ft below the toe, and comes out on the crest about
+140 ft back from the top of the slope. This is the unrealistically deep surface Duncan et al. warn about.
 Of the four soils in their Table 10.3, it happens with the two that have the most cohesion, soils 2 and 4. With soils
 1 and 3, the two circles nearly agree.
 

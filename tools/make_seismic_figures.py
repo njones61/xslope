@@ -86,6 +86,23 @@ def _one_soil(path, name):
     return sd
 
 
+def _crest_to(sd, x_end):
+    """The model with its crest run out to ``x = x_end`` and nothing else changed:
+    the profile line, its polygon, the domain, and the ground surface."""
+    from shapely.geometry import LineString, Polygon
+    pts = list(sd["profile_lines"][0]["coords"])
+    assert len(sd["profile_lines"]) == 1 and pts[-1][1] == pts[-2][1], pts
+    pts[-1] = (x_end, pts[-1][1])
+    base = sd["max_depth"]
+    poly = Polygon(pts + [(x_end, base), (pts[0][0], base)])
+    out = dict(sd)
+    out["profile_lines"] = [dict(sd["profile_lines"][0], coords=pts)]
+    out["polygons"] = [dict(sd["polygons"][0], polygon=poly)]
+    out["domain_polygon"] = poly
+    out["ground_surface"] = LineString(pts)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # VP104: k_y, F against k, and the Newmark histories
 # ---------------------------------------------------------------------------
@@ -150,7 +167,10 @@ def newmark():
 # ---------------------------------------------------------------------------
 
 def ky_surfaces():
-    sd = _one_soil(DWB_DRY, "Soil 2 R envelope")
+    # The verification model's crest ends at x = 165, which stops soil 2's
+    # lowest-k_y circle. Run out to x = 230, the crest leaves room past where that
+    # circle comes out (x = 217); nothing else in the model changes.
+    sd = _crest_to(_one_soil(DWB_DRY, "Soil 2 R envelope"), 230.0)
     bundle = _quiet(yield_coefficient, sd, "spencer", analysis="auto_search",
                     surface="circular", num_slices=NUM_SLICES, announce=False)
     info = bundle["yield"]

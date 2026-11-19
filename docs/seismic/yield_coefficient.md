@@ -120,11 +120,12 @@ full record with the deep mass's low yield coefficient overstates its displaceme
 
 **xslope** cannot find the third candidate by itself. Finding it requires knowing how the acceleration varies through
 the slope, which takes a site response analysis or published relations such as those in FHWA (2011). Once you have
-chosen a surface, **xslope** can compute its displacement. The search gives $k_y$ only for the two surfaces it finds,
-so a surface of your own needs its own run:
+chosen a surface, **xslope** can compute its displacement:
 
-1. Enter the surface as the model's circle or non-circular surface, set **Analysis** to a single surface, and run with
-   **Find the yield coefficient k_y** checked. This gives its $k_y$.
+1. Get the surface's $k_y$. If it is one of the two surfaces the search found, its $k_y$ is in the Log. If it is a
+   different surface, for example one between the shallow and the deep circle, enter it as the model's circle or
+   non-circular surface, set **Analysis** to a single surface, and run with **Find the yield coefficient k_y**
+   checked.
 2. Estimate the average peak acceleration of the mass above that surface, from a site response analysis or from
    FHWA (2011).
 3. In [**Newmark…**](newmark.md), choose **Target peak acceleration (g)**, enter that value, and run the record. The

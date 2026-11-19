@@ -125,11 +125,15 @@ terms do not depend on $z$. On an infinite slope, a deeper surface in a cohesive
 coefficient, and in a soil with no cohesion depth makes no difference. A circle in a slope of limited height is not an
 infinite slope, and its yield coefficient need not keep falling as the circle gets deeper.
 
-**xslope** does not find the third candidate, because it does not compute how the acceleration varies through the
-slope. It does the calculations for any surface you choose: a single-surface run gives that surface's $k_y$, and
-[**Newmark…**](newmark.md) computes its displacement for an acceleration record scaled to a peak acceleration you
-enter. The acceleration that suits a given sliding mass has to come from elsewhere, such as a site response analysis
-or the variation of acceleration with depth in FHWA (2011).
+**xslope** cannot find the third candidate by itself. Finding it requires knowing how the acceleration varies through
+the slope, which takes a site response analysis or published relations such as those in FHWA (2011). Once you have
+chosen a surface, **xslope** can compute its displacement:
+
+1. Run that surface as a single surface with **Find the yield coefficient k_y** checked. This gives its $k_y$.
+2. Estimate the average peak acceleration of the mass above that surface, from a site response analysis or from
+   FHWA (2011).
+3. In [**Newmark…**](newmark.md), choose **Target peak acceleration (g)**, enter that value, and run the record. The
+   result is the displacement of that surface.
 
 ## Vertical Seismic Coefficient {#vertical}
 

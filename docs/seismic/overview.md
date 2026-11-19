@@ -18,8 +18,8 @@ simple, most slope stability programs can do it, and used as a screening analysi
 of the more detailed analyses at all.
 
 - **Pseudostatic analysis.** The earthquake is a static force on every slice, the soil weight times a seismic
-  coefficient. It is less accurate than the other procedures but useful for screening, as long as the soil does not
-  lose significant strength.
+  coefficient. The result is a factor of safety: an index for screening, not a prediction of how far the slope
+  moves. It applies only where the soil does not lose significant strength in the earthquake.
 
 - **Sliding block analysis.** The sliding mass is a rigid block that slides whenever the ground acceleration exceeds
   its yield acceleration. Integrating the acceleration record gives the permanent displacement (Newmark 1965). The

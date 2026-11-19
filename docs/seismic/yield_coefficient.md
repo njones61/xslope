@@ -102,21 +102,24 @@ soil 2's R envelope ($c_R$ = 700 psf, $\phi_R$ = 15°) and no water, they differ
 
 ![The slope of Duncan et al.'s Figure 10.7 with soil 2's R envelope: the static critical circle, with k_y = 0.432 on it, and the circle with the minimum k_y = 0.357, which reaches the base of the model and the end of its crest](images/seismic_ky_surfaces.png){width=1000px}
 
-The lowest yield coefficient, 0.357, is 17 percent below the static critical circle's 0.432. Its circle extends to the
-base of the model, placed one slope height below the toe, and to the far end of the crest, so its $k_y$ depends on
-where the model's boundaries are. This is the unrealistically deep surface Duncan et al. warn about. Of the four soils
+The lowest yield coefficient, 0.357, is 17 percent below the static critical circle's 0.432. The model's boundaries
+stop this circle: it touches the base of the model, placed one slope height below the toe, and leaves the ground at the
+right end of the crest. In a larger model, deeper circles have lower yield coefficients, so the value depends on where
+the boundaries are placed. This is the unrealistically deep surface Duncan et al. warn about. Of the four soils
 in their Table 10.3, it happens with soils 2 and 4, which have the most cohesion. For soils 1 and 3 the two circles
 nearly agree.
 
 The closed form for a planar surface shows why cohesion has this effect. With $W = \gamma \ell z \cos\beta$, the
 cohesion term $c\ell/W$ equals $c/(\gamma z \cos\beta)$, which gets smaller as the depth $z$ grows, while the friction
-terms do not depend on $z$. In a cohesive soil a deeper surface has a lower yield coefficient; in a soil with no
-cohesion, depth makes no difference.
+terms do not depend on $z$. On an infinite slope, a deeper surface in a cohesive soil therefore has a lower yield
+coefficient, and in a soil with no cohesion depth makes no difference. A circle in a slope of limited height is not an
+infinite slope, and its yield coefficient need not keep falling as the circle gets deeper.
 
-**xslope** does not find the third candidate automatically. To find it, choose several surfaces of different depths
-and run each one as a single surface to get its $k_y$. Scale the acceleration record for each surface to the average
-acceleration of its sliding mass, from a site response analysis or from FHWA (2011), and compute the
-[Newmark displacement](newmark.md) for each. The largest displacement governs.
+**xslope** does not find the third candidate, because it does not compute how the acceleration varies through the
+slope. It does the calculations for any surface you choose: a single-surface run gives that surface's $k_y$, and
+[**Newmark…**](newmark.md) computes its displacement for an acceleration record scaled to a peak acceleration you
+enter. The acceleration that suits a given sliding mass has to come from elsewhere, such as a site response analysis
+or the variation of acceleration with depth in FHWA (2011).
 
 ## Vertical Seismic Coefficient {#vertical}
 

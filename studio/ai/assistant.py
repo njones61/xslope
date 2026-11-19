@@ -332,7 +332,8 @@ the canvas re-renders automatically.
 - scalars: gamma_water, max_depth (elevation of the hard base — the lowest
   elevation the PROBLEM describes, never one you chose; see iron rule 1),
   k_seismic (pseudo-static horizontal seismic coefficient, a fraction of g, applied to
-  each slice's weight in the driving direction), tcrack_depth, tcrack_water,
+  each slice's weight in the driving direction), k_vertical (vertical seismic
+  coefficient, signed, + downward), tcrack_depth, tcrack_water,
   circular (bool), surface_family ('circular'|'noncircular'|None — which surface the
   model declares), water_loads ('auto'|'manual', see §5), unit_system, time_unit,
   template_version (the file's, not editable).
@@ -611,8 +612,8 @@ _SOURCE_KEYS = (
     # circle does, so it belongs here: without it the flip left no undo step, no
     # dirty flag, and (once the checks were keyed off this same comparison) no
     # input check either.
-    "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "max_depth",
-    "circular",
+    "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "k_vertical",
+    "max_depth", "circular",
     "materials", "profile_lines", "polygons", "circles", "non_circ", "piezo_line",
     "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "joint_lines",
     "pile_lines",
@@ -623,7 +624,8 @@ _SOURCE_KEYS = (
 # to the same tag (e.g. both piezo lines -> "piezo") so a multi-key edit reads cleanly.
 _KEY_LABELS = {
     "gamma_water": "global", "tcrack_depth": "global", "tcrack_water": "global",
-    "k_seismic": "global", "max_depth": "global", "circular": "surface family",
+    "k_seismic": "global", "k_vertical": "global", "max_depth": "global",
+    "circular": "surface family",
     "materials": "materials", "profile_lines": "profile", "polygons": "polygons",
     "circles": "circles", "non_circ": "non-circular", "piezo_line": "piezo",
     "piezo_line2": "piezo", "dloads": "dloads", "dloads2": "dloads",
@@ -1189,8 +1191,8 @@ def _surface_line(sd):
 
 def _settings_line(sd):
     bits = []
-    for key, label in (("k_seismic", "k_seismic"), ("tcrack_depth", "tcrack_depth"),
-                       ("tcrack_water", "tcrack_water")):
+    for key, label in (("k_seismic", "k_seismic"), ("k_vertical", "k_vertical"),
+                       ("tcrack_depth", "tcrack_depth"), ("tcrack_water", "tcrack_water")):
         if sd.get(key):
             bits.append(f"{label}={_num(sd.get(key))}")
     for key, label in (("lem_method", "declared LEM method"),

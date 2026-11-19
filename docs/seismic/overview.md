@@ -15,6 +15,15 @@ procedures follow Duncan, Wright, and Brandon (2014), Chapter 10.
 
 Duncan et al. describe three kinds of seismic slope analysis.
 
+- **Pseudostatic analysis.** The earthquake is a static force on every slice, the soil weight times a seismic
+  coefficient. It is less accurate than the other procedures but useful for screening, as long as the soil does not
+  lose significant strength.
+
+- **Sliding block analysis.** The sliding mass is a rigid block that slides whenever the ground acceleration exceeds
+  its yield acceleration. Integrating the acceleration record gives the permanent displacement (Newmark 1965). The
+  yield acceleration is k<sub>y</sub>g, where the yield coefficient k<sub>y</sub> is the seismic coefficient at which
+  a pseudostatic analysis gives F = 1.
+
 - **Comprehensive analysis.** Used for large embankments and wherever the consequences of failure are high or the
   soil could lose significant strength. Geologists and seismologists determine the acceleration history of the site,
   and a dynamic finite element analysis computes the stresses and strains it causes in the slope. From those, the
@@ -27,25 +36,16 @@ Duncan et al. describe three kinds of seismic slope analysis.
     reduced strengths entered (see [After the Earthquake](#after-the-earthquake)), and the displacement a
     [Newmark analysis](newmark.md).
 
-- **Pseudostatic analysis.** The earthquake is a static force on every slice, the soil weight times a seismic
-  coefficient. It is less accurate than the other procedures but useful for screening, as long as the soil does not
-  lose significant strength.
-
-- **Sliding block analysis.** The sliding mass is a rigid block that slides whenever the ground acceleration exceeds
-  its yield acceleration. Integrating the acceleration record gives the permanent displacement (Newmark 1965). The
-  yield acceleration is k<sub>y</sub>g, where the yield coefficient k<sub>y</sub> is the seismic coefficient at which
-  a pseudostatic analysis gives F = 1.
-
 What **xslope** computes for each kind, and where. The last row is not one of the three kinds: it is the check of the
 stability after the earthquake, described below.
 
 | Kind of analysis | What XSLOPE computes | In XSLOPE | Page |
 |---|---|---|---|
-| Comprehensive | Its last two steps: F with the reduced strengths, and the displacement D. Not the dynamic analysis | An ordinary run with the reduced strengths; **Run** menu, **Newmark…** | [After the Earthquake](#after-the-earthquake), [Newmark Displacement](newmark.md) |
 | Pseudostatic: one stage | F with k<sub>h</sub>W on every slice | Any limit equilibrium method, and strength reduction in the finite element analysis | [Below](#pseudostatic-force) |
 | Pseudostatic: two stages | F with undrained strengths from each slice's stresses before the earthquake | **Run LEM…**, **Two-stage seismic** | [Two-Stage Analysis](two_stage.md) |
 | Sliding block: yield coefficient | k<sub>y</sub>, the seismic coefficient at which F = 1 | **Run LEM…**, **Find the yield coefficient k_y** | [Yield Coefficient](yield_coefficient.md) |
 | Sliding block: displacement | The permanent displacement D under an acceleration record | **Run** menu, **Newmark…** | [Newmark Displacement](newmark.md) |
+| Comprehensive | Its last two steps: F with the reduced strengths, and the displacement D. Not the dynamic analysis | An ordinary run with the reduced strengths; **Run** menu, **Newmark…** | [After the Earthquake](#after-the-earthquake), [Newmark Displacement](newmark.md) |
 | After the earthquake (a separate check) | F with the strengths left after shaking | An ordinary run with those strengths | [Below](#after-the-earthquake) |
 
 ## The Pseudostatic Force {#pseudostatic-force}

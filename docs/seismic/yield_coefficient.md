@@ -128,7 +128,8 @@ example, uses $k_v = \pm 0.5k_h$ or $\pm 0.33k_h$. **xslope** follows that conve
 coefficient of a model that has both.
 
 While it searches for $k_y$, **xslope** changes the horizontal coefficient from one trial to the next. At each trial it
-sets the vertical coefficient to the same fraction of the horizontal one as in the model, with the same sign. For
+sets the vertical coefficient to the same fraction of the horizontal one as in the model, acting up or down as it was
+entered. For
 example, a model with $k_h$ = 0.2 and $k_v$ = 0.1 has $k_v/k_h$ = 0.5, so a trial at $k_h$ = 0.15 uses $k_v$ = 0.075.
 The yield coefficient reported is the horizontal one, and the vertical coefficient at yield is $0.5k_y$.
 

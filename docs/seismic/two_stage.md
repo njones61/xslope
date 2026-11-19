@@ -26,8 +26,8 @@ stress $\tau_{fc}$:
 where $N'$ is the effective normal force on the base, $\Delta \ell$ the base length, and $F_1$ the stage 1 factor of
 safety. These are the rapid drawdown page's equations (2) and (3), and its [Stage 1](../lem/rapid.md#stage-1-pre-drawdown-conditions) section explains them.
 
-**Stage 2** gives every slice in a material with $d$ and $\psi$ its undrained strength $\tau_{ff}$ from those
-stresses, keeps $c'$ and $\phi'$ on the slices of every other material, keeps the same pore pressures and loads, and
+**Stage 2** gives every slice in a material with $d$ and $\psi$ its undrained strength $\tau_{ff}$ from the
+stresses found in stage 1, keeps $c'$ and $\phi'$ on the slices of every other material, keeps the same pore pressures and loads, and
 adds the seismic force. Its factor of safety is the answer.
 
 There is no third stage. In a rapid drawdown analysis, stage 3 checks for drainage during the drawdown, but drainage

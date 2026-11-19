@@ -21,10 +21,15 @@ mass moves.
 Both work with any limit equilibrium method, with a vertical seismic coefficient, and with the
 [two-stage analysis](two_stage.md).
 
+The page starts with the basic theory. For a mass that slides on one plane, $k_y$ has a closed form, which shows how
+the yield coefficient depends on the soil's strength and the slope angle. The sections after it describe how
+**xslope** computes $k_y$ for circular and non-circular surfaces, where there is no closed form, and which slip
+surface to compute it for.
+
 ## Planar Slip Surfaces {#one-plane}
 
-Figure 10.1 of Duncan et al. shows the forces on one block of an infinite slope, with the seismic force at the
-block's center of gravity:
+The simplest case is a mass that slides on one plane, such as a block of an infinite slope. Figure 10.1 of Duncan et
+al. shows the forces on one block, with the seismic force at the block's center of gravity:
 
 ![One block of an infinite slope: its weight W and the horizontal seismic force k_hW at the center of gravity, the normal force N and the shear force S on the base, the depth z, the base length l, and the slope angle beta](images/seismic_infinite_slope.png){width=620px}
 

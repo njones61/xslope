@@ -71,20 +71,6 @@ $k_y$ = 0.1445:
 
 ![The factor of safety against the horizontal seismic coefficient on the VP104 circle with the lowest yield coefficient, falling from 1.38 at no seismic force through 1 at k_y = 0.1445](images/seismic_ky_curve.png){width=640px}
 
-The [Parametric](../parametric/index.md) tools can also find the yield coefficient, less directly, by varying
-**k_seismic**, the horizontal seismic coefficient:
-
-- A [sensitivity](../parametric/sensitivity.md) sweep solves the model at a series of values of $k$ and plots the
-  factor of safety against $k$. With **Re-search the critical surface at each step** unticked, it solves the surface
-  entered in the model each time and draws a curve like the one above. With it ticked, each point is for the surface
-  that is critical at that value of $k$, and the curve crosses $F = 1$ near the lowest yield coefficient.
-- A [back-analysis](../parametric/back_analysis.md) solves the model at evenly spaced values of $k$ over a range you
-  set and interpolates the value at which $F = 1$. With a search at each step, that value is close to the lowest
-  yield coefficient, and how close depends on the spacing of the steps.
-
-Finding the yield coefficient directly also reports $k_y$ for the static critical surface and passes $k_y$ to
-**Newmark…**.
-
 ## Searching for the Lowest Yield Coefficient {#which-surface}
 
 The steps above compute $k_y$ for a surface that has already been chosen. The choice matters, because the yield
@@ -143,6 +129,23 @@ horizontal one, there is no ratio, and the yield coefficient run is refused.
 
 The yield coefficient can also be computed with the [two-stage analysis](two_stage.md). Stage 1 has no seismic force,
 so the undrained strengths it gives for a surface are the same at every trial value of $k$. Only stage 2 changes.
+
+## Using the Parametric Tools {#parametric}
+
+The [Parametric](../parametric/index.md) tools can also estimate the yield coefficient, by varying **k_seismic**, the
+horizontal seismic coefficient. They are a way to check a result, or to see how the factor of safety changes with $k$.
+
+- **Sensitivity.** A [sensitivity](../parametric/sensitivity.md) sweep plots the factor of safety against $k$. If
+  **Re-search the critical surface at each step** is unticked, it solves only the surface entered in the model, and the
+  curve is the one-surface curve shown in [Computing the Yield Coefficient for One Surface](#one-surface): it crosses
+  $F = 1$ at that surface's $k_y$. If the option is ticked, it searches for the critical surface at each value of $k$,
+  and the curve crosses $F = 1$ near the lowest yield coefficient.
+- **Back-analysis.** A [back-analysis](../parametric/back_analysis.md) solves the model at evenly spaced values of $k$
+  over a range you set and interpolates between them for the value at which $F = 1$. With a search at each step, the
+  result is close to the lowest yield coefficient. Closer steps give a closer result.
+
+Finding the yield coefficient directly, as described above, does not depend on the spacing of steps, reports $k_y$ for
+the static critical surface as well, and passes $k_y$ to **Newmark…**.
 
 ## In Studio {#studio}
 

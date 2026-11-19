@@ -5,10 +5,14 @@ description: "Newmark sliding-block displacement in XSLOPE: the rigid block, int
 
 # Newmark Displacement
 
-A pseudostatic factor of safety below 1 does not by itself mean that a slope fails in an earthquake: the accelerations that exceed
-the yield acceleration last only moments. Newmark (1965) estimated what they do by treating the sliding mass as a
-rigid block on a plane. Whenever the ground accelerates harder than the block's yield acceleration, the block slips;
-the slips add up to a permanent displacement.
+A pseudostatic factor of safety below 1 does not mean that a slope fails in an earthquake. The accelerations that
+exceed the yield acceleration last only moments, so the sliding mass moves a limited distance and stops. Newmark
+(1965) estimated that distance by replacing the sliding mass in the slope, (a) in the figure below, with a rigid block
+on an inclined plane, (b). Whenever the ground acceleration $a(t)$ exceeds the block's yield acceleration $k_y g$, the
+block slides down the plane, and these slips add up to a permanent displacement.
+
+**xslope** computes this displacement from an acceleration record and the yield coefficient $k_y$ of the sliding mass,
+found as on the [Yield Coefficient](yield_coefficient.md) page.
 
 ![Newmark's sliding block: (a) a slope whose sliding mass rests on a slip surface while the ground shakes with a(t), and (b) the same mass as a rigid block on an inclined plane, sliding when a(t) exceeds k_y g](images/seismic_block.png){width=900px}
 

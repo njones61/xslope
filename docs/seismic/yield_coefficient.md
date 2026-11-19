@@ -109,9 +109,16 @@ from the top of the slope, far enough that neither circle reaches its end:
 
 The static critical circle is shallow and has $k_y$ = 0.432. The circle with the lowest yield coefficient,
 $k_y$ = 0.351, is far larger. It reaches the bottom of the model, 30 ft below the toe, and comes out on the crest about
-140 ft back from the top of the slope. This is the unrealistically deep surface Duncan et al. warn about.
-Of the four soils in their Table 10.3, it happens with the two that have the most cohesion, soils 2 and 4. With soils
-1 and 3, the two circles nearly agree.
+140 ft back from the top of the slope. Of the four soils in their Table 10.3, this happens with the two that have the
+most cohesion, soils 2 and 4. With soils 1 and 3, the two circles nearly agree.
+
+So the two candidates can be far apart, and computing $k_y$ only on the static critical circle can miss a much lower
+value. But Duncan et al. warn that the surface with the lowest yield coefficient can be unrealistically deep, with a
+yield coefficient too low for computing displacements. The reason is the acceleration. A Newmark analysis applies one
+acceleration record to the whole sliding mass. Peak accelerations increase from the bottom of a dam to the top
+(Duncan et al. 2014), so a large, deep mass is shaken less, on average, than a shallow one near the face. Pairing the
+full record with the deep mass's low yield coefficient overstates its displacement. The Log reports $k_y$ for both
+surfaces so they can be compared.
 
 The closed form for a planar surface shows why cohesion has this effect. With $W = \gamma \ell z \cos\beta$, the
 cohesion term $c\ell/W$ equals $c/(\gamma z \cos\beta)$, which gets smaller as the depth $z$ grows, while the friction

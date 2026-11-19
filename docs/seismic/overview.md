@@ -13,7 +13,9 @@ procedures follow Duncan, Wright, and Brandon (2014), Chapter 10.
 
 ## Three Kinds of Analysis {#kinds-of-analysis}
 
-Duncan et al. describe three kinds of seismic slope analysis.
+Duncan et al. describe three kinds of seismic slope analysis. **The pseudostatic analysis is the most common.** It is
+simple, most slope stability programs can do it, and used as a screening analysis it shows whether a slope needs one
+of the more detailed analyses at all.
 
 - **Pseudostatic analysis.** The earthquake is a static force on every slice, the soil weight times a seismic
   coefficient. It is less accurate than the other procedures but useful for screening, as long as the soil does not

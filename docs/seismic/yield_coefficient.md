@@ -98,7 +98,7 @@ the steps in the previous section:
 3. It repeats step 2 with each new $k_y$ until a search finds no surface with $F$ more than 0.002 below 1, or until it
    has made six of these searches. The surface it ends with is the second candidate.
 
-The Log reports $k_y$ for both surfaces.
+The Log reports $k_y$ for each of the two: the static critical surface and the surface with the lowest $k_y$.
 
 For VP104 the two candidates nearly agree: $k_y$ = 0.1457 for the static critical circle and 0.1445 for the circle
 with the lowest $k_y$. For the slope Duncan et al. use for their Table 10.4 (2.5H:1V, 30 ft high, γ = 135 pcf), with
@@ -116,8 +116,7 @@ value. But Duncan et al. warn that the surface with the lowest yield coefficient
 yield coefficient too low for computing displacements. The reason is the acceleration. A Newmark analysis applies one
 acceleration record to the whole sliding mass. Peak accelerations increase from the bottom of a dam to the top
 (Duncan et al. 2014), so a large, deep mass is shaken less, on average, than a shallow one near the face. Pairing the
-full record with the deep mass's low yield coefficient overstates its displacement. The Log reports $k_y$ for both
-surfaces so they can be compared.
+full record with the deep mass's low yield coefficient overstates its displacement.
 
 **xslope** cannot find the third candidate by itself. Finding it requires knowing how the acceleration varies through
 the slope, which takes a site response analysis or published relations such as those in FHWA (2011). Once you have

@@ -138,6 +138,11 @@ nav:
     - Pile and Wall Types: piles/types.md
     - Piles in LEM: piles/lem.md
     - Piles in FEM: piles/fem.md
+  - Seismic Analysis:
+    - Overview: seismic/overview.md
+    - Two-Stage Analysis: seismic/two_stage.md
+    - Yield Coefficient: seismic/yield.md
+    - Newmark Displacement: seismic/newmark.md
   - Reliability:
     - Overview: reliability/index.md
     - Taylor Series (TSPM): reliability/taylor.md

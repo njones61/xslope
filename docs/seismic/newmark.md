@@ -1,0 +1,117 @@
+---
+title: "Newmark displacement — XSLOPE"
+description: "Newmark sliding-block displacement in XSLOPE: the rigid block, integrating an acceleration record above the yield acceleration in both directions, record formats and scaling, the VP104 example, and the method's limits."
+---
+
+# Newmark Displacement
+
+A pseudostatic factor of safety below 1 does not by itself mean that a slope fails in an earthquake: the accelerations that exceed
+the yield acceleration last only moments. Newmark (1965) estimated what they do by treating the sliding mass as a
+rigid block on a plane. Whenever the ground accelerates harder than the block's yield acceleration, the block slips;
+the slips add up to a permanent displacement.
+
+![Newmark's sliding block: (a) a slope whose sliding mass rests on a slip surface while the ground shakes with a(t), and (b) the same mass as a rigid block on an inclined plane, sliding when a(t) exceeds k_y g](images/seismic_block.png){width=900px}
+
+## The Sliding Block {#sliding-block}
+
+The block's yield acceleration is $a_y = k_y g$, where $k_y$ is the [yield coefficient](yield.md) of the sliding
+mass. While the ground acceleration $a(t)$, in the direction that drives the block down the slope, exceeds $a_y$, the
+block accelerates relative to the ground at
+
+>>$\dfrac{dv}{dt} = a(t) - k_y g$
+
+It keeps sliding after the ground acceleration falls back below $a_y$, slowing down, until its velocity relative to the
+ground returns to zero. Integrating the relative velocity gives the displacement:
+
+>>$D = \displaystyle\int v\,dt$
+
+The block slides again each time the acceleration exceeds $a_y$, and never slides back up the slope (Duncan, Wright,
+and Brandon 2014, Fig. 10.3). **xslope** takes the record as linear between its samples and integrates each step
+exactly on that line, including the moments sliding starts and stops.
+
+**Both directions.** Nothing in a record says which way its positive accelerations point on the slope being
+analyzed: the sign is the compass direction of the instrument's axis where it was recorded. So **xslope** runs every
+record both ways, once with its positive accelerations driving the block down the slope and once with its negative
+ones, and reports the larger displacement as $D$, with the other beside it.
+
+**A check.** For one rectangular pulse of acceleration $A g$ lasting $t_0$, Newmark's closed form is
+
+>>$D = \dfrac{g t_0^2}{2}\,\dfrac{A(A - k_y)}{k_y}$
+
+and **xslope** matches it exactly ([Newmark (1965)](../verification/published.md#newmark-1965) on the verification
+pages).
+
+## Acceleration Records {#records}
+
+A record is a file of horizontal ground acceleration, in g, in one of two forms:
+
+- **A PEER `.AT2` file**, as the PEER ground motion databases give them: header lines, a line stating the number of
+  points and the time step (`NPTS=  5862, DT=   .0050 SEC`, or the older `5862  .0050  NPTS, DT`), then the
+  accelerations, several to a line.
+- **Two columns of text,** time in s and acceleration in g, separated by spaces, tabs, or commas. Lines before the
+  first pair of numbers are the header, and lines after it that start with `#` are skipped. The time steps need not be equal.
+
+Records come from the strong-motion collections, among them the PEER ground motion databases and the U.S. Geological
+Survey's Center for Engineering Strong Motion Data. A record can be used as recorded, multiplied by a scale factor, or
+scaled so that its peak acceleration matches a target, such as the design peak acceleration of the site.
+
+The displacement is in cm for a metric model and in inches for an English one.
+
+## An Example: VP104 {#vp104-example}
+
+The Slide2 verification problem [VP104](../verification/rocscience.md#vp104) is a slope with the record of the 1980
+Mammoth Lakes earthquake at station CVK, component 090: 5,862 points at 0.005 s, with a peak of 0.416 g. Its lowest
+yield coefficient on circles, found as on the [Yield Coefficient](yield.md#one-surface) page, is $k_y$ = 0.1445:
+
+![The VP104 record, the block's velocity relative to the ground, and its displacement over time, each way: the negative accelerations govern, with D = 4.47 cm](images/seismic_newmark_vp104.png){width=900px}
+
+The top panel marks $\pm k_y$ on the record. With its negative accelerations driving the block, it slides in 22
+episodes and moves 4.47 cm; the other way it moves 3.39 cm. Slide2's multi-modal search finds a slightly lower yield
+coefficient, 0.139, and at that coefficient **xslope** computes 5.036 cm against Slide2's 5.042 cm.
+
+## Limits {#limits}
+
+- **A rigid block.** The whole mass slides as one, on one surface, with one yield coefficient, and the record stands for
+  the acceleration of the whole mass. The [third candidate surface](yield.md#which-surface) of Duncan et al. accounts for
+  how the acceleration varies through the slope.
+- **No loss of strength.** The yield coefficient stays fixed through the shaking. Duncan et al. (2014) use a
+  sliding block analysis only where the cyclic loading costs the soil little strength; where it costs much, other
+  methods apply. Seed (1979) found that pseudostatic analyses did not reveal the large displacements of the Upper Van
+  Norman Dam, and used the concept of strain potential instead.
+- **One way.** The block never slides back up the slope.
+
+## In Studio {#studio}
+
+In **LEM** mode, **Newmark…** is on the **Run** menu and the toolbar. Its dialog takes:
+
+- **Record:** the file, chosen with **Browse…**. The dialog shows the record's header line, its number of points, time
+  step, and peak acceleration.
+- **Scaling:** **As recorded**, a **Scale factor**, or a **Target peak acceleration (g)**.
+- **Yield coefficient k_y:** filled from the last run that found the yield coefficient, or typed.
+
+The results open in the **LEM · Newmark** view: the three histories, both directions, with $D$ in the title, and a
+table. The Log reports $D$, the governing direction and its number of slip episodes, and the displacement the other
+way. The [Analysis Report](../studio/reports.md) prints the run under **Newmark displacement**: the record and its
+scaling, $k_y$, the displacement each way, and the three histories. The record itself is not saved in the workbook.
+
+## From Python {#python}
+
+```python
+from xslope.seismic import newmark_displacement, read_record, scale_for_pga
+from xslope.plot import plot_newmark
+
+record = read_record("record.AT2")
+scale = scale_for_pga(record, 0.30)                  # scale the record to a peak of 0.30 g
+result = newmark_displacement(record, ky=0.1445, scale=scale, units="si")
+print(result["D"], result["D_unit"])                 # the larger of the two directions
+print({sign: d["D"] for sign, d in result["directions"].items()})
+plot_newmark(result)
+```
+
+## References
+
+- Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014). *Soil Strength and Slope Stability*, 2nd ed. Wiley, Hoboken,
+  NJ. Section 10.1.3.
+- Newmark, N.M. (1965). "Effects of earthquakes on dams and embankments." *Géotechnique*, 15(2), 139–160.
+- Seed, H.B. (1979). "Considerations in the earthquake-resistant design of earth and rockfill dams." Nineteenth
+  Rankine Lecture, *Géotechnique*, 29(3), 215–263.

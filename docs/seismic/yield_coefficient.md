@@ -71,9 +71,19 @@ $k_y$ = 0.1445:
 
 ![The factor of safety against the horizontal seismic coefficient on the VP104 circle with the lowest yield coefficient, falling from 1.38 at no seismic force through 1 at k_y = 0.1445](images/seismic_ky_curve.png){width=640px}
 
-A Parametric sweep of **k_seismic** gives a similar curve, but it searches for a new critical surface at each value
-of $k$. A [Back-Analysis](../parametric/back_analysis.md) of **k_seismic** to $F = 1$ gives an approximate minimum
-yield coefficient, but it runs a full search at every step.
+The [Parametric](../parametric/index.md) tools can also find the yield coefficient, less directly, by varying
+**k_seismic**, the horizontal seismic coefficient:
+
+- A [sensitivity](../parametric/sensitivity.md) sweep solves the model at a series of values of $k$ and plots the
+  factor of safety against $k$. With **Re-search the critical surface at each step** unticked, it solves the surface
+  entered in the model each time and draws a curve like the one above. With it ticked, each point is for the surface
+  that is critical at that value of $k$, and the curve crosses $F = 1$ near the lowest yield coefficient.
+- A [back-analysis](../parametric/back_analysis.md) solves the model at evenly spaced values of $k$ over a range you
+  set and interpolates the value at which $F = 1$. With a search at each step, that value is close to the lowest
+  yield coefficient, and how close depends on the spacing of the steps.
+
+Finding the yield coefficient directly also reports $k_y$ for the static critical surface and passes $k_y$ to
+**Newmark…**.
 
 ## Choosing the Slip Surface {#which-surface}
 

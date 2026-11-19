@@ -119,12 +119,6 @@ acceleration record to the whole sliding mass. Peak accelerations increase from 
 full record with the deep mass's low yield coefficient overstates its displacement. The Log reports $k_y$ for both
 surfaces so they can be compared.
 
-The closed form for a planar surface shows why cohesion has this effect. With $W = \gamma \ell z \cos\beta$, the
-cohesion term $c\ell/W$ equals $c/(\gamma z \cos\beta)$, which gets smaller as the depth $z$ grows, while the friction
-terms do not depend on $z$. On an infinite slope, a deeper surface in a cohesive soil therefore has a lower yield
-coefficient, and in a soil with no cohesion depth makes no difference. A circle in a slope of limited height is not an
-infinite slope, and its yield coefficient need not keep falling as the circle gets deeper.
-
 **xslope** cannot find the third candidate by itself. Finding it requires knowing how the acceleration varies through
 the slope, which takes a site response analysis or published relations such as those in FHWA (2011). Once you have
 chosen a surface, **xslope** can compute its displacement:

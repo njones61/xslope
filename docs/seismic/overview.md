@@ -33,7 +33,7 @@ What **xslope** computes for each, and where:
 |---|---|---|---|
 | Pseudostatic, one stage | F with k<sub>h</sub>W on every slice | Any limit equilibrium method, and strength reduction in the finite element analysis | [Below](#pseudostatic-force) |
 | Pseudostatic, two stages | F with undrained strengths from each slice's stresses before the earthquake | **Run LEM…**, **Two-stage seismic** | [Two-Stage Analysis](two_stage.md) |
-| Yield coefficient | k<sub>y</sub>, the seismic coefficient at which F = 1 | **Run LEM…**, **Find the yield coefficient k_y** | [Yield Coefficient](yield.md) |
+| Yield coefficient | k<sub>y</sub>, the seismic coefficient at which F = 1 | **Run LEM…**, **Find the yield coefficient k_y** | [Yield Coefficient](yield_coefficient.md) |
 | Sliding block | The permanent displacement D under an acceleration record | **Run** menu, **Newmark…** | [Newmark Displacement](newmark.md) |
 | After the earthquake | F with the strengths left after shaking | An ordinary run with those strengths | [Below](#after-the-earthquake) |
 
@@ -150,7 +150,7 @@ strengths entered as each material's strength. A zone that liquefies is entered 
 
 - [Two-Stage Analysis](two_stage.md): the pseudostatic analysis for a slope that has consolidated, with undrained
   strengths from consolidated-undrained tests, and the single-stage R envelope.
-- [Yield Coefficient](yield.md): the seismic coefficient at which the factor of safety is 1, on one surface or by
+- [Yield Coefficient](yield_coefficient.md): the seismic coefficient at which the factor of safety is 1, on one surface or by
   search, and which surface to find it on.
 - [Newmark Displacement](newmark.md): the permanent displacement of the sliding mass under an acceleration record.
 

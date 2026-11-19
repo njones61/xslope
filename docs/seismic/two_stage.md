@@ -107,7 +107,11 @@ the interpolated choice's values on the same slope.
 
 In the dialog **Run LEM…** opens, under **Seismic**, check **Two-stage seismic** and choose the **Stage 2 strength**: **Interpolated
 (as in rapid drawdown)** or **Kc = 1 envelope**. A run is a rapid drawdown analysis or a two-stage seismic analysis,
-never both, so checking one clears the other. The two-stage analysis works with every method, on a single surface or
+never both, so checking one clears the other.
+
+![The Run LEM dialog with Two-stage seismic checked and the Stage 2 strength under it](../studio/images/analysis_run_lem_seismic.png)
+
+The two-stage analysis works with every method, on a single surface or
 in a search; a search solves both stages on every trial surface.
 
 The Log reports both stages' factors of safety on the critical surface, and the LEM Solution view notes them. The

@@ -14,7 +14,7 @@ the slips add up to a permanent displacement.
 
 ## The Sliding Block {#sliding-block}
 
-The block's yield acceleration is $a_y = k_y g$, where $k_y$ is the [yield coefficient](yield.md) of the sliding
+The block's yield acceleration is $a_y = k_y g$, where $k_y$ is the [yield coefficient](yield_coefficient.md) of the sliding
 mass. While the ground acceleration $a(t)$, in the direction that drives the block down the slope, exceeds $a_y$, the
 block accelerates relative to the ground at
 
@@ -61,7 +61,7 @@ The displacement is in cm for a metric model and in inches for an English one.
 
 The Slide2 verification problem [VP104](../verification/rocscience.md#vp104) is a slope with the record of the 1980
 Mammoth Lakes earthquake at station CVK, component 090: 5,862 points at 0.005 s, with a peak of 0.416 g. Its lowest
-yield coefficient on circles, found as on the [Yield Coefficient](yield.md#one-surface) page, is $k_y$ = 0.1445:
+yield coefficient on circles, found as on the [Yield Coefficient](yield_coefficient.md#one-surface) page, is $k_y$ = 0.1445:
 
 ![The VP104 record, the block's velocity relative to the ground, and its displacement over time, each way: the negative accelerations govern, with D = 4.47 cm](images/seismic_newmark_vp104.png){width=900px}
 
@@ -72,7 +72,7 @@ coefficient, 0.139, and at that coefficient **xslope** computes 5.036 cm against
 ## Limits {#limits}
 
 - **A rigid block.** The whole mass slides as one, on one surface, with one yield coefficient, and the record stands for
-  the acceleration of the whole mass. The [third candidate surface](yield.md#which-surface) of Duncan et al. accounts for
+  the acceleration of the whole mass. The [third candidate surface](yield_coefficient.md#which-surface) of Duncan et al. accounts for
   how the acceleration varies through the slope.
 - **No loss of strength.** The yield coefficient stays fixed through the shaking. Duncan et al. (2014) use a
   sliding block analysis only where the cyclic loading costs the soil little strength; where it costs much, other
@@ -88,6 +88,8 @@ In **LEM** mode, **Newmark…** is on the **Run** menu and the toolbar. Its dial
   step, and peak acceleration.
 - **Scaling:** **As recorded**, a **Scale factor**, or a **Target peak acceleration (g)**.
 - **Yield coefficient k_y:** filled from the last run that found the yield coefficient, or typed.
+
+![The Newmark dialog with VP104's record chosen and k_y from the last yield coefficient run](../studio/images/analysis_newmark_dialog.png)
 
 The results open in the **LEM · Newmark** view: the three histories, both directions, with $D$ in the title, and a
 table. The Log reports $D$, the governing direction and its number of slip episodes, and the displacement the other

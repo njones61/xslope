@@ -124,6 +124,15 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   search-driven analyses.
 - **Seepage time** and the **rapid-drawdown stage times** — shown when the model
   carries transient seepage. See [Seepage time](#seepage-time).
+- **Seismic** — **Find the yield coefficient k_y** finds the seismic coefficient at
+  which the factor of safety is 1, in place of the model's own (see
+  [Yield Coefficient](../seismic/yield_coefficient.md)). **Two-stage seismic** runs the two-stage
+  pseudostatic analysis, and **Stage 2 strength** under it chooses how stage 2 takes
+  the undrained strength: **Interpolated (as in rapid drawdown)** or **Kc = 1
+  envelope** (see [Two-Stage Analysis](../seismic/two_stage.md)). The two can be
+  combined. Neither runs with **Rapid drawdown**: checking one clears the other.
+
+![Run LEM dialog with Two-stage seismic checked](images/analysis_run_lem_seismic.png)
 
 The result depends on the analysis type:
 
@@ -168,6 +177,21 @@ described in [Forces at the Crossings](../reinforcement/lem.md#forces-at-the-cro
 Both circular and non-circular surfaces are supported for single solves and
 searches. Search iteration progress streams to the Log pane, and a search can be
 **cancelled** from the status bar.
+
+### Newmark displacement {#newmark}
+
+In **LEM** mode, **Newmark…** on the **Run** menu and the toolbar integrates an
+acceleration record as a rigid sliding block at the yield coefficient. The dialog
+takes the **Record** (a PEER `.AT2` file, or two columns of time and acceleration),
+shows its header line, number of points, time step, and peak, and offers **As
+recorded**, a **Scale factor**, or a **Target peak acceleration (g)**. **Yield
+coefficient k_y** is filled from the last run that found one, or typed.
+
+![Newmark dialog](images/analysis_newmark_dialog.png)
+
+The result opens in the **LEM · Newmark** view: the record, the block's velocity
+relative to the ground, and its displacement, both directions, with a table. See
+[Newmark Displacement](../seismic/newmark.md).
 
 ---
 

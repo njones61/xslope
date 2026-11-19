@@ -2204,6 +2204,49 @@ results = solve_selected("spencer", slice_df, rapid=True)
 
 ---
 
+## Seismic Analysis (pseudostatic, two-stage, yield coefficient, Newmark)
+
+The pages under https://xslope.org/en/latest/seismic/overview/ are the reference. Rules:
+
+- **Pseudostatic F:** enter `k_seismic` (main!D13) and, only if a code asks for it, `k_vertical`
+  (main!D14, signed, + down). Every LEM method applies k_hW (and k_vW) at each slice's center of
+  gravity; one run is one k_v direction.
+- **Which strength** (Duncan, Wright & Brandon 2014, Sec. 10.4): UU strengths in total stress for an
+  earthquake right after construction or on an existing slope; CU strengths for a new slope after it
+  consolidates — d/psi on the mat sheet with `seismic2=`, or the R envelope's c_R, phi_R entered as c,
+  phi in ONE stage with the pore pressures from BEFORE the earthquake (steady seepage). Free-draining
+  gravels keep c', phi' (leave d/psi blank). XSLOPE applies no screening strength reduction; enter
+  reduced strengths if the screening method calls for one.
+- **Two-stage** (`seismic2="interpolated"` default, or `"kc1"` to reproduce DWB Table 10.4): stage 1
+  static and drained, stage 2 undrained from stage-1 stresses plus the seismic force; no stage 3.
+  Refused with `rapid=True`, without any d/psi material, with d or psi alone, on pow/hb materials
+  carrying d/psi, and when stage 1 F < 1.
+- **Yield coefficient** `xslope.seismic.yield_coefficient(slope_data, method, analysis=...)`:
+  `"single_surface"` on the entered surface, `"auto_search"` for the minimum k_y (it reports k_y on
+  the static critical surface too, in `bundle["yield"]["static"]`). The minimum-k_y surface can run to
+  the model's base and ends on a cohesive slope; say so, and report both candidates. With k_v, the
+  ratio k_v/|k| is held; k_v with k = 0 is refused.
+- **Newmark** `newmark_displacement(read_record(path), ky, scale=..., units=...)`: records are PEER
+  .AT2 or two columns (t s, a g). It always runs both directions and reports the larger; quote both.
+  The method assumes no significant strength loss; do not offer it for liquefiable soils.
+- **After the earthquake:** an ordinary static run (k = 0) with the reduced (residual or partly
+  reduced) strengths entered; a liquefying zone is its own material.
+
+```python
+from xslope.search import run_lem_analysis
+from xslope.seismic import newmark_displacement, read_record, yield_coefficient
+
+two = run_lem_analysis(slope_data, "spencer", seismic2="interpolated")
+print(two["results"]["seismic_stage1_FS"], two["results"]["seismic_stage2_FS"])
+
+ky_run = yield_coefficient(slope_data, "spencer", analysis="auto_search")
+ky = ky_run["yield"]["k_y"]
+nm = newmark_displacement(read_record("record.AT2"), ky, units="si")   # D in cm (in for imperial)
+print(nm["D"], {s: d["D"] for s, d in nm["directions"].items()})
+```
+
+---
+
 ## Important Guidelines
 
 1. **Units must be consistent.** Declare the system with `unit_system` — Imperial: ft, pcf, psf; SI: m, kN/m3, kPa. Do not mix; xslope never converts, it only declares and labels.

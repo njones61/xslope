@@ -1511,6 +1511,48 @@ def capture_seep_solution_view():
     return _seep_view("solution", "analysis_seep_solution.png")
 
 
+# --------------------------------------------------------------------------- #
+# Seismic: the Run LEM seismic options and the Newmark dialog
+# --------------------------------------------------------------------------- #
+# Duncan, Wright & Brandon's Table 10.4 slope: its materials carry d and psi, so
+# the model checks have nothing against a two-stage run.
+DWB_T10_4 = os.path.join(REPO_ROOT, "docs/verification/files/published/dwb_t10_4_dry.xlsx")
+VP104_RECORD = os.path.join(REPO_ROOT, "docs/verification/files/rocscience/vp104_record.txt")
+
+
+def capture_run_lem_seismic():
+    """The Run LEM dialog with Two-stage seismic checked, so its Stage 2 strength is
+    live under it, on a model whose materials carry d and psi."""
+    from xslope.fileio import load_slope_data
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"seismic2": "interpolated"},
+                       slope_data=load_slope_data(DWB_T10_4))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_run_lem_seismic.png")
+
+
+def capture_newmark_dialog():
+    """Run → Newmark… on VP104's record, with k_y filled from a yield coefficient
+    run in the words Studio uses for one (main_window._ky_of_run)."""
+    from studio.dialogs import NewmarkDialog
+
+    # Opened from the record's own folder, so the Record field shows the file's name
+    # rather than the tail of this checkout's path.
+    here = os.getcwd()
+    os.chdir(os.path.dirname(VP104_RECORD))
+    try:
+        dlg = NewmarkDialog(ky=0.1445, units="si", last_path=os.path.basename(VP104_RECORD),
+                            ky_source="Spencer, on the critical circle, k_y = 0.1445")
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, "analysis_newmark_dialog.png")
+    finally:
+        os.chdir(here)
+
+
+SEISMIC_SHOTS = (capture_run_lem_seismic, capture_newmark_dialog)
+
+
 CROSSING_SHOTS = (capture_crossing_table, capture_lem8_crossings,
                   capture_crossings_pullout)
 
@@ -1526,6 +1568,11 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "parametric":
         print("capture_studio_screenshots: regenerating the Parametric images")
         for fn in PARAMETRIC_SHOTS:
+            print(f"  wrote {os.path.relpath(fn(), REPO_ROOT)}")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "seismic":
+        print("capture_studio_screenshots: regenerating the seismic images")
+        for fn in SEISMIC_SHOTS:
             print(f"  wrote {os.path.relpath(fn(), REPO_ROOT)}")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "crossings":
@@ -1564,7 +1611,7 @@ def main():
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,
                capture_display_dock_fem, capture_seep_data_view,
-               capture_seep_solution_view) + PARAMETRIC_SHOTS + CROSSING_SHOTS:
+               capture_seep_solution_view) + PARAMETRIC_SHOTS + CROSSING_SHOTS + SEISMIC_SHOTS:
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     global _MW

@@ -69,7 +69,7 @@ A two-stage run is refused when:
 - a material with $d$ and $\psi$ uses a power-curve or Hoek-Brown envelope;
 - the run is also a rapid drawdown analysis.
 
-A seismic coefficient of 0 draws a warning: stage 2 is then a static analysis with undrained strengths. A material
+A horizontal seismic coefficient of 0 draws a warning: stage 2 is then a static analysis with undrained strengths. A material
 whose strength is an undrained c/p ratio keeps that strength in both stages, and its $d$ and $\psi$ are not read.
 [Preflight Input Checks](../usage/preflight.md) lists every rule.
 

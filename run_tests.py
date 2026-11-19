@@ -6140,10 +6140,14 @@ PREFLIGHT_RULE_SPECS = [
     # --- main-sheet scalars ------------------------------------------------
     dict(rule='main.seismic_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=float('nan')),
-         expect='Seismic coefficient k is blank'),
+         expect='Horizontal seismic coefficient k is blank'),
     dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=15.0),
          expect='fraction of gravity'),
+    # A rule returning one (severity, message) pair is one finding, not two.
+    dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.7),
+         expect='which is high', count=1),
     dict(rule='main.seismic_negative_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=-0.2),
          expect='is negative'),
@@ -7209,6 +7213,12 @@ PREFLIGHT_RULE_SPECS = [
          control_selection={'param': 'mat:Shell:gamma', 'values': [10.0, 20.0]},
          mutation=lambda sd: sd,
          expect='will be skipped'),
+    dict(rule='sensitivity.range_crosses_zero', base=PREFLIGHT_BASE_LEM,
+         mode='dict', analysis='sensitivity',
+         selection={'param': 'mat:Shell:gamma', 'values': [-10.0, -5.0, 0.0]},
+         control_selection={'param': 'mat:Shell:gamma', 'values': [10.0, 20.0]},
+         mutation=lambda sd: sd,
+         expect='every value in it is zero or negative', count=1),
     dict(rule='sensitivity.seismic_sign_discarded', base=PREFLIGHT_BASE_LEM,
          mode='dict', analysis='sensitivity',
          selection={'param': 'global:k_seismic', 'values': [-0.2, 0.2],
@@ -7861,7 +7871,7 @@ def run_sweep_gate_test(test):
                                      search=False, num_slices=20)
     if ok3:
         problems.append("a sweep started on a base model preflight refuses")
-    elif 'Seismic coefficient k' not in str(res3):
+    elif 'Horizontal seismic coefficient k' not in str(res3):
         problems.append(f"the base-model refusal does not name the field: {res3}")
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
@@ -8013,7 +8023,7 @@ def run_preflight_contract_test(test):
             problems.append("PreflightError is not a ValueError")
         if getattr(exc, 'report', None) is None:
             problems.append("PreflightError carries no report")
-    if 'Seismic coefficient k' not in bad.format():
+    if 'Horizontal seismic coefficient k' not in bad.format():
         problems.append("format() lost the finding text")
     if bad.format(min_severity=pf.ERROR).count('WARNING') != 0:
         problems.append("format(min_severity=ERROR) leaked a warning")

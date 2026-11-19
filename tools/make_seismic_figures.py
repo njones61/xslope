@@ -162,6 +162,50 @@ def newmark():
           f"{rec['npts']} points, dt {rec['dt']}, PGA {rec['pga']:.3f} g")
 
 
+def newmark_steps():
+    """The sliding-block integration on a record simple enough to follow: three
+    cycles of a 1 Hz sine wave with a 0.3 g peak, k_y = 0.15, positive
+    accelerations driving the block downslope. The block slides while its
+    velocity relative to the ground is above zero; those spans are shaded in all
+    three panels."""
+    import numpy as np
+    ky, peak, cycles = 0.15, 0.30, 3
+    time = np.linspace(0.0, float(cycles), 3001)
+    rec = {"time": time, "accel": peak * np.sin(2.0 * np.pi * time)}
+    res = newmark_displacement(rec, ky, units="si")
+    run = res["directions"][+1]
+    v, d, a = run["v"], run["d"], res["accel"]
+    sliding = v > 1e-9
+    fig, axes = plt.subplots(3, 1, figsize=(9.0, 7.0), sharex=True)
+    for ax in axes:
+        ax.fill_between(time, 0, 1, where=sliding, transform=ax.get_xaxis_transform(),
+                        color=ORANGE, alpha=0.12, lw=0)
+        ax.grid(True, color="0.93")
+        ax.set_axisbelow(True)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+    ax = axes[0]
+    ax.plot(time, a, color=BLUE, lw=1.6)
+    ax.axhline(ky, color=ORANGE, lw=1.4, ls="--")
+    ax.axhline(0.0, color="0.6", lw=0.8)
+    ax.fill_between(time, ky, a, where=a > ky, color=ORANGE, alpha=0.55, lw=0)
+    ax.text(time[-1], ky + 0.01, "k$_y$ = 0.15", color=ORANGE, fontsize=9,
+            ha="right", va="bottom")
+    ax.set_ylabel("Ground acceleration\na(t) (g)")
+    ax = axes[1]
+    ax.plot(time, v, color=BLUE, lw=1.6)
+    ax.set_ylabel("Block velocity relative\nto the ground (cm/s)")
+    ax = axes[2]
+    ax.plot(time, d, color=BLUE, lw=1.6)
+    ax.set_ylabel("Displacement\n(cm)")
+    ax.set_xlabel("Time (s)")
+    ax.set_xlim(0, time[-1])
+    fig.align_ylabels(axes)
+    _save(fig, "seismic_newmark_steps.png")
+    print(f"  sine record: peak {peak} g, k_y {ky}: D = {run['D']:.2f} cm in "
+          f"{run['episodes']} episodes, v_max {run['v_max']:.1f} cm/s")
+
+
 # ---------------------------------------------------------------------------
 # DWB Fig. 10.7: the static critical circle and the minimum-k_y circle
 # ---------------------------------------------------------------------------
@@ -286,7 +330,8 @@ def single_two_stage():
             for n in range(1, 5)))
 
 
-FIGURES = {"ky_curve": ky_curve, "newmark": newmark, "ky_surfaces": ky_surfaces,
+FIGURES = {"ky_curve": ky_curve, "newmark": newmark, "newmark_steps": newmark_steps,
+           "ky_surfaces": ky_surfaces,
            "envelopes": envelopes, "single_two_stage": single_two_stage}
 
 if __name__ == "__main__":

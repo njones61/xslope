@@ -30,8 +30,16 @@ ground returns to zero. Integrating the relative velocity gives the displacement
 >>$D = \displaystyle\int v\,dt$
 
 The block slides again each time the acceleration exceeds $a_y$, and never slides back up the slope (Duncan, Wright,
-and Brandon 2014, Fig. 10.3). **xslope** takes the record as linear between its samples and integrates each step
-exactly on that line, including the moments sliding starts and stops.
+and Brandon 2014, Fig. 10.3). The figure shows the process for a simple record, three cycles of a sine wave with a
+peak of 0.3 g, and $k_y$ = 0.15. The dark shading marks where the acceleration exceeds $k_y g$, and the light bands
+mark where the block is sliding. Each slip starts when the acceleration rises past $k_y g$ and ends after it has
+fallen back below, when the relative velocity returns to zero. Each cycle adds about 9.4 cm, and the block ends
+28.3 cm down the slope.
+
+![The sliding-block integration for three cycles of a 0.3 g sine wave and k_y = 0.15: the ground acceleration with the parts above k_y g shaded, the block's velocity relative to the ground, and the displacement growing in three steps to 28.3 cm](images/seismic_newmark_steps.png){width=760px}
+
+**xslope** takes the record as linear between its samples and integrates each step exactly on that line, including
+the moments sliding starts and stops.
 
 **Both directions.** Nothing in a record says which way its positive accelerations point on the slope being
 analyzed: the sign is the compass direction of the instrument's axis where it was recorded. So **xslope** runs every

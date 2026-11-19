@@ -96,13 +96,26 @@ Duncan et al. compare, the R envelope lies below the $K_c = 1$ envelope:
 
 Duncan et al. ran both procedures on one slope, 2.5H:1V and 30 ft high, with γ = 135 pcf, at a seismic coefficient of
 0.15, dry and submerged, for each of the four soils (their Fig. 10.7 and Table 10.4). **xslope** reproduces their
-factors of safety with the Kc = 1 envelope choice, within 1.3 percent, and reproduces their finding that the
-single-stage factor of safety is 80 to 90 percent of the two-stage one:
+factors of safety, run with the Kc = 1 envelope choice, within 1.3 percent:
+
+| Soil | Water | Single-stage F, XSLOPE | Single-stage F, Duncan et al. | Two-stage F, XSLOPE | Two-stage F, Duncan et al. | Single ÷ two-stage, XSLOPE |
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| 1 | Dry | 0.946 | 0.95 | 1.056 | 1.06 | 90% |
+| 2 | Dry | 1.557 | 1.56 | 1.764 | 1.77 | 88% |
+| 3 | Dry | 1.068 | 1.07 | 1.192 | 1.19 | 90% |
+| 4 | Dry | 2.759 | 2.76 | 3.416 | 3.42 | 81% |
+| 1 | Submerged | 0.829 | 0.83 | 0.949 | 0.95 | 87% |
+| 2 | Submerged | 1.570 | 1.59 | 1.776 | 1.79 | 88% |
+| 3 | Submerged | 1.086 | 1.10 | 1.209 | 1.21 | 90% |
+| 4 | Submerged | 2.815 | 2.83 | 3.486 | 3.49 | 81% |
+
+In every case the single-stage factor of safety is the lower one, between 81 and 90 percent of the two-stage one, as
+Duncan et al. found:
 
 ![The single-stage factor of safety against the two-stage one for the four soils, dry and submerged, XSLOPE and Duncan et al.](images/seismic_single_two_stage.png){width=560px}
 
-[DWB Table 10.4](../verification/published.md#dwb-10-4) on the verification pages gives every value, the model, and
-the interpolated choice's values on the same slope.
+[DWB Table 10.4](../verification/published.md#dwb-10-4) on the verification pages gives the model and the interpolated
+choice's values on the same slope.
 
 ## In Studio {#studio}
 

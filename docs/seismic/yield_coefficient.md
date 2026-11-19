@@ -65,6 +65,10 @@ with the limit equilibrium method chosen for the run:
 4. It narrows that interval, choosing each new trial value by interpolating between its two ends, until $F$ equals 1
    to within 0.00001.
 
+Each trial is an ordinary one-stage pseudostatic analysis, with the strengths entered in the model. If **Two-stage
+seismic** is also checked, each trial is a [two-stage analysis](two_stage.md) instead. Stage 1 has no seismic force, so
+the undrained strengths it gives are the same at every trial, and only stage 2 changes with $k$.
+
 For the circle with the lowest yield coefficient in the Slide2 verification problem
 [VP104](../verification/rocscience.md#vp104), with Spencer's method, $F$ falls from 1.38 with no seismic force to 1 at
 $k_y$ = 0.1445:
@@ -135,11 +139,6 @@ The yield coefficient reported is the horizontal one, and the vertical coefficie
 
 A model with a vertical coefficient and a horizontal coefficient of 0 gives no fraction to work from, and its yield
 coefficient run is refused.
-
-## Two-Stage Analysis {#two-stage}
-
-The yield coefficient can also be computed with the [two-stage analysis](two_stage.md). Stage 1 has no seismic force,
-so the undrained strengths it gives for a surface are the same at every trial value of $k$. Only stage 2 changes.
 
 ## Using the Parametric Tools {#parametric}
 

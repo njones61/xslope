@@ -118,7 +118,7 @@ SLICE_COLUMNS = (
     # been dropped for being zero, an inclination belonging to no force.
     Column("beta", "β", "Inclination of the distributed-load resultant from the "
            "horizontal.", "deg", "{:.2f}", True, gated_by="dload"),
-    Column("kw", "kW", "Horizontal seismic force on the slice, per unit "
+    Column("kw", "k_hW", "Horizontal seismic force on the slice, per unit "
            "thickness.", "force_per_len", "{:.1f}", True),
     Column("kvw", "k_vW", "Vertical seismic force on the slice, per unit "
            "thickness, positive downward.", "force_per_len", "{:.1f}", True),

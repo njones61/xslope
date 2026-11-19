@@ -4393,7 +4393,7 @@ def test_column_registry():
 
     # drop_empty removes a column of zeros, and never a geometry one.
     kept = {h.split(" (")[0] for h in headers}
-    if "kW" in kept:
+    if "k_hW" in kept:
         fails.append("a seismic column was printed for a model with no seismic load")
     for needed in ("Δx", "α", "W", "c", "φ"):
         if needed not in kept:
@@ -5308,6 +5308,66 @@ def _quoted_numbers(sentence, fs, bounds):
             if abs(n - fs) > 5e-7 and not low <= n <= high]
 
 
+def test_the_vertical_seismic_force_reaches_the_working():
+    """A model with a vertical seismic coefficient prints working that returns
+    its solution, for every method.
+
+    The vertical seismic force k_v·W acts through the slice's center of gravity
+    with the weight, and the documentation's equations carry the two together as
+    W(1 + k_v). Read without it, the weight terms are the static weight, the
+    quotient misses k_v·W, and every method whose normal force depends on it
+    refuses its own working. The mutation drops the column the force arrives in
+    and requires the refusals back, so a check that cannot see the force fails.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    methods = ("oms", "bishop", "janbu", "spencer", "corps", "lowe", "mprice")
+    opts = {"input_path": RFACE_XLSX, "method": list(methods), "pd_figure": False,
+            "lem_search_figure": False, "lem_solution_figure": False}
+    fails = []
+    for kv in (0.1, -0.1):
+        slope_data = load_slope_data(RFACE_XLSX)
+        slope_data["k_seismic"], slope_data["k_vertical"] = 0.15, kv
+        ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
+                                  num_slices=20)
+        if not ok:
+            return [f"the model produced no slices: {out}"]
+        slice_df, surface = out
+        bundles = []
+        for method in methods:
+            solved = slice_df.copy()
+            with contextlib.redirect_stdout(io.StringIO()):
+                results = solve_selected(method, solved)
+            bundles.append({"slice_df": solved, "failure_surface": surface,
+                            "results": results, "search": None,
+                            "method": method})
+        for mutated in (False, True):
+            if mutated:
+                bundles = [dict(b, slice_df=b["slice_df"].drop(columns=["kvw"]))
+                           for b in bundles]
+            with tempfile.TemporaryDirectory() as tmp:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    built = build_report(slope_data, {"lem": bundles}, opts, tmp)
+            refusals = [p for p in _prose(built)
+                        if "does not return the solution" in p]
+            if not mutated and refusals:
+                fails.append(f"k_v = {kv:+g}: {len(refusals)} method(s) refused "
+                             f"their working: {refusals[0]!r}")
+            if not mutated and "W(1 + k_v)" not in repr(built):
+                fails.append(f"k_v = {kv:+g}: no equation writes the weight "
+                             f"as W(1 + k_v)")
+            if mutated and not refusals:
+                fails.append(f"k_v = {kv:+g}: with the vertical seismic force "
+                             f"dropped every method still returned its "
+                             f"solution, so this check cannot see the force")
+    return fails
+
+
 def test_a_refusal_prints_no_number_it_cannot_stand_behind():
     """A refused calculation states the mismatch; it does not typeset a
     degenerate quotient as a measurement.
@@ -5554,7 +5614,7 @@ def test_calculation_terms_follow_the_model():
                          f"{maths}")
         # The general moment arms write the forces out; the named sums give
         # each its letter.
-        for absent in ("P ", "P·", "kW", "H cos", "T·a_t",
+        for absent in ("P ", "P·", "k_hW", "H cos", "T·a_t",
                        "D_P", "D_k", "D_H", "D_T"):
             if absent in equation_line:
                 fails.append(f"the equation prints a {absent!r} term for a model "
@@ -6138,7 +6198,7 @@ def test_spencer_force_sums():
     # reinforcement, pile, line load or tension-crack term survives the
     # reduction.
     for notation in reduced:
-        for absent in ("kW", "R cos", "R sin", "H cos", "H sin", "L cos",
+        for absent in ("k_hW", "R cos", "R sin", "H cos", "H sin", "L cos",
                        "L sin", "V"):
             if absent in notation:
                 fails.append(f"{notation!r} prints a {absent!r} term for a model "
@@ -6387,7 +6447,7 @@ def test_spencer_mirror_rule():
 #: load there and the reinforcement everywhere else.
 _FEATURE_SYMBOLS = {
     "distributed load": ("D",),
-    "seismic load": ("kW",),
+    "seismic load": ("k_hW",),
     "tension-crack water force": ("T",),
     "reinforcement crossing the failure surface": ("P", "P_p"),
     "pile force": ("H", "H_p"),
@@ -6542,7 +6602,17 @@ def _terms_printed(notation):
     body = notation.split(" = ", 1)[-1].strip()
     if body == "0":
         return []
-    return [bare(p) for p in re.split(r" [−+] ", body.lstrip("−"))]
+    # An operator inside parentheses belongs to the term that holds it: the
+    # weight is written W(1 + k_v), and the line load's direction cos(α − δ).
+    pieces, depth, start = [], 0, 0
+    body = body.lstrip("−")
+    for at, ch in enumerate(body):
+        depth += (ch == "(") - (ch == ")")
+        if not depth and body[at:at + 3] in (" + ", " − "):
+            pieces.append(body[start:at])
+            start = at + 3
+    pieces.append(body[start:])
+    return [bare(p) for p in pieces if p.strip()]
 
 
 #: How the prose names a documentation equation. One form, so that a number
@@ -7534,7 +7604,7 @@ def test_the_full_forms_match_their_pages():
     found = re.search(r"\$([^$]*?)\\q?quad ?\(7\)\$", page)
     want, _why = _canonical(found.group(1))
     want = want.replace("sumNsinα", "sumN'sinα+sumuΔlsinα")
-    drifted = full[0].replace(" + sum{kW}", "")
+    drifted = full[0].replace(" + sum{k_hW}", "")
     if drifted == full[0]:
         fails.append("the mutation dropped nothing, so it tests nothing")
     elif _canonical(drifted)[0] == want:
@@ -7677,7 +7747,7 @@ def test_the_whole_mass_balance_is_published_then_reduced():
     # published equation has to stop matching the page, and the reduced form
     # printed in its place has to stop being the published form.
     method, full = sorted(printed_full.items())[0]
-    dropped = full.replace(" + sum{kW}", "")
+    dropped = full.replace(" + sum{k_hW}", "")
     if dropped == full:
         fails.append("the mutation dropped nothing, so it tests nothing")
     elif not _whole_mass_is_the_page(dropped, want_num, want_den, "the mutation"):
@@ -8769,7 +8839,7 @@ def test_the_wide_quotient_is_narrowed():
     # And the construction reaches the document. Read off the compiled OMML, so
     # a stack that is built and then not emitted is caught.
     wide = ("F = frac{sum{(c·Δl + N'·tan φ)·cos α}}"
-            "{sum{N'·sin α} + sum{u·Δl·sin α} + sum{kW} + sum{T} "
+            "{sum{N'·sin α} + sum{u·Δl·sin α} + sum{k_hW} + sum{T} "
             "− sum{D·sin β} − sum{P cos ψ} − sum{H cos θ_p} − sum{L cos δ}}")
     if _sole_fraction(wide) is None:
         fails.append("the wide quotient is not read as a quotient at all")
@@ -8972,6 +9042,9 @@ DOC_SYMBOLS = {
     "F_h": ("F_h",),
     "P_p": (r"P\cos \psi", r"P \cos \psi"),
     "H_p": (r"H \cos \theta_p",),
+    "k_hW": ("k_hW",),
+    "k_h": ("k_h",),
+    "k_v": ("k_v",),
 }
 
 
@@ -21618,6 +21691,8 @@ CHECKS = [
     ("a method block never goes quiet", test_a_method_block_never_goes_quiet),
     ("a refusal prints no number it cannot stand behind",
      test_a_refusal_prints_no_number_it_cannot_stand_behind),
+    ("the vertical seismic force reaches the working",
+     test_the_vertical_seismic_force_reaches_the_working),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",

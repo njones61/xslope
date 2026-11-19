@@ -298,7 +298,7 @@ FORCE_DIAGRAM_BLOCK_IN = 0.90
 #: report reads no pixels at build time. A check re-measures every image and
 #: fails a drawing whose block has moved.
 FORCE_DIAGRAM_BLOCK_PX = {
-    "oms_complete.png": (211, 417),
+    "oms_complete.png": (210, 417),
     "bishop_complete.png": (189, 389),
     "slice_fe_complete.png": (210, 467),
     "spencer3_forces.png": (168, 627),
@@ -2526,7 +2526,7 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     kv = _num(slope_data.get("k_vertical")) or 0.0
     kv_dir = "downward" if kv > 0 else "upward"
     if seismic and ky:
-        text = ("A pseudo-static seismic force kW acts horizontally toward the toe on "
+        text = ("A pseudo-static seismic force k_hW acts horizontally toward the toe on "
                 "every slice, at the seismic coefficient the analysis finds: the yield "
                 "coefficient k_y, at which the factor of safety is 1.")
         if kv and k:
@@ -3748,7 +3748,7 @@ def _seismic2_section(results, counter, slope_data=None, slice_df=None,
         f"stress on each slice base before the earthquake. Stage 2 gives each "
         f"slice whose base is in a material with a nonzero d or ψ an undrained "
         f"strength τ_ff, {how}; free-draining materials keep c′, φ′. Stage 2 "
-        f"adds the seismic force kW with {k_txt}, and its factor of safety is the "
+        f"adds the seismic force k_hW with {k_txt}, and its factor of safety is the "
         f"one reported. {where} gives the strengths and F for each stage.",
         links=links))
 
@@ -4134,6 +4134,12 @@ _ACTIVE_FORM = NotApplicable(
     "mobilizes with the soil and enters divided by F")
 
 
+def _wv(C):
+    """The slice weight with the vertical seismic force through the same center
+    of gravity: W(1 + k_v) = W + k_vW, per slice."""
+    return C.A["W"] + C.A["kvW"]
+
+
 def _unexercised(C):
     """A published term no model carries: zero on every slice, every time.
 
@@ -4239,29 +4245,33 @@ FORCE_TERMS = (
     ForceTerm(
         key="W",
         columns=("w",),
-        arrays=(("W", "w", False),),
+        # The vertical seismic force k_v·W acts through the same center of
+        # gravity, so every equation carries the two together as W(1 + k_v),
+        # as the documentation writes them: its column is read here, not
+        # registered as a force of its own.
+        arrays=(("W", "w", False), ("kvW", "kvw", False)),
         symbols=(Symbol("x_r", "arm",
                         "horizontal moment arm of the slice weight about the "
                         "center of rotation"),),
         feature="", passive=False,
         moment_res=NotApplicable("the weight drives"),
         # Equation (8a) opens with the weight, ahead of the base terms.
-        moment_drv=(Term(+1, "W·x_r", lambda C: C.A["W"] * C.arms["x_r"],
+        moment_drv=(Term(+1, "W(1 + k_v)·x_r", lambda C: _wv(C) * C.arms["x_r"],
                          rank=-1),),
         force_res=_NO_HORIZONTAL_COMPONENT,
         force_drv=_NO_HORIZONTAL_COMPONENT,
         spencer_h=_NO_HORIZONTAL_COMPONENT,
-        spencer_v=(Term(-1, "W", lambda C: C.A["W"]),),
+        spencer_v=(Term(-1, "W(1 + k_v)", _wv),),
         march_x=_NO_HORIZONTAL_COMPONENT,
-        march_y=(Term(+1, "W", lambda C: C.A["W"], rank=5),),
-        normal=(Term(+1, "W", lambda C: C.A["W"], always=True),),
+        march_y=(Term(+1, "W(1 + k_v)", _wv, rank=5),),
+        normal=(Term(+1, "W(1 + k_v)", _wv, always=True),),
         # The weight opens all three: equation (4) resolves it perpendicular to
         # the base, equation (10) vertically, and the driving side takes its
         # moment as W·sin α with the radius factored out.
-        oms_num=(Term(+1, "W cos α", lambda C: C.A["W"] * C.A["cos_a"],
+        oms_num=(Term(+1, "W(1 + k_v) cos α", lambda C: _wv(C) * C.A["cos_a"],
                       rank=-1, always=True),),
-        bishop_num=(Term(+1, "W", lambda C: C.A["W"], rank=-1, always=True),),
-        page_drv=(Term(+1, "W·sin α", lambda C: C.A["W"] * C.A["sin_a"],
+        bishop_num=(Term(+1, "W(1 + k_v)", _wv, rank=-1, always=True),),
+        page_drv=(Term(+1, "W(1 + k_v)·sin α", lambda C: _wv(C) * C.A["sin_a"],
                        rank=-1, always=True),),
     ),
     ForceTerm(
@@ -4324,22 +4334,22 @@ FORCE_TERMS = (
                         "moment arm of the seismic force, taken at the slice "
                         "center of gravity"),
                  # Spencer's section transcribes the published equations before
-                 # reducing them, so kW is printed on a model with no seismic
+                 # reducing them, so k_hW is printed on a model with no seismic
                  # load, where the column it would be read from is not.
-                 Symbol("kW", "letter",
+                 Symbol("k_hW", "letter",
                         "horizontal seismic force on the slice, per unit "
-                        "thickness — column kW of the slice table")),
+                        "thickness — column k_hW of the slice table")),
         feature="seismic load", passive=False,
         moment_res=NotApplicable("the seismic force drives"),
-        moment_drv=(Term(+1, "kW·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
+        moment_drv=(Term(+1, "k_hW·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
         force_res=NotApplicable("the seismic force drives"),
-        force_drv=(Term(+1, "kW", lambda C: C.A["kW"]),),
-        spencer_h=(Term(-1, "kW", lambda C: C.A["kW"]),),
+        force_drv=(Term(+1, "k_hW", lambda C: C.A["kW"]),),
+        spencer_h=(Term(-1, "k_hW", lambda C: C.A["kW"]),),
         spencer_v=_NO_VERTICAL_COMPONENT,
-        march_x=(Term(+1, "kW", lambda C: C.A["kW"], rank=7),),
+        march_x=(Term(+1, "k_hW", lambda C: C.A["kW"], rank=7),),
         march_y=_NO_VERTICAL_COMPONENT,
         normal=_NO_VERTICAL_COMPONENT,
-        oms_num=(Term(-1, "kW sin α", lambda C: C.A["kW"] * C.A["sin_a"],
+        oms_num=(Term(-1, "k_hW sin α", lambda C: C.A["kW"] * C.A["sin_a"],
                       rank=4),),
         bishop_num=_NO_VERTICAL_COMPONENT,
         page_drv=(Term(+1, "W·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
@@ -4670,6 +4680,10 @@ EQUATION_SYMBOLS = {
            "the soil and so stands on the mobilized side",
     "k": "seismic coefficient, the fraction of the slice weight applied "
          "horizontally",
+    "k_h": "horizontal seismic coefficient, the fraction of the slice weight "
+           "applied horizontally",
+    "k_v": "vertical seismic coefficient, the fraction of the slice weight "
+           "applied vertically, positive downward",
     "α": "inclination of the slice base from horizontal",
     **_group_symbols("angle"),
     "θ": "inclination of the interslice forces from horizontal",
@@ -5481,7 +5495,7 @@ def _quotient_full(res_consumer, drv_consumer):
 _DRIVING_PARTS = (
     ("D_W", "W", +1, "", True),
     ("D_D", "D", +1, "frac{1}{R}·", True),
-    ("D_k", "kW", +1, "frac{k}{R}·", True),
+    ("D_k", "kW", +1, "frac{k_h}{R}·", True),
     ("D_T", "T", +1, "frac{1}{R}·", False),
     ("D_P", "P", -1, "frac{1}{R}·", True),
     ("D_H", "H", -1, "frac{1}{R}·", True),

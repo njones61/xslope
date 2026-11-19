@@ -94,8 +94,6 @@ Records can be downloaded from strong-motion databases such as the
 California Geological Survey. A record can be used as recorded, multiplied by a scale factor, or scaled so that its
 peak acceleration matches a target, such as the design peak acceleration of the site.
 
-The displacement is in cm for a metric model and in inches for an English one.
-
 ## Example: VP104 {#vp104-example}
 
 The Slide2 verification problem [VP104](../verification/rocscience.md#vp104) is a slope with the record of the 1980
@@ -131,7 +129,7 @@ In **LEM** mode, **Newmark…** is on the **Run** menu and the toolbar. Its dial
 ![The Newmark dialog with VP104's record chosen and k_y from the last yield coefficient run](../studio/images/analysis_newmark_dialog.png)
 
 The results open in the **LEM · Newmark** view: the three histories, both directions, with $D$ in the title, and a
-table. The Log reports $D$, the governing direction and its number of slip episodes, and the displacement the other
+table. $D$ is in cm for a metric model and in inches for an English one. The Log reports $D$, the governing direction and its number of slip episodes, and the displacement the other
 way. The [Analysis Report](../studio/reports.md) prints the run under **Newmark displacement**: the record and its
 scaling, $k_y$, the displacement each way, and the three histories. The record itself is not saved in the workbook.
 

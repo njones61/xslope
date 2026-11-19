@@ -6,9 +6,20 @@ description: "The seismic yield coefficient k_y in XSLOPE: the seismic coefficie
 # Yield Coefficient
 
 The **yield coefficient** $k_y$ is the seismic coefficient at which a pseudostatic analysis gives a factor of safety of
-exactly 1. The yield acceleration is $a_y = k_y g$. When the ground acceleration exceeds $a_y$, the sliding mass moves
-(Duncan, Wright, and Brandon 2014, Sec. 10.1.3). A [Newmark analysis](newmark.md) integrates the part of an
-acceleration record above $a_y$ to find how far the mass moves.
+exactly 1. The yield acceleration $a_y = k_y g$ is the ground acceleration at which the sliding mass starts to move
+(Duncan, Wright, and Brandon 2014, Sec. 10.1.3). The yield coefficient is the input to a
+[Newmark analysis](newmark.md), which integrates the part of an acceleration record above $a_y$ to find how far the
+mass moves.
+
+**xslope** computes the yield coefficient in two ways:
+
+- **For one slip surface,** a circle or a non-circular surface entered in the model. **xslope** solves the surface at
+  a series of seismic coefficients until the factor of safety is 1.
+- **By search.** **xslope** searches for the slip surface with the lowest yield coefficient, which is not always the
+  surface with the lowest static factor of safety.
+
+Both work with any limit equilibrium method, with a vertical seismic coefficient, and with the
+[two-stage analysis](two_stage.md).
 
 ## Planar Slip Surfaces {#one-plane}
 

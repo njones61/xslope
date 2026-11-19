@@ -102,12 +102,11 @@ soil 2's R envelope ($c_R$ = 700 psf, $\phi_R$ = 15°) and no water, they differ
 
 ![The slope of Duncan et al.'s Figure 10.7 with soil 2's R envelope: the static critical circle, with k_y = 0.432 on it, and the circle with the minimum k_y = 0.357, which reaches the base of the model and the end of its crest](images/seismic_ky_surfaces.png){width=1000px}
 
-The lowest yield coefficient, 0.357, is 17 percent below the static critical circle's 0.432. The model's boundaries
-stop this circle: it touches the base of the model, placed one slope height below the toe, and leaves the ground at the
-right end of the crest. In a larger model, deeper circles have lower yield coefficients, so the value depends on where
-the boundaries are placed. This is the unrealistically deep surface Duncan et al. warn about. Of the four soils
-in their Table 10.3, it happens with soils 2 and 4, which have the most cohesion. For soils 1 and 3 the two circles
-nearly agree.
+The static critical circle is shallow and has $k_y$ = 0.432. The circle with the lowest yield coefficient,
+$k_y$ = 0.357, is far larger. It reaches the bottom of the model and the right end of the crest, and in a larger model
+deeper circles have even lower yield coefficients. This is the unrealistically deep surface Duncan et al. warn about.
+Of the four soils in their Table 10.3, it happens with the two that have the most cohesion, soils 2 and 4. With soils
+1 and 3, the two circles nearly agree.
 
 The closed form for a planar surface shows why cohesion has this effect. With $W = \gamma \ell z \cos\beta$, the
 cohesion term $c\ell/W$ equals $c/(\gamma z \cos\beta)$, which gets smaller as the depth $z$ grows, while the friction

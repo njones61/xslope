@@ -55,17 +55,44 @@ pages).
 
 ## Acceleration Records {#records}
 
-A record is a file of horizontal ground acceleration, in g, in one of two forms:
+A record is a file of horizontal ground acceleration, in g, in one of two forms.
 
-- **A PEER `.AT2` file**, as the PEER ground motion databases give them: header lines, a line stating the number of
-  points and the time step (`NPTS=  5862, DT=   .0050 SEC`, or the older `5862  .0050  NPTS, DT`), then the
-  accelerations, several to a line.
-- **Two columns of text,** time in s and acceleration in g, separated by spaces, tabs, or commas. Lines before the
-  first pair of numbers are the header, and lines after it that start with `#` are skipped. The time steps need not be equal.
+**Two columns of text:** time in s and acceleration in g, separated by spaces, tabs, or commas. Lines before the
+first pair of numbers are the header, and lines after it that start with `#` are skipped. The time steps need not be
+equal. The record in the [example below](#vp104-example),
+[vp104_record.txt](../verification/files/rocscience/vp104_record.txt), is in this form. Its first lines:
 
-Records come from the strong-motion collections, among them the PEER ground motion databases and the U.S. Geological
-Survey's Center for Engineering Strong Motion Data. A record can be used as recorded, multiplied by a scale factor, or
-scaled so that its peak acceleration matches a target, such as the design peak acceleration of the site.
+```text
+# Mammoth Lakes-1 1980: CVK-090
+# The acceleration record of Slide2's Tutorial 28 (Seismic Analysis with the
+# Newmark Method), scenario "Newmark Displacement", used by Slide2 verification
+# problem 104. Values as the tutorial model stores them; 5862 samples at 0.005 s.
+# time (s), acceleration (g)
+0.000	-9.81237e-05
+0.005	-0.000115044
+0.010	-8.23472e-05
+0.015	-1.82978e-05
+0.020	-2.06383e-05
+```
+
+**A PEER `.AT2` file,** as the PEER databases give them: header lines, a line stating the number of points and the
+time step (`NPTS=  5862, DT=   .0050 SEC`, or the older `5862  .0050  NPTS, DT`), then the accelerations, several to a
+line. In that layout, the same record begins:
+
+```text
+PEER NGA STRONG MOTION DATABASE RECORD
+Mammoth Lakes-01, 5/25/1980, Convict Creek, 90
+ACCELERATION TIME SERIES IN UNITS OF G
+NPTS=  5862, DT=   .0050 SEC
+ -9.8123700E-05 -1.1504400E-04 -8.2347200E-05 -1.8297800E-05 -2.0638300E-05
+  1.3921800E-06  1.6148900E-05  9.9604700E-06  8.1173000E-06  2.5475200E-05
+```
+
+Records can be downloaded from strong-motion databases such as the
+[PEER Strong Ground Motion Databases](https://peer.berkeley.edu/peer-strong-ground-motion-databases) and the
+[Center for Engineering Strong Motion Data](https://www.strongmotioncenter.org/) of the U.S. Geological Survey and the
+California Geological Survey. A record can be used as recorded, multiplied by a scale factor, or scaled so that its
+peak acceleration matches a target, such as the design peak acceleration of the site.
 
 The displacement is in cm for a metric model and in inches for an English one.
 

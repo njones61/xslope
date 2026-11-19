@@ -24,7 +24,8 @@ stress $\tau_{fc}$:
 >>$\sigma'_{fc} = \dfrac{N'}{\Delta \ell}, \qquad \tau_{fc} = \dfrac{1}{F_1}(c' + \sigma'_{fc} \tan \phi')$
 
 where $N'$ is the effective normal force on the base, $\Delta \ell$ the base length, and $F_1$ the stage 1 factor of
-safety. These are the rapid drawdown page's equations (2) and (3), and its [Stage 1](../lem/rapid.md#stage-1-pre-drawdown-conditions) section explains them.
+safety. These are the same equations as in stage 1 of a
+[rapid drawdown analysis](../lem/rapid.md#stage-1-pre-drawdown-conditions).
 
 **Stage 2** gives every slice in a material with $d$ and $\psi$ its undrained strength $\tau_{ff}$ from the
 stresses found in stage 1, keeps $c'$ and $\phi'$ on the slices of every other material, keeps the same pore pressures and loads, and
@@ -44,7 +45,7 @@ The undrained strength is one of two choices, set in the run:
 
 - **Interpolated (as in rapid drawdown),** the default. The strength lies between the $K_c = 1$ envelope ($d$, $\psi$)
   and the drained envelope ($c'$, $\phi'$), according to each slice's consolidation stress ratio $K_1$, exactly as in
-  a rapid drawdown analysis's stage 2 (the rapid drawdown page's [equations (4) to (6)](../lem/rapid.md#anisotropy-and-k-interpolation)).
+  stage 2 of a [rapid drawdown analysis](../lem/rapid.md#anisotropy-and-k-interpolation).
   This is the procedure Duncan et al.'s text prescribes: the undrained strength is estimated "using the same
   procedures as for rapid drawdown."
 - **Kc = 1 envelope.** The strength is read from the $K_c = 1$ envelope at the slice's stage 1 stress, with no
@@ -77,7 +78,7 @@ whose strength is an undrained c/p ratio keeps that strength in both stages, and
 Duncan et al. call the two-stage analysis the proper procedure, but a simpler single-stage analysis is also used. It
 takes the **R envelope**, the U.S. Army Corps of Engineers' name for the envelope drawn through $\overline{CU}$ test
 results with each circle starting at the effective consolidation pressure $\sigma'_{3c}$ and spanning the principal
-stress difference at failure. The rapid drawdown page's [R envelope section](../lem/rapid.md#r-envelope) draws one.
+stress difference at failure. An example is shown on the [rapid drawdown page](../lem/rapid.md#r-envelope).
 Its intercept and slope, $c_R$ and $\phi_R$, enter as an ordinary c and φ, and the analysis is one run with the seismic
 force.
 

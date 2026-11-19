@@ -58,7 +58,7 @@ coefficient k<sub>v</sub> adds a force k<sub>v</sub>W through the same point, po
 
 ![A slice with its weight W, the horizontal seismic force k_hW, and the vertical seismic force k_vW at its center of gravity, with the interslice forces Z and the base forces N and S](../lem/images/seismic.png){width=360}
 
-Every limit equilibrium method includes these forces in its equilibrium equations, as each method's page shows. The
+Every limit equilibrium method includes these forces in its equilibrium equations (see the page for each method). The
 limit equilibrium methods take the magnitude of k<sub>h</sub> and point the force the way the failure surface would
 slide, so a model needs no sign for it. The finite element analysis has no failure surface to read a direction from,
 so it reads the sign: positive pushes toward +x and negative toward −x. The

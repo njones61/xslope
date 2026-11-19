@@ -85,7 +85,7 @@ The [Parametric](../parametric/index.md) tools can also find the yield coefficie
 Finding the yield coefficient directly also reports $k_y$ for the static critical surface and passes $k_y$ to
 **Newmark…**.
 
-## Choosing the Slip Surface {#which-surface}
+## Searching for the Lowest Yield Coefficient {#which-surface}
 
 The steps above compute $k_y$ for a surface that has already been chosen. The choice matters, because the yield
 coefficient depends on which slip surface it is computed for. Duncan et al. (2014) list three candidates:

@@ -22,9 +22,9 @@ Both work with any limit equilibrium method, with a vertical seismic coefficient
 [two-stage analysis](two_stage.md).
 
 The page starts with the basic theory. For a mass that slides on one plane, $k_y$ has a closed form, which shows how
-the yield coefficient depends on the soil's strength and the slope angle. The sections after it describe how
-**xslope** computes $k_y$ for circular and non-circular surfaces, where there is no closed form, and which slip
-surface to compute it for.
+the yield coefficient depends on the soil's strength and the slope angle. The next section describes how
+**xslope** computes $k_y$ for one circular or non-circular surface, where there is no closed form. The section after
+it covers which surface to compute $k_y$ for, and how **xslope** searches for the surface with the lowest $k_y$.
 
 ## Planar Slip Surfaces {#one-plane}
 
@@ -50,10 +50,10 @@ With $c = 0$ this is $\tan(\phi - \beta)$. A sand slope with $\phi = 35°$ and $
 $\tan 5° = 0.087$. [DWB Figure 10.1](../verification/published.md#dwb-10-1) on the verification pages checks
 **xslope** against this closed form, with and without a vertical seismic force.
 
-## Circular and Non-Circular Surfaces {#one-surface}
+## Computing the Yield Coefficient for One Surface {#one-surface}
 
-For a circular or non-circular surface there is no closed form. **xslope** finds $k_y$ by trial, with the limit
-equilibrium method chosen for the run:
+For a circular or non-circular surface there is no closed form. Given one surface, **xslope** finds $k_y$ by trial,
+with the limit equilibrium method chosen for the run:
 
 1. It divides the sliding mass into slices once. The seismic force on each slice is $k$ times the slice's weight, so
    from one trial to the next only the seismic forces change. The slices, their weights, and their pore pressures,
@@ -87,7 +87,8 @@ Finding the yield coefficient directly also reports $k_y$ for the static critica
 
 ## Choosing the Slip Surface {#which-surface}
 
-The yield coefficient depends on which slip surface it is computed for. Duncan et al. (2014) list three candidates:
+The steps above compute $k_y$ for a surface that has already been chosen. The choice matters, because the yield
+coefficient depends on which slip surface it is computed for. Duncan et al. (2014) list three candidates:
 
 1. **The surface with the lowest static factor of safety.** There is no reason to expect it to have the lowest yield
    coefficient or the largest displacement.
@@ -97,7 +98,8 @@ The yield coefficient depends on which slip surface it is computed for. Duncan e
    and the mass itself, vary with the extent of the surface. Duncan et al. call this the most appropriate choice.
    FHWA (2011) gives the variation of acceleration with depth.
 
-With an automated search, **xslope** finds the first two candidates:
+With an automated search, **xslope** finds the first two candidates. Each time it needs $k_y$ for a surface, it uses
+the steps in the previous section:
 
 1. It searches for the critical surface with no seismic force and computes $k_y$ for that surface. This is the first
    candidate.

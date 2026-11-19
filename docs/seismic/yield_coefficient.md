@@ -1,19 +1,19 @@
 ---
 title: "Yield coefficient — XSLOPE"
-description: "The seismic yield coefficient k_y in XSLOPE: the seismic coefficient at which the factor of safety is 1, its closed form for a mass on one plane, how XSLOPE finds it on one surface or by search, and which slip surface to find it on."
+description: "The seismic yield coefficient k_y in XSLOPE: the seismic coefficient at which the factor of safety is 1, its closed form for a planar slip surface, how XSLOPE computes it for a circular or non-circular surface or by search, and which slip surface to compute it for."
 ---
 
 # Yield Coefficient
 
 The **yield coefficient** $k_y$ is the seismic coefficient at which a pseudostatic analysis gives a factor of safety of
-exactly 1. The yield acceleration is $a_y = k_y g$: when the ground accelerates harder than that, the sliding mass
-slides (Duncan, Wright, and Brandon 2014, Sec. 10.1.3). A [Newmark analysis](newmark.md) integrates the part of an
-acceleration record above $a_y$ to find how far the mass slides.
+exactly 1. The yield acceleration is $a_y = k_y g$. When the ground acceleration exceeds $a_y$, the sliding mass moves
+(Duncan, Wright, and Brandon 2014, Sec. 10.1.3). A [Newmark analysis](newmark.md) integrates the part of an
+acceleration record above $a_y$ to find how far the mass moves.
 
-## A Mass on One Plane {#one-plane}
+## Planar Slip Surfaces {#one-plane}
 
-Duncan et al.'s Figure 10.1 resolves the forces on one block of an infinite slope with the seismic force at its
-center of gravity:
+Figure 10.1 of Duncan et al. shows the forces on one block of an infinite slope, with the seismic force at the
+block's center of gravity:
 
 ![One block of an infinite slope: its weight W and the horizontal seismic force k_hW at the center of gravity, the normal force N and the shear force S on the base, the depth z, the base length l, and the slope angle beta](images/seismic_infinite_slope.png){width=620px}
 
@@ -30,28 +30,38 @@ summed. Setting $F = 1$ gives the yield coefficient in closed form:
 
 >>$k_y = \dfrac{c\ell/W + \cos\beta\tan\phi - \sin\beta}{\cos\beta + \sin\beta\tan\phi}$
 
-With $c = 0$ this is $\tan(\phi - \beta)$. A sand slope at $\phi = 35°$ and $\beta = 30°$ yields at
-$k_y = \tan 5° = 0.087$. [DWB Figure 10.1](../verification/published.md#dwb-10-1) on the verification pages checks
+With $c = 0$ this is $\tan(\phi - \beta)$. A sand slope with $\phi = 35°$ and $\beta = 30°$ has a yield coefficient of
+$\tan 5° = 0.087$. [DWB Figure 10.1](../verification/published.md#dwb-10-1) on the verification pages checks
 **xslope** against this closed form, with and without a vertical seismic force.
 
-## On One Surface {#one-surface}
+## Circular and Non-Circular Surfaces {#one-surface}
 
-On any other surface the yield coefficient comes from the methods of slices. **xslope** cuts the slices once, solves
-them at a sequence of seismic coefficients with the seismic force scaled to each, and finds the coefficient at which
-$F = 1$ by root finding (the Illinois form of regula falsi). The pore pressures, loads, and strengths stay exactly as
-cut. On the circle with the lowest yield coefficient of the Slide2 verification problem
-[VP104](../verification/rocscience.md#vp104), with Spencer's method:
+For a circular or non-circular surface there is no closed form. **xslope** finds $k_y$ by trial, with the limit
+equilibrium method chosen for the run:
+
+1. It divides the sliding mass into slices once. The seismic force on each slice is $k$ times the slice's weight, so
+   from one trial to the next only the seismic forces change. The slices, their weights, and their pore pressures,
+   loads, and strengths stay the same.
+2. It solves the surface with no seismic force. If $F$ is already 1 or less, the slope is not stable before the
+   earthquake and has no yield coefficient, and the run stops.
+3. It tries larger values of $k$ until $F$ falls below 1. The yield coefficient then lies between the last two values
+   tried.
+4. It narrows that interval, choosing each new trial value by interpolating between its two ends, until $F$ equals 1
+   to within 0.00001.
+
+For the circle with the lowest yield coefficient in the Slide2 verification problem
+[VP104](../verification/rocscience.md#vp104), with Spencer's method, $F$ falls from 1.38 with no seismic force to 1 at
+$k_y$ = 0.1445:
 
 ![The factor of safety against the horizontal seismic coefficient on the VP104 circle with the lowest yield coefficient, falling from 1.38 at no seismic force through 1 at k_y = 0.1445](images/seismic_ky_curve.png){width=640px}
 
-The same curve, searched afresh at each coefficient, comes from a Parametric sweep of **k_seismic**, and a
-[Back-Analysis](../parametric/back_analysis.md) of **k_seismic** to $F = 1$ approximates the minimum yield coefficient
-at the cost of a full search per step.
+A Parametric sweep of **k_seismic** gives a similar curve, but it searches for a new critical surface at each value
+of $k$. A [Back-Analysis](../parametric/back_analysis.md) of **k_seismic** to $F = 1$ gives an approximate minimum
+yield coefficient, but it runs a full search at every step.
 
-## Which Surface {#which-surface}
+## Choosing the Slip Surface {#which-surface}
 
-The yield coefficient depends on the surface, and so does the mass that slides. Duncan et al. (2014) name three
-candidate surfaces:
+The yield coefficient depends on which slip surface it is computed for. Duncan et al. (2014) list three candidates:
 
 1. **The surface with the lowest static factor of safety.** There is no reason to expect it to have the lowest yield
    coefficient or the largest displacement.
@@ -61,52 +71,60 @@ candidate surfaces:
    and the mass itself, vary with the extent of the surface. Duncan et al. call this the most appropriate choice.
    FHWA (2011) gives the variation of acceleration with depth.
 
-The yield coefficient search gives the first two. It searches with no seismic force for the critical surface and finds
-$k_y$ on it, the first candidate. It then searches again at that $k_y$: a surface found below $F = 1$ has a lower yield
-coefficient, so the answer moves to it and the search repeats at the new coefficient. The rounds stop when a search
-finds nothing more than 0.002 below $F = 1$, after at most six. The Log reports $k_y$ on both the static critical
-surface and the surface with the lowest $k_y$.
+With an automated search, **xslope** finds the first two candidates:
 
-On VP104 the two candidates nearly agree: $k_y$ = 0.1457 on the static critical circle and 0.1445 on the circle with
-the lowest $k_y$. On the slope Duncan et al. use for their Table 10.4 (2.5H:1V, 30 ft high, γ = 135 pcf), with soil 2's
-R envelope ($c_R$ = 700 psf, $\phi_R$ = 15°) and no water, they do not:
+1. It searches for the critical surface with no seismic force and computes $k_y$ for that surface. This is the first
+   candidate.
+2. It searches again with the seismic coefficient set to that $k_y$. If the search finds a surface with $F$ below 1,
+   that surface has a lower yield coefficient, so **xslope** computes $k_y$ for it.
+3. It repeats step 2 with each new $k_y$ until a search finds no surface with $F$ more than 0.002 below 1, or until it
+   has made six of these searches. The surface it ends with is the second candidate.
+
+The Log reports $k_y$ for both surfaces.
+
+For VP104 the two candidates nearly agree: $k_y$ = 0.1457 for the static critical circle and 0.1445 for the circle
+with the lowest $k_y$. For the slope Duncan et al. use for their Table 10.4 (2.5H:1V, 30 ft high, γ = 135 pcf), with
+soil 2's R envelope ($c_R$ = 700 psf, $\phi_R$ = 15°) and no water, they differ:
 
 ![The slope of Duncan et al.'s Figure 10.7 with soil 2's R envelope: the static critical circle, with k_y = 0.432 on it, and the circle with the minimum k_y = 0.357, which reaches the base of the model and the end of its crest](images/seismic_ky_surfaces.png){width=1000px}
 
-The circle with the lowest yield coefficient, 0.357, is 17 percent below the static critical circle's 0.432. It
-reaches the base of the model, set one slope height below the toe, and the far end of the crest, so its yield
-coefficient depends on where the model ends: the unrealistic depth Duncan et al. warn of. Of the four soils, the two
-with the most cohesion, soils 2 and 4, do this. The seismic force grows with the sliding mass, while the resistance
-that cohesion gives grows only with the length of the surface, so on a cohesive soil a larger mass yields at a lower
-coefficient. Friction grows with the mass, as the seismic force does, and on soils 1 and 3 the two circles nearly
-agree.
+The lowest yield coefficient, 0.357, is 17 percent below the static critical circle's 0.432. Its circle extends to the
+base of the model, placed one slope height below the toe, and to the far end of the crest, so its $k_y$ depends on
+where the model's boundaries are. This is the unrealistically deep surface Duncan et al. warn about. Of the four soils
+in their Table 10.3, it happens with soils 2 and 4, which have the most cohesion. For soils 1 and 3 the two circles
+nearly agree.
 
-**The third candidate by hand.** Choose surfaces of several depths, find $k_y$ on each one on its own (a single-surface
-run), and scale the acceleration record to the average acceleration of each surface's sliding mass, from a site
-response analysis or from FHWA (2011). The [Newmark displacement](newmark.md) of each surface follows, and the largest
-governs.
+The closed form for a planar surface shows why cohesion has this effect. With $W = \gamma \ell z \cos\beta$, the
+cohesion term $c\ell/W$ equals $c/(\gamma z \cos\beta)$, which gets smaller as the depth $z$ grows, while the friction
+terms do not depend on $z$. In a cohesive soil a deeper surface has a lower yield coefficient; in a soil with no
+cohesion, depth makes no difference.
 
-## With a Vertical Seismic Coefficient {#vertical}
+**xslope** does not find the third candidate automatically. To find it, choose several surfaces of different depths
+and run each one as a single surface to get its $k_y$. Scale the acceleration record for each surface to the average
+acceleration of its sliding mass, from a site response analysis or from FHWA (2011), and compute the
+[Newmark displacement](newmark.md) for each. The largest displacement governs.
 
-A vertical coefficient $k_v$ rides with $k_h$ at the ratio of the two values entered, $k_v/k_h$, the way design codes
-state it (Eurocode 8, for example, as $\pm 0.5k_h$ or $\pm 0.33k_h$). The yield coefficient is the horizontal
-coefficient at which $F = 1$ with $k_v$ at that ratio. A model with a vertical coefficient and no horizontal one sets
-no ratio, and its yield coefficient run is refused.
+## Vertical Seismic Coefficient {#vertical}
 
-## With the Two-Stage Analysis {#two-stage}
+When a vertical seismic coefficient $k_v$ is entered, it is held at the ratio $k_v/k_h$ of the two values entered, the
+way design codes specify it (Eurocode 8, for example, uses $\pm 0.5k_h$ or $\pm 0.33k_h$). The yield coefficient is then
+the horizontal coefficient at which $F = 1$, with $k_v$ at that ratio. If a model has a vertical coefficient but no
+horizontal one, there is no ratio, and the yield coefficient run is refused.
 
-The yield coefficient can be found with the [two-stage analysis](two_stage.md). Stage 1 has no seismic force, so on
-each surface the undrained strengths are fixed, and only stage 2 depends on the coefficient.
+## Two-Stage Analysis {#two-stage}
+
+The yield coefficient can also be computed with the [two-stage analysis](two_stage.md). Stage 1 has no seismic force,
+so the undrained strengths it gives for a surface are the same at every trial value of $k$. Only stage 2 changes.
 
 ## In Studio {#studio}
 
-In the dialog **Run LEM…** opens, under **Seismic**, check **Find the yield coefficient k_y**. The model's own seismic
-coefficient is not used. With **Analysis** set to a single surface, the run finds $k_y$ on the first circle or on the
-non-circular surface; with an automated search, it finds the surface with the lowest $k_y$. The result is solved at
-$k = k_y$, so its factor of safety is 1, and the LEM Solution view shows that surface. The Log and the LEM Solution
-view report $k_y$ and, after a search, $k_y$ on the static critical surface too. The
+In the **Run LEM…** dialog, under **Seismic**, check **Find the yield coefficient k_y**. The model's own seismic
+coefficient is not used. With **Analysis** set to a single surface, the run finds $k_y$ for the first circle or for
+the non-circular surface. With an automated search, it finds the surface with the lowest $k_y$. The final solution is
+computed at $k = k_y$, so its factor of safety is 1, and the LEM Solution view shows that surface. The Log and the LEM
+Solution view report $k_y$ and, after a search, $k_y$ for the static critical surface too. The
 [Analysis Report](../studio/reports.md) prints, under **Yield coefficient detail**, each search and its $k_y$, or the
-coefficients tried on a single surface. **Newmark…** takes the last yield coefficient found.
+coefficients tried on a single surface. **Newmark…** uses the last yield coefficient found.
 
 ## From Python {#python}
 
@@ -117,12 +135,12 @@ from xslope.seismic import yield_coefficient
 slope_data = load_slope_data("my_slope.xlsx")
 bundle = yield_coefficient(slope_data, "spencer", analysis="auto_search")   # or "single_surface"
 info = bundle["yield"]
-print(info["k_y"], info["static"]["k_y"])   # the lowest k_y, and k_y on the static critical surface
+print(info["k_y"], info["static"]["k_y"])   # the lowest k_y, and k_y for the static critical surface
 ```
 
 `yield_coefficient` takes `surface="noncircular"` for a non-circular search and `seismic2=` for the two-stage
-analysis. It returns the bundle of a run solved at $k = k_y$. `info["trace"]` holds every (k, F) the root search passed
-through, and `info["rounds"]` each search round.
+analysis. It returns the bundle of a run solved at $k = k_y$. `info["trace"]` holds every (k, F) pair computed while
+finding $k_y$, and `info["rounds"]` each search.
 
 ## References
 

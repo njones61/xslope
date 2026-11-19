@@ -39,7 +39,7 @@ $\overline{CU}$ tests, as $d$ and $\psi$, beside its drained $c'$ and $\phi'$. A
 both stages, which suits gravels and cobbles that drain freely. The [rapid drawdown page](../lem/rapid.md#full-pool)
 shows how the tests give $d$ and $\psi$.
 
-## Stage 2's Undrained Strength {#stage-2-strength}
+## Undrained Strength in Stage 2 {#stage-2-strength}
 
 The undrained strength is one of two choices, set in the run:
 
@@ -119,7 +119,7 @@ choice's values on the same slope.
 
 ## In Studio {#studio}
 
-In the dialog **Run LEM…** opens, under **Seismic**, check **Two-stage seismic** and choose the **Stage 2 strength**: **Interpolated
+In the **Run LEM…** dialog, under **Seismic**, check **Two-stage seismic** and choose the **Stage 2 strength**: **Interpolated
 (as in rapid drawdown)** or **Kc = 1 envelope**. A run is a rapid drawdown analysis or a two-stage seismic analysis,
 never both, so checking one clears the other.
 

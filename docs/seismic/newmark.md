@@ -57,7 +57,7 @@ scaled so that its peak acceleration matches a target, such as the design peak a
 
 The displacement is in cm for a metric model and in inches for an English one.
 
-## An Example: VP104 {#vp104-example}
+## Example: VP104 {#vp104-example}
 
 The Slide2 verification problem [VP104](../verification/rocscience.md#vp104) is a slope with the record of the 1980
 Mammoth Lakes earthquake at station CVK, component 090: 5,862 points at 0.005 s, with a peak of 0.416 g. Its lowest

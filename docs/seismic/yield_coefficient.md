@@ -123,10 +123,17 @@ or the variation of acceleration with depth in FHWA (2011).
 
 ## Vertical Seismic Coefficient {#vertical}
 
-When a vertical seismic coefficient $k_v$ is entered, it is held at the ratio $k_v/k_h$ of the two values entered, the
-way design codes specify it (Eurocode 8, for example, uses $\pm 0.5k_h$ or $\pm 0.33k_h$). The yield coefficient is then
-the horizontal coefficient at which $F = 1$, with $k_v$ at that ratio. If a model has a vertical coefficient but no
-horizontal one, there is no ratio, and the yield coefficient run is refused.
+Design codes usually give the vertical seismic coefficient as a fraction of the horizontal one. Eurocode 8, for
+example, uses $k_v = \pm 0.5k_h$ or $\pm 0.33k_h$. **xslope** follows that convention when it computes the yield
+coefficient of a model that has both.
+
+While it searches for $k_y$, **xslope** changes the horizontal coefficient from one trial to the next. At each trial it
+sets the vertical coefficient to the same fraction of the horizontal one as in the model, with the same sign. For
+example, a model with $k_h$ = 0.2 and $k_v$ = 0.1 has $k_v/k_h$ = 0.5, so a trial at $k_h$ = 0.15 uses $k_v$ = 0.075.
+The yield coefficient reported is the horizontal one, and the vertical coefficient at yield is $0.5k_y$.
+
+A model with a vertical coefficient and a horizontal coefficient of 0 gives no fraction to work from, and its yield
+coefficient run is refused.
 
 ## Two-Stage Analysis {#two-stage}
 

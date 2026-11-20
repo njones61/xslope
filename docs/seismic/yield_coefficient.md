@@ -84,11 +84,12 @@ coefficient depends on which slip surface it is computed for. Duncan et al. (201
    coefficient or the largest displacement.
 2. **The surface with the lowest yield coefficient.** It can become unrealistically deep, with a yield coefficient
    too low to be realistic for computing displacements.
-3. **A surface chosen with the shaking in the slope in mind.** The shaking is not the same throughout a slope. In a
-   dam, the peak accelerations grow from the bottom to the top (Duncan et al. 2014), so a deep sliding mass is shaken
-   less, on average, than a shallow one near the face. The third candidate is found by comparing each surface's yield
-   coefficient with the average acceleration of its own sliding mass, rather than with one record for the whole slope.
-   Duncan et al. call it the most appropriate choice. FHWA (2011) gives the variation of acceleration with depth.
+3. **A surface chosen with the shaking in the slope in mind.** The first two candidates come from limit equilibrium
+   alone, and neither accounts for how hard each sliding mass is shaken. The shaking is not the same throughout a
+   slope. In a dam, the peak accelerations grow from the bottom to the top (Duncan et al. 2014), so a deep sliding mass
+   is shaken less, on average, than a shallow one near the face. The third candidate is the surface that gives the
+   largest displacement once each sliding mass is shaken by its own average acceleration. Duncan et al. call it the
+   most appropriate choice. FHWA (2011) gives the variation of acceleration with depth.
 
 With an automated search, **xslope** finds the first two candidates. Each time it needs $k_y$ for a surface, it uses
 the steps in the previous section:

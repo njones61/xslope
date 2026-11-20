@@ -21,13 +21,18 @@ per scenario) stores it inside the "Newmark Displacement" scenario as parallel
 blocks of times and accelerations (``m_newmark_user_times``,
 ``m_newmark_user_accelerations``), with ``m_example_earthquake_text:
 "Mammoth Lakes-1 1980: CVK-090"`` alongside: 5862 samples at dt = 0.005 s, peaks
--0.41648 g and +0.341544 g. The values are a public strong-motion record, not
-vendor authorship, and they are carried verbatim in
-docs/verification/files/rocscience/vp104_record.txt, the file the tag reads. The
-vendor tutorial model itself is not redistributed. Anyone holding a Slide2 install
-can confirm the file sample for sample::
+-0.41648 g and +0.341544 g.
+
+The model is Rocscience's file and is not in this repository. Rocscience publishes
+it in its deprecated-tutorials zip (``MODEL_URL``). The tags and this script read
+the record straight out of the model, found by name under the local vendor archive
+(``$XSLOPE_VENDOR_FILES``, default ``~/python_projects/vendor_files``), or from a
+path given on the command line::
 
     python3 benchmarks/rocscience/newmark_vp104.py "/path/to/Tutorial 28 Seismic.slmd"
+
+Without the model the tags skip and this script stops with a message saying where
+to get it.
 
 Published reference values (Slide2 verification manual, Table 104.1)
 -------------------------------------------------------------------
@@ -52,10 +57,16 @@ import zipfile
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 sys.path.insert(0, ROOT)
 
-from xslope.seismic import newmark_displacement, read_record  # noqa: E402
+from xslope.seismic import newmark_displacement, _record_out  # noqa: E402
 
-RECORD = os.path.normpath(os.path.join(
-    ROOT, "docs", "verification", "files", "rocscience", "vp104_record.txt"))
+#: Root of the local archive of vendor files, which are never committed here.
+VENDOR_FILES = os.environ.get(
+    "XSLOPE_VENDOR_FILES", os.path.expanduser("~/python_projects/vendor_files"))
+#: The Slide2 tutorial model that carries the record.
+MODEL_NAME = "Tutorial 28 Seismic.slmd"
+#: Rocscience's public download that holds the model.
+MODEL_URL = ("https://static.rocscience.cloud/assets/model-files/Slide2/"
+             "Slide2-Deprecated-Tutorials-v9027.zip")
 
 # Slide2 verification manual Table 104.1 — {label: (K_y, displacement in cm)}.
 SLIDE2_PUBLISHED = {
@@ -69,14 +80,48 @@ SLIDE2_PUBLISHED = {
 XSLOPE_KY = 0.1436
 
 
-# --- re-extraction from the vendor model -----------------------------------
+# --- the record, from the vendor model ---------------------------------------
+def find_model(root=None):
+    """The path of ``Tutorial 28 Seismic.slmd`` under the vendor archive, or None."""
+    for dirpath, _dirs, files in os.walk(root or VENDOR_FILES):
+        if MODEL_NAME in files:
+            return os.path.join(dirpath, MODEL_NAME)
+    return None
+
+
+def load_record(slmd_path=None):
+    """VP104's record, in the form :func:`xslope.seismic.read_record` returns,
+    read from the vendor model (found with :func:`find_model` when no path is
+    given). None when the model is not there."""
+    path = slmd_path or find_model()
+    if path is None:
+        return None
+    times, accel, description = extract_record(path)
+    return _record_out(path, "Slide2", [description], times, accel,
+                       description=description)
+
+
+def write_record(path, slmd_path=None):
+    """Write VP104's record as a two-column text file, for a tool that needs the
+    record on disk. Returns ``path``, or None when the model is not there."""
+    rec = load_record(slmd_path)
+    if rec is None:
+        return None
+    with open(path, "w") as fh:
+        fh.write("# %s\n" % rec["description"])
+        for t, a in zip(rec["time"], rec["accel"]):
+            fh.write("%.4f  %.8g\n" % (t, a))
+    return path
+
+
 def extract_record(slmd_path):
     """Pull the acceleration record out of a Slide2 ``.slmd`` tutorial model.
 
-    Returns ``(times_s, accel_g)`` from the scenario that carries a POPULATED
-    ``m_newmark_user_accelerations`` block — every scenario in the tutorial
-    declares the block, but only "Newmark Displacement" fills it. The ``.slmd``
-    is a ZIP holding one ``.slsc`` text file per scenario; the block is a ``num:``
+    Returns ``(times_s, accel_g, description)`` from the scenario that carries a
+    POPULATED ``m_newmark_user_accelerations`` block — every scenario in the
+    tutorial declares the block, but only "Newmark Displacement" fills it. The
+    description is the scenario's ``m_example_earthquake_text``. The ``.slmd`` is
+    a ZIP holding one ``.slsc`` text file per scenario; the block is a ``num:``
     count followed by ``index: value`` lines between ``<name> start:`` and
     ``<name> end:``.
     """
@@ -91,7 +136,10 @@ def extract_record(slmd_path):
             accel = _read_block(lines, "m_newmark_user_accelerations")
             if not accel:
                 continue
-            return _read_block(lines, "m_newmark_user_times"), accel
+            text = [ln.split(":", 1)[1].strip().strip('"') for ln in lines
+                    if ln.strip().startswith("m_example_earthquake_text:")]
+            return (_read_block(lines, "m_newmark_user_times"), accel,
+                    text[0] if text else MODEL_NAME)
     raise ValueError("%s carries no Newmark acceleration record."
                      % os.path.basename(slmd_path))
 
@@ -101,18 +149,6 @@ def _read_block(lines, name):
     j = lines.index("  %s end:" % name)
     return [float(ln.split(":", 1)[1]) for ln in lines[i + 1:j]
             if not ln.strip().startswith("num")]
-
-
-def verify_record(slmd_path, record):
-    """Check the record file against a vendor ``.slmd``, sample for sample."""
-    times, accel = extract_record(slmd_path)
-    if len(accel) != record["npts"]:
-        return False, "length %d vs the file's %d" % (len(accel), record["npts"])
-    worst = max(abs(a - b) for a, b in zip(accel, record["accel"]))
-    worst_t = max(abs(a - b) for a, b in zip(times, record["time"]))
-    ok = worst == 0.0 and worst_t < 1e-9
-    return ok, ("%d samples, max |da| = %.3g g, max |dt| = %.3g s"
-                % (len(accel), worst, worst_t))
 
 
 def yield_acceleration_for(record, displacement_cm):
@@ -128,16 +164,17 @@ def yield_acceleration_for(record, displacement_cm):
 
 
 def main(argv):
-    rec = read_record(RECORD)
+    rec = load_record(argv[1] if len(argv) > 1 else None)
+    if rec is None:
+        print("%s is not under %s. It is in Rocscience's deprecated-tutorials zip,\n"
+              "%s;\nunzip it there or give the model's path as the argument."
+              % (MODEL_NAME, VENDOR_FILES, MODEL_URL))
+        return 1
     print("VP104 — Newmark permanent displacement")
     print("=" * 78)
-    print("record   : %s" % rec["description"])
+    print("record   : %s, from %s" % (rec["description"], rec["path"]))
     print("           %d samples, dt = %.4f s, duration = %.3f s, peak %.5g g"
           % (rec["npts"], rec["dt"], rec["duration"], rec["pga"]))
-    if len(argv) > 1:
-        ok, detail = verify_record(argv[1], rec)
-        print("vendor   : %s vs %s — %s"
-              % ("MATCH" if ok else "DIFFERS", os.path.basename(argv[1]), detail))
 
     print()
     print("At the published yield accelerations (the larger direction governs)")

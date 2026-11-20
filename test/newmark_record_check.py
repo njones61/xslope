@@ -1,11 +1,13 @@
 """Newmark records: every way a record file is written reads to the same record,
 and the integration does what a rigid block does to it.
 
-The corpus tags read the VP104 record as two columns of time and acceleration
-and a synthetic pulse with an uneven step. A PEER .AT2 file never reaches them,
-so this check writes the VP104 record as the NGA-West2 file the PEER database
-serves, and again in the older PEER layout, and requires the same samples and
-the same displacement from each. It also writes the run-together negative
+The corpus tags read records as two columns of time and acceleration. A PEER
+.AT2 file never reaches them, so this check writes one record as two columns,
+as the NGA-West2 file the PEER database serves, and again in the older PEER
+layout, and requires the same samples and the same displacement from each. The
+record is made here: a few sine waves under a rise-and-decay envelope, peaking
+near 0.4 g and stronger one way than the other, so both directions slide by
+different amounts. It also writes the run-together negative
 values some fixed-width files carry, and the files the reader must refuse: a
 record in cm/s², and times that run backward.
 
@@ -26,9 +28,31 @@ sys.path.insert(0, ROOT)
 from xslope.seismic import (newmark_displacement, read_record,  # noqa: E402
                             scale_for_pga)
 
-RECORD = os.path.join(ROOT, "docs", "verification", "files", "rocscience",
-                      "vp104_record.txt")
 KY = 0.139
+DT = 0.005
+
+
+def _synthetic_accel():
+    """The test record's accelerations, in g, at DT for 20 s."""
+    t = np.arange(0.0, 20.0 + DT / 2, DT)
+    env = np.minimum(t / 2.0, 1.0) * np.exp(-np.maximum(t - 8.0, 0.0) / 4.0)
+    a = (0.25 * np.sin(2 * np.pi * 1.3 * t)
+         + 0.12 * np.sin(2 * np.pi * 2.9 * t + 1.0)
+         + 0.08 * np.sin(2 * np.pi * 0.7 * t + 0.4)
+         + 0.06 * np.sin(2 * np.pi * 0.35 * t) ** 2)
+    return t, np.round(env * a, 8)
+
+
+def _record_file(folder):
+    """The test record as a two-column text file in ``folder``."""
+    t, a = _synthetic_accel()
+    return _write(folder, "test_record.txt", "# A synthetic test record\n" + "".join(
+        f"{ti:.3f}  {ai:.8f}\n" for ti, ai in zip(t, a)))
+
+
+def _record():
+    with tempfile.TemporaryDirectory() as tmp:
+        return read_record(_record_file(tmp))
 
 
 def _write(folder, name, text):
@@ -47,18 +71,18 @@ def _at2_lines(accel, per_line=5, fmt="{:15.7E}"):
 
 def check_at2_matches_the_text_file():
     fails = []
-    text = read_record(RECORD)
+    text = _record()
     accel = list(text["accel"])
     with tempfile.TemporaryDirectory() as tmp:
-        new = _write(tmp, "CVK090.AT2", "\n".join(
+        new = _write(tmp, "TEST090.AT2", "\n".join(
             ["PEER NGA STRONG MOTION DATABASE RECORD",
-             "Mammoth Lakes-01, 5/25/1980, Convict Creek, 90",
+             "Test Event, 1/1/2000, Test Station, 90",
              "ACCELERATION TIME SERIES IN UNITS OF G",
              f"NPTS= {len(accel):5d}, DT=   .0050 SEC"]
             + _at2_lines(accel)) + "\n")
-        old = _write(tmp, "CVK090_old.at2", "\n".join(
+        old = _write(tmp, "TEST090_old.at2", "\n".join(
             ["PACIFIC EARTHQUAKE ENGINEERING RESEARCH CENTER",
-             "MAMMOTH LAKES 05/25/80, CONVICT CREEK, 090",
+             "TEST EVENT 01/01/00, TEST STATION, 090",
              "ACCELERATION TIME HISTORY IN UNITS OF G",
              f"  {len(accel)}    .00500    NPTS, DT"]
             + _at2_lines(accel, per_line=8, fmt="{:10.6f}")) + "\n")
@@ -74,8 +98,8 @@ def check_at2_matches_the_text_file():
             # the older layout's six decimals round each value by up to 5e-7
             if worst > (1e-7 if exact else 5.01e-7):
                 fails.append(f"{label}: accelerations differ by up to {worst:.2g} g")
-            if "Convict Creek" not in rec["description"] and \
-                    "CONVICT CREEK" not in rec["description"]:
+            if "Test Station" not in rec["description"] and \
+                    "TEST STATION" not in rec["description"]:
                 fails.append(f"{label}: description {rec['description']!r}")
             d = newmark_displacement(rec, KY)["D"]
             if abs(d - d_text) > (1e-6 if exact else 1e-3):
@@ -133,7 +157,7 @@ def check_uneven_steps():
 
 
 def check_reversal_swaps_the_directions():
-    rec = read_record(RECORD)
+    rec = _record()
     fwd = newmark_displacement(rec, KY)
     rev = newmark_displacement(dict(rec, accel=-rec["accel"]), KY)
     fails = []
@@ -147,7 +171,7 @@ def check_reversal_swaps_the_directions():
 
 
 def check_units_and_scale():
-    rec = read_record(RECORD)
+    rec = _record()
     si = newmark_displacement(rec, KY, units="si")
     us = newmark_displacement(rec, KY, units="imperial")
     want = si["D"] / 100.0 * 32.174 / 9.81 * 12.0

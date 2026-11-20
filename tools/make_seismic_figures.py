@@ -40,12 +40,11 @@ import matplotlib.pyplot as plt  # noqa: E402
 from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.plot import plot_inputs, plot_newmark  # noqa: E402
 from xslope.seismic import (_OneSurface, newmark_displacement,  # noqa: E402
-                            read_record, yield_coefficient)
+                            yield_coefficient)
 
 OUT = os.path.join(ROOT, "docs", "seismic", "images")
 VER = os.path.join(ROOT, "docs", "verification")
 VP104 = os.path.join(VER, "files", "rocscience", "vp104a.xlsx")
-VP104_RECORD = os.path.join(VER, "files", "rocscience", "vp104_record.txt")
 DWB_DRY = os.path.join(VER, "files", "published", "dwb_t10_4_dry.xlsx")
 PUBLISHED = os.path.join(VER, "published.md")
 NUM_SLICES = 40
@@ -150,7 +149,14 @@ def ky_curve():
 
 def newmark():
     ky = vp104_yield()["info"]["k_y"]
-    rec = read_record(VP104_RECORD)
+    # VP104's record is inside Rocscience's own tutorial model, which is not in
+    # this repository: it is read from the local vendor archive.
+    sys.path.insert(0, os.path.join(ROOT, "benchmarks", "rocscience"))
+    from newmark_vp104 import MODEL_NAME, MODEL_URL, VENDOR_FILES, load_record
+    rec = load_record()
+    if rec is None:
+        raise SystemExit(f"{MODEL_NAME} is not under {VENDOR_FILES}; it is in "
+                         f"{MODEL_URL}.")
     res = newmark_displacement(rec, round(ky, 4), units="si")
     fig = plt.figure(figsize=(9.0, 7.5))
     plot_newmark(res, fig=fig)

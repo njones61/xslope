@@ -59,33 +59,35 @@ A record is a file of horizontal ground acceleration, in g, in one of two forms.
 
 **Two columns of text:** time in s and acceleration in g, separated by spaces, tabs, or commas. Lines before the
 first pair of numbers are the header, and lines after it that start with `#` are skipped. The time steps need not be
-equal. The record in the [example below](#vp104-example),
-[vp104_record.txt](../verification/files/rocscience/vp104_record.txt), is in this form. Its first lines:
+equal. For example, [anderson_dam_1989_243.txt](../tutorials/files/anderson_dam_1989_243.txt), a U.S. Geological
+Survey record of the 1989 Loma Prieta earthquake, begins:
 
 ```text
-# Mammoth Lakes-1 1980: CVK-090
-# The acceleration record of Slide2's Tutorial 28 (Seismic Analysis with the
-# Newmark Method), scenario "Newmark Displacement", used by Slide2 verification
-# problem 104. Values as the tutorial model stores them; 5862 samples at 0.005 s.
+# Loma Prieta 1989, Anderson Dam downstream, 243 degrees
+# The Loma Prieta, California, earthquake of October 17, 1989 (local time), recorded
+# downstream of Anderson Dam by U.S. Geological Survey National Strong Motion Project
+# station 1652, horizontal component 243 degrees. Corrected acceleration (Brady and
+# Mork 1990, USGS Open-File Report 90-247), converted here from cm/s2 to g.
+# Source: https://escweb.wr.usgs.gov/nsmp-data/data_sets/891018_1.html
 # time (s), acceleration (g)
-0.000	-9.81237e-05
-0.005	-0.000115044
-0.010	-8.23472e-05
-0.015	-1.82978e-05
-0.020	-2.06383e-05
+0.000  0.00133379
+0.005  -0.000836188
+0.010  0.00103205
+0.015  0.00203291
+0.020  0.00328532
 ```
 
 **A PEER `.AT2` file,** as the PEER databases give them: header lines, a line stating the number of points and the
-time step (`NPTS=  5862, DT=   .0050 SEC`, or the older `5862  .0050  NPTS, DT`), then the accelerations, several to a
-line. In that layout, the same record begins:
+time step (`NPTS=  7934, DT=   .0050 SEC`, or the older `7934  .0050  NPTS, DT`), then the accelerations, several to a
+line. In that layout, the same record would begin:
 
 ```text
 PEER NGA STRONG MOTION DATABASE RECORD
-Mammoth Lakes-01, 5/25/1980, Convict Creek, 90
+Loma Prieta, 10/18/1989, Anderson Dam (Downstream), 243
 ACCELERATION TIME SERIES IN UNITS OF G
-NPTS=  5862, DT=   .0050 SEC
- -9.8123700E-05 -1.1504400E-04 -8.2347200E-05 -1.8297800E-05 -2.0638300E-05
-  1.3921800E-06  1.6148900E-05  9.9604700E-06  8.1173000E-06  2.5475200E-05
+NPTS=  7934, DT=   .0050 SEC
+  1.3337900E-03 -8.3618800E-04  1.0320500E-03  2.0329100E-03  3.2853200E-03
+  5.1758800E-03  6.5994000E-03  6.7027000E-03  6.1901900E-03  5.6805300E-03
 ```
 
 Records can be downloaded from strong-motion databases such as the

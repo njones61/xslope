@@ -190,6 +190,8 @@ def parse_page(md_path: Path):
                     params[key.strip()] = value.strip()
             if 'file' not in params:
                 continue        # a documentation example of the tag syntax
+            if 'vendor' in params:
+                continue        # a vendor's own file, not in this repository
             params['_line'] = i
             params['_model'] = os.path.normpath(
                 os.path.join(md_dir, params['file']))

@@ -1517,7 +1517,6 @@ def capture_seep_solution_view():
 # Duncan, Wright & Brandon's Table 10.4 slope: its materials carry d and psi, so
 # the model checks have nothing against a two-stage run.
 DWB_T10_4 = os.path.join(REPO_ROOT, "docs/verification/files/published/dwb_t10_4_dry.xlsx")
-VP104_RECORD = os.path.join(REPO_ROOT, "docs/verification/files/rocscience/vp104_record.txt")
 
 
 def capture_run_lem_seismic():
@@ -1537,17 +1536,30 @@ def capture_newmark_dialog():
     run in the words Studio uses for one (main_window._ky_of_run)."""
     from studio.dialogs import NewmarkDialog
 
-    # Opened from the record's own folder, so the Record field shows the file's name
-    # rather than the tail of this checkout's path.
+    # VP104's record is inside Rocscience's own tutorial model, which is not in this
+    # repository: it is read from the local vendor archive and written as a
+    # two-column file in a temporary folder. The dialog is opened from that folder,
+    # so the Record field shows the file's name rather than the folder's path.
+    import shutil
+    import tempfile
+    sys.path.insert(0, os.path.join(REPO_ROOT, "benchmarks", "rocscience"))
+    from newmark_vp104 import MODEL_NAME, write_record
+    tmp = tempfile.mkdtemp()
+    record = write_record(os.path.join(tmp, "vp104_record.txt"))
+    if record is None:
+        print(f"  skipped analysis_newmark_dialog.png: {MODEL_NAME} is not in the "
+              f"vendor archive")
+        return None
     here = os.getcwd()
-    os.chdir(os.path.dirname(VP104_RECORD))
+    os.chdir(tmp)
     try:
-        dlg = NewmarkDialog(ky=0.1445, units="si", last_path=os.path.basename(VP104_RECORD),
+        dlg = NewmarkDialog(ky=0.1445, units="si", last_path=os.path.basename(record),
                             ky_source="Spencer, on the critical circle, k_y = 0.1445")
         dlg.resize(dlg.sizeHint())
         return _grab(dlg, "analysis_newmark_dialog.png")
     finally:
         os.chdir(here)
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 SEISMIC_SHOTS = (capture_run_lem_seismic, capture_newmark_dialog)
@@ -1573,7 +1585,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "seismic":
         print("capture_studio_screenshots: regenerating the seismic images")
         for fn in SEISMIC_SHOTS:
-            print(f"  wrote {os.path.relpath(fn(), REPO_ROOT)}")
+            path = fn()             # None: a shot that needs a vendor file skipped
+            if path:
+                print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "crossings":
         print("capture_studio_screenshots: regenerating the crossing tables")
@@ -1612,8 +1626,9 @@ def main():
                capture_inputs_tree, capture_display_panel_seep,
                capture_display_dock_fem, capture_seep_data_view,
                capture_seep_solution_view) + PARAMETRIC_SHOTS + CROSSING_SHOTS + SEISMIC_SHOTS:
-        path = fn()
-        print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
+        path = fn()                 # None: a shot that needs a vendor file skipped
+        if path:
+            print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     global _MW
     if _MW is not None:                 # closes the assistant's worker thread too
         _MW.close()

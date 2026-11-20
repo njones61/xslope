@@ -168,11 +168,11 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp104b.xlsx, type=circular_search, num_slices=40, fs_spencer=0.989, benchmark=VP104-k015 -->
 <!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.1445, kc_tol=0.001, num_slices=40, benchmark=VP104-kc -->
 <!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.1436, kc_tol=0.001, num_slices=40, benchmark=VP104-kc-noncirc -->
-<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.139, expected_d=5.036, tolerance=0.005, benchmark=VP104-newmark -->
-<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.139, direction=positive, expected_d=4.007, tolerance=0.005, benchmark=VP104-newmark-positive -->
-<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.140, expected_d=4.928, tolerance=0.005, benchmark=VP104-newmark-uni -->
-<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.1436, expected_d=4.560, tolerance=0.005, benchmark=VP104-newmark-xslope-ky -->
-<!-- test: file=files/rocscience/vp104_record.txt, type=newmark, ky=0.1445, expected_d=4.473, tolerance=0.005, benchmark=VP104-newmark-xslope-ky-circles -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.139, expected_d=5.036, tolerance=0.005, benchmark=VP104-newmark -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.139, direction=positive, expected_d=4.007, tolerance=0.005, benchmark=VP104-newmark-positive -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.140, expected_d=4.928, tolerance=0.005, benchmark=VP104-newmark-uni -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.1436, expected_d=4.560, tolerance=0.005, benchmark=VP104-newmark-xslope-ky -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.1445, expected_d=4.473, tolerance=0.005, benchmark=VP104-newmark-xslope-ky-circles -->
 <!-- test: file=files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.532, benchmark=VP82 -->
 <!-- test: file=files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
@@ -2444,8 +2444,7 @@ the lower of its circular and non-circular searches. The fourth scenario is run 
 K<sub>y</sub> (below).
 
 **Input files:** [vp104a.xlsx](files/rocscience/vp104a.xlsx) (no seismic) ·
-[vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15) ·
-[vp104_record.txt](files/rocscience/vp104_record.txt) (the acceleration record)
+[vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15)
 
 | Scenario | XSLOPE (Spencer) | Slide2 uni-modal | Slide2 MMO |
 |---|---|---|---|
@@ -2464,8 +2463,9 @@ critical-acceleration row compares a yield acceleration, not a factor of safety.
 not printed in the verification manual, but it ships with the product: the tutorial model the
 problem is built on (`Tutorial 28 Seismic.slmd`) stores the whole history in its *Newmark
 Displacement* scenario, 5862 samples at dt = 0.005 s spanning 0 to 29.305 s, labeled *Mammoth
-Lakes-1 1980: CVK-090*. The record file carries it as two columns of time and acceleration.
-XSLOPE's Newmark analysis treats the sliding mass as a rigid block that slides whenever the
+Lakes-1 1980: CVK-090*. The model is in Rocscience's
+[deprecated Slide2 tutorials](https://static.rocscience.cloud/assets/model-files/Slide2/Slide2-Deprecated-Tutorials-v9027.zip)
+download, and the checks read the record from it. XSLOPE's Newmark analysis treats the sliding mass as a rigid block that slides whenever the
 ground acceleration exceeds K<sub>y</sub>·g, runs the record once with each sign pushing the
 block downslope, and reports the larger displacement.
 

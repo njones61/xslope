@@ -2154,14 +2154,27 @@ def test_ky_section():
     return fails
 
 
-NEWMARK_RECORD = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
-                              "vp104_record.txt")
+def _write_newmark_record(folder):
+    """A synthetic test record as a two-column text file in ``folder``: two sine
+    waves under a rise-and-decay envelope, 20 s at 0.005 s, stronger one way than
+    the other. Returns its path."""
+    import numpy as np
+    t = np.arange(0.0, 20.0 + 0.0025, 0.005)
+    env = np.minimum(t / 2.0, 1.0) * np.exp(-np.maximum(t - 8.0, 0.0) / 4.0)
+    a = env * (0.25 * np.sin(2 * np.pi * 1.3 * t)
+               + 0.12 * np.sin(2 * np.pi * 2.9 * t + 1.0)
+               + 0.06 * np.sin(2 * np.pi * 0.35 * t) ** 2)
+    path = os.path.join(folder, "test_record.txt")
+    with open(path, "w") as fh:
+        fh.write("# A synthetic test record\n")
+        fh.writelines(f"{ti:.3f}  {ai:.8f}\n" for ti, ai in zip(t, a))
+    return path
 
 
 def test_newmark_section():
     """The Newmark section of a report that carries a Newmark run.
 
-    VP104's record at k_y = 0.139, scaled by 1.2: the record named and described,
+    A synthetic record at k_y = 0.139, scaled by 1.2: the record named and described,
     its scaling and both peaks, k_y and where it came from, the displacement each
     way with the governing one first and stated in bold, and the histories figure
     drawn and cited. The figure count a build plans includes it, a report with
@@ -2169,13 +2182,21 @@ def test_newmark_section():
     but a Newmark run still carries it.
     """
     import tempfile
+    with tempfile.TemporaryDirectory() as rec_dir:
+        return _newmark_section_fails(_write_newmark_record(rec_dir))
+
+
+def _newmark_section_fails(record_path):
+    import tempfile
     fails = []
     from xslope.fileio import load_slope_data
     from xslope.report import (_Counter, _newmark_section, build_report,
                                planned_figures, resolve_options)
     from xslope.seismic import newmark_displacement, read_record
 
-    r = newmark_displacement(read_record(NEWMARK_RECORD), 0.139, scale=1.2)
+    record = read_record(record_path)
+    pga = record["pga"]
+    r = newmark_displacement(record, 0.139, scale=1.2)
     r["ky_source"] = "Spencer's Method, on the critical circle, k_y = 0.1390"
     opts = resolve_options({})
     with tempfile.TemporaryDirectory() as tmp:
@@ -2184,11 +2205,11 @@ def test_newmark_section():
             return ["no Newmark section for a Newmark run"]
         kv = dict(item for b in sec.blocks if b.kind == "keyvalues"
                   for item in b.items)
-        want = {"Record file": "vp104_record.txt",
-                "Record": "Mammoth Lakes-1 1980: CVK-090",
+        want = {"Record file": "test_record.txt",
+                "Record": "A synthetic test record",
                 "Scale factor": "1.2",
-                "Peak acceleration as recorded": "0.416 g",
-                "Peak acceleration as analyzed": f"{0.41648 * 1.2:.3f} g"}
+                "Peak acceleration as recorded": f"{pga:.3f} g",
+                "Peak acceleration as analyzed": f"{pga * 1.2:.3f} g"}
         for k, v in want.items():
             if kv.get(k) != v:
                 fails.append(f"{k} reads {kv.get(k)!r}, not {v!r}")

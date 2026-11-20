@@ -5274,9 +5274,9 @@ def vp076b():
 # search columns, and they agree to ~0.1%. XSLOPE has no multi-modal search, but
 # it does not need one to verify this problem: the uni-modal column is exactly
 # what an ordinary circular search targets. The fourth scenario, the Newmark
-# displacement, needs no model: it integrates the tutorial's acceleration record
-# (docs/verification/files/rocscience/vp104_record.txt) at a yield acceleration
-# (benchmarks/rocscience/newmark_vp104.py).
+# displacement, needs no model: it integrates the tutorial's acceleration record,
+# read from the vendor's tutorial model in the local vendor archive, at a yield
+# acceleration (benchmarks/rocscience/newmark_vp104.py).
 # ---------------------------------------------------------------------------
 
 _VP104_ZONES = [                      # (mat_id, polygon vertices)

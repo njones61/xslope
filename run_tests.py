@@ -1397,6 +1397,11 @@ def run_critical_kc_test(test):
     return bundle['yield']['k_y'], None
 
 
+#: An error message that starts with this is a skip with its reason, not an error:
+#: the row needs a file this repository does not carry and this machine lacks.
+SKIP_PREFIX = 'SKIP: '
+
+
 def run_newmark_test(test):
     """Integrate an acceleration record as a rigid sliding block and compare the
     permanent displacement to the published or closed-form one.
@@ -1409,10 +1414,26 @@ def run_newmark_test(test):
     ``units=imperial``), tolerance (absolute, default 0.005), scale or
     target_pga (default: the record as written), direction (``both``, the
     larger of the two and the default; ``positive`` or ``negative``, the one
-    with that sign of acceleration pushing the block downslope)."""
+    with that sign of acceleration pushing the block downslope).
+
+    ``vendor=rocscience`` marks a record that lives inside a vendor's own model
+    (``file`` is the model's name), which this repository does not carry: the
+    record is read from the local vendor archive, and the row SKIPS with the
+    reason when the model is not there."""
     from xslope.seismic import newmark_displacement, read_record, scale_for_pga
     try:
-        record = read_record(test['file'])
+        if test.get('vendor'):
+            sys.path.insert(0, str(Path(__file__).parent / 'benchmarks' / 'rocscience'))
+            from newmark_vp104 import MODEL_NAME, MODEL_URL, load_record
+            name = Path(test['file']).name
+            if name != MODEL_NAME:
+                return None, f"vendor={test['vendor']}: no reader for {name}"
+            record = load_record()
+            if record is None:
+                return None, (f"{SKIP_PREFIX}{name} is not in the local vendor "
+                              f"archive (it is in {MODEL_URL})")
+        else:
+            record = read_record(test['file'])
     except (OSError, ValueError) as e:
         return None, str(e)
     scale = test.get('scale', 1.0)
@@ -18365,6 +18386,7 @@ def main():
     passed = 0
     failed = 0
     errors = 0
+    skipped = 0
     total_time = 0
     wall_t0 = time.time()
     # Two-tier fem_ssrm kernel-routing tallies (see _run_fem_ssrm). Reported at the
@@ -18395,7 +18417,7 @@ def main():
         return f"{v:10.3e}" if (av and (av < 1e-3 or av >= 1e6)) else f"{v:10.3f}"
 
     def report(i, test, computed, error_msg, annotation, elapsed):
-        nonlocal passed, failed, errors
+        nonlocal passed, failed, errors, skipped
         nonlocal route_fast, route_fallback, route_direct, route_fail
         nonlocal route_edges, route_edges_bracket
         # Every row's wall-clock, under the mode it ran in. This is the record the
@@ -18408,7 +18430,11 @@ def main():
         test_type = test.get('type', '?')
         method = test.get('method', '-')
         expected, tol = _expected_and_tol(test, args.tolerance)
-        if error_msg:
+        if error_msg and error_msg.startswith(SKIP_PREFIX):
+            status = error_msg
+            skipped += 1
+            comp_str = "    --    "
+        elif error_msg:
             status = f"ERROR: {error_msg}"
             errors += 1
             comp_str = "    --    "
@@ -18494,7 +18520,9 @@ def main():
             report(i, test, computed, error_msg, annotation, elapsed)
 
     print("-" * 120)
-    print(f"\nResults: {passed} passed, {failed} failed, {errors} errors out of {len(tests)} tests")
+    print(f"\nResults: {passed} passed, {failed} failed, {errors} errors"
+          + (f", {skipped} skipped" if skipped else "")
+          + f" out of {len(tests)} tests")
     # FEM SSRM kernel routing: which kernel decided each fem_ssrm row. A run-over-run
     # rise in the fallback count is the visible signal of fast-kernel drift (see
     # _run_fem_ssrm); its companion guard is the kernel_xcheck gate.

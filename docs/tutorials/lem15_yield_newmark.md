@@ -61,20 +61,23 @@ the earthquake record moves the slope, so the displacement depends on it directl
 
 ### Choosing the slip surface
 
-Every slip surface has its own yield coefficient, and a Newmark analysis uses one surface and its k<sub>y</sub>. Two
-candidates are the static critical surface, the one with the lowest factor of safety before the earthquake, and the
-surface with the lowest yield coefficient (Duncan, Wright, and Brandon 2014). They are not always the same surface.
-**xslope** finds the second one with a search. It first finds k<sub>y</sub> on the static critical surface. Then it
-searches again with the seismic coefficient set to that k<sub>y</sub>. A surface with a factor of safety below 1 at that
-coefficient has a lower yield coefficient, so **xslope** finds k<sub>y</sub> on that surface. It repeats the search at
-each new k<sub>y</sub> until the surface it finds is within 0.001 of F = 1.
+Every slip surface has its own yield coefficient, and a Newmark analysis uses one surface and its k<sub>y</sub>.
+Duncan, Wright, and Brandon (2014) list three candidates:
 
-Neither surface is always the right one to use. The surface with the lowest k<sub>y</sub> gives the largest
-displacement, but it is often large and deep. A Newmark analysis shakes the whole sliding mass with one record. In an
-embankment, the peak accelerations generally grow from the bottom to the top (Duncan et al. 2014), so a large, deep mass
-is shaken less, on average, than a shallow one near the face. Shaking it with the full record overstates its
-displacement. Where the two surfaces agree, as they do on this slope, the choice does not matter. Where they differ, the
-[Yield Coefficient](../seismic/yield_coefficient.md#which-surface) page explains how to choose.
+1. The static critical surface, the one with the lowest factor of safety before the earthquake.
+2. The surface with the lowest yield coefficient.
+3. The surface that gives the largest displacement once each sliding mass is shaken by its own average acceleration.
+
+The first two come from limit equilibrium alone, and **xslope** finds both in one run. It first finds k<sub>y</sub> on
+the static critical surface. Then it searches again with the seismic coefficient set to that k<sub>y</sub>. A surface
+with a factor of safety below 1 at that coefficient has a lower yield coefficient, so **xslope** finds k<sub>y</sub> on
+that surface and searches again, until the surface it finds is within 0.001 of F = 1.
+
+The third candidate takes a site response analysis of the slope, which **xslope** does not do. It matters because the
+shaking is not the same throughout a slope. In an embankment, the peak accelerations grow from the bottom to the top,
+so a large, deep mass is shaken less, on average, than a shallow one near the face. The surface with the lowest
+k<sub>y</sub> is often large and deep, and running the full record on it overstates its displacement. The
+[Yield Coefficient](../seismic/yield_coefficient.md#which-surface) page explains how to find the third candidate.
 
 ### Finding the yield coefficient
 
@@ -187,7 +190,7 @@ earthquake. The [Newmark Displacement](../seismic/newmark.md#limits) page lists 
 This tutorial covered:
 
 - Finding the yield coefficient in one run, on the static critical circle and by search.
-- How the static critical surface and the surface with the lowest yield coefficient compare, and when they differ.
+- The three candidate surfaces for a Newmark analysis, and how the first two compare on this slope.
 - Running an acceleration record through the Newmark sliding block, in both directions.
 - Scaling a record, and how much faster the displacement grows than the record.
 

@@ -134,9 +134,11 @@ each surface you want to check, such as the shallow circle, the deep circle, and
    coefficient k_y** checked.
 2. From a site response analysis of the slope, get the average acceleration of the mass above the surface over time,
    $k(t)$. In a two-dimensional analysis, add up mass times acceleration over the soil inside the sliding mass at each
-   time step and divide by the total mass. The result is the same as the horizontal force on the mass along the slip
-   surface divided by its weight. In a one-dimensional analysis of a soil column, $k(t)$ is the horizontal shear stress
-   at the depth of the slip surface divided by the total vertical stress there, $\tau(t)/\sigma_v$.
+   time step and divide by the total mass (Seed and Martin 1966). The result is the same as the horizontal force on the
+   mass along the slip surface divided by its weight, which is how Makdisi and Seed (1978) computed it from the stresses
+   in a finite element analysis. In a one-dimensional analysis of a soil column, $k(t)$ is the horizontal shear stress
+   at the depth of the slip surface divided by the total vertical stress there, $\tau(t)/\sigma_v$ (Bray and Rathje
+   1998).
 3. Save $k(t)$ as a two-column record, time in s and acceleration in g, and run it in [**Newmark…**](newmark.md)
    **As recorded**, with the surface's $k_y$. The result is that surface's displacement.
 
@@ -214,9 +216,13 @@ finding $k_y$, and `info["rounds"]` each search.
 
 ## References
 
+- Bray, J.D., and Rathje, E.M. (1998). "Earthquake-induced displacements of solid-waste landfills." *Journal of
+  Geotechnical and Geoenvironmental Engineering*, ASCE, 124(3), 242–253.
 - Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014). *Soil Strength and Slope Stability*, 2nd ed. Wiley, Hoboken,
   NJ. Section 10.1.
 - FHWA (2011). *LRFD Seismic Analysis and Design of Transportation Geotechnical Features and Structural Foundations.*
   Geotechnical Engineering Circular No. 3, Report FHWA-NHI-11-032, Federal Highway Administration, Washington, DC.
 - Makdisi, F.I., and Seed, H.B. (1978). "Simplified procedure for estimating dam and embankment earthquake-induced
   deformations." *Journal of the Geotechnical Engineering Division*, ASCE, 104(GT7), 849–867.
+- Seed, H.B., and Martin, G.R. (1966). "The seismic coefficient in earth dam design." *Journal of the Soil Mechanics
+  and Foundations Division*, ASCE, 92(SM3), 25–58.

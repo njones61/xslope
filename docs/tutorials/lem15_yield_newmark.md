@@ -137,7 +137,7 @@ The dashed lines in the top panel mark ±k<sub>y</sub>. Only a few peaks of the 
 s, and each one adds a step to the displacement. The Log reports:
 
 ```text
-Newmark displacement D = 0.66 in at k_y = 0.127 under anderson_dam_1989_243.txt (peak 0.250 g), with its positive accelerations pushing the block downslope (10 slip episodes); the other way it is 0.22 in.
+Newmark displacement D = 0.66 in at k_y = 0.1266 under anderson_dam_1989_243.txt (peak 0.250 g), with its positive accelerations pushing the block downslope (10 slip episodes); the other way it is 0.22 in.
 ```
 
 <!-- test: file=files/anderson_dam_1989_243.txt, type=newmark, ky=0.1266, units=imperial, expected_d=0.66, tolerance=0.005, benchmark=LEM-15-newmark-x1 -->

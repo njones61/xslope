@@ -3490,7 +3490,7 @@ class MainWindow(QMainWindow):
         self.view_tabs.setCurrentWidget(self.newmark_canvas)
         self.statusBar().showMessage(
             f"Newmark done — D = {result['D']:.2f} {result['D_unit']} at "
-            f"k_y = {result['ky']:.3f}")
+            f"k_y = {result['ky']:.4f}")
         self._update_run_actions()       # the report now has a run to document
 
     def _show_newmark(self):

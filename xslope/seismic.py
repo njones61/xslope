@@ -978,7 +978,7 @@ def newmark_line(result):
     other = result["directions"][-gov]
     main = result["directions"][gov]
     return (f"Newmark displacement D = {result['D']:.2f} {u} at k_y = "
-            f"{result['ky']:.3f} under {result['record']['name']} "
+            f"{result['ky']:.4f} under {result['record']['name']} "
             f"(peak {result['pga']:.3f} g), with {direction_phrase(gov)} "
             f"({main['episodes']} slip episodes); the other way it is "
             f"{other['D']:.2f} {u}.")

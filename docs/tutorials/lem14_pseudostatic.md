@@ -286,7 +286,11 @@ declares. Click **Build**. Then click **Run → Run FEM…**:
 ![Run FEM for the strength reduction](images/lem14_studio_run_fem.png)
 
 The dialog opens on **SSRM (find FS)** with the bracket the file declares, **F min (SSRM)** = 0.50 and **F max (SSRM)** =
-1.50. The bracket reaches below 1 because the limit equilibrium answer is 0.843. Leave the rest alone and click **Run**.
+1.50. The bracket reaches below 1 because the limit equilibrium answer is 0.843.
+
+**Model checks** shows one note, *Horizontal seismic coefficient k_h = 0.15 pushes in +x*. Every finite element run with
+a seismic force shows it, as a reminder that the sign sets the direction. Here +x is down the face, so the run is
+loaded the way it should be. Leave the rest of the dialog alone and click **Run**.
 
 **FS = 0.801.** The shear strain at failure shows the mechanism:
 

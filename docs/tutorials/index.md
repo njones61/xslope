@@ -79,9 +79,9 @@ The smallest complete model — one material, one profile line, a rigid base —
 
 ### [Loads on the Crest](lem02_loads_on_the_crest.md)
 
-A surcharge added to LEM-1's embankment — spread over the crest, gathered onto a point, pushed normal to the ground or straight down, and shaken — then a sweep for the cohesion that would carry it at a target factor of safety.
+A surcharge added to LEM-1's embankment — spread over the crest, gathered onto a point, pushed normal to the ground or straight down — then a sweep for the cohesion that would carry it at a target factor of safety.
 
-<p class="tut-tags"><span class="tut-tag">distributed loads</span><span class="tut-tag">line loads</span><span class="tut-tag">load direction</span><span class="tut-tag">seismic coefficient</span><span class="tut-tag">design mode</span></p>
+<p class="tut-tags"><span class="tut-tag">distributed loads</span><span class="tut-tag">line loads</span><span class="tut-tag">load direction</span><span class="tut-tag">design mode</span></p>
 
 </div>
 </div>

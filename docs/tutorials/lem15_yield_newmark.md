@@ -38,7 +38,7 @@ below Anderson Dam
 ## Opening the model
 
 Download [xslope_pseudostatic_start.xlsx](files/xslope_pseudostatic_start.xlsx) and open it in Studio with **File →
-Open**. It is the starter file of LEM-14: a 15 ft slope at 2:1 in one soil, dry, with one starting circle through the
+Open**. It is the starter file of LEM-14, a 15 ft slope at 2:1 in one soil, dry, with one starting circle through the
 toe. Open **Materials** and set the **Show parameters for:** toggles to **LEM** alone:
 
 | name | γ (pcf) | γsat (pcf) | option | c (psf) | φ (deg) | c/p | r-elev | d (psf) | ψ (deg) | u |
@@ -57,18 +57,16 @@ undrained strength, because the earthquake is over before the fill can drain.
 
 The yield coefficient k<sub>y</sub> is the seismic coefficient at which the factor of safety is exactly 1. A ground
 acceleration above k<sub>y</sub> g moves the sliding mass, and one below it does not. It can be found on any slip
-surface, and the surfaces that matter are two (Duncan, Wright, and Brandon 2014):
-
-- **the static critical surface,** the one with the lowest factor of safety with no seismic force;
-- **the surface with the lowest yield coefficient,** which is not always the same one.
-
-One run finds both. Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** = `Auto search`, leave
+surface. Duncan, Wright, and Brandon (2014) suggest computing it on the static critical surface, which has the lowest
+factor of safety with no seismic force, and on the surface with the lowest yield coefficient, which is not always the
+same one. One run finds both. Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** = `Auto search`, leave
 **Number of slices** at 40, and tick **Find the yield coefficient k_y** under **Seismic**:
 
 ![Run LEM with Find the yield coefficient k_y ticked](images/lem15_studio_run_lem_ky.png)
 
-The model's own seismic coefficient is not used: the run searches for the static critical circle, finds k<sub>y</sub> on
-it, and then searches again at that coefficient for any circle with a factor of safety below 1. Click **Run**. The Log
+The run does not use the model's own seismic coefficient. It searches for the static critical circle, finds
+k<sub>y</sub> on it, and then searches again at that coefficient for any circle with a factor of safety below 1. Click
+**Run**. The Log
 reports:
 
 ```text
@@ -127,8 +125,8 @@ Newmark displacement D = 0.66 in at k_y = 0.127 under anderson_dam_1989_243.txt 
 
 <!-- test: file=files/anderson_dam_1989_243.txt, type=newmark, ky=0.1266, units=imperial, expected_d=0.66, tolerance=0.005, benchmark=LEM-15-newmark-x1 -->
 
-Nothing in a record says which way its positive accelerations point on the slope being analyzed: the sign is the compass
-direction of the instrument's axis. So **xslope** runs the record both ways and reports the larger displacement. Here the
+The sign of a recorded acceleration gives the compass direction of the instrument's axis, not a direction on the slope
+being analyzed. So **xslope** runs the record both ways and reports the larger displacement. Here the
 positive accelerations govern, at 0.66 in, against 0.22 in the other way.
 
 ### Scaling the record
@@ -138,8 +136,8 @@ A record is often scaled to the peak acceleration expected at the site. Open **R
 
 ![The Newmark dialog with the record scaled by 2](images/lem15_studio_newmark_scaled.png)
 
-Run it, and then run it once more with a scale factor of `3`. **Target peak acceleration (g)** does the same thing by
-another route: it scales the record so that its peak equals the value entered.
+Run it, and then run it once more with a scale factor of `3`. **Target peak acceleration (g)** is the other way to scale a
+record. It scales the record so that its peak equals the value entered.
 
 | Scale factor | Peak (g) | D (in) | Other direction (in) | Slip episodes |
 | :---: | :---: | :---: | :---: | :---: |

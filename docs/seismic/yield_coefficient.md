@@ -89,7 +89,7 @@ coefficient depends on which slip surface it is computed for. Duncan et al. (201
    slope. In a dam, the peak accelerations grow from the bottom to the top (Duncan et al. 2014), so a deep sliding mass
    is shaken less, on average, than a shallow one near the face. The third candidate is the surface that gives the
    largest displacement once each sliding mass is shaken by its own average acceleration. Duncan et al. call it the
-   most appropriate choice. FHWA (2011) gives the variation of acceleration with depth.
+   most appropriate choice. FHWA (2011) gives the variation of acceleration with slope height.
 
 With an automated search, **xslope** finds the first two candidates:
 
@@ -126,20 +126,24 @@ that shakes it with the full record overstates its displacement. The third candi
 ### Finding the Third Candidate
 
 **xslope** cannot find the third candidate by itself, because that takes knowing how the acceleration varies through
-the slope. That comes from a site response analysis or from published relations such as those in FHWA (2011). With
-it, you can compare surfaces by their displacements. For each surface you want to check, such as the shallow circle,
-the deep circle, and one or two in between:
+the slope, which comes from a site response analysis. With it, you can compare surfaces by their displacements. For
+each surface you want to check, such as the shallow circle, the deep circle, and one or two in between:
 
 1. Find the surface's $k_y$. For the two circles the search found, $k_y$ is in the Log. For any other surface, enter it
    as the model's circle or non-circular surface, set **Analysis** to a single surface, and run with **Find the yield
    coefficient k_y** checked.
-2. Estimate the average peak acceleration of the mass above the surface, from the site response analysis or from
-   FHWA (2011).
+2. Estimate the average peak acceleration of the mass above the surface from the site response analysis.
 3. In [**Newmark…**](newmark.md), choose **Target peak acceleration (g)**, enter that acceleration, and run the
    record. The record is scaled so that its peak equals the mass's average peak acceleration, and the result is that
    surface's displacement.
 
 The surface with the largest displacement is the third candidate.
+
+FHWA (2011) gives a simpler estimate of the average peak acceleration, for a mass that spans the full height of the
+slope. It multiplies the site's peak ground acceleration, adjusted for the soil at the site, by a factor that falls as
+the slope gets taller, because a tall mass does not shake in step from top to bottom. The estimate depends on the
+height of the slope, not on the depth of the surface, so it suits a surface that runs the full height of the slope,
+but it cannot compare surfaces of different depths.
 
 ## Vertical Seismic Coefficient {#vertical}
 

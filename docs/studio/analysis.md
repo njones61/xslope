@@ -184,7 +184,8 @@ In **LEM** mode, **Newmark…** on the **Run** menu and the toolbar integrates a
 acceleration record as a rigid sliding block at the yield coefficient. The dialog
 takes the **Record** (a PEER `.AT2` file, or two columns of time and acceleration),
 shows its header line, number of points, time step, and peak, and offers **As
-recorded**, a **Scale factor**, or a **Target peak acceleration (g)**. **Yield
+recorded**, a **Scale factor**, or a **Target peak acceleration (g)** (see
+[Scaling a Record](../seismic/newmark.md#scaling)). **Yield
 coefficient k_y** is filled from the last run that found one, or typed.
 
 ![Newmark dialog](images/analysis_newmark_dialog.png)

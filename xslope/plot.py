@@ -5864,7 +5864,7 @@ def plot_newmark(result, figsize=(9.0, 7.5), save_png=False, dpi=300, fig=None,
     ax_a.set_ylabel("Ground\nacceleration (g)")
     span = max(float(np.max(np.abs(a))), ky) * 1.15
     ax_a.set_ylim(-span, span)
-    ax_a.text(0.995, 0.97, f"±k$_y$ = {ky:.3f} g", transform=ax_a.transAxes,
+    ax_a.text(0.995, 0.97, f"±k$_y$ = {ky:.4f} g", transform=ax_a.transAxes,
               ha="right", va="top", fontsize=8,
               bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.8))
 
@@ -5899,7 +5899,7 @@ def plot_newmark(result, figsize=(9.0, 7.5), save_png=False, dpi=300, fig=None,
         scale = result.get("scale", 1.0)
         scaled = "" if abs(scale - 1.0) < 1e-12 else f", scaled ×{scale:.3g}"
         ax_a.set_title(f"Newmark displacement D = {result['D']:.2f} {unit} at "
-                       f"k$_y$ = {ky:.3f}\n{rec.get('description') or rec.get('name') or ''}"
+                       f"k$_y$ = {ky:.4f}\n{rec.get('description') or rec.get('name') or ''}"
                        f" (peak {result['pga']:.3f} g{scaled})", fontsize=11)
     fig.tight_layout()
     if save_png:

@@ -132,8 +132,8 @@ each surface you want to check, such as the shallow circle, the deep circle, and
 1. Find the surface's $k_y$. For the two circles the search found, $k_y$ is in the Log. For any other surface, enter it
    as the model's circle or non-circular surface, set **Analysis** to a single surface, and run with **Find the yield
    coefficient k_y** checked.
-2. From the response analysis, get the average acceleration of the mass above the surface over time, $k(t)$. In a
-   two-dimensional analysis of the slope, add up mass times acceleration over the soil inside the sliding mass at each
+2. From a site response analysis of the slope, get the average acceleration of the mass above the surface over time,
+   $k(t)$. In a two-dimensional analysis, add up mass times acceleration over the soil inside the sliding mass at each
    time step and divide by the total mass. The result is the same as the horizontal force on the mass along the slip
    surface divided by its weight. In a one-dimensional analysis of a soil column, $k(t)$ is the horizontal shear stress
    at the depth of the slip surface divided by the total vertical stress there, $\tau(t)/\sigma_v$.

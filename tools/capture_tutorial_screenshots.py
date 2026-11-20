@@ -3856,6 +3856,67 @@ def lem14_run_fem():
     return _grab(dlg, "lem14_studio_run_fem.png")
 
 
+# --------------------------------------------------------------------------- #
+# LEM-15 — Yield Coefficient and Newmark Displacement (LEM-14's dry starter)
+# --------------------------------------------------------------------------- #
+LEM15_RECORD = os.path.join(REPO_ROOT, "docs/tutorials/files/anderson_dam_1989_243.txt")
+
+
+def lem15_run_lem_ky():
+    """Run LEM with Find the yield coefficient k_y ticked, auto search."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "ky": True},
+                       slope_data=_load(LEM14_START))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem15_studio_run_lem_ky.png")
+
+
+def _lem15_newmark(name, factor=None):
+    """Run → Newmark… with the record chosen and k_y from the yield coefficient run,
+    worded as Studio words it (main_window._ky_of_run)."""
+    from studio.dialogs import NewmarkDialog
+    from studio.main_window import _ky_of_run
+    from xslope.search import run_lem_analysis
+
+    data = _load(LEM14_START)
+    with contextlib.redirect_stdout(io.StringIO()):
+        bundle = run_lem_analysis(data, "spencer", analysis="auto_search",
+                                  num_slices=40, ky=True, announce=False)
+    ky, source = _ky_of_run(bundle, "spencer")
+    here = os.getcwd()
+    # Opened from the record's folder, so the Record field shows the file's name.
+    os.chdir(os.path.dirname(LEM15_RECORD))
+    try:
+        dlg = NewmarkDialog(ky=ky, units=data.get("unit_system") or "si",
+                            last_path=os.path.basename(LEM15_RECORD), ky_source=source)
+        if factor is not None:
+            dlg.scale_factor_btn.setChecked(True)
+            dlg.factor.setValue(float(factor))
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, name)
+    finally:
+        os.chdir(here)
+
+
+def lem15_newmark():
+    """The Newmark dialog with the record as recorded."""
+    return _lem15_newmark("lem15_studio_newmark.png")
+
+
+def lem15_newmark_scaled():
+    """The Newmark dialog with the record scaled by 2."""
+    return _lem15_newmark("lem15_studio_newmark_scaled.png", factor=2.0)
+
+
+SHOTS.update({
+    "lem15_run_lem_ky": lem15_run_lem_ky,
+    "lem15_newmark": lem15_newmark,
+    "lem15_newmark_scaled": lem15_newmark_scaled,
+})
+
+
 SHOTS.update({
     "lem14_global": lem14_global,
     "lem14_run_lem": lem14_run_lem,

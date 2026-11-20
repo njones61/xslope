@@ -48,7 +48,7 @@ The three build paths, the template's worksheets, what **Save As** writes, and `
 
 ## Limit equilibrium
 
-<span class="tut-band-sub">14 tutorials</span>
+<span class="tut-band-sub">15 tutorials</span>
 
 </div>
 
@@ -286,6 +286,23 @@ A 10 m rock cut whose strength is described by four field observations rather th
 A 15 ft fill slope at a seismic coefficient of 0.15, with undrained strengths from consolidated-undrained tests: run in one stage with the R envelope and in two stages with each choice of stage 2 strength, dry and with a water table, and then by strength reduction at the same coefficient.
 
 <p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">seismic coefficient</span><span class="tut-tag">R envelope</span><span class="tut-tag">two-stage seismic</span><span class="tut-tag">Kc = 1 envelope</span><span class="tut-tag">d and ψ</span><span class="tut-tag">piezometric line</span><span class="tut-tag">Spencer</span><span class="tut-tag">circular search</span><span class="tut-tag">strength reduction</span><span class="tut-tag">quadratic triangles</span></p>
+
+</div>
+</div>
+
+<div class="tut-row" markdown>
+<div class="tut-thumb" markdown>
+[![](images/lem15_newmark_x3.png)](lem15_yield_newmark.md)
+<span class="tut-num">15</span>
+</div>
+<div class="tut-body" markdown>
+<p class="tut-kicker">LEM-15 · Limit equilibrium · ~30 min</p>
+
+### [Yield Coefficient and Newmark Displacement](lem15_yield_newmark.md)
+
+The yield coefficient of LEM-14's fill slope, found on the static critical circle and by search, and the permanent displacement a recorded earthquake causes it in a Newmark sliding-block analysis, in both directions, as recorded and scaled by 2 and 3.
+
+<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">R envelope</span><span class="tut-tag">yield coefficient</span><span class="tut-tag">Spencer</span><span class="tut-tag">circular search</span><span class="tut-tag">Newmark displacement</span><span class="tut-tag">acceleration record</span><span class="tut-tag">scale factor</span></p>
 
 </div>
 </div>

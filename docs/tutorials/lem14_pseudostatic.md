@@ -315,8 +315,9 @@ This tutorial covered:
   earthquake.
 - Strength reduction at the same seismic coefficient.
 
-**Where to go next:** the [Seismic Analysis](../seismic/overview.md) pages cover choosing the seismic coefficient and
-the strengths.
+**Where to go next:** in [LEM-15](lem15_yield_newmark.md) we find the yield coefficient of this slope and the
+displacement an earthquake record would cause. The [Seismic Analysis](../seismic/overview.md) pages cover choosing the
+seismic coefficient and the strengths.
 
 ## References
 

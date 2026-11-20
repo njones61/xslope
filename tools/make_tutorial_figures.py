@@ -7568,6 +7568,61 @@ def lem14_ssrm():
             failure_solution=result.get("failure_solution"), field_state="failure")
 
 
+# --------------------------------------------------------------------------- #
+# LEM-15 — Yield Coefficient and Newmark Displacement
+#
+# LEM-14's dry starter file (the fill with its R envelope), run as Studio's Run LEM
+# runs it with "Find the yield coefficient k_y" ticked, then the Anderson Dam record
+# through the Newmark sliding block at that k_y, as recorded and scaled by 2 and 3.
+# Printed: the Log's yield coefficient lines, the k_y circle, and each Newmark run's
+# Log sentence.
+# --------------------------------------------------------------------------- #
+LEM15_MODEL = LEM14_START
+LEM15_RECORD = os.path.join(REPO_ROOT, "docs/tutorials/files/anderson_dam_1989_243.txt")
+LEM15_SCALES = (1.0, 2.0, 3.0)
+#: The scale factors whose Newmark view the page shows.
+LEM15_FIGURES = {1.0: "lem15_newmark_x1.png", 3.0: "lem15_newmark_x3.png"}
+
+
+def lem15_plots():
+    """The yield coefficient run and the Newmark runs."""
+    from xslope.plot import plot_newmark
+    from xslope.search import run_lem_analysis
+    from xslope.seismic import model_at, newmark_displacement, newmark_line, read_record
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(LEM15_MODEL)
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        bundle = run_lem_analysis(copy.deepcopy(sd), LEM14_METHOD,
+                                  analysis="auto_search", num_slices=LEM14_SLICES,
+                                  ky=True)
+    for line in log.getvalue().splitlines():
+        if "k_y" in line or line.startswith(("Critical FS", "Sliding mass")):
+            print("        %s" % line.strip())
+    info = bundle["yield"]
+    ky = info["k_y"]
+    crit = bundle["search"]["fs_cache"][0]
+    print("   k_y %.4f (static circle %.4f, static F %.3f) on (%.2f, %.2f) R %.2f"
+          % (ky, info["static"]["k_y"], info["static"]["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"]))
+    # The run's own solution, solved at k = k_y (F = 1), as the LEM Solution view
+    # draws it; the search cache's entry is the last trial of the confirming search.
+    capture("lem15_ky_solution.png", plot_solution, model_at(sd, ky),
+            bundle["slice_df"], bundle["failure_surface"], bundle["results"],
+            frame="content")
+
+    record = read_record(LEM15_RECORD)
+    # The Newmark dialog carries k_y to four decimals, and runs on what it shows.
+    ky = round(ky, 4)
+    for scale in LEM15_SCALES:
+        result = newmark_displacement(record, ky, scale=scale,
+                                      units=sd.get("unit_system") or "si")
+        print("   x%g: %s" % (scale, newmark_line(result)))
+        if scale in LEM15_FIGURES:
+            capture(LEM15_FIGURES[scale], plot_newmark, result)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -7598,6 +7653,7 @@ GROUPS = {
     "lem13_sweeps": lem13_sweeps,
     "lem14_plots": lem14_plots,
     "lem14_ssrm": lem14_ssrm,
+    "lem15_plots": lem15_plots,
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,

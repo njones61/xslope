@@ -214,7 +214,8 @@ def _yield_note(bundle):
     if not info:
         return ""
     circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
-    return yield_line(info, analyzed_surface_noun(bool(info.get("search")), circular))
+    return yield_line(info, analyzed_surface_noun(bool(info.get("search")), circular)
+                      ).replace("\n", " ")
 
 
 def _ky_of_run(bundle, method=None):
@@ -253,7 +254,7 @@ def lem_done_message(bundle):
     res = bundle["results"]
     info = bundle.get("yield")
     if info:
-        message = f"LEM done — {res.get('method')} k_y = {info['k_y']:.3f}"
+        message = f"LEM done — {res.get('method')} k_y = {info['k_y']:.4f}"
         if "seismic_stage1_FS" in res:
             message += " (two-stage seismic)"
         return message

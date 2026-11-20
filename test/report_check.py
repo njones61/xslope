@@ -2116,7 +2116,7 @@ def test_ky_section():
     if tables and f"Table {tables[0].number}" not in prose:
         fails.append("the coefficient table is not cited by number")
     kv = [v for x in block(sub, "keyvalues") for _l, v in x.items]
-    if not kv or kv[0] != f"{info['k_y']:.3f}":
+    if not kv or kv[0] != f"{info['k_y']:.4f}":
         fails.append(f"the reported k_y reads {kv[:1]}")
 
     # A search, from a record: static, then two confirming searches, the first
@@ -2125,7 +2125,7 @@ def test_ky_section():
            "static": {"FS": 1.372, "k_y": 0.1457, "surface": None},
            "rounds": [{"k": 0.1457, "FS": 0.9975, "k_y": 0.1445},
                       {"k": 0.1445, "FS": 1.0003, "k_y": None}],
-           "confirm_tol": 0.002}
+           "confirm_tol": 0.001}
     sub = _ky_section(rec, {"FS": 1.0}, _Counter(), noun="circle")
     rows = block(sub, "table")[0].rows
     if [r[0] for r in rows] != ["1", "2", "3"] or rows[0][1] != "0 (no seismic force)":

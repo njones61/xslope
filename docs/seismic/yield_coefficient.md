@@ -95,7 +95,7 @@ the steps in the previous section:
    candidate.
 2. It searches again with the seismic coefficient set to that $k_y$. If the search finds a surface with $F$ below 1,
    that surface has a lower yield coefficient, so **xslope** computes $k_y$ for it.
-3. It repeats step 2 with each new $k_y$ until a search finds no surface with $F$ more than 0.002 below 1, or until it
+3. It repeats step 2 with each new $k_y$ until a search finds no surface with $F$ more than 0.001 below 1, or until it
    has made six of these searches. The surface it ends with is the second candidate.
 
 The Log reports $k_y$ for each of the two: the static critical surface and the surface with the lowest $k_y$.

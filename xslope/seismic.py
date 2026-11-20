@@ -40,7 +40,7 @@ K_TOL = 1e-6
 #: A confirming search that finds a surface this far below F = 1 at the current
 #: k_y moves the answer to that surface; one that finds nothing lower ends the
 #: search for the minimum k_y.
-CONFIRM_TOL = 0.002
+CONFIRM_TOL = 0.001
 
 #: The most confirming searches the minimum-k_y search makes.
 MAX_ROUNDS = 6
@@ -293,6 +293,7 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
     circular = surface != "noncircular"
     search = analysis == "auto_search"
     noun = analyzed_surface_noun(search, circular)
+    base = "circle" if circular else "surface"
     strength = seismic2_strength(seismic2)
     tag = (" (two-stage seismic, K_c = 1 envelope)" if strength == "kc1" else
            " (two-stage seismic)" if strength else "")
@@ -400,8 +401,6 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
                 f"stable before the earthquake has no yield coefficient.")
         k0, f0, trace0 = k_y_on(s0, f"the {noun} {zero}")
         static = {"FS": f_static, "k_y": k0, "surface": s0}
-        say(f"The {noun} {zero} has F = {f_static:.3f}; on it, "
-            f"F = 1 at k = {k0:.4f}.")
         best_surface, best_k, best_f0, best_trace, best_search = (
             s0, k0, f0, trace0, search0)
         current_nc = s0 if not circular else None
@@ -420,16 +419,13 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
                     if not circular:
                         current_nc = s_r
             rounds.append(entry)
+            if diagnostic:
+                say(f"  search at k_h = {k:.4f}: lowest F = {f_r:.4f}"
+                    + ("" if entry["k_y"] is None
+                       else f", k_y = {entry['k_y']:.4f} on that {base}"))
             if f_r >= 1.0 - confirm_tol:
-                say(f"The search at k = {k:.4f} finds F = {f_r:.4f}, within "
-                    f"{confirm_tol:g} of 1: k_y has settled.")
                 converged = True
                 break
-            say(f"The search at k = {k:.4f} finds F = {f_r:.4f}; on that "
-                f"surface, F = 1 at k = {entry['k_y']:.4f}.")
-        if not converged:
-            say(f"k_y did not settle in {max_rounds} confirming searches; the "
-                f"lowest found is reported.")
 
     # The answer as a run like any other: the k_y surface solved at k = k_y,
     # through the same entry point, so the slices, the result, and the views
@@ -465,24 +461,33 @@ def zero_k_phrase(info):
 
 
 def yield_line(info, surface_noun):
-    """The sentence a yield coefficient result is reported in: the Log's last
-    line, the note on Studio's LEM Solution tab, and the report's summary.
+    """The lines a yield coefficient result is reported in: the Log's last
+    lines, and the note on Studio's LEM Solution tab, which joins them. After a
+    search, the first line is k_y on the static critical surface and the second
+    is the lowest k_y the search found.
 
     ``info`` is a bundle's ``"yield"`` record; ``surface_noun`` names the surface
     (:func:`xslope.search.analyzed_surface_noun`).
     """
     zero = zero_k_phrase(info)
-    text = (f"k_y = {info['k_y']:.3f} on the {surface_noun}, which has "
-            f"F = {info['FS_k0']:.3f} {zero}.")
+    base = surface_noun.split()[-1]
+    k_y, f0 = info["k_y"], info["FS_k0"]
     static = info.get("static")
-    if static:
-        text += (f" The {surface_noun} {zero} has "
-                 f"F = {static['FS']:.3f} and k_y = {static['k_y']:.3f}.")
-    if info.get("search") and not info.get("converged"):
-        text += (f" The confirming searches did not settle in "
-                 f"{len(info.get('rounds') or [])} rounds; this is the lowest "
-                 f"k_y they found.")
-    return text
+    if not (info.get("search") and static):
+        return f"k_y = {k_y:.4f} on the {surface_noun} (F = {f0:.3f} {zero})."
+    lines = [f"k_y = {static['k_y']:.4f} on the static critical {base} "
+             f"(F = {static['FS']:.3f} {zero})."]
+    if abs(static["k_y"] - k_y) < 1e-12:
+        lines.append(f"k_y = {k_y:.4f} on the {base} with the lowest yield "
+                     f"coefficient, which is the same {base}.")
+    else:
+        lines.append(f"k_y = {k_y:.4f} on the {base} with the lowest yield "
+                     f"coefficient.")
+    if not info.get("converged"):
+        lines.append(f"The searches did not settle in "
+                     f"{len(info.get('rounds') or [])} rounds, so a {base} with "
+                     f"a lower k_y may exist.")
+    return "\n".join(lines)
 
 
 def model_at(slope_data, k):

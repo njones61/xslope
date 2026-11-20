@@ -3644,7 +3644,7 @@ def _ky_section(info, results, counter, noun="surface"):
     """
     if not info:
         return None
-    from .seismic import zero_k_phrase
+    from .seismic import CONFIRM_TOL, zero_k_phrase
     sub = Section("Yield Coefficient")
     k_y = info["k_y"]
     zero = zero_k_phrase(info)
@@ -3662,7 +3662,7 @@ def _ky_section(info, results, counter, noun="surface"):
             f"search was then repeated at that coefficient: a {noun} with a factor "
             f"of safety below 1 there has a lower k_y, which was found in turn, and "
             f"the searches stopped when none fell more than "
-            f"{info.get('confirm_tol', 0.002):g} below 1. {where} lists each "
+            f"{info.get('confirm_tol', CONFIRM_TOL):g} below 1. {where} lists each "
             f"search.", links=links))
         rows = [["1", "0 (no seismic force)", f"{static.get('FS', float('nan')):.3f}",
                  f"{static.get('k_y', float('nan')):.4f}"]]
@@ -3676,10 +3676,10 @@ def _ky_section(info, results, counter, noun="surface"):
             ["Search", "Made at k", "Critical F", f"k_y on that {noun}"], rows,
             "The searches that located the minimum yield coefficient",
             table_number, bold_rows=[best]))
-        items = [("Yield coefficient k_y", f"{k_y:.3f}"),
+        items = [("Yield coefficient k_y", f"{k_y:.4f}"),
                  (f"F on that {noun} {zero}", f"{info['FS_k0']:.3f}"),
                  (f"k_y on the critical {noun} {zero}",
-                  f"{static.get('k_y', float('nan')):.3f}")]
+                  f"{static.get('k_y', float('nan')):.4f}")]
         sub.blocks.append(KeyValues(items))
         if not info.get("converged"):
             sub.blocks.append(Prose(
@@ -3701,7 +3701,7 @@ def _ky_section(info, results, counter, noun="surface"):
             "Factor of safety at each seismic coefficient tried",
             table_number, bold_rows=[len(rows) - 1] if rows else []))
         sub.blocks.append(KeyValues([
-            ("Yield coefficient k_y", f"{k_y:.3f}"),
+            ("Yield coefficient k_y", f"{k_y:.4f}"),
             (f"F on the {noun} {zero}", f"{info['FS_k0']:.3f}")]))
     return sub
 
@@ -3890,7 +3890,7 @@ def _fs_table(slope_data, solutions, opts, counter):
         info = bundle.get("yield")
         if info:
             ky = True
-            rows.append([method_label(name), f"{info['k_y']:.3f}",
+            rows.append([method_label(name), f"{info['k_y']:.4f}",
                          _solution_parameters(res)])
             continue
         rows.append([method_label(name),
@@ -7075,7 +7075,7 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     fs = _num(results.get("FS"))
     if fs is not None and ky_info:
         surface = f"the {named} of {where}" if where else f"the {named}"
-        k_y = f"{ky_info['k_y']:.3f}"
+        k_y = f"{ky_info['k_y']:.4f}"
         text = (f"{label} gives a seismic yield coefficient of k_y = {k_y} on "
                 f"{surface}, where the factor of safety is {fs:.3f} at k = k_y.")
         if not searched:

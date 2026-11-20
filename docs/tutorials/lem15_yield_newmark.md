@@ -67,7 +67,7 @@ surface with the lowest yield coefficient (Duncan, Wright, and Brandon 2014). Th
 **xslope** finds the second one with a search. It first finds k<sub>y</sub> on the static critical surface. Then it
 searches again with the seismic coefficient set to that k<sub>y</sub>. A surface with a factor of safety below 1 at that
 coefficient has a lower yield coefficient, so **xslope** finds k<sub>y</sub> on that surface. It repeats the search at
-each new k<sub>y</sub> until the surface it finds is within 0.002 of F = 1.
+each new k<sub>y</sub> until the surface it finds is within 0.001 of F = 1.
 
 Neither surface is always the right one to use. The surface with the lowest k<sub>y</sub> gives the largest
 displacement, but it is often large and deep. A Newmark analysis shakes the whole sliding mass with one record. In an
@@ -87,13 +87,13 @@ The run does not use the model's own seismic coefficient. It finds k<sub>y</sub>
 Log reports:
 
 ```text
-The search at k = 0.1275 finds F = 0.9983, within 0.002 of 1: k_y has settled.
-k_y = 0.127 on the critical circle, which has F = 1.312 with no seismic force. The critical circle with no seismic force has F = 1.309 and k_y = 0.127.
+k_y = 0.1275 on the static critical circle (F = 1.309 with no seismic force).
+k_y = 0.1266 on the circle with the lowest yield coefficient.
 ```
 
 The static critical circle has a factor of safety of 1.309 before the earthquake and a yield coefficient of 0.1275. The
-second search, at k = 0.1275, finds a circle just below F = 1, at 0.9983, and its yield coefficient is 0.1266. The LEM
-Solution view shows that circle, solved at k = k<sub>y</sub>, so its factor of safety is 1:
+search found a circle with a slightly lower yield coefficient, 0.1266. The LEM Solution view shows that circle, solved at
+k<sub>h</sub> = k<sub>y</sub>, so its factor of safety is 1:
 
 ![The circle with the lowest yield coefficient, solved at k = k_y: FS = 1.000](images/lem15_ky_solution.png){width=1000}
 

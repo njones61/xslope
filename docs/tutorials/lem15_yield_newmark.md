@@ -56,36 +56,51 @@ undrained strength, because the earthquake is over before the fill can drain.
 ## Part 1 — The yield coefficient {#part-1-the-yield-coefficient}
 
 The yield coefficient k<sub>y</sub> is the seismic coefficient at which the factor of safety is exactly 1. A ground
-acceleration above k<sub>y</sub> g moves the sliding mass, and one below it does not. It can be found on any slip
-surface. Duncan, Wright, and Brandon (2014) suggest computing it on the static critical surface, which has the lowest
-factor of safety with no seismic force, and on the surface with the lowest yield coefficient, which is not always the
-same one. One run finds both. Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** = `Auto search`, leave
-**Number of slices** at 40, and tick **Find the yield coefficient k_y** under **Seismic**:
+acceleration above k<sub>y</sub> g moves the sliding mass, and one below it does not. In Part 2 it decides how much of
+the earthquake record moves the slope, so the displacement depends on it directly.
+
+### Choosing the slip surface
+
+Every slip surface has its own yield coefficient, and a Newmark analysis needs one surface and its k<sub>y</sub>. The
+obvious choice is the static critical surface, the one with the lowest factor of safety before the earthquake. It is not
+always the surface with the lowest yield coefficient. The seismic force acts on the whole weight of the sliding mass,
+including the part under level ground, which adds nothing to the driving force when the slope is static. So a larger,
+deeper mass that is safer before the earthquake can reach F = 1 at a lower seismic coefficient, and it would slide
+farther in the same earthquake.
+
+For that reason Duncan, Wright, and Brandon (2014) recommend finding k<sub>y</sub> on both surfaces. Where the two agree, the choice
+does not matter. Where they differ, the engineer chooses between them, because the surface with the lowest
+k<sub>y</sub> is often deep, and a deep mass is shaken less than the record assumes. The
+[Yield Coefficient](../seismic/yield_coefficient.md#which-surface) page discusses that choice.
+
+### Finding the yield coefficient
+
+One run finds both surfaces. Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** = `Auto search`,
+leave **Number of slices** at 40, and tick **Find the yield coefficient k_y** under **Seismic**:
 
 ![Run LEM with Find the yield coefficient k_y ticked](images/lem15_studio_run_lem_ky.png)
 
-The run does not use the model's own seismic coefficient. It searches for the static critical circle, finds
-k<sub>y</sub> on it, and then searches again at that coefficient for any circle with a factor of safety below 1. Click
-**Run**. The Log
-reports:
+The run does not use the model's own seismic coefficient. It searches for the static critical circle and finds
+k<sub>y</sub> on it. Then it searches again at that coefficient: any circle with a factor of safety below 1 there has a
+lower yield coefficient, so the run finds k<sub>y</sub> on that circle too. Click **Run**. The Log reports:
 
 ```text
 The search at k = 0.1275 finds F = 0.9983, within 0.002 of 1: k_y has settled.
 k_y = 0.127 on the critical circle, which has F = 1.312 with no seismic force. The critical circle with no seismic force has F = 1.309 and k_y = 0.127.
 ```
 
-The static critical circle has a factor of safety of 1.309 and a yield coefficient of 0.127. The search at that
-coefficient finds a circle a little below F = 1, and the lowest yield coefficient, on that circle, is 0.1266. The two
-circles are nearly the same and so are their yield coefficients. The LEM Solution view shows the circle with the lowest
-yield coefficient, solved at k = k<sub>y</sub>, so its factor of safety is 1:
+The static critical circle has a factor of safety of 1.309 before the earthquake and a yield coefficient of 0.1275. The
+second search, at k = 0.1275, finds a circle just below F = 1, at 0.9983, and its yield coefficient is 0.1266. The LEM
+Solution view shows that circle, solved at k = k<sub>y</sub>, so its factor of safety is 1:
 
 ![The circle with the lowest yield coefficient, solved at k = k_y: FS = 1.000](images/lem15_ky_solution.png){width=1000}
 
 <!-- test: file=files/xslope_pseudostatic_start.xlsx, type=critical_kc, method=spencer, num_slices=40, expected_kc=0.1266, kc_tol=0.0005, benchmark=LEM-15-ky -->
 
-For a frictional soil like this fill, the two surfaces agree. In a soil with more cohesion they can be far apart, and the
-surface with the lowest yield coefficient can be much deeper. The [Yield Coefficient](../seismic/yield_coefficient.md#which-surface)
-page shows an example and explains which surface to use for a displacement.
+The two circles nearly coincide, and their yield coefficients differ by less than 1 percent. For this fill the choice of
+surface makes little difference: with the record as recorded, k<sub>y</sub> = 0.1275 gives a displacement of 0.64 in and
+k<sub>y</sub> = 0.1266 gives 0.66 in. We use 0.1266 in Part 2. In a soil with more cohesion the two surfaces can be far
+apart, as the example on the Yield Coefficient page shows.
 
 ---
 

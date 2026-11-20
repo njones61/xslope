@@ -225,7 +225,7 @@ input, and they are the ones easiest to miss by reading a single result:
   a crack depth therefore poses two different problems, and comparing its own LEM and
   SSRM numbers compares a cracked surface with an uncracked continuum.
 - The **horizontal seismic coefficient** means different things to the two engines. The
-  limit-equilibrium engine takes the magnitude of the **Horizontal seismic coefficient k** and
+  limit-equilibrium engine takes the magnitude of the **Horizontal seismic coefficient k_h** and
   applies it in the failure-driving direction, ignoring the sign; the finite element engine reads the
   sign as direction, `+k` pushing `+x`. Both are correct for their formulation —
   a continuum code analyzes both faces at once and cannot know which one you are

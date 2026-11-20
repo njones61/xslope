@@ -976,7 +976,7 @@ LEM02_DLOAD_TABS = ("Set 1", "Set 2 (rapid drawdown)")
 LEM02_DLOAD_DIRECTION_LABEL = "Direction:"
 
 #: The Global-parameters row LEM-2's seismic section sends the reader to.
-LEM02_GLOBAL_ROW = "Horizontal seismic coefficient k"
+LEM02_GLOBAL_ROW = "Horizontal seismic coefficient k_h"
 
 #: The line-loads table's column headers, in the order the page dictates values
 #: into them (**Label** `footing`, **x** `30`, **y** `20`, **P** `7500`,

@@ -304,7 +304,7 @@ A **seismic coefficient** applies a horizontal force of k × W to every slice, a
 the slice's center of gravity — the pseudo-static representation of earthquake
 loading. It is a single global number:
 
-- **Studio** — open **Global parameters** and set **Horizontal seismic coefficient k**.
+- **Studio** — open **Global parameters** and set **Horizontal seismic coefficient k_h**.
 - **Excel** — `main!D13`.
 - **Assistant** — say: *"Set the seismic coefficient to 0.15."*
 

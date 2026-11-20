@@ -87,7 +87,7 @@ the direction entered, so checking both directions takes two runs.
 
 **Entering the coefficients.** The coefficients are the **Horizontal seismic coefficient** and the **Vertical seismic
 coefficient** on the template's [main sheet](../usage/input_template.md#worksheet-main). In Studio they are
-**Horizontal seismic coefficient k** and **Vertical seismic coefficient k_v (+ down)** under **Global parameters**.
+**Horizontal seismic coefficient k_h** and **Vertical seismic coefficient k_v (+ down)** under **Global parameters**.
 
 ## Choosing the Seismic Coefficient {#choosing-k}
 

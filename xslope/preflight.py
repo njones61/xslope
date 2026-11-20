@@ -127,7 +127,7 @@ _SEVERITY_RANK = {s: i for i, s in enumerate(SEVERITY_ORDER)}
 # Where an input lives: the trailing locator every message ends with.
 #
 # The message itself leads with the parameter's own name, in the words the
-# interface labels it with -- "Tension crack depth", "Horizontal seismic coefficient k",
+# interface labels it with -- "Tension crack depth", "Horizontal seismic coefficient k_h",
 # "Material 3 ('Core')". These say WHERE to go and change it: the Studio editor
 # that owns the input, then the sheet cell for anyone working in the spreadsheet
 # instead. Both, in that order, because a Studio user never sees a cell reference
@@ -2583,20 +2583,20 @@ def _mat_hb_method_convergence(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("main.seismic_missing", ERROR, ("lem",),
-      "Horizontal seismic coefficient k (main!D13) must be a number.",
+      "Horizontal seismic coefficient k_h (main!D13) must be a number.",
       remedy="set_seismic_zero",
       fields=("k_seismic",))
 def _seismic_missing(ctx):
     if _finite(ctx.sd.get("k_seismic")):
         return None
-    return (f"Horizontal seismic coefficient k is blank or not a number -- enter 0 for a "
+    return (f"Horizontal seismic coefficient k_h is blank or not a number -- enter 0 for a "
             f"static analysis. Left blank it reaches every slice as NaN, and the "
             f"Ordinary Method of Slices then reports success with a factor of safety "
             f"of NaN {_at_global('D13')}.")
 
 
 @rule("main.seismic_magnitude", WARNING, ("lem", "fem"),
-      "A horizontal seismic coefficient k outside the usual 0.05-0.3 range is probably a "
+      "A horizontal seismic coefficient k_h outside the usual 0.05-0.3 range is probably a "
       "percent/fraction slip.",
       fields=("k_seismic",))
 def _seismic_magnitude(ctx):
@@ -2605,12 +2605,12 @@ def _seismic_magnitude(ctx):
         return None
     a = abs(k)
     if a > 1.0:
-        return (f"Horizontal seismic coefficient k = {k:g}. k is a fraction of gravity, "
+        return (f"Horizontal seismic coefficient k_h = {k:g}. k_h is a fraction of gravity, "
                 f"typically 0.05-0.3 -- enter 0.15 for 15%g. At this magnitude some "
                 f"methods return a negative factor of safety through the success "
-                f"path and others fail without naming k {_at_global('D13')}.")
+                f"path and others fail without naming k_h {_at_global('D13')}.")
     if a > 0.5:
-        return (INFO, f"Horizontal seismic coefficient k = {k:g}, which is high for a "
+        return (INFO, f"Horizontal seismic coefficient k_h = {k:g}, which is high for a "
                       f"pseudo-static analysis (typically 0.05-0.3) "
                       f"{_at_global('D13')}.")
     return None
@@ -2631,7 +2631,7 @@ def _seismic_vertical_invalid(ctx):
     return (f"Vertical seismic coefficient k_v = {kv:g}. k_v is signed, positive "
             f"downward, and scales the soil's weight by 1 + k_v: at {kv:g} the "
             f"weight is {1.0 + kv:g} times itself, so the soil is lifted off the "
-            f"ground. Enter a fraction of gravity, typically half of k or less "
+            f"ground. Enter a fraction of gravity, typically half of k_h or less "
             f"{_at_global(_main_cell(ctx, 'k_vertical'))}.")
 
 
@@ -2643,21 +2643,21 @@ def _seismic_vertical_magnitude(ctx):
     if kv is None or abs(kv) <= 0.5 or kv <= -1.0:
         return None
     return (f"Vertical seismic coefficient k_v = {kv:g}. k_v is a fraction of "
-            f"gravity, usually a half or a third of k (Eurocode 8) -- enter 0.05 "
+            f"gravity, usually a half or a third of k_h (Eurocode 8) -- enter 0.05 "
             f"for 5%g {_at_global(_main_cell(ctx, 'k_vertical'))}.")
 
 
 @rule("main.seismic_negative_lem", WARNING, ("lem",),
-      "The LEM takes the magnitude of k and orients it itself; the sign is ignored.",
+      "The LEM takes the magnitude of k_h and orients it itself; the sign is ignored.",
       fields=("k_seismic",))
 def _seismic_negative_lem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k >= 0:
         return None
-    return (f"Horizontal seismic coefficient k = {k:g} is negative. The limit-equilibrium "
+    return (f"Horizontal seismic coefficient k_h = {k:g} is negative. The limit-equilibrium "
             f"engine applies the coefficient in the failure-driving direction "
             f"automatically and ignores the sign, so this run is identical to "
-            f"k = {abs(k):g}. Enter a magnitude -- in the finite element engine the "
+            f"k_h = {abs(k):g}. Enter a magnitude -- in the finite element engine the "
             f"sign does set the direction {_at_global('D13')}.")
 
 
@@ -5229,7 +5229,7 @@ def _seismic2_curved(ctx):
 
 
 @rule("seismic2.no_seismic_coefficient", WARNING, ("seismic2",),
-      "A two-stage seismic analysis with k = 0 is an undrained static analysis.",
+      "A two-stage seismic analysis with k_h = 0 is an undrained static analysis.",
       fields=("k_seismic",))
 def _seismic2_k_zero(ctx):
     if ctx.selection.get("ky"):
@@ -5237,9 +5237,9 @@ def _seismic2_k_zero(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k != 0.0:
         return None            # a blank k is the global rule's to report
-    return ("The horizontal seismic coefficient k is 0, so stage 2 adds no seismic force and "
+    return ("The horizontal seismic coefficient k_h is 0, so stage 2 adds no seismic force and "
             "the result is the static factor of safety with undrained strengths. "
-            f"Enter k {_at_global('D13')}.")
+            f"Enter k_h {_at_global('D13')}.")
 
 
 # ---------------------------------------------------------------------------
@@ -5254,17 +5254,17 @@ def _seismic2_k_zero(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("main.seismic_direction_lem", INFO, ("lem",),
-      "The LEM applies the horizontal k in the failure-driving direction and ignores its sign.",
+      "The LEM applies k_h in the failure-driving direction and ignores its sign.",
       fields=("k_seismic",))
 def _seismic_direction_lem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k == 0.0:
         return None
-    text = (f"Horizontal seismic coefficient k = {k:g} is applied at magnitude "
+    text = (f"Horizontal seismic coefficient k_h = {k:g} is applied at magnitude "
             f"{abs(k):g} in the failure-driving direction for each surface: the "
             f"direction is automatic in the limit-equilibrium engine, so the sign is "
             f"ignored. Enter a magnitude -- the finite element engine reads the same "
-            f"value as a vector, where +k pushes +x and -k pushes -x "
+            f"value as a vector, where +k_h pushes +x and -k_h pushes -x "
             f"{_at_global('D13')}.")
     kv = _num(ctx.sd.get("k_vertical"))
     if kv:
@@ -5275,14 +5275,14 @@ def _seismic_direction_lem(ctx):
 
 
 @rule("main.seismic_direction_fem", INFO, ("fem",),
-      "In the FEM the sign of k sets the direction of the body force.",
+      "In the FEM the sign of k_h sets the direction of the body force.",
       fields=("k_seismic",))
 def _seismic_direction_fem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k == 0.0:
         return None
     pushes = "+x" if k > 0 else "-x"
-    return (f"Horizontal seismic coefficient k = {k:g} pushes in {pushes}. In the finite "
+    return (f"Horizontal seismic coefficient k_h = {k:g} pushes in {pushes}. In the finite "
             f"element engine the sign IS the direction: both faces are analyzed at "
             f"once, so choose the direction that drives the face you are checking -- "
             f"the engine will not choose for you, and a pseudo-static factor of "

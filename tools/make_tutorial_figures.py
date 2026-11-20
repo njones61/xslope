@@ -393,7 +393,6 @@ FACE_LOAD = [[{"X": 5.0, "Y": 5.0, "Normal": 750.0},
 LINE_LOAD = [{"x": 30.0, "y": 20.0, "P": 7500.0, "angle": -90.0,
               "label": "footing"}]
 
-LEM02_K = 0.15                     #: the seismic coefficient the page runs
 LEM02_TARGET_FS = 1.5              #: the design target the page solves for
 
 
@@ -490,14 +489,6 @@ def lem02_plots():
                 face[word]["failure_surface"], face[word]["solver_result"],
                 frame="content")
 
-    # A second kind of demand on the same model.
-    sk = copy.deepcopy(sd)
-    sk["k_seismic"] = LEM02_K
-    fs_k, _, _ = _lem02_search(sk)
-    crit_k = fs_k[0]
-    capture("lem02_solution_seismic.png", plot_solution, sk, crit_k["slices"],
-            crit_k["failure_surface"], crit_k["solver_result"], frame="content")
-
     # The design sweep: the cohesion that would hold the target under the load.
     # Drawn from the same run the page quotes, so the crossing on the figure is
     # the number in the sentence beside it — and drawn the way Studio's Design
@@ -520,9 +511,9 @@ def lem02_plots():
     capture("lem02_design.png", _design_figure, res)
 
     print("   surcharge %.4f · line load %.4f · face normal %.4f · face vertical "
-          "%.4f · k=%.2f %.4f · c(FS %.1f) = %.1f"
+          "%.4f · c(FS %.1f) = %.1f"
           % (crit["FS"], crit_ll["FS"], face["normal"]["FS"], face["vertical"]["FS"],
-             LEM02_K, crit_k["FS"], LEM02_TARGET_FS, res["crossing"]))
+             LEM02_TARGET_FS, res["crossing"]))
 
 
 # --------------------------------------------------------------------------- #

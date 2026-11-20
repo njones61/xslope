@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-2 — Loads on the Crest"
-description: "Put a surcharge on the crest of a slope in XSLOPE — as a distributed load, as a line load, pushed normal to the surface or straight down — add a seismic coefficient, and solve for the cohesion that would carry it all at a target factor of safety."
+description: "Put a surcharge on the crest of a slope in XSLOPE — as a distributed load, as a line load, pushed normal to the surface or straight down — and solve for the cohesion that would carry it at a target factor of safety."
 ---
 
 # Tutorial LEM-2 — Loads on the Crest
@@ -20,11 +20,10 @@ unchanged — the load is the only new input.
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to apply loads to a slope model: how to enter
-distributed and line loads and set their direction, what a seismic coefficient
-does, how each load moves the factor of safety and the critical surface, and how
+distributed and line loads and set their direction, how each load moves the factor of safety and the critical surface, and how
 to sweep strength against a target factor of safety.
 </div>
-<p><span class="tg-pill">distributed loads</span><span class="tg-pill">line loads</span><span class="tg-pill">load direction</span><span class="tg-pill">seismic coefficient</span><span class="tg-pill">design mode</span></p>
+<p><span class="tg-pill">distributed loads</span><span class="tg-pill">line loads</span><span class="tg-pill">load direction</span><span class="tg-pill">design mode</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_crest_surcharge.xlsx](../lem/files/xslope_crest_surcharge.xlsx) — the LEM-1 embankment with the surcharge added</div>
 </div>
 
@@ -298,36 +297,18 @@ pressure — ponded water, a reservoir, anything acting *on* a surface — and
 `vertical` for anything whose load is its own weight. On level ground the two
 settings give the same answer; on a face they do not.
 
-### Adding a seismic coefficient {#a-second-kind-of-demand}
+### Earthquake loads {#a-second-kind-of-demand}
 
-A **seismic coefficient** applies a horizontal force of k × W to every slice, at
-the slice's center of gravity — the pseudo-static representation of earthquake
-loading. It is a single global number:
-
-- **Studio** — open **Global parameters** and set **Horizontal seismic coefficient k_h**.
-- **Excel** — `main!D13`.
-- **Assistant** — say: *"Set the seismic coefficient to 0.15."*
-
-With the crest surcharge back in place:
-
-| k | 0.00 | 0.10 | 0.15 |
-| --- | :---: | :---: | :---: |
-| Factor of safety (Spencer) | 0.918 | 0.817 | 0.774 |
-
-![Spencer at k = 0.15](images/lem02_solution_seismic.png){width=1000}
-
-**k is unconditionally driving.** It is applied in the direction that reduces the
-factor of safety, and it acts on the whole sliding mass rather than on the loaded
-strip. The critical surface at k = 0.15 carries 41,883 lb/ft of soil, so the
-horizontal force is 0.15 × 41,883 = 6,282 lb/ft, against the 7,500 lb/ft the
-surcharge itself weighs. Pushed sideways rather than
-pressed down, the same order of force costs less — 0.144 off the factor of
-safety, where the surcharge took 0.358.
+An earthquake is another load on a slope. **xslope** represents it with a seismic
+coefficient, a horizontal force on every slice in proportion to its weight.
+[Tutorial LEM-14](lem14_pseudostatic.md) covers the pseudostatic analysis, and
+[Tutorial LEM-15](lem15_yield_newmark.md) the yield coefficient and the Newmark
+displacement.
 
 ### Finding the cohesion for a target factor of safety {#what-strength-would-carry-it}
 
-The model as it stands is not supportable: 0.918 is below 1 before any
-earthquake. The next question is what strength would raise the factor of safety
+The model as it stands is not supportable: its factor of safety, 0.918, is
+below 1. The next question is what strength would raise the factor of safety
 to the value required, and a parametric sweep answers it.
 
 **Design mode** varies one input across a range, solves the model at every step,
@@ -386,8 +367,6 @@ This tutorial covered:
   with a direction.
 - The difference direction makes — a normal pressure against a vertical dead
   weight — and the slopes where it matters.
-- The seismic coefficient as a second kind of demand, applied to every slice
-  and always driving.
 - Design mode: sweeping one input to find the value that meets a target factor
   of safety, re-searching the surface at every step.
 - Loads reshape the critical surface, so every load case gets its own search.

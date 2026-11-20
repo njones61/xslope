@@ -84,9 +84,11 @@ coefficient depends on which slip surface it is computed for. Duncan et al. (201
    coefficient or the largest displacement.
 2. **The surface with the lowest yield coefficient.** It can become unrealistically deep, with a yield coefficient
    too low to be realistic for computing displacements.
-3. **A surface that reflects the pattern of accelerations in the slope.** The average acceleration of the sliding mass,
-   and the mass itself, vary with the extent of the surface. Duncan et al. call this the most appropriate choice.
-   FHWA (2011) gives the variation of acceleration with depth.
+3. **A surface chosen with the shaking in the slope in mind.** The shaking is not the same throughout a slope. In a
+   dam, the peak accelerations grow from the bottom to the top (Duncan et al. 2014), so a deep sliding mass is shaken
+   less, on average, than a shallow one near the face. The third candidate is found by comparing each surface's yield
+   coefficient with the average acceleration of its own sliding mass, rather than with one record for the whole slope.
+   Duncan et al. call it the most appropriate choice. FHWA (2011) gives the variation of acceleration with depth.
 
 With an automated search, **xslope** finds the first two candidates. Each time it needs $k_y$ for a surface, it uses
 the steps in the previous section:
@@ -114,9 +116,8 @@ most cohesion, soils 2 and 4. With soils 1 and 3, the two circles nearly agree.
 So the two candidates can be far apart, and computing $k_y$ only on the static critical circle can miss a much lower
 value. But Duncan et al. warn that the surface with the lowest yield coefficient can be unrealistically deep, with a
 yield coefficient too low for computing displacements. The reason is the acceleration. A Newmark analysis applies one
-acceleration record to the whole sliding mass. Peak accelerations increase from the bottom of a dam to the top
-(Duncan et al. 2014), so a large, deep mass is shaken less, on average, than a shallow one near the face. Pairing the
-full record with the deep mass's low yield coefficient overstates its displacement.
+record to the whole sliding mass, and a large, deep mass is shaken less than a shallow one, so pairing the full record
+with the deep mass's low yield coefficient overstates its displacement.
 
 **xslope** cannot find the third candidate by itself. Finding it requires knowing how the acceleration varies through
 the slope, which takes a site response analysis or published relations such as those in FHWA (2011). Once you have

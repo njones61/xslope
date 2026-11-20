@@ -132,12 +132,21 @@ each surface you want to check, such as the shallow circle, the deep circle, and
 1. Find the surface's $k_y$. For the two circles the search found, $k_y$ is in the Log. For any other surface, enter it
    as the model's circle or non-circular surface, set **Analysis** to a single surface, and run with **Find the yield
    coefficient k_y** checked.
-2. Estimate the average peak acceleration of the mass above the surface from the site response analysis.
-3. In [**Newmark…**](newmark.md), choose **Target peak acceleration (g)**, enter that acceleration, and run the
-   record. The record is scaled so that its peak equals the mass's average peak acceleration, and the result is that
-   surface's displacement.
+2. From the response analysis, get the average acceleration of the mass above the surface over time, $k(t)$. In a
+   two-dimensional analysis of the slope, add up mass times acceleration over the soil inside the sliding mass at each
+   time step and divide by the total mass. The result is the same as the horizontal force on the mass along the slip
+   surface divided by its weight. In a one-dimensional analysis of a soil column, $k(t)$ is the horizontal shear stress
+   at the depth of the slip surface divided by the total vertical stress there, $\tau(t)/\sigma_v$.
+3. Save $k(t)$ as a two-column record, time in s and acceleration in g, and run it in [**Newmark…**](newmark.md)
+   **As recorded**, with the surface's $k_y$. The result is that surface's displacement.
 
 The surface with the largest displacement is the third candidate.
+
+If only the peak of $k(t)$ is known, the input record can be scaled to it instead. In **Newmark…**, choose **Target
+peak acceleration (g)** and enter that peak. The scaled record keeps the shape of the input record rather than the
+shaking of the mass itself, so the displacement is a rougher estimate. For dams, Makdisi and Seed (1978) give charts of
+that peak as a fraction of the acceleration at the crest, against the depth of the sliding mass relative to the height
+of the dam.
 
 FHWA (2011) gives a simpler estimate of the average peak acceleration, for a mass that spans the full height of the
 slope. It multiplies the site's peak ground acceleration, adjusted for the soil at the site, by a factor that falls as
@@ -209,3 +218,5 @@ finding $k_y$, and `info["rounds"]` each search.
   NJ. Section 10.1.
 - FHWA (2011). *LRFD Seismic Analysis and Design of Transportation Geotechnical Features and Structural Foundations.*
   Geotechnical Engineering Circular No. 3, Report FHWA-NHI-11-032, Federal Highway Administration, Washington, DC.
+- Makdisi, F.I., and Seed, H.B. (1978). "Simplified procedure for estimating dam and embankment earthquake-induced
+  deformations." *Journal of the Geotechnical Engineering Division*, ASCE, 104(GT7), 849–867.

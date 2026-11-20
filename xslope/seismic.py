@@ -240,7 +240,8 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
         only from the last surface, the rounds settled on RS2-68 Case 2 at
         k_y = 0.4366 where the entered surface leads to 0.4318, and started only
         from the entered surface they settle on VP104 at 0.1452 where the last
-        surface leads to 0.1436.
+        surface leads to 0.1436 (both measured when the rounds stopped within
+        0.002 of F = 1).
     surface : {"circular", "noncircular"}
     num_slices, seismic2, composite, grid_seed, diagnostic, cancel_check,
     fs_tol, tol, max_iter, min_slip_depth, announce

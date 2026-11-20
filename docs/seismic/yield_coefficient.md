@@ -145,18 +145,19 @@ each surface you want to check, such as the shallow circle, the deep circle, and
 After repeating the three steps for each surface, the one with the largest displacement is the third candidate.
 
 **When only the peak is known.** Without a response analysis of your own, you may have only an estimate of the largest
-value of $k(t)$, the peak average acceleration of the mass, $k_{max}$. For dams, Makdisi and Seed (1978) give charts of
-$k_{max}$ as a fraction of the peak acceleration at the crest, against the depth of the bottom of the sliding mass as a
-fraction of the height of the dam. With $k_{max}$, run the record for the site in place of $k(t)$. In **Newmark…**,
-choose **Target peak acceleration (g)** and enter $k_{max}$, so that the record is scaled to that peak. The scaled
-record has the right peak, but the timing and frequency content of the ground motion rather than of the mass's own
-shaking, so the displacement is a rougher estimate than one from $k(t)$.
+value of $k(t)$, the peak average acceleration of the mass, $k_{max}$. Two published sources give one:
 
-FHWA (2011) gives a simpler estimate of the average peak acceleration, for a mass that spans the full height of the
-slope. It multiplies the site's peak ground acceleration, adjusted for the soil at the site, by a factor that falls as
-the slope gets taller, because a tall mass does not shake in step from top to bottom. The estimate depends on the
-height of the slope, not on the depth of the surface, so it suits a surface that runs the full height of the slope,
-but it cannot compare surfaces of different depths.
+- **Makdisi and Seed (1978),** for dams, give charts of $k_{max}$ as a fraction of the peak acceleration at the crest,
+  against the depth of the bottom of the sliding mass as a fraction of the height of the dam.
+- **FHWA (2011)** gives $k_{max}$ for a mass that spans the full height of a slope. It multiplies the site's peak ground
+  acceleration, adjusted for the soil at the site, by a factor that falls as the slope gets taller, because a tall mass
+  does not shake in step from top to bottom. Unlike the charts of Makdisi and Seed, it depends on the height of the
+  slope, not on the depth of the surface, so it cannot compare surfaces of different depths.
+
+With $k_{max}$, run the record for the site in place of $k(t)$. In **Newmark…**, choose **Target peak acceleration
+(g)** and enter $k_{max}$, so that the record is scaled to that peak. The scaled record has the right peak, but the
+timing and frequency content of the ground motion rather than of the mass's own shaking, so the displacement is a
+rougher estimate than one from $k(t)$.
 
 ## Vertical Seismic Coefficient {#vertical}
 

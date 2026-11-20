@@ -7446,6 +7446,128 @@ def capture_only(name):
     return drawn
 
 
+# --------------------------------------------------------------------------- #
+# LEM-14 — Pseudostatic Analysis
+#
+# One fill slope at k = 0.15, run as Studio's Run LEM runs it (Spencer, auto
+# search from the file's circle, 40 slices) in six states: dry and with the water
+# table, each with the R envelope in one stage and with c', phi', d, psi in two
+# stages under both stage 2 strength choices. The dry runs start from the starter
+# file with k entered; the wet runs from the completed file, which carries the
+# water table, k, and the R envelope. Then the strength reduction run on the
+# completed file. Printed: each run's factor of safety, circle, and the two-stage
+# log line; the strength reduction's mesh, trials, and answer.
+# --------------------------------------------------------------------------- #
+LEM14_START = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic_start.xlsx")
+LEM14_DONE = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic.xlsx")
+LEM14_METHOD = "spencer"
+LEM14_SLICES = 40
+LEM14_K = 0.15
+#: The two-stage strength set the page enters in place of the R envelope:
+#: Duncan, Wright, and Brandon (2014), Table 10.3, soil 1.
+LEM14_TWO_STAGE = {"c": 0.0, "phi": 45.0, "d": 64.0, "psi": 24.4}
+#: The strength reduction settings the page leaves on Run FEM.
+LEM14_TOLERANCE = 0.01
+LEM14_MAX_ITERATIONS = 12000
+LEM14_CRITERION = "non_convergence"
+
+
+def _lem14_model(path, two_stage=False):
+    """The model in the state a step leaves it: k entered, and the two-stage
+    strengths in place of the R envelope where the step enters them."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(path)
+    sd["k_seismic"] = LEM14_K
+    if two_stage:
+        sd["materials"] = [dict(m, **LEM14_TWO_STAGE) for m in sd["materials"]]
+    return sd
+
+
+def _lem14_run(label, sd, seismic2=False):
+    """One Run LEM run, the call Studio's dialog makes; prints the reading and the
+    Log's closing lines, and returns the bundle."""
+    from xslope.search import run_lem_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        bundle = run_lem_analysis(copy.deepcopy(sd), LEM14_METHOD,
+                                  analysis="auto_search", num_slices=LEM14_SLICES,
+                                  seismic2=seismic2)
+    crit = bundle["search"]["fs_cache"][0]
+    print("   %-26s FS %.4f  circle (%.2f, %.2f) R %.2f  tangent %.2f"
+          % (label, bundle["results"]["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"], crit["Depth"]))
+    for line in log.getvalue().splitlines():
+        if line.startswith(("Critical FS", "Two-stage seismic stages", "Sliding mass",
+                            "[✓ converged]")):
+            print("        %s" % line.strip())
+    return bundle
+
+
+def _lem14_capture(name, sd, bundle):
+    crit = bundle["search"]["fs_cache"][0]
+    capture(name, plot_solution, sd, crit["slices"], crit["failure_surface"],
+            crit["solver_result"], frame="content")
+
+
+def lem14_plots():
+    """The six limit equilibrium runs and their figures."""
+    capture("lem14_inputs.png", plot_inputs, load_slope_data(LEM14_START),
+            title="Slope Geometry and Inputs")
+    dry_r = _lem14_model(LEM14_START)
+    dry_2 = _lem14_model(LEM14_START, two_stage=True)
+    wet_r = _lem14_model(LEM14_DONE)
+    wet_2 = _lem14_model(LEM14_DONE, two_stage=True)
+
+    b = _lem14_run("dry, one stage, R", dry_r)
+    _lem14_capture("lem14_dry_one_stage.png", dry_r, b)
+    b = _lem14_run("dry, two stages, Kc = 1", dry_2, seismic2="kc1")
+    _lem14_capture("lem14_dry_two_stage.png", dry_2, b)
+    _lem14_run("dry, two stages, interp.", dry_2, seismic2="interpolated")
+    _lem14_run("wet, two stages, Kc = 1", wet_2, seismic2="kc1")
+    _lem14_run("wet, two stages, interp.", wet_2, seismic2="interpolated")
+    b = _lem14_run("wet, one stage, R", wet_r)
+    _lem14_capture("lem14_wet_one_stage.png", wet_r, b)
+
+
+def lem14_ssrm():
+    """The strength reduction run on the completed file, at the mesh and bracket
+    it declares, and the at-failure shear strain."""
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+    from xslope.plot_fem import plot_fem_results
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        model = load_slope_data(LEM14_DONE)
+        mesh = build_mesh_from_polygons(get_material_polygons(model),
+                                        model["target_size"], model["element_type"],
+                                        size_regions=extract_size_regions(model))
+    print("   mesh        %d nodes · %d elements · %s at target size %g ft"
+          % (len(np.asarray(mesh["nodes"])), len(mesh["elements"]),
+             model["element_type"], model["target_size"]))
+    fem_data = build_fem_data(model, mesh)
+    t0 = time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = solve_ssrm(fem_data, F_min=model["ssrm_f_min"],
+                            F_max=model["ssrm_f_max"], tolerance=LEM14_TOLERANCE,
+                            debug_level=1, failure_criterion=LEM14_CRITERION,
+                            max_iterations=LEM14_MAX_ITERATIONS, k0=model.get("k0"))
+    print("   SSRM        FS %.4f from [%.4f, %.4f] · %.0f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             time.time() - t0))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    capture("lem14_ssrm_shear_strain.png", plot_fem_results, fem_data,
+            result["last_solution"], plot_type="shear_strain", fs=result["FS"],
+            failure_solution=result.get("failure_solution"), field_state="failure")
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -7474,6 +7596,8 @@ GROUPS = {
     "lem13_plots": lem13_plots,
     "lem13_ssrm": lem13_ssrm,
     "lem13_sweeps": lem13_sweeps,
+    "lem14_plots": lem14_plots,
+    "lem14_ssrm": lem14_ssrm,
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,

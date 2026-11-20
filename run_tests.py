@@ -716,15 +716,31 @@ def _apply_material_tag(slope_data, test):
     row, so a one-zone model runs that soil. It exists for Duncan, Wright and
     Brandon's Table 10.4, which runs eight strength sets (four soils, each as a
     two-stage d/psi material and as an R envelope) on one geometry: one workbook per
-    water case carries all eight, and the tag picks the row. Returns an error
-    message, or None (also when the tag names no material)."""
+    water case carries all eight, and the tag picks the row. Then any
+    `mat_<column>=<value>` keys are set on every row. Returns an error message, or
+    None (also when the tag sets neither)."""
     name = str(test.get('material', '')).strip()
-    if not name:
-        return None
-    named = [m for m in slope_data.get('materials', []) if m.get('name') == name]
-    if len(named) != 1:
-        return f"material={name!r} names {len(named)} rows of the materials table, not one"
-    slope_data['materials'] = [dict(named[0]) for _ in slope_data['materials']]
+    if name:
+        named = [m for m in slope_data.get('materials', []) if m.get('name') == name]
+        if len(named) != 1:
+            return f"material={name!r} names {len(named)} rows of the materials table, not one"
+        slope_data['materials'] = [dict(named[0]) for _ in slope_data['materials']]
+    # `mat_<column>=<value>` sets that column on every row of the materials table,
+    # for a tutorial whose reader edits a strength between runs of one file (LEM-14
+    # enters the R envelope's c and phi, then c', phi', d, and psi, on one soil).
+    for key, raw in test.items():
+        if not key.startswith('mat_'):
+            continue
+        col = key[len('mat_'):]
+        mats = slope_data.get('materials', [])
+        if not mats or any(col not in m for m in mats):
+            return f"{key}: the materials table has no column {col!r}"
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = str(raw).strip()
+        for m in mats:
+            m[col] = value
     return None
 
 

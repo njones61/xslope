@@ -3730,6 +3730,140 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
+# LEM-14 — Pseudostatic Analysis (open-and-run on a starter, edited step by step)
+#
+# Every shot is the dialog in the state the page's step leaves it: the starter
+# with k entered, then the two-stage strengths in place of the R envelope, then the
+# water table and u = piezo, then the R envelope back (the completed file).
+# --------------------------------------------------------------------------- #
+LEM14_START = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic_start.xlsx")
+LEM14_DONE = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic.xlsx")
+#: The two-stage strength set (Duncan, Wright, and Brandon 2014, Table 10.3, soil 1).
+LEM14_TWO_STAGE = {"c": 0.0, "phi": 45.0, "d": 64.0, "psi": 24.4}
+
+
+def _lem14(path, k=0.15, **mat):
+    d = _load(path)
+    d["k_seismic"] = k
+    if mat:
+        d["materials"] = [dict(m, **mat) for m in d["materials"]]
+    return d
+
+
+def _lem14_materials(data, name):
+    from studio.editors import MaterialsEditor
+
+    dlg = _lem_only(MaterialsEditor().build(data, None))
+    return _grab(_mat_table(dlg, through="u"), name)
+
+
+def lem14_global():
+    """Global parameters with the seismic coefficient entered on the starter."""
+    from studio.editors import GlobalEditor
+
+    dlg = GlobalEditor().build(_lem14(LEM14_START), None)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_global.png")
+
+
+def lem14_run_lem():
+    """The first run: Spencer, auto search, 40 slices, no seismic option ticked."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_lem14(LEM14_START))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_run_lem.png")
+
+
+def lem14_materials_two_stage():
+    """The fill with c', phi', d, and psi in place of the R envelope, dry."""
+    return _lem14_materials(_lem14(LEM14_START, **LEM14_TWO_STAGE),
+                            "lem14_studio_materials_two_stage.png")
+
+
+def lem14_run_lem_two_stage():
+    """Two-stage seismic ticked, Stage 2 strength on Kc = 1 envelope."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "seismic2": "kc1"},
+                       slope_data=_lem14(LEM14_START, **LEM14_TWO_STAGE))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_run_lem_two_stage.png")
+
+
+def lem14_piezo():
+    """The piezometric editor holding the water table, on Line 1."""
+    from studio.editors import PiezoEditor
+
+    data = _lem14(LEM14_DONE, **LEM14_TWO_STAGE)
+    dlg = PiezoEditor().build(data, None)
+    _size_preview(dlg, data)
+    return _grab(dlg, "lem14_studio_piezo.png", settle=False)
+
+
+def lem14_materials_piezo():
+    """The two-stage strengths with u = piezo, after the water table goes in."""
+    return _lem14_materials(_lem14(LEM14_DONE, **LEM14_TWO_STAGE),
+                            "lem14_studio_materials_piezo.png")
+
+
+def lem14_materials_r():
+    """The R envelope back in c and phi, d and psi cleared, u = piezo: the
+    completed file."""
+    return _lem14_materials(_lem14(LEM14_DONE), "lem14_studio_materials_r.png")
+
+
+def lem14_build_mesh():
+    """Build Mesh on the size the completed file declares."""
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(LEM14_DONE)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_build_mesh.png")
+
+
+def lem14_run_fem():
+    """Run FEM on the meshed completed file, at the bracket it declares."""
+    from studio.dialogs import RunFemDialog
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    data = _load(LEM14_DONE)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data), data["target_size"], data["element_type"],
+            size_regions=extract_size_regions(data))
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": float(data["ssrm_f_min"]),
+                                 "F_max": float(data["ssrm_f_max"]),
+                                 "tolerance": 0.01,
+                                 "k0": data["k0"]},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_run_fem.png")
+
+
+SHOTS.update({
+    "lem14_global": lem14_global,
+    "lem14_run_lem": lem14_run_lem,
+    "lem14_materials_two_stage": lem14_materials_two_stage,
+    "lem14_run_lem_two_stage": lem14_run_lem_two_stage,
+    "lem14_piezo": lem14_piezo,
+    "lem14_materials_piezo": lem14_materials_piezo,
+    "lem14_materials_r": lem14_materials_r,
+    "lem14_build_mesh": lem14_build_mesh,
+    "lem14_run_fem": lem14_run_fem,
+})
+
+
+# --------------------------------------------------------------------------- #
 # W-1 — The AI Assistant: the setup shots
 #
 # The two figures the tutorial's "Setting it up" section needs, and the only W-1

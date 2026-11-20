@@ -48,7 +48,7 @@ The three build paths, the template's worksheets, what **Save As** writes, and `
 
 ## Limit equilibrium
 
-<span class="tut-band-sub">13 tutorials</span>
+<span class="tut-band-sub">14 tutorials</span>
 
 </div>
 
@@ -269,6 +269,23 @@ A 20 ft clay slope stabilized by two rows of drilled shafts whose force column i
 A 10 m rock cut whose strength is described by four field observations rather than a cohesion and a friction angle — the intact strength, the Geological Strength Index, the intact constant and the blast disturbance — solved by Spencer's method and then by strength reduction on the same file, read once more with its intact strength typed in the megapascals the literature quotes, and then swept across the Geological Strength Index and the blast-disturbance factor to find which of the four field inputs controls the answer.
 
 <p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">Hoek-Brown</span><span class="tut-tag">GSI</span><span class="tut-tag">disturbance factor</span><span class="tut-tag">instantaneous tangent</span><span class="tut-tag">circular search</span><span class="tut-tag">strength reduction</span><span class="tut-tag">quadratic triangles</span><span class="tut-tag">parametric study</span><span class="tut-tag">design sweep</span><span class="tut-tag">model checks</span></p>
+
+</div>
+</div>
+
+<div class="tut-row" markdown>
+<div class="tut-thumb" markdown>
+[![](images/lem14_dry_two_stage.png)](lem14_pseudostatic.md)
+<span class="tut-num">14</span>
+</div>
+<div class="tut-body" markdown>
+<p class="tut-kicker">LEM-14 · Limit equilibrium, finite element (strength reduction) · ~45 min</p>
+
+### [Pseudostatic Analysis](lem14_pseudostatic.md)
+
+A 15 ft fill slope at a seismic coefficient of 0.15, with undrained strengths from consolidated-undrained tests: run in one stage with the R envelope and in two stages with each choice of stage 2 strength, dry and with a water table, and then by strength reduction at the same coefficient.
+
+<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">seismic coefficient</span><span class="tut-tag">R envelope</span><span class="tut-tag">two-stage seismic</span><span class="tut-tag">Kc = 1 envelope</span><span class="tut-tag">d and ψ</span><span class="tut-tag">piezometric line</span><span class="tut-tag">Spencer</span><span class="tut-tag">circular search</span><span class="tut-tag">strength reduction</span><span class="tut-tag">quadratic triangles</span></p>
 
 </div>
 </div>

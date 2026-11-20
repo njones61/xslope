@@ -3608,6 +3608,8 @@ class NewmarkDialog(QDialog):
         self._ky_run = ky
         self._ky_source = ky_source
         unit = DISPLACEMENT_UNIT.get(units, ("cm", 100.0))[0]
+        # Spelled out: "reported in in" reads as a typo.
+        unit_word = {"cm": "centimeters", "in": "inches"}.get(unit, unit)
 
         layout = QVBoxLayout(self)
         note = QLabel(
@@ -3615,7 +3617,7 @@ class NewmarkDialog(QDialog):
             "ground acceleration exceeds k_y·g. The record is run both ways, with "
             "its positive and with its negative accelerations pushing the block "
             "downslope, and the larger displacement is reported, in "
-            f"{unit} for this model.")
+            f"{unit_word} for this model.")
         note.setWordWrap(True)
         layout.addWidget(note)
 

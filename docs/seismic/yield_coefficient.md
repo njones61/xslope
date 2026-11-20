@@ -91,8 +91,7 @@ coefficient depends on which slip surface it is computed for. Duncan et al. (201
    largest displacement once each sliding mass is shaken by its own average acceleration. Duncan et al. call it the
    most appropriate choice. FHWA (2011) gives the variation of acceleration with depth.
 
-With an automated search, **xslope** finds the first two candidates. Each time it needs $k_y$ for a surface, it uses
-the steps in the previous section:
+With an automated search, **xslope** finds the first two candidates:
 
 1. It searches for the critical surface with no seismic force and computes $k_y$ for that surface. This is the first
    candidate.
@@ -101,7 +100,9 @@ the steps in the previous section:
 3. It repeats step 2 with each new $k_y$ until a search finds no surface with $F$ more than 0.001 below 1, or until it
    has made six of these searches. The surface it ends with is the second candidate.
 
-The Log reports $k_y$ for each of the two: the static critical surface and the surface with the lowest $k_y$.
+Each time it needs $k_y$ for a surface, it computes it as described under
+[Computing the Yield Coefficient for One Surface](#one-surface). The Log reports $k_y$ on both surfaces, the static
+critical surface first.
 
 ### When the Two Candidates Differ
 

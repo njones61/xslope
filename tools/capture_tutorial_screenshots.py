@@ -3777,6 +3777,12 @@ def lem14_run_lem():
     return _grab(dlg, "lem14_studio_run_lem.png")
 
 
+def lem14_materials_r_dry():
+    """The fill as the starter carries it: the R envelope as c and phi, d and psi
+    at 0, u = none."""
+    return _lem14_materials(_lem14(LEM14_START), "lem14_studio_materials_r_dry.png")
+
+
 def lem14_materials_two_stage():
     """The fill with c', phi', d, and psi in place of the R envelope, dry."""
     return _lem14_materials(_lem14(LEM14_START, **LEM14_TWO_STAGE),
@@ -3853,6 +3859,7 @@ def lem14_run_fem():
 SHOTS.update({
     "lem14_global": lem14_global,
     "lem14_run_lem": lem14_run_lem,
+    "lem14_materials_r_dry": lem14_materials_r_dry,
     "lem14_materials_two_stage": lem14_materials_two_stage,
     "lem14_run_lem_two_stage": lem14_run_lem_two_stage,
     "lem14_piezo": lem14_piezo,

@@ -6177,7 +6177,7 @@ PREFLIGHT_RULE_SPECS = [
     # --- main-sheet scalars ------------------------------------------------
     dict(rule='main.seismic_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=float('nan')),
-         expect='Horizontal seismic coefficient k is blank'),
+         expect='Horizontal seismic coefficient k_h is blank'),
     dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=15.0),
          expect='fraction of gravity'),
@@ -7638,6 +7638,7 @@ def run_preflight_corpus_test(test):
     raising rule to an info so a broken rule can never block a valid model, and
     this is what stops that safety net from hiding the breakage.
     """
+    import copy
     import warnings as _warnings
     from xslope.fileio import load_slope_data
     from xslope.preflight import preflight, ERROR
@@ -7683,18 +7684,24 @@ def run_preflight_corpus_test(test):
                 sel['max_iterations'] = int(float(t['max_iter']))
             if t.get('max_iter_ceiling'):
                 sel['max_iterations_ceiling'] = int(float(t['max_iter_ceiling']))
-        key = (f, analysis, tuple(sorted(sel.items())))
+        # A tag that edits the model before it runs (`material=`, `mat_<column>=`,
+        # `k_seismic=`, `k_vertical=`) is checked on the model as edited: LEM-14's
+        # two-stage rows enter d and psi on a file whose fill carries the R envelope.
+        mods = tuple(sorted((k, v) for k, v in t.items()
+                            if k.startswith('mat_')
+                            or k in ('material', 'k_seismic', 'k_vertical')))
+        key = (f, analysis, tuple(sorted(sel.items())), mods)
         if key in cases:
-            cases[key] = (analysis, sel, cases[key][2] or field_at_run)
+            cases[key] = (analysis, sel, cases[key][2] or field_at_run, mods)
         else:
-            cases[key] = (analysis, sel, field_at_run)
+            cases[key] = (analysis, sel, field_at_run, mods)
 
     problems = []
     checked = 0
     loaded = {}
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
-        for (path, _a, _s), (analysis, sel, field_at_run) in sorted(cases.items()):
+        for (path, _a, _s, _m), (analysis, sel, field_at_run, mods) in sorted(cases.items()):
             if not os.path.exists(path):
                 continue
             if path not in loaded:
@@ -7707,6 +7714,13 @@ def run_preflight_corpus_test(test):
                 problems.append(f"{os.path.basename(path)}: load failed "
                                 f"({type(sd).__name__})")
                 continue
+            if mods:
+                sd = copy.deepcopy(sd)
+                err = (_apply_material_tag(sd, dict(mods))
+                       or _apply_seismic_tag(sd, dict(mods)))
+                if err:
+                    problems.append(f"{os.path.basename(path)}: {err}")
+                    continue
             checked += 1
             report = preflight(sd, analysis, sel)
             for f in report.errors:
@@ -7908,7 +7922,7 @@ def run_sweep_gate_test(test):
                                      search=False, num_slices=20)
     if ok3:
         problems.append("a sweep started on a base model preflight refuses")
-    elif 'Horizontal seismic coefficient k' not in str(res3):
+    elif 'Horizontal seismic coefficient k_h' not in str(res3):
         problems.append(f"the base-model refusal does not name the field: {res3}")
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
@@ -8060,7 +8074,7 @@ def run_preflight_contract_test(test):
             problems.append("PreflightError is not a ValueError")
         if getattr(exc, 'report', None) is None:
             problems.append("PreflightError carries no report")
-    if 'Horizontal seismic coefficient k' not in bad.format():
+    if 'Horizontal seismic coefficient k_h' not in bad.format():
         problems.append("format() lost the finding text")
     if bad.format(min_severity=pf.ERROR).count('WARNING') != 0:
         problems.append("format(min_severity=ERROR) leaked a warning")

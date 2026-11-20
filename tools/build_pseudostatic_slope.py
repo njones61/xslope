@@ -146,9 +146,9 @@ def _model(wet):
         sd[key] = []
     sd["circular"] = True
     sd["search_window"] = {}
-    # One starting circle over the face, tangent to the toe's elevation.
-    sd["circles"] = [{"Xo": X_TOE / 2.0 + 0.3 * H, "Yo": 2.2 * H, "Depth": 0.0,
-                      "R": 2.2 * H}]
+    # One starting circle through the toe: centered over it, tangent to the toe's
+    # elevation, and coming out on the crest just behind the top of the face.
+    sd["circles"] = [{"Xo": X_TOE, "Yo": 40.0, "Depth": 0.0, "R": 40.0}]
     sd["element_type"] = ELEMENT_TYPE
     sd["target_size"] = TARGET_SIZE
     sd["ssrm_f_min"] = F_MIN

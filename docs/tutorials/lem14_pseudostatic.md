@@ -28,7 +28,7 @@ the factor of safety.
 envelope and no seismic coefficient
 
 **Completed model** — [xslope_pseudostatic.xlsx](files/xslope_pseudostatic.xlsx), the slope as the tutorial leaves it,
-with the water table, the R envelope, and k = 0.15; open it to start at
+with the water table, the R envelope, and k<sub>h</sub> = 0.15; open it to start at
 [Part 3](#part-3-strength-reduction-at-the-same-coefficient)
 </div>
 </div>
@@ -66,23 +66,36 @@ Open**. The Inputs plot draws the section and the starting circle the search wil
 
 ![The starter model: the slope, the maximum depth 15 ft below the toe, and the starting circle](images/lem14_inputs.png){width=1000}
 
-The fill has the R envelope as its strength, c = 60 psf and φ = 23°, with no pore pressure.
-
 ---
 
 ## Part 1 — The dry slope {#part-1-the-dry-slope}
 
 ### Entering the seismic coefficient
 
-Open **Global parameters** and set **Horizontal seismic coefficient k** to `0.15`. Leave **Vertical seismic
+Open **Global parameters** and set **Horizontal seismic coefficient k_h** to `0.15`. Leave **Vertical seismic
 coefficient k_v (+ down)** at 0:
 
 ![Global parameters with the seismic coefficient entered](images/lem14_studio_global.png)
 
-Every slice now carries a horizontal force of k times its weight, at its center of gravity. The limit equilibrium methods
-point it in the direction that drives the slope, so k needs no sign for them.
+Every slice now carries a horizontal force of k<sub>h</sub> times its weight, at its center of gravity. The limit
+equilibrium methods point it in the direction that drives the slope, so k<sub>h</sub> needs no sign for them.
 
 ### One stage with the R envelope
+
+Open **Materials** and set the **Show parameters for:** toggles to **LEM** alone. The starter file has one material, the
+fill, with the R envelope as its strength:
+
+| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ (deg) | c/p | r-elev | d (psf) | ψ (deg) | u |
+| --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
+| fill | 135 | | mc | 60 | 23 | 0 | 0 | 0 | 0 | none |
+
+![The fill with the R envelope](images/lem14_studio_materials_r_dry.png)
+
+- **option** is `mc`, a straight-line Mohr-Coulomb envelope.
+- **c** and **φ** hold the R envelope, c<sub>R</sub> = 60 psf and φ<sub>R</sub> = 23°. A one-stage analysis uses them as
+  it would any c and φ.
+- **d** and **psi** are 0, so nothing in the run treats the fill as undrained in a second stage.
+- **u** is `none`: the slope is dry.
 
 Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** = `Auto search`, and leave **Number of slices**
 at 40 and every box under **Seismic** clear:
@@ -91,17 +104,16 @@ at 40 and every box under **Seismic** clear:
 
 Click **Run**. The search settles on a circle that runs from just behind the crest to the toe:
 
-![The one-stage analysis with the R envelope, dry: FS = 0.957](images/lem14_dry_one_stage.png){width=1000}
+![The one-stage analysis with the R envelope, dry: FS = 0.956](images/lem14_dry_one_stage.png){width=1000}
 
-**FS = 0.957.**
+**FS = 0.956.**
 
-<!-- test: file=files/xslope_pseudostatic_start.xlsx, type=circular_search, method=spencer, num_slices=40, k_seismic=0.15, expected_fs=0.957, tolerance=0.005, benchmark=LEM-14-dry-one-stage -->
+<!-- test: file=files/xslope_pseudostatic_start.xlsx, type=circular_search, method=spencer, num_slices=40, k_seismic=0.15, expected_fs=0.956, tolerance=0.005, benchmark=LEM-14-dry-one-stage -->
 
 ### Two stages
 
 The two-stage analysis needs the drained strengths and the K<sub>c</sub> = 1 envelope in place of the R envelope. Open
-**Materials**, set the **Show parameters for:** toggles to **LEM** alone, and enter the row below (or paste it into the
-table view starting at **name**). The c and φ columns now hold c′ and φ′, and the **d** and **psi** columns hold the
+**Materials** again and enter the row below (or paste it into the table view starting at **name**). The c and φ columns now hold c′ and φ′, and the **d** and **psi** columns hold the
 K<sub>c</sub> = 1 envelope:
 
 | name | γ (pcf) | γsat (pcf) | option | c (psf) | φ (deg) | c/p | r-elev | d (psf) | ψ (deg) | u |
@@ -121,10 +133,10 @@ Click **Run**. The search solves both stages on every trial circle, and the Log 
 
 ```text
 Critical FS = 1.068
-Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.3598, Stage 2 (seismic, undrained strength from the K_c = 1 envelope) FS = 1.0684
+Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.3499, Stage 2 (seismic, undrained strength from the K_c = 1 envelope) FS = 1.0684
 ```
 
-Stage 1 solves the slope before the earthquake, with the drained strengths, and gives 2.36. Stage 2 gives the factor of
+Stage 1 solves the slope before the earthquake, with the drained strengths, and gives 2.35. Stage 2 gives the factor of
 safety of the two-stage analysis:
 
 ![The two-stage analysis with the Kc = 1 envelope, dry: FS = 1.068](images/lem14_dry_two_stage.png){width=1000}
@@ -137,7 +149,7 @@ Now run it once more with **Stage 2 strength** set to `Interpolated (as in rapid
 
 ```text
 Critical FS = 1.282
-Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.2785, Stage 2 (seismic, undrained strength interpolated between the K_c = 1 and drained envelopes) FS = 1.2820
+Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.2825, Stage 2 (seismic, undrained strength interpolated between the K_c = 1 and drained envelopes) FS = 1.2821
 ```
 
 <!-- test: file=files/xslope_pseudostatic_start.xlsx, type=circular_search, method=spencer, num_slices=40, k_seismic=0.15, mat_c=0, mat_phi=45, mat_d=64, mat_psi=24.4, seismic2=interpolated, expected_fs=1.282, tolerance=0.005, benchmark=LEM-14-dry-two-stage-interpolated -->
@@ -146,12 +158,12 @@ Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.2785, S
 
 | Procedure | FS |
 | --- | :---: |
-| One stage, R envelope | 0.957 |
+| One stage, R envelope | 0.956 |
 | Two stages, K<sub>c</sub> = 1 envelope | 1.068 |
 | Two stages, interpolated | 1.282 |
 
-The one-stage answer is below 1 and both two-stage answers are above it, so on this slope the procedure decides whether
-the slope passes. The one-stage factor of safety is 90 percent of the two-stage one with the K<sub>c</sub> = 1 envelope.
+The one-stage factor of safety is below 1, and both two-stage factors of safety are above 1. The one-stage factor of
+safety is 90 percent of the two-stage one with the K<sub>c</sub> = 1 envelope.
 Duncan et al. found the one-stage analysis between 81 and 90 percent of the two-stage one for all four of their soils.
 The interpolation raises the strength further because the drained envelope, at φ′ = 45°, lies far above the
 K<sub>c</sub> = 1 envelope at the stresses on this slope.
@@ -207,12 +219,12 @@ Run LEM again with **Two-stage seismic** ticked, first with the `Kc = 1 envelope
 
 ```text
 Critical FS = 0.934
-Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.1228, Stage 2 (seismic, undrained strength from the K_c = 1 envelope) FS = 0.9339
+Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.1307, Stage 2 (seismic, undrained strength from the K_c = 1 envelope) FS = 0.9339
 ```
 
 ```text
 Critical FS = 1.161
-Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.0842, Stage 2 (seismic, undrained strength interpolated between the K_c = 1 and drained envelopes) FS = 1.1607
+Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.0855, Stage 2 (seismic, undrained strength interpolated between the K_c = 1 and drained envelopes) FS = 1.1607
 ```
 
 <!-- test: file=files/xslope_pseudostatic.xlsx, type=circular_search, method=spencer, num_slices=40, mat_c=0, mat_phi=45, mat_d=64, mat_psi=24.4, seismic2=kc1, expected_fs=0.934, tolerance=0.005, benchmark=LEM-14-wet-two-stage-kc1 -->
@@ -241,7 +253,7 @@ in front of it. The blue band along its base is the pore pressure on each slice:
 
 | Water | One stage, R envelope | Two stages, K<sub>c</sub> = 1 | Two stages, interpolated |
 | --- | :---: | :---: | :---: |
-| Dry | 0.957 | 1.068 | 1.282 |
+| Dry | 0.956 | 1.068 | 1.282 |
 | Water table | 0.843 | 0.934 | 1.161 |
 
 The water table lowers every factor of safety by 0.11 to 0.13. With it, the two-stage answer with the
@@ -254,14 +266,14 @@ the K<sub>c</sub> = 1 envelope is how their Table 10.4 was computed.
 
 ## Part 3 — Strength reduction at the same coefficient {#part-3-strength-reduction-at-the-same-coefficient}
 
-The finite element engine applies the same seismic force, k times the weight of the soil, as a body force throughout the
-mesh. Strength reduction cannot run the two-stage analysis, so this part uses the model as Part 2 leaves it: the R
-envelope, the water table, and k = 0.15. If you are starting here, open
+The finite element engine applies the same seismic force, k<sub>h</sub> times the weight of the soil, as a body force
+throughout the mesh. Strength reduction cannot run the two-stage analysis, so this part uses the model as Part 2 leaves
+it, with the R envelope, the water table, and k<sub>h</sub> = 0.15. If you are starting here, open
 [xslope_pseudostatic.xlsx](files/xslope_pseudostatic.xlsx).
 
-The finite element engine has no slip surface to read a direction from, so it reads the sign of k: **a positive k
-pushes toward +x** and a negative k toward −x. This slope faces +x, with the crest on the left, so k = 0.15 drives it
-down the face. A slope facing the other way would need k = −0.15.
+The finite element engine has no slip surface to read a direction from, so it reads the sign of k<sub>h</sub>: **a positive
+k<sub>h</sub> pushes toward +x** and a negative one toward −x. This slope faces +x, with the crest on the left, so
+k<sub>h</sub> = 0.15 drives it down the face. A slope facing the other way would need k<sub>h</sub> = −0.15.
 
 The two elastic properties the run needs, E = 2,088,500 psf and ν = 0.3, are already on the materials table behind its
 **FEM** toggle. Switch the mode strip to **FEM** and click **Run → Build Mesh…**:

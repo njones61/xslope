@@ -61,17 +61,17 @@ the earthquake record moves the slope, so the displacement depends on it directl
 
 ### Choosing the slip surface
 
-Every slip surface has its own yield coefficient, and a Newmark analysis needs one surface and its k<sub>y</sub>. The
-obvious choice is the static critical surface, the one with the lowest factor of safety before the earthquake. It is not
-always the surface with the lowest yield coefficient. The seismic force acts on the whole weight of the sliding mass,
+Every slip surface has its own yield coefficient, and a Newmark analysis uses one surface and its k<sub>y</sub>.
+Duncan, Wright, and Brandon (2014) suggest finding k<sub>y</sub> on two surfaces. The first is the static critical
+surface, the one with the lowest factor of safety before the earthquake. The second is the surface with the lowest yield
+coefficient, which is not always the same surface. The seismic force acts on the whole weight of the sliding mass,
 including the part under level ground, which adds nothing to the driving force when the slope is static. So a larger,
-deeper mass that is safer before the earthquake can reach F = 1 at a lower seismic coefficient, and it would slide
-farther in the same earthquake.
+deeper mass that is safer before the earthquake can reach F = 1 at a lower seismic coefficient.
 
-For that reason Duncan, Wright, and Brandon (2014) recommend finding k<sub>y</sub> on both surfaces. Where the two agree, the choice
-does not matter. Where they differ, the engineer chooses between them, because the surface with the lowest
-k<sub>y</sub> is often deep, and a deep mass is shaken less than the record assumes. The
-[Yield Coefficient](../seismic/yield_coefficient.md#which-surface) page discusses that choice.
+Neither surface is always the right one. The surface with the lowest k<sub>y</sub> gives the largest displacement, but it
+is often deep, and a deep mass is shaken less than the record assumes, so its displacement can be overstated. Where the
+two surfaces agree, the choice does not matter. Where they differ, the engineer chooses, and the
+[Yield Coefficient](../seismic/yield_coefficient.md#which-surface) page discusses how.
 
 ### Finding the yield coefficient
 

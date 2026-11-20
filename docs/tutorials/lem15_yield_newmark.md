@@ -102,10 +102,10 @@ k<sub>h</sub> = k<sub>y</sub>, so its factor of safety is 1:
 
 <!-- test: file=files/xslope_pseudostatic_start.xlsx, type=critical_kc, method=spencer, num_slices=40, expected_kc=0.1266, kc_tol=0.0005, benchmark=LEM-15-ky -->
 
-The two circles nearly coincide, and their yield coefficients differ by less than 1 percent. For this fill the choice of
-surface makes little difference: with the record as recorded, k<sub>y</sub> = 0.1275 gives a displacement of 0.64 in and
-k<sub>y</sub> = 0.1266 gives 0.66 in. We use 0.1266 in Part 2. In a soil with more cohesion the two surfaces can be far
-apart, as the example on the Yield Coefficient page shows.
+The two circles nearly coincide, and their yield coefficients differ by less than 1 percent. For this fill the choice
+of surface makes little difference, because both give a similar displacement. We use the lower value, 0.1266, in
+Part 2. In a soil with more cohesion the two surfaces can be far apart, as the example on the Yield Coefficient page
+shows.
 
 ---
 

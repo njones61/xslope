@@ -16308,11 +16308,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                       f"{equilibration['n_plastic']} yielded elements); trials start "
                       "from it with a zero displacement datum")
         else:
+            # The equilibration carries every load of the run, so a pseudostatic run
+            # that fails here fails under the seismic force as well as the weight.
+            _seismic = bool(fem_data_trials.get("k_seismic") or 0.0) or bool(
+                fem_data_trials.get("k_vertical") or 0.0)
+            _loads = ("its own weight and the seismic force" if _seismic
+                      else "its own weight")
             warnings.warn(
                 "The K0 in-situ stress state could not be equilibrated at full "
                 f"strength ({eq['iterations']} iterations, max|u| = "
                 f"{eq['max_displacement']:.4g}, verdict {eq['verdict']}): the slope "
-                "does not stand under its own weight with this initial stress, so "
+                f"does not stand under {_loads} with this initial stress, so "
                 "FS < 1. The bisection runs without a carried in-situ state.")
 
     # ---- SSRM driver switch (INTERNAL, spike; see SPIKE.md, "RAMP") ---------

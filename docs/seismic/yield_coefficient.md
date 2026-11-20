@@ -142,7 +142,7 @@ each surface you want to check, such as the shallow circle, the deep circle, and
 3. Save $k(t)$ as a two-column record, time in s and acceleration in g, and run it in [**Newmark…**](newmark.md)
    **As recorded**, with the surface's $k_y$. The result is that surface's displacement.
 
-The surface with the largest displacement is the third candidate.
+After repeating the three steps for each surface, the one with the largest displacement is the third candidate.
 
 If only the peak of $k(t)$ is known, the input record can be scaled to it instead. In **Newmark…**, choose **Target
 peak acceleration (g)** and enter that peak. The scaled record keeps the shape of the input record rather than the

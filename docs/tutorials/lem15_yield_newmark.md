@@ -104,8 +104,8 @@ k<sub>h</sub> = k<sub>y</sub>, so its factor of safety is 1:
 
 The two circles nearly coincide, and their yield coefficients differ by less than 1 percent. For this fill the choice
 of surface makes little difference, because both give a similar displacement. We use the lower value, 0.1266, in
-Part 2. In a soil with more cohesion the two surfaces can be far apart, as the example on the Yield Coefficient page
-shows.
+Part 2. In a soil with more cohesion the two surfaces can be far apart, as
+[the example on the Yield Coefficient page](../seismic/yield_coefficient.md#when-the-two-candidates-differ) shows.
 
 ---
 

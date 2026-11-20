@@ -55,11 +55,11 @@ from PySide6.QtWidgets import (
     QSizePolicy, QStackedWidget, QStyle, QToolButton, QVBoxLayout, QWidget,
 )
 
-#: The two seismic-direction infos, which the Run dialogs show as prominent notes
-#: rather than behind the info disclosure: one template cell means a magnitude to
-#: the limit-equilibrium engine and a vector to the finite element engine, and a
-#: user carrying a habit from one to the other has no other way to learn it.
-SEISMIC_NOTE_LEM = "main.seismic_direction_lem"
+#: The seismic-direction info, which the finite element Run dialogs show as a
+#: prominent note rather than behind the info disclosure: the finite element engine
+#: reads the sign of k_h as the direction, where the limit-equilibrium engine takes
+#: its magnitude, and a user carrying a habit from one to the other has no other way
+#: to learn it.
 SEISMIC_NOTE_FEM = "main.seismic_direction_fem"
 
 #: Prefix and color per severity. Colors are chosen to read on both the light and
@@ -380,9 +380,9 @@ class PreflightPanel(QGroupBox):
         refresh, so it reads live widget state.
     notes : iterable of str, optional
         Rule ids to lift OUT of the collapsed info list and show as prominent
-        notes. The seismic direction infos are the reason this exists: they are
-        education rather than defects, and the design calls for them beside the
-        button rather than behind a disclosure.
+        notes. The finite element seismic direction info is the reason this
+        exists: it is education rather than a defect, and the design calls for it
+        beside the button rather than behind a disclosure.
     """
 
     #: Emitted after every evaluation, including one triggered by a remedy.

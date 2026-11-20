@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from .preflight_panel import (
-    PreflightPanel, SEISMIC_NOTE_FEM, SEISMIC_NOTE_LEM, apply_capabilities,
+    PreflightPanel, SEISMIC_NOTE_FEM, apply_capabilities,
     two_pane,
 )
 # The thin-zone toggle's default is declared beside the code that acts on it, so
@@ -1677,7 +1677,7 @@ class RunLemDialog(QDialog):
             analysis=lambda: ("rapid" if self.rapid.isChecked() else
                               "seismic2" if self.seismic2.isChecked() else "lem"),
             slope_data=slope_data, document=document,
-            selection_fn=self._selection, notes=(SEISMIC_NOTE_LEM,), parent=self)
+            selection_fn=self._selection, notes=(), parent=self)
 
         self.analysis.currentIndexChanged.connect(self._sync_tols)
         if self.surface is not None:
@@ -2108,7 +2108,7 @@ class SensitivityDialog(QDialog):
         self.preflight = PreflightPanel(
             analysis="sensitivity", slope_data=slope_data, document=document,
             selection_fn=self._selection,
-            notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
+            notes=(() if self.app_mode == "lem" else (SEISMIC_NOTE_FEM,)),
             parent=self)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -3141,7 +3141,7 @@ class ReliabilityDialog(QDialog):
                                   "method": self.method.currentData(),
                                   "surface": self._surface_value(),
                                   "search": self.search.isChecked()},
-            notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
+            notes=(() if self.app_mode == "lem" else (SEISMIC_NOTE_FEM,)),
             parent=self)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)

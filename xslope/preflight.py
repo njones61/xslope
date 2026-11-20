@@ -2647,20 +2647,6 @@ def _seismic_vertical_magnitude(ctx):
             f"for 5%g {_at_global(_main_cell(ctx, 'k_vertical'))}.")
 
 
-@rule("main.seismic_negative_lem", WARNING, ("lem",),
-      "The LEM takes the magnitude of k_h and orients it itself; the sign is ignored.",
-      fields=("k_seismic",))
-def _seismic_negative_lem(ctx):
-    k = _num(ctx.sd.get("k_seismic"))
-    if k is None or k >= 0:
-        return None
-    return (f"Horizontal seismic coefficient k_h = {k:g} is negative. The limit-equilibrium "
-            f"engine applies the coefficient in the failure-driving direction "
-            f"automatically and ignores the sign, so this run is identical to "
-            f"k_h = {abs(k):g}. Enter a magnitude -- in the finite element engine the "
-            f"sign does set the direction {_at_global('D13')}.")
-
-
 @rule("main.crack_water_deeper_than_crack", ERROR, ("lem",),
       "Water in crack (main!D12) cannot exceed Tension crack depth (main!D11).",
       fields=("tcrack_depth", "tcrack_water"))
@@ -5243,36 +5229,14 @@ def _seismic2_k_zero(ctx):
 
 
 # ---------------------------------------------------------------------------
-# Family: seismic direction -- one cell, two meanings
+# Family: seismic direction
 #
-# The limit-equilibrium engine takes the MAGNITUDE of k and orients it itself
-# (slice.py:1689, kw = abs(k) * W); the finite element engine reads the SIGN as
-# direction (fem.py:6911, a signed horizontal body force). Both are documented,
-# each on its own engine's page, and neither page mentions the other. These two
-# INFOs state the convention of the engine actually being run, which is also the
-# copy a Run dialog shows.
+# The limit-equilibrium engine takes the MAGNITUDE of k_h and orients it itself
+# (slice.py, kw = abs(k) * W), so the sign never changes its answer and a limit
+# equilibrium run says nothing about it. The finite element engine reads the SIGN
+# as the direction (a signed horizontal body force), and this INFO states it on
+# every finite element run with a seismic force, which is the copy Run FEM shows.
 # ---------------------------------------------------------------------------
-
-@rule("main.seismic_direction_lem", INFO, ("lem",),
-      "The LEM applies k_h in the failure-driving direction and ignores its sign.",
-      fields=("k_seismic",))
-def _seismic_direction_lem(ctx):
-    k = _num(ctx.sd.get("k_seismic"))
-    if k is None or k == 0.0:
-        return None
-    text = (f"Horizontal seismic coefficient k_h = {k:g} is applied at magnitude "
-            f"{abs(k):g} in the failure-driving direction for each surface: the "
-            f"direction is automatic in the limit-equilibrium engine, so the sign is "
-            f"ignored. Enter a magnitude -- the finite element engine reads the same "
-            f"value as a vector, where +k_h pushes +x and -k_h pushes -x "
-            f"{_at_global('D13')}.")
-    kv = _num(ctx.sd.get("k_vertical"))
-    if kv:
-        text += (f" The vertical seismic coefficient k_v = {kv:g} is applied as "
-                 f"entered, {'downward' if kv > 0 else 'upward'} "
-                 f"{_at_global(_main_cell(ctx, 'k_vertical'))}.")
-    return text
-
 
 @rule("main.seismic_direction_fem", INFO, ("fem",),
       "In the FEM the sign of k_h sets the direction of the body force.",

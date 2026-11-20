@@ -229,8 +229,8 @@ input, and they are the ones easiest to miss by reading a single result:
   applies it in the failure-driving direction, ignoring the sign; the finite element engine reads the
   sign as direction, `+k` pushing `+x`. Both are correct for their formulation —
   a continuum code analyzes both faces at once and cannot know which one you are
-  checking — so preflight states the convention of the engine you are running rather
-  than trying to choose for you.
+  checking — so a finite element run with a seismic force carries a note stating the direction it
+  pushes. A limit equilibrium run says nothing about the sign, since it never changes the answer.
 - A **seepage field** is handed to the stability and stress engines as computed, and a
   pressure the flow problem tolerates can be one the stress problem cannot hold.
   `water.seep_pressure_on_free_surface` — a **WARNING**, on `lem` and `fem` runs — checks the

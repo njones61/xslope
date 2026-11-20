@@ -6185,9 +6185,6 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=0.7),
          expect='which is high', count=1),
-    dict(rule='main.seismic_negative_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
-         mutation=lambda sd: _pf_set(sd, k_seismic=-0.2),
-         expect='is negative'),
     dict(rule='main.seismic_vertical_invalid', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=0.2, k_vertical=-1.5),
          expect='lifted off the ground'),
@@ -6827,9 +6824,6 @@ PREFLIGHT_RULE_SPECS = [
          expect='same resultant'),
 
     # --- seismic direction -------------------------------------------------
-    dict(rule='main.seismic_direction_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
-         mutation=lambda sd: _pf_set(sd, k_seismic=0.15),
-         expect='the sign is ignored'),
     dict(rule='main.seismic_direction_fem', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_set(sd, k_seismic=0.15),

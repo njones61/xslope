@@ -692,7 +692,7 @@ Options start from the open file and are remembered for the session, not written
 
 Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)).
 
-The seismic note in the dialog explains the entered sign: **+k** pushes right and **−k** left; see [Seismic forces](../fem/overview.md#seismic-forces).
+The seismic note in the dialog explains the entered sign: **+k_h** pushes right and **−k_h** left; see [Seismic forces](../fem/overview.md#seismic-forces).
 
 **SSR exclusions…** opens the picker below; uncheck a material zone to hold it at full strength. The button and selection summary appear only for SSRM, and the selection is not saved; see [SSR exclusions](../fem/solver.md#ssr-exclusion-zones).
 

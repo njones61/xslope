@@ -3735,6 +3735,7 @@ class NewmarkDialog(QDialog):
         ky = float(self.ky.value())
         typed = not (self._ky_run and abs(ky - round(self._ky_run, 4)) < 5e-5)
         source = "typed in" if typed else self._ky_source
+        # The run uses the k_y the field shows, so a k_y left as filled and the same
+        # value typed in give the same displacement.
         return {"record": self._record, "path": self.path.text(),
-                "scale": self.scale(), "ky": self._ky_run if not typed else ky,
-                "ky_source": source}
+                "scale": self.scale(), "ky": ky, "ky_source": source}

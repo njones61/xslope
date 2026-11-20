@@ -144,11 +144,13 @@ each surface you want to check, such as the shallow circle, the deep circle, and
 
 After repeating the three steps for each surface, the one with the largest displacement is the third candidate.
 
-If only the peak of $k(t)$ is known, the input record can be scaled to it instead. In **Newmark…**, choose **Target
-peak acceleration (g)** and enter that peak. The scaled record keeps the shape of the input record rather than the
-shaking of the mass itself, so the displacement is a rougher estimate. For dams, Makdisi and Seed (1978) give charts of
-that peak as a fraction of the acceleration at the crest, against the depth of the sliding mass relative to the height
-of the dam.
+**When only the peak is known.** Without a response analysis of your own, you may have only an estimate of the largest
+value of $k(t)$, the peak average acceleration of the mass, $k_{max}$. For dams, Makdisi and Seed (1978) give charts of
+$k_{max}$ as a fraction of the peak acceleration at the crest, against the depth of the bottom of the sliding mass as a
+fraction of the height of the dam. With $k_{max}$, run the record for the site in place of $k(t)$. In **Newmark…**,
+choose **Target peak acceleration (g)** and enter $k_{max}$, so that the record is scaled to that peak. The scaled
+record has the right peak, but the timing and frequency content of the ground motion rather than of the mass's own
+shaking, so the displacement is a rougher estimate than one from $k(t)$.
 
 FHWA (2011) gives a simpler estimate of the average peak acceleration, for a mass that spans the full height of the
 slope. It multiplies the site's peak ground acceleration, adjusted for the soil at the site, by a factor that falls as

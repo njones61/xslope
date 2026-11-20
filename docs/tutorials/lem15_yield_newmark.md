@@ -68,10 +68,12 @@ the part under level ground, which adds nothing to the driving force when the sl
 that is safer before the earthquake can reach F = 1 at a lower seismic coefficient. Duncan, Wright, and Brandon (2014)
 suggest finding k<sub>y</sub> on both surfaces.
 
-Neither surface is always the right one. The surface with the lowest k<sub>y</sub> gives the largest displacement, but it
-is often deep, and a deep mass is shaken less than the record assumes, so its displacement can be overstated. Where the
-two surfaces agree, the choice does not matter. Where they differ, the engineer chooses, and the
-[Yield Coefficient](../seismic/yield_coefficient.md#which-surface) page discusses how.
+Neither surface is always the right one to use. The surface with the lowest k<sub>y</sub> gives the largest
+displacement, but it is often large and deep. A Newmark analysis shakes the whole sliding mass with one record. In an
+embankment, the peak accelerations generally grow from the bottom to the top (Duncan et al. 2014), so a large, deep mass
+is shaken less, on average, than a shallow one near the face. Shaking it with the full record overstates its
+displacement. Where the two surfaces agree, as they do on this slope, the choice does not matter. Where they differ, the
+[Yield Coefficient](../seismic/yield_coefficient.md#which-surface) page explains how to choose.
 
 ### Finding the yield coefficient
 

@@ -141,9 +141,9 @@ is computed; the form it uses is given on the
 Mohr-Coulomb is the usual choice, but it is one of six strength options a material can carry on
 the **mat** sheet. The FEM accepts `mc`, the criterion above; `cp`, an undrained strength that
 increases with depth from a reference elevation, assigned to each element at its centroid; `ratio`,
-an undrained strength that is a ratio of the vertical effective stress, also set at each element's
-centroid from the same soil column, surface loads, and pore pressure the limit equilibrium slices
-use; `pow`
+an undrained strength that is a ratio of the vertical effective stress, set at each Gauss point
+from the same soil column, surface loads, and pore pressure the limit equilibrium slices use (the
+results report each element's value at its centroid); `pow`
 and `hb`, the curved envelopes described next; and `elastic`, for a material that is never checked
 against a yield criterion and so stays elastic at every strength reduction factor (Rocscience RS2's
 "Plasticity: None"). Any other option is refused rather than run as zero-strength soil. The inputs

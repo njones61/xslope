@@ -24,6 +24,9 @@ Checks against closed forms and identities, no tolerances to tune:
   strength from its centroid: r gamma (ground - y) on the dry wedge; the c/p
   option's strength under level ground with the water at the surface; and the same
   again under a pond, whose load and pore pressure cancel.
+* **The Gauss-point strengths the solver yields at.** The same three identities at
+  every Gauss point of the prepared model, and both solution paths' working groups
+  carry them reduced by the trial F.
 
 Runs in a few seconds.
 """
@@ -220,6 +223,60 @@ def check_fem_wedge_dry():
     return []
 
 
+def _gauss_points(fd):
+    """The prepared model, and each static group's Gauss-point x, y and
+    strength-ratio s_u (NaN off a ratio material)."""
+    from xslope.fem import _prepare_fem_model
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        prep = _prepare_fem_model(fd)
+    nodes, el, et = fd["nodes"], fd["elements"], fd["element_types"]
+    out = []
+    for grp in prep["gp_groups_static"]:
+        xy = np.array([prep["elem_gp_data"][e][g]["N"] @ nodes[el[e][:et[e]]]
+                       for e, g in grp["pairs"]])
+        out.append((xy[:, 0], xy[:, 1], grp.get("c_ratio")))
+    return prep, out
+
+
+def check_fem_gauss_points():
+    fails = []
+    sd = _ratio(load_slope_data(WEDGE))
+    g = float(sd["materials"][0]["gamma"])
+    gx, gy = np.array(sd["ground_surface"].coords).T
+    fd = _fem(sd)
+    prep, groups = _gauss_points(fd)
+    for x, y, cr in groups:
+        want = R * g * np.maximum(0.0, np.interp(x, gx, gy) - y)
+        if cr is None or not np.allclose(cr, want, rtol=1e-9, atol=1e-9):
+            fails.append("FEM, dry wedge: Gauss-point strengths differ from r gamma "
+                         "(ground - y) at the point")
+    # Both paths' working groups reduce them by the trial F.
+    from xslope.fem import _nr_build_groups
+    F = 1.7
+    n = len(fd["elements"])
+    c_red = fd["c_by_elem"] / F
+    groups_nr = _nr_build_groups(prep, c_red, np.zeros(n), None,
+                                 finv_by_elem=np.full(n, 1.0 / F))
+    for grp, (_x, _y, cr) in zip(groups_nr, groups):
+        if not np.allclose(grp["c_r"], cr / F, rtol=1e-12, atol=0.0):
+            fails.append("FEM, Newton groups: Gauss-point strengths are not s_u / F")
+    base = load_slope_data(WEDGE)
+    wet = _level(base, water=True)
+    gw = float(wet["gamma_water"])
+    pond = _ratio(_level(base, pond=3.0), u="piezo")
+    pond["water_loads"] = "auto"
+    for label, model in (("level ground", _ratio(wet, u="piezo")), ("a 3 m pond", pond)):
+        _p, gps = _gauss_points(_fem(model))
+        for x, y, cr in gps:
+            want = R * (20.0 - gw) * np.maximum(0.0, 10.0 - y)
+            if cr is None or not np.allclose(cr, want, rtol=1e-9, atol=1e-6):
+                fails.append(f"FEM, {label}: Gauss-point strengths differ from "
+                             "r gamma' (ground - y)")
+                break
+    return fails
+
+
 def check_fem_level_ground_and_pond():
     fails = []
     base = load_slope_data(WEDGE)
@@ -247,7 +304,8 @@ def run():
     fails = []
     for check in (check_wedge_closed_form, check_wedge_minimum, check_level_ground_matches_cp,
                   check_pond_cancels, check_two_stage_factor_reduces_ratio,
-                  check_fem_wedge_dry, check_fem_level_ground_and_pond):
+                  check_fem_wedge_dry, check_fem_level_ground_and_pond,
+                  check_fem_gauss_points):
         try:
             fails += check()
         except Exception as exc:          # a crash is a failure, not a pass

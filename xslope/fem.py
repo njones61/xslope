@@ -3868,6 +3868,9 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         _ratio_element_strengths(slope_data, materials, nodes, elements, element_types,
                                  element_materials, u, _overburden_columns,
                                  _water_table, c_by_elem, phi_by_elem)
+        _ratio_gp = _ratio_gauss_point_inputs(slope_data, materials, element_materials)
+    else:
+        _ratio_gp = None
 
     # Get other parameters
     unit_weight = require_gamma_water(slope_data, "FEM analysis")
@@ -3950,6 +3953,10 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         # explicit ssr_zone kwarg wins. An EMPTY list means "reduce everything".
         "ssr_zones": list(slope_data.get("ssr_zones") or []),
         "c_by_elem": c_by_elem,  # Element-wise cohesion (for c/p option)
+        # The strength ratio's minimum c and ratio per element (NaN off a ratio
+        # material) and the surface loads, from which _prepare_fem_model sets the
+        # strength at each Gauss point. None on a model with no ratio material.
+        "ratio_gp": _ratio_gp,
         "phi_by_elem": phi_by_elem,  # Element-wise friction angle
         "pow_flag_by_elem": pow_flag_by_elem,  # power-curve elements (tangent-linearized in the VP loop)
         "pow_a_by_elem": pow_a_by_elem,
@@ -4286,7 +4293,9 @@ def _ratio_element_strengths(slope_data, materials, nodes, elements, element_typ
     surface load above it, ponded water included, minus the pore pressure there.
     The centroid and its pore pressure are the means over the element's nodes,
     exact for a field linear across the element, as the c/p option takes its
-    centroid. Fixed for the run, as the limit equilibrium slicer fixes it."""
+    centroid. Fixed for the run, as the limit equilibrium slicer fixes it. This is
+    the element's strength the results report; the solver yields at each Gauss
+    point's own value (:func:`_ratio_gauss_point_strengths`)."""
     polys = [(Polygon(c[0]), c[1], c[2] if len(c) > 2 else np.nan)
              for c in overburden_columns]
     y_top = float(np.max(nodes[:, 1])) + 1.0
@@ -4302,6 +4311,72 @@ def _ratio_element_strengths(slope_data, materials, nodes, elements, element_typ
         c_by_elem[e] = max(float(m.get("c", 0.0) or 0.0),
                            float(m.get("cp", 0.0) or 0.0) * max(0.0, sv - u_c))
         phi_by_elem[e] = 0.0
+
+
+_SURFACE_LOAD_KEYS = ("dloads", "dload_dirs", "dloads_derived", "distributed_loads",
+                      "distributed_load_dirs")
+
+
+def _ratio_gauss_point_inputs(slope_data, materials, element_materials):
+    """What :func:`_ratio_gauss_point_strengths` needs from slope_data: each
+    element's minimum c and ratio (NaN where the material is not option = ratio),
+    and a copy of the surface loads :func:`surface_vertical_load` reads."""
+    n = len(element_materials)
+    c_min, ratio = np.full(n, np.nan), np.full(n, np.nan)
+    for e in range(n):
+        m = materials[element_materials[e] - 1]
+        if str(m.get("option") or "").strip().lower() == "ratio":
+            c_min[e] = float(m.get("c", 0.0) or 0.0)
+            ratio[e] = float(m.get("cp", 0.0) or 0.0)
+    loads = copy.deepcopy({k: slope_data.get(k) for k in _SURFACE_LOAD_KEYS})
+    return {"c": c_min, "cp": ratio, "loads": loads}
+
+
+def _ratio_gauss_point_strengths(fem_data, elem_gp_data, u_gp):
+    """The strength ratio's s_u = max(c, c/p * sigma'_v) at every Gauss point of
+    a ratio element, where the yield check reads it: ``out[e]`` is a list over the
+    element's Gauss points, or None off a ratio material. sigma'_v is the soil
+    column above the point (gamma_sat below the water table), plus the vertical
+    surface load above it, minus the pore pressure the solver uses there. The
+    element's centroid value (:func:`_ratio_element_strengths`) stays the one the
+    results report; this one is what the material yields at. A strength that grows
+    linearly from the ground surface changes across a single element, and with one
+    value per element a mechanism could run along the bottoms of a row of surface
+    elements at the strength of their centroids."""
+    info = fem_data["ratio_gp"]
+    cols = fem_data.get("overburden_columns") or []
+    polys = [(Polygon(c[0]), c[1], c[2] if len(c) > 2 else np.nan) for c in cols]
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    water_table = fem_data.get("water_table")
+    y_top = float(np.max(nodes[:, 1])) + 1.0
+    out = []
+    for e in range(len(elem_gp_data)):
+        r = info["cp"][e]
+        if not np.isfinite(r):
+            out.append(None)
+            continue
+        c_min = float(info["c"][e])
+        coords = nodes[elements[e][:element_types[e]]]
+        vals = []
+        for g, gp_data in enumerate(elem_gp_data[e]):
+            N = gp_data['N']
+            x, y = float(N @ coords[:, 0]), float(N @ coords[:, 1])
+            sv = (_column_stress_at(polys, water_table, x, y, y_top)
+                  + surface_vertical_load(info["loads"], x))
+            vals.append(max(c_min, float(r) * max(0.0, sv - float(u_gp[e][g]))))
+        out.append(vals)
+    return out
+
+
+def _with_ratio_strength(c_r, c_ratio, finv):
+    """A group's reduced cohesion ``c_r`` with each strength-ratio Gauss point's
+    own s_u (``c_ratio``, NaN elsewhere) reduced by ``finv`` = 1/F in its place.
+    A group with no ratio point (``c_ratio`` None) comes back unchanged."""
+    if c_ratio is None:
+        return c_r
+    return np.where(np.isfinite(c_ratio), c_ratio * finv, c_r)
 
 
 def _gauss_point_overburden(fem_data, elem_gp_data):
@@ -4893,6 +4968,17 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                     grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
         gp_groups_static.append(grp)
     n_total_gp = sum(len(g['pairs']) for g in gp_groups_static)
+
+    # ---- Strength ratio at each Gauss point (F-independent) ----
+    # Fixed for the run from the pore pressures above; each trial reduces it by F
+    # where it gathers the group's cohesion (_with_ratio_strength).
+    if fem_data.get("ratio_gp") is not None:
+        _c_ratio = _ratio_gauss_point_strengths(fem_data, elem_gp_data, u_gp)
+        for grp in gp_groups_static:
+            _cr = np.array([np.nan if _c_ratio[e] is None else _c_ratio[e][g]
+                            for e, g in grp['pairs']])
+            if np.isfinite(_cr).any():
+                grp['c_ratio'] = _cr
 
     # ---- K0 initial stress: per-GP overburden (F-independent) ----
     sv0_gp = None
@@ -7545,7 +7631,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     tc_new = np.minimum(np.asarray(tc_new, dtype=float), _t_apex)
                 for grp in groups:
                     e = grp['e_idx']
-                    cc = c_r_new[e]
+                    cc = _with_ratio_strength(c_r_new[e], grp.get('c_ratio'),
+                                              1.0 / Fb[e])
                     if 'elastic' in grp:
                         cc = cc.copy()
                         cc[grp['elastic']] = np.inf
@@ -8387,7 +8474,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             'pairs': _sg['pairs'],
             'B': _sg['B'], 'D4': _sg['D4'], 'w': _sg['w'], 'dof': _sg['dof'],
             'dt_r': _sg['dt_r'],
-            'c_r': c_reduced[_e_idx],
+            'c_r': _with_ratio_strength(c_reduced[_e_idx], _sg.get('c_ratio'),
+                                        1.0 / F_by_elem[_e_idx]),
             'phi_r': phi_reduced[_e_idx],
             'F': F_by_elem[_e_idx],
             't_cap': t_cap_by_elem[_e_idx],
@@ -12725,6 +12813,16 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
             'csph': np.cos(phi_reduced[e_idx]),
             'ep': np.zeros((G, 4)),
         }
+        if sg.get('c_ratio') is not None:
+            # The strength ratio's own s_u at each Gauss point, kept on the group
+            # so a ramp can re-reduce it (see _restrength in solve_fem).
+            if finv_by_elem is None:
+                raise FemInvariantError(
+                    "a strength-ratio group needs the trial's 1/F per element to "
+                    "reduce its Gauss-point strengths; pass finv_by_elem.")
+            grp['c_ratio'] = sg['c_ratio']
+            grp['c_r'] = _with_ratio_strength(grp['c_r'], sg['c_ratio'],
+                                              np.asarray(finv_by_elem)[e_idx])
         # The surficial skin the min_slip_depth filter excludes (None when the
         # filter is off). It changes ONE thing: the tangent at these points stays
         # elastic — see _nr_group_state. Nothing about the internal force, the

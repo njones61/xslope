@@ -135,7 +135,7 @@ and when the earthquake comes:
 | Slope | Strength | In XSLOPE |
 |---|---|---|
 | A new slope, with the earthquake soon after construction | Unconsolidated-undrained (UU) tests, total stresses | c and φ from the tests, with no pore pressure on the material |
-| An existing slope that has consolidated under its own weight | UU tests on representative samples, total stresses | As above |
+| An existing slope that has consolidated under its own weight | UU tests on representative samples, total stresses | As above, or a [`ratio`](../lem/overview.md) material where the undrained strength is known as a ratio of the vertical effective stress |
 | A new slope, after it consolidates | Consolidated-undrained (CU) tests | d and ψ, run as a [two-stage analysis](two_stage.md); or the R envelope's c<sub>R</sub> and φ<sub>R</sub> in a [single stage](two_stage.md#single-stage) |
 | Free-draining gravels and cobbles | Drained | c′ and φ′ |
 
@@ -158,7 +158,11 @@ al. (2014), Sec. 10.5, check it in three steps:
    Where a soil may lose strength as it drains afterward, the lower of its drained and undrained strengths applies.
 
 In **xslope** the third step is an ordinary limit equilibrium run with no seismic coefficient, with the reduced
-strengths entered as each material's strength. A zone that liquefies is entered as a material of its own.
+strengths entered as each material's strength. A zone that liquefies is entered as a material of its own. Some
+correlations give a liquefied soil's residual strength as a ratio of the vertical effective stress before the
+earthquake, the liquefied strength ratio (Olson and Stark 2002; Idriss and Boulanger 2008). That zone can be a
+[`ratio`](../lem/overview.md) material, with the ratio in its **c/p** column and the water as it stood before the
+earthquake, so that $\sigma'_v$ is the stress the ratio was correlated against.
 
 ## Pages in This Section
 
@@ -172,9 +176,13 @@ strengths entered as each material's strength. A zone that liquefies is entered 
 
 - Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014). *Soil Strength and Slope Stability*, 2nd ed. Wiley, Hoboken,
   NJ. Chapter 10.
+- Idriss, I.M., and Boulanger, R.W. (2008). *Soil Liquefaction During Earthquakes.* Monograph MNO-12, Earthquake
+  Engineering Research Institute, Oakland, CA.
 - Makdisi, F.I., and Seed, H.B. (1977). *A Simplified Procedure for Estimating Earthquake-Induced Deformation in Dams
   and Embankments.* Report UCB/EERC-77/19, University of California, Berkeley.
 - Newmark, N.M. (1965). "Effects of earthquakes on dams and embankments." *Géotechnique*, 15(2), 139–160.
+- Olson, S.M., and Stark, T.D. (2002). "Liquefied strength ratio from liquefaction flow failure case histories."
+  *Canadian Geotechnical Journal*, 39(3), 629–647.
 - Seed, H.B. (1979). "Considerations in the earthquake-resistant design of earth and rockfill dams." Nineteenth
   Rankine Lecture, *Géotechnique*, 29(3), 215–263.
 - Terzaghi, K. (1950). "Mechanism of landslides." In *Application of Geology to Engineering Practice* (Berkey

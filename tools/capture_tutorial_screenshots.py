@@ -1390,6 +1390,14 @@ def lem07_low_materials_const():
                            edit={"option": "mc", "c": 22.5})
 
 
+def lem07_low_materials_ratio():
+    """Part C's edit: the lower layer as option `ratio`, ratio 0.1875 in c/p and a
+    15 kN/m² minimum in c. Under the bench, where the clay carries only its own
+    weight, this is the c/p profile exactly; under the slope it is stronger."""
+    return _lem07_material(LEM07_B, "lem07_studio_low_materials_ratio.png", row=2,
+                           edit={"option": "ratio", "c": 15.0, "cp": 0.1875})
+
+
 def lem07_low_run_lem():
     """Part B's run: Bishop's Simplified, auto search, 50 slices — the slice count
     the step raises from the dialog's default."""
@@ -1408,6 +1416,7 @@ SHOTS.update({
     "lem07_run_lem": lem07_run_lem,
     "lem07_low_materials_cp": lem07_low_materials_cp,
     "lem07_low_materials_const": lem07_low_materials_const,
+    "lem07_low_materials_ratio": lem07_low_materials_ratio,
     "lem07_low_run_lem": lem07_low_run_lem,
 })
 

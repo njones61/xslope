@@ -717,8 +717,9 @@ def _apply_material_tag(slope_data, test):
     Brandon's Table 10.4, which runs eight strength sets (four soils, each as a
     two-stage d/psi material and as an R envelope) on one geometry: one workbook per
     water case carries all eight, and the tag picks the row. Then any
-    `mat_<column>=<value>` keys are set on every row. Returns an error message, or
-    None (also when the tag sets neither)."""
+    `mat_<column>=<value>` keys are set on every row, and `mat<k>_<column>=<value>`
+    keys on row k (1-based). Returns an error message, or None (also when the tag
+    sets neither)."""
     name = str(test.get('material', '')).strip()
     if name:
         named = [m for m in slope_data.get('materials', []) if m.get('name') == name]
@@ -728,11 +729,22 @@ def _apply_material_tag(slope_data, test):
     # `mat_<column>=<value>` sets that column on every row of the materials table,
     # for a tutorial whose reader edits a strength between runs of one file (LEM-14
     # enters the R envelope's c and phi, then c', phi', d, and psi, on one soil).
+    # `mat<k>_<column>=<value>` sets it on row k only (1-based), for a layered model
+    # whose reader edits one soil (LEM-7 turns two of three clays into ratios).
     for key, raw in test.items():
-        if not key.startswith('mat_'):
+        row = re.match(r'mat(\d+)_(.+)$', key)
+        if key.startswith('mat_'):
+            col = key[len('mat_'):]
+        elif row:
+            col = row.group(2)
+        else:
             continue
-        col = key[len('mat_'):]
         mats = slope_data.get('materials', [])
+        if row:
+            k = int(row.group(1))
+            if not 1 <= k <= len(mats):
+                return f"{key}: the materials table has no row {k}"
+            mats = [mats[k - 1]]
         if not mats or any(col not in m for m in mats):
             return f"{key}: the materials table has no column {col!r}"
         try:
@@ -7701,10 +7713,11 @@ def run_preflight_corpus_test(test):
             if t.get('max_iter_ceiling'):
                 sel['max_iterations_ceiling'] = int(float(t['max_iter_ceiling']))
         # A tag that edits the model before it runs (`material=`, `mat_<column>=`,
-        # `k_seismic=`, `k_vertical=`) is checked on the model as edited: LEM-14's
-        # two-stage rows enter d and psi on a file whose fill carries the R envelope.
+        # `mat<k>_<column>=`, `k_seismic=`, `k_vertical=`) is checked on the model as
+        # edited: LEM-14's two-stage rows enter d and psi on a file whose fill carries
+        # the R envelope, and LEM-7's ratio rows turn its clays into ratios.
         mods = tuple(sorted((k, v) for k, v in t.items()
-                            if k.startswith('mat_')
+                            if k.startswith('mat_') or re.match(r'mat\d+_', k)
                             or k in ('material', 'k_seismic', 'k_vertical')))
         key = (f, analysis, tuple(sorted(sel.items())), mods)
         if key in cases:

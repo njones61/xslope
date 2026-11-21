@@ -3070,6 +3070,19 @@
       "model": "docs/lem/files/xslope_low_clay.xlsx",
       "references": [
         {
+          "anchor": "entering-the-ratio",
+          "checks": [
+            "LEM-7-ratio-both",
+            "LEM-7-ratio-lower"
+          ],
+          "level": 3,
+          "page": "tutorials/lem07_strength_envelopes/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem07_strength_envelopes.md",
+          "title": "Entering the ratio",
+          "url": "https://xslope.org/en/latest/tutorials/lem07_strength_envelopes/#entering-the-ratio"
+        },
+        {
           "anchor": "opening-the-model_1",
           "checks": [
             "circular_search"
@@ -6937,7 +6950,8 @@
           "checks": [
             "LEM-14-dry-one-stage",
             "LEM-14-dry-two-stage-interpolated",
-            "LEM-14-dry-two-stage-kc1"
+            "LEM-14-dry-two-stage-kc1",
+            "LEM-14-dry-two-stage-kc1-factor"
           ],
           "level": 2,
           "page": "tutorials/lem14_pseudostatic/",
@@ -29039,7 +29053,7 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 731,
+    "tags": 734,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

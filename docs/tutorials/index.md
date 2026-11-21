@@ -160,13 +160,13 @@ An embankment on bedrock that dips across the section, entered as closed materia
 <span class="tut-num">7</span>
 </div>
 <div class="tut-body" markdown>
-<p class="tut-kicker">LEM-7 · Limit equilibrium · 30–40 min</p>
+<p class="tut-kicker">LEM-7 · Limit equilibrium · 40–50 min</p>
 
 ### [Strength Options Beyond Mohr-Coulomb](lem07_strength_envelopes.md)
 
-Two slopes whose strength is not a pair of numbers — a compacted clay fitted once as a curved power envelope and once as the straight Mohr-Coulomb line through the same triaxial data, and a layered clay whose undrained strength grows with depth, flattened to a constant to see how the search responds when strength no longer increases with depth.
+Two slopes whose strength is not a pair of numbers — a compacted clay fitted once as a curved power envelope and once as the straight Mohr-Coulomb line through the same triaxial data, and a layered clay whose undrained strength grows with depth, flattened to a constant to see how the search responds when strength no longer increases with depth, and then entered as strength ratios, as the clays become once they consolidate under the slope.
 
-<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">three materials</span><span class="tut-tag">power-curve envelope</span><span class="tut-tag">Mohr-Coulomb</span><span class="tut-tag">strength with depth</span><span class="tut-tag">undrained strength</span><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span></p>
+<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">three materials</span><span class="tut-tag">power-curve envelope</span><span class="tut-tag">Mohr-Coulomb</span><span class="tut-tag">strength with depth</span><span class="tut-tag">strength ratio</span><span class="tut-tag">undrained strength</span><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span></p>
 
 </div>
 </div>

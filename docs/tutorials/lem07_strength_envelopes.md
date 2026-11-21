@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-7 — Strength Options Beyond Mohr-Coulomb"
-description: "Two slopes whose strength is not a straight line in XSLOPE: Baker's compacted clay, where a curved envelope gives a factor of safety below one and its linear fit gives 1.5, and Low's layered clay, where undrained strength grows with depth and keeps the critical surface above the base of the model."
+description: "Two slopes whose strength is not a straight line in XSLOPE: Baker's compacted clay, where a curved envelope gives a factor of safety below one and its linear fit gives 1.5, and Low's layered clay, where undrained strength grows with depth and keeps the critical surface above the base of the model, and the same clays as strength ratios, which they become once they consolidate under the slope."
 ---
 
 # Tutorial LEM-7 — Strength Options Beyond Mohr-Coulomb
@@ -11,23 +11,26 @@ a curved power envelope, once as the straight Mohr-Coulomb line — and the two
 fits give opposite results on whether the slope stands. Part B is a layered undrained
 slope whose lowest clay gets stronger the deeper the surface cuts, and where
 flattening that profile to a single strength moves the failure to the bottom of
-the model. The choice of strength model can change the answer as much as the
-geometry can.
+the model. Part C enters the same clays as ratios of the vertical effective
+stress, which makes them stronger under the slope than in front of it, as they
+become once they consolidate under its weight. The choice of strength model can
+change the answer as much as the geometry can.
 
 ![A 6 m slope in compacted clay with a nonlinear strength envelope](images/lem07_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>30–40 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>40–50 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to use strength options beyond Mohr-Coulomb: how to
-enter a non-linear envelope and a strength that varies with elevation, and how
-to measure what each choice does to the factor of safety and the critical
-surface against its linear or constant stand-in.
+enter a non-linear envelope, a strength that varies with elevation, and a
+strength that is a ratio of the effective stress, and how to measure what each
+choice does to the factor of safety and the critical surface against its linear
+or constant stand-in.
 </div>
-<p><span class="tg-pill">power-curve envelope</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">strength with depth</span><span class="tg-pill">undrained strength</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span></p>
+<p><span class="tg-pill">power-curve envelope</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">strength with depth</span><span class="tg-pill">strength ratio</span><span class="tg-pill">undrained strength</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed models** — [xslope_baker_clay.xlsx](../lem/files/xslope_baker_clay.xlsx), the compacted-clay slope of [verification problem VP44](../verification/rocscience.md#vp44) with its power-curve envelope, and [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx), the layered undrained slope of [verification problem VP23](../verification/rocscience.md#vp23) with its depth-varying strength</div>
 </div>
 
@@ -304,6 +307,99 @@ alone.
 
 ---
 
+## Part C — Strength from the effective stress {#part-c-strength-from-the-effective-stress}
+
+The `cp` option ties the strength to elevation, so in Part B the lower clay has
+the same strength under the crest as in front of the toe. That is the clay as it
+stood before the slope was built on it. Once the clay has consolidated under the
+slope's weight, its strength follows the vertical effective stress σ′<sub>v</sub>
+instead: the weight of the soil above a point, less the pore pressure there. A
+point in the lower clay under the crest carries two to three times the soil that
+a point at the same elevation in front of the toe carries. The `ratio` option models this
+strength as s<sub>u</sub> = max(c, r·σ′<sub>v</sub>), where r is the strength
+ratio and c is a minimum strength. In this part we enter the clays as ratios and
+compare the answers with Part B's.
+
+### Entering the ratio
+
+Open [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx) again, so the
+lower clay is back to its `cp` profile. Open **Materials**, switch to **List
+view**, select the third row, and change **Model (option)** to `ratio` with
+these values:
+
+| option | c | c/p |
+| --- | :---: | :---: |
+| ratio | 15 | 0.1875 |
+
+For this option the **c/p** field holds the ratio r and **c** the minimum
+strength. The `r-elev` field leaves the form, since a ratio needs no reference
+elevation. The plot draws the strength against σ′<sub>v</sub>: 15 kPa up to
+σ′<sub>v</sub> = 80 kPa, then rising at 0.1875 kPa per kPa:
+
+![The lower clay as a strength ratio](images/lem07_studio_low_materials_ratio.png)
+
+These two numbers reproduce Part B's profile in front of the toe. The model has
+no water and every soil weighs 20 kN/m³, so σ′<sub>v</sub> is 20 kN/m³ times
+the depth below the ground. Under the bench at elevation 8, the top of the lower
+clay, at elevation 4, has σ′<sub>v</sub> = 80 kPa and a strength of 15 kPa; its
+base, at elevation 0, has 160 kPa and 30 kPa. That is Part B's line, since
+0.1875 is its rate of 3.75 kPa per meter divided by 20 kN/m³. Under the crest,
+8 m more soil stands above the clay, and the same ratio gives 45 kPa at the top
+of the layer and 60 kPa at its base.
+
+### Running the analysis
+
+Click **OK** and run the same Bishop auto search at 50 slices:
+
+![Bishop with the lower clay as a strength ratio](images/lem07_low_ratio.png){width=1000}
+
+**FS = 1.394**, against 1.142 with the `cp` profile. The critical circle no
+longer enters the lower clay: it is tangent to elevation 4.00, the top of that
+layer, and its lowest part runs through the middle clay, whose strength is still
+a constant 15 kPa. The circle is centered at (18.00, 16.06), and its 29.00 m of
+surface carry 2767.0 kN/m of soil. The lower clay is now stronger under the
+slope, so the search finds its critical surface above it.
+
+<!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, mat3_option=ratio, mat3_c=15, mat3_cp=0.1875, expected_fs=1.394, tolerance=0.005, benchmark=LEM-7-ratio-lower -->
+
+### The middle clay as a ratio
+
+The middle clay's constant 15 kPa is also its strength from before the slope was
+built. Entered as a ratio with the same r = 0.1875 and c = 15, it keeps 15 kPa
+everywhere in front of the toe, where σ′<sub>v</sub> is at most 80 kPa, and gains
+strength under the slope as the lower clay does. Select the second row, make the
+same edit, click **OK**, and run again:
+
+![Bishop with both clays as strength ratios](images/lem07_low_ratio_both.png){width=1000}
+
+**FS = 1.613.** With both clays stronger under the slope, the circle goes deep
+again and is tangent to elevation 1.06. Of its 38.56 m of surface, 19.11 m runs
+through the lower clay, where the mobilized strength averages 34.18 kPa, against
+22.88 kPa on Part B's critical circle.
+
+<!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, mat2_option=ratio, mat2_c=15, mat2_cp=0.1875, mat3_option=ratio, mat3_c=15, mat3_cp=0.1875, expected_fs=1.613, tolerance=0.005, benchmark=LEM-7-ratio-both -->
+
+### Choosing between the profile and the ratio
+
+| Clays | Bishop FS | Tangent elevation |
+| --- | :---: | :---: |
+| `cp` profile and constant (Part B) | 1.142 | 0.83 |
+| Lower clay as a ratio | 1.394 | 4.00 |
+| Both clays as ratios | 1.613 | 1.06 |
+
+The two strength models agree in front of the toe and differ only under the
+slope, so the choice between them turns on whether the clay has consolidated
+under the slope's weight. Low's paper is about embankments on soft ground. An
+embankment loads the clay faster than the clay can drain, so at the end of
+construction the clay still has the strength it had before: Part B's profile,
+and FS = 1.142. As the clay consolidates under the embankment, its strength
+rises toward the ratio's, and the factor of safety rises toward 1.613. So an
+embankment on soft clay is least stable at the end of construction, and some
+are built in stages, with time between them for the clay to gain strength. Entering a ratio for a clay that has not yet consolidated under the
+slope credits it with strength from a load it does not yet carry.
+
+---
+
 ## Conclusion
 
 This tutorial covered:
@@ -314,6 +410,9 @@ This tutorial covered:
   linear fit extrapolates cohesion the tests never measured, and on shallow
   surfaces it can overstate the answer badly.
 - The `cp` option for an undrained strength that grows with depth.
+- The `ratio` option for an undrained strength tied to the vertical effective
+  stress. It agrees with `cp` under level ground and is stronger under a slope,
+  and it applies once the clay has consolidated under the slope's weight.
 - Replacing a strength profile with a constant changes the surface the search
   selects, not just the number it reports.
 

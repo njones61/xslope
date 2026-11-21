@@ -1,14 +1,14 @@
 ---
 title: "Tutorial LEM-14 — Pseudostatic Analysis"
-description: "A 15 ft fill slope at a seismic coefficient of 0.15, analyzed with undrained strengths from consolidated-undrained tests: in one stage with the R envelope, in two stages with each choice of stage 2 strength, dry and with a water table, and by finite element strength reduction at the same coefficient."
+description: "A 15 ft fill slope at a seismic coefficient of 0.15, analyzed with undrained strengths from consolidated-undrained tests: in one stage with the R envelope, in two stages with each choice of stage 2 strength and with a strength reduction, dry and with a water table, and by finite element strength reduction at the same coefficient."
 ---
 
 # Tutorial LEM-14 — Pseudostatic Analysis
 
 This tutorial shows how to analyze a slope for earthquake loading with a pseudostatic seismic coefficient and
 undrained strengths from consolidated-undrained tests. The slope is a 15 ft fill at 2:1. We run it at a seismic
-coefficient of 0.15 in one stage with the R envelope, then in two stages with each choice of stage 2 strength, first dry
-and then with a water table. Last, we run finite element strength reduction at the same coefficient.
+coefficient of 0.15 in one stage with the R envelope, then in two stages with each choice of stage 2 strength and with
+a strength reduction, first dry and then with a water table. Last, we run finite element strength reduction at the same coefficient.
 
 ![A 15 ft fill slope at 2:1 on a rigid base 15 ft below the toe, with level ground 45 ft wide behind the crest and in front of the toe, a water table 6 ft below the crest at the back that comes out at the toe, and a seismic coefficient of 0.15](images/lem14_problem_sketch.png){width=1000}
 
@@ -19,10 +19,10 @@ and then with a water table. Last, we run finite element strength reduction at t
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to enter a seismic coefficient, how to enter the strengths for a one-stage analysis with the
-R envelope and for a two-stage analysis, and how the two procedures, the two stage 2 strengths, and a water table change
-the factor of safety.
+R envelope and for a two-stage analysis, and how the two procedures, the two stage 2 strengths, a strength reduction, and
+a water table change the factor of safety.
 </div>
-<p><span class="tg-pill">one material</span><span class="tg-pill">seismic coefficient</span><span class="tg-pill">R envelope</span><span class="tg-pill">two-stage seismic</span><span class="tg-pill">Kc = 1 envelope</span><span class="tg-pill">d and ψ</span><span class="tg-pill">piezometric line</span><span class="tg-pill">Spencer</span><span class="tg-pill">circular search</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span></p>
+<p><span class="tg-pill">one material</span><span class="tg-pill">seismic coefficient</span><span class="tg-pill">R envelope</span><span class="tg-pill">two-stage seismic</span><span class="tg-pill">Kc = 1 envelope</span><span class="tg-pill">strength factor</span><span class="tg-pill">d and ψ</span><span class="tg-pill">piezometric line</span><span class="tg-pill">Spencer</span><span class="tg-pill">circular search</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span></p>
 <div class="tgm-model" markdown>
 **Starter file** — [xslope_pseudostatic_start.xlsx](files/xslope_pseudostatic_start.xlsx), the dry slope with the R
 envelope and no seismic coefficient
@@ -154,6 +154,25 @@ Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.2825, S
 
 <!-- test: file=files/xslope_pseudostatic_start.xlsx, type=circular_search, method=spencer, num_slices=40, k_seismic=0.15, mat_c=0, mat_phi=45, mat_d=64, mat_psi=24.4, seismic2=interpolated, expected_fs=1.282, tolerance=0.005, benchmark=LEM-14-dry-two-stage-interpolated -->
 
+### Reducing the undrained strength
+
+A seismic coefficient usually comes from a screening method, a published procedure that pairs the coefficient with a
+minimum factor of safety and, in most methods, a reduction of the soil's strength, most often by 15 to 20 percent (see
+[Choosing the Seismic Coefficient](../seismic/overview.md#choosing-k)). In a two-stage analysis, the **Strength factor**
+applies that reduction: it multiplies the undrained strengths in stage 2. To see its effect, set **Stage 2 strength**
+back to `Kc = 1 envelope`, set **Strength factor** to `0.8`, a 20 percent reduction, and run again. The Log reports:
+
+```text
+Critical FS = 0.855
+Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.3499, Stage 2 (seismic, undrained strength from the K_c = 1 envelope, times 0.80) FS = 0.8547
+```
+
+The critical circle is the same one, and the factor of safety is 0.8 times 1.068. Every slice of the fill takes its
+undrained strength in stage 2, so the factor reduces every strength the slope relies on. Stage 1 is unchanged, since the
+reduction applies only to stage 2. Set **Strength factor** back to 1 before going on.
+
+<!-- test: file=files/xslope_pseudostatic_start.xlsx, type=circular_search, method=spencer, num_slices=40, k_seismic=0.15, mat_c=0, mat_phi=45, mat_d=64, mat_psi=24.4, seismic2=kc1, seismic2_factor=0.8, expected_fs=0.855, tolerance=0.005, benchmark=LEM-14-dry-two-stage-kc1-factor -->
+
 ### Comparing the dry results
 
 | Procedure | FS |
@@ -161,12 +180,15 @@ Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.2825, S
 | One stage, R envelope | 0.956 |
 | Two stages, K<sub>c</sub> = 1 envelope | 1.068 |
 | Two stages, interpolated | 1.282 |
+| Two stages, K<sub>c</sub> = 1 envelope, strength factor 0.8 | 0.855 |
 
-The one-stage factor of safety is below 1, and both two-stage factors of safety are above 1. The one-stage factor of
+The one-stage factor of safety is below 1, and both two-stage factors of safety at full strength are above 1. The one-stage factor of
 safety is 90 percent of the two-stage one with the K<sub>c</sub> = 1 envelope.
 Duncan et al. found the one-stage analysis between 81 and 90 percent of the two-stage one for all four of their soils.
 The interpolation raises the strength further because the drained envelope, at φ′ = 45°, lies far above the
-K<sub>c</sub> = 1 envelope at the stresses on this slope.
+K<sub>c</sub> = 1 envelope at the stresses on this slope. A 20 percent strength reduction takes the K<sub>c</sub> = 1
+result below 1. A screening method's strength reduction, seismic coefficient, and minimum factor of safety go together,
+so the result is judged against the minimum of the method that set the reduction.
 
 ---
 

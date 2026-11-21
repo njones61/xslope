@@ -7515,6 +7515,8 @@ def lem14_plots():
     b = _lem14_run("dry, two stages, Kc = 1", dry_2, seismic2="kc1")
     _lem14_capture("lem14_dry_two_stage.png", dry_2, b)
     _lem14_run("dry, two stages, interp.", dry_2, seismic2="interpolated")
+    _lem14_run("dry, Kc = 1, factor 0.8", dry_2,
+               seismic2={"strength": "kc1", "factor": 0.8})
     _lem14_run("wet, two stages, Kc = 1", wet_2, seismic2="kc1")
     _lem14_run("wet, two stages, interp.", wet_2, seismic2="interpolated")
     b = _lem14_run("wet, one stage, R", wet_r)

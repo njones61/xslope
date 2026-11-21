@@ -758,6 +758,19 @@ def _apply_seismic_tag(slope_data, test):
     return None
 
 
+def _tag_seismic2(test):
+    """A tag's two-stage seismic option: `seismic2=interpolated|kc1` names the stage 2
+    strength, and `seismic2_factor=f` adds the stage 2 strength factor (the dict
+    form). Absent -> False (no two-stage analysis)."""
+    strength = str(test.get('seismic2', '')).strip().lower() or False
+    factor = str(test.get('seismic2_factor', '')).strip()
+    if factor:
+        if not strength:
+            raise ValueError("seismic2_factor needs seismic2=interpolated|kc1")
+        return {"strength": strength, "factor": float(factor)}
+    return strength
+
+
 def run_lem_test(test):
     """Run a single LEM test (single_circle, circular_search, or noncircular_search)."""
     from xslope.fileio import load_slope_data
@@ -774,7 +787,7 @@ def run_lem_test(test):
     rapid = str(test.get('rapid', 'false')).strip().lower() in ('true', '1', 'yes')
     # `seismic2=interpolated|kc1` runs the two-stage pseudostatic seismic analysis
     # (advanced.seismic_two_stage) with that stage 2 strength. Absent -> none.
-    seismic2 = str(test.get('seismic2', '')).strip().lower() or False
+    seismic2 = _tag_seismic2(test)
     # `composite=true` lets a circle be truncated at the bottom of the model and run
     # along it (slice.CompositeSurface). Only for problems whose base is a real
     # impenetrable boundary; off by default.
@@ -1406,7 +1419,7 @@ def run_critical_kc_test(test):
             analysis='auto_search' if search else 'single_surface',
             surface=str(test.get('surface', 'circular')).strip().lower(),
             num_slices=int(test.get('num_slices', 40)),
-            seismic2=str(test.get('seismic2', '')).strip().lower() or False,
+            seismic2=_tag_seismic2(test),
             ky=True, announce=False)
     except AnalysisError as e:
         return None, str(e)

@@ -283,9 +283,9 @@ A 10 m rock cut whose strength is described by four field observations rather th
 
 ### [Pseudostatic Analysis](lem14_pseudostatic.md)
 
-A 15 ft fill slope at a seismic coefficient of 0.15, with undrained strengths from consolidated-undrained tests: run in one stage with the R envelope and in two stages with each choice of stage 2 strength, dry and with a water table, and then by strength reduction at the same coefficient.
+A 15 ft fill slope at a seismic coefficient of 0.15, with undrained strengths from consolidated-undrained tests: run in one stage with the R envelope and in two stages with each choice of stage 2 strength and with a strength reduction, dry and with a water table, and then by strength reduction at the same coefficient.
 
-<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">seismic coefficient</span><span class="tut-tag">R envelope</span><span class="tut-tag">two-stage seismic</span><span class="tut-tag">Kc = 1 envelope</span><span class="tut-tag">d and ψ</span><span class="tut-tag">piezometric line</span><span class="tut-tag">Spencer</span><span class="tut-tag">circular search</span><span class="tut-tag">strength reduction</span><span class="tut-tag">quadratic triangles</span></p>
+<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">seismic coefficient</span><span class="tut-tag">R envelope</span><span class="tut-tag">two-stage seismic</span><span class="tut-tag">Kc = 1 envelope</span><span class="tut-tag">strength factor</span><span class="tut-tag">d and ψ</span><span class="tut-tag">piezometric line</span><span class="tut-tag">Spencer</span><span class="tut-tag">circular search</span><span class="tut-tag">strength reduction</span><span class="tut-tag">quadratic triangles</span></p>
 
 </div>
 </div>

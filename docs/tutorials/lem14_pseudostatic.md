@@ -125,7 +125,7 @@ K<sub>c</sub> = 1 envelope:
 A material with d and ψ is one that does not drain during the earthquake, and stage 2 gives its slices an undrained
 strength. A material without them would keep its drained strength in both stages.
 
-Click **Run → Run LEM…** again, tick **Two-stage seismic**, and set **Stage 2 strength** to `Kc = 1 envelope`:
+Click **Run → Run LEM…** again, tick **Two-stage seismic**, and set **Stage 2 strength** to `Kc = 1 envelope`. Leave **Strength factor** at 1:
 
 ![Run LEM with Two-stage seismic ticked and the Kc = 1 envelope chosen](images/lem14_studio_run_lem_two_stage.png)
 

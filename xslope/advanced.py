@@ -86,15 +86,67 @@ def seismic2_strength(seismic2):
     ``seismic2`` is False (no two-stage analysis), True or ``"interpolated"`` (the
     default: Duncan, Wright & Wong's interpolation, as in rapid drawdown), or
     ``"kc1"`` (the K_c = 1 envelope at the stage 1 stresses, with no
-    interpolation, as Duncan, Wright & Brandon's Table 10.4 was computed). Any
-    other value raises ValueError."""
+    interpolation, as Duncan, Wright & Brandon's Table 10.4 was computed). It may
+    also be a dict, ``{"strength": <one of those>, "factor": <0 < f <= 1>}``, which
+    adds the stage 2 strength factor (:func:`seismic2_factor`); a dict without
+    ``"strength"`` means ``"interpolated"``. Any other value raises ValueError."""
+    if isinstance(seismic2, dict):
+        seismic2_factor(seismic2)
+        unknown = set(seismic2) - {"strength", "factor"}
+        if unknown:
+            raise ValueError(f"seismic2 takes the keys 'strength' and 'factor', not "
+                             f"{sorted(unknown)}.")
+        strength = seismic2.get("strength", "interpolated")
+        if strength is False or strength is None:
+            raise ValueError("A seismic2 dict names a stage 2 strength: 'interpolated' "
+                             "or 'kc1'.")
+        return seismic2_strength(strength)
     if seismic2 is False or seismic2 is None:
         return None
     if seismic2 is True:
         return "interpolated"
     if isinstance(seismic2, str) and seismic2.lower() in SEISMIC2_STRENGTHS:
         return seismic2.lower()
-    raise ValueError(f"seismic2 must be False, True, 'interpolated', or 'kc1', not {seismic2!r}.")
+    raise ValueError(f"seismic2 must be False, True, 'interpolated', 'kc1', or a dict "
+                     f"with 'strength' and 'factor', not {seismic2!r}.")
+
+
+def seismic2_factor(seismic2):
+    """The stage 2 strength factor a ``seismic2`` argument carries: the number each
+    low-permeability slice's stage 2 undrained strength is multiplied by, 1 unless
+    ``seismic2`` is a dict with a ``"factor"``. The screening methods' strength
+    reduction (Duncan, Wright & Brandon 2014, Table 10.1; 0.8 to 0.85 of the static
+    undrained strength for soils that don't liquefy) goes here: in a two-stage run
+    it can't be applied to the inputs, which also set stage 1. A factor outside
+    0 < f <= 1 raises ValueError."""
+    if not isinstance(seismic2, dict) or seismic2.get("factor") is None:
+        return 1.0
+    try:
+        f = float(seismic2["factor"])
+    except (TypeError, ValueError):
+        raise ValueError(f"The stage 2 strength factor must be a number, not "
+                         f"{seismic2['factor']!r}.") from None
+    if not (0.0 < f <= 1.0):
+        raise ValueError(f"The stage 2 strength factor must be greater than 0 and at "
+                         f"most 1, not {f:g}.")
+    return f
+
+
+def seismic2_tag(seismic2):
+    """The label a run's announcement puts after the method's name: ``""`` with no
+    two-stage analysis, else " (two-stage seismic)" with the K_c = 1 choice and
+    the stage 2 strength factor named when they apply."""
+    strength = seismic2_strength(seismic2)
+    if not strength:
+        return ""
+    words = ", K_c = 1 envelope" if strength == "kc1" else ""
+    return f" (two-stage seismic{words}{seismic2_factor_words(seismic2_factor(seismic2))})"
+
+
+def seismic2_factor_words(factor):
+    """How the Log, the report, and run labels name a stage 2 strength factor:
+    ``""`` at 1, ``", times 0.80"`` otherwise."""
+    return "" if factor == 1.0 else f", times {factor:.2f}"
 
 
 def seismic_stages_line(results, where):
@@ -102,6 +154,7 @@ def seismic_stages_line(results, where):
     safety on ``where`` ("the critical surface", "the surface"), and how stage 2
     took its undrained strength."""
     how = SEISMIC2_STRENGTHS[results.get("seismic_strength", "interpolated")]
+    how += seismic2_factor_words(results.get("seismic_factor", 1.0))
     return (f"Two-stage seismic stages on {where}: Stage 1 (static) FS = "
             f"{results['seismic_stage1_FS']:.4f}, Stage 2 (seismic, undrained strength "
             f"{how}) FS = {results['seismic_stage2_FS']:.4f}")
@@ -244,9 +297,14 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
         The limit equilibrium method ('spencer', 'bishop', ...).
     debug_level : int
         0: no output, 1: each stage's factor of safety, >1: per-slice detail.
-    strength : str or True
+    strength : str, True, or dict
         How stage 2 takes the undrained strength: ``"interpolated"`` (or True, the
-        default) or ``"kc1"``; see :func:`seismic2_strength`.
+        default) or ``"kc1"``; see :func:`seismic2_strength`. A dict
+        ``{"strength": ..., "factor": f}`` also multiplies every low-permeability
+        slice's stage 2 undrained strength by f (:func:`seismic2_factor`), the
+        screening methods' strength reduction; the free-draining slices keep their
+        drained strength, since the reduction is on undrained strength (Duncan,
+        Wright & Brandon 2014, p. 182).
 
     Returns
     -------
@@ -263,6 +321,7 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
           out zero or negative and stage 2 used the lower of the two envelopes
           (always False with ``"kc1"``).
         - ``seismic_strength``: ``"interpolated"`` or ``"kc1"``.
+        - ``seismic_factor``: the stage 2 strength factor (1 unless one was given).
 
         The keys are distinct from rapid drawdown's, so nothing that reads a
         rapid drawdown result mistakes this for one.
@@ -274,6 +333,7 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
                            f"(option='{_opt}'), which is not supported in the "
                            "two-stage seismic analysis.")
 
+    factor = seismic2_factor(strength)
     strength = seismic2_strength(strength)
     if strength is None:
         return False, "seismic_two_stage needs a stage 2 strength: 'interpolated' or 'kc1'."
@@ -320,6 +380,10 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
         df, sigma_fc, tau_fc, "Two-stage seismic", debug_level, kc1=(strength == "kc1"))
     if err:
         return False, err
+    if factor != 1.0:
+        # The low-permeability slices now carry c = tau_ff, phi = 0.
+        low = np.asarray(low_k_flags, dtype=bool)
+        df.loc[low, 'c'] = df.loc[low, 'c'].to_numpy() * factor
     df['kw'] = kw.values
     if kvw is not None:
         df['kvw'] = kvw.values
@@ -340,6 +404,7 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
     result['seismic_low_k'] = low_k_flags
     result['seismic_fallback'] = fallback_flags
     result['seismic_strength'] = strength
+    result['seismic_factor'] = factor
     return True, result
 
 

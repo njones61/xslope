@@ -1308,7 +1308,10 @@ def analysis_options(slope_data, solutions):
            "surface": surface,
            "num_slices": int(slices),
            "rapid": "stage1_FS" in results,
-           "seismic2": results.get("seismic_strength", False),
+           "seismic2": (results.get("seismic_strength", False)
+                        if results.get("seismic_factor", 1.0) == 1.0 else
+                        {"strength": results.get("seismic_strength", "interpolated"),
+                         "factor": results["seismic_factor"]}),
            "ky": bool(ref.get("yield")),
            "composite": False,
            "grid_seed": False}
@@ -3721,6 +3724,7 @@ def _seismic2_section(results, counter, slope_data=None, slice_df=None,
     sub = Section("Two-Stage Seismic Analysis")
     s1, s2 = results["seismic_stage1_FS"], results["seismic_stage2_FS"]
     strength = results.get("seismic_strength", "interpolated")
+    factor = results.get("seismic_factor", 1.0)
     low_k = _rapid_flags(results, slice_df, "seismic_low_k")
     if low_k is None and slice_df is not None and {"d", "psi"} <= set(slice_df.columns):
         low_k = [bool(d > 0 or p > 0) for d, p in zip(slice_df["d"], slice_df["psi"])]
@@ -3747,7 +3751,10 @@ def _seismic2_section(results, counter, slope_data=None, slice_df=None,
         f"(c′, φ′) in every material, and gives the effective normal and shear "
         f"stress on each slice base before the earthquake. Stage 2 gives each "
         f"slice whose base is in a material with a nonzero d or ψ an undrained "
-        f"strength τ_ff, {how}; free-draining materials keep c′, φ′. Stage 2 "
+        f"strength τ_ff, {how}"
+        + (f", multiplied by the stage 2 strength factor, {factor:.2f}, the strength "
+           f"reduction of a screening method" if factor != 1.0 else "")
+        + f"; free-draining materials keep c′, φ′. Stage 2 "
         f"adds the seismic force k_hW with {k_txt}, and its factor of safety is the "
         f"one reported. {where} gives the strengths and F for each stage.",
         links=links))
@@ -3762,8 +3769,9 @@ def _seismic2_section(results, counter, slope_data=None, slice_df=None,
     if n_low == 0:
         strengths2 = "c′, φ′ in all materials"
     else:
-        undrained = ("undrained (τ_ff from d, ψ)" if strength == "kc1"
-                     else "undrained (τ_ff from d, ψ and c′, φ′)")
+        undrained = ("undrained (τ_ff from d, ψ" if strength == "kc1"
+                     else "undrained (τ_ff from d, ψ and c′, φ′")
+        undrained += f", × {factor:.2f})" if factor != 1.0 else ")"
         strengths2 = (f"{undrained} in {_join(names)}" if names else
                       f"{undrained} in the low-permeability materials")
         if low_k is None or n_low < len(low_k):

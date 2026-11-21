@@ -10292,6 +10292,12 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'seismic2_factor': (
+        'seismic2_factor_check.py',
+        "The two-stage seismic analysis's stage 2 strength factor: with every slice "
+        "undrained in stage 2, F scales by exactly the factor in every LEM method and "
+        "stage 1 is unchanged; free-draining slices keep their drained strength; the "
+        "yield coefficient carries it; out-of-range factors are refused."),
     'vertical_seismic': (
         'vertical_seismic_check.py',
         "The vertical seismic coefficient: on a dry frictional circle every LEM "
@@ -16985,7 +16991,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'rapid_drained_surface': 3, 'noncircular_kink': 3,
-              'fem_yield_coefficient': 1, 'vertical_seismic': 2,
+              'fem_yield_coefficient': 1, 'vertical_seismic': 2, 'seismic2_factor': 2,
               'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
@@ -17413,6 +17419,9 @@ def main():
         # (a few seconds).
         tests.append({'type': 'vertical_seismic',
                       'method': 'all', 'source': 'vertical_seismic'})
+        # The two-stage seismic analysis's stage 2 strength factor (a few seconds).
+        tests.append({'type': 'seismic2_factor',
+                      'method': 'all', 'source': 'seismic2_factor'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
         # ponded water into. File-less (builds on xslope_acads_simple).

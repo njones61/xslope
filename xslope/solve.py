@@ -362,11 +362,13 @@ def solve_selected(method_name, slice_df, rapid=False, seismic2=False):
     rapid : bool, optional
         If True, performs rapid drawdown analysis using the specified method.
         Default is False.
-    seismic2 : bool or str, optional
+    seismic2 : bool, str, or dict, optional
         If set, performs the two-stage pseudostatic seismic analysis
         (:func:`xslope.advanced.seismic_two_stage`) with the specified method:
         True or ``"interpolated"`` for the rapid drawdown interpolation, ``"kc1"``
-        for the K_c = 1 envelope alone. Default is False. Not with ``rapid``.
+        for the K_c = 1 envelope alone, or ``{"strength": ..., "factor": f}`` to
+        also multiply the stage 2 undrained strengths by f. Default is False. Not
+        with ``rapid``.
 
     Returns
     -------

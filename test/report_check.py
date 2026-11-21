@@ -2045,6 +2045,27 @@ def test_seismic2_section():
         if kv != [f"{res['FS']:.3f}"]:
             fails.append(f"{where}: the reported factor reads {kv}")
 
+    # The stage 2 strength factor: named in the procedure and in the stage 2 row
+    # when it is below 1, absent at 1 (466a).
+    df, res = _solve(sd, {"strength": "kc1", "factor": 0.8})
+    sub = _seismic2_section(res, _Counter(), sd, df, surface="specified circle")
+    prose = " ".join(b.text for b in block(sub, "prose")) if sub else ""
+    if "multiplied by the stage 2 strength factor, 0.80" not in prose:
+        fails.append("factor 0.8: the procedure does not name the stage 2 strength factor")
+    rows = block(sub, "table")[0].rows if sub else []
+    if not rows or "× 0.80" not in rows[1][2]:
+        fails.append(f"factor 0.8: the stage 2 strengths read {rows[1][2] if rows else None!r}")
+    df1, res1 = _solve(sd, "kc1")
+    sub1 = _seismic2_section(res1, _Counter(), sd, df1, surface="specified circle")
+    if "strength factor" in " ".join(b.text for b in block(sub1, "prose")):
+        fails.append("factor 1: the procedure names a strength factor")
+    from xslope.report import analysis_options
+    for r, want in ((res, {"strength": "kc1", "factor": 0.8}), (res1, "kc1")):
+        got = analysis_options(sd, {"lem": {"results": r, "slice_df": df}}
+                               ).get("seismic2")
+        if got != want:
+            fails.append(f"analysis_options rebuilt seismic2 = {got!r}, not {want!r}")
+
     # Not a two-stage result: no block.
     df, res = _solve(sd, False)
     if _seismic2_section(res, _Counter(), sd, df) is not None:

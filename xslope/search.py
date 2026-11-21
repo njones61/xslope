@@ -20,7 +20,8 @@ import numpy as np
 from shapely.geometry import LineString, Point
 
 from . import solve
-from .advanced import (no_low_k_sentence, rapid_drawdown, seismic2_strength, seismic_stages_line,
+from .advanced import (no_low_k_sentence, rapid_drawdown, seismic2_strength, seismic2_tag,
+                       seismic_stages_line,
                        seismic_two_stage, validate_rapid_drawdown)
 # Re-exported beside the search it feeds: a starting set for a model that carries
 # no circles is a search input, and a caller reaching for one is already here.
@@ -1750,9 +1751,11 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         Which family to run over, for a model that defines both.
     num_slices, rapid, composite, grid_seed, diagnostic
         The run options, under the names Studio's Run LEM dialog gives them.
-    seismic2 : bool or str
+    seismic2 : bool, str, or dict
         The two-stage pseudostatic analysis (:func:`xslope.advanced.seismic_two_stage`):
-        False, or the stage 2 strength (True or ``"interpolated"``, ``"kc1"``).
+        False, or the stage 2 strength (True or ``"interpolated"``, ``"kc1"``), or
+        ``{"strength": ..., "factor": f}`` to multiply the stage 2 undrained
+        strengths by f (:func:`xslope.advanced.seismic2_factor`).
     ky : bool
         Find the seismic yield coefficient instead of the factor of safety at the
         model's k (:func:`xslope.seismic.yield_coefficient`): on the specified
@@ -1815,9 +1818,7 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             grid_seed=grid_seed, diagnostic=diagnostic, cancel_check=cancel_check,
             fs_tol=fs_tol, tol=tol, max_iter=max_iter,
             min_slip_depth=min_slip_depth, announce=announce)
-    tag = (" (rapid drawdown)" if rapid else
-           " (two-stage seismic, K_c = 1 envelope)" if seismic2_strength(seismic2) == "kc1" else
-           " (two-stage seismic)" if seismic2 else "")
+    tag = " (rapid drawdown)" if rapid else seismic2_tag(seismic2)
     # Recorded before anything is solved, so what comes back says how it was made
     # whichever branch made it.
     made_under = {"analysis": analysis,

@@ -129,7 +129,10 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   [Yield Coefficient](../seismic/yield_coefficient.md)). **Two-stage seismic** runs the two-stage
   pseudostatic analysis, and **Stage 2 strength** under it chooses how stage 2 takes
   the undrained strength: **Interpolated (as in rapid drawdown)** or **Kc = 1
-  envelope** (see [Two-Stage Analysis](../seismic/two_stage.md)). The two can be
+  envelope** (see [Two-Stage Analysis](../seismic/two_stage.md)). **Strength factor**
+  multiplies those undrained strengths: 1 leaves them as computed, and a screening
+  method's reduction, such as 0.8, goes here (see
+  [Stage 2 Strength Factor](../seismic/two_stage.md#factor)). The two can be
   combined. Neither runs with **Rapid drawdown**: checking one clears the other.
 
 ![Run LEM dialog with Two-stage seismic checked](images/analysis_run_lem_seismic.png)

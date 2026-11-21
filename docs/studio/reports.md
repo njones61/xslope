@@ -139,8 +139,8 @@ Then **one block per method**, under that method's own heading:
   [crosses no material with d and ψ](../lem/rapid.md#drained-surfaces) is
   stated as such, with c′, φ′ in all materials for stage 2.
 - **Two-stage seismic**, for a [two-stage seismic](../seismic/two_stage.md) run —
-  the factor of safety of each stage on the surface and how stage 2 took the
-  undrained strength.
+  the factor of safety of each stage on the surface, how stage 2 took the
+  undrained strength, and the stage 2 strength factor when it is below 1.
 - **Yield coefficient**, for a run that found [k<sub>y</sub>](../seismic/yield_coefficient.md)
   — k<sub>y</sub> and the factor of safety on that surface with no seismic force;
   after a search, a table of the searches that located the minimum, each with the

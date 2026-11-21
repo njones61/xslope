@@ -117,8 +117,9 @@ multiplier:
 Each method is complete in itself: a factor of safety at or above its minimum, computed with its reference
 acceleration, multiplier, and strength reduction, indicates a displacement no larger than its tolerable one. Duncan et
 al. (2014), Table 10.1, compare the methods of Seed (1979), Hynes-Griffin and Franklin (1984), Kavazanjian et al.
-(1997), Bray et al. (1998), NCHRP 12-70 (2008), Bray and Travasarou (2009), and FHWA (2011). **xslope** applies no
-strength reduction of its own: to follow a method that calls for one, enter the reduced strengths.
+(1997), Bray et al. (1998), NCHRP 12-70 (2008), Bray and Travasarou (2009), and FHWA (2011). To follow a method that
+calls for a strength reduction, enter the reduced strengths in a single-stage analysis; in a two-stage analysis, set the
+[stage 2 strength factor](two_stage.md#factor).
 
 **Peak accelerations.** For a site in the United States, the U.S. Geological Survey's
 [Unified Hazard Tool](https://earthquake.usgs.gov/hazards/interactive/) gives the peak ground acceleration on rock

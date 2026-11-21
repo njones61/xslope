@@ -58,6 +58,21 @@ The undrained strength is one of two choices, set in the run:
 The two choices differ where the envelopes do. Where the $K_c = 1$ envelope lies below the drained envelope at the
 stresses on the surface, the interpolation raises the strength; where it lies above, the interpolation lowers it.
 
+## Stage 2 Strength Factor {#factor}
+
+Most [screening methods](overview.md#choosing-k) reduce the static undrained strength, usually to 80 or 85 percent
+(Duncan et al. 2014, Table 10.1). In a two-stage analysis the reduction can't be made on the inputs: $c'$ and $\phi'$
+also set stage 1 and $K_f$, so reducing them changes the consolidation stresses, and can bring stage 1 below a factor
+of safety of 1. The **stage 2 strength factor**, $f$, applies it after the undrained strength is computed:
+
+>>$\tau_{ff,\,\mathrm{used}} = f\,\tau_{ff} \qquad 0 < f \le 1$
+
+Stage 1 is unchanged, and materials without $d$ and $\psi$ keep their drained strength in stage 2: the reduction is
+on the undrained strength (Duncan et al. 2014, Sec. 10.2). The default, 1, uses the strengths as computed. Duncan et
+al. (2014, Sec. 10.4.3) argue that the higher undrained strength at earthquake loading rates offsets a loss of 15 to
+20 percent (see [Choosing the Strengths](overview.md#strengths)). Where no screening method calls for a reduction,
+that is the case for leaving it at 1.
+
 ## Requirements {#requirements}
 
 A two-stage run is refused when:
@@ -68,6 +83,7 @@ A two-stage run is refused when:
 - a material carries $d$ or $\psi$ but not both;
 - a material with $d$ and $\psi$ uses a power-curve or Hoek-Brown envelope;
 - the run is also a rapid drawdown analysis.
+- the [stage 2 strength factor](#factor) is not greater than 0 and at most 1.
 
 A horizontal seismic coefficient of 0 draws a warning: stage 2 is then a static analysis with undrained strengths. A material
 whose strength is an undrained c/p ratio keeps that strength in both stages, and its $d$ and $\psi$ are not read.
@@ -120,7 +136,7 @@ choice's values on the same slope.
 ## In Studio {#studio}
 
 In the **Run LEM…** dialog, under **Seismic**, check **Two-stage seismic** and choose the **Stage 2 strength**: **Interpolated
-(as in rapid drawdown)** or **Kc = 1 envelope**. A run is a rapid drawdown analysis or a two-stage seismic analysis,
+(as in rapid drawdown)** or **Kc = 1 envelope**. **Strength factor** is the [stage 2 strength factor](#factor). A run is a rapid drawdown analysis or a two-stage seismic analysis,
 never both, so checking one clears the other.
 
 ![The Run LEM dialog with Two-stage seismic checked and the Stage 2 strength under it](../studio/images/analysis_run_lem_seismic.png)
@@ -143,8 +159,9 @@ results = bundle["results"]
 print(results["seismic_stage1_FS"], results["seismic_stage2_FS"])
 ```
 
-`seismic2` is `False` (no two-stage analysis), `True` or `"interpolated"`, or `"kc1"`. `results["FS"]` is stage 2's
-factor of safety. `circular_search` and `noncircular_search` take the same argument.
+`seismic2` is `False` (no two-stage analysis), `True` or `"interpolated"`, or `"kc1"`. For a stage 2 strength factor,
+pass a dict: `seismic2={"strength": "kc1", "factor": 0.8}`. `results["FS"]` is stage 2's factor of safety, and
+`results["seismic_factor"]` the factor used. `circular_search` and `noncircular_search` take the same argument.
 
 ## References
 

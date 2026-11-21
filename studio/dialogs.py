@@ -1506,9 +1506,14 @@ class RunLemDialog(QDialog):
             "slice in a material with d and ψ an undrained strength from those "
             "stresses and adds the seismic force kW; its factor of safety is the "
             "answer. Materials without d and ψ stay drained.")
+        from xslope.advanced import seismic2_factor, seismic2_strength
+        try:
+            _s2_strength = seismic2_strength(_s2) if _s2 else None
+            _s2_factor = seismic2_factor(_s2)
+        except ValueError:
+            _s2_strength, _s2_factor = None, 1.0
         self.seismic2_strength = self._combo(
-            SEISMIC2_STRENGTH_CHOICES,
-            _s2 if isinstance(_s2, str) else "interpolated")
+            SEISMIC2_STRENGTH_CHOICES, _s2_strength or "interpolated")
         self.seismic2_strength.setToolTip(
             "How stage 2 takes the undrained strength.\n\n"
             "Interpolated: between the Kc = 1 envelope (d, ψ) and the drained "
@@ -1518,6 +1523,22 @@ class RunLemDialog(QDialog):
             "interpolation. This is how the book's Table 10.4 was computed.")
         self.seismic2_strength_label = QLabel("Stage 2 strength")
         self.seismic2_strength_label.setToolTip(self.seismic2_strength.toolTip())
+        # The screening methods' strength reduction (Duncan, Wright & Brandon 2014,
+        # Table 10.1), on the stage 2 undrained strengths only: it can't be applied
+        # to the inputs, which also set stage 1.
+        self.seismic2_factor = QDoubleSpinBox()
+        self.seismic2_factor.setRange(0.05, 1.0)
+        self.seismic2_factor.setSingleStep(0.05)
+        self.seismic2_factor.setDecimals(2)
+        self.seismic2_factor.setValue(_s2_factor)
+        self.seismic2_factor.setToolTip(
+            "Multiplies each stage 2 undrained strength (the slices in materials "
+            "with d and ψ). Free-draining materials keep their drained strength.\n\n"
+            "1 uses the strength as computed. A screening analysis reduces it as its "
+            "method directs, usually to 0.8 or 0.85 (Duncan, Wright & Brandon 2014, "
+            "Table 10.1).")
+        self.seismic2_factor_label = QLabel("Strength factor")
+        self.seismic2_factor_label.setToolTip(self.seismic2_factor.toolTip())
 
         # The seismic yield coefficient (Duncan, Wright & Brandon 2014, Sec. 10.1.3):
         # the run finds k instead of using the model's. Not with a rapid drawdown,
@@ -1554,6 +1575,16 @@ class RunLemDialog(QDialog):
         sr.addWidget(self.seismic2_strength_label)
         sr.addWidget(self.seismic2_strength, 1)
         form.addRow("", strength_row)
+        factor_row = QWidget()
+        fr = QHBoxLayout(factor_row)
+        fr.setContentsMargins(0, 0, 0, 0)
+        fr.addSpacing(style.pixelMetric(QStyle.PM_IndicatorWidth, None, self.seismic2)
+                      + style.pixelMetric(QStyle.PM_CheckBoxLabelSpacing, None,
+                                          self.seismic2))
+        fr.addWidget(self.seismic2_factor_label)
+        fr.addWidget(self.seismic2_factor)
+        fr.addStretch(1)
+        form.addRow("", factor_row)
 
         # Composite surfaces: let a circle be truncated at the bottom of the model
         # and run along it. Off by default — the floor of a profile-line model is
@@ -1852,11 +1883,20 @@ class RunLemDialog(QDialog):
         if on and self.rapid.isChecked():
             self.rapid.setChecked(False)
 
+    def _seismic2_option(self):
+        """The run's ``seismic2`` option (see :func:`xslope.advanced.seismic2_strength`)."""
+        if not self.seismic2.isChecked():
+            return False
+        strength = self.seismic2_strength.currentData()
+        factor = round(self.seismic2_factor.value(), 2)
+        return strength if factor == 1.0 else {"strength": strength, "factor": factor}
+
     def _sync_seismic2(self, *_):
         """The stage 2 strength choice means something only for a two-stage run."""
         on = self.seismic2.isChecked()
-        self.seismic2_strength.setEnabled(on)
-        self.seismic2_strength_label.setEnabled(on)
+        for w in (self.seismic2_strength, self.seismic2_strength_label,
+                  self.seismic2_factor, self.seismic2_factor_label):
+            w.setEnabled(on)
 
     def _sync_seep_time(self):
         """A rapid drawdown reads its two stage times, not a single instant, so the
@@ -1914,9 +1954,9 @@ class RunLemDialog(QDialog):
             "surface": self._surface_value(),
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
-            # False, or the stage 2 strength choice ("interpolated" / "kc1").
-            "seismic2": (self.seismic2_strength.currentData()
-                         if self.seismic2.isChecked() else False),
+            # False, the stage 2 strength choice ("interpolated" / "kc1"), or, with
+            # a strength factor below 1, {"strength": ..., "factor": ...}.
+            "seismic2": self._seismic2_option(),
             "ky": self.ky.isChecked(),
             "composite": self.composite.isChecked(),
             "grid_seed": self.grid_seed.isChecked(),

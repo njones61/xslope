@@ -25,7 +25,7 @@ import re
 import numpy as np
 
 from . import solve
-from .advanced import seismic2_strength, seismic_two_stage
+from .advanced import seismic2_strength, seismic2_tag, seismic_two_stage
 from .slice import generate_slices
 
 #: The largest seismic coefficient the bracket search tries before it reports
@@ -76,7 +76,9 @@ class _OneSurface:
         # scales with k as the horizontal one does (see yield_coefficient).
         self.kvw1 = self.df["kvw"].to_numpy(copy=True)
         self.method = method
-        self.strength = seismic2_strength(seismic2)
+        # The whole option (strength choice and factor) goes to each stage 2 solve;
+        # seismic2_strength() also checks it here, once.
+        self.seismic2 = seismic2 if seismic2_strength(seismic2) else False
         self.func = getattr(solve, method)
         self.trace = []
 
@@ -85,9 +87,9 @@ class _OneSurface:
         df = self.df.copy()
         df["kw"] = k * self.kw1
         df["kvw"] = k * self.kvw1
-        if self.strength:
+        if self.seismic2:
             ok, res = seismic_two_stage(df, self.method, debug_level=0,
-                                        strength=self.strength)
+                                        strength=self.seismic2)
         else:
             ok, res = self.func(df)
         if not ok:
@@ -296,8 +298,7 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
     noun = analyzed_surface_noun(search, circular)
     base = "circle" if circular else "surface"
     strength = seismic2_strength(seismic2)
-    tag = (" (two-stage seismic, K_c = 1 envelope)" if strength == "kc1" else
-           " (two-stage seismic)" if strength else "")
+    tag = seismic2_tag(seismic2)
     made_under = {"analysis": analysis,
                   "surface": "circular" if circular else "noncircular",
                   "num_slices": num_slices, "rapid": False, "seismic2": seismic2,

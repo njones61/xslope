@@ -3754,6 +3754,9 @@ def _seismic2_section(results, counter, slope_data=None, slice_df=None,
         f"strength τ_ff, {how}"
         + (f", multiplied by the stage 2 strength factor, {factor:.2f}, the strength "
            f"reduction of a screening method" if factor != 1.0 else "")
+        + (f"; c/p materials keep their undrained strength, times the same factor in "
+           f"stage 2" if factor != 1.0 and slice_df is not None and "cp_flag" in slice_df.columns
+           and bool(slice_df["cp_flag"].any()) else "")
         + f"; free-draining materials keep c′, φ′. Stage 2 "
         f"adds the seismic force k_hW with {k_txt}, and its factor of safety is the "
         f"one reported. {where} gives the strengths and F for each stage.",

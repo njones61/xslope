@@ -10,8 +10,10 @@ The factor multiplies each low-permeability slice's stage 2 undrained strength
   c/F, so F at factor f is exactly f times F at 1. Stage 1 doesn't change. Run on
   Duncan, Wright & Brandon's Fig. 10.7 slope (the Table 10.4 workbook) in every
   method, with both stage 2 strength choices.
-* **Free-draining slices keep their drained strength.** On a slice table with
-  half its slices stripped of d and psi, the factor scales c on the others only.
+* **Free-draining slices keep their drained strength; c/p slices are reduced.**
+  On a slice table with a third of its slices stripped of d and psi and a third
+  made c/p slices, the factor scales c on the d/psi and c/p slices only, and
+  stage 1 doesn't change.
 * **The yield coefficient gets it.** k_y with the factor is lower, and the
   two-stage analysis at that k_y with the same factor gives F = 1.
 * **The option is checked.** A factor outside 0 < f <= 1, or a dict with a key
@@ -86,20 +88,59 @@ def check_f_scales_by_the_factor():
 def check_free_draining_slices_keep_their_strength():
     fails = []
     _sd, df = _slices()
-    drained = np.arange(len(df)) % 2 == 0
-    df.loc[drained, "d"] = 0.0
-    df.loc[drained, "psi"] = 0.0
+    if "cp_flag" not in df.columns:
+        return ["the slice table has no cp_flag column"]
+    k = np.arange(len(df)) % 3
+    drained, cp = k == 0, k == 1
+    df.loc[drained | cp, "d"] = 0.0
+    df.loc[drained | cp, "psi"] = 0.0
+    # a c/p slice as the slicer builds one: c the undrained strength, phi, c1, phi1 0
+    df.loc[cp, "c"] = 900.0
+    df.loc[cp, ["phi", "c1", "phi1"]] = 0.0
+    df.loc[cp, "cp_flag"] = True
     one, scaled = df.copy(), df.copy()
-    ok1, _r1 = seismic_two_stage(one, "spencer", debug_level=0, strength="interpolated")
-    okf, _rf = seismic_two_stage(scaled, "spencer", debug_level=0,
-                                 strength={"strength": "interpolated", "factor": FACTOR})
+    ok1, r1 = seismic_two_stage(one, "spencer", debug_level=0, strength="interpolated")
+    okf, rf = seismic_two_stage(scaled, "spencer", debug_level=0,
+                                strength={"strength": "interpolated", "factor": FACTOR})
     if not (ok1 and okf):
-        return ["spencer found no solution on the half-drained slice table"]
+        return [f"spencer found no solution on the mixed slice table ({r1 if not ok1 else rf})"]
     if not np.allclose(scaled.loc[drained, "c"], df.loc[drained, "c1"]) or \
             not np.allclose(scaled.loc[drained, "phi"], df.loc[drained, "phi1"]):
         fails.append("the factor changed the strength of a slice with no d or psi")
-    if not np.allclose(scaled.loc[~drained, "c"], FACTOR * one.loc[~drained, "c"]):
-        fails.append(f"the undrained slices' c is not {FACTOR} times its value at factor 1")
+    und = ~drained
+    if not np.allclose(scaled.loc[und, "c"], FACTOR * one.loc[und, "c"]):
+        fails.append(f"the d/psi and c/p slices' c is not {FACTOR} times its value at factor 1")
+    if not np.allclose(scaled.loc[cp, "c"], FACTOR * 900.0):
+        fails.append("the c/p slices' strength was not reduced")
+    if rf["seismic_stage1_FS"] != r1["seismic_stage1_FS"]:
+        fails.append("the factor changed stage 1 on the mixed slice table")
+    return fails
+
+
+def check_the_slicer_flags_cp_slices():
+    """Both slice-table builders mark c/p slices: generate_slices, and
+    update_slice_materials after a material switches to c/p."""
+    from xslope.slice import update_slice_materials
+    sd = load_slope_data(MODEL)
+    row = next(m for m in sd["materials"] if m.get("name") == "Soil 2 R envelope")
+    mc = [dict(row) for _ in sd["materials"]]
+    cp = [dict(row, option="cp", c=500.0, cp=20.0, r_elev=30.0) for _ in sd["materials"]]
+    fails = []
+    for mats, want in ((mc, False), (cp, True)):
+        s = dict(sd, materials=mats)
+        ok, out = generate_slices(s, circle=s["circles"][0], num_slices=20)
+        if not ok:
+            return [f"generate_slices failed: {out}"]
+        if bool(out[0]["cp_flag"].all()) != want or bool(out[0]["cp_flag"].any()) != want:
+            fails.append(f"generate_slices: cp_flag is not {want} on every slice")
+    s = dict(sd, materials=mc)
+    ok, out = generate_slices(s, circle=s["circles"][0], num_slices=20, material_breakdown=True)
+    try:
+        df2 = update_slice_materials(out[0].copy(), cp)
+    except ValueError as exc:
+        return fails + [f"update_slice_materials refused the c/p switch: {exc}"]
+    if not bool(df2["cp_flag"].all()):
+        fails.append("update_slice_materials left cp_flag False after a switch to c/p")
     return fails
 
 
@@ -171,6 +212,7 @@ def run():
     """Failures as a list, for run_tests.py."""
     fails = []
     for check in (check_f_scales_by_the_factor, check_free_draining_slices_keep_their_strength,
+                  check_the_slicer_flags_cp_slices,
                   check_the_yield_coefficient_gets_it, check_the_option_is_checked,
                   check_the_words):
         try:

@@ -67,8 +67,10 @@ of safety of 1. The **stage 2 strength factor**, $f$, applies it after the undra
 
 >>$\tau_{ff,\,\mathrm{used}} = f\,\tau_{ff} \qquad 0 < f \le 1$
 
-Stage 1 is unchanged, and materials without $d$ and $\psi$ keep their drained strength in stage 2: the reduction is
-on the undrained strength (Duncan et al. 2014, Sec. 10.2). The default, 1, uses the strengths as computed. Duncan et
+It multiplies every undrained strength in stage 2: $\tau_{ff}$ in the materials with $d$ and $\psi$, and the strength
+of a material whose undrained strength comes from c/p, which is the same in both stages. Stage 1 is unchanged, and
+materials without $d$ and $\psi$ keep their drained strength in stage 2: the reduction is on the undrained strength
+(Duncan et al. 2014, Sec. 10.2). The default, 1, uses the strengths as computed. Duncan et
 al. (2014, Sec. 10.4.3) argue that the higher undrained strength at earthquake loading rates offsets a loss of 15 to
 20 percent (see [Choosing the Strengths](overview.md#strengths)). Where no screening method calls for a reduction,
 that is the case for leaving it at 1.

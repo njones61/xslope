@@ -2217,8 +2217,8 @@ The pages under https://xslope.org/en/latest/seismic/overview/ are the reference
   phi in ONE stage with the pore pressures from BEFORE the earthquake (steady seepage). Free-draining
   gravels keep c', phi' (leave d/psi blank). A screening strength reduction (DWB Table 10.1, usually
   0.8): in one stage enter the reduced strengths; in two stages pass
-  `seismic2={"strength": ..., "factor": 0.8}`, which scales only the stage 2 undrained strengths
-  (reducing c', phi', d, psi would also change stage 1).
+  `seismic2={"strength": ..., "factor": 0.8}`, which scales only the stage 2 undrained strengths,
+  d/psi and c/p materials alike (reducing the inputs would also change stage 1).
 - **Two-stage** (`seismic2="interpolated"` default, or `"kc1"` to reproduce DWB Table 10.4): stage 1
   static and drained, stage 2 undrained from stage-1 stresses plus the seismic force; no stage 3.
   Refused with `rapid=True`, without any d/psi material, with d or psi alone, on pow/hb materials

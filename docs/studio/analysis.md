@@ -130,7 +130,8 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   pseudostatic analysis, and **Stage 2 strength** under it chooses how stage 2 takes
   the undrained strength: **Interpolated (as in rapid drawdown)** or **Kc = 1
   envelope** (see [Two-Stage Analysis](../seismic/two_stage.md)). **Strength factor**
-  multiplies those undrained strengths: 1 leaves them as computed, and a screening
+  multiplies the stage 2 undrained strengths, including those of c/p materials: 1
+  leaves them as computed, and a screening
   method's reduction, such as 0.8, goes here (see
   [Stage 2 Strength Factor](../seismic/two_stage.md#factor)). The two can be
   combined. Neither runs with **Rapid drawdown**: checking one clears the other.

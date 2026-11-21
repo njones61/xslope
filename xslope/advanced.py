@@ -112,8 +112,8 @@ def seismic2_strength(seismic2):
 
 
 def seismic2_factor(seismic2):
-    """The stage 2 strength factor a ``seismic2`` argument carries: the number each
-    low-permeability slice's stage 2 undrained strength is multiplied by, 1 unless
+    """The stage 2 strength factor a ``seismic2`` argument carries: the number every
+    stage 2 undrained strength (d/psi and c/p materials) is multiplied by, 1 unless
     ``seismic2`` is a dict with a ``"factor"``. The screening methods' strength
     reduction (Duncan, Wright & Brandon 2014, Table 10.1; 0.8 to 0.85 of the static
     undrained strength for soils that don't liquefy) goes here: in a two-stage run
@@ -300,11 +300,12 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
     strength : str, True, or dict
         How stage 2 takes the undrained strength: ``"interpolated"`` (or True, the
         default) or ``"kc1"``; see :func:`seismic2_strength`. A dict
-        ``{"strength": ..., "factor": f}`` also multiplies every low-permeability
-        slice's stage 2 undrained strength by f (:func:`seismic2_factor`), the
-        screening methods' strength reduction; the free-draining slices keep their
-        drained strength, since the reduction is on undrained strength (Duncan,
-        Wright & Brandon 2014, p. 182).
+        ``{"strength": ..., "factor": f}`` also multiplies every undrained
+        strength in stage 2 by f (:func:`seismic2_factor`), the screening methods'
+        strength reduction: the low-permeability slices' tau_ff and the c/p slices'
+        strength (``cp_flag``). The free-draining slices keep their drained
+        strength, since the reduction is on undrained strength (Duncan, Wright &
+        Brandon 2014, p. 182).
 
     Returns
     -------
@@ -381,8 +382,12 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
     if err:
         return False, err
     if factor != 1.0:
-        # The low-permeability slices now carry c = tau_ff, phi = 0.
+        # Every undrained strength in stage 2 (471a): the low-permeability slices,
+        # which now carry c = tau_ff, phi = 0, and the c/p slices, whose undrained
+        # strength is the same in both stages. Neither has a friction angle here.
         low = np.asarray(low_k_flags, dtype=bool)
+        if 'cp_flag' in df.columns:
+            low = low | df['cp_flag'].to_numpy(dtype=bool)
         df.loc[low, 'c'] = df.loc[low, 'c'].to_numpy() * factor
     df['kw'] = kw.values
     if kvw is not None:

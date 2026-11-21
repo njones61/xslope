@@ -983,7 +983,7 @@ class PythonKernel:
             `'interpolated'` (or True) takes stage 2's undrained strengths the rapid
             drawdown way, `'kc1'` from the Kc = 1 envelope alone. Not with `rapid`.
             A dict, `{'strength': 'kc1', 'factor': 0.8}`, also multiplies every stage
-            2 undrained strength by the factor (0 < factor <= 1): a screening
+            2 undrained strength (d/psi and c/p materials) by the factor (0 < factor <= 1): a screening
             method's strength reduction (Table 10.1), which can't go on the inputs
             because they also set stage 1. The result carries 'seismic_stage1_FS' (static) and 'seismic_stage2_FS'
             (the pseudostatic factor of safety, the same as 'FS').

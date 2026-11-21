@@ -1532,8 +1532,9 @@ class RunLemDialog(QDialog):
         self.seismic2_factor.setDecimals(2)
         self.seismic2_factor.setValue(_s2_factor)
         self.seismic2_factor.setToolTip(
-            "Multiplies each stage 2 undrained strength (the slices in materials "
-            "with d and ψ). Free-draining materials keep their drained strength.\n\n"
+            "Multiplies each stage 2 undrained strength: materials with d and ψ, "
+            "and c/p materials. Free-draining materials keep their drained "
+            "strength.\n\n"
             "1 uses the strength as computed. A screening analysis reduces it as its "
             "method directs, usually to 0.8 or 0.85 (Duncan, Wright & Brandon 2014, "
             "Table 10.1).")

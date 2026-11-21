@@ -595,6 +595,7 @@ def update_slice_materials(slice_df, materials):
     c = np.empty(n); phi = np.empty(n)
     c1 = np.zeros(n); phi1 = np.zeros(n)
     dcol = np.zeros(n); psi = np.zeros(n)
+    cp_flag = np.zeros(n, dtype=bool)
     for bi in np.unique(base):
         mask = base == bi
         m = materials[bi]
@@ -605,7 +606,10 @@ def update_slice_materials(slice_df, materials):
         else:  # cp
             c[mask] = m['c'] + np.maximum(0.0, m['r_elev'] - y_cb[mask]) * m['cp']
             phi[mask] = 0.0
+            cp_flag[mask] = True
     slice_df['c'] = c; slice_df['phi'] = phi
+    if 'cp_flag' in slice_df.columns:
+        slice_df['cp_flag'] = cp_flag
     slice_df['c1'] = c1; slice_df['phi1'] = phi1
     slice_df['d'] = dcol; slice_df['psi'] = psi
     return slice_df
@@ -2748,10 +2752,14 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             psi = 0     # not used in rapid drawdown, but must be defined
             pow_flag = False
             hb_flag = False
+            cp_flag = False
         else:
             pow_flag = False
             hb_flag = False
             mat_option = materials[base_material_idx]['option']
+            # An undrained strength from c/p: the two-stage seismic analysis's stage 2
+            # strength factor reduces it (advanced.seismic_two_stage).
+            cp_flag = mat_option == 'cp'
             if mat_option == 'hb':
                 # Generalized Hoek-Brown. Like 'pow' this is a curved envelope, so
                 # the strength depends on the base normal stress, which depends on
@@ -2918,6 +2926,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'c_suction': c_suction,  # apparent cohesion from matric suction (0.0 unless suction_phi_b opt-in)
             'phi': phi,
             'pow_flag': pow_flag,  # power-curve strength: iterate tangent (c,phi) on sigma'_n
+            'cp_flag': cp_flag,    # undrained strength from the c/p option
             'pow_a': (materials[base_material_idx]['pow_a'] if pow_flag else 0.0),
             'pow_b': (materials[base_material_idx]['pow_b'] if pow_flag else 0.0),
             'pow_c': (materials[base_material_idx]['pow_c'] if pow_flag else 0.0),

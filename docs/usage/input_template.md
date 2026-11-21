@@ -150,9 +150,9 @@ material's options don't use are grayed out.
 | --- | --- | --- |
 | **γ** | F/L³ | Unit weight above the water table |
 | **γsat** | F/L³ | Unit weight below the water table. Blank uses γ everywhere |
-| **option** | | Strength model: `mc`, `cp`, `pow`, `hb`, or `elastic` (table below) |
+| **option** | | Strength model: `mc`, `cp`, `ratio`, `pow`, `hb`, or `elastic` (table below) |
 | **c**, **φ** | F/L², deg | Cohesion and friction angle |
-| **c/p**, **r-elev** | F/L²/L, L | Strength gain per unit depth, and the elevation it starts from (`cp`) |
+| **c/p**, **r-elev** | F/L²/L, L | Strength gain per unit depth, and the elevation it starts from (`cp`); with `ratio`, c/p is the strength ratio S<sub>u</sub>/σ′<sub>v</sub> (–) and r-elev is not read |
 | **d**, **psi** | F/L², deg | Kc = 1 envelope for [rapid drawdown](../lem/rapid.md) |
 | **t_cut** | F/L² | Tensile strength cap (FEM only) |
 | **E**, **nu** | F/L², – | Young's modulus and Poisson's ratio (FEM only) |
@@ -174,6 +174,7 @@ whatever its **u** option.
 | --- | --- | --- |
 | `mc` | Mohr-Coulomb: τ = c + σ′ tan φ | c, φ |
 | `cp` | Undrained strength increasing below an elevation: S<sub>u</sub> = c + c/p × (r-elev − y) | c, c/p, r-elev |
+| `ratio` | Undrained strength ratio: S<sub>u</sub> = max(c, c/p × σ′<sub>v</sub>), with c the minimum ([details](../lem/overview.md)) | c, c/p |
 | `pow` | Power curve: τ = pow_a (σ′ + pow_d)<sup>pow_b</sup> + pow_c | pow_a, pow_b, pow_c, pow_d |
 | `hb` | Generalized Hoek-Brown, for rock | hb_sci, hb_gsi, hb_mi, hb_d |
 | `elastic` | Can't fail. Search surfaces may run along it but not through it | none |

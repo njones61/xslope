@@ -2330,16 +2330,16 @@ def _mat_unsat_vocabulary(ctx):
 
 
 @rule("mat.option_vocabulary", ERROR, ("lem", "fem"),
-      "The strength model option must be one of mc / cp / pow / hb / elastic.")
+      "The strength model option must be one of mc / cp / ratio / pow / hb / elastic.")
 def _mat_option_vocabulary(ctx):
-    ok = ("mc", "cp", "pow", "hb", "elastic")
+    ok = ("mc", "cp", "ratio", "pow", "hb", "elastic")
     for i, m in ctx.strength_materials():
         o = m.get("option")
         if o is None or (isinstance(o, str) and not o.strip()):
             continue
         if str(o).strip().lower() not in ok:
             yield (f"{ctx.mat_label(i)} sets option = {o!r}, which is not a "
-                   f"strength model. Expected one of: mc, cp, pow, hb, elastic "
+                   f"strength model. Expected one of: mc, cp, ratio, pow, hb, elastic "
                    f"{_AT_MAT}.")
 
 
@@ -2456,7 +2456,7 @@ def _mat_gamma_nonpositive(ctx):
     fem = "fem" in ctx.analyses
     for i, m in (ctx.fem_materials() if fem else enumerate(ctx.materials)):
         opt = str(m.get("option") or "").strip().lower()
-        if not fem and opt not in ("mc", "cp", "pow", "hb"):
+        if not fem and opt not in ("mc", "cp", "ratio", "pow", "hb"):
             continue
         if _pos(m.get("gamma")):
             continue
@@ -2539,6 +2539,41 @@ def _mat_cp_zero(ctx):
             yield (f"{ctx.mat_label(i)} carries no strength: option = cp but both "
                    f"c and c/p are zero, so the undrained strength Su is zero "
                    f"everywhere in this material {_AT_MAT}.")
+
+
+@rule("mat.ratio_zero_strength", ERROR, ("lem", "fem"),
+      "option = ratio with both c and c/p zero gives zero undrained strength.",
+      fields=("c", "cp"))
+def _mat_ratio_zero(ctx):
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "ratio":
+            continue
+        c, r = _num(m.get("c")) or 0.0, _num(m.get("cp")) or 0.0
+        if c == 0.0 and r == 0.0:
+            yield (f"{ctx.mat_label(i)} carries no strength: option = ratio but both "
+                   f"c and c/p are zero, so the undrained strength is zero everywhere "
+                   f"in this material. Under option = ratio, c/p is the strength ratio "
+                   f"s_u/sigma'_v and c the minimum strength {_AT_MAT}.")
+
+
+@rule("mat.ratio_above_one", WARNING, ("lem", "fem"),
+      "A strength ratio above 1 is far outside the range soils show.",
+      fields=("cp",))
+def _mat_ratio_above_one(ctx):
+    # Measured ratios run from about 0.05 (liquefied sands; Olson and Stark 2002) to
+    # about 0.3 (normally consolidated clays). Above 1 the likeliest cause is a c/p
+    # entered for option = cp, a strength GAIN per unit depth in stress units, left in
+    # place when the option was switched to ratio.
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "ratio":
+            continue
+        r = _num(m.get("cp"))
+        if r is not None and r > 1.0:
+            yield (f"{ctx.mat_label(i)} has option = ratio with c/p = {r:g}. Under "
+                   f"option = ratio, c/p is the strength ratio s_u/sigma'_v, which runs "
+                   f"from about 0.05 to 0.3 in soils. A value above 1 is usually a c/p "
+                   f"entered for option = cp (a strength gain per unit depth) and left "
+                   f"in place after the option changed {_AT_MAT}.")
 
 
 @rule("mat.ru_zero", ERROR, ("lem",),
@@ -5024,14 +5059,15 @@ def _rapid_free_draining(ctx):
       "An undrained (option = cp) material cannot also carry a Kc = 1 envelope.")
 def _rapid_cp(ctx):
     for i, m in ctx.strength_materials():
-        if str(m.get("option") or "").strip().lower() != "cp":
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in ("cp", "ratio"):
             continue
         if (_num(m.get("d")) or 0.0) == 0.0 and (_num(m.get("psi")) or 0.0) == 0.0:
             continue
-        yield (f"{ctx.mat_label(i)} uses option = cp, so its d / psi are set to "
+        yield (f"{ctx.mat_label(i)} uses option = {opt}, so its d / psi are set to "
                f"zero for the drawdown: an undrained material can never be "
                f"low-permeability in the Duncan & Wright sense whatever the "
-               f"materials table says. The stage-2 strength comes from c/p alone "
+               f"materials table says. The stage-2 strength is its option's own "
                f"{_AT_MAT}.")
 
 
@@ -5192,11 +5228,12 @@ def _seismic2_d_psi(ctx):
       "An undrained (option = cp) material cannot also carry a Kc = 1 envelope.")
 def _seismic2_cp(ctx):
     for i, m in ctx.strength_materials():
-        if str(m.get("option") or "").strip().lower() != "cp" or not _has_d_psi(m):
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in ("cp", "ratio") or not _has_d_psi(m):
             continue
-        yield (f"{ctx.mat_label(i)} uses option = cp, so its d / psi are not read: "
-               f"its strength in both stages is the undrained strength c/p gives "
-               f"{_AT_MAT}.")
+        yield (f"{ctx.mat_label(i)} uses option = {opt}, so its d / psi are not read: "
+               f"its strength in both stages is the undrained strength its option "
+               f"gives {_AT_MAT}.")
 
 
 @rule("seismic2.curved_envelope_unsupported", ERROR, ("seismic2",),
@@ -6985,8 +7022,11 @@ def _mat_strength_negative(ctx):
     # quantities here.
     for i, m in ctx.strength_materials():
         opt = str(m.get("option") or "").strip().lower()
+        # Under option = ratio, c/p IS a strength ratio, so a negative one is not
+        # a profile but a mistake, unlike the cp gradient above.
         cols = {"mc": (("c", "c"), ("phi", "f")),
-                "cp": (("c", "c"),)}.get(opt, ())
+                "cp": (("c", "c"),),
+                "ratio": (("c", "c"), ("cp", "c/p"))}.get(opt, ())
         for key, col in cols:
             v = _num(m.get(key))
             if v is None or v >= 0:
@@ -7519,7 +7559,7 @@ def _rel_elastic_sigma(ctx):
 def _rel_option_unsupported(ctx):
     for i, m in enumerate(ctx.materials):
         opt = str(m.get("option") or "").strip()
-        if opt.lower() in ("", "mc", "cp", "elastic"):
+        if opt.lower() in ("", "mc", "cp", "ratio", "elastic"):
             continue
         yield unsupported_option_message(m.get("name", f"Material_{i + 1}"), opt)
 
@@ -7528,7 +7568,8 @@ def _rel_option_unsupported(ctx):
       "A standard deviation the material's strength model does not read.")
 def _rel_sigma_ignored(ctx):
     used = {"mc": ("sigma_gamma", "sigma_c", "sigma_phi"),
-            "cp": ("sigma_gamma", "sigma_c", "sigma_cp")}
+            "cp": ("sigma_gamma", "sigma_c", "sigma_cp"),
+            "ratio": ("sigma_gamma", "sigma_c", "sigma_cp")}
     for i, m in enumerate(ctx.materials):
         opt = str(m.get("option") or "").strip().lower()
         if opt not in used:
@@ -7575,7 +7616,8 @@ def _rel_sigma_exceeds_mean(ctx):
         # that the Taylor series must decline is admissible there.
         return None
     used = {"mc": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("phi", "sigma_phi")),
-            "cp": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp"))}
+            "cp": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp")),
+            "ratio": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp"))}
     bad = []
     for i, m in enumerate(ctx.materials):
         opt = str(m.get("option") or "").strip().lower()

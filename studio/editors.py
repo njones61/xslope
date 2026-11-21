@@ -3684,7 +3684,7 @@ _MAT_SIGMA = {"gamma": "sigma_gamma", "c": "sigma_c", "phi": "sigma_phi",
               "cp": "sigma_cp", "d": "sigma_d", "psi": "sigma_psi"}
 # Strength option -> the option-specific fields shown in the list-view form (only
 # the selected option's are visible; blank shows none, per bc0999d).
-_MAT_OPTION_FIELDS = {"mc": ["c", "phi"], "cp": ["c", "cp", "r_elev"],
+_MAT_OPTION_FIELDS = {"mc": ["c", "phi"], "cp": ["c", "cp", "r_elev"], "ratio": ["c", "cp"],
                       "pow": ["pow_a", "pow_b", "pow_c", "pow_d"],
                       "hb": ["hb_sci", "hb_gsi", "hb_mi", "hb_d"],
                       "elastic": [], "": []}
@@ -3723,7 +3723,7 @@ def _mat_dim_keys(row):
     if opt == "elastic":
         return _MAT_ELASTIC_DIM
     u = str(row.get("u", "") or "").strip().lower()
-    if opt == "cp" or u not in ("piezo", "seep"):
+    if opt in ("cp", "ratio") or u not in ("piezo", "seep"):
         return _MAT_SUCTION_DIM
     return frozenset()
 
@@ -4428,9 +4428,11 @@ MATERIALS_HELP = {
     "gamma_sat": ("Saturated unit weight (below the water table — the seepage "
                   "surface, else the piezo line; blank = use γ). LEM & FEM."),
     "option": "Strength model — determines which strength columns apply.",
-    "c": "Cohesion intercept (mc: Mohr-Coulomb c; cp: undrained strength at r-elev).",
+    "c": ("Cohesion intercept (mc: Mohr-Coulomb c; cp: undrained strength at r-elev; "
+          "ratio: the minimum undrained strength)."),
     "phi": "Friction angle φ, degrees (mc option).",
-    "cp": "Rate of undrained-strength increase per unit elevation below r-elev (cp option).",
+    "cp": ("cp option: rate of undrained-strength increase per unit elevation below "
+           "r-elev. ratio option: the strength ratio s_u/σ′v (about 0.05 to 0.3)."),
     "r_elev": "Reference elevation; at or above it the strength equals c (cp option).",
     "d": ("Intercept d of the Kc = 1 envelope (τff against σ′fc), for a material "
           "that does not drain: LEM rapid drawdown and two-stage seismic only."),
@@ -4808,7 +4810,7 @@ class MaterialsEditor(CategoryEditor):
         # it as an empty combo entry so the editor round-trips it instead of
         # normalizing blank -> 'mc'. 'elastic' (v16): infinite strength — the row's
         # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
-        Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
+        Field("option", "option", "choice", choices=["mc", "cp", "ratio", "pow", "hb", "elastic", ""], applies=LF),
         Field("c", "c", "optfloat", applies=LF, unit="stress"),
         Field("phi", "φ", "optfloat", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),

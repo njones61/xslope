@@ -201,7 +201,9 @@ Do NOT call `doc.new()` or reassign `doc.slope_data`; your edits are detected an
 the canvas re-renders automatically.
 
 - materials[i]: name, gamma, gamma_sat (saturated unit weight, weighed below the water table
-  when set; the key is gamma_sat, never gsat), option ('mc' Mohr-Coulomb | 'cp' | 'elastic' —
+  when set; the key is gamma_sat, never gsat), option ('mc' Mohr-Coulomb | 'cp' (undrained,
+  c at r_elev plus cp per unit depth below it) | 'ratio' (undrained, max(c, cp * sigma'_v):
+  cp is the strength ratio) | 'elastic' —
   infinite strength, cannot fail; ignores every strength key below, uses only
   gamma/gamma_sat/E/nu (+ seepage); LEM
   treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
@@ -1081,6 +1083,12 @@ def _material_line(i, m):
         for key in ("cp", "d", "r_elev"):
             if m.get(key):
                 bits.append(f"{key}={_num(m.get(key))}")
+    elif opt == "cp":
+        bits.append(f"c={_num(m.get('c') or 0)} at r_elev={_num(m.get('r_elev') or 0)}")
+        bits.append(f"cp={_num(m.get('cp') or 0)} per unit depth")
+    elif opt == "ratio":
+        bits.append(f"s_u = max(c={_num(m.get('c') or 0)}, "
+                    f"cp={_num(m.get('cp') or 0)} * sigma'_v)")
     if opt == "elastic":
         bits.append("(infinite strength)")
     bits.append(f"u={m.get('u') or 'none'}")

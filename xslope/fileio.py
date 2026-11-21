@@ -1827,11 +1827,11 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # 'elastic' (v16): infinite strength / cannot fail -- the FEM holds it out
         # of plasticity entirely and the LEM treats it as impenetrable.
         option_val = _choice(row.get('option'), '')
-        if option_val not in ('', 'mc', 'cp', 'pow', 'hb', 'elastic'):
+        if option_val not in ('', 'mc', 'cp', 'ratio', 'pow', 'hb', 'elastic'):
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized strength option option='{option_val}'. "
-                "Expected one of: mc, cp, pow, hb, elastic."
+                "Expected one of: mc, cp, ratio, pow, hb, elastic."
             )
 
         # v12 columns, read by header name. Older templates lack them entirely:

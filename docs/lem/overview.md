@@ -49,6 +49,25 @@ is a $\phi = 0$ model: the strength assigned to a slice base depends only on whe
 normal stress acting on it. The rate is normally positive (strength increasing with depth); a negative rate is
 accepted for the consolidated-crust case — see [VP30](../verification/rocscience.md#vp30).
 
+**Undrained strength ratio.** The `ratio` option ties the undrained strength to the vertical effective stress
+itself, the way the ratio is measured:
+
+> $S_u = \max\left(c,\; r\,\sigma'_v\right)$
+
+where $r$ is the strength ratio $S_u/\sigma'_v$, entered in the **c/p** column, and $c$ is a minimum strength.
+Typical ratios are about 0.2 to 0.3 for normally consolidated clays, and lower for soils that have liquefied. At
+each slice base, $\sigma'_v$ is the weight of the soil column above it (saturated unit weight below the water
+table), plus the vertical part of the distributed load on the slice top, minus the pore pressure. Ponded water is
+part of that load: under a reservoir the pore pressure includes the water depth, and the water's weight balances it.
+Line loads are not counted. The strength is set from the model as it stands, like `cp`, and does not change with
+the solution.
+
+Under level ground with the water table at the surface, `ratio` and `cp` with $c_p = r\,\gamma'$ give the same
+strength. Under a slope they differ, because $\sigma'_v$ depends on how much soil stands above a point rather than
+on its elevation. One case needs care: under a fill placed so recently that the soil beneath it has not
+consolidated, the ratio credits the soil with strength from a load it does not yet carry. For that case, use `cp`
+for the soil's strength before the fill.
+
 **Nonlinear (power-curve) strength.** In addition to the linear Mohr-Coulomb envelope, a material may use the
 curved power-curve envelope (option `pow` in the input template):
 

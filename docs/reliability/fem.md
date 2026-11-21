@@ -70,7 +70,7 @@ reliability and *reduces* the $\beta$ sensitivity above).
 
 The FEM reliability perturbs the **same strength parameters as the LEM
 reliability** — the cohesion $c$ and friction angle $\phi$ for a Mohr-Coulomb
-(`mc`) material, or $c$ and the rate $c_p$ for the depth-varying undrained (`cp`)
+(`mc`) material, or $c$ and the c/p value for the undrained `cp` and `ratio`
 model, plus the unit weight $\gamma$ for both — using the standard deviations
 in the materials table's σ(c), σ(φ) / σ(c/p) and σ(γ) columns.
 Using the same standard deviations keeps the FEM and LEM reliability results

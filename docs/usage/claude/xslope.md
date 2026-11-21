@@ -479,14 +479,18 @@ slope_data['materials'] = [
                                  #   independent of this material's 'u'.
                                  #   So u='none' soil below the water table still weighs gamma_sat,
                                  #   and gamma_sat with no water anywhere is weighed gamma.
-        'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c/p ratio),
+        'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c + c/p per unit
+                                 #   depth below r_elev), 'ratio' (max(c, c/p * sigma'_v): c/p is the
+                                 #   strength ratio, c the minimum; sigma'_v counts surface loads and
+                                 #   ponded water, not line loads),
                                  #   'pow' (power curve), 'hb' (generalized Hoek-Brown), or
                                  #   'elastic' (infinite strength, cannot fail — see below)
         'c':     200.0,          # cohesion
         'phi':   28.0,           # friction angle (degrees)
         'u':     'piezo',        # pore pressure: 'none', 'piezo', 'seep', or 'ru'; set slope_data['piezo_phreatic']=True for the phreatic cos^2 correction (piezo sheet Type)
-        # --- option='cp' only ---
-        'cp':    0.0,            # c/p ratio: rate of Su increase per unit depth below r_elev
+        # --- option='cp' (and 'ratio') only ---
+        'cp':    0.0,            # cp: rate of Su increase per unit depth below r_elev;
+                                 #   ratio: the strength ratio Su/sigma'_v (about 0.05-0.3)
         'r_elev':0.0,            # reference elevation for c/p (normally cp>0; negative only
                                  #   for a consolidated crust over softer clay — see VP30)
         # --- option='pow' only: tau = pow_a*(sigma_n + pow_d)^pow_b + pow_c ---

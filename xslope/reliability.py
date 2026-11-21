@@ -560,7 +560,7 @@ def _strength_param_mapping(material, mat_name):
     mapping = {'gamma': 'sigma_gamma'}
     if option == 'mc':
         mapping.update({'c': 'sigma_c', 'phi': 'sigma_phi'})
-    elif option == 'cp':
+    elif option in ('cp', 'ratio'):
         mapping.update({'c': 'sigma_c', 'cp': 'sigma_cp'})
     elif option == 'elastic':
         stated = sorted(k for k in ('sigma_gamma', 'sigma_c', 'sigma_phi', 'sigma_cp')

@@ -177,6 +177,25 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         ax.set_xlim(left=0)
         ax.grid(True, alpha=0.3)
 
+    elif option == "ratio":
+        c, r = g("c"), g("cp")
+        if c == 0 and r == 0:
+            return _material_hint(ax, "enter c/p (the ratio) and c (the minimum)",
+                                  "Strength ratio")
+        # The same max(c, r·σ′v) the slicer and the FEM apply, over a σ′v range
+        # that shows the floor and the line: past the knee c/r by about as much again.
+        knee = c / r if r > 0 else 0.0
+        s_max = max(2.0 * knee, sigma_max) if r > 0 else sigma_max
+        s = np.linspace(0.0, s_max, n)
+        su = np.maximum(c, r * s)
+        ax.plot(s, su, color=_STRENGTH_COLOR, lw=2)
+        ax.set_xlabel("σ′v  (vertical effective stress)")
+        ax.set_ylabel("Sᵤ  (undrained strength)")
+        ax.set_title(f"Strength ratio   Sᵤ = max({c:g}, {r:g}·σ′v)")
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.grid(True, alpha=0.3)
+
     elif option == "pow":
         a, b, cp_c, d = g("pow_a"), g("pow_b"), g("pow_c"), g("pow_d")
         if a == 0:

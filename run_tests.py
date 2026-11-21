@@ -6158,6 +6158,15 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.cp_zero_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, option='cp', c=0.0, cp=0.0),
          expect='undrained strength Su is zero'),
+    dict(rule='mat.ratio_zero_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=0.0, cp=0.0),
+         expect='option = ratio but both c and c/p are zero'),
+    # A c/p rate left behind by a switch from cp: 20 per unit depth read as a ratio.
+    # The control is a real ratio on the same option.
+    dict(rule='mat.ratio_above_one', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=0.0, cp=20.0),
+         control=lambda sd: _pf_mats(sd, option='ratio', c=0.0, cp=0.25),
+         expect='usually a c/p entered for option = cp'),
     dict(rule='mat.ru_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.0),
          expect='selects u = ru'),
@@ -10292,6 +10301,13 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'strength_ratio': (
+        'strength_ratio_check.py',
+        "The strength ratio material, s_u = max(c, c/p x sigma'_v): on a planar "
+        "wedge F = r/(sin a cos a) exactly in every force-equilibrium method and "
+        "each slice's strength is r W/b; under level ground it equals c/p = r "
+        "gamma' slice by slice and element by element; a pond leaves it unchanged "
+        "in both engines; the minimum c holds; stage 2's strength factor reduces it."),
     'seismic2_factor': (
         'seismic2_factor_check.py',
         "The two-stage seismic analysis's stage 2 strength factor: with every slice "
@@ -16991,7 +17007,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'rapid_drained_surface': 3, 'noncircular_kink': 3,
-              'fem_yield_coefficient': 1, 'vertical_seismic': 2, 'seismic2_factor': 2,
+              'fem_yield_coefficient': 1, 'vertical_seismic': 2, 'seismic2_factor': 2, 'strength_ratio': 2,
               'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
@@ -17422,6 +17438,9 @@ def main():
         # The two-stage seismic analysis's stage 2 strength factor (a few seconds).
         tests.append({'type': 'seismic2_factor',
                       'method': 'all', 'source': 'seismic2_factor'})
+        # The strength ratio material against closed forms, both engines (seconds).
+        tests.append({'type': 'strength_ratio',
+                      'method': 'all', 'source': 'strength_ratio'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
         # ponded water into. File-less (builds on xslope_acads_simple).

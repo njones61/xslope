@@ -2543,6 +2543,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             cp_rate = material.get("cp", 0.0)
             c_by_mat[i] = cp_rate  # Store cp rate temporarily (used per-element below)
             phi_by_mat[i] = 0.0     # Undrained analysis
+        elif strength_option == "ratio":
+            # Undrained strength ratio (template v28): s_u = max(c, c/p * sigma'_v)
+            # at each element's centroid, set in a pass after the pore pressures
+            # and the overburden columns exist (_ratio_element_strengths).
+            c_by_mat[i] = material.get("cp", 0.0)
+            phi_by_mat[i] = 0.0
         elif strength_option in ("pow", "hb"):
             # Curved envelopes: the power curve tau = a*(sigma'_n + d)^b + c_p
             # and generalized Hoek-Brown. Both are handled by per-Gauss-point
@@ -2566,7 +2572,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 raise ValueError(
                     f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
                     f"strength option '{strength_option}' is not supported by the "
-                    f"FEM (supported: mc, cp, pow, hb, elastic).")
+                    f"FEM (supported: mc, cp, ratio, pow, hb, elastic).")
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
 
@@ -2743,6 +2749,10 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             c_seed, phi_seed = hb_tangent_const(s_n, sci_, mb_, s_, a_)
             c_by_elem[elem_idx] = float(c_seed)
             phi_by_elem[elem_idx] = float(phi_seed)
+        elif strength_option == "ratio":
+            # the minimum until _ratio_element_strengths sets it from sigma'_v
+            c_by_elem[elem_idx] = float(material.get("c", 0.0) or 0.0)
+            phi_by_elem[elem_idx] = 0.0
         else:
             c_by_elem[elem_idx] = c_by_mat[mat_id]
             phi_by_elem[elem_idx] = phi_by_mat[mat_id]
@@ -3848,6 +3858,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         _overburden_columns = []
         _overburden_error = f"{type(_e).__name__}: {_e}"
 
+    if any(str(m.get("option") or "").strip().lower() == "ratio" for m in materials):
+        if not _overburden_columns:
+            raise ValueError(
+                "A material with option = ratio needs the vertical effective stress at "
+                "each element, which is integrated over the material zones, and this "
+                "model's zones could not be built"
+                + (f" ({_overburden_error})." if _overburden_error else "."))
+        _ratio_element_strengths(slope_data, materials, nodes, elements, element_types,
+                                 element_materials, u, _overburden_columns,
+                                 _water_table, c_by_elem, phi_by_elem)
+
     # Get other parameters
     unit_weight = require_gamma_water(slope_data, "FEM analysis")
     # SIGN CONVENTION (see the FEM overview page): the FEM analyzes both
@@ -4189,6 +4210,100 @@ def _dt_stability_clamp(dt_base, E_by_elem, nu_by_elem, phi_reduced_rad,
     return min(dt_base, safety * float(limit))
 
 
+def _column_stress_at(polys, water_table, x, y, y_top):
+    """The total vertical stress of the soil column above (x, y): each zone's
+    length along the vertical ray to ``y_top``, gamma_sat below the water table and
+    gamma above it. ``polys`` is a list of (Polygon, gamma, gamma_sat). Shared by the
+    K0 overburden (:func:`_gauss_point_overburden`) and the strength ratio
+    (:func:`_ratio_element_strengths`)."""
+    ray = LineString([(x, y), (x, y_top)])
+    y_w = float(water_table_elevation(water_table, x))
+    sv = 0.0
+    for poly, gamma, gamma_sat in polys:
+        minx, _miny, maxx, maxy = poly.bounds
+        if x < minx or x > maxx or y >= maxy:
+            continue
+        if np.isfinite(gamma_sat) and np.isfinite(y_w):
+            # Weigh the column in two pieces, split at the water table: the
+            # part of it that stands below the table saturated, the part
+            # above it moist. A table below the point or above the whole
+            # column collapses one piece to zero length and the other to the
+            # whole ray, which is the single-weight answer.
+            y_split = min(max(y_w, y), y_top)
+            if y_split > y:
+                wet = LineString([(x, y), (x, y_split)]).intersection(poly)
+                if not wet.is_empty:
+                    sv += gamma_sat * wet.length
+            if y_top > y_split:
+                dry = LineString([(x, y_split), (x, y_top)]).intersection(poly)
+                if not dry.is_empty:
+                    sv += gamma * dry.length
+            continue
+        inter = ray.intersection(poly)
+        if not inter.is_empty:
+            sv += gamma * inter.length
+    return max(0.0, sv)
+
+
+def surface_vertical_load(slope_data, x):
+    """The vertical stress at x from the distributed loads on the ground: stage 1's
+    user loads and the automatic water loads, per unit horizontal width. A load
+    applied normal to a surface inclined at theta pushes down with p per unit
+    horizontal width; a vertical one with p / cos(theta), the same total force
+    spread over the line's horizontal projection. This is the slicer's
+    ``dload cos(beta) / dx`` read at a point, so the two engines' strength ratio
+    sigma'_v agree."""
+    total = 0.0
+    for key, dirs_key in (("dloads", "dload_dirs"), ("dloads_derived", ""),
+                          ("distributed_loads", "distributed_load_dirs")):
+        lines = slope_data.get(key) or []
+        dirs = (slope_data.get(dirs_key) or []) if dirs_key else []
+        for k, line in enumerate(lines):
+            if isinstance(line, dict) and "coords" in line:
+                pts = [(float(a), float(b), float(p)) for (a, b), p in
+                       zip(line["coords"], line["loads"])]
+            else:
+                pts = [(float(q["X"]), float(q["Y"]), float(q["Normal"])) for q in line]
+            vertical = str(dirs[k] if k < len(dirs) else "normal").lower() == "vertical"
+            for (x0, y0, p0), (x1, y1, p1) in zip(pts[:-1], pts[1:]):
+                lo, hi = min(x0, x1), max(x0, x1)
+                if hi - lo < 1e-12 or not (lo <= x <= hi):
+                    continue
+                t = (x - x0) / (x1 - x0)
+                p = p0 + t * (p1 - p0)
+                cos_t = (x1 - x0) / max(np.hypot(x1 - x0, y1 - y0), 1e-300)
+                total += abs(p / cos_t) if vertical else p
+                break                     # one segment per line at this x
+    return total
+
+
+def _ratio_element_strengths(slope_data, materials, nodes, elements, element_types,
+                             element_materials, u, overburden_columns, water_table,
+                             c_by_elem, phi_by_elem):
+    """Set c (phi = 0) on every element of an option = ratio material, in place:
+    s_u = max(c, c/p * sigma'_v) at the element's centroid, where sigma'_v is the
+    soil column above it (gamma_sat below the water table), plus the vertical
+    surface load above it, ponded water included, minus the pore pressure there.
+    The centroid and its pore pressure are the means over the element's nodes,
+    exact for a field linear across the element, as the c/p option takes its
+    centroid. Fixed for the run, as the limit equilibrium slicer fixes it."""
+    polys = [(Polygon(c[0]), c[1], c[2] if len(c) > 2 else np.nan)
+             for c in overburden_columns]
+    y_top = float(np.max(nodes[:, 1])) + 1.0
+    for e in range(len(elements)):
+        m = materials[element_materials[e] - 1]
+        if str(m.get("option") or "").strip().lower() != "ratio":
+            continue
+        idx = elements[e][:element_types[e]]
+        x, y = float(np.mean(nodes[idx, 0])), float(np.mean(nodes[idx, 1]))
+        u_c = float(np.mean(np.asarray(u)[idx]))
+        sv = (_column_stress_at(polys, water_table, x, y, y_top)
+              + surface_vertical_load(slope_data, x))
+        c_by_elem[e] = max(float(m.get("c", 0.0) or 0.0),
+                           float(m.get("cp", 0.0) or 0.0) * max(0.0, sv - u_c))
+        phi_by_elem[e] = 0.0
+
+
 def _gauss_point_overburden(fem_data, elem_gp_data):
     """Total vertical soil stress from the overburden at every Gauss point.
 
@@ -4234,33 +4349,7 @@ def _gauss_point_overburden(fem_data, elem_gp_data):
             N = gp_data['N']
             x_gp = float(N @ elem_coords[:, 0])
             y_gp = float(N @ elem_coords[:, 1])
-            ray = LineString([(x_gp, y_gp), (x_gp, y_top)])
-            y_w = float(water_table_elevation(water_table, x_gp))
-            sv = 0.0
-            for poly, gamma, gamma_sat in polys:
-                minx, _miny, maxx, maxy = poly.bounds
-                if x_gp < minx or x_gp > maxx or y_gp >= maxy:
-                    continue
-                if np.isfinite(gamma_sat) and np.isfinite(y_w):
-                    # Weigh the column in two pieces, split at the water table: the
-                    # part of it that stands below the table saturated, the part
-                    # above it moist. A table below the point or above the whole
-                    # column collapses one piece to zero length and the other to the
-                    # whole ray, which is the single-weight answer.
-                    y_split = min(max(y_w, y_gp), y_top)
-                    if y_split > y_gp:
-                        wet = LineString([(x_gp, y_gp), (x_gp, y_split)]).intersection(poly)
-                        if not wet.is_empty:
-                            sv += gamma_sat * wet.length
-                    if y_top > y_split:
-                        dry = LineString([(x_gp, y_split), (x_gp, y_top)]).intersection(poly)
-                        if not dry.is_empty:
-                            sv += gamma * dry.length
-                    continue
-                inter = ray.intersection(poly)
-                if not inter.is_empty:
-                    sv += gamma * inter.length
-            gp_list.append(max(0.0, sv))
+            gp_list.append(_column_stress_at(polys, water_table, x_gp, y_gp, y_top))
         sv0.append(gp_list)
     return sv0
 

@@ -610,6 +610,9 @@ def update_slice_materials(slice_df, materials):
     slice_df['c'] = c; slice_df['phi'] = phi
     if 'cp_flag' in slice_df.columns:
         slice_df['cp_flag'] = cp_flag
+    if 'ratio_flag' in slice_df.columns:
+        # a ratio base refuses this path above (its strength follows the weight)
+        slice_df['ratio_flag'] = False
     slice_df['c1'] = c1; slice_df['phi1'] = phi1
     slice_df['d'] = dcol; slice_df['psi'] = psi
     return slice_df
@@ -2753,13 +2756,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             pow_flag = False
             hb_flag = False
             cp_flag = False
+            ratio_flag = False
         else:
             pow_flag = False
             hb_flag = False
             mat_option = materials[base_material_idx]['option']
-            # An undrained strength from c/p: the two-stage seismic analysis's stage 2
-            # strength factor reduces it (advanced.seismic_two_stage).
+            # An undrained strength from c/p or from a strength ratio: the two-stage
+            # seismic analysis's stage 2 strength factor reduces both
+            # (advanced.seismic_two_stage).
             cp_flag = mat_option == 'cp'
+            ratio_flag = mat_option == 'ratio'
             if mat_option == 'hb':
                 # Generalized Hoek-Brown. Like 'pow' this is a curved envelope, so
                 # the strength depends on the base normal stress, which depends on
@@ -2800,13 +2806,35 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     f"Failure surface runs along elastic (impenetrable) material "
                     f"'{materials[base_material_idx]['name']}' with no material "
                     f"beneath it.")
+            elif mat_option == 'ratio':
+                # Undrained strength ratio (template v28, Norm 472a): s_u = c/p times
+                # the vertical effective stress at the pore-pressure point, never
+                # below c. The vertical stress is the soil column above that point
+                # (the column the 'ru' option multiplies, gamma_sat below the water
+                # table) plus the vertical part of the distributed load on the slice
+                # top, ponded water included (468a): under a pond the pore pressure
+                # carries the water depth, so leaving its weight out would understate
+                # sigma'_v. A line load is a point force, not an overburden, and is
+                # not counted. Fixed for the run, like c/p: the strength the soil
+                # consolidated to, not one that follows the solution.
+                mat = materials[base_material_idx]
+                sigma_v_soil = (_column_stress_at_u(i, water_table_y_u_all[i])
+                                if on_arc_all[i] else sum_gam_h)
+                sigma_v_load = (dload * cos(radians(beta_d)) / dx) if dx > 0 else 0.0
+                sigma_v_eff = max(0.0, sigma_v_soil + sigma_v_load - u)
+                c = max(mat['c'], mat['cp'] * sigma_v_eff)
+                phi = 0
+                c1 = 0      # not used in rapid drawdown, but must be defined
+                phi1 = 0    # not used in rapid drawdown, but must be defined
+                d = 0       # not used in rapid drawdown, but must be defined
+                psi = 0     # not used in rapid drawdown, but must be defined
             elif mat_option not in ('mc', 'cp'):
                 # Was silently treated as 'cp'. A blank option is legal on seep-only
                 # material rows, but not on one a failure surface passes through.
                 raise ValueError(
                     f"Material '{materials[base_material_idx]['name']}' lies on the failure "
                     f"surface but has no valid strength option (option='{mat_option}'). "
-                    "Expected one of: mc, cp."
+                    "Expected one of: mc, cp, ratio."
                 )
             elif mat_option == 'mc':
                 c = materials[base_material_idx]['c']
@@ -2927,6 +2955,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'phi': phi,
             'pow_flag': pow_flag,  # power-curve strength: iterate tangent (c,phi) on sigma'_n
             'cp_flag': cp_flag,    # undrained strength from the c/p option
+            'ratio_flag': ratio_flag,  # undrained strength from the strength ratio option
             'pow_a': (materials[base_material_idx]['pow_a'] if pow_flag else 0.0),
             'pow_b': (materials[base_material_idx]['pow_b'] if pow_flag else 0.0),
             'pow_c': (materials[base_material_idx]['pow_c'] if pow_flag else 0.0),

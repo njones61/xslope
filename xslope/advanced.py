@@ -386,8 +386,9 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
         # which now carry c = tau_ff, phi = 0, and the c/p slices, whose undrained
         # strength is the same in both stages. Neither has a friction angle here.
         low = np.asarray(low_k_flags, dtype=bool)
-        if 'cp_flag' in df.columns:
-            low = low | df['cp_flag'].to_numpy(dtype=bool)
+        for flag in ('cp_flag', 'ratio_flag'):
+            if flag in df.columns:
+                low = low | df[flag].to_numpy(dtype=bool)
         df.loc[low, 'c'] = df.loc[low, 'c'].to_numpy() * factor
     df['kw'] = kw.values
     if kvw is not None:

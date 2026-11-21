@@ -192,6 +192,8 @@ def parse_page(md_path: Path):
                 continue        # a documentation example of the tag syntax
             if 'vendor' in params:
                 continue        # a vendor's own file, not in this repository
+            if params.get('type') == 'newmark':
+                continue        # its file is an acceleration record, not a model
             params['_line'] = i
             params['_model'] = os.path.normpath(
                 os.path.join(md_dir, params['file']))

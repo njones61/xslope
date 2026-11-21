@@ -6815,6 +6815,158 @@
       "features": {
         "circular": true,
         "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.15,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_pseudostatic.xlsx",
+      "references": [
+        {
+          "anchor": "part-3-strength-reduction-at-the-same-coefficient",
+          "checks": [
+            "LEM-14-ssrm",
+            "LEM-14-wet-one-stage",
+            "LEM-14-wet-two-stage-interpolated",
+            "LEM-14-wet-two-stage-kc1"
+          ],
+          "level": 2,
+          "page": "tutorials/lem14_pseudostatic/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem14_pseudostatic.md",
+          "title": "Part 3 — Strength reduction at the same coefficient",
+          "url": "https://xslope.org/en/latest/tutorials/lem14_pseudostatic/#part-3-strength-reduction-at-the-same-coefficient"
+        }
+      ],
+      "topics": [
+        "seismic",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_pseudostatic_start.xlsx",
+      "references": [
+        {
+          "anchor": "opening-the-model",
+          "checks": [
+            "LEM-14-dry-one-stage",
+            "LEM-14-dry-two-stage-interpolated",
+            "LEM-14-dry-two-stage-kc1"
+          ],
+          "level": 2,
+          "page": "tutorials/lem14_pseudostatic/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem14_pseudostatic.md",
+          "title": "Opening the model",
+          "url": "https://xslope.org/en/latest/tutorials/lem14_pseudostatic/#opening-the-model"
+        },
+        {
+          "anchor": "opening-the-model",
+          "checks": [
+            "LEM-15-ky"
+          ],
+          "level": 2,
+          "page": "tutorials/lem15_yield_newmark/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem15_yield_newmark.md",
+          "title": "Opening the model",
+          "url": "https://xslope.org/en/latest/tutorials/lem15_yield_newmark/#opening-the-model"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
         "dloads": 1,
         "element_type": "tri6",
         "hoek_brown": false,
@@ -28840,7 +28992,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 408,
+    "models": 410,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -28868,6 +29020,8 @@
       "tutorials/lem11_reliability/",
       "tutorials/lem12_piles/",
       "tutorials/lem13_rock_slope/",
+      "tutorials/lem14_pseudostatic/",
+      "tutorials/lem15_yield_newmark/",
       "tutorials/seep01_sheetpile/",
       "tutorials/seep02_johnson_dam/",
       "tutorials/seep03_reservoir_drawdown/",
@@ -28885,24 +29039,24 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 726,
+    "tags": 731,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 194,
+      "homogeneous": 196,
       "non-circular": 41,
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 8,
       "reinforcement": 35,
       "seepage-coupled": 76,
-      "seismic": 13,
+      "seismic": 14,
       "soil-nails": 5,
       "tension-cracks": 21,
       "transient-seepage": 25,
       "zoned-dams": 51
     },
-    "unloadable": 1
+    "unloadable": 0
   },
   "topic_labels": {
     "anchors-tiebacks": "Anchors & tiebacks",
@@ -28969,6 +29123,8 @@
       "docs/tutorials/files/xslope_dam_infiltration_storm.xlsx",
       "docs/tutorials/files/xslope_pile_wall.xlsx",
       "docs/tutorials/files/xslope_pile_wall_start.xlsx",
+      "docs/tutorials/files/xslope_pseudostatic.xlsx",
+      "docs/tutorials/files/xslope_pseudostatic_start.xlsx",
       "docs/tutorials/files/xslope_rock_joints.xlsx",
       "docs/tutorials/files/xslope_rock_slope.xlsx",
       "docs/tutorials/files/xslope_rock_toppling.xlsx",
@@ -29333,6 +29489,7 @@
       "docs/videos/files/xslope_video11_seep_to_lem.xlsx"
     ],
     "seismic": [
+      "docs/tutorials/files/xslope_pseudostatic.xlsx",
       "docs/verification/files/published/dwb_t10_4_dry.xlsx",
       "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
       "docs/verification/files/published/fhwa_e7.xlsx",
@@ -29458,10 +29615,5 @@
       "docs/videos/files/xslope_video14_weak_layer_fem.xlsx"
     ]
   },
-  "unloadable": [
-    {
-      "model": "docs/verification/files/published/newmark_pulse.txt",
-      "reason": "ValueError: Excel file format cannot be determined, you must specify an engine manually."
-    }
-  ]
+  "unloadable": []
 }

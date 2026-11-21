@@ -6937,7 +6937,8 @@
           "checks": [
             "LEM-14-dry-one-stage",
             "LEM-14-dry-two-stage-interpolated",
-            "LEM-14-dry-two-stage-kc1"
+            "LEM-14-dry-two-stage-kc1",
+            "LEM-14-dry-two-stage-kc1-factor"
           ],
           "level": 2,
           "page": "tutorials/lem14_pseudostatic/",
@@ -29039,7 +29040,7 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 731,
+    "tags": 732,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

@@ -3,7 +3,9 @@
 The [RS2 Slope Stability Verification
 Manual](https://www.rocscience.com/help/rs2/verification-theory/verification-manuals) (Rocscience)
 publishes 68 slope stability problems in Parts I–III, and a separate, later Part 4 manual (© 2021)
-re-verifies 52 Slide2 verification problems by shear strength reduction. Most rows below verify
+re-verifies 52 Slide2 verification problems by shear strength reduction. Several of these problems come from the
+Association for Computer Aided Design's (ACADS) 1989 review of slope stability programs (Donald &
+Giam 1989). Most rows below verify
 XSLOPE's FEM/**SSRM** solver against RS2's own SSR column, which is what the manuals exist to
 publish; a few verify a published limit-equilibrium quantity instead and name the column they
 reproduce. The four summary tables give each problem's headline comparison, a [match
@@ -98,6 +100,9 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 
 </div>
 
+Abbreviations in these tables: D&W, Duncan & Wright (2005); P&D, Pockoski & Duncan (2000); TC,
+tension crack.
+
 ### Part II (35–58)
 
 <div class="corpus-summary match" markdown>
@@ -111,7 +116,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [39](#rs2-39) | <span class="nodata">⊘</span> | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | | *planned* — the FE-seepage member of the [RS2-41/43](#rs2-39) family; the LEM build is Slide2 [VP76](rocscience.md#vp76). |
 | [40](#rs2-40) | 🟡 | Dam with impermeable foundation (D&W Fig 7.24) | Piezometric, filter off: SSRM 1.109 vs closed form 1.190 (−6.8%) · Piezometric, `min_slip_depth` = 30 ft: SSRM 1.521 vs RS2 SSRM 1.53 (−0.6%) · FE seepage: SSRM 1.590 vs RS2 SSRM 1.52 (+4.6%) | (both seepage cases) The piezometric case carries two mechanisms; the deep one holds from a 30 ft cutoff to a 50 ft one and follows the element size, as the skin does. A closed form governs a dot only where XSLOPE sits within band of it, and the skin does not, so the FE-seepage case sets this row's dot. |
 | [41](#rs2-39) | 🟢 | Earth embankment, infinite-slope mechanism (D&W Fig 14.4) | SSRM 1.431 vs D&W referee 1.44 (−0.6%) | (caveat) the unconstrained skin is the mechanism, and it lands inside RS2's own 1.43–1.47 band. |
-| [42](#rs2-42) | 🟢 | James dike | SSRM 1.214 vs RS2 SSRM 1.19 (+2.0%) | Scored against the Part IV VP75 model this file is built from; the input-identical native twin, which differs only in its SRF tensile setting and a coarser mesh, publishes 1.26. |
+| [42](#rs2-42) | 🟢 | James Bay dike | SSRM 1.214 vs RS2 SSRM 1.19 (+2.0%) | Scored against the Part IV VP75 model this file is built from; the input-identical native twin, which differs only in its SRF tensile setting and a coarser mesh, publishes 1.26. |
 | [43](#rs2-39) | 🟢 | Earth embankment, infinite-slope mechanism (D&W Fig 14.7) | SSRM 1.228 vs RS2 Part IV VP81 case 1 SSR 1.23 (−0.2%) | (caveat) run under the vendor model's own SSR Exclusion Area; unconstrained, the failure runs through the c = 0 skin at 1.116. |
 | [44](#rs2-44) | 🟢 | Seepage analysis for an earth embankment (D&W Fig 14.20-a) | SSRM 1.490 vs RS2 SSRM 1.51 (−1.3%) | |
 | [45](#rs2-45) | 🟢 | Varying undrained shear strength profiles (D&W Fig 14.20-b) | vp083a: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) · vp083b: SSRM 1.330 vs RS2 SSRM 1.32 (+0.8%) | (caveat) |
@@ -1226,7 +1231,7 @@ bisection step, to **1.607**, so the shallow skin carries little weight on this 
 
 ![RS2-40 solved on a finite-element seepage field, SSRM 1.590 against RS2 SSRM 1.52 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band cutting down from the crest through the clay core and running out along the foundation contact under the downstream shell with no depth filter applied](images/RS2-40-seep.png)
 
-### 🟢 RS2-42: James dike {#rs2-42}
+### 🟢 RS2-42: James Bay dike {#rs2-42}
 
 Slide2 counterpart: [VP75](rocscience.md#vp75).
 

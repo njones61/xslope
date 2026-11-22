@@ -984,7 +984,8 @@ class PythonKernel:
             drawdown way, `'kc1'` from the Kc = 1 envelope alone. Not with `rapid`.
             A dict, `{'strength': 'kc1', 'factor': 0.8}`, also multiplies every stage
             2 undrained strength (d/psi, cp, and ratio materials) by the factor (0 < factor <= 1): a screening
-            method's strength reduction (Table 10.1), which can't go on the inputs
+            method's strength reduction (0.85 in Seed 1979, 0.8 in Hynes-Griffin and Franklin
+            1984 and most later methods, each with its own k and minimum F), which can't go on the inputs
             because they also set stage 1. The result carries 'seismic_stage1_FS' (static) and 'seismic_stage2_FS'
             (the pseudostatic factor of safety, the same as 'FS').
 

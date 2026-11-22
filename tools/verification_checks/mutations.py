@@ -259,13 +259,13 @@ MUTATIONS = [
     # ---------------------------------------- slip-surface depth locks -----
     # A slip-surface depth is locked the way a factor of safety is — the tag
     # holds the value, the section prints it — so both directions of drift must
-    # be caught on `expected_depth` too.  G12 moves the D1/D = 4 depth, which
+    # be caught on `expected_depth` too.  G12 moves the S/D = 4 depth, which
     # the page prints once: the forward pass is existential, so a value the
     # section states twice would still be found on the other statement.
     ("rocscience", "tags", "G11 a slip-surface depth drifts in the tag",
      "expected_depth=3.094", "expected_depth=3.194"),
     ("rocscience", "tags", "G12 a printed slip-surface depth drifts from its tag",
-     "| D1/D = 4 | 3.261 |", "| D1/D = 4 | 3.361 |"),
+     "| S/D = 4 | 3.261 |", "| S/D = 4 | 3.361 |"),
     ("rocscience", "tags", "G13 a back-analyzed support force drifts in the tag",
      "expected_force=351.4", "expected_force=352.4"),
 

@@ -414,7 +414,9 @@ This iteration backstop is separate from the Newton corrector's final-state disp
 
 This criterion does not judge trials one at a time. It solves the slope at a sweep of trial
 factors, plots the displacement at a chosen point against $F$, and takes the factor of safety where
-that curve turns sharply upward, the evidence Griffiths & Lane present in their Figs 2 and 18. The
+that curve turns sharply upward. Griffiths & Lane (1999) read the factor of safety this way for a
+homogeneous slope and for an earth dam. The [sweep figure under Methodology](#methodology) shows the
+upturn. The
 point is chosen automatically: after a coarse sweep, the node whose plastic displacement grew most
 between the lowest and highest $F$ becomes the measurement point, so the curve is read on the
 mechanism rather than on background deformation that grows at every $F$; the sweep is then refined

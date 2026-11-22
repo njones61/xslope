@@ -3340,8 +3340,9 @@ def _mesh_element_type_linear(ctx):
             f"incompressible plastic flow of a Mohr-Coulomb collapse: they resist "
             f"the failure mechanism more than the soil does, so the factor of "
             f"safety comes back too high, in the unconservative direction -- +21% "
-            f"(tri3) and +11% (quad4) against the reference on the Griffiths & Lane "
-            f"Example 1 benchmark. Use tri6, quad8 or quad9 for a finite element or "
+            f"(tri3) and +11% (quad4) on a homogeneous 2:1 slope with φ′ = 20° "
+            f"and c′/γH = 0.05 (Griffiths & Lane 1999), whose factor of safety "
+            f"is about 1.4. Use tri6, quad8 or quad9 for a finite element or "
             f"strength-reduction run; tri3 is for seepage, where the field is scalar "
             f"and nothing can lock (Build mesh; main "
             f"{_main_cell(ctx, 'element_type')}).")
@@ -5016,9 +5017,9 @@ def _rapid_d_psi(ctx):
             continue
         have, missing = ("d", "psi") if d != 0.0 else ("psi", "d")
         yield (f"{ctx.mat_label(i)} carries {have} but not {missing}. The "
-               f"Duncan & Wright Kc = 1 envelope needs both, and a material with "
+               f"Kc = 1 envelope (d, psi) needs both, and a material with "
                f"only one of them is silently treated as free-draining: it keeps "
-               f"its drained c/f through stage 2, which on the reference model was "
+               f"its drained c/f through stage 2, which in one test case was "
                f"worth +12.8% on the factor of safety. Fill both, or clear both to "
                f"declare the material free-draining {_AT_MAT}.")
 
@@ -5065,9 +5066,9 @@ def _rapid_cp(ctx):
         if (_num(m.get("d")) or 0.0) == 0.0 and (_num(m.get("psi")) or 0.0) == 0.0:
             continue
         yield (f"{ctx.mat_label(i)} uses option = {opt}, so its d / psi are set to "
-               f"zero for the drawdown: an undrained material can never be "
-               f"low-permeability in the Duncan & Wright sense whatever the "
-               f"materials table says. The stage-2 strength is its option's own "
+               f"zero for the drawdown: an undrained material does not take its "
+               f"stage-2 strength from d and psi, whatever the materials table "
+               f"says. The stage-2 strength is its option's own "
                f"{_AT_MAT}.")
 
 

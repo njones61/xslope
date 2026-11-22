@@ -136,9 +136,10 @@ The **Dir** setting sets $\psi$:
   discussed by Duncan & Wright (2005). Where the reinforcement crosses sand or gravel the direction makes little
   difference: tilting the force adds to its moment but takes away from the normal force on the base and the strength
   that comes with it. Where it crosses clay with $\phi = 0$ nothing offsets the added moment, so tangent gives the
-  higher factor of safety. In Wright & Duncan's (1991) second example, Spencer's method gives 1.37 with the force
-  horizontal and 1.36 with it tangent when the reinforcement is in sand, and 1.36 and 1.57 when it is in clay. GEC 11
-  calls the direction along the reinforcement the conservative one. Wright & Duncan add that reinforcement is rarely
+  higher factor of safety. Wright & Duncan (1991) analyzed a 10 ft fill of sand (φ = 35°, γ = 105 pcf) on 10 ft of
+  saturated clay with an undrained strength of 200 psf. One layer of reinforcement at the base of the fill carries
+  3,000 lb/ft. Their Spencer analyses give 1.37 with the force horizontal and 1.36 with it tangent when the
+  reinforcement is in sand, and 1.36 and 1.57 when it is in clay. GEC 11 calls the direction along the reinforcement the conservative one. Wright & Duncan add that reinforcement is rarely
   placed in such a clay, since it usually sits on a sand or gravel pad above it.
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.

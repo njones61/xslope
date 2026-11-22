@@ -117,7 +117,8 @@ this page measures is the one the search finds, not this one:
 | :---: | :---: | --- | :---: |
 | 195 | 150 | Depth | 18.1 |
 
-The section and this circle come from two exercises in CE 544, Slope Stability
+The section and this circle come from two exercises in
+[CE 544](https://byu-ce544.readthedocs.io/en/latest/), Seepage and Slope Stability
 Analysis, a graduate course at Brigham Young University — the
 [Ordinary Method of Slices exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_class/)
 and the
@@ -521,8 +522,8 @@ does not use.
 
 ## Factor of safety by method
 
-The two tables give every method on the starting circle as entered, the circle
-the CE 544 exercises analyze, and each method's own search.
+The two tables give every method on the starting circle entered above and each
+method's own search.
 
 **On the starting circle**, solved as a single surface with no search:
 

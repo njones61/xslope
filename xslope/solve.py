@@ -523,7 +523,9 @@ def _moment_arms(slice_df, Xo, Yo, alpha, right_facing):
 
 def oms(slice_df, debug=False):
     """
-    Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
+    Computes FS by the Ordinary Method of Slices: equation (8) on
+    https://xslope.org/en/latest/lem/oms/ (its moment-arm form, (8a), on a
+    composite surface).
 
     Inputs
     ------
@@ -776,7 +778,8 @@ def oms(slice_df, debug=False):
 
 def bishop(slice_df, debug=False, tol=1e-6, max_iter=100, fs_seed=None):
     """
-    Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
+    Computes FS using the complete Bishop's Simplified Method (equation (10) on
+    https://xslope.org/en/latest/lem/bishop/) and computes N_eff (equation (8) there).
     Requires circular slip surface and full input data structure consistent with OMS.
 
     Parameters:

@@ -25,11 +25,12 @@ shared [References](references.md) page.
 Match dots and status terms follow the shared [definitions](index.md#status-terms) and
 [scoring](index.md#how-the-match-dots-are-scored).
 
-Duncan, Wright & Brandon's Table 10.4 is a textbook's worked comparison rather than
-a hand calculation: the authors computed it with their own program and printed the
-factors of safety, so it is the published answer for the procedure it illustrates.
-Their Figure 10.1 entry is a closed form: the book's two equilibrium equations for a
-mass sliding on a plane, solved for the seismic coefficient at which F = 1.
+Duncan, Wright & Brandon's comparison of single-stage and two-stage seismic analyses
+(2014, Table 10.4) is a worked comparison rather than a hand calculation. The authors
+computed it with their own program and printed the factors of safety, so it is the
+published answer for the procedure it illustrates. The rigid-wedge yield coefficient
+(their Figure 10.1) is a closed form. Their two equilibrium equations for a mass sliding
+on a plane are solved for the seismic coefficient at which F = 1.
 
 A worked example frequently publishes one part of a design and defers the rest,
 and where XSLOPE computes a quantity the example does not carry, that quantity is reported as
@@ -45,8 +46,8 @@ XSLOPE's own with no published counterpart and takes no dot.
 | [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.637 has no published counterpart |
 | [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands rather than properties of the reinforcement, so they leave the capacity envelope where it stands, and XSLOPE's searched Spencer 1.542 has no published counterpart |
 | [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.122 has no published counterpart |
-| [DWB 10.1](#dwb-10-1) | 🟢 | Yield coefficient of a rigid wedge (Duncan, Wright & Brandon, Figure 10.1) | c–φ wedge: k<sub>y</sub> 0.2366 vs closed form 0.2366 (0.0%) · frictional wedge: k<sub>y</sub> 0.0875 vs closed form 0.0875 (0.0%) | **built**; Spencer's method finds no solution on the frictional wedge, which the Corps of Engineers and Lowe & Karafiath rows cover |
-| [DWB 10.4](#dwb-10-4) | 🟢 | Pseudostatic slope, single-stage and two-stage (Duncan, Wright & Brandon, Table 10.4) | All 16 values within 1.3%: dry within 0.4%, submerged within 1.3% | **built**; the two-stage columns are XSLOPE's two-stage analysis with the K<sub>c</sub> = 1 envelope; its default interpolated values have no published counterpart |
+| [Wedge](#dwb-10-1) | 🟢 | Yield coefficient of a rigid wedge (Duncan, Wright & Brandon, Figure 10.1) | c–φ wedge: k<sub>y</sub> 0.2366 vs closed form 0.2366 (0.0%) · frictional wedge: k<sub>y</sub> 0.0875 vs closed form 0.0875 (0.0%) | **built**; Spencer's method finds no solution on the frictional wedge, which the Corps of Engineers and Lowe & Karafiath rows cover |
+| [Two-stage](#dwb-10-4) | 🟢 | Pseudostatic slope, single-stage and two-stage (Duncan, Wright & Brandon, Table 10.4) | All 16 values within 1.3%: dry within 0.4%, submerged within 1.3% | **built**; the two-stage columns are XSLOPE's two-stage analysis with the K<sub>c</sub> = 1 envelope; its default interpolated values have no published counterpart |
 | [Newmark](#newmark-1965) | 🟢 | Rigid sliding block under a rectangular pulse (Newmark 1965) | k<sub>y</sub> = 0.1: D 73.575 cm vs closed form 73.575 cm (0.0%) · k<sub>y</sub> = 0.2: D 18.394 cm vs closed form 18.394 cm (0.0%) · imperial: D 28.957 in vs closed form 28.957 in (0.0%) | **built**; the record's other sign never pushes the block, so that direction stays at zero |
 
 </div>
@@ -250,13 +251,17 @@ in.
 
 $F^{*}$ for steel strips interpolates from $1.2 + \log_{10}C_u$ at the top of the
 wall to $\tan\varphi_r$ at 20 ft depth, which for this backfill is 2.000 down to
-0.675. A reinforcement layer is horizontal, so its depth is a single number and
+0.675. $C_u$ is the backfill's coefficient of uniformity, 7.0 here, so the top value
+would be $1.2 + \log_{10}7.0 = 2.045$, which the manual caps at 2.0. A reinforcement layer is horizontal, so its depth is a single number and
 its $F^{*}$ is a single number: one Delta per level, taken from the manual's own
 column.
 
 **Per-level pullout resistance.** The internal failure surface for inextensible
-reinforcement is the bilinear surface of Figure E3-5, and $L_e$ is the embedment
-beyond it. Reading XSLOPE's envelope at the station L − L<sub>e</sub> where that
+reinforcement is bilinear (the manual's Figure E3-5), and $L_e$ is the embedment
+beyond it. The sloping backfill raises the surface's height to
+$H_1 = H + 0.3H\tan\beta/(1 - 0.3\tan\beta) = 35.29$ ft. Over the upper half of $H_1$
+the surface stands at $0.3H_1 = 10.59$ ft from the face and $L_e = L - 0.3H_1$; below
+that it runs straight down to the toe of the wall and $L_e = L - 0.6(H - Z)$. Reading XSLOPE's envelope at the station L − L<sub>e</sub> where that
 surface crosses each level gives the resistance the resisting zone alone
 develops, which is the quantity Table E3-7.3 publishes:
 
@@ -342,7 +347,8 @@ for the four-wire mats and 1.0 ft for the three-wire mat at level 2. The
 element's horizontal spacing is the 5 ft panel width, so Spacing is 5 ft and
 each line's Tmax is the whole mat, $N$ wires' worth. The pullout resistance
 factor for a bar mat runs from $20(t/S_t)$ at the top of the wall to $10(t/S_t)$
-at 20 ft depth, with the transverse wire spacing $S_t$ stepping from 6 in on the
+at 20 ft depth, where $t$ is the transverse wire diameter (0.374 in for W11 wire),
+with the transverse wire spacing $S_t$ stepping from 6 in on the
 top four levels to 12 in and then 18 in below them; that step is what makes
 $F^{*}$ fall abruptly between levels 4 and 5 and again between 7 and 8.
 
@@ -644,7 +650,7 @@ gravity:
 $$N = W\cos\beta - kW\sin\beta, \qquad T = W\sin\beta + kW\cos\beta, \qquad
 F = \frac{cL + N\tan\phi}{T}$$
 
-The book applies them to an infinite slope. They hold exactly for any mass that slides
+Duncan, Wright & Brandon apply them to an infinite slope. They hold exactly for any mass that slides
 on one plane: every slice base lies in that plane, and the interslice forces cancel
 when the slices are summed, so every method that satisfies force equilibrium gives this
 F at any k. Setting F = 1 gives the yield coefficient in closed form,
@@ -722,14 +728,15 @@ directions.
 
 Duncan, Wright & Brandon (2014), Section 10.4.2, compare the two ways of giving a
 pseudostatic analysis undrained strengths for a slope that has consolidated under its
-own weight. The **single-stage** analysis enters the R envelope's c<sub>R</sub> and
-φ<sub>R</sub> as an ordinary c and φ, with the pore pressures from before the
-earthquake. The **two-stage** analysis first solves the slope with no seismic force
+own weight. The **single-stage** analysis enters c<sub>R</sub> and φ<sub>R</sub>, the
+intercept and slope of the R envelope (the Corps' consolidated-undrained strength envelope;
+see [R envelope](../lem/rapid.md#r-envelope)), as an ordinary c and φ, with the pore
+pressures from before the earthquake. The **two-stage** analysis first solves the slope with no seismic force
 and drained strengths, which gives each slice's consolidation stresses
 σ′<sub>fc</sub> and τ<sub>fc</sub>; the second stage gives every slice its undrained
 strength from those stresses and adds the seismic force. Their Table 10.4 runs both on
-the slope of Figure 10.7 with k = 0.15, for the four soils of Table 10.3, dry and
-submerged.
+the slope of Figure 10.7 with k = 0.15, for [the four soils](../seismic/two_stage.md#four-soils)
+of their Table 10.3, dry and submerged.
 
 **Input:** [dwb_t10_4_dry.xlsx](files/published/dwb_t10_4_dry.xlsx) ·
 [dwb_t10_4_submerged.xlsx](files/published/dwb_t10_4_submerged.xlsx) · built by
@@ -737,13 +744,14 @@ submerged.
 
 The slope is 2.5H:1V and 30 ft high, with γ = 135 pcf throughout. Each workbook carries
 all eight strength sets of Table 10.3, each soil once with c′, φ′, d, and ψ for the
-two-stage analysis and once with c<sub>R</sub> and φ<sub>R</sub> for the single-stage
+two-stage analysis (d and ψ, the intercept and slope of the K<sub>c</sub> = 1 envelope; see
+[two envelopes](../lem/rapid.md#two-envelopes)) and once with c<sub>R</sub> and φ<sub>R</sub> for the single-stage
 analysis; the profile line points at the soil being run. The figure gives no foundation
 depth and no water depth, so the model sets the base 30 ft (one slope height) below the
 toe and, in the submerged case, the water 15 ft above the crest. The dry results do not
 depend on the base, because their critical circles stay above it. In the submerged case
 the critical circles for soils 2 and 4 reach the base, so those four values depend on the
-assumed depth, and a deeper base lowers them further below the book's.
+assumed depth, and a deeper base lowers them further below the published values.
 
 Every run is Spencer's method, a circular search, and 40 slices.
 
@@ -758,13 +766,13 @@ Every run is Spencer's method, a circular search, and 40 slices.
 | 3 | submerged | 1.086 | 1.10 (−1.3%) | 1.209 | 1.21 (−0.1%) |
 | 4 | submerged | 2.815 | 2.83 (−0.5%) | 3.486 | 3.49 (−0.1%) |
 
-XSLOPE reproduces the book's finding that the single-stage analysis gives 80 to 90 percent
+XSLOPE reproduces Duncan, Wright & Brandon's finding that the single-stage analysis gives 80 to 90 percent
 of the two-stage factor of safety.
 
-The book's text says to estimate the undrained strengths in the second stage "using the
+Duncan, Wright & Brandon say to estimate the undrained strengths in the second stage "using the
 same procedures as for rapid drawdown", which interpolates between the K<sub>c</sub> = 1
 envelope and the drained envelope according to each slice's consolidation stress ratio
-K<sub>c</sub>. Its Table 10.4 was computed from the K<sub>c</sub> = 1 envelope alone,
+K<sub>c</sub>. Their Table 10.4 was computed from the K<sub>c</sub> = 1 envelope alone,
 τ<sub>ff</sub> = d + σ′<sub>fc</sub> tan ψ, and XSLOPE matches the table only that way.
 The two-stage analysis offers both. The table's two-stage columns above use the
 K<sub>c</sub> = 1 choice; the default interpolated choice gives these values, which are

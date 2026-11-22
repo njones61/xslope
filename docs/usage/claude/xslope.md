@@ -267,7 +267,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 | LEM formulation, slice forces, method comparison | `lem/overview/` |
 | A single method in full | `lem/oms/`, `lem/bishop/`, `lem/janbu/`, `lem/spencer/`, `lem/mprice/`, `lem/force_eq/` |
 | Reinforcement, piles (LEM) | `reinforcement/lem/`, `piles/lem/` |
-| Rapid drawdown (three-stage Duncan-Wright-Brandon) | `lem/rapid/` |
+| Rapid drawdown (the three-stage method of Duncan, Wright, and Wong 1990) | `lem/rapid/` |
 | Automated search for the critical surface | `lem/search/` |
 | Seepage FE formulation, unsaturated models | `seep/overview/` |
 | Transient seepage and storage | `seep/transient/` |
@@ -301,20 +301,20 @@ published comparisons against the source or vendor program, not illustrations.
 
 | Topic | Worked examples |
 |:------|:----------------|
-| Reinforcement & geosynthetics | [VP87–VP94 — Geosynthetic multitiered MSE walls (Leshc…](https://xslope.org/en/latest/verification/rocscience/#vp87) · [2.18 — Borges & Cardoso – Geosynthetic Embankmen…](https://xslope.org/en/latest/verification/geostudio/#gs-2-18) · [Opening the starter file](https://xslope.org/en/latest/tutorials/fem02_reinforcement/#opening-the-starter-file) · [A base geotextile on soft clay](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay) · [A smooth geomembrane liner on a firm foundation](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation) · [FHWA Example E1 — MSE wall with a broken backslope](https://xslope.org/en/latest/verification/published/#fhwa-e1) |
-| Soil nails | [Effect of Dir and Appl](https://xslope.org/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change) · [VP47 — Soil-nailed wall in clay (Amherst test wa…](https://xslope.org/en/latest/verification/rocscience/#vp47) · [VP48 — Soil-nailed wall in sand (Clouterre test…](https://xslope.org/en/latest/verification/rocscience/#vp48) · [RS2 Part IV VP60 — Soil-nailed wall (Pockoski & Duncan slope…](https://xslope.org/en/latest/verification/rs2/#p4-vp60) |
+| Reinforcement & geosynthetics | [VP87–VP94 — Geosynthetic multitiered MSE walls (Leshc…](https://xslope.org/en/latest/verification/rocscience/#vp87) · [2.18 — Borges & Cardoso – Geosynthetic Embankmen…](https://xslope.org/en/latest/verification/geostudio/#gs-2-18) · [Tutorial FEM-2 — Opening the starter file](https://xslope.org/en/latest/tutorials/fem02_reinforcement/#opening-the-starter-file) · [Tutorial FEM-3 — A base geotextile on soft clay](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay) · [Tutorial FEM-3 — A smooth geomembrane liner on a firm foundation](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation) · [FHWA Example E1 — MSE wall with a broken backslope](https://xslope.org/en/latest/verification/published/#fhwa-e1) |
+| Soil nails | [Tutorial LEM-8 — Effect of Dir and Appl](https://xslope.org/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change) · [VP47 — Soil-nailed wall in clay (Amherst test wa…](https://xslope.org/en/latest/verification/rocscience/#vp47) · [VP48 — Soil-nailed wall in sand (Clouterre test…](https://xslope.org/en/latest/verification/rocscience/#vp48) · [RS2 Part IV VP60 — Soil-nailed wall (Pockoski & Duncan slope…](https://xslope.org/en/latest/verification/rs2/#p4-vp60) |
 | Anchors & tiebacks | [VP49 — Retaining wall, grouted tiebacks, soldier…](https://xslope.org/en/latest/verification/rocscience/#vp49) · [VP58 — Tied-back wall in layered soil](https://xslope.org/en/latest/verification/rocscience/#vp58) · [VP59 — Tieback wall in sand, drawdown water table](https://xslope.org/en/latest/verification/rocscience/#vp59) |
-| Piles & drilled shafts | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Torggler (2016) §3 — Homogeneous slope with a vertical plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3a) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3b) · [Opening the model and reading the pile rows](https://xslope.org/en/latest/tutorials/fem04_piles/#opening-the-model-and-reading-the-pile-rows) · [Opening the model](https://xslope.org/en/latest/tutorials/lem12_piles/#opening-the-model) · [SIGMAW-SRS — Slope stabilization with a sheet pile wall](https://xslope.org/en/latest/verification/geostudio/#sigmaw-wall) |
-| Sheet-pile & cutoff walls | [1. Sea Trench](https://xslope.org/en/latest/seep/samples/#1-sea-trench) · [Check its work](https://xslope.org/en/latest/tutorials/seep01_sheetpile/#check-its-work) · [Partially Penetrating Sheetpile](https://xslope.org/en/latest/verification/seep/#verification-sheetpile) |
-| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.org/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.org/en/latest/verification/rocscience/#vp99) · [6. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.org/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat) · [Conclusion](https://xslope.org/en/latest/tutorials/combo02_rapid_drawdown/#conclusion) · [The dam](https://xslope.org/en/latest/tutorials/combo02_rapid_drawdown/#the-dam) |
-| Transient seepage | [6. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.org/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient) · [Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model) · [Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model_1) · [Conclusion](https://xslope.org/en/latest/tutorials/seep03_reservoir_drawdown/#conclusion) · [Rain that comes and goes](https://xslope.org/en/latest/tutorials/seep04_dam_infiltration/#rain-that-comes-and-goes) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.org/en/latest/verification/geostudio/#seepw-t01) |
+| Piles & drilled shafts | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Torggler (2016) §3 — Homogeneous slope with a vertical plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3a) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3b) · [Tutorial FEM-4 — Opening the model and reading the pile rows](https://xslope.org/en/latest/tutorials/fem04_piles/#opening-the-model-and-reading-the-pile-rows) · [Tutorial LEM-12 — Opening the model](https://xslope.org/en/latest/tutorials/lem12_piles/#opening-the-model) · [SIGMAW-SRS — Slope stabilization with a sheet pile wall](https://xslope.org/en/latest/verification/geostudio/#sigmaw-wall) |
+| Sheet-pile & cutoff walls | [1. Sea Trench](https://xslope.org/en/latest/seep/samples/#1-sea-trench) · [Tutorial SEEP-1 — Check its work](https://xslope.org/en/latest/tutorials/seep01_sheetpile/#check-its-work) · [Partially Penetrating Sheetpile](https://xslope.org/en/latest/verification/seep/#verification-sheetpile) |
+| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.org/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.org/en/latest/verification/rocscience/#vp99) · [6. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.org/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat) · [Tutorial COMBO-2 — Conclusion](https://xslope.org/en/latest/tutorials/combo02_rapid_drawdown/#conclusion) · [Tutorial COMBO-2 — The dam](https://xslope.org/en/latest/tutorials/combo02_rapid_drawdown/#the-dam) |
+| Transient seepage | [6. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.org/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient) · [Tutorial COMBO-3 — Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model) · [Tutorial COMBO-3 — Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model_1) · [Tutorial SEEP-3 — Conclusion](https://xslope.org/en/latest/tutorials/seep03_reservoir_drawdown/#conclusion) · [Tutorial SEEP-4 — Rain that comes and goes](https://xslope.org/en/latest/tutorials/seep04_dam_infiltration/#rain-that-comes-and-goes) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.org/en/latest/verification/geostudio/#seepw-t01) |
 | Seepage-coupled stability | [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.org/en/latest/verification/rocscience/#vp102) · [VP46 — Baker (1993) three-stage dam — stages 1-2…](https://xslope.org/en/latest/verification/rocscience/#vp46) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.org/en/latest/verification/rs2/#p4-vp102) · [RS2-28 — Excavated slope with FE groundwater and m…](https://xslope.org/en/latest/verification/rs2/#rs2-28) · [4. Earth Dam (Duncan, Wright, and Brandon)](https://xslope.org/en/latest/lem/samples/#4-earth-dam-duncan-wright-and-brandon) · [6. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.org/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient) |
-| Probabilistic & reliability | [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.org/en/latest/verification/rs2/#rs2-26) · [2. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.org/en/latest/fem/samples/#2-reliability-analysis-two-layer-c-slope) · [Worked sample](https://xslope.org/en/latest/parametric/sensitivity/#worked-sample) · [Opening the model](https://xslope.org/en/latest/tutorials/lem11_reliability/#opening-the-model) · [The deterministic run](https://xslope.org/en/latest/tutorials/lem11_reliability/#the-deterministic-run) |
-| Tension cracks | [VP53 — Priest (1993) rigid block on a plane](https://xslope.org/en/latest/verification/rocscience/#vp53) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.org/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-29 — Geosynthetic-reinforced embankment on sof…](https://xslope.org/en/latest/verification/rs2/#rs2-29) · [A Simple Embankment from Scratch](https://xslope.org/en/latest/videos/#video-1) · [5. Tension Crack](https://xslope.org/en/latest/lem/samples/#5-tension-crack) |
-| Seismic (pseudo-static) | [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-64 — Slope stability assessment of three homog…](https://xslope.org/en/latest/verification/rs2/#rs2-64) · [Part 3 — Strength reduction at the same coefficient](https://xslope.org/en/latest/tutorials/lem14_pseudostatic/#part-3-strength-reduction-at-the-same-coefficient) · [Duncan, Wright & Brandon — single- and two-stage seismic analyses](https://xslope.org/en/latest/verification/published/#dwb-10-4) · [FHWA Example E7 — seismic loading on an MSE wall](https://xslope.org/en/latest/verification/published/#fhwa-e7) · [VP104 — Seismic slope with Newmark and multi-moda…](https://xslope.org/en/latest/verification/rocscience/#vp104) |
+| Probabilistic & reliability | [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.org/en/latest/verification/rs2/#rs2-26) · [2. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.org/en/latest/fem/samples/#2-reliability-analysis-two-layer-c-slope) · [Sensitivity — Worked sample](https://xslope.org/en/latest/parametric/sensitivity/#worked-sample) · [Tutorial LEM-11 — Opening the model](https://xslope.org/en/latest/tutorials/lem11_reliability/#opening-the-model) · [Tutorial LEM-11 — The deterministic run](https://xslope.org/en/latest/tutorials/lem11_reliability/#the-deterministic-run) |
+| Tension cracks | [VP53 — Priest (1993) rigid block on a plane](https://xslope.org/en/latest/verification/rocscience/#vp53) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.org/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-29 — Geosynthetic-reinforced embankment on sof…](https://xslope.org/en/latest/verification/rs2/#rs2-29) · [Videos — A Simple Embankment from Scratch](https://xslope.org/en/latest/videos/#video-1) · [5. Tension Crack](https://xslope.org/en/latest/lem/samples/#5-tension-crack) |
+| Seismic (pseudo-static) | [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-64 — Slope stability assessment of three homog…](https://xslope.org/en/latest/verification/rs2/#rs2-64) · [Tutorial LEM-14 — Part 3 — Strength reduction at the same coefficient](https://xslope.org/en/latest/tutorials/lem14_pseudostatic/#part-3-strength-reduction-at-the-same-coefficient) · [Duncan, Wright & Brandon — single- and two-stage seismic analyses](https://xslope.org/en/latest/verification/published/#dwb-10-4) · [FHWA Example E7 — seismic loading on an MSE wall](https://xslope.org/en/latest/verification/published/#fhwa-e7) · [VP104 — Seismic slope with Newmark and multi-moda…](https://xslope.org/en/latest/verification/rocscience/#vp104) |
 | Non-circular surfaces | [Griffiths & Lane (1999) Example 3 — Undrained Clay Slope wi…](https://xslope.org/en/latest/verification/ssrm/#verification-griffiths3) · [VP25 — Prandtl bearing mechanism on a 60° slope…](https://xslope.org/en/latest/verification/rocscience/#vp25) · [VP43 — Slope, homogeneous — planar surface (Bake…](https://xslope.org/en/latest/verification/rocscience/#vp43) · [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.org/en/latest/verification/rs2/#rs2-26) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3b) |
 | Layered & zoned dams | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.org/en/latest/verification/rocscience/#vp98) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.org/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [4. Earth Dam (Duncan, Wright, and Brandon)](https://xslope.org/en/latest/lem/samples/#4-earth-dam-duncan-wright-and-brandon) · [4. Earth Dam with Core and Filter](https://xslope.org/en/latest/seep/samples/#4-earth-dam-with-core-and-filter) |
-| Homogeneous benchmarks | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI…](https://xslope.org/en/latest/verification/ssrm/#hoek-brown) · [Griffiths & Lane (1999) Example 1 — Homogeneous Slope](https://xslope.org/en/latest/verification/ssrm/#verification-griffiths1) · [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.org/en/latest/verification/rocscience/#vp102) · [VP21 — Slope, homogeneous, ru pore pressure (Fre…](https://xslope.org/en/latest/verification/rocscience/#vp21) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.org/en/latest/verification/rs2/#p4-vp102) |
+| Homogeneous benchmarks | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Hammah et al. (2005b) Example 1 — Hoek-Brown Rock Slope, GS…](https://xslope.org/en/latest/verification/ssrm/#hoek-brown) · [Griffiths & Lane (1999) Example 1 — Homogeneous Slope](https://xslope.org/en/latest/verification/ssrm/#verification-griffiths1) · [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.org/en/latest/verification/rocscience/#vp102) · [VP21 — Slope, homogeneous, ru pore pressure (Fre…](https://xslope.org/en/latest/verification/rocscience/#vp21) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.org/en/latest/verification/rs2/#p4-vp102) |
 <!-- corpus-index:end -->
 
 ### Tone
@@ -360,9 +360,9 @@ You build the model as an **in-memory `slope_data` dictionary** and write it to 
 template in a single call — you never touch cells or XML directly:
 
 ```python
-from xslope.fileio import save_slope_data_to_xlsx, load_slope_data
+from xslope.fileio import save_slope_data_to_xlsx, load_slope_data, default_template_path
 
-TEMPLATE = "docs/inputs/input_template.xlsx"   # blank master template (copy is made for you)
+TEMPLATE = default_template_path()               # the blank template bundled with xslope (copy is made for you)
 dst = "inputs/problem_name.xlsx"
 
 slope_data = { ... }                            # build the dict (schema below)
@@ -556,7 +556,7 @@ slope_data['materials'] = [
         #     leave None for steady-state. Ss = specific storage [1/len], required on
         #     every material; Sy = specific yield [-], required only on UNCONFINED models
         #     (an exit-face BC exists). See "Transient seepage" under Seepage Analysis
-        #     Code for how to build and run one; theory: docs/seep/transient.md.
+        #     Code for how to build and run one; theory: https://xslope.org/en/latest/seep/transient/.
         'Ss': None, 'Sy': None,
         # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,
@@ -1022,9 +1022,12 @@ The two pullout laws share one envelope. With `lp1`/`lp2` the capacity develops 
 `2*(adhesion + sigma'_v*tan(delta))` per unit length, integrated along the line — `sigma'_v`
 being the weight of the soil column above each point (gamma_sat below the water table where a
 material declares one) less the pore pressure that point's material declares. `lp1`/`lp2` are
-then not read. The FHWA form is `adhesion = 0`, `delta = atan(F* * alpha)` for a nominal
-pullout resistance, `atan(F* * alpha / FS_PO)` for an allowable one. Both engines apply
-the same envelope, `xslope.fileio.reinforce_available_tension`. A `slope_data` you assemble in
+then not read. The FHWA form (FHWA-NHI-10-024/025, GEC 11: *Design and Construction of
+Mechanically Stabilized Earth Walls and Reinforced Soil Slopes*, 2009) is `adhesion = 0`,
+`delta = atan(F* * alpha)` for a nominal pullout resistance, `atan(F* * alpha / FS_PO)` for an
+allowable one, where F* is the pullout resistance factor, alpha the scale-effect correction
+factor, and FS_PO the pullout factor of safety (1.5 in granular soil, 2 in cohesive soil).
+Both engines apply the same envelope, `xslope.fileio.reinforce_available_tension`. A `slope_data` you assemble in
 memory resolves the law on the way into either engine, so nothing extra has to be called.
 
 `appl` decides what every capacity on the line is. With `active` the LEM does not divide the
@@ -1042,15 +1045,17 @@ and the report prints; the slice table's `p_active`/`p_passive` columns sum the 
 slice.
 
 Support-type recipes, end 1 at the face or wall (column-by-column entries with typical values
-from the FHWA manuals: `docs/reinforcement/types.md`):
+from the FHWA manuals: https://xslope.org/en/latest/reinforcement/types/):
 - geosynthetics -> `type='geosynthetic'` (tangent, active): `t_max` = long-term strength
   Tal ÷ its factor of safety; `tend1` = the facing connection's allowable strength, 0 where the
   layer ends free at the face; `tend2` = 0.
-- soil nails -> `type='nail'` (axial, active, GEC 7's allowable values): `t_max` = bar area ×
-  yield strength per nail ÷ 1.8; `lp1` = `lp2` = `t_max` ÷ (π × bond strength × drill-hole
+- soil nails -> `type='nail'` (axial, active, allowable values from GEC 7: FHWA Geotechnical
+  Engineering Circular No. 7, *Soil Nail Walls*, FHWA-NHI-14-007, 2015, with its factors of
+  safety from Table 5.1): `t_max` = bar area × yield strength per nail ÷ 1.8 (Grade 60 or 75
+  bar; ÷ 2.0 for Grade 95 or 150); `lp1` = `lp2` = `t_max` ÷ (π × bond strength × drill-hole
   diameter ÷ 2.0); `tend1` = nail-head capacity, the smallest of the facing's flexure and
-  punching-shear resistances ÷ 1.5 and headed-stud resistance ÷ its factor; `tend2` = 0;
-  `adhesion`/`delta` blank. Nominal values instead go with `appl='passive'`.
+  punching-shear resistances ÷ 1.5 and headed-stud resistance ÷ 2.0 (A307 bolt) or 1.7 (A325
+  bolt); `tend2` = 0; `adhesion`/`delta` blank. Nominal values instead go with `appl='passive'`.
 - tiebacks -> `type='tieback'` (axial, active): `t_max` = the smallest of the tendon's design
   load, the allowable capacity of the head's connection to the wall, and the bond capacity
   (allowable load transfer per unit length × bond length); `lp1` = 0; `lp2` = `t_max` ÷ the
@@ -1075,7 +1080,7 @@ read (the grip is the interface traction); the bar still yields at `t_max` and s
 where one is given. A blank `tend1`/`tend2` leaves that end free to pull out, and a filled one
 ties it at that capacity. LEM ignores `joint` entirely. Preflight
 reports the geometry that indicates a bonded line should have been a joint. See
-`docs/reinforcement/fem.md`, "Choosing a Bonded Bar or a Joint".
+https://xslope.org/en/latest/reinforcement/fem/#bonded-bar-or-joint.
 
 ### Joint lines (v27 `joints` sheet, FEM only)
 
@@ -1115,8 +1120,8 @@ jointed too (`joint='Yes'`) or stop short of it, and a pile must stop short: the
 node, and a bonded member there has no side to attach to (preflight
 `joint.crosses_constraint_line` refuses it). A thin zone crossed by many joint lines needs a per-polygon `size`
 (the polygon sheet's Size column) — a 0.3 m facing column crossed every 0.6 m does not mesh at a
-1 m target size. LEM ignores the sheet entirely. See `docs/reinforcement/fem.md`, "Joints without
-reinforcement".
+1 m target size. LEM ignores the sheet entirely. See
+https://xslope.org/en/latest/reinforcement/fem/#joints-without-reinforcement.
 
 #### Joint networks (`xslope.joints`)
 
@@ -1427,8 +1432,9 @@ nodes with; pass `slope_data.get('element_size_1d')` through so a stated cell is
 **Never use linear elements for a FEM or SSRM run.** `tri3` and `quad4` lock volumetrically:
 Mohr-Coulomb plastic flow is nearly incompressible, a linear element cannot shear at constant
 volume, so it resists the mechanism and needs a larger reduction to collapse — FS comes back
-**too high, in the unconservative direction**. On Griffiths & Lane Example 1 (reference ≈ 1.40)
-`tri3` returns 1.70 (+21%) and `quad4` 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return
+**too high, in the unconservative direction**. On a homogeneous 2:1 slope with φ′ = 20° and
+c′/γH = 0.05 (Griffiths & Lane 1999), whose factor of safety is about 1.4, `tri3` returns 1.70
+(+21%) and `quad4` 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return
 1.41. Use `tri6` (conforms best to irregular/zoned geometry — the default choice) or `quad8`/
 `quad9` (more regular layout on block-like sections). The model checks warn before an SSRM on a
 linear mesh; it is a warning rather than an error, but a linear mesh is still wrong for an SSRM.
@@ -2162,7 +2168,7 @@ slope height below the toe (or ask).
 
 ---
 
-## Rapid Drawdown (three-stage Duncan-Wright-Brandon)
+## Rapid Drawdown (three-stage method of Duncan, Wright, and Wong 1990)
 
 Rapid drawdown uses TWO states of everything water-related. The template carries the second
 state on dedicated sheets whose layouts mirror the first set:
@@ -2218,7 +2224,10 @@ The pages under https://xslope.org/en/latest/seismic/overview/ are the reference
 - **Which strength** (Duncan, Wright & Brandon 2014, Sec. 10.4): UU strengths in total stress for an
   earthquake right after construction or on an existing slope; CU strengths for a new slope after it
   consolidates — d/psi on the mat sheet with `seismic2=`, or the R envelope's c_R, phi_R entered as c,
-  phi in ONE stage with the pore pressures from BEFORE the earthquake (steady seepage). Free-draining
+  phi in ONE stage with the pore pressures from BEFORE the earthquake (steady seepage). The R envelope
+  is the Corps of Engineers' total-stress envelope from consolidated-undrained triaxial tests,
+  drawn on Mohr circles that each start at the sample's effective consolidation pressure
+  sigma'_3c (https://xslope.org/en/latest/lem/rapid/#r-envelope). Free-draining
   gravels keep c', phi' (leave d/psi blank). A screening strength reduction (usually 0.8, sometimes
   0.85) belongs to one screening method and is used only with that method's k and minimum F (table at
   https://xslope.org/en/latest/seismic/overview/#choosing-k). In one stage enter the reduced strengths;
@@ -2228,7 +2237,8 @@ The pages under https://xslope.org/en/latest/seismic/overview/ are the reference
 - **Two-stage** (`seismic2="interpolated"` default: the stage 2 strength is interpolated between the
   K_c = 1 envelope (d, psi) and the drained envelope by each slice's consolidation stress ratio, as in
   rapid drawdown; or `"kc1"`: the K_c = 1 envelope alone at the stage 1 stresses, tau_ff = d +
-  sigma'_fc tan psi, which is how Duncan et al. computed their published two-stage F): stage 1
+  sigma'_fc tan psi, which is how Duncan, Wright & Brandon (2014) computed their published two-stage
+  factors of safety (four soils on one slope at k = 0.15)): stage 1
   static and drained, stage 2 undrained from stage-1 stresses plus the seismic force; no stage 3.
   Refused with `rapid=True`, without any d/psi material, with d or psi alone, on pow/hb materials
   carrying d/psi, and when stage 1 F < 1.

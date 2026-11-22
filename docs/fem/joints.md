@@ -208,9 +208,10 @@ The factor of safety a jointed strength reduction reports is
 valid: it is the factor by which the joint strengths can be reduced before the mass starts to move,
 which is the same quantity the closed forms and a distinct element strength reduction report. On
 the problems that have a closed form the method reproduces them — a slab on a daylighting bedding
-plane to within a bisection step of tan φ / tan β, the block toppling stacks of Goodman & Bray to
-within a few percent ([Tutorial FEM-5](../tutorials/fem05_rock_slope_joints.md) works the first by
-hand). What the method does not answer is anything about the movement after that point: how far
+plane to within a bisection step of tan φ / tan β, and the stacks of toppling columns that
+Goodman & Bray's (1976) limit equilibrium toppling analysis solves, to within 2 percent
+([RJ-1a to RJ-1d](../verification/rs2_joints.md#rj-1a)).
+[Tutorial FEM-5](../tutorials/fem05_rock_slope_joints.md) works the slab by hand. What the method does not answer is anything about the movement after that point: how far
 the blocks travel, where they come to rest, or what they strike on the way. The deformed section
 at failure shows the mechanism that starts, not the run-out. Those questions need a distinct
 element program such as UDEC, in which blocks separate, rotate through large angles and make new
@@ -411,6 +412,9 @@ disappears where the interface slips, because every slipping station is held at 
 Mohr-Coulomb limit, which follows the normal stress. Read a gripping stretch by its element
 averages, not station by station.
 ## References
+
+Goodman, R.E., & Bray, J.W. (1976). Toppling of rock slopes. *Proceedings, Specialty Conference on
+Rock Engineering for Foundations and Slopes*, ASCE, Boulder, Colorado, Vol. 2, 201-234.
 
 Goodman, R.E., Taylor, R.L., & Brekke, T.L. (1968). A model for the mechanics of jointed rock.
 *Journal of the Soil Mechanics and Foundations Division*, 94(SM3), 637-659.

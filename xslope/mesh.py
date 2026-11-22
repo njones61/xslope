@@ -4845,7 +4845,7 @@ def get_material_polygons(slope_data, reinf_lines=None):
     Return material-zone polygons for mesh generation, in the format the mesher
     expects: a list of dicts with 'coords' (closed (x, y) list) and 'mat_id'.
 
-    Unified entry point that works for both geometry inputs (plan_polygons.md §6):
+    Unified entry point that works for both geometry inputs:
       - Polygon input: use slope_data['polygons'] directly (the polygons ARE the
         geometry — no profile lines to convert).
       - Profile input: convert profile lines via build_polygons(), which also

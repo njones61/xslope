@@ -266,7 +266,7 @@ Construction Engineering Department at
 principal of [Jones Geoscience LLC](https://jonesgeo.com/){target="blank"}.
 Prof. Jones earned his PhD at the University of Texas under
 [Stephen G. Wright](https://caee.utexas.edu/person/stephen-wright/){target="blank"},
-and has taught *CE 544 — Seepage and Slope Stability Analysis* at BYU for several decades.
+and has taught [*CE 544 — Seepage and Slope Stability Analysis*](https://byu-ce544.readthedocs.io/en/latest/){target="blank"} at BYU for several decades.
 He can be reached at [njones@byu.edu](mailto:njones@byu.edu) or
 [xslope@jonesgeo.com](mailto:xslope@jonesgeo.com).
 

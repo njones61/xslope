@@ -371,9 +371,10 @@ safety nobody can explain. The two ways to give such a zone the size it needs ar
 **Size** on the zone, which is not capped, and a finer global target. A **Size** declared
 on the zone composes with the derived size by taking the smaller of the two.
 
-On the Griffiths soft-band section
-([xslope_griffiths3_r0p2_thin.xlsx](files/xslope_griffiths3_r0p2_thin.xlsx)) at a 3-unit
-target size, the band carries 1.6 element rows on a triangular mesh with the box clear and
+Take the thin weak layer of Griffiths & Lane's (1999) Example 3
+([verification](../verification/ssrm.md#verification-griffiths3)), at $c_{u2}/c_{u1} = 0.2$
+([xslope_griffiths3_r0p2_thin.xlsx](files/xslope_griffiths3_r0p2_thin.xlsx)). At a 3-unit
+target size, the layer carries 1.6 element rows on a triangular mesh with the box clear and
 1.2 on a quadrilateral one; with the option on both carry 4.0.
 
 From a script, pass `refine_features=['thin_zones']` together with any `refine_factor`

@@ -2,7 +2,8 @@
 
 The [GeoStudio slope stability verification manual](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Verification%20Manual.pdf)
 (Seequent, 2025.2 edition) solves 47 two-dimensional problems with SLOPE/W (its separate 3D chapter verifies
-SLOPE3D and is out of scope). Seven SEEP/W transient-seepage examples (T01–T07) and one SIGMA/W
+SLOPE3D and is out of scope). Problems 2.1 to 2.9 come from the Association for Computer Aided
+Design's (ACADS) 1989 review of slope stability programs (Donald & Giam 1989). Seven SEEP/W transient-seepage examples (T01–T07) and one SIGMA/W
 strength-reduction example (SRS), from GeoStudio's example libraries rather than from the manual, are carried
 at the foot of the table. Each row carries XSLOPE's results against the published values, a match dot
 following the corpus-wide [scoring convention](index.md#how-the-match-dots-are-scored), and where a problem
@@ -78,7 +79,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.43](#gs-2-43) | 🟢 | Rapid Drawdown – Pilarcitos Dam | Spencer 1.044 vs Slide 1.043 (+0.1%) · vs DWW 1.05 (−0.6%) | Duncan-Wright-Wong 3-stage |
 | [2.44](rocscience.md#vp75) | 🟢 | Probability – James Bay Case History | Bishop free search 1.424 vs Duncan & Wright 1.45 (−1.8%) · vs SLOPE/W 1.46 (−2.5%) | *covered* (deterministic); probabilistic case *blocked* — the 8 Bishop analyses are a pure spatial-averaging study differing *only* in a `SamplingDistance` (autocorrelation length): every-slice (0 m) / 30 / 40 / 50 / 80 / 100 m / none, over one set of plain σ's (marine-clay c σ = 8.14, lacustrine c σ = 8.65, fill γ and φ σ = 1). SLOPE/W's own results trace the variance-reduction curve directly: mean FS ≈ 1.46 throughout, **σ_F 0.065 → 0.215** and **PF 0 → 1.45%** as the averaging length grows. Only the "no spatial consideration" point-variance case (σ_F 0.215, PF 1.45%) is reproducible; the other seven vary a spatial-averaging length, and XSLOPE has no autocorrelation-length input — the same absence [Slide2 #33](rocscience.md#vp33) names |
 | [2.45](#gs-2-45) | 🟢 | Eurocode 7 – Cutting in Clay | Spencer 1.173 vs SLOPE/W's Overdesign Factor 1.174 (−0.1%) · Bishop 1.172 vs 1.173 (−0.1%) | Design Approach 3 partial factors baked into the material |
-| [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | M-P free search 1.073 vs SLOPE/W's composite minimum 1.091 (−1.6%) · Bishop free search 1.075 vs the Smith textbook's Bishop 1.07 (+0.5%) | DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage |
+| [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | M-P free search 1.073 vs SLOPE/W's composite minimum 1.091 (−1.6%) · Bishop free search 1.075 vs Bishop 1.07 in *Smith's Elements of Soil Mechanics* (+0.5%) | DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage |
 | [2.47](#gs-2-47) | <span class="nodata">⊘</span> | Compound Strength vs Anisotropic Function | | *blocked* — needs a dip-relative strength model |
 | [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Center excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
 | [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46,800 s (0.4% of the 8 m suction step) | unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
@@ -415,17 +416,17 @@ Mohr-Coulomb materials with no piezometric line, taken from the Slide2 manual's 
 
 ![gs2_22: inputs and the Figure 7 surface A solution](images/gs2_22.png)
 
-| Surface | XSLOPE M-P | SLOPE/W M-P | XSLOPE Bishop | Slide2 Bishop (Table 35.2) | Hassan & Wolff |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Fig. 7 A | 2.560 | 2.560 (0.0%) | 2.549 | 2.551 (−0.1%) | 2.753 |
-| Fig. 7 B | 2.803 | 2.806 (−0.1%) | 2.815 | 2.820 (−0.2%) | 2.352 |
-| Fig. 7 C | 2.769 | 2.771 (−0.1%) | 2.779 | 2.777 (+0.1%) | 2.523 |
-| Fig. 7 D | 2.589 | 2.589 (0.0%) | 2.577 | 2.583 (−0.2%) | 2.457 |
-| Fig. 7 E | 2.703 | 2.703 (0.0%) | 2.690 | 2.692 (−0.1%) | 2.602 |
-| Fig. 8 B | 2.671 | 2.673 (−0.1%) | 2.673 | 2.672 (0.0%) | 2.995 |
-| Fig. 8 F | 3.581 | 3.586 (−0.1%) | 3.591 | 3.598 (−0.2%) | 3.916 |
-| Fig. 8 G | 6.059 | 6.069 (−0.2%) | 6.060 | 6.074 (−0.2%) | 10.576 |
-| Fig. 8 H | 11.561 | 11.583 (−0.2%) | 11.561 | 11.230 (+2.9%) | 6.293 |
+| Surface | Center (x, y), radius (m) | XSLOPE M-P | SLOPE/W M-P | XSLOPE Bishop | Slide2 Bishop (Table 35.2) | Hassan & Wolff |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Fig. 7 A | (320.2, 313.3), 168.0 | 2.560 | 2.560 (0.0%) | 2.549 | 2.551 (−0.1%) | 2.753 |
+| Fig. 7 B | (295.2, 277.6), 121.3 | 2.803 | 2.806 (−0.1%) | 2.815 | 2.820 (−0.2%) | 2.352 |
+| Fig. 7 C | (303.7, 310.2), 154.3 | 2.769 | 2.771 (−0.1%) | 2.779 | 2.777 (+0.1%) | 2.523 |
+| Fig. 7 D | (322.2, 310.2), 164.8 | 2.589 | 2.589 (0.0%) | 2.577 | 2.583 (−0.2%) | 2.457 |
+| Fig. 7 E | (327.7, 324.0), 176.9 | 2.703 | 2.703 (0.0%) | 2.690 | 2.692 (−0.1%) | 2.602 |
+| Fig. 8 B | (304.2, 307.9), 152.5 | 2.671 | 2.673 (−0.1%) | 2.673 | 2.672 (0.0%) | 2.995 |
+| Fig. 8 F | (313.1, 304.8), 144.4 | 3.581 | 3.586 (−0.1%) | 3.591 | 3.598 (−0.2%) | 3.916 |
+| Fig. 8 G | (314.9, 305.6), 139.8 | 6.059 | 6.069 (−0.2%) | 6.060 | 6.074 (−0.2%) | 10.576 |
+| Fig. 8 H | (316.2, 305.6), 135.1 | 11.561 | 11.583 (−0.2%) | 11.561 | 11.230 (+2.9%) | 6.293 |
 
 XSLOPE's Morgenstern-Price reproduces SLOPE/W's own on all nine surfaces to **0.19%** or
 better, and its Bishop reproduces the Slide2 manual's Bishop column to **0.5%** on eight
@@ -843,7 +844,7 @@ the factored model then reproduces GeoStudio's Overdesign Factor (ODF).
 
 ![gs2_45: inputs and representative solution](images/gs2_45.png)
 
-| Method | XSLOPE | SLOPE/W (ODF) | Book (Bishop) | Note |
+| Method | XSLOPE | SLOPE/W (ODF) | *Designers' Guide to Eurocode 7* (Bishop) | Note |
 |---|---|---|---|---|
 | Spencer | 1.173 | 1.174 (−0.1%) | — | on SLOPE/W's own critical circle the two agree to −0.09% |
 | Bishop | 1.172 | 1.173 (−0.1%) | 1.193 (−1.8%) | — |
@@ -870,13 +871,13 @@ kPa, φ′* = 16.23° — so an ordinary analysis yields the Overdesign Factor.
 
 ![gs2_46: inputs and representative solution](images/gs2_46.png)
 
-| Method | XSLOPE | SLOPE/W (ODF) | Book (Bishop) | Note |
+| Method | XSLOPE | SLOPE/W (ODF) | *Smith's Elements of Soil Mechanics* (Bishop) | Note |
 |---|---|---|---|---|
 | Morgenstern-Price, free search | 1.073 | 1.091 (−1.6%, base-truncated composite minimum) | — | pore pressures from XSLOPE's own FE seepage, whose phreatic reproduces SEEP/W's to ~0.1–0.2 m |
 | Bishop, free search | 1.075 | 1.092 (−1.6%, base-truncated composite minimum) | 1.07 (+0.5%) | — |
 
 XSLOPE's free search finds a slightly more critical downstream surface than SLOPE/W's,
-landing on the Smith textbook value, where SLOPE/W reports its base-truncated composite
+landing on the value in *Smith's Elements of Soil Mechanics*, where SLOPE/W reports its base-truncated composite
 minimum — a search-coverage difference, not a model one. Janbu is not compared
 (corrected vs uncorrected convention).
 

@@ -368,29 +368,26 @@ analysis. A line is used by every material on the **mat** sheet whose pore press
 applies to soils analyzed with effective-stress (drained) strengths. Below the line, pore pressures are positive;
 above it, they are zero.
 
-Each line has a **Type** cell that states what the line represents, which determines how the pressure head is
-computed:
+Each line has a **Type** cell that says how the head at a point below the line is read from the line. The figure
+shows one line read both ways, at a point on a slip surface:
 
-- **piezo** (the default — a blank cell means the same): the line is a true *piezometric line*, i.e., the locus of
-  pressure heads measured by piezometers at the slip surface. The pore pressure at a slice base is the full static
-  head, u = γw · Δz, where Δz is the vertical distance from the slice base up to the line (upper figure below).
+![One water line read two ways at a point on a slip surface: piezo takes the vertical distance Δz up to the line; phreatic takes Δz cos²θ, the height a standpipe at the point rises to, where the equipotential through the point meets the line at a right angle](../lem/images/piezo_phreatic.png){width=760px}
 
-- **phreatic**: the line is the *phreatic surface* (the water table) in a slope with inclined, roughly
-  surface-parallel steady seepage. In that flow regime the equipotentials are not vertical, so the head at depth is
-  less than the static column and the static head is reduced by cos²θ, where θ is the inclination of the line
-  segment directly above the slice base (lower figure below). This is the same correction as Slide2's "Hu: Auto"
-  and the phreatic-surface option in XSTABL, and it matters most on steep phreatic lines — on a flat line the two
-  types are identical.
+- **piezo** (the default; a blank cell means the same): the head reaches the line directly above the point. The pore
+  pressure is u = γ<sub>w</sub> Δz, where Δz is the vertical distance from the point up to the line.
+
+- **phreatic**: the line is the water table in a slope with steady seepage along it. The equipotentials cross the
+  line at a right angle, so a standpipe at the point rises only to Δz cos²θ, where θ is the inclination of the line
+  segment directly above the point. The pore pressure is u = γ<sub>w</sub> Δz cos²θ. This is the same correction as
+  Slide2's "Hu: Auto" and the phreatic-surface option in XSTABL.
 
 In XSLOPE Studio, the **Piezometric lines** editor sets each line's Type in the box above its table.
 
-![piezo.png](images/piezo.png)
-
-Choosing between them: if the line came from piezometer readings, a flow net, or a seepage analysis, it is a
-piezometric line — use **piezo**. If all you have is the water table position, **phreatic** is the appropriate
-shortcut. For full rigor on complex problems, run a finite element seepage analysis and set the material pore
-pressure option to "seep" instead; the pore pressures then come from the seepage solution directly and neither line
-type is needed.
+On a flat or gentle line the Type hardly matters, so leave it at piezo. On a steep line with the water moving along
+it, phreatic is more realistic, and piezo is the more conservative choice. A line plotted from piezometers with
+their tips at the slip surface is exact as piezo. For the most accurate pore pressures, run a finite element seepage
+analysis and set the material's pore pressure option to "seep"; no line is then needed. The
+[LEM overview](../lem/overview.md#pore-pressures) explains the two types in more detail.
 
 A line applies only over its own horizontal extent — its pressures are not extended past either end. That makes a
 line that stops short of the section a legitimate model, for a water body that stops there too (a reservoir on one

@@ -75,7 +75,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide2 chart everywhere | |
 | [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 publishes both quantities and governs; x₁ turns on an unsaturated curve the vendor file does not store |
 | [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%) · solved pressure head inside Fig 5-4's own 1 m color bands at 46 of 49 grid points | chart-keyed target; the pressure-head field is read against Fig 5-4's color bands |
-| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide2: cases 2 and 5 within 0.10 m, cases 1 and 4 within 0.37 m, case 3 the outlier at 0.98 m near the crest, where Slide2 and Ref[1] themselves differ by 0.9 m | *unconfirmed* — the targets are charts with no tabulated values, and on case 3 the two published curves themselves differ by 0.9 m; all five cases built on one conductivity curve |
+| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide2: cases 2 and 5 within 0.10 m, cases 1 and 4 within 0.37 m, case 3 the outlier at 0.98 m near the crest, where Slide2 and Fredlund & Rahardjo (1993) themselves differ by 0.9 m | *unconfirmed* — the targets are charts with no tabulated values, and on case 3 the two published curves themselves differ by 0.9 m; all five cases built on one conductivity curve |
 | [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms of RS2's Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide2 / Rulon & Freeze 0.3 m · perched zone and slope-face spring reproduced | problem 7's own figures are chart-only, so the numeric target comes from the RS2 manual's Fig 22.7 steady frame |
 | [8](#gw8) | 🟢 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table within 0.004–0.006 m of the Fig 8.3/8.4 line over the whole span · Fig 8.3's labeled pressure-head contours within 0.010 m rms over 14 stations | flux rate and Soil B's Gardner *a* taken from the vendor model where it disagrees with the printed tables |
 | [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.384×10⁻³ vs Slide2 1.378×10⁻³ m³/(min·m) (+0.4%) · dam 2: Q = 4.28×10⁻⁶ vs Slide2 4.23×10⁻⁶ m³/(s·m) (+1.2%) | both dams; body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
@@ -350,7 +350,7 @@ almost the whole head drop across its 4 m width (Fig 6.13's crowded contours) an
 the flowrate to 4.880×10⁻⁸ m³/s per m. Along line 1-1, now inside the core, XSLOPE reproduces
 the profile shape and sits at the high end of the published scatter:
 
-| Elevation on line 1-1 | XSLOPE pressure head | Slide2 (Fig 6.14) | Ref[1] |
+| Elevation on line 1-1 | XSLOPE pressure head | Slide2 (Fig 6.14) | Fredlund & Rahardjo (1993) |
 |---|---|---|---|
 | 0 | 5.75 | ≈5.9 (≈−0.15 m) | ≈5.8 (≈−0.05 m) |
 | 2 | 3.79 | ≈3.9 (≈−0.11 m) | ≈3.9 (≈−0.11 m) |
@@ -358,7 +358,7 @@ the profile shape and sits at the high end of the published scatter:
 | 6 | 1.08 | ≈0.4 (≈+0.68 m) | ≈0.7 (≈+0.38 m) |
 | 8 | −0.22 | ≈−1.2 (≈+0.98 m) | ≈−0.3 (≈+0.08 m) |
 
-*The published Slide2 and Ref[1] curves themselves diverge 0.9 m at elevation 8; XSLOPE tracks
+*The published Slide2 and Fredlund & Rahardjo curves themselves diverge 0.9 m at elevation 8; XSLOPE tracks
 the shape, running below both over the lower half of the line and above Slide2 near the crest.
 Of the five cases this one reaches the deepest suction, so it samples the part of the
 conductivity curve that falls fastest.*
@@ -373,10 +373,10 @@ takes, so the surface goes in as three blocks: q_n = 10⁻⁸ cos(arctan ½) = 8
 2:1 faces and the full 10⁻⁸ across the horizontal crest.
 
 Figure 6.18 is the one target on this problem printed as **markers rather than a curve** —
-Slide2 and Ref[1] at every meter of elevation — so it can be read to about 0.05 m, and all
+Slide2 and Fredlund & Rahardjo (1993) at every meter of elevation — so it can be read to about 0.05 m, and all
 thirteen stations are compared:
 
-| Elevation on line 1-1 | XSLOPE pressure head | Slide2 (Fig 6.18) | Ref[1] |
+| Elevation on line 1-1 | XSLOPE pressure head | Slide2 (Fig 6.18) | Fredlund & Rahardjo (1993) |
 |---|---|---|---|
 | 0 | 7.85 | ≈7.73 (≈+0.12 m) | ≈7.49 (≈+0.36 m) |
 | 2 | 5.92 | ≈5.77 (≈+0.15 m) | ≈5.53 (≈+0.39 m) |
@@ -386,7 +386,7 @@ thirteen stations are compared:
 | 10 | −1.33 | ≈−1.52 (≈+0.19 m) | ≈−1.78 (≈+0.45 m) |
 | 12 (crest) | −2.86 | ≈−3.23 (≈+0.37 m) | ≈−3.36 (≈+0.50 m) |
 
-*Over all thirteen stations XSLOPE tracks Slide2 to 0.19 m rms and Ref[1] to 0.42 m rms, flat
+*Over all thirteen stations XSLOPE tracks Slide2 to 0.19 m rms and Fredlund & Rahardjo to 0.42 m rms, flat
 at 0.12–0.19 m up the saturated part of the line and opening to 0.37 m at the crest node, where
 the profile is steepest. It is not discretization: rebuilding the vendor's own 195-node mesh
 and its fourteen traction cards node for node moves the crest line by at most 0.023 m.*
@@ -470,7 +470,7 @@ right place:
 | XSLOPE total head | 0.868 | 0.850 | 0.827 | 0.743 | 0.632 | 0.614 | 0.607 |
 | RS2 Fig 22.7 at 208 s | 0.862 | 0.845 | 0.832 | 0.730 | 0.628 | 0.610 | 0.605 |
 
-The second series on the same chart, the Ref [1] (Fredlund & Rahardjo) curve, runs a little
+The second series on the same chart, the Fredlund & Rahardjo (1993) curve, runs a little
 above both, so XSLOPE sits between the two published sources and closer to RS2. The Slide2
 manual's Fig 20.7 is the same comparison from Slide2's solve and its markers run above RS2's
 — [GW20](#gw20) sets that spread out. Five stations of the profile are checked alongside
@@ -879,7 +879,7 @@ line, reproduced rather than fitted.
 The published target is **total head sampled along the toe slope**, compared with the
 **RS2** manual's Fig 20.5 at the vendor's own two stage times, $t=0.6$ h and $t=19656$ h.
 That chart carries two series named in its own legend — RS2's own solve ("Phase 2", markers)
-and the Ref [1] reference curve ("Analytical", lines) — and here they coincide, so the
+and the Fredlund & Rahardjo (1993) reference curve ("Analytical", lines) — and here they coincide, so the
 markers are the comparison. Slide2's Fig 18.5 is the same comparison with Slide2's markers
 on the same curve, at the same values to the precision the chart can be read to. Fig 20.5 is
 a labeled chart, so it is digitized at all eleven of its own $x$ stations; XSLOPE's steady
@@ -939,8 +939,8 @@ also the **initial condition**; the lagoon then steps to total head 11 for $t>0$
 are the vendor stage schedule: 73 / 416 / 792 / 11340 min.
 
 The published target is **pressure head along the top boundary**: the **RS2** manual's
-Fig 21.9, whose markers are RS2's own solve and whose lines are Ref [1] (Fredlund &
-Rahardjo); the comparison here is with the markers. Slide2's Fig 19.9 is the same chart from
+Fig 21.9, whose markers are RS2's own solve and whose lines are the Fredlund &
+Rahardjo (1993) reference curve; the comparison here is with the markers. Slide2's Fig 19.9 is the same chart from
 Slide2's solve. It has no tabulated companion, but it is a marker plot on labeled axes
 carrying two anchors that fix its calibration independently of any reading — its far-field
 markers sit at the initial water table and its lagoon markers at the 1 m of ponded water — so
@@ -1010,7 +1010,7 @@ markers to 0.005 m rms, and this model's 208 s frame matches them to 0.001 m.
 The published target is **total head along a query line**, vertical at $x=1.6$ m and running
 the full 1 m from the base to the crest. The **RS2** manual's Fig 22.7 plots it at the three
 times as two series named in the chart's own legend: square markers for RS2's own solve
-("Phase 2") and lines for Ref [1], Fredlund & Rahardjo ("Analytical"). Both are digitized at
+("Phase 2") and lines for Fredlund & Rahardjo (1993) ("Analytical"). Both are digitized at
 21 stations. The chart has no tabulated companion but calibrates itself: its 4.6 s markers at
 the base of the line read 0.302–0.305 against the model's initial total head of 0.300, so the
 digitization is good to ≈0.005 m.
@@ -1018,7 +1018,7 @@ digitization is good to ≈0.005 m.
 **Every residual against a published series is smaller than the disagreement between the two
 published series at the same frame.**
 
-| frame | XSLOPE vs RS2 | XSLOPE vs Ref [1] | RS2 vs Ref [1] |
+| frame | XSLOPE vs RS2 | XSLOPE vs Fredlund & Rahardjo | RS2 vs Fredlund & Rahardjo |
 |---|---|---|---|
 | $t$ = 4.6 s | 0.007 m rms, 0.026 m worst | 0.012 m rms, 0.045 m worst | 0.018 m rms, 0.071 m worst |
 | $t$ = 31 s | 0.003 m rms, 0.007 m worst | 0.052 m rms, 0.064 m worst | 0.054 m rms, 0.065 m worst |
@@ -1030,14 +1030,14 @@ accounts for 0.026 m of it and the next for 0.011 m, with the other 19 within 0.
 enters and the wetting front is still inside the top element, and it is also where RS2 departs
 furthest from its own reference:
 
-| total head at the crest, $y=1.0$ | XSLOPE | RS2, Fig 22.7 | Ref [1], Fig 22.7 | Slide2, Fig 20.7 |
+| total head at the crest, $y=1.0$ | XSLOPE | RS2, Fig 22.7 | Fredlund & Rahardjo, Fig 22.7 | Slide2, Fig 20.7 |
 |---|---|---|---|---|
 | $t$ = 4.6 s | 0.417 | 0.392 | 0.462 | ≈0.43 |
 | $t$ = 31 s | 0.612 | 0.605 | 0.652 | ≈0.67 |
 | $t$ = 208 s | 0.863 | 0.862 | 0.877 | ≈0.89 |
 
 The fourth column is the same problem in the Slide2 manual, whose Fig 20.7 draws Slide2's own
-markers against the same Ref [1] curves; that chart is unlabeled at this resolution and reads
+markers against the same Fredlund & Rahardjo curves; that chart is unlabeled at this resolution and reads
 to about 0.01 m. The two programs disagree at the crest at every time, and XSLOPE falls
 between them. That crest value is converged: it moves under 0.003 m between a 396-node mesh
 and a 5375-node one, and under 0.001 m at a fifth of the time step.

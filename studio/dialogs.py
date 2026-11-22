@@ -1538,8 +1538,9 @@ class RunLemDialog(QDialog):
             "and c/p materials. Free-draining materials keep their drained "
             "strength.\n\n"
             "1 uses the strength as computed. A screening analysis reduces it as its "
-            "method directs, usually to 0.8 or 0.85 (Duncan, Wright & Brandon 2014, "
-            "Table 10.1).")
+            "method directs: 0.85 in Seed (1979), 0.8 in Hynes-Griffin and Franklin "
+            "(1984) and most later methods, each used with that method's own seismic "
+            "coefficient and minimum factor of safety.")
         self.seismic2_factor_label = QLabel("Strength factor")
         self.seismic2_factor_label.setToolTip(self.seismic2_factor.toolTip())
 
@@ -2445,8 +2446,9 @@ class SensitivityDialog(QDialog):
         unit_txt = f" {self._time_unit}" if self._time_unit else ""
         self.rapid = QCheckBox("Rapid drawdown at each time")
         self.rapid.setToolTip(self._rapid_time_reason or (
-            f"On: every ticked instant is a three-stage Duncan-Wright-Brandon "
-            f"rapid drawdown — stage 1 the transient run's initial state at "
+            f"On: every ticked instant is a rapid drawdown by the three-stage "
+            f"method of Duncan, Wright, and Wong (1990) — stage 1 the transient "
+            f"run's initial state at "
             f"t = {_fmt_time(self._stage_1)}{unit_txt} (full pool), stage 2 that "
             f"instant's drawn-down state, stage 3 the same section re-checked with "
             f"drained strengths. The curve reports the drawdown's own factor of "

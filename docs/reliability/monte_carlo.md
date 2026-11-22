@@ -254,10 +254,13 @@ therefore **never randomized**. Two treatments are meaningful:
   *same* surface: the prescribed surface when `search=False`, or the
   most-likely-values critical surface when `search=True` (found once, then held
   fixed). This is the analogue of Slide2's **Global Minimum** probabilistic method,
-  and it is what every published probabilistic benchmark did — Duncan's estimated
-  LASH surface (VP29), Chowdhury & Xu's printed circles (VP28), Wolff & Harr's
-  prescribed noncircular surface (VP34) — so it is the correct like-for-like basis
-  for comparison. A fixed-surface $P_f$ *understates* the
+  and it is what every published probabilistic benchmark did, so it is the correct
+  like-for-like basis for comparison. Those benchmarks use the slip surface Duncan (2000)
+  estimated for the underwater trench failure at the Port of San Francisco LASH terminal
+  ([VP29](../verification/rocscience.md#vp29)), the critical circles of Chowdhury & Xu's
+  (1995) Congress Street Cut and embankment ([VP28](../verification/rocscience.md#vp28)),
+  and the noncircular surface Wolff & Harr (1987) prescribed for the Clarence Cannon Dam
+  ([VP34](../verification/rocscience.md#vp34)). A fixed-surface $P_f$ *understates* the
   slope-system probability of failure, because for some sampled parameter sets the
   true critical surface lies elsewhere.
 - **Per-realization minimum (not available).** The system-level analogue of

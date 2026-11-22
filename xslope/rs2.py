@@ -45,8 +45,9 @@ straight down, once the file's OWN solved traction deck confirms which way it po
 
 Material ELASTIC constants cross too: RS2 states a linear-elastic ``nu``/``E`` pair
 for every material and solves its published SSR with it, so the pair is an input and
-transcribes verbatim. Where a file states none, the soil-type table in
-``docs/fem/overview.md`` fills the gap (:func:`xslope.units.classify_elastic`) and the
+transcribes verbatim. Where a file states none, the soil-type table at
+https://xslope.org/en/latest/fem/overview/#typical-elastic-parameters fills the gap
+(:func:`xslope.units.classify_elastic`) and the
 substitution is named in the caveats — never a silent zero, which is a singular
 stiffness matrix waiting for the first FEM run.
 
@@ -1266,7 +1267,8 @@ def fez_to_slope_data(d):
             for n, soil, e, nu, model in e_fallback)
         caveats.append(
             f"{len(e_fallback)} material(s) state no elastic constants in the RS2 file, "
-            f"so E and nu were filled from the soil-type table in docs/fem/overview.md "
+            f"so E and nu were filled from the soil-type table at "
+            f"https://xslope.org/en/latest/fem/overview/#typical-elastic-parameters "
             f"by strength: {_named}. These are ASSUMPTIONS. The "
             f"LEM never reads them, but every FEM displacement does; set them before "
             f"running the FEM")

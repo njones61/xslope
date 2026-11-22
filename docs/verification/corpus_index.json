@@ -9299,7 +9299,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI = 5",
+          "title": "Hammah et al. (2005b) Example 1 — Hoek-Brown Rock Slope, GSI = 5",
           "url": "https://xslope.org/en/latest/verification/ssrm/#hoek-brown"
         }
       ],
@@ -21791,7 +21791,7 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-42: James dike",
+          "title": "RS2-42: James Bay dike",
           "url": "https://xslope.org/en/latest/verification/rs2/#rs2-42"
         }
       ],

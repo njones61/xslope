@@ -124,10 +124,14 @@ the undrained strength assigned in stage 2 came out *higher* than the drained
 strength at the same stresses, so what limits the slope is the ordinary drained
 strength at the drawn-down pore pressures. The
 [sweep](#the-governing-stage-flip) at the end of the page moves this dam from one
-to the other and reports what it takes. Duncan, Wright and Brandon (2014) work the whole
-procedure by hand in their Table 9.2, on two slip planes in one submerged infinite
-slope that are governed by different stages — the shallow one by stage 3 and the
-deep one by stage 2 — for the same reason: the stress each plane consolidated at.
+to the other and reports what it takes. Duncan, Wright, and Brandon (2014, Table 9.2)
+work the procedure by hand on a 3H:1V infinite slope, submerged under 100 ft of water
+and then drawn down completely. The soil has a saturated unit weight of 125 pcf,
+$c' = 0$, $\phi' = 40°$, $d = 2{,}000$ psf, and $\psi = 20°$. On a plane 5 ft deep, the
+drained strength after drawdown (472 psf) is below the undrained one (1,585 psf), so
+stage 3 governs, with $F = 2.52$. On a plane 30 ft deep, the undrained strength
+(2,283 psf) is the lower, so stage 2 governs, with $F = 2.03$. The stress each plane
+consolidated at decides which stage governs.
 
 ### What the procedure needs on the inputs
 

@@ -86,7 +86,8 @@ def seismic2_strength(seismic2):
     ``seismic2`` is False (no two-stage analysis), True or ``"interpolated"`` (the
     default: Duncan, Wright & Wong's interpolation, as in rapid drawdown), or
     ``"kc1"`` (the K_c = 1 envelope at the stage 1 stresses, with no
-    interpolation, as Duncan, Wright & Brandon's Table 10.4 was computed). It may
+    interpolation, the way Duncan, Wright & Brandon (2014) computed their published
+    two-stage factors of safety (four soils on one slope at k = 0.15)). It may
     also be a dict, ``{"strength": <one of those>, "factor": <0 < f <= 1>}``, which
     adds the stage 2 strength factor (:func:`seismic2_factor`); a dict without
     ``"strength"`` means ``"interpolated"``. Any other value raises ValueError."""
@@ -282,11 +283,12 @@ def seismic_two_stage(df, method_name, debug_level=1, strength="interpolated"):
     and adds the seismic force kW: its factor of safety is the answer. There is
     no third stage, because drainage during an earthquake is unlikely (Sec. 10.4).
 
-    The book's text says to take the undrained strength "using the same
-    procedures as for rapid drawdown", which is the default here. Its own
-    Table 10.4 was computed from the K_c = 1 envelope alone, tau_ff = d +
-    sigma'_fc tan psi at the stage 1 stresses; ``strength="kc1"`` does that, and
-    reproduces the table.
+    Duncan, Wright & Brandon (2014, Sec. 10.4.2) take the stage 2 undrained
+    strength "using the same procedures as for rapid drawdown", which is the
+    default here. They computed their published two-stage factors of safety
+    (four soils on one slope at k = 0.15) from the K_c = 1 envelope alone,
+    tau_ff = d + sigma'_fc tan psi at the stage 1 stresses; ``strength="kc1"``
+    does that.
 
     Parameters
     ----------

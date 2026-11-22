@@ -185,7 +185,8 @@ reduction applies only to stage 2. Set **Strength factor** back to 1 before goin
 
 The one-stage factor of safety is below 1, and both two-stage factors of safety at full strength are above 1. The one-stage factor of
 safety is 90 percent of the two-stage one with the K<sub>c</sub> = 1 envelope.
-Duncan et al. found the one-stage analysis between 81 and 90 percent of the two-stage one for all four of their soils.
+On their 30 ft, 2.5H:1V slope, Duncan et al. found the one-stage factor of safety to be about 80 to 90 percent of the two-stage one
+for all [four soils](../seismic/two_stage.md#comparison).
 The interpolation raises the strength further because the drained envelope, at φ′ = 45°, lies far above the
 K<sub>c</sub> = 1 envelope at the stresses on this slope. A 20 percent strength reduction takes the K<sub>c</sub> = 1
 result below 1. A screening method's strength reduction, seismic coefficient, and minimum factor of safety go together,

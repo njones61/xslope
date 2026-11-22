@@ -158,7 +158,7 @@ case, and here it is the deep one.
 
 Part B applies the same check at full scale, on a real section.
 [Verification problem VP75](../verification/rocscience.md#vp75) is one of the
-planned James Bay dykes, from Duncan & Wright's Fig. 7.16, in metric units: a
+planned James Bay dykes, from Duncan and Wright (2005, Fig. 7.16), in metric units: a
 granular fill embankment — c′ = 0, φ′ = 30° — with a wide berm, resting on
 three soft φ = 0 clays: a 4 m crust at c = 41 kN/m², 8 m of marine clay at
 34.5 kN/m², and 7 m of lacustrine clay at 31.2 kN/m². Two deep mechanisms
@@ -212,8 +212,8 @@ Run again:
 
 **FS = 1.420**, on a wider circle that runs under the berm and daylights beyond
 it — 19% below the single seed's answer, against Slide's 1.464 and Duncan &
-Wright's published 1.45. The wrongly seeded search missed by far more than the
-programs and the textbook differ among themselves, and it reported nothing
+Wright's (2005) published 1.45. The wrongly seeded search missed by far more than the
+published values differ among themselves, and it reported nothing
 unusual. The full **Generate starting circles…** set also finds 1.420 with the
 2 m filter on — the deep member of the per-layer family reaches it, as the
 per-layer rule of [LEM-3](lem03_layered_slope.md#guarding-against-local-minima)

@@ -357,7 +357,7 @@ owns which subject — and `docs()` is how you read it. Real pages, all under
 | LEM formulation, slice forces, method comparison | `lem/overview/` |
 | A single method in full | `lem/oms/`, `lem/bishop/`, `lem/janbu/`, `lem/spencer/`, `lem/mprice/`, `lem/force_eq/` |
 | Reinforcement, piles (LEM) | `reinforcement/lem/`, `piles/lem/` |
-| Rapid drawdown (three-stage Duncan-Wright-Brandon) | `lem/rapid/` |
+| Rapid drawdown (the three-stage method of Duncan, Wright, and Wong 1990) | `lem/rapid/` |
 | Automated search for the critical surface | `lem/search/` |
 | Seepage FE formulation, unsaturated models | `seep/overview/` |
 | Transient seepage and storage | `seep/transient/` |

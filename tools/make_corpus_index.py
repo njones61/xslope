@@ -454,6 +454,48 @@ def short_label(title: str) -> str:
     return title if len(title) <= 60 else title[:59].rstrip() + '…'
 
 
+def names_its_problem(page: str) -> bool:
+    """True where a heading names its problem and reads on its own.
+
+    A verification page's and a samples page's headings are problem names
+    (``VP98 — Walter Bouldin Dam ...``, ``4. Earth Dam ...``). Every other page
+    is a tutorial, a theory page, or the video list, whose headings are steps or
+    parts of that page (``Conclusion``, ``Opening the model``), so a link to one
+    has to say which page it is on.
+    """
+    return page.startswith('verification/') or page.endswith('samples/')
+
+
+_PAGE_NAMES = {}
+
+
+def page_name(source_md: str) -> str:
+    """A page's short name: its title up to the first dash, so
+    ``Tutorial COMBO-2 — Rapid Drawdown`` gives ``Tutorial COMBO-2``."""
+    if source_md not in _PAGE_NAMES:
+        name = ''
+        in_fence = False
+        for line in (REPO_ROOT / source_md).read_text(encoding='utf-8').splitlines():
+            if line.lstrip().startswith('```'):
+                in_fence = not in_fence
+                continue
+            m = HEADING_RE.match(line)
+            if not in_fence and m and len(m.group(1)) == 1:
+                name = strip_inline_markup(m.group(2)).partition(' — ')[0].strip()
+                break
+        _PAGE_NAMES[source_md] = name
+    return _PAGE_NAMES[source_md]
+
+
+def link_label(pick) -> str:
+    """The link text the table shows for one picked section."""
+    label = short_label(pick['title'])
+    if names_its_problem(pick['page']):
+        return label
+    name = page_name(pick['source_md'])
+    return f'{name} — {label}' if name else label
+
+
 # --------------------------------------------------------------------------- #
 # Build
 # --------------------------------------------------------------------------- #
@@ -575,6 +617,7 @@ def render_table(index) -> str:
                     'anchor': ref['anchor'],
                     'title': ref['title'],
                     'url': ref['url'],
+                    'source_md': ref['source_md'],
                 })
         # one row per section, deduplicated
         seen, uniq = set(), []
@@ -585,7 +628,7 @@ def render_table(index) -> str:
             seen.add(k)
             uniq.append(c)
         picks = pick_examples(uniq)
-        cells = ' · '.join(f"[{short_label(p['title'])}]({p['url']})" for p in picks)
+        cells = ' · '.join(f"[{link_label(p)}]({p['url']})" for p in picks)
         lines.append(f'| {label} | {cells} |')
     lines.append('')
     return '\n'.join(lines)

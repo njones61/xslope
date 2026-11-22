@@ -271,8 +271,11 @@ def yield_coefficient(slope_data, method, analysis="auto_search",
         - ``trace``: every (k, F) the root search passed through on that surface.
         - ``search``: True for the minimum-k_y search.
         - ``static``: the critical surface with no seismic force, its F, and its
-          own k_y (``{"FS", "k_y", "surface"}``), the first of the book's
-          candidate surfaces; None on a single surface.
+          own k_y (``{"FS", "k_y", "surface"}``); None on a single surface. It is
+          one of the three candidate surfaces Duncan, Wright & Brandon (2014,
+          Sec. 10.1.3) list: the minimum static F surface, the minimum k_y
+          surface, and a surface that follows the pattern of accelerations in
+          the mass.
         - ``rounds``: one entry per confirming search, ``{"k", "FS", "k_y"}``: the
           coefficient it searched at, the critical F it found, and k_y on that
           surface (None where it found nothing below F = 1).

@@ -2,7 +2,9 @@
 
 The [Rocscience Slide2 verification manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
 publishes 111 slope stability problems drawn from the literature, each with Slide2's own factor of
-safety and, in most cases, the original authors'. XSLOPE reproduces them problem by problem; the
+safety and, in most cases, the original authors'. Problems 1 to 10 come from the Association for
+Computer Aided Design's (ACADS) 1989 review of slope stability programs (Donald & Giam 1989).
+XSLOPE reproduces them problem by problem; the
 summary table gives each problem's headline comparison and a
 [match dot](index.md#how-the-match-dots-are-scored), and links to the section that builds it.
 
@@ -310,7 +312,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | 4 files, both mechanisms; the deep→shallow switch lands in Slide2's own interval |
 | [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.1433 vs Slide2 uni-modal 0.140 (+2.4%) · Newmark D 5.036 cm vs Slide2 MMO 5.042 cm (−0.1%) | all 4 scenarios; the Newmark displacement is run at Slide2's own K<sub>y</sub> 0.139 |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
-| [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · D1/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · D1/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · D1/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · D1/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | 5 cases; the Ito & Matsui limit pressure is auto-computed. The paper's three-dimensional finite-element results are compared separately, as a [diagnostic of the 2D pile idealization](#vp106-fem) that carries no dot |
+| [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · S/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · S/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · S/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · S/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | 5 cases; the Ito & Matsui limit pressure is auto-computed. The paper's three-dimensional finite-element results are compared separately, as a [diagnostic of the 2D pile idealization](#vp106-fem) that carries no dot |
 | [107](#vp107) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Spencer 1.397 vs Slide 1.386 (+0.8%) · mesh supports: Spencer 1.397 vs Slide 1.392 (+0.4%) |  |
 | [108](#vp108) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Bishop 1.790 vs Slide 1.787 (+0.2%) · mesh: Bishop 1.830 vs Slide 1.835 (−0.3%) | Spencer within 0.3% on both |
 | [109](#vp109) | 🟢 | Retaining walls, gabion walls, weak layers | Spencer 1.797 vs Slide's joint block search 1.803 (−0.3%) · Bishop 1.790 vs Slide 1.799 (−0.5%) | the joints do not govern overall stability |
@@ -318,6 +320,10 @@ Full bibliographic details for the author-year citations on this page are on the
 | [111](#vp111) | <span class="nodata">⊘</span> | Helical anchor | Slide's problem 111 verifies its helical-anchor capacity envelope, not a slope — there is no slope and no factor of safety to compare. Helically anchored slopes are analyzed in XSLOPE by entering the governing capacity as a standard anchor force — see the [worked note](#vp111). | *not supported* — XSLOPE takes an anchor's capacity as an input rather than computing a helical plate's |
 
 </div>
+
+Abbreviations in the table: A&T, Arai & Tagyo (1985); Y&U, Yamagami & Ueta (1988); F&K, Fredlund &
+Krahn (1977); H&W, Hassan & Wolff (1999); D&W, Duncan & Wright (2005); L&H, Leshchinsky & Han
+(2004); DWW, Duncan, Wright & Wong (1990); LLA, local linear approximation.
 
 ---
 
@@ -1292,7 +1298,7 @@ the uncorrected one.
 
 ## 🟢 VP41: Slope, homogenous, ru pore pressure {#vp41}
 
-Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curve strength tau = 1.4*(sigma')^0.8 and ru = 0.3 — exercises the v12 pow option and ru together.
+Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curve strength tau = 1.4*(sigma')^0.8 and ru = 0.3 — exercises the pow option and ru together.
 
 **Input files:** [vp041.xlsx](files/rocscience/vp041.xlsx)
 
@@ -1345,7 +1351,7 @@ Every method that applies to a non-circular surface reads 1.352 on the plane, ag
 
 ## 🟢 VP44: Slope, homogeneous — linear vs non-linear envelope (Baker ex. 1) {#vp44}
 
-Slide #44 / Baker (2003) example problem 1: a straight 43° slope, H = 6 m, γ = 18 kN/m³, in compacted Israeli clays, analyzed with three strength models fitted to the same triaxial data — the power curve τ = 1.107·σ′^0.86, the experimentally fitted Mohr-Coulomb envelope c′ = 11.64 kPa / φ′ = 24.7° (Baker's Table I, iteration 0, which resolves the property-table ambiguity in the Slide manual), and Baker's converged local-linear-approximation parameters c′ = 0.39 kPa / φ′ = 38.6°. The example is about extrapolating a linear envelope into the low-stress range: the Mohr-Coulomb fit says the slope is safe, the non-linear law says it is failing.
+Slide #44 / Baker (2003) example problem 1: a straight 43° slope, H = 6 m, γ = 18 kN/m³, in compacted Israeli clays, analyzed with three strength models fitted to the same triaxial data — the power curve τ = 1.107·σ′^0.86, the experimentally fitted Mohr-Coulomb envelope c′ = 11.64 kPa / φ′ = 24.7° (Baker's Table I, iteration 0, which resolves the property-table ambiguity in the Slide manual), and Baker's converged local-linear-approximation (LLA) parameters c′ = 0.39 kPa / φ′ = 38.6°. The example is about extrapolating a linear envelope into the low-stress range: the Mohr-Coulomb fit says the slope is safe, the non-linear law says it is failing.
 
 **Input files:** [vp044a.xlsx](files/rocscience/vp044a.xlsx), [vp044b.xlsx](files/rocscience/vp044b.xlsx), [vp044c.xlsx](files/rocscience/vp044c.xlsx)
 
@@ -1526,20 +1532,21 @@ Also [SLOPE/W §2.31](geostudio.md) — the same problem in the GeoStudio corpus
 
 ## 🟢 VP52: Slope, (4) materials, water table, tension crack {#vp52}
 
-Slide #52, dry and wet (Table 52.2 water table). An unconstrained circular search lands in the
-deep (surface 3) family, where Slide runs a grid search and Zhu a specified deep circle, and the
-published values spread widely.
+Slide #52 is Zhu & Lee's (2002) heterogeneous slope: a 15 m high slope at 2H:1V cut through four
+horizontal soil layers, analyzed dry and with the water table of the manual's Table 52.2. An
+unconstrained circular search lands in the deep-circle family (Zhu & Lee's surface 3), where Slide runs a grid
+search and Zhu a specified deep circle, and the published values spread widely.
 
 **Input files:** [vp052a.xlsx](files/rocscience/vp052a.xlsx), [vp052b.xlsx](files/rocscience/vp052b.xlsx)
 
-*Dry — governing deep (surface 3) family*
+*Dry — governing deep-circle family*
 
 | Method | XSLOPE | Slide | Zhu |
 |---|---|---|---|
 | Bishop | 1.796 | 1.804 (−0.4%) | 1.429 (+25.7%) |
 | Spencer | 1.797 | 1.804 (−0.4%) | 1.836 (−2.1%) |
 
-*Wet — governing deep (surface 3) family*
+*Wet — governing deep-circle family*
 
 | Method | XSLOPE | Slide | Zhu |
 |---|---|---|---|
@@ -1912,9 +1919,9 @@ Slide #72 / Duncan & Wright (2005) Figs. 6.39–6.40: a symmetric embankment dam
 
 Pore pressures are modeled both ways, as in the manual: FE seepage from XSLOPE's own solver, and
 Slide's piezometric line vertex-extracted from Figure 72.2. This dam is also
-[LEM sample problem 4](../lem/samples.md#4-earth-dam-duncan-wright-and-brandon), built independently from the book; the
-corpus file follows Slide's slightly different crest and core-top dimensions rather than the
-book's, since Slide's published numbers are the benchmark here.
+[LEM sample problem 4](../lem/samples.md#4-earth-dam-duncan-wright-and-brandon), built independently from Duncan & Wright's example; the
+corpus file follows Slide's slightly different crest and core-top dimensions rather than
+Duncan & Wright's, since Slide's published numbers are the benchmark here.
 
 **Input files:** [vp072a.xlsx](files/rocscience/vp072a.xlsx) (FE seepage), [vp072b.xlsx](files/rocscience/vp072b.xlsx) (piezometric line)
 
@@ -2127,7 +2134,11 @@ Slide #84 / Duncan & Wright (2005) Fig. 15.9: an embankment (c' = 0, φ' = 35°,
 
 ## 🟢 VP85: Reinforced slope, homogenous, grouted tieback {#vp85}
 
-Slide #85 case 1 applies the tieback as active support, case 2 as passive; each is
+Slide #85 is a 20 ft cut in saturated clay (γ = 98 pcf, c = 350 psf, φ = 0), held by one
+horizontal tieback carrying 9,000 lb/ft at mid-height, from Duncan & Wright (2005, Fig. 6.34).
+Case 1 applies the tieback as active support, a working load that is not divided by the factor
+of safety; case 2 applies it as passive support, divided by the factor of safety along with the
+soil strength (see [force application](../reinforcement/lem.md#force-application-appl)). Each case is
 evaluated on the circle Slide prints for it.
 
 **Input files:** [vp085a.xlsx](files/rocscience/vp085a.xlsx), [vp085b.xlsx](files/rocscience/vp085b.xlsx)
@@ -2154,8 +2165,6 @@ methods scatter so widely here and why the per-circle comparison is the meaningf
 ![vp085a: inputs and representative solution](images/vp085a.png)
 
 ![vp085b: inputs and representative solution](images/vp085b.png)
-
-The problem is Duncan & Wright (2005) Fig. 6.34; the tieback carries 9,000 lb/ft, applied horizontally at mid-height of the slope.
 
 ## 🟢 VP86: Reinforced slope, homogenous, grouted tieback {#vp86}
 
@@ -2221,6 +2230,11 @@ In VP90 the upper 8 geotextile layers carry Ta = 7.5 and the lower 7 carry Ta = 
 Slide #95 runs the USACE EM 1110-2-1902 (1970) Appendix G example — the same dam that
 [VP96](#vp96) builds — through the **Corps of Engineers 2-stage** rapid-drawdown
 procedure and its R-envelope.
+
+The R envelope is the Corps' consolidated-undrained strength envelope
+([R envelope](../lem/rapid.md#r-envelope)). The three-stage problems below use the
+K<sub>c</sub> = 1 envelope instead, with intercept d and slope ψ
+([two envelopes](../lem/rapid.md#two-envelopes)).
 
 | Method | XSLOPE | Slide | USACE |
 |---|---|---|---|
@@ -2301,7 +2315,12 @@ The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW pr
 
 ## 🟢 VP100: Embankment dam, homogenous, rapid drawdown, water table {#vp100}
 
-Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore pressure is hydrostatic below the slope surface, i.e. piezo = ground, no external pond.
+Slide #100 is a slope from Morgenstern's (1963) rapid drawdown charts, 100 ft high at 3H:1V, with
+c′ = 312 psf, φ′ = 30°, and γ = 124.8 pcf. The pool drops from the crest, el. 100, all the way
+to the toe, el. 0. Slide runs it with its B-bar method at B̄ = 1, which means the pore pressure
+falls by the full change in total stress when the water is removed. The pore pressure left after drawdown is then
+hydrostatic below the slope surface, so the piezometric line follows the ground and no pond
+remains.
 
 **Input files:** [vp100.xlsx](files/rocscience/vp100.xlsx)
 
@@ -2316,7 +2335,9 @@ Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore pressure 
 
 ## 🟢 VP101: Embankment dam, homogenous, rapid drawdown, water table {#vp101}
 
-Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground where the face is above the pool and stays at 50 below it, with the remaining pond loading the submerged face.
+Slide #101 is the same Morgenstern (1963) slope drawn down halfway, from el. 100 to el. 50,
+again with B̄ = 1. The piezometric line follows the ground where the face is above the pool and
+stays at el. 50 below it, and the remaining pond loads the submerged face.
 
 **Input files:** [vp101.xlsx](files/rocscience/vp101.xlsx)
 
@@ -2511,11 +2532,12 @@ ordinary circular search. The same gap blocks [GeoStudio §2.47](geostudio.md).
 **Input files:** [vp106a.xlsx](files/rocscience/vp106a.xlsx) (no pile) ·
 [vp106b](files/rocscience/vp106b.xlsx) / [c](files/rocscience/vp106c.xlsx) /
 [d](files/rocscience/vp106d.xlsx) / [e](files/rocscience/vp106e.xlsx)
-(D1/D = 2, 3, 4, 6)
+(S/D = 2, 3, 4, 6)
 
 Cai & Ugai (2000)'s pile-reinforced slope: a 10-m, 1V:1.5H dry cohesive-frictional slope
 (γ = 20, c′ = 10, φ′ = 20) with a row of 0.8-m steel-tube piles at mid-slope, embedded to
-bedrock, at center-to-center spacings of 2–6 diameters. The pile's stabilizing force is
+bedrock, at center-to-center spacings S of 2–6 pile diameters D (S/D = 2–6; Cai & Ugai write
+D1 for S). The pile's stabilizing force is
 the Ito & Matsui (1975) theoretical limit pressure, which XSLOPE computes automatically
 from the pile diameter and spacing (the per-pile force is divided by the spacing to give
 the per-meter-width value). The reaction is applied in the passive sense — added to the
@@ -2524,16 +2546,16 @@ resisting moment and divided by the factor of safety — which is how Slide appl
 | Case | XSLOPE (Bishop search) | Slide | Cai & Ugai |
 |---|---|---|---|
 | No pile | 1.143 | 1.14 (+0.3%) | 1.13 (+1.2%) |
-| D1/D = 2 | 1.540 | 1.54 (0.0%) | 1.54 (0.0%) |
-| D1/D = 3 | 1.451 | 1.43 (+1.5%) | 1.37 (+5.9%) |
-| D1/D = 4 | 1.341 | 1.33 (+0.8%) | 1.31 (+2.4%) |
-| D1/D = 6 | 1.260 | 1.25 (+0.8%) | 1.25 (+0.8%) |
+| S/D = 2 | 1.540 | 1.54 (0.0%) | 1.54 (0.0%) |
+| S/D = 3 | 1.451 | 1.43 (+1.5%) | 1.37 (+5.9%) |
+| S/D = 4 | 1.341 | 1.33 (+0.8%) | 1.31 (+2.4%) |
+| S/D = 6 | 1.260 | 1.25 (+0.8%) | 1.25 (+0.8%) |
 
-At the closest spacing (D1/D = 2) all three programs report the same factor, but not on
+At the closest spacing (S/D = 2) all three programs report the same factor, but not on
 the same surface. XSLOPE's critical circle passes through the pile head, so it develops no
 pile force at all: the reinforcement is strong enough that the cheapest mechanism is one
 that misses it. Cai & Ugai's surface at that spacing crosses the pile and carries a
-reaction, so the agreement at 1.54 is between two different mechanisms. At D1/D = 3 the published
+reaction, so the agreement at 1.54 is between two different mechanisms. At S/D = 3 the published
 values themselves spread — Slide sits 4.4% above the paper, a search-method difference the
 manual acknowledges — and XSLOPE lands 1.5% above Slide but 5.9% above Cai & Ugai's own
 value, the widest gap among this section's references. Every other case agrees with
@@ -2546,14 +2568,14 @@ the pile station x = 17.5 m.
 
 | Case | XSLOPE depth at the pile (m) | Cai & Ugai (Bishop, m) |
 |---|---|---|
-| D1/D = 2 | 0.000 | 2.84 |
-| D1/D = 3 | 3.094 | 3.18 (−2.7%) |
-| D1/D = 4 | 3.261 | 3.34 (−2.4%) |
-| D1/D = 6 | 3.488 | 3.50 (−0.3%) |
+| S/D = 2 | 0.000 | 2.84 |
+| S/D = 3 | 3.094 | 3.18 (−2.7%) |
+| S/D = 4 | 3.261 | 3.34 (−2.4%) |
+| S/D = 6 | 3.488 | 3.50 (−0.3%) |
 
 Three of the four spacings match, and the trend the paper reports — a shallower surface as
 the piles close up — comes out a little steeper: 3.488 m at six diameters to 3.094 m at
-three, against 3.50 m to 3.18 m. At D1/D = 2 the two readings are two different mechanisms
+three, against 3.50 m to 3.18 m. At S/D = 2 the two readings are two different mechanisms
 rather than a pairing, so no difference is given. The row's match dot is set by the factors
 of safety; the depths say which surface each factor belongs to.
 
@@ -2566,13 +2588,13 @@ of safety; the depths say which surface each factor belongs to.
 ## VP106 — finite-element variant: the 2D pile idealization measured {#vp106-fem}
 
 **Input files:** [vp106a_fem.xlsx](files/rocscience/vp106a_fem.xlsx) (no pile) ·
-[vp106c_fem.xlsx](files/rocscience/vp106c_fem.xlsx) (D1/D = 3, free head) ·
-[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (D1/D = 3, unrotated head — rotation held, translation free)
+[vp106c_fem.xlsx](files/rocscience/vp106c_fem.xlsx) (S/D = 3, free head) ·
+[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (S/D = 3, unrotated head — rotation held, translation free)
 
 Cai & Ugai analyzed this slope twice; the limit-equilibrium side is [VP106](#vp106) above, and the
 other is a **three-dimensional** shear-strength-reduction finite-element model that meshes the
 individual piles and the soil between them, with interfaces that can slip. These three files run
-that side through XSLOPE's SSRM at the paper's default D1/D = 3, on the same section and soil, with
+that side through XSLOPE's SSRM at the paper's default S/D = 3, on the same section and soil, with
 the pile as a plane-strain beam: E = 6×10⁷ kPa on the 0.8 m section, so I = 0.0201 m⁴ and
 A = 0.5027 m², both divided by the 2.4 m spacing; soil E = 2×10⁵ kPa, ν = 0.25. The Ito & Matsui
 limit pressure the limit-equilibrium files carry is deliberately absent: in a finite-element

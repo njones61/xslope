@@ -6991,14 +6991,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             slipping joint pair's viscoplastic slip increment is divided by, so
             the interface returns to its limit surface in fewer sweeps. RS2's
             own value is 0.01 (xslope.joint.JOINT_RS2_SLIP_STIFFNESS_FACTOR) and
-            the manual's Updates page is what it is read from. It changes no
+            the RS2 manual's Updates page is what it is read from. It changes no
             physics — the traction limit, the assembled elastic block and a
             re-stuck pair's full stiffness are all untouched; it is an
             OVER-RELAXATION of the joint's own fixed point, and the iteration is
             already at its stability boundary at a factor of 1, so RS2's 0.01
             diverges (see joint_vp_sweep's ``ks_slip_factor``). OFF by default
-            (None), no locked factor of safety is defined with it on, and what
-            it does to an answer is measured in r15_joint_convergence.md §3.
+            (None), and no locked factor of safety is defined with it on.
         joint_tangent ('off' | 'slip' | None): THE INTERFACE RELIEF — RS2's
             "automatically calculate the stiffness of the joint as soon as a joint
             violates the strength criteria", transplanted where it belongs. A pair
@@ -16452,7 +16451,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             "displacement evidence), 'displacement_limit' (displacement-budget "
             "backstop), and "
             "'displacement_increase' (displacement-catastrophe sweep) - see "
-            "docs/fem/overview.md, 'Choosing a Failure Criterion'.")
+            "https://xslope.org/en/latest/fem/solver/#choosing-a-criterion.")
 
     # The fields of the fixed trials, by F: read here only by a search read back
     # from its record, and never left on a result.

@@ -951,8 +951,7 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     the current displacement field, so the factor is the relaxation parameter of
     the interface's fixed-point iteration and 1/factor is how far past the
     return it is driven. RS2's own 0.01 is a relaxation of 100 and diverges here
-    (max|u| = 3.8e+50 in 41 sweeps on one corpus row). The measured behavior over
-    milder factors is in r15_joint_convergence.md §3.
+    (max|u| = 3.8e+50 in 41 sweeps on one corpus row).
 
     ``slip_state`` is the (n, 3) record of which pairs were slipping on the last
     sweep, read for the one-sided stick/slip band (see
@@ -1090,8 +1089,8 @@ def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False,
     DOES move with the normal one, through ``t_n = k_n delta_n``, and
     ``d t_s / d delta_n = +- k_n tan phi_j`` is a non-symmetric rank-one term.
     ``cross=True`` supplies it. It is the difference between a tangent whose
-    worst departure from a finite difference is 0.53 and one whose worst is 0.16
-    (r3_surfaces.md §2). The tip-borrowed limit normal (:func:`_limit_normal`)
+    worst departure from a finite difference is 0.53 and one whose worst is 0.16.
+    The tip-borrowed limit normal (:func:`_limit_normal`)
     is treated as fixed in the linearization: it is an average over the pairs of
     one element and it applies to the two pairs at a line's ends only.
 

@@ -1,6 +1,6 @@
 ---
 title: "Two-stage seismic analysis — XSLOPE"
-description: "The two-stage pseudostatic analysis of Duncan, Wright, and Brandon (2014) in XSLOPE: undrained strengths from consolidated-undrained tests, set by each slice's stresses before the earthquake, the two stage 2 strength choices, the single-stage R envelope, and the comparison with the book's Table 10.4."
+description: "The two-stage pseudostatic analysis of Duncan, Wright, and Brandon (2014) in XSLOPE: undrained strengths from consolidated-undrained tests, set by each slice's stresses before the earthquake, the two stage 2 strength choices, the single-stage R envelope, and the comparison with the factors of safety Duncan, Wright, and Brandon (2014) published for four soils."
 ---
 
 # Two-Stage Analysis

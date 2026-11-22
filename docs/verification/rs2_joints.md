@@ -40,9 +40,11 @@ shared [References](references.md) page.
       RS2's numbers used the 100 kPa and are shown beside each row for comparison only. Each row
       also shows XSLOPE on the vendor's file as given and on the chapter's full list.
 - **Referee.** A closed-form rigid-block solution, recomputed from the model's own inputs, is the
-  referee, the one value each row is scored against, where one exists: Goodman & Bray's column analysis on problems 1 and 2, Alejano's plowing
-  equation on 11 to 14, the sliding block with its tensile bridge on 19 and, on 15, the vendor's
-  Slide2 search, since Alejano's footwall equations describe a mechanism the slope does not take.
+  referee, the one value each row is scored against, where one exists: Goodman & Bray's column analysis on problems 1 and 2, Alejano et al.'s
+  limit equilibrium for the plowing slab (a moment balance about the toe, their Eq. 7) on 11 to 14,
+  the sliding block with its tensile bridge on 19 and, on 15, the vendor's Slide2 search, since
+  Alejano et al.'s limit equilibrium for a footwall that breaks out through one bed (their
+  Eqs. 9–10) describes a mechanism the slope does not take.
   Otherwise the referee is the one the manual names, in every case UDEC, a distinct-element program
   that models the rock as separate blocks in contact. Each row shows the
   recomputed value beside the printed one.
@@ -538,8 +540,8 @@ for this problem. The mechanism has two rigid blocks, the slab and the toe block
 reduction factor you can ask whether some set of joint forces, each within its friction limit, could
 hold both blocks in place; above 1.2148 here, none can. A closed-form answer that assumes one
 particular mechanism can sit below that ceiling or on it, as on problem 13 where the two agree
-to three figures, but not above it. Alejano's Eq. (7) gives 1.7582
-here, above the ceiling, so it cannot be right for this model, and the ceiling is the referee
+to three figures, but not above it. Alejano et al.'s limit equilibrium for the plowing slab, a
+moment balance about the toe (their Eq. 7), gives 1.7582 here, above the ceiling, so it cannot be right for this model, and the ceiling is the referee
 instead. XSLOPE gives 1.213, RS2 1.22 and the paper's own UDEC run 1.21: the three differ by 0.01 at
 most, and all three sit on that ceiling.
 

@@ -610,9 +610,10 @@ weakest — the generator seeds on it and states the choice and the reason:
 *"seeding on 'Weak Layer' — mobilizable strength 22.3 against 67.1 for the next
 weakest ('Soil 1')"*. **When two are comparable it returns the ranked candidates
 instead of guessing**, and the caller chooses. This reflects the sections themselves
-rather than a weakness of the ranking. Guo & Griffiths' embankment-over-foundation pair
-fails deep on one set of numbers and shallow on another with the *same* two zones,
-and both are in the verification corpus. Passing `zone=` (a polygon index or a
+rather than a weakness of the ranking. Guo & Griffiths' (2020) undrained embankment on an
+undrained foundation ([VP103](../verification/rocscience.md#vp103)) fails deep on one set
+of numbers and shallow on another with the *same* two zones, and both cases are in the
+verification corpus. Passing `zone=` (a polygon index or a
 material name) names the zone explicitly and skips the question, which is also how a
 script overrides an automatic pick.
 
@@ -635,9 +636,11 @@ is 0.63.
   sliding mass is concerned, and the run that covers most of the slope is the one
   that carries a mechanism.
 - **Where the zone reaches the ground**, the track simply runs out to it and that is
-  the entry or exit point — the zone is its own ramp, which is the shape of Griffiths
-  & Lane's dipping band and the reason their published critical surface is nothing
-  but the band.
+  the entry or exit point — the zone is its own ramp. The thin weak layer of Griffiths &
+  Lane's (1999) Example 3 has this shape. It runs parallel to the face, horizontally
+  through the foundation, and out at 45° beyond the toe
+  ([verification](../verification/ssrm.md#verification-griffiths3)), so their published
+  critical surface is nothing but the layer.
 - **Where it does not**, a straight ramp at the Rankine wedge angle carries the
   surface to the ground: `45 + φ/2` for the scarp dropping in behind the crest and
   `45 − φ/2` for the wedge pushing out at the toe, using the `φ` of the *overburden*

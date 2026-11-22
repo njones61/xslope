@@ -533,8 +533,9 @@ valid: it is the factor by which the joint strengths can be reduced before the
 mass starts to move, which is the same quantity the closed forms and a distinct
 element strength reduction report, and on the problems that have a closed form
 it reproduces them — Part 1's slab to within a bisection step of tan φ / tan β,
-and the block toppling stacks of the verification corpus to within a few
-percent of Goodman & Bray. What the method does not answer is anything about
+and the stacks of toppling columns that Goodman & Bray's (1976) limit
+equilibrium toppling analysis solves, to within 2 percent
+([RJ-1a to RJ-1d](../verification/rs2_joints.md#rj-1a)). What the method does not answer is anything about
 the movement after that point: how far the blocks travel, where they come to
 rest, or what they strike on the way. The deformed section at failure shows
 the mechanism that starts, not the run-out. Those questions need a distinct

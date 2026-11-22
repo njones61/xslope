@@ -15,6 +15,7 @@ extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js
   - js/mathjax-config.js
   - js/nav_collapse.js
+  - js/nav_new.js
 markdown_extensions:
     - attr_list
     - sane_lists
@@ -30,7 +31,7 @@ theme:
 # Change the ?v= date whenever custom.css changes: browsers keep the stylesheet
 # for 4 hours, and a new query string makes them fetch the new one at once.
 extra_css:
-  - css/custom.css?v=2026-10-15
+  - css/custom.css?v=2026-11-22
 plugins:
   - search
   - redirects:

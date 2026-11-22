@@ -68,7 +68,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.32](#gs-2-32) | 🟢 | Zhu & Lee – Heterogeneous Slope | Wet Spencer 1.180 vs Slide 1.189 (−0.8%) | |
 | [2.33](#gs-2-33) | 🟢 | Priest – Rigid Blocks | M-P 1.049 vs SLOPE/W 1.049 (0.0%) · Janbu 1.049 vs Priest's hand calculation 1.049 (0.0%) | |
 | [2.34](#gs-2-34) | 🟢 | Yamagami – Stabilizing Piles | Unreinforced Bishop 1.100 vs SLOPE/W 1.102 (−0.2%) · with piles 1.185 vs Yamagami 1.20 (−1.3%) | pile-force conventions differ program to program |
-| [2.35](#gs-2-35) | 🟢 | Pockoski & Duncan – Tie-Back Wall | Bishop 1.142 vs Slide 1.147 (−0.4%) · Spencer 1.140 vs Slide 1.145 (−0.4%) | *covered* — [Slide2 VP58](rocscience.md#vp58); the vendor model was saved unsolved, so the SLOPE/W value is the one Pockoski & Duncan themselves report |
+| [2.35](#gs-2-35) | 🟢 | Pockoski & Duncan – Tie-Back Wall | Bishop 1.142 vs Slide 1.147 (−0.4%) · Spencer 1.140 vs Slide 1.145 (−0.4%) · Spencer 1.140 vs SLOPE/W 1.135 (+0.4%) | *covered* — [Slide2 VP58](rocscience.md#vp58); SLOPE/W's own file solves Spencer only, so the SLOPE/W Bishop value is the one Pockoski & Duncan report |
 | [2.36](#gs-2-36) | 🟢 | Pockoski & Duncan – Reinforcement | Janbu 0.579 vs SLOPE/W's own Janbu 0.575 (+0.7%) · Corps / Lowe 0.577 vs SLOPE/W's Lowe 0.587 (−1.7%) | *covered* — [Slide2 VP59](rocscience.md#vp59); under-designed, so every published factor of safety is below 1 |
 | [2.37](#gs-2-37) | 🟢 | Pockoski & Duncan – Soil Nails | Spencer 1.009 vs SLOPE/W's own 1.000 (+0.9%) · vs Slide 1.009 (0.0%) | *covered* — [Slide2 VP60](rocscience.md#vp60) |
 | [2.38](#gs-2-38) | 🟢 | Loukidis – Seismic Coefficient | Spencer 1.001 in both cases vs SLOPE/W 1.00 (+0.1%) | |
@@ -670,11 +670,11 @@ lb/ft of wall.
 
 | Method | XSLOPE | Slide | UTEXAS4 | P&D's SLOPE/W | SLOPE/W | Note |
 |---|---|---|---|---|---|---|
-| Bishop | 1.142 | 1.147 (−0.4%) | 1.14 (+0.2%) | 1.14 (+0.2%) | — (file saved unsolved) | the vendor file carries no solved value of its own |
-| Spencer | 1.140 | 1.145 (−0.4%) | 1.14 (0.0%) | — | — | — |
+| Bishop | 1.142 | 1.147 (−0.4%) | 1.14 (+0.2%) | 1.14 (+0.2%) | — | the vendor file solves Spencer only |
+| Spencer | 1.140 | 1.145 (−0.4%) | 1.14 (0.0%) | — | 1.135 (+0.4%) | SLOPE/W's critical circle in the vendor file |
 
-The vendor `.gsz` was saved unsolved, so SLOPE/W's own critical factor of safety is not in
-the file; the SLOPE/W reference is the value Pockoski & Duncan themselves reported for it
+The vendor `.gsz` is solved with Spencer's method, and SLOPE/W's critical factor of safety in it
+is 1.135. For Bishop's method, the SLOPE/W reference is the value Pockoski & Duncan reported
 (1.14). Pockoski & [Duncan (2000)](https://doi.org/10.1061/(ASCE)1090-0241(2000)126:4(307))
 supplies the eight-layer section, strengths and anchor capacities.
 
@@ -758,8 +758,8 @@ coefficient at which the searched minimum FS = 1.
 
 | Target | XSLOPE | SLOPE/W | Loukidis | Slide2 | Note |
 |---|---|---|---|---|---|
-| FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | — (file saved unsolved) | 1.000 (+0.1%) | — | Loukidis defines FS = 1.000 at k꜀ by construction |
-| Critical k꜀ (Spencer, non-circular search) | 0.157 | — | Spencer 0.155 (+1.3%), FEM 0.161 | Spencer 0.151 (+4.0%) | the paper's rigorous bounds are UB 0.172 / LB 0.148 |
+| FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | 0.9996 (+0.1%) | 1.000 (+0.1%) | — | Loukidis defines FS = 1.000 at k꜀ by construction; SLOPE/W's value is on its optimized surface |
+| Critical k꜀ (Spencer, non-circular search) | 0.156 | — | Spencer 0.155 (+0.6%), FEM 0.161 | Spencer 0.151 (+3.3%) | the paper's rigorous bounds are UB 0.172 / LB 0.148 |
 
 The two targets are checked separately. [VP63](rocscience.md#vp63) fixes k at the paper's
 0.155 and confirms the slope is just stable there; the [RS2-68 Case 3](rs2.md#rs2-68)

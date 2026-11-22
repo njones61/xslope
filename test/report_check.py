@@ -406,6 +406,77 @@ def test_a_declared_zero_cutoff_prints():
     return fails
 
 
+def test_the_tables_print_what_each_option_reads():
+    """Each materials table prints a strength property only where the material's
+    option reads it, keeps every digit a property was entered with, and says what c
+    and c/p mean on an undrained material.
+
+    The model is LEM-7 Part C's: both clays entered as strength ratios, the lower
+    one still carrying the r elev. of 4 its cp profile had. The walk of that page
+    found the report printing that 4.0 (an input the ratio never reads, under a
+    sentence saying the table shows "the properties that option uses"), c/p
+    rounded to 0.188 from 0.1875, no c/p at all in the finite element table, and
+    nothing saying what c and c/p are under the ratio option.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.report import (_Counter, _fem_materials_table, _materials_table,
+                               _strength_option_notes)
+
+    fails = []
+    sd = load_slope_data(os.path.join(_REPO, "docs", "lem", "files",
+                                      "xslope_low_clay.xlsx"))
+    lower = sd["materials"][2]
+    if (str(lower["option"]), lower["r_elev"]) != ("cp", 4.0):
+        return [f"the shipped model's lower clay is no longer cp with r elev. 4: "
+                f"{lower['option']!r}, {lower['r_elev']!r}"]
+    for m in sd["materials"][1:]:
+        m.update(option="ratio", c=15.0, phi=0.0, cp=0.1875)
+
+    for table in (_materials_table(sd, _Counter()),
+                  _fem_materials_table(sd, _Counter())):
+        where = table.caption
+        heads = [str(h) for h in table.headers]
+        if any(h.startswith("r elev.") for h in heads):
+            fails.append(f"{where}: an r elev. column on a model whose only "
+                         f"r elev. is a ratio material's, which nothing reads")
+        if "c/p" not in heads or "Strength" not in heads:
+            fails.append(f"{where}: no c/p or Strength column on a model with "
+                         f"ratio materials: {heads}")
+            continue
+        col = {h: i for i, h in enumerate(heads)}
+        got = [(r[col["Strength"]], r[col["c/p"]]) for r in table.rows]
+        want = [("MC", ""), ("RATIO", "0.1875"), ("RATIO", "0.1875")]
+        if got != want:
+            fails.append(f"{where}: (Strength, c/p) by row read {got}, not {want}")
+
+    notes = _strength_option_notes(sd)
+    for phrase in ("strength ratio S_u/σ_v′", "c is a minimum strength"):
+        if phrase not in notes:
+            fails.append(f"the option note does not say {phrase!r}: {notes!r}")
+    if "CP option" in notes:
+        fails.append(f"the option note explains cp on a model with no cp "
+                     f"material: {notes!r}")
+
+    # The control: the shipped model, its lower clay still cp. r elev. is read
+    # there and prints, the column carries the column's three decimals, and an mc
+    # row's leftover c/p or r elev. would print nothing.
+    sd = load_slope_data(os.path.join(_REPO, "docs", "lem", "files",
+                                      "xslope_low_clay.xlsx"))
+    table = _materials_table(sd, _Counter())
+    heads = [str(h) for h in table.headers]
+    rel = next((i for i, h in enumerate(heads) if h.startswith("r elev.")), None)
+    if rel is None:
+        fails.append(f"the cp model prints no r elev. column: {heads}")
+    else:
+        got = [(r[heads.index("c/p")], r[rel]) for r in table.rows]
+        if got != [("", ""), ("", ""), ("3.750", "4.0")]:
+            fails.append(f"the cp model's (c/p, r elev.) by row read {got}")
+    if "Under the CP option" not in _strength_option_notes(sd):
+        fails.append("the cp model's report does not say what c and c/p are "
+                     "under the cp option")
+    return fails
+
+
 def test_figures_rendered():
     """Every figure block points at a real, non-trivial PNG."""
     fails = []
@@ -21542,6 +21613,8 @@ CHECKS = [
     ("the content tree and its section order", test_tree),
     ("the tables carry the model's numbers", test_tables_carry_the_model),
     ("a declared zero tensile cutoff prints", test_a_declared_zero_cutoff_prints),
+    ("the tables print what each option reads",
+     test_the_tables_print_what_each_option_reads),
     ("every figure is rendered to a file", test_figures_rendered),
     ("the traceability stamp", test_traceability),
     ("the content toggles remove what they name", test_toggles),

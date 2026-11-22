@@ -2332,27 +2332,28 @@ def _mat_unsat_vocabulary(ctx):
 @rule("mat.option_vocabulary", ERROR, ("lem", "fem"),
       "The strength model option must be one of mc / cp / ratio / pow / hb / elastic.")
 def _mat_option_vocabulary(ctx):
-    ok = ("mc", "cp", "ratio", "pow", "hb", "elastic")
+    from .fileio import STRENGTH_OPTIONS
     for i, m in ctx.strength_materials():
         o = m.get("option")
         if o is None or (isinstance(o, str) and not o.strip()):
             continue
-        if str(o).strip().lower() not in ok:
+        if str(o).strip().lower() not in STRENGTH_OPTIONS:
             yield (f"{ctx.mat_label(i)} sets option = {o!r}, which is not a "
-                   f"strength model. Expected one of: mc, cp, ratio, pow, hb, elastic "
+                   f"strength model. Expected one of: {', '.join(STRENGTH_OPTIONS)} "
                    f"{_AT_MAT}.")
 
 
 @rule("mat.option_missing", ERROR, ("lem",),
       "A material a failure surface can cross needs a strength model.")
 def _mat_option_missing(ctx):
+    from .fileio import strength_options_text
     for i, m in ctx.strength_materials():
         o = m.get("option")
         if o is None or (isinstance(o, str) and not str(o).strip()):
             yield (f"{ctx.mat_label(i)} has no strength model: option is blank, "
                    f"and the material is inside the geometry, so a failure surface "
-                   f"can pass through it. Choose a strength model (mc, cp, pow, hb "
-                   f"or elastic) {_AT_MAT}.")
+                   f"can pass through it. Choose a strength model "
+                   f"({strength_options_text()}) {_AT_MAT}.")
 
 
 #: Every field a material row carries when it comes off the mat sheet. A key
@@ -5203,12 +5204,40 @@ def _seismic2_no_low_k(ctx):
     mats = list(ctx.strength_materials())
     if not mats or any(_has_d_psi(m) for _, m in mats):
         return None
-    return ("No material carries the d / psi pair, so stage 2 has no undrained "
-            "strength to give any slice, and the two-stage analysis would only "
-            "repeat a single-stage pseudostatic analysis with drained strengths. "
-            "Enter d and psi for the materials that do not drain during the "
-            "earthquake, or clear Two-stage seismic to run the single-stage "
-            f"analysis {_AT_MAT}.")
+    opts = [str(m.get("option") or "").strip().lower() for _, m in mats]
+    undrained = sorted({o for o in opts if o in ("cp", "ratio")})
+    n_mc = opts.count("mc")
+    if not undrained:
+        return ("No material carries the d / psi pair, so stage 2 has no undrained "
+                "strength to give any slice, and the two-stage analysis would only "
+                "repeat a single-stage pseudostatic analysis with drained strengths. "
+                "Enter d and psi for the materials that do not drain during the "
+                "earthquake, or clear Two-stage seismic to run the single-stage "
+                f"analysis {_AT_MAT}.")
+    # A cp or ratio material is undrained already: advanced.seismic_two_stage gives
+    # it the same strength in both stages (times the stage 2 strength factor), and
+    # its d / psi are never read (seismic2.cp_ignores_d_psi). Only an mc material
+    # takes a stage 2 strength from d and psi.
+    n_und = sum(o in undrained for o in opts)
+    which = " or ".join(undrained)
+    und = (f"The material with option = {which} is undrained already: its option "
+           f"gives it" if n_und == 1 else
+           f"The materials with option = {which} are undrained already: their option "
+           f"gives them")
+    mc = ("" if not n_mc else
+          ", and the material with option = mc keeps its drained strength"
+          if n_mc == 1 else
+          ", and the materials with option = mc keep their drained strength")
+    todo = ("Enter d and psi for the mc materials that do not drain during the "
+            "earthquake, or clear Two-stage seismic to run the single-stage analysis"
+            if n_mc else
+            "Clear Two-stage seismic to run the single-stage analysis")
+    return (f"No material carries the d / psi pair, so stage 1 gives no slice an "
+            f"undrained strength to carry into stage 2. {und} the same strength in "
+            f"both stages{mc}. The two-stage analysis would therefore be a "
+            f"single-stage pseudostatic analysis with these strengths, the undrained "
+            f"ones multiplied by the stage 2 strength factor when it is below 1. "
+            f"{todo} {_AT_MAT}.")
 
 
 @rule("seismic2.d_psi_incomplete", ERROR, ("seismic2",),
@@ -7013,7 +7042,7 @@ def _structural_members_cross(ctx):
 
 @rule("mat.strength_negative", ERROR, ("lem", "fem"),
       "A negative cohesion or friction angle is not a strength.",
-      fields=("c", "phi", "cp"))
+      fields=("c", "phi"))
 def _mat_strength_negative(ctx):
     # c/p is deliberately NOT checked. It is a GRADIENT -- the rate at which the
     # undrained strength changes with depth below r_elev -- and a negative one is a
@@ -7023,11 +7052,11 @@ def _mat_strength_negative(ctx):
     # quantities here.
     for i, m in ctx.strength_materials():
         opt = str(m.get("option") or "").strip().lower()
-        # Under option = ratio, c/p IS a strength ratio, so a negative one is not
-        # a profile but a mistake, unlike the cp gradient above.
+        # Under option = ratio, c/p is a strength RATIO, not a strength, and its
+        # own rule says what a negative one does (mat.ratio_negative).
         cols = {"mc": (("c", "c"), ("phi", "f")),
                 "cp": (("c", "c"),),
-                "ratio": (("c", "c"), ("cp", "c/p"))}.get(opt, ())
+                "ratio": (("c", "c"),)}.get(opt, ())
         for key, col in cols:
             v = _num(m.get(key))
             if v is None or v >= 0:
@@ -7038,6 +7067,36 @@ def _mat_strength_negative(ctx):
                    f"stepping c to -500 reports FS = -1.279, and phi to -30 reports "
                    f"FS = -0.493), so nothing downstream can tell the answer is "
                    f"meaningless {_AT_MAT}.")
+
+
+@rule("mat.ratio_negative", ERROR, ("lem", "fem"),
+      "A strength ratio below zero is no soil's, and it never governs the strength.",
+      fields=("cp",))
+def _mat_ratio_negative(ctx):
+    # Under option = ratio the strength is max(c, c/p * sigma'_v), with sigma'_v
+    # floored at zero in the slicer and the finite element engine alike. A negative
+    # ratio makes the second term zero or less, so it never governs: the strength is
+    # c everywhere, the strength the ratio was entered to give is silently dropped,
+    # and with c = 0 the material carries no strength at all -- a case
+    # mat.ratio_zero_strength, which reads c/p = 0, does not see. Nothing goes
+    # negative, so this is not a strength_negative case; it is refused because no
+    # soil has a negative S_u/sigma'_v, and a run would answer for a different
+    # material from the one entered.
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "ratio":
+            continue
+        r = _num(m.get("cp"))
+        if r is None or r >= 0:
+            continue
+        c = _num(m.get("c")) or 0.0
+        then = (f"the strength is c = {c:g} everywhere in this material"
+                if c > 0 else
+                "with c = 0 the material carries no strength at all")
+        yield (f"{ctx.mat_label(i)} has option = ratio with c/p = {r:g}. Under "
+               f"option = ratio, c/p is the strength ratio s_u/sigma'_v, which is "
+               f"never negative in a soil. A negative ratio never governs the "
+               f"strength max(c, c/p * sigma'_v), so {then}, and the ratio entered "
+               f"has no effect. Enter the ratio as a positive number {_AT_MAT}.")
 
 
 @rule("mat.phi_out_of_range", ERROR, ("lem", "fem"),

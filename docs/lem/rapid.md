@@ -182,6 +182,8 @@ The two envelopes usually cross. To the right of the crossing, at higher stress,
 
 For a rapid drawdown analysis in **xslope**, enter $d$ and $\psi$ in the material properties for each soil that does not drain during the drawdown. The free-draining soils keep their drained strengths, $c'$ and $\phi'$, in every stage, and their $d$ and $\psi$ are left blank.
 
+A soil given an undrained strength directly, with the `cp` or [`ratio`](overview.md#undrained-strength-ratio) option, takes no $d$ and $\psi$ and keeps that strength in all three stages. A `ratio` material's strength comes from the vertical effective stress under the water before drawdown, the Stage 1 water, so lowering the pool does not change it.
+
 ### When the lab reports an R envelope {#r-envelope}
 
 $\overline{CU}$ test results are often reported as an R envelope instead of the $K_c = 1$ envelope. R is the U.S. Army Corps of Engineers' name for the consolidated-undrained test, between its Q (unconsolidated-undrained) and S (drained) tests, and the R envelope is also called the total stress envelope. It is drawn on a Mohr diagram with one circle for each test. Each circle starts at the sample's effective consolidation pressure, $\sigma'_{3c}$, and its diameter is the principal stress difference at failure, $\sigma_{1f} - \sigma_{3f}$. The envelope's intercept and slope are $c_R$ and $\phi_R$.

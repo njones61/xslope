@@ -82,7 +82,7 @@ A two-stage run is refused when:
 
 - stage 1's factor of safety is below 1, since a slope that fails before the earthquake has no consolidation stresses
   to give;
-- no material carries $d$ and $\psi$, since stage 2 would only repeat a single-stage analysis with drained strengths;
+- no material carries $d$ and $\psi$, since stage 1 would then give no slice an undrained strength to carry into stage 2;
 - a material carries $d$ or $\psi$ but not both;
 - a material with $d$ and $\psi$ uses a power-curve or Hoek-Brown envelope;
 - the run is also a rapid drawdown analysis.

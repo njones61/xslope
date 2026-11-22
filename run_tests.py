@@ -4900,10 +4900,11 @@ def _run_dialog_preflight_checks(app):
         problems.append("new_slope_data(): a new project does not default to auto "
                         "water loads")
 
-    # (8) Blank preservation, end to end: a cleared cell reaches the model as None
-    #     (not 0.0), the checks can see the difference, and the writer puts a blank
-    #     cell in the sheet rather than inventing a zero on the way out.
-    problems += _blank_preservation_checks(app)
+    # (8) A blank cell, end to end: a cell cleared in the Materials editor reaches
+    #     the model as the value the loader gives the same blank cell in a workbook,
+    #     the runs that crashed on a blank c now slice and solve, the checks still
+    #     see a cleared unit weight, and the writer leaves an unset property blank.
+    problems += _blank_cell_checks(app)
 
     # (9) The surface family the dialog chose survives the session: the write-back
     #     lands in the cell-backed key, a save carries it, and the next dialog opens
@@ -5015,88 +5016,143 @@ def _surface_family_persistence_checks(app):
     return problems
 
 
-def _blank_preservation_checks(app):
-    """A blank material cell must stay blank through the editor and the writer.
+def _blank_cell_checks(app):
+    """A blank cell in the Materials editor is the model a blank workbook cell is.
 
-    The mutation is the point: clear one cell that a plain float field would have
-    stamped 0.0 onto, and require (a) None in the model, (b) a finding that names
-    it, and (c) an empty cell in the saved file. Without all three, the model checks
-    cannot tell a cohesionless material from an unfilled one on any model Studio has
-    touched -- which is every model a Studio user has.
+    The loader is the independent truth. One material row of a real model is saved
+    with every numeric property unset, which the writer turns into blank cells, and
+    loaded back: the value the loader gives each blank column is what the editor must
+    give the same column cleared, in the table view and in the list view. Columns
+    whose blank means "not set" (gsat, t_cut, phi_b, s_cap, Ss, Sy) load as None and
+    stay None; every other column takes the value the loader fills in (0 for c, phi,
+    d, psi, E, nu, ru, k1 and the rest, 0.5 for the Mualem exponent l).
+
+    Then the runs that broke when the editor stored a blank as None instead (Studio
+    walk, 2026-11-22). A ratio or cp material with c cleared reached the slicer as
+    None, and its strength raised a TypeError there; an mc material with c cleared
+    sliced, and then no trial surface solved. Each is sliced and solved on the
+    file's own circle.
     """
     import copy
-    import shutil
     import tempfile
 
-    from studio.editors import CATEGORY_EDITORS
+    import openpyxl
+    from studio.editors import CATEGORY_EDITORS, Field
     from xslope import preflight as pf
-    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    from xslope.fileio import (MAT_NUM_HEADERS, MAT_OPT_NUM_HEADERS,
+                               load_slope_data, save_slope_data_to_xlsx)
+    from xslope.slice import generate_slices
+    from xslope.solve import bishop
 
     problems = []
     editor = CATEGORY_EDITORS["materials"]
-    blank_keys = ("gamma", "c", "phi", "d", "psi", "E", "nu", "ru", "k1")
+    numeric = [f for f in editor.FIELDS if f.kind in Field.NUMERIC_KINDS]
+    model = load_slope_data(_repo('docs/lem/files/xslope_low_clay.xlsx'))
+    row = 2                                   # Lower Soil
 
-    # (a) Opening the editor and applying with NOTHING typed must not stamp zeros
-    #     over a property that was already unset.
-    sd = _editor_fixture()
-    for m in sd["materials"]:
-        m["nu"] = None
-    dlg = editor.build(sd, None)
-    editor.apply(sd, dlg)
-    if any(m.get("nu") is not None for m in sd["materials"]):
-        problems.append("blank(nu): a round-trip through the editor filled in a "
-                        "blank Poisson's ratio")
-    dlg.deleteLater()
-    app.processEvents()
+    def _same(a, b):
+        if a is None or b is None:
+            return a is None and b is None
+        return float(a) == float(b)
 
-    # (b) Clearing a cell in the table gives None, not 0.0 -- for every field whose
-    #     zero is physically meaningful.
-    sd = _editor_fixture()
-    dlg = editor.build(sd, None)
-    dlg.set_view_mode("table")
-    for key in blank_keys:
-        col = next(j for j, f in enumerate(editor.FIELDS) if f.key == key)
-        dlg._table.table.item(0, col).setText("")
-    editor.apply(sd, dlg)
-    got = {k: sd["materials"][0].get(k) for k in blank_keys}
-    bad = {k: v for k, v in got.items() if v is not None}
-    if bad:
-        problems.append(f"blank(clear): cleared cells came back as {bad}, not None")
-    dlg.deleteLater()
-    app.processEvents()
+    # (a) What the loader gives each blank column, from a file whose cells really are
+    #     blank: the writer leaves an unset property's cell empty, never a 0.
+    unset = copy.deepcopy(model)
+    for f in numeric:
+        unset["materials"][row][f.key] = None
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "blank.xlsx")
+        save_slope_data_to_xlsx(unset, out)
+        wb = openpyxl.load_workbook(out)
+        header = _mat_header_columns(wb["mat"])
+        sheet_row = header["_row"] + 1 + row
+        for key, names in MAT_NUM_HEADERS + MAT_OPT_NUM_HEADERS:
+            names = names if isinstance(names, tuple) else (names,)
+            col = next((header[n.lower().replace("_", "")] for n in names
+                        if n.lower().replace("_", "") in header), None)
+            if col is None:
+                problems.append(f"blank(save): no '{names[0]}' column in the saved "
+                                f"mat sheet")
+                continue
+            val = wb["mat"].cell(row=sheet_row, column=col).value
+            if val is not None:
+                problems.append(f"blank(save): an unset {key} was written as {val!r}, "
+                                f"not a blank cell")
+        wb.close()
+        truth = load_slope_data(out)["materials"][row]
 
-    # (c) The checks see the blank -- an unset unit weight is an error naming the row.
-    ids = {f.rule_id for f in pf.preflight(sd, "lem")}
+    # (b) The same columns cleared in each view of the editor.
+    cleared = None
+    for view in ("table", "list"):
+        sd = copy.deepcopy(model)
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode(view)
+        app.processEvents()
+        if view == "table":
+            for j, f in enumerate(editor.FIELDS):
+                item = dlg._table.table.item(row, j)
+                if f.kind in Field.NUMERIC_KINDS and item is not None:
+                    item.setText("")
+        else:
+            lv = dlg._list_view
+            lv.list.setCurrentRow(row)
+            app.processEvents()
+            for f in numeric:
+                if f.key in lv._edits:        # the form carries no Ss / Sy
+                    lv._edits[f.key].setText("")
+        editor.apply(sd, dlg)
+        got = sd["materials"][row]
+        keys = [f.key for f in numeric
+                if view == "table" or f.key in dlg._list_view._edits]
+        bad = {k: (got.get(k), truth.get(k)) for k in keys
+               if not _same(got.get(k), truth.get(k))}
+        if bad:
+            problems.append(f"blank({view} view): cleared cells came back as "
+                            f"(editor, loader) {bad}")
+        if view == "table":
+            cleared = sd
+        dlg.deleteLater()
+        app.processEvents()
+
+    # (c) The checks still see a cleared unit weight, as they see a blank one in a
+    #     workbook: a weightless strength material is an error naming the row.
+    ids = {f.rule_id for f in pf.preflight(cleared, "lem")}
     if "mat.gamma_nonpositive" not in ids:
-        problems.append(f"blank(check): a blank unit weight raised no finding ({ids})")
+        problems.append(f"blank(check): a cleared unit weight raised no finding ({ids})")
 
-    # (d) The writer blanks the cell instead of writing 0.0. Round-tripped through a
-    #     REAL model so the whole save path runs, not just the mat block.
-    src = _repo('docs/inputs/slope/xslope_dam.xlsx')
-    if os.path.exists(src):
-        with tempfile.TemporaryDirectory() as td:
-            model = load_slope_data(src)
-            model["materials"][0]["nu"] = None
-            out = os.path.join(td, "blank.xlsx")
-            try:
-                save_slope_data_to_xlsx(model, out)
-            except Exception as exc:
-                problems.append(f"blank(save): saving a None property raised "
-                                f"{type(exc).__name__}: {exc}")
-            else:
-                import openpyxl
-                wb = openpyxl.load_workbook(out)
-                ws = wb["mat"]
-                header = _mat_header_columns(ws)
-                col = header.get("nu")
-                if col is None:
-                    problems.append("blank(save): no nu column found in the saved sheet")
-                else:
-                    val = ws.cell(row=header["_row"] + 1, column=col).value
-                    if val is not None:
-                        problems.append(f"blank(save): a None Poisson's ratio was "
-                                        f"written as {val!r}, not a blank cell")
-                wb.close()
+    # (d) c cleared in the list view, as the walk entered it, then a run.
+    for option, i, cp in (("ratio", 2, "0.1875"), ("cp", 2, "3.75"), ("mc", 0, None)):
+        sd = copy.deepcopy(model)
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode("list")
+        lv = dlg._list_view
+        lv.list.setCurrentRow(i)
+        app.processEvents()
+        combo = lv._edits["option"]
+        combo.setCurrentIndex(combo.findText(option))
+        app.processEvents()
+        lv._edits["c"].setText("")
+        if cp is not None:
+            lv._edits["cp"].setText(cp)
+        editor.apply(sd, dlg)
+        dlg.deleteLater()
+        app.processEvents()
+        what = f"blank c ({option})"
+        try:
+            ok, out = generate_slices(sd, circle=sd["circles"][0], num_slices=50)
+        except Exception as exc:
+            problems.append(f"{what}: slicing raised {type(exc).__name__}: {exc}")
+            continue
+        if not ok:
+            problems.append(f"{what}: the circle did not slice: {out}")
+            continue
+        try:
+            ok, res = bishop(out[0])
+        except Exception as exc:
+            problems.append(f"{what}: Bishop raised {type(exc).__name__}: {exc}")
+            continue
+        if not ok:
+            problems.append(f"{what}: Bishop did not solve: {res}")
     return problems
 
 
@@ -6825,6 +6881,14 @@ PREFLIGHT_RULE_SPECS = [
          analysis='seismic2',
          mutation=lambda sd: _pf_mats(sd, d=0.0, psi=0.0),
          expect='no undrained strength to give any slice'),
+    # The same refusal on undrained materials (LEM-7 Part C's clays) must not say
+    # the run would use drained strengths: a ratio material keeps its own undrained
+    # strength in both stages.
+    dict(rule='seismic2.no_low_k_material', base=PREFLIGHT_BASE_SEISMIC2, mode='excel',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=10.0, phi=0.0, cp=0.25,
+                                      d=0.0, psi=0.0),
+         expect='undrained already'),
     dict(rule='seismic2.d_psi_incomplete', base=PREFLIGHT_BASE_SEISMIC2, mode='excel',
          analysis='seismic2',
          mutation=lambda sd: _pf_mats(sd, psi=0.0),
@@ -7252,6 +7316,14 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.strength_negative', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, c=-500.0),
          expect='A strength cannot be negative'),
+    # A negative strength ratio never governs max(c, c/p * sigma'_v): the walk's
+    # -0.2 under a 15 minimum. The control is the same material with a real ratio,
+    # and strength_negative stays silent on both, since nothing here is negative
+    # strength.
+    dict(rule='mat.ratio_negative', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=15.0, phi=0.0, cp=-0.2),
+         control=lambda sd: _pf_mats(sd, option='ratio', c=15.0, phi=0.0, cp=0.2),
+         expect='never governs the strength'),
     dict(rule='mat.phi_out_of_range', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, phi=95.0),
          expect='no finite value at 90 degrees'),

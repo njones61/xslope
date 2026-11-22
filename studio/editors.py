@@ -139,7 +139,12 @@ class Field:
     'bool' is a YES/blank flag, edited through the same combo widget as 'choice' but
     stored as a real Python bool — matching what the loader produces for a YES/blank
     worksheet column. Writing the literal strings back would make the loader reject
-    the saved file, so the conversion happens at BOTH ends here."""
+    the saved file, so the conversion happens at BOTH ends here.
+
+    ``blank`` overrides the value a blank (or unreadable) numeric cell reads back as,
+    for a column whose loader fills a blank with something other than the kind's own
+    blank: the Mualem exponent l, which a blank workbook cell loads as 0.5. It is
+    also the field's ``default`` unless one is given."""
 
     _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": "",
               "bool": False}
@@ -151,10 +156,13 @@ class Field:
     _BOOL_CHOICES = ["", "YES"]
 
     def __init__(self, key, header, kind="float", choices=None, default=None,
-                 usage=None, applies=None, tooltip=None, unit=None):
+                 usage=None, applies=None, tooltip=None, unit=None, blank=None):
         self.key = key
         self.header = header
         self.kind = kind
+        self.blank = self._BLANK.get(kind) if blank is None else blank
+        if default is None and blank is not None:
+            default = blank
         # Optional units-plan (phase 4) tag: the name of a ``xslope.units.labels()``
         # dict key (e.g. "stress", "unit_weight", "k"). When the project declares a
         # unit system the form builder appends the corresponding label to the header
@@ -221,18 +229,13 @@ class Field:
         text = (text or "").strip()
         if self.kind == "bool":
             return text.lower() in ("yes", "true", "1")
-        if self.kind == "float":
-            try:
-                return float(text)
-            except ValueError:
-                return 0.0
-        if self.kind == "optfloat":
+        if self.kind in ("float", "optfloat"):
             if text == "" or text.lower() == "none":
-                return None
+                return self.blank
             try:
                 return float(text)
             except ValueError:
-                return None
+                return self.blank
         if self.kind == "int":
             try:
                 return int(float(text))
@@ -4831,22 +4834,28 @@ class MaterialsEditor(CategoryEditor):
     # left empty rather than 0.0. The alternate-envelope columns (pow_*/hb_*) are
     # always shown; option-driven show/hide grouping is a later UX pass.
     #
-    # Every property whose ZERO is physically meaningful is an 'optfloat' -- gamma,
-    # c, phi, d, psi, E, nu, ru, k1 -- so a blank cell comes back as None and the
-    # model checks can tell "the user entered 0" from "the user left it blank".
-    # A plain 'float' stamps 0.0 onto every blank cell of every row on OK (the table
-    # rewrites all fields), which made a cohesionless material and an unfilled one
-    # indistinguishable, a blank Poisson's ratio silently 0.0 (-33% on a measured
-    # SSRM factor of safety), and a blank r_u a model with no pore pressure at all.
-    # The writer blanks the cell for a None rather than stamping a 0.0 into the
-    # sheet, so an unfilled property is not invented on the way out either. (The
-    # LOADER still reads a blank numeric cell back as 0.0, unchanged here; what this
-    # buys is that a model edited in Studio carries the distinction while it is being
-    # edited, which is when the checks run and when the user can act on them.)
+    # A blank cell reads back as what the LOADER gives the same blank cell in the
+    # mat sheet (fileio.load_slope_data), so a model edited in Studio is the model
+    # its saved file reopens as. Most columns load a blank as 0 -- gamma, c, phi, d,
+    # psi, E, nu, ru, k1 among them -- and are plain 'float's; the Mualem exponent l
+    # loads as 0.5 (its own `blank`). The columns whose blank means "not set" load as
+    # None and are 'optfloat's: gsat (falls back to g), t_cut (no stated cutoff),
+    # phi_b and s_cap (no suction strength, uncapped), Ss and Sy (required only with
+    # a tseep sheet).
+    #
+    # These columns were once 'optfloat's too, so a cleared cell would stay None and
+    # the model checks could word it as blank. Nothing downstream reads a None there:
+    # a ratio or cp material with c cleared raised a TypeError in the slicer, an mc
+    # one left every trial surface unsolved, and a None d read as a Kc = 1 envelope
+    # (advanced.validate_rapid_drawdown tests d != 0). The checks already refuse the
+    # zeros that matter -- a unit weight or E of 0, a Poisson's ratio of 0 (which
+    # mat.nu_unusable names as what a blank cell reads as), u = ru with r_u = 0 -- so
+    # the loader's value costs them nothing. The writer still blanks the cell for a
+    # None (from a script or the assistant), and the loader reads it back as above.
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
-        Field("gamma", "γ", "optfloat", applies=LF, unit="unit_weight"),
+        Field("gamma", "γ", applies=LF, unit="unit_weight"),
         Field("gamma_sat", "γsat", "optfloat", applies=LF, unit="unit_weight"),
         # A BLANK option is valid for seep-only material rows (the loader keeps ''
         # via _choice; document._blank_material produces it for DXF imports). Offer
@@ -4854,18 +4863,18 @@ class MaterialsEditor(CategoryEditor):
         # normalizing blank -> 'mc'. 'elastic' (v16): infinite strength — the row's
         # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
         Field("option", "option", "choice", choices=["mc", "cp", "ratio", "pow", "hb", "elastic", ""], applies=LF),
-        Field("c", "c", "optfloat", applies=LF, unit="stress"),
-        Field("phi", "φ", "optfloat", applies=LF),
+        Field("c", "c", applies=LF, unit="stress"),
+        Field("phi", "φ", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
-        Field("d", "d", "optfloat", usage="lem"),
-        Field("psi", "psi", "optfloat", usage="lem"),
+        Field("d", "d", usage="lem"),
+        Field("psi", "psi", usage="lem"),
         # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
-        Field("E", "E", "optfloat", usage="fem", unit="stress"),
-        Field("nu", "n", "optfloat", usage="fem"),
+        Field("E", "E", usage="fem", unit="stress"),
+        Field("nu", "n", usage="fem"),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
-        Field("ru", "ru", "optfloat", applies=LF),
+        Field("ru", "ru", applies=LF),
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — the red
         # "LEM & FEM" block, mirroring c/φ, since both solvers now read it). optfloat
         # so a blank cell stays None — phi_b None = no suction strength (the default,
@@ -4881,7 +4890,7 @@ class MaterialsEditor(CategoryEditor):
         Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
-        Field("k1", "k1", "optfloat", usage="seep", unit="k"),
+        Field("k1", "k1", usage="seep", unit="k"),
         Field("k2", "k2", usage="seep", unit="k"),
         Field("alpha", "alpha", usage="seep"),
         # Unsaturated model: lf (linear front -> kr0/h0), vg (van Genuchten) or gard
@@ -4891,9 +4900,9 @@ class MaterialsEditor(CategoryEditor):
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep", unit="length"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
         # v26: the Mualem pore-connectivity exponent of the van Genuchten
-        # conductivity curve. optfloat so a blank cell stays None -- which the
-        # loader reads as Mualem's 0.5, the value a 0.0 would NOT mean.
-        Field("vg_l", "l", "optfloat", usage="seep", tooltip=MATERIALS_HELP["vg_l"]),
+        # conductivity curve. A blank cell is Mualem's 0.5, as the loader reads it --
+        # the value a 0.0 would NOT mean.
+        Field("vg_l", "l", usage="seep", tooltip=MATERIALS_HELP["vg_l"], blank=0.5),
         # v18: transient storage (mat sheet seepage block, after the unsat curve
         # pair). optfloat so a blank stays None — the loader never defaults these
         # to 0 (a silent zero would drop the storage term), and preflight demands

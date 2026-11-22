@@ -1425,6 +1425,12 @@ def test_lem09_materials():
 #: the three adjacent mat columns option/c/φ, pasted onto a row the file already
 #: carries. The header run is contiguous, so a rectangular copy still lands.
 _MAT_HEADERS_STRENGTH = ["option", "c", "φ"]
+#: Part C's ratio edit runs one column further, to c/p, which sits right of φ in the
+#: Table view and the sheet: a block printed without its φ column puts the ratio
+#: into φ.
+_MAT_HEADERS_RATIO = ["option", "c", "φ", "c/p"]
+#: The material key behind each printed strength header.
+_STRENGTH_KEYS = {"option": "option", "c": "c", "φ": "phi", "c/p": "cp"}
 
 #: How close a pasted model's answer must come to the number the page prints.
 #: It is the tutorial test tags' line: a page number is re-recorded when the
@@ -1435,7 +1441,8 @@ _PAGE_TOL = 0.005
 
 
 def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
-                       expected_fs, occurrence=0):
+                       expected_fs, occurrence=0, headers=_MAT_HEADERS_STRENGTH,
+                       also=()):
     """One of LEM-7's strength-option edits, pasted onto the real material row.
 
     The page ships the model in its PRE-edit state, so — unlike every other
@@ -1446,9 +1453,12 @@ def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
     * The row's option in the shipped file is still ``was``. A page teaching a
       change from `pow` to `mc` stops being true the moment the file it ships
       already holds `mc`.
-    * The block lands in option, c and φ and nowhere else — every other field on
-      the row comes back exactly as the file had it, which is what makes a
-      three-column slice safe to print.
+    * The block lands in its own columns (option, c and φ, and c/p for a ratio)
+      and nowhere else — every other field on the row comes back exactly as the
+      file had it, which is what makes a slice of the row safe to print.
+
+    ``also`` names further ``(row, was)`` pairs the same block is pasted onto, for
+    a page that makes one edit on two materials.
     * The pasted model reproduces ``expected_fs``, the factor of safety the page
       prints beside the figure for the edited state, within ``_PAGE_TOL``.
       That is the oracle: a block that lands in the wrong columns, drops
@@ -1457,12 +1467,17 @@ def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
     from studio.editors import MaterialsEditor
     from xslope.search import circular_search
 
-    printed = _taught(page, _MAT_HEADERS_STRENGTH, occurrence)
+    printed = _taught(page, headers, occurrence)
+    block = [_STRENGTH_KEYS[h] for h in headers]
     model = _load(model_path)
-    before = model["materials"][row]
-    out = _fail(str(before["option"]).lower() == was,
-                f"{label}: the shipped file's row {row + 1} carries option "
-                f"{before['option']!r}, but the page teaches an edit from {was!r}")
+    targets = [(row, was)] + list(also)
+    befores = {r: dict(model["materials"][r]) for r, _w in targets}
+    out = []
+    for r, w in targets:
+        out += _fail(str(befores[r]["option"]).lower() == w,
+                     f"{label}: the shipped file's row {r + 1} carries option "
+                     f"{befores[r]['option']!r}, but the page teaches an edit "
+                     f"from {w!r}")
     out += _fail(len(printed) == 1,
                  f"{label}: the page prints {len(printed)} rows; the edit is one")
 
@@ -1471,24 +1486,27 @@ def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
     for cb in (getattr(dlg, "_toggles", None) or {}).values():
         cb.setChecked(True)
     keys = [f.key for f in MaterialsEditor.FIELDS]
-    _paste(dlg._table, _tsv(printed), row=row, col=keys.index("option"))
-    out += _fail(_summary(dlg._table) == "Pasted 1 row × 3 columns.",
-                 f"{label}: the status line read {_summary(dlg._table)!r}")
+    for r, _w in targets:
+        _paste(dlg._table, _tsv(printed), row=r, col=keys.index("option"))
+        out += _fail(_summary(dlg._table) == f"Pasted 1 row × {len(headers)} columns.",
+                     f"{label}: the status line read {_summary(dlg._table)!r}")
 
     landed = dict(model)
     editor.apply(landed, dlg)
-    got = landed["materials"][row]
-    for key, cell in zip(("option", "c", "phi"), printed[0]):
-        want = cell if key == "option" else float(cell)
-        out += _fail(_matches(got[key], cell, want),
-                     f"{label}: {key} came back {got[key]!r} from {cell!r}")
-    # Nothing outside the three-column block moved.
-    for key in keys:
-        if key in ("option", "c", "phi"):
-            continue
-        out += _fail(got[key] == before[key],
-                     f"{label}: the block also changed {key}, {before[key]!r} "
-                     f"-> {got[key]!r}")
+    for r, _w in targets:
+        got, before = landed["materials"][r], befores[r]
+        for key, cell in zip(block, printed[0]):
+            want = cell if key == "option" else float(cell)
+            out += _fail(_matches(got[key], cell, want),
+                         f"{label}: row {r + 1}'s {key} came back {got[key]!r} "
+                         f"from {cell!r}")
+        # Nothing outside the block moved.
+        for key in keys:
+            if key in block:
+                continue
+            out += _fail(got[key] == before[key],
+                         f"{label}: the block also changed row {r + 1}'s {key}, "
+                         f"{before[key]!r} -> {got[key]!r}")
 
     with contextlib.redirect_stdout(io.StringIO()):
         fs_cache, _, _, _ = circular_search(landed, method,
@@ -1517,6 +1535,17 @@ def test_lem07_profile_to_constant():
         "LEM-7 c/p -> constant", "lem07_strength_envelopes.md",
         os.path.join(_MODELS, "xslope_low_clay.xlsx"), row=2, was="cp",
         method="bishop", num_slices=50, expected_fs=1.084, occurrence=1)
+
+
+def test_lem07_both_clays_to_ratio():
+    """Part C's edit: both clays entered as strength ratios, the one block pasted
+    onto the lower clay (a `cp` profile in the shipped file) and the middle clay (a
+    constant `mc` strength)."""
+    return _strength_edit_leg(
+        "LEM-7 both clays -> ratio", "lem07_strength_envelopes.md",
+        os.path.join(_MODELS, "xslope_low_clay.xlsx"), row=2, was="cp",
+        method="bishop", num_slices=50, expected_fs=1.613,
+        headers=_MAT_HEADERS_RATIO, also=((1, "mc"),))
 
 
 def test_lem10_seed_circle():
@@ -1925,6 +1954,7 @@ CHECKS = [
     ("LEM-6 materials", test_lem06_materials),
     ("LEM-7 power -> Mohr-Coulomb", test_lem07_power_to_mohr_coulomb),
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),
+    ("LEM-7 both clays -> ratio", test_lem07_both_clays_to_ratio),
     ("LEM-10 seed circle", test_lem10_seed_circle),
     ("LEM-11 σ block", test_lem11_sigma_block),
     ("LEM-12 pile rows", test_lem12_pile_rows),

@@ -2569,10 +2569,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             # c/phi columns would be zeros - silently running it as
             # zero-strength soil is the failure mode this refuses.
             if strength_option:
+                from .fileio import STRENGTH_OPTIONS
                 raise ValueError(
                     f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
                     f"strength option '{strength_option}' is not supported by the "
-                    f"FEM (supported: mc, cp, ratio, pow, hb, elastic).")
+                    f"FEM (supported: {', '.join(STRENGTH_OPTIONS)}).")
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
 

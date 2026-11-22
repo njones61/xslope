@@ -73,6 +73,45 @@ def _material_hint(ax, msg, title=""):
     return ax
 
 
+def _fit_title(ax, min_size=8.0):
+    """Keep a property preview's title inside its figure.
+
+    Studio draws these previews into a pane only as wide as the Materials editor
+    leaves it, and a title such as ``Strength ratio   Sᵤ = max(15, 0.1875·σ′v)``
+    runs off the side of a narrow one. A title too wide for the figure goes onto two
+    lines, split where the model's name meets its parameters (the three spaces
+    these titles put between them), as the engine plots set a long title; one still
+    too wide steps its font down, no smaller than ``min_size``. The room allowed is
+    the figure's width less the pad ``tight_layout`` keeps at each side, so a title
+    that fits is left exactly as it was. With no renderer to measure against, the
+    title is left as set.
+    """
+    import matplotlib as _mpl
+    title = ax.title
+    text = title.get_text()
+    if not text:
+        return
+    fig = ax.figure
+    try:
+        renderer = fig.canvas.get_renderer()
+    except AttributeError:
+        return
+    pad = 1.08 * _mpl.rcParams["font.size"] * fig.dpi / 72.0
+    room = fig.bbox.width - 2.0 * pad
+
+    def width():
+        return title.get_window_extent(renderer).width
+
+    if width() <= room:
+        return
+    if "   " in text:
+        title.set_text(text.replace("   ", "\n", 1))
+    size = title.get_fontsize()
+    while width() > room and size > min_size:
+        size = max(min_size, size - 0.5)
+        title.set_fontsize(size)
+
+
 def _tau_sigma_extent(ax, sigma_span, tau0, tau_of=None):
     """``(σ_max, τ_max)`` for a τ–σ envelope drawn at one scale on both axes.
 
@@ -267,6 +306,7 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
     else:
         return _material_hint(ax, "no strength model\n(blank option)")
 
+    _fit_title(ax)
     return ax
 
 
@@ -452,6 +492,7 @@ def plot_material_kr(ax, material, n=200):
     ax.set_xlabel("matric suction, ψ")
     ax.set_ylabel("relative conductivity, kr")
     ax.set_title(title)
+    _fit_title(ax)
     return ax
 
 

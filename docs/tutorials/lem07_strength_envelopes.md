@@ -333,16 +333,20 @@ enter both clays as ratios and compare the results with Part B's.
 ### Entering both clays as ratios
 
 Open [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx) again, so the
-lower clay is back to its `cp` profile. Open **Materials**, switch to **List
-view**, and select the third row, the lower clay. Change **Model (option)** to
-`ratio` and enter these values:
+lower clay is back to its `cp` profile. Open **Materials**, set the **Show
+parameters for:** toggles to **LEM** alone, and switch to **List view**. Select
+the third row, **Lower Soil**, which is the lower clay. Change
+**Model (option)** to `ratio` and enter these values:
 
-| option | c | c/p |
-| --- | :---: | :---: |
-| ratio | 15 | 0.1875 |
+| option | c | φ | c/p |
+| --- | :---: | :---: | :---: |
+| ratio | 15 | 0 | 0.1875 |
 
 For this option, the **c/p** field holds the ratio r, and the **c** field holds
-the minimum strength. The **r-elev** field disappears from the form, because a
+the minimum strength. The option does not read φ, so the form does not show it.
+The table includes φ because the **Table view** and the `mat` worksheet put it
+between c and c/p, so the row can be pasted there as four adjacent cells. The
+**r-elev** field disappears from the form, because a
 ratio needs no reference elevation. The plot runs σ′<sub>v</sub> down the
 side, as depth would run. It shows the strength holding at 15 kPa until
 σ′<sub>v</sub> reaches 80 kPa and growing in proportion to σ′<sub>v</sub>
@@ -350,8 +354,8 @@ below that:
 
 ![The lower clay as a strength ratio](images/lem07_studio_low_materials_ratio.png)
 
-Now select the second row, the middle clay, and make the same edit: `ratio`,
-with c = 15 and c/p = 0.1875.
+Now select the second row, **Middle Soil**, which is the middle clay, and make
+the same edit: `ratio`, with c = 15 and c/p = 0.1875.
 
 ### Comparing the ratio with Part B's strengths
 
@@ -387,7 +391,9 @@ Click **OK** and run the same Bishop auto search at 50 slices:
 
 **FS = 1.613**, up from 1.142 in Part B. The critical circle goes about as deep
 as Part B's and is about as long: its lowest point is at elevation 1.06,
-against 0.83, and it is 38.56 m long, against 39.30 m. What changed is the
+against 0.83, and it is 38.56 m long, against 39.30 m. The Log prints that
+elevation as `depth=1.06` on its converged line, because a circle's depth, as in
+the **Circles** table, is the elevation of its lowest point. What changed is the
 strength along it. Of its length, 19.11 m runs through the lower clay, where
 the strength averages 34.18 kPa, against 22.88 kPa along Part B's circle.
 

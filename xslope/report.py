@@ -64,6 +64,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import io
+import math
 import os
 import re
 import shutil
@@ -1956,7 +1957,7 @@ def _traceability_section(slope_data, solutions, opts):
     return sec
 
 
-def _property_table(slope_data, fields, caption, counter):
+def _property_table(slope_data, fields, caption, counter, view=None):
     """One row per referenced material, one column per property that is real.
 
     ``fields`` is ``(key, header, formatter, when-shown)``. A column marked
@@ -1966,10 +1967,15 @@ def _property_table(slope_data, fields, caption, counter):
     printed only where some material populates it with a nonzero one, so a table
     never rules off a column of blanks. Each engine's table is this function with
     its own field list.
+
+    ``view`` maps each material to the values the table reads, both to format
+    them and to decide which columns are real (:func:`_strength_as_read`).
     """
     rows_src = referenced_materials(slope_data)
     if not rows_src:
         return None
+    if view is not None:
+        rows_src = [(i, view(m)) for i, m in rows_src]
     mats = [m for _i, m in rows_src]
     keep = _keep_columns(mats, fields)
     headers = [f[1] for f in keep]
@@ -1996,30 +2002,115 @@ def _fmt(value, spec="{:.2f}"):
     return "" if n is None else spec.format(n)
 
 
+#: Significant digits an entered property is read to, the same six Studio's
+#: editors show it at: enough for anything typed, and short of the noise in a
+#: value Studio computed.
+_ENTERED_DIGITS = 6
+
+
+def _fmt_entered(value, decimals, thousands=False):
+    """An entered property, with at least ``decimals`` decimal places and as many
+    more as the value carries.
+
+    A column's fixed decimals line its numbers up, and a value entered with more
+    digits than the column shows keeps them: a strength ratio of 0.1875 prints as
+    0.1875 in a c/p column of three decimals, not as 0.188, and a cohesion of
+    11.64 as 11.64, not 11.6. A value with no more digits than the column shows
+    prints as it always has (20.0, 0.250).
+    """
+    n = _num(value)
+    if n is None:
+        return ""
+    need = 0
+    if n != 0:
+        mag = math.floor(math.log10(abs(n)))
+        text = f"{n:.{max(0, _ENTERED_DIGITS - 1 - mag)}f}"
+        if "." in text:
+            need = len(text.rstrip("0").split(".")[1])
+    places = max(decimals, need)
+    return f"{n:,.{places}f}" if thousands else f"{n:.{places}f}"
+
+
+#: The strength properties each option reads, of those the materials tables
+#: print. A row's cell for any other one is left blank, and a column no row's
+#: option reads is not printed: a c/p or r elev. left behind by an earlier option
+#: is in the file, but it is not a property of the analysis. d and ψ are the
+#: Kc = 1 envelope, which only an mc material carries into rapid drawdown or a
+#: two-stage seismic analysis. An elastic material reads none of them.
+_STRENGTH_READS = {
+    "mc": frozenset({"c", "phi", "d", "psi", "t_cut"}),
+    "cp": frozenset({"c", "phi", "cp", "r_elev", "t_cut"}),
+    "ratio": frozenset({"c", "phi", "cp", "t_cut"}),
+    "pow": frozenset({"t_cut"}),
+    "hb": frozenset({"t_cut"}),
+}
+_STRENGTH_KEYS = ("c", "phi", "cp", "r_elev", "d", "psi", "t_cut")
+
+
+def _strength_as_read(m):
+    """``m`` with each strength property as the analysis reads it: blank where the
+    material's option does not read it, φ = 0 on an undrained (cp or ratio)
+    material, which is the friction angle those options analyze with whatever the
+    φ cell holds, and r_u blank unless the pore pressure is taken from it."""
+    opt = str(m.get("option") or "").strip().lower()
+    reads = _STRENGTH_READS.get(opt, frozenset())
+    out = dict(m)
+    for key in _STRENGTH_KEYS:
+        if key not in reads:
+            out[key] = None
+    if opt in ("cp", "ratio"):
+        out["phi"] = 0.0
+    if str(m.get("u") or "").strip().lower() != "ru":
+        out["ru"] = None
+    return out
+
+
+def _strength_option_notes(slope_data):
+    """What c and c/p mean on an undrained material, for each such option the
+    referenced materials use, or ``""``. The table prints the option's code and the
+    two numbers under the same headers as a Mohr-Coulomb material's, and c/p in
+    particular means a different thing under each option."""
+    opts = {str(m.get("option") or "").strip().lower()
+            for _i, m in referenced_materials(slope_data)}
+    notes = []
+    if "cp" in opts:
+        notes.append("Under the CP option, c is the undrained strength at the "
+                     "reference elevation r elev., and c/p is the rate the "
+                     "strength increases per unit of depth below that elevation.")
+    if "ratio" in opts:
+        notes.append("Under the RATIO option, c/p is the strength ratio "
+                     "S_u/σ_v′, and c is a minimum strength: the undrained "
+                     "strength is the larger of c and c/p times the vertical "
+                     "effective stress σ_v′.")
+    return " ".join(notes)
+
+
 def _materials_table(slope_data, counter):
     """The materials table: referenced rows, populated columns."""
     unit = _unit_suffix(slope_data)
 
-    # (key, header, formatter, always-shown)
+    # (key, header, formatter, always-shown). Each cell is the value the analysis
+    # reads (_strength_as_read), printed without losing an entered digit.
     fields = [
         ("__index", "#", lambda m: "", True),
         ("name", "Material", lambda m: str(m.get("name") or ""), True),
-        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt(m.get("gamma"), "{:.1f}"), True),
-        ("gamma_sat", f"γ_sat{unit('unit_weight')}", lambda m: _fmt(m.get("gamma_sat"), "{:.1f}"), False),
+        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt_entered(m.get("gamma"), 1), True),
+        ("gamma_sat", f"γ_sat{unit('unit_weight')}", lambda m: _fmt_entered(m.get("gamma_sat"), 1), False),
         ("option", "Strength", lambda m: str(m.get("option") or "").upper(), True),
-        ("c", f"c{unit('stress')}", lambda m: _fmt(m.get("c"), "{:.1f}"), True),
-        ("phi", "φ (deg)", lambda m: _fmt(m.get("phi"), "{:.1f}"), True),
-        ("cp", "c/p", lambda m: _fmt(m.get("cp"), "{:.3f}"), False),
-        ("r_elev", f"r elev.{unit('length')}", lambda m: _fmt(m.get("r_elev"), "{:.1f}"), False),
-        ("d", f"d{unit('stress')}", lambda m: _fmt(m.get("d"), "{:.1f}"), False),
-        ("psi", "ψ (deg)", lambda m: _fmt(m.get("psi"), "{:.1f}"), False),
+        ("c", f"c{unit('stress')}", lambda m: _fmt_entered(m.get("c"), 1), True),
+        ("phi", "φ (deg)", lambda m: _fmt_entered(m.get("phi"), 1), True),
+        ("cp", "c/p", lambda m: _fmt_entered(m.get("cp"), 3), False),
+        ("r_elev", f"r elev.{unit('length')}", lambda m: _fmt_entered(m.get("r_elev"), 1), False),
+        ("d", f"d{unit('stress')}", lambda m: _fmt_entered(m.get("d"), 1), False),
+        ("psi", "ψ (deg)", lambda m: _fmt_entered(m.get("psi"), 1), False),
         # A DECLARED cutoff prints even where every material's is 0: that is a
         # no-tension soil, and the analysis was run under it.
-        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), DECLARED),
-        ("ru", "r_u", lambda m: _fmt(m.get("ru"), "{:.3f}"), False),
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt_entered(m.get("t_cut"), 1), DECLARED),
+        ("ru", "r_u", lambda m: _fmt_entered(m.get("ru"), 3), False),
         ("u", "Pore pressure", lambda m: str(m.get("u") or "none"), True),
     ]
-    return _property_table(slope_data, fields, "Material properties", counter)
+    return _property_table(slope_data, fields, "Material properties", counter,
+                           view=_strength_as_read)
 
 
 def _seep_materials_table(slope_data, counter, unsaturated=True):
@@ -2078,19 +2169,24 @@ def _fem_materials_table(slope_data, counter):
     stiffness columns are what separate it from the limit equilibrium table: a
     limit equilibrium analysis never reads E or ν, and this one does."""
     unit = _unit_suffix(slope_data)
+    # The strength option and the c/p and r elev. it may read, as on the limit
+    # equilibrium table: a ratio or cp material's strength is not its c alone.
     fields = [
         ("__index", "#", lambda m: "", True),
         ("name", "Material", lambda m: str(m.get("name") or ""), True),
-        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt(m.get("gamma"), "{:.1f}"), True),
-        ("c", f"c{unit('stress')}", lambda m: _fmt(m.get("c"), "{:.1f}"), True),
-        ("phi", "φ (deg)", lambda m: _fmt(m.get("phi"), "{:.1f}"), True),
-        ("E", f"E{unit('stress')}", lambda m: _fmt(m.get("E"), "{:,.0f}"), True),
-        ("nu", "ν", lambda m: _fmt(m.get("nu"), "{:.2f}"), True),
+        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt_entered(m.get("gamma"), 1), True),
+        ("option", "Strength", lambda m: str(m.get("option") or "").upper(), True),
+        ("c", f"c{unit('stress')}", lambda m: _fmt_entered(m.get("c"), 1), True),
+        ("phi", "φ (deg)", lambda m: _fmt_entered(m.get("phi"), 1), True),
+        ("cp", "c/p", lambda m: _fmt_entered(m.get("cp"), 3), False),
+        ("r_elev", f"r elev.{unit('length')}", lambda m: _fmt_entered(m.get("r_elev"), 1), False),
+        ("E", f"E{unit('stress')}", lambda m: _fmt_entered(m.get("E"), 0, thousands=True), True),
+        ("nu", "ν", lambda m: _fmt_entered(m.get("nu"), 2), True),
         # As on the strength table: a stated 0 is a no-tension material and prints.
-        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), DECLARED),
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt_entered(m.get("t_cut"), 1), DECLARED),
     ]
     return _property_table(slope_data, fields, "Finite element material properties",
-                           counter)
+                           counter, view=_strength_as_read)
 
 
 #: What each pore-pressure option on the materials sheet MEANS, in the words the
@@ -7415,6 +7511,9 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                 f"analysis are shown in {where}, including the strength option "
                 f"each material is analyzed under, the properties that option "
                 f"uses, and how its pore pressure is taken.", links=links))
+            notes = _strength_option_notes(slope_data)
+            if notes:
+                sub.blocks.append(Prose(notes))
             sub.blocks.append(table)
         else:
             sub.blocks.append(Prose("The model defines no materials."))
@@ -10468,10 +10567,14 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             sub_inputs.blocks.append(Prose(
                 f"The material properties associated with "
                 f"{'SSRM ' if ssrm else ''}finite element analysis are shown in "
-                f"{where}, including the unit weight, the Mohr-Coulomb strength "
-                f"that sets when an element yields, and the Young's modulus and "
-                f"Poisson's ratio that set how it deforms before yielding.",
+                f"{where}, including the unit weight, the strength option and the "
+                f"properties it uses, which set when an element yields, and the "
+                f"Young's modulus and Poisson's ratio that set how it deforms "
+                f"before yielding.",
                 links=links))
+            notes = _strength_option_notes(slope_data)
+            if notes:
+                sub_inputs.blocks.append(Prose(notes))
             sub_inputs.blocks.append(table)
     pore = _fem_pore_basis(fem_data, solutions, opts)
     if pore is not None:

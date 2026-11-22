@@ -1827,11 +1827,11 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # 'elastic' (v16): infinite strength / cannot fail -- the FEM holds it out
         # of plasticity entirely and the LEM treats it as impenetrable.
         option_val = _choice(row.get('option'), '')
-        if option_val not in ('', 'mc', 'cp', 'ratio', 'pow', 'hb', 'elastic'):
+        if option_val not in ('',) + STRENGTH_OPTIONS:
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized strength option option='{option_val}'. "
-                "Expected one of: mc, cp, ratio, pow, hb, elastic."
+                f"Expected one of: {', '.join(STRENGTH_OPTIONS)}."
             )
 
         # v12 columns, read by header name. Older templates lack them entirely:
@@ -2930,6 +2930,21 @@ def default_template_path():
     """
     return os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "resources", "input_template.xlsx")
+
+
+#: The strength options a material row may name in the mat sheet's 'option' column.
+#: A blank is accepted too, on a row that carries no strength (a seep-only material).
+#: The loader checks the column against this tuple, and every message that lists the
+#: choices reads them from here (:func:`strength_options_text`), so no message can
+#: offer a different set from the one the loader accepts.
+STRENGTH_OPTIONS = ("mc", "cp", "ratio", "pow", "hb", "elastic")
+
+
+def strength_options_text(conjunction="or"):
+    """The strength options read out for a message: ``"mc, cp, ratio, pow, hb, or
+    elastic"``."""
+    *head, last = STRENGTH_OPTIONS
+    return f"{', '.join(head)}, {conjunction} {last}"
 
 
 # in-memory material key -> 'mat' sheet header text. Shared by the writer and by the

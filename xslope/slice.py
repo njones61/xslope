@@ -2831,10 +2831,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             elif mat_option not in ('mc', 'cp'):
                 # Was silently treated as 'cp'. A blank option is legal on seep-only
                 # material rows, but not on one a failure surface passes through.
+                from .fileio import STRENGTH_OPTIONS
                 raise ValueError(
                     f"Material '{materials[base_material_idx]['name']}' lies on the failure "
                     f"surface but has no valid strength option (option='{mat_option}'). "
-                    "Expected one of: mc, cp, ratio."
+                    f"Expected one of: {', '.join(STRENGTH_OPTIONS)}."
                 )
             elif mat_option == 'mc':
                 c = materials[base_material_idx]['c']

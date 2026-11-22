@@ -1450,17 +1450,13 @@ def lem07_plots():
     print("   B c/p    %s" % _lem07_reading(crit_cp, mat=3))
     print("   B su=%.1f %s" % (LEM07_B_CONST, _lem07_reading(crit_const, mat=3)))
 
-    # ---- Part C: the same section with strength ratios -------------------- #
+    # ---- Part C: the same section with both clays as strength ratios ----- #
     as_ratio = {"option": "ratio", "c": LEM07_C_MIN, "cp": LEM07_C_RATIO}
-    lower = dict(b["materials"][2], **as_ratio)
-    b_ratio = dict(b, materials=list(b["materials"][:2]) + [lower])
-    crit_ratio = _lem07_search(b_ratio, "bishop", LEM07_B_SLICES)
-    _lem07_solution("lem07_low_ratio.png", b_ratio, crit_ratio)
     middle = dict(b["materials"][1], **as_ratio)
+    lower = dict(b["materials"][2], **as_ratio)
     b_both = dict(b, materials=[b["materials"][0], middle, lower])
     crit_both = _lem07_search(b_both, "bishop", LEM07_B_SLICES)
     _lem07_solution("lem07_low_ratio_both.png", b_both, crit_both)
-    print("   C lower  %s" % _lem07_reading(crit_ratio, mat=2))
     print("   C both   %s" % _lem07_reading(crit_both, mat=3))
 
 

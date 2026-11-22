@@ -326,12 +326,12 @@ s<sub>u</sub> = max(c, r·σ′<sub>v</sub>)
 where r is the **strength ratio** and c is a minimum strength. In this part we
 enter both clays as ratios and compare the results with Part B's.
 
-### Entering the lower clay as a ratio
+### Entering both clays as ratios
 
 Open [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx) again, so the
 lower clay is back to its `cp` profile. Open **Materials**, switch to **List
-view**, and select the third row. Change **Model (option)** to `ratio` and enter
-these values:
+view**, and select the third row, the lower clay. Change **Model (option)** to
+`ratio` and enter these values:
 
 | option | c | c/p |
 | --- | :---: | :---: |
@@ -346,59 +346,46 @@ below that:
 
 ![The lower clay as a strength ratio](images/lem07_studio_low_materials_ratio.png)
 
-### Comparing the ratio with Part B's profile
+Now select the second row, the middle clay, and make the same edit: `ratio`,
+with c = 15 and c/p = 0.1875.
+
+### Comparing the ratio with Part B's strengths
 
 We chose 15 and 0.1875 because in front of the toe they give exactly Part B's
-strengths. The model has no water and every soil weighs 20 kN/m³, so
-σ′<sub>v</sub> at a point is 20 kN/m³ times the depth of soil above it. The
-ground is at elevation 8 in front of the toe and at elevation 16 under the crest,
-and the lower clay runs from elevation 4 down to 0:
+strengths in both clays. The model has no water and every soil weighs
+20 kN/m³, so σ′<sub>v</sub> at a point is 20 kN/m³ times the depth of soil
+above it. The ground is at elevation 8 in front of the toe and at elevation 16
+under the crest. The middle clay runs from elevation 8 down to 4, and the lower
+clay from 4 down to 0:
 
-| Point in the lower clay | Soil above it | σ′<sub>v</sub> (kPa) | Ratio strength (kPa) | Part B strength (kPa) |
+| Point | Soil above it | σ′<sub>v</sub> (kPa) | Ratio strength (kPa) | Part B strength (kPa) |
 | --- | :---: | :---: | :---: | :---: |
-| Top, in front of the toe | 4 m | 80 | 15 | 15 |
-| Base, in front of the toe | 8 m | 160 | 30 | 30 |
-| Top, under the crest | 12 m | 240 | 45 | 15 |
-| Base, under the crest | 16 m | 320 | 60 | 30 |
+| In front of the toe, elevation 8: top of the middle clay | 0 m | 0 | 15 | 15 |
+| In front of the toe, elevation 4: top of the lower clay | 4 m | 80 | 15 | 15 |
+| In front of the toe, elevation 0: base of the lower clay | 8 m | 160 | 30 | 30 |
+| Under the crest, elevation 8 | 8 m | 160 | 30 | 15 |
+| Under the crest, elevation 4 | 12 m | 240 | 45 | 15 |
+| Under the crest, elevation 0 | 16 m | 320 | 60 | 30 |
 
-In front of the toe, the ratio and the profile give the same strength, because
-0.1875 is Part B's rate of 3.75 kPa per meter divided by 20 kN/m³. Under the
-crest, the extra 8 m of soil makes the clay three times as strong at the top of
-the layer and twice as strong at its base.
+In front of the toe, the ratio and Part B give the same strength in both clays.
+The middle clay has at most 4 m of soil above it there, so σ′<sub>v</sub> stays
+at or below 80 kPa and the 15 kPa minimum holds. In the lower clay, the
+strength grows at Part B's rate, because 0.1875 is that rate of 3.75 kPa per
+meter divided by 20 kN/m³. Under the crest, the extra 8 m of soil makes both
+clays stronger: twice Part B's strength at elevation 8, three times at
+elevation 4, and twice at elevation 0.
 
-### Searching with the lower clay as a ratio
+### Searching with both clays as ratios
 
 Click **OK** and run the same Bishop auto search at 50 slices:
 
-![Bishop with the lower clay as a strength ratio](images/lem07_low_ratio.png){width=1000}
-
-**FS = 1.394**, up from 1.142 in Part B. The critical circle no longer cuts into
-the lower clay. Its lowest point is at elevation 4.00, the top of that clay, so
-its deepest part runs through the middle clay, which still has a constant
-15 kPa. Now that the lower clay is stronger under the slope, the search finds
-its critical circle above it.
-
-The circle is centered at (18.00, 16.06). It is 29.00 m long and carries
-2767.0 kN/m of soil, against 39.30 m and 4937.0 kN/m for Part B's circle.
-
-<!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, mat3_option=ratio, mat3_c=15, mat3_cp=0.1875, expected_fs=1.394, tolerance=0.005, benchmark=LEM-7-ratio-lower -->
-
-### Entering the middle clay as a ratio
-
-The middle clay's constant 15 kPa is also its strength from before the slope was
-built. Enter it as a ratio as well, with the same r = 0.1875 and c = 15. In
-front of the toe, no more than 4 m of soil stands above this clay, so
-σ′<sub>v</sub> is at most 80 kPa and the strength stays at 15 kPa. Under the
-slope, this clay gains strength just as the lower clay does.
-
-Select the second row, make the same edit, click **OK**, and run again:
-
 ![Bishop with both clays as strength ratios](images/lem07_low_ratio_both.png){width=1000}
 
-**FS = 1.613.** With both clays stronger under the slope, the critical circle
-goes deep again, and its lowest point is at elevation 1.06. Of its 38.56 m
-length, 19.11 m runs through the lower clay. Along that stretch the clay's
-strength averages 34.18 kPa, against 22.88 kPa along Part B's circle.
+**FS = 1.613**, up from 1.142 in Part B. The critical circle goes about as deep
+as Part B's and is about as long: its lowest point is at elevation 1.06,
+against 0.83, and it is 38.56 m long, against 39.30 m. What changed is the
+strength along it. Of its length, 19.11 m runs through the lower clay, where
+the strength averages 34.18 kPa, against 22.88 kPa along Part B's circle.
 
 <!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, mat2_option=ratio, mat2_c=15, mat2_cp=0.1875, mat3_option=ratio, mat3_c=15, mat3_cp=0.1875, expected_fs=1.613, tolerance=0.005, benchmark=LEM-7-ratio-both -->
 
@@ -407,8 +394,7 @@ strength averages 34.18 kPa, against 22.88 kPa along Part B's circle.
 | Clays | Bishop FS | Lowest point of the circle, elevation (m) |
 | --- | :---: | :---: |
 | Part B: lower clay `cp`, middle clay constant | 1.142 | 0.83 |
-| Lower clay as a ratio | 1.394 | 4.00 |
-| Both clays as ratios | 1.613 | 1.06 |
+| Part C: both clays as ratios | 1.613 | 1.06 |
 
 The two strength models agree in front of the toe and differ only under the
 slope. So the choice depends on one question: has the clay consolidated under

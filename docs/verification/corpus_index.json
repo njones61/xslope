@@ -3070,17 +3070,16 @@
       "model": "docs/lem/files/xslope_low_clay.xlsx",
       "references": [
         {
-          "anchor": "entering-the-lower-clay-as-a-ratio",
+          "anchor": "entering-both-clays-as-ratios",
           "checks": [
-            "LEM-7-ratio-both",
-            "LEM-7-ratio-lower"
+            "LEM-7-ratio-both"
           ],
           "level": 3,
           "page": "tutorials/lem07_strength_envelopes/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/lem07_strength_envelopes.md",
-          "title": "Entering the lower clay as a ratio",
-          "url": "https://xslope.org/en/latest/tutorials/lem07_strength_envelopes/#entering-the-lower-clay-as-a-ratio"
+          "title": "Entering both clays as ratios",
+          "url": "https://xslope.org/en/latest/tutorials/lem07_strength_envelopes/#entering-both-clays-as-ratios"
         },
         {
           "anchor": "opening-the-model_1",
@@ -29053,7 +29052,7 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 734,
+    "tags": 733,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

@@ -633,8 +633,9 @@ class _EditableTable(QWidget):
         self._on_select = on_select
         # Optional per-row disable rule: row_dict -> set of field keys to gray out
         # (kept read-only, value retained). The Materials editor uses it to mirror
-        # the mat-sheet conditional formatting for an option=elastic row.
+        # the mat-sheet conditional formatting (the cells a row's choices leave unread).
         self._dim_rule = dim_rule
+        self._pasting = False      # a paste re-grays once, at its end
         # Whether a TYPED cell can change which cells apply. The materials rule is
         # driven by combos, which re-derive on their own; the reinforcement rule is
         # driven by whether Adhesion and Delta carry values, so it has to re-derive
@@ -843,7 +844,9 @@ class _EditableTable(QWidget):
         value is kept the way an untouched cell is), the matching entry for a choice
         column, matched without regard to case. Text that names no choice, and a
         column held read-only by the row's own state, leave their cells as they
-        were and are counted. One change notification for the whole block, so a
+        were and are counted — unless the block also sets one of that row's choices,
+        which defines the row: then every cell lands and the graying follows the
+        block's choices. One change notification for the whole block, so a
         preview redraws for the finished table rather than for every cell of a
         half-filled one."""
         block = _parse_clipboard_block(QApplication.clipboard().text())
@@ -858,6 +861,7 @@ class _EditableTable(QWidget):
 
         prev = self._suppress_notify
         self._suppress_notify = True
+        self._pasting = True
         try:
             grow = start_row + len(block) - self.table.rowCount()
             for _ in range(max(0, grow)):
@@ -867,6 +871,17 @@ class _EditableTable(QWidget):
                 self._bases.append(base)
                 self._set_row(i, base)
             for dr, cells in enumerate(block):
+                # A block that sets one of the row's live choices (a material's
+                # option, u or unsat) defines the row, as a row of the file does: the
+                # graying its OLD choices imposed does not hold its cells back. They
+                # all land, and the row is grayed afresh at the end for what the
+                # block chose.
+                if self._dim_rule is not None and any(
+                        isinstance(w, QComboBox) and w.isEnabled()
+                        for w in (self.table.cellWidget(start_row + dr, cols[start + dc])
+                                  for dc in range(len(cells))
+                                  if start + dc < len(cols))):
+                    self._apply_dim_row(start_row + dr, dim=frozenset())
                 for dc, text in enumerate(cells):
                     if start + dc >= len(cols):
                         skipped["past the last column"] += 1
@@ -876,8 +891,10 @@ class _EditableTable(QWidget):
                     if reason:
                         skipped[reason] += 1
             self._rebuild_swatches()
+            self._pasting = False
             self._apply_dim_all()
         finally:
+            self._pasting = False
             self._suppress_notify = prev
         self._show_paste_summary(len(block), width, skipped)
         self._emit_change()
@@ -1098,6 +1115,8 @@ class _EditableTable(QWidget):
         return next((j for j, f in enumerate(self._fields) if f.key == key), None)
 
     def _on_combo_changed(self):
+        if self._pasting:
+            return                 # the paste re-grays and announces once, at its end
         self._apply_dim_all()
         self._emit_change()
 
@@ -1140,10 +1159,12 @@ class _EditableTable(QWidget):
         finally:
             self._suppress_notify = prev
 
-    def _apply_dim_row(self, i):
+    def _apply_dim_row(self, i, dim=None):
         """Gray (disable, keep value) the fields the dim rule marks inapplicable for
-        this row; restore the rest to normal editable/enabled state."""
-        dim = self._dim_rule(self._row_values(i))
+        this row; restore the rest to normal editable/enabled state. ``dim`` given
+        overrides the rule (an empty set makes the whole row live)."""
+        if dim is None:
+            dim = self._dim_rule(self._row_values(i))
         for j, f in enumerate(self._fields):
             dimmed = f.key in dim
             w = self.table.cellWidget(i, j)
@@ -3712,20 +3733,56 @@ _MAT_ELASTIC_DIM = frozenset(
                               "sigma_d", "sigma_psi"])
 
 
-def _mat_dim_keys(row):
-    """Field keys to gray for a material row.
+# The fields each strength option leaves unread, as the mat sheet grays them (its
+# conditional formatting on cols F:K and AB:AF). The Kc = 1 pair d/psi is read only
+# for mc: an undrained option (cp, ratio) is the stage-2 strength itself, and pow/hb
+# are refused by rapid drawdown and the two-stage seismic analysis.
+_MAT_DPSI_DIM = frozenset(["d", "psi", "sigma_d", "sigma_psi"])
+_MAT_OPTION_DIM = {
+    "mc": frozenset(["cp", "r_elev", "sigma_cp"]),
+    "cp": frozenset(["phi", "sigma_phi"]) | _MAT_DPSI_DIM | _MAT_SUCTION_DIM,
+    "ratio": (frozenset(["phi", "r_elev", "sigma_phi"]) | _MAT_DPSI_DIM
+              | _MAT_SUCTION_DIM),
+    "pow": (frozenset(["c", "phi", "cp", "r_elev", "sigma_c", "sigma_phi", "sigma_cp"])
+            | _MAT_DPSI_DIM),
+}
+_MAT_OPTION_DIM["hb"] = _MAT_OPTION_DIM["pow"]
+_MAT_POW_FIELDS = frozenset(["pow_a", "pow_b", "pow_c", "pow_d"])
+_MAT_HB_FIELDS = frozenset(["hb_sci", "hb_gsi", "hb_mi", "hb_d"])
 
-    An elastic row grays its whole inert set. Otherwise the only option-coupled
-    graying is the matric-suction pair phi_b/s_cap, which is inert for a total-stress
-    strength option (cp) or a pore-pressure model that delivers no signed u — i.e. u
-    not in {piezo, seep} — mirroring the template's L:M conditional formatting."""
+
+def _mat_dim_keys(row):
+    """Field keys to gray for a material row: the fields its choices leave unread.
+
+    Mirrors the mat sheet's conditional formatting, so the table, the form and the
+    workbook gray the same cells. An elastic row grays its whole inert set. Otherwise:
+    the fields the strength option does not read (``_MAT_OPTION_DIM``) and the other
+    options' curve parameters; ru unless u = ru; the matric-suction pair unless u
+    delivers a signed pressure (piezo or seep); and the unsaturated-model parameters
+    the chosen model does not read (the seepage block, elastic rows included). A
+    blank option or u (a seep-only row) grays nothing on its own account, as the
+    sheet's blank guards do — except the suction pair, which a blank u never feeds.
+    The sheet leaves vg_l live for gard, which does not read it; this grays it, as
+    the form hides it."""
     opt = str(row.get("option", "") or "").strip().lower()
     if opt == "elastic":
-        return _MAT_ELASTIC_DIM
-    u = str(row.get("u", "") or "").strip().lower()
-    if opt in ("cp", "ratio") or u not in ("piezo", "seep"):
-        return _MAT_SUCTION_DIM
-    return frozenset()
+        dim = set(_MAT_ELASTIC_DIM)
+    else:
+        dim = set(_MAT_OPTION_DIM.get(opt, ()))
+        if opt and opt != "pow":
+            dim |= _MAT_POW_FIELDS
+        if opt and opt != "hb":
+            dim |= _MAT_HB_FIELDS
+        u = str(row.get("u", "") or "").strip().lower()
+        if u and u != "ru":
+            dim.add("ru")
+        if u not in ("piezo", "seep"):
+            dim |= _MAT_SUCTION_DIM
+    um = str(row.get("unsat", "") or "").strip().lower()
+    if um in _MAT_UNSAT_FIELDS:
+        dim.update(k for k in _MAT_ALL_UNSAT_FIELDS
+                   if k not in _MAT_UNSAT_FIELDS[um])
+    return frozenset(dim)
 
 
 # Unsaturated model -> its curve params. gard reuses vg's a/n columns (fileio.py),
@@ -4085,8 +4142,8 @@ class _MaterialListView(QWidget):
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — LEM & FEM).
         # Placed here to mirror the template, where the pair moved right of ru and is
         # coupled to the pore-pressure model (matric suction = negative pore pressure).
-        # Always shown, grayed when inert (cp/elastic, or u not signed) by
-        # _update_suction_disable.
+        # Always shown, grayed when inert (cp/ratio/elastic, or u not signed) by
+        # _update_dim.
         gv.addWidget(self._pair(self._cell("φ_b", "phi_b", label_w=52),
                                 self._cell("s_cap", "s_cap", label_w=44)))
         self._group_boxes.append((g, ["u", "ru", "phi_b", "s_cap"]))
@@ -4209,8 +4266,7 @@ class _MaterialListView(QWidget):
             self._update_u_visibility()
             self._update_unsat_visibility()
             self._update_sigma_visibility()
-            self._update_elastic_disable()
-            self._update_suction_disable()
+            self._update_dim()
             self._refresh_plots()
         else:
             self._clear_plots()
@@ -4282,32 +4338,19 @@ class _MaterialListView(QWidget):
             self._set_model_hidden(key, key not in shown)
         self._apply_visibility()
 
-    def _update_elastic_disable(self):
-        """Gray the fields inert for an option=elastic material (mirrors the mat-sheet
-        conditional formatting): t_cut, the rapid-drawdown pair d/ψ and the pore-pressure
-        model u/ru go read-only; g/gsat, E/ν and the seepage block stay live. The
-        strength-option cells are already hidden for 'elastic' (empty option set), so
-        only the always-shown cells need graying. Disabling a whole d/ψ cell also
-        grays its s(d)/s(ψ) — matching the template, which grays those too."""
-        elastic = self._opt_combo.currentText().strip().lower() == "elastic"
-        for key in ("t_cut", "d", "psi", "ru"):
-            w = self._cell_widgets.get(key)
-            if w is not None:
-                w.setEnabled(not elastic)
-        self._u_cell.setEnabled(not elastic)
-
-    def _update_suction_disable(self):
-        """Gray the matric-suction pair phi_b/s_cap when it is inert (mirrors the
-        mat-sheet CF on cols Q:R): grayed for cp (total-stress Su already embodies
-        field suction) or elastic (no strength), and whenever u delivers no signed
-        pressure (u not in {piezo, seep}). Reuses the table view's dim rule so the two
-        views stay a single source of truth. Depends on both the option and u combos,
-        so it is re-run whenever either changes as well as on load."""
+    def _update_dim(self):
+        """Gray the cells the row's choices leave unread, by the table view's own
+        rule (``_mat_dim_keys``), so the two views and the mat sheet agree: d/ψ for
+        any option but mc, t_cut and u for elastic, the suction pair unless u is piezo
+        or seep, and so on. A cell the option already hides is grayed as well, which
+        shows only if it comes back. Disabling a cell grays its σ readout with it,
+        as the sheet grays s(d)/s(ψ) with d/ψ. Depends on the option, u and unsat
+        combos, so it is re-run whenever one changes as well as on load."""
         dim = _mat_dim_keys({"option": self._opt_combo.currentText(),
-                             "u": self._u_combo.currentText()})
-        for key in ("phi_b", "s_cap"):
-            w = self._cell_widgets.get(key)
-            if w is not None:
+                             "u": self._u_combo.currentText(),
+                             "unsat": self._unsat_combo.currentText()})
+        for key, w in self._cell_widgets.items():
+            if key != "option":
                 w.setEnabled(key not in dim)
 
     def _update_u_visibility(self):
@@ -4353,18 +4396,18 @@ class _MaterialListView(QWidget):
     def _on_option_changed(self):
         self._commit()
         self._update_option_visibility()
-        self._update_elastic_disable()
-        self._update_suction_disable()       # option gates the suction pair too
+        self._update_dim()                   # the option gates d/ψ, suction, ...
         self._plot_timer.start()
 
     def _on_u_changed(self):
         self._commit()
         self._update_u_visibility()          # u affects neither plot; no refresh
-        self._update_suction_disable()       # u gates the matric-suction pair
+        self._update_dim()                   # u gates ru and the suction pair
 
     def _on_unsat_changed(self):
         self._commit()
         self._update_unsat_visibility()
+        self._update_dim()
         self._plot_timer.start()             # kr plot depends on the unsat model
 
     def _add(self):

@@ -67,6 +67,11 @@ Seepage — redraw as you type, so a wrong option is easy to see:
 
 ![Materials list view](images/editing_materials_list.png)
 
+A cell that the material's options leave unused is grayed in the table view, as on
+the `mat` sheet, and grayed or hidden in the list view. For example, `d` and `ψ`,
+which define the K<sub>c</sub> = 1 envelope for rapid drawdown and the two-stage
+seismic analysis, are used only by an `mc` material.
+
 On a Hoek-Brown material the strength envelope also reads out the rock-mass constants
 $m_b$, $s$ and $a$ that σci, GSI, mi and D derive to — the three numbers a published
 Hoek-Brown table quotes, so the four entered inputs can be confirmed against one.

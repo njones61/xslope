@@ -225,7 +225,7 @@ def test_read_only_cells_are_skipped():
     fields = MaterialsEditor.FIELDS
     keys = [f.key for f in fields]
     row = {f.key: f.default for f in fields}
-    row.update(name="clay", option="mc", u="none", ru=None, phi_b=None, s_cap=None)
+    row.update(name="clay", option="mc", u="ru", ru=None, phi_b=None, s_cap=None)
     t = _new_table(fields, [row], dim_rule=_mat_dim_keys)
     # Anchored on the live cell to their left and running across them — the only way
     # a block reaches a grayed cell, since a grayed cell cannot be made the current
@@ -483,6 +483,138 @@ def test_tab_past_the_last_cell_of_a_plain_grid():
                  == (3, 2, 0),
                  f"Tab from the last cell left {grid.rowCount()} rows with the "
                  f"cursor at row {grid.currentRow()}, column {grid.currentColumn()}")
+
+
+# The mat sheet's columns by header, as the editor's field keys.
+_SHEET_KEYS = {"c": "c", "f": "phi", "c/p": "cp", "r-elev": "r_elev", "d": "d",
+               "psi": "psi", "t_cut": "t_cut", "E": "E", "nu": "nu", "u": "u",
+               "ru": "ru", "phi_b": "phi_b", "s_cap": "s_cap",
+               "pow_a": "pow_a", "pow_b": "pow_b", "pow_c": "pow_c", "pow_d": "pow_d",
+               "hb_sci": "hb_sci", "hb_gsi": "hb_gsi", "hb_mi": "hb_mi",
+               "hb_d": "hb_d", "s(g)": "sigma_gamma", "s(c)": "sigma_c",
+               "s(f)": "sigma_phi", "s(c/p)": "sigma_cp", "s(d)": "sigma_d",
+               "s(psi)": "sigma_psi", "kr0": "kr0", "h0": "h0", "a": "vg_a",
+               "n": "vg_n", "l": "vg_l"}
+
+
+def _sheet_gray_rules():
+    """The template mat sheet's conditional formatting as (test, keys) pairs: each
+    rule's formula as a function of (option, u, unsat), and the editor fields its
+    ranges cover. Read from the workbook, so the check below follows the sheet."""
+    import openpyxl
+    from openpyxl.utils import range_boundaries
+    ws = openpyxl.load_workbook(os.path.join(_REPO, "docs", "inputs",
+                                             "input_template.xlsx"))["mat"]
+    header = {c.column: c.value for c in ws[10] if c.value is not None}
+    rules = []
+    for rng, cf in ws.conditional_formatting._cf_rules.items():
+        keys = set()
+        for part in str(rng.sqref).split():
+            lo, _, hi, _ = range_boundaries(part)
+            keys |= {_SHEET_KEYS[header[c]] for c in range(lo, hi + 1)
+                     if header.get(c) in _SHEET_KEYS}
+        for r in cf:
+            expr = (r.formula[0].replace("$E11", "OPT").replace("$O11", "U")
+                    .replace("$AJ11", "UNSAT").replace("<>", "\0")
+                    .replace("=", "==").replace("\0", "!="))
+            rules.append((expr, keys))
+    return rules
+
+
+def test_the_material_graying_is_the_sheets():
+    """The editor grays a material's cells by the template mat sheet's own
+    conditional formatting, for every strength option, pore-pressure model and
+    unsaturated model: d and psi live only for mc, the other options' parameters
+    grayed, ru only for u = ru, and so on. The one place the editor grays more is
+    l for the Gardner model, which does not read it and whose sheet cell stays
+    live."""
+    from studio.editors import _mat_dim_keys
+    rules = _sheet_gray_rules()
+    env = {"AND": lambda *a: all(a), "OR": lambda *a: any(a)}
+    out = []
+    for opt, u, um in itertools.product(
+            ["mc", "cp", "ratio", "pow", "hb", "elastic"],
+            ["none", "piezo", "seep", "ru"], ["lf", "vg", "gard"]):
+        names = dict(env, OPT=opt, U=u, UNSAT=um)
+        want = set()
+        for expr, keys in rules:
+            if eval(expr, {"__builtins__": {}}, names):
+                want |= keys
+        if um == "gard":
+            want.add("vg_l")
+        got = set(_mat_dim_keys({"option": opt, "u": u, "unsat": um}))
+        if got != want:
+            out.append(f"option={opt}, u={u}, unsat={um}: the editor grays "
+                       f"{sorted(got - want)} the sheet leaves live and leaves "
+                       f"{sorted(want - got)} live the sheet grays")
+    return out
+
+
+def test_a_pasted_option_defines_the_row():
+    """A block that sets a row's strength option lands whole, though the row's old
+    option grayed some of its cells: a cp material pasted over an mc row keeps its
+    c/p and r-elev. The row is then grayed for cp. A block that leaves the option
+    alone still skips the cells the row's option grays."""
+    from studio.editors import MaterialsEditor, _mat_dim_keys
+
+    fields = MaterialsEditor.FIELDS
+    keys = [f.key for f in fields]
+    row = {f.key: f.default for f in fields}
+    row.update(name="clay", option="mc", c=10.0, phi=30.0, cp=0.0, r_elev=0.0,
+               u="none")
+    t = _new_table(fields, [row], dim_rule=_mat_dim_keys)
+    _paste(t, _tsv([["cp", 15, 0, 3.75, 4]]), row=0, col=keys.index("option"))
+    got = t.result_rows()[0]
+    out = _fail((got["option"], got["c"], got["cp"], got["r_elev"])
+                == ("cp", 15.0, 3.75, 4.0),
+                f"the pasted cp row read option={got['option']!r}, c={got['c']!r}, "
+                f"c/p={got['cp']!r}, r-elev={got['r_elev']!r}")
+    out += _fail(_summary(t) == "Pasted 1 row × 5 columns.",
+                 f"the status line read {_summary(t)!r}")
+    phi_item = t.table.item(0, keys.index("phi"))
+    cp_item = t.table.item(0, keys.index("cp"))
+    from PySide6.QtCore import Qt
+    out += _fail(not (phi_item.flags() & Qt.ItemIsEditable)
+                 and bool(cp_item.flags() & Qt.ItemIsEditable),
+                 "after the paste the row is not grayed for cp (φ live or c/p gray)")
+
+    # Anchored on the live c to the left of the grayed pair: a grayed cell cannot
+    # be made the current one.
+    t2 = _new_table(fields, [row], dim_rule=_mat_dim_keys)
+    _paste(t2, _tsv([[12, 32, 3.75, 4]]), row=0, col=keys.index("c"))
+    got2 = t2.result_rows()[0]
+    out += _fail((got2["c"], got2["phi"]) == (12.0, 32.0),
+                 f"the live c and φ took {got2['c']!r}, {got2['phi']!r}")
+    out += _fail((got2["cp"], got2["r_elev"]) == (0.0, 0.0),
+                 f"c/p and r-elev on an mc row took {got2['cp']!r}, "
+                 f"{got2['r_elev']!r} from a block that left the option alone")
+    out += _fail("2 cells skipped (2 read-only)" in _summary(t2),
+                 f"the status line read {_summary(t2)!r}")
+    return out
+
+
+def test_the_material_form_grays_d_and_psi():
+    """The list view's form grays d and ψ, with their σ fields, for every option
+    but mc, the one whose Kc = 1 envelope they are; and switching the option back
+    to mc makes them live again."""
+    from studio.editors import MaterialsEditor, _MaterialListView, _new_material
+
+    out = []
+    for opt in ("mc", "cp", "ratio", "pow", "hb", "elastic"):
+        lv = _MaterialListView(MaterialsEditor.FIELDS,
+                               [dict(_new_material(), name="clay", option=opt)],
+                               _new_material, False)
+        lv._load(0)
+        live = [k for k in ("d", "psi", "sigma_d", "sigma_psi")
+                if lv._edits[k].isEnabled()]
+        want = ["d", "psi", "sigma_d", "sigma_psi"] if opt == "mc" else []
+        out += _fail(live == want, f"option={opt}: live d/ψ fields {live}, "
+                                   f"expected {want}")
+        if opt == "ratio":
+            lv._opt_combo.setCurrentText("mc")
+            out += _fail(lv._edits["d"].isEnabled() and lv._edits["psi"].isEnabled(),
+                         "switching a ratio material to mc left d/ψ grayed")
+    return out
 
 
 def test_the_material_form_waits_for_a_material():
@@ -1761,6 +1893,9 @@ CHECKS = [
      test_extra_columns_are_dropped_and_counted),
     ("hidden columns are not filled", test_hidden_columns_are_not_filled),
     ("read-only cells are skipped", test_read_only_cells_are_skipped),
+    ("a pasted option defines its row", test_a_pasted_option_defines_the_row),
+    ("material graying is the mat sheet's", test_the_material_graying_is_the_sheets),
+    ("the form grays d and ψ but for mc", test_the_material_form_grays_d_and_psi),
     ("a pasted rounding keeps the stored value",
      test_a_pasted_rounding_keeps_the_stored_value),
     ("a paste is one edit", test_paste_notifies_once),

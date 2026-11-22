@@ -540,8 +540,8 @@ bias the [SEEP2D cross-check](#seep2d-crosscheck) documents across this panel. T
 **Input files:** [gw009a.xlsx](files/rocscience_gw/gw009a.xlsx) (dam 1) ·
 [gw009b.xlsx](files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain)
 
-Bowles' homogeneous dam, the flow-net textbook example re-solved numerically by Chapuis,
-Chenaf & Bowles (2001) and by Slide2: base 100 m, crest 10 m at el. 20 (2.5:1 upstream,
+Bowles' homogeneous dam, the flow-net textbook example re-solved numerically by Chapuis
+et al. (2001) and by Slide2: base 100 m, crest 10 m at el. 20 (2.5:1 upstream,
 2:1 downstream), reservoir head 18.5 m, ks = 6.67×10⁻⁶ m/s with the manual's printed
 8-point unsaturated conductivity table, fit here by a Mualem–van Genuchten curve
 (α = 0.2835, n = 2.765).

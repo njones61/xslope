@@ -96,8 +96,7 @@ Engineers).
 - Chapuis, R.P., Chenaf, D., Bussière, B., Aubertin, M. & Crespo, R. (2001). A
   user's approach to assess numerical codes for saturated and unsaturated
   seepage conditions. *Canadian Geotechnical Journal* 38(5), 1113–1126.
-  [doi:10.1139/t01-055](https://doi.org/10.1139/t01-055). *(Cited in the groundwater corpus as "Chapuis, Chenaf &
-  Bowles" / "Chapuis et al. (2001)".)*
+  [doi:10.1139/t01-055](https://doi.org/10.1139/t01-055)
 - Charles, J.A. & Soares, M.M. (1984). The stability of slopes in soils with
   nonlinear failure envelopes. *Canadian Geotechnical Journal* 21(3), 397–406.
   [doi:10.1139/t84-044](https://doi.org/10.1139/t84-044)

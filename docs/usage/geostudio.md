@@ -187,8 +187,7 @@ Both are implied by the reinforcement type. XSLOPE stores them explicitly, so th
 has to supply them, and the mapping was chosen by comparison with *SLOPE/W's own factors
 of safety*: reinforcement acts **along the bar** (`dir='axial'`), as a
 known load (`appl='active'`). On the SLOPE/W verification manual's geosynthetic-reinforced
-embankment ([§2.24](../verification/geostudio.md#gs-2-24)) this reproduces SLOPE/W to within 0.3% for the clay fill and 0.6% for the sand fill, where applying the force tangent to the slip surface
-does not converge at all.
+embankment ([§2.24](../verification/geostudio.md#gs-2-24)) this reproduces SLOPE/W to within 0.3% for the clay fill and 0.6% for the sand fill.
 
 Everything is converted to XSLOPE's **per unit width** convention by dividing through by
 the spacing, and GeoStudio's pullout resistance per unit length becomes the bond length

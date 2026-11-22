@@ -41,7 +41,7 @@ shared [References](references.md) page.
       also shows XSLOPE on the vendor's file as given and on the chapter's full list.
 - **Referee.** A closed-form rigid-block solution, recomputed from the model's own inputs, is the
   referee, the one value each row is scored against, where one exists: Goodman & Bray's column analysis on problems 1 and 2, Alejano et al.'s
-  limit equilibrium for the plowing slab (a moment balance about the toe, their Eq. 7) on 11 to 14,
+  limit equilibrium for the plowing slab (the lower of its sliding factor, their Eq. 6, and its toppling factor, a moment balance about the toe, their Eq. 7) on 11 to 14,
   the sliding block with its tensile bridge on 19 and, on 15, the vendor's Slide2 search, since
   Alejano et al.'s limit equilibrium for a footwall that breaks out through one bed (their
   Eqs. 9–10) describes a mechanism the slope does not take.
@@ -80,7 +80,7 @@ For maintainers (kept out of the page text):
   benchmarks/rocscience/make_rs2_joint_figures.py the figures, sidecars and records; builders are
   authoritative, corpus workbooks are never patched by hand.
 - The referee values are recomputed by the scripts under the private reports r25 and r27
-  (Goodman & Bray, Alejano Eqs. 7 and 9–10, the rigid-block ceiling), validated on the sources' own
+  (Goodman & Bray, Alejano Eqs. 5–8 and 9–10, the rigid-block ceiling), validated on the sources' own
   worked examples before use.
 -->
 
@@ -108,9 +108,9 @@ joint model whose output is a stress-displacement curve.
 | [8](#rj-8) | 🟢 | Flexural toppling, base friction model | SSRM 0.764 vs UDEC 0.76 (+0.5%) | 0.75 vs 0.76 (−1.3%) | — | 0.75 / 0.75 | |
 | [9](#rj-9) | 🟢 | Bilinear slab failure, example 1a | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 1.01 vs 1.03 (−1.9%) | LE (Alejano) 0.40–1.45 | 1.01 / 1.09 | |
 | [10](#rj-10) | 🟢 | Bilinear slab failure, example 1b | SSRM 1.037 vs UDEC 1.03 (+0.7%) | 0.92 vs 1.03 (−10.7%) | LE (Alejano) 0.43–1.45 | 0.92 / 1.08 | |
-| [11](#rj-11) | 🟢 | Plowing sliding slab failure | SSRM 1.213 vs rigid-block ceiling 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | UDEC 1.21 (+0.2%) · Alejano Eq. (7) 1.7582 | 1.22 / 1.3 | Alejano's Eq. (7) returns a factor above the ceiling on this problem, so the ceiling is what scores it; all three programs sit on the ceiling. |
+| [11](#rj-11) | 🟢 | Plowing sliding slab failure | SSRM 1.213 vs rigid-block ceiling 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | UDEC 1.21 (+0.2%) · Alejano Eq. (6) 1.7582 | 1.22 / 1.3 | Alejano's Eq. (6) returns a factor above the ceiling on this problem, so the ceiling is what scores it; all three programs sit on the ceiling. |
 | [12](#rj-12) | 🟡 | Plowing toppling slab failure | SSRM 2.033 vs Alejano Eq. (7) 1.9659 (+3.4%) | 1.39 vs 1.9659 (−29.3%) | UDEC 1.78 (+14.2%) · Alejano prints 2.00 | 1.39 / 1.75 | |
-| [13](#rj-13) | 🟢 | Plowing sliding slab, example 4 | SSRM 0.998 vs Alejano Eq. (7) 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | UDEC 1.0 (−0.2%) · Alejano prints 1.0 | 1.0 / 1.05 | |
+| [13](#rj-13) | 🟢 | Plowing sliding slab, example 4 | SSRM 0.998 vs Alejano Eq. (6) 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | UDEC 1.0 (−0.2%) · Alejano prints 1.0 | 1.0 / 1.05 | |
 | [14](#rj-14) | 🟢 | Plowing sliding slab, example 5 | SSRM 1.232 vs Alejano Eq. (7) 1.2034 (+2.4%) | 0.89 vs 1.2034 (−26.0%) | UDEC 0.9 (+36.9%) · Alejano prints 1.00 | 0.89 / 1.09 | The 1.00 the paper prints for this example does not follow from the inputs it prints; Eq. (7) on them gives 1.2034. |
 | [15](#rj-15) | 🟢 | Partially joint-controlled footwall | SSRM 1.271 vs Slide2 LE search 1.25 (+1.7%) | 1.28 vs 1.25 (+2.4%) | Alejano Eqs. (9)–(10) 1.7985 (single-bed formula; the paper prints 1.72) · UDEC 1.6 (−20.6%) | 1.28 / 1.42 | Alejano's closed form drives a wedge out through a single 2 m bed and its factor rises with bed thickness; the three programs free to search for a surface agree at 1.25–1.28, so the limit-equilibrium search is the referee, as the rigid-block ceiling is on problem 11. |
 | [16](#rj-16) | <span class="nodata">⊘</span> | Barla et al. tilt-table block toppling | Tilt 10.24° | 9° | UDEC 11° · Experiment 9° · Goodman & Bray, plate tilted, 7.6° | 9° / 7° | *no reference value* — UDEC built each stack at its tilt against a support block that was then removed, a sequence XSLOPE does not model, and rigid-block statics lets the stack topple anywhere from 7.8° to 19.6°, so no single tilt is the answer. With the tilt represented by a seismic coefficient and the strengths unreduced, the stack stands at 10.20° and topples at 10.28°. |
@@ -540,12 +540,12 @@ for this problem. The mechanism has two rigid blocks, the slab and the toe block
 reduction factor you can ask whether some set of joint forces, each within its friction limit, could
 hold both blocks in place; above 1.2148 here, none can. A closed-form answer that assumes one
 particular mechanism can sit below that ceiling or on it, as on problem 13 where the two agree
-to three figures, but not above it. Alejano et al.'s limit equilibrium for the plowing slab, a
-moment balance about the toe (their Eq. 7), gives 1.7582 here, above the ceiling, so it cannot be right for this model, and the ceiling is the referee
+to three figures, but not above it. Alejano et al.'s limit equilibrium for the plowing slab, in
+its governing sliding mode (their Eq. 6), gives 1.7582 here, above the ceiling, so it cannot be right for this model, and the ceiling is the referee
 instead. XSLOPE gives 1.213, RS2 1.22 and the paper's own UDEC run 1.21: the three differ by 0.01 at
 most, and all three sit on that ceiling.
 
-| XSLOPE SSRM | Rigid-block ceiling referee | RS2 vs referee | UDEC | Alejano Eq. (7) | RS2 without / with improvement |
+| XSLOPE SSRM | Rigid-block ceiling referee | RS2 vs referee | UDEC | Alejano Eq. (6) | RS2 without / with improvement |
 |---|---|---|---|---|---|
 | **1.213** | 1.2148 (−0.1%) | 1.22 vs 1.2148 (+0.4%) | 1.21 (+0.2%) | 1.7582 · the paper prints 1.75 | 1.22 / 1.3 |
 
@@ -600,14 +600,14 @@ which lifts the toe block. The rock is again elastic and stiff enough to act as 
 E = 2 × 10⁸ MPa, γ = 25 kN/m³, ν = 0.3. The release traces end exactly on the bedding plane they
 are meant to meet; see [where a joint ends on another](../fem/joints.md#where-a-joint-ends-on-another-joint).
 
-Alejano's Eq. (7), recomputed on this problem's inputs, gives **1.0002**, with its sliding mode
-governing; the paper prints 1.00 for the same example.
+Alejano's Eq. (6), the sliding mode that governs here, recomputed on this problem's inputs, gives
+**1.0002**; the paper prints 1.00 for the same example.
 
 The rigid-block ceiling is the highest factor any rigid-block analysis can give for this problem,
-explained under [problem 11](#rj-11); Eq. (7) sits on it, the two agreeing to three figures, so
-Eq. (7) is the referee.
+explained under [problem 11](#rj-11); Eq. (6) sits on it, the two agreeing to three figures, so
+Eq. (6) is the referee.
 
-| XSLOPE SSRM | Alejano Eq. (7) referee | RS2 vs referee | Rigid-block ceiling | UDEC | RS2 without / with improvement |
+| XSLOPE SSRM | Alejano Eq. (6) referee | RS2 vs referee | Rigid-block ceiling | UDEC | RS2 without / with improvement |
 |---|---|---|---|---|---|
 | **0.998** | 1.0002 (−0.2%) | 1.0 vs 1.0002 (0.0%) | 0.9988 | 1.0 (−0.2%) | 1.0 / 1.05 |
 

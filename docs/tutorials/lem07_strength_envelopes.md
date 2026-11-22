@@ -339,9 +339,10 @@ these values:
 
 For this option, the **c/p** field holds the ratio r, and the **c** field holds
 the minimum strength. The **r-elev** field disappears from the form, because a
-ratio needs no reference elevation. The plot shows the strength holding at
-15 kPa until σ′<sub>v</sub> reaches 80 kPa and growing in proportion to
-σ′<sub>v</sub> after that:
+ratio needs no reference elevation. The plot runs σ′<sub>v</sub> down the
+side, as depth would run. It shows the strength holding at 15 kPa until
+σ′<sub>v</sub> reaches 80 kPa and growing in proportion to σ′<sub>v</sub>
+below that:
 
 ![The lower clay as a strength ratio](images/lem07_studio_low_materials_ratio.png)
 

@@ -188,12 +188,14 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         s_max = max(2.0 * knee, sigma_max) if r > 0 else sigma_max
         s = np.linspace(0.0, s_max, n)
         su = np.maximum(c, r * s)
-        ax.plot(s, su, color=_STRENGTH_COLOR, lw=2)
-        ax.set_xlabel("σ′v  (vertical effective stress)")
-        ax.set_ylabel("Sᵤ  (undrained strength)")
+        # σ′v grows with depth, so it runs down the side from 0 at the top, as the
+        # c-with-depth plot runs elevation; Sᵤ runs across.
+        ax.plot(su, s, color=_STRENGTH_COLOR, lw=2)
+        ax.set_xlabel("Sᵤ  (undrained strength)")
+        ax.set_ylabel("σ′v  (vertical effective stress)")
         ax.set_title(f"Strength ratio   Sᵤ = max({c:g}, {r:g}·σ′v)")
         ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
+        ax.set_ylim(s_max, 0)
         ax.grid(True, alpha=0.3)
 
     elif option == "pow":

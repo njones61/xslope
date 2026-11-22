@@ -14184,6 +14184,142 @@ def run_gsz_import_test(test):
     return 0.0, None
 
 
+# Which of SLOPE/W's saved trial surfaces the import may treat as circles. One analysis
+# per case: (name, its <SlipSurface><Option>, its ParentID, the results' CSV style, the
+# SlipOrigSearchMethod on every row). 'old' results are as GeoStudio 11.4 wrote them:
+# the radius column is SlipRadius and there is no SlipOrigSearchMethod, so the
+# analysis's own <Option> must decide. 'old inherit' takes its parent's ('old block').
+_GSZ_TRIAL_CASES = [
+    # name           option            parent  csv    code
+    ("old grid",     "GridAndRadius",  None,   "old", None),
+    ("old block",    "Block",          None,   "old", None),
+    ("old inherit",  "FromOther",      2,      "old", None),
+    ("grid",         "GridAndRadius",  None,   "new", "1"),
+    ("specified",    "FullySpecified", None,   "new", "2"),
+    ("block",        "Block",          None,   "new", "4"),
+]
+
+# Every case scores the same three trials, so a case that imports anything imports the
+# same circle. Both valid ones build on the fixture slope -- which is the trap for a
+# block or a specified surface: its FITTED circle would build and solve just fine.
+_GSZ_TRIAL_ROWS = [(998.0, 25.0, 45.0, 36.4),        # a failed trial: sentinel FOS
+                   (1.42, 28.0, 48.0, 39.0),
+                   (1.31, 25.0, 45.0, 36.4)]         # the critical one
+
+
+def _write_trial_surface_gsz(path):
+    """A one-slope .gsz with one solved analysis per _GSZ_TRIAL_CASES row. Each gets
+    its own result folder, holding a copy of the model XML (as SLOPE/W saves one) and
+    001/slip_surface.csv."""
+    import zipfile
+    n = len(_GSZ_TRIAL_CASES)
+    analyses, contexts, stab = [], [], []
+    for i, (name, option, parent, _kind, _code) in enumerate(_GSZ_TRIAL_CASES, 1):
+        par = f"<ParentID>{parent}</ParentID>" if parent else ""
+        analyses.append(f"<Analysis><ID>{i}</ID><Name>{name}</Name><Kind>SLOPE/W</Kind>"
+                        f"{par}<Method>Spencer</Method><GeometryId>1</GeometryId>"
+                        f"</Analysis>")
+        contexts.append(f"<Context><AnalysisID>{i}</AnalysisID><GeometryUsesMaterials "
+                        f"Len=\"1\"><GeometryUsesMaterial ID=\"Regions-1\" Entry=\"1\" />"
+                        f"</GeometryUsesMaterials></Context>")
+        opt = f"<Option>{option}</Option>" if option else ""
+        stab.append(f"<StabilityItem><AnalysisID>{i}</AnalysisID><Entry><SlipSurface>"
+                    f"{opt}<Grid NumXInc=\"4\" NumYInc=\"4\" /></SlipSurface>"
+                    f"<Seismic Horizontal=\"\" Vertical=\"\" /></Entry></StabilityItem>")
+    xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<GSIData Version="11.11" AppVersion="25.2.1.4">
+  <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
+  <Analyses Len="{n}">{''.join(analyses)}</Analyses>
+  <Geometries Len="1"><Geometry><Name>2D</Name>
+    <Points Len="6">
+      <Point ID="1" X="0" Y="0" /><Point ID="2" X="60" Y="0" />
+      <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
+      <Point ID="5" X="20" Y="10" /><Point ID="6" X="0" Y="10" />
+    </Points>
+    <Regions Len="1"><Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region></Regions>
+  </Geometry></Geometries>
+  <Materials Len="1">
+    <Material><ID>1</ID><Name>fill</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>10</CohesionPrime>
+        <PhiPrime>30</PhiPrime></StressStrain></Material>
+  </Materials>
+  <Contexts Len="{n}">{''.join(contexts)}</Contexts>
+  <StabilityItems Len="{n}">{''.join(stab)}</StabilityItems>
+</GSIData>
+"""
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("fixture.xml", xml)
+        for name, _option, _parent, kind, code in _GSZ_TRIAL_CASES:
+            zf.writestr(f"{name}/fixture.xml", xml)
+            if kind == "old":
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadius,SlipVolume,"
+                         "SlipWeight"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000"
+                          for k, (fs, x, y, r) in enumerate(_GSZ_TRIAL_ROWS, 1)]
+            else:
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadiusX,SlipVolume,"
+                         "SlipWeight,SlipOrigSearchMethod"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000,{code}"
+                          for k, (fs, x, y, r) in enumerate(_GSZ_TRIAL_ROWS, 1)]
+            zf.writestr(f"{name}/001/slip_surface.csv", "\n".join(lines) + "\n")
+
+
+def run_gsz_trial_surfaces_test(test):
+    """Which of SLOPE/W's saved trial surfaces the import takes as its circle.
+
+    A solved .gsz stores every trial surface SLOPE/W scored, each with a center and a
+    radius -- including block and fully-specified surfaces, whose center and radius
+    describe a circle FITTED to them. The import must take the critical circle from a
+    circle search and nothing else:
+      - an older file (radius column SlipRadius, no SlipOrigSearchMethod) is read at all,
+        and its rows are classified by the analysis's own <SlipSurface><Option>:
+        GridAndRadius is a circle, Block is not, and FromOther answers for its parent;
+      - SlipOrigSearchMethod 1 is the grid-and-radius search: a circle;
+      - 2 (fully specified) and 4 (block) are not, though their fitted circle builds.
+    Returns (0.0, None) or (None, message).
+    """
+    import tempfile
+    from xslope.geostudio import read_gsz, gsz_to_slope_data, read_gsz_results
+
+    want_circle = {"old grid": True, "old block": False, "old inherit": False,
+                   "grid": True, "specified": False, "block": False}
+    _fs, xo, yo, r = _GSZ_TRIAL_ROWS[-1]          # the critical trial
+    problems = []
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "trials.gsz")
+        _write_trial_surface_gsz(path)
+        gsz = read_gsz(path)
+        for a in gsz["analyses"]:
+            name, circ = a["name"], want_circle[a["name"]]
+            rows = read_gsz_results(gsz, name)
+            # The sentinel row is dropped; the two scored rows survive either way.
+            if [(t["fs"], t["xo"], t["yo"], t["r"]) for t in rows] != \
+                    [tuple(v) for v in _GSZ_TRIAL_ROWS[1:]]:
+                problems.append(f"'{name}': read {len(rows)} trial rows "
+                                f"{[(t['fs'], t['r']) for t in rows]}, expected the two "
+                                f"scored ones")
+                continue
+            if any(t["circular"] != circ for t in rows):
+                problems.append(f"'{name}': rows read as circular="
+                                f"{[t['circular'] for t in rows]}, expected {circ}")
+            sd, cav = gsz_to_slope_data(gsz, a["id"])
+            got = [(c["Xo"], c["Yo"], c["R"]) for c in sd["circles"]]
+            if circ and got != [(xo, yo, r)]:
+                problems.append(f"'{name}': imported circles {got}, expected SLOPE/W's "
+                                f"critical one ({xo}, {yo}, {r})")
+            if circ and not sd["circular"]:
+                problems.append(f"'{name}': the circle imported but circular is False")
+            if not circ and (got or sd["circular"]):
+                problems.append(f"'{name}': imported {got} as a circle -- the FITTED "
+                                f"circle of a surface that is not one")
+            if not circ and not any("non-circular" in c for c in cav):
+                problems.append(f"'{name}': no caveat says SLOPE/W's surface is "
+                                f"non-circular")
+    if problems:
+        return None, "GeoStudio trial surfaces: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
 # A minimal Slide2 model in the sectioned ASCII grammar Slide2 writes. Authored here
 # rather than shipped because Rocscience's own tutorial files are their copyrighted
 # material and are not in this repository (the same reason the .gsz fixture above is
@@ -16665,6 +16801,8 @@ def _dispatch_test(test):
         return run_dxf_water_test(test)
     if test_type == 'gsz':
         return run_gsz_import_test(test)
+    if test_type == 'gsz_trials':
+        return run_gsz_trial_surfaces_test(test)
     if test_type == 'gsz_water':
         return run_gsz_water_corpus_test(test)
     if test_type == 'slide2':
@@ -16952,7 +17090,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average', 'kr_gradient',
+                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_trials', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average', 'kr_gradient',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -18184,13 +18322,17 @@ def main():
     if run_gsz:
         tests.append({'type': 'gsz', 'file': '(synthetic .gsz)',
                       'method': '-', 'source': 'gsz'})
+        # Which saved trial surfaces import as SLOPE/W's circle: old- and new-style
+        # results, circle searches against block and specified ones. Own fixture too.
+        tests.append({'type': 'gsz_trials', 'file': '(synthetic .gsz trial surfaces)',
+                      'method': '-', 'source': 'gsz'})
         # The water-load handover is pinned on Seequent's own models as well as on the
         # fixture: it reads a local, git-ignored copy of the .gsz corpus and skips
         # when absent (the files are Seequent's copyrighted material).
         tests.append({'type': 'gsz_water', 'file': '(GeoStudio corpus)',
                       'method': 'water loads', 'source': 'gsz'})
         if not run_all:
-            print("Including 2 GeoStudio import tests")
+            print("Including 3 GeoStudio import tests")
 
     # The Slide2 import test authors its own .slim fixture (Rocscience's own tutorial
     # files are their copyrighted material and are not in this repository), so it needs

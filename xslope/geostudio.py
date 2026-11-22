@@ -570,12 +570,27 @@ _ENTRY_ELEMENTS = {
 # of a crack line means nothing on its own. Anything else here is reported, not guessed.
 _TCRACK_OPTIONS = {"Surface"}
 
-# SLOPE/W's SlipOrigSearchMethod, in the solved results: which searches produce a real
-# circle. 5 is entry-and-exit; 6 inherits the surface from a parent analysis, which is a
-# circle only if the parent's was. 2 (fully specified) and 4 (block) are not circles at
-# all -- though SLOPE/W still writes a center and radius for them, which is the trap.
-# Callers must confirm a 6 really is a circle; read_gsz_results cannot know.
-_CIRCULAR_SEARCHES = {"5", "6"}
+# SLOPE/W's SlipOrigSearchMethod, in the solved results: the search that produced each
+# trial surface. Read off SLOPE/W's own verification files by pairing each analysis's
+# <SlipSurface><Option> with the codes in its slip_surface.csv. Every analysis carries
+# a single code on all its rows, and each option always the same code:
+#
+#   1  GridAndRadius     4  Block                      7  Automatic (auto-locate)
+#   2  FullySpecified    5  entry and exit, the        6  FromOther: the parent
+#                           default (no <Option>)         analysis's surface
+#
+# 1 and 5 search circles. 6 inherits the parent's surface, which is a circle only if
+# the parent's was. 2 and 4 are not circles at all -- though SLOPE/W still writes a
+# center and radius for them, a circle FITTED to the surface, which is the trap. 7 is
+# not taken either. A 6 is counted here without looking at the parent.
+_CIRCULAR_SEARCHES = {"1", "5", "6"}
+
+# Older files (AppVersion 11.4 in the vendor's set) write no SlipOrigSearchMethod column
+# at all, and name the radius column SlipRadius rather than SlipRadiusX. Their rows are
+# classified by the analysis's own <SlipSurface><Option> instead, read from the XML saved
+# beside the results: a grid-and-radius search, or the default (no <Option>), searches
+# circles.
+_CIRCULAR_OPTIONS = {"GridAndRadius", None}
 
 
 def list_analyses(gsz):
@@ -1670,7 +1685,9 @@ def read_gsz_results(gsz, analysis_name, step=None):
     ``circular`` is False for a surface SLOPE/W did not generate as a circle (a block or
     fully-specified one). Those rows still carry a center and a radius, but they describe
     a *fitted* circle, not the surface that was solved -- rebuilding them as circles
-    silently scores the wrong geometry.
+    silently scores the wrong geometry. Each row's SlipOrigSearchMethod decides it; an
+    older file has no such column, and there the analysis's own search option decides
+    for every row (see ``_CIRCULAR_OPTIONS``).
 
     This is not part of the model. It exists so the same surfaces can be re-solved
     in xslope and the two programs' answers compared directly, with no difference
@@ -1687,11 +1704,19 @@ def read_gsz_results(gsz, analysis_name, step=None):
 
     out = []
     text = zf.read(name).decode("utf-8-sig")
-    for row in csv.DictReader(io.StringIO(text)):
+    reader = csv.DictReader(io.StringIO(text))
+    fields = reader.fieldnames or []
+    # An older file names the radius SlipRadius and records no search code per row.
+    radius_col = "SlipRadiusX" if "SlipRadiusX" in fields else "SlipRadius"
+    coded = "SlipOrigSearchMethod" in fields
+    if not coded:
+        found, option = _search_option(gsz, analysis_name)
+        by_option = found and option in _CIRCULAR_OPTIONS
+    for row in reader:
         try:
             fs = float(row["SlipFOS"])
             xo, yo = float(row["SlipCenterX"]), float(row["SlipCenterY"])
-            radius = float(row["SlipRadiusX"])
+            radius = float(row[radius_col])
         except (KeyError, TypeError, ValueError):
             continue                     # a trial SLOPE/W could not evaluate
         if not 0.0 < fs < 100.0:
@@ -1700,9 +1725,57 @@ def read_gsz_results(gsz, analysis_name, step=None):
             weight = float(row.get("SlipWeight") or 0.0)
         except ValueError:
             weight = 0.0
+        circular = (row.get("SlipOrigSearchMethod") in _CIRCULAR_SEARCHES if coded
+                    else by_option)
         out.append({"fs": fs, "xo": xo, "yo": yo, "r": radius, "weight": weight,
-                    "circular": row.get("SlipOrigSearchMethod") in _CIRCULAR_SEARCHES})
+                    "circular": circular})
     return out
+
+
+def _search_option(gsz, analysis_name):
+    """An analysis's own ``<SlipSurface><Option>``, for results that do not record it.
+
+    Returns ``(found, option)``. ``option`` is None for the default search, which
+    GeoStudio writes as no ``<Option>`` at all. A ``FromOther`` analysis solved its
+    parent's surface, so it answers with the parent's option. ``found`` is False when
+    the analysis or its stability entry cannot be located; the caller then treats its
+    rows as not circular rather than guess.
+
+    The XML saved in the analysis's own result folder is read first: it is the model
+    SLOPE/W solved, where the root XML may have been edited since.
+    """
+    zf = gsz["zip"]
+    names = zf.namelist()
+    folder = analysis_name.lower() + "/"
+    xml = next((n for n in sorted(names) if n.lower().startswith(folder)
+                and "/" not in n[len(folder):] and n.lower().endswith(".xml")), None)
+    if xml is None:
+        xml = next((n for n in names if "/" not in n and n.lower().endswith(".xml")), None)
+    if xml is None:
+        return False, None
+    try:
+        root = ET.fromstring(zf.read(xml))
+    except ET.ParseError:
+        return False, None
+
+    ids, parents = {}, {}
+    for a in root.findall("./Analyses/Analysis"):
+        aid = _text(a, "ID")
+        ids[(_text(a, "Name") or "").lower()] = aid
+        parents[aid] = _text(a, "ParentID")
+    entries = {_text(s, "AnalysisID"): s.find("Entry")
+               for s in root.findall("./StabilityItems/StabilityItem")}
+
+    aid = ids.get(analysis_name.lower())
+    for _ in range(len(parents) + 1):       # bounds the walk up a FromOther chain
+        entry = entries.get(aid)
+        if entry is None:
+            return False, None
+        option = _text(entry.find("SlipSurface"), "Option")
+        if option != "FromOther":
+            return True, option
+        aid = parents.get(aid)
+    return False, None
 
 
 # --------------------------------------------------------------------------------------

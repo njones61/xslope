@@ -210,7 +210,9 @@ without telling you. Read the caveats it returns.
   which makes the model complete, and lets you compare the two programs on identical
   geometry. Run a search afterwards to find XSLOPE's own critical surface. If that circle
   will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
-  along a bedrock boundary), no surface is imported and the caveats report this.
+  along a bedrock boundary), XSLOPE takes the most critical of SLOPE/W's circles that
+  does build, or imports no surface if none does, and the caveats report either case. A
+  block or fully specified surface is not a circle, so no surface is imported from one.
 - **Reinforcement *sets*** — GeoStudio's out-of-plane staging groups. The reinforcement
   itself imports; the grouping does not.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line

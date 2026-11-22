@@ -47,6 +47,40 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Fixed
 
+- A material property left blank in Studio's Materials editor now reads as the
+  value a blank workbook cell loads as: 0 for c, φ, γ, d, ψ, E, ν, r_u, and k1,
+  and 0.5 for l. A cp or ratio material with a blank c failed with "Solve
+  failed", and an mc material with a blank c left every trial surface unsolved.
+  The model checks still refuse a zero γ, E, ν, or k1 by name.
+- Importing a solved GeoStudio file brings in SLOPE/W's critical circle when
+  SLOPE/W searched with a grid and radius, and when an older GeoStudio (version
+  11.4) saved the file. The import took circles only from entry-and-exit searches
+  and couldn't read the trial surfaces older versions save, so 31 analyses in 10
+  of SLOPE/W's 43 verification files arrived with no failure surface.
+- A GeoStudio file finds its solved results when an analysis name holds a slash
+  or a colon, or ends in a period. GeoStudio saves "SLOPE/W Analysis" in a folder
+  named "SLOPE&3W Analysis", so six of SLOPE/W's verification files imported no
+  failure surface at all.
+- A GeoStudio import applies the phreatic correction to a piezometric line only
+  when the SLOPE/W analysis turns it on. Every line used to import with the
+  correction, which put Zhu and Lee's wet slope 3.7% and 3.0% above SLOPE/W on
+  SLOPE/W's own circles; the two are now within 0.6% and 0.3%.
+- A GeoStudio analysis that takes its pore pressure from Ru imports it as
+  XSLOPE's r_u, material by material. It used to import dry: on Loukidis's wet
+  slope XSLOPE read 77% above SLOPE/W on SLOPE/W's own circle, and now reads
+  within 0.06%.
+- An optimized SLOPE/W search imports its most critical searched circle, and the
+  import's notes give the lower factor of safety of SLOPE/W's optimized surface.
+  It used to import a circle fitted to the optimized surface, which read 24.6%
+  above SLOPE/W on Greco's layered slope; the searched circle reads 0.1% below.
+- A GeoStudio analysis that takes its slip surface from another analysis imports
+  a circle only when that analysis searched circles. One used to import a circle
+  fitted to an automatic search's surface, 14.9% above SLOPE/W.
+- Importing a SLOPE/W staged rapid drawdown now says the imported model is the
+  slope before drawdown, while SLOPE/W's factor of safety is the one after it, and
+  gives the lowered water line and the d and ψ that XSLOPE's own rapid drawdown
+  analysis needs. A B-bar analysis imports its piezometric line, and the notes say
+  the excess pore pressure from B-bar is not included; it used to import dry.
 - A non-circular search now runs when the surface's points were entered from
   right to left. Every move was refused, and the search returned the starting
   surface as its answer: 1.313 on one model where the search, run from the same

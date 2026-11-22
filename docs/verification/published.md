@@ -489,7 +489,7 @@ own number with no published value behind it.
 
 ---
 
-## 🟢 FHWA Example E6 — traffic barrier impact on the E4 wall {#fhwa-e6}
+## 🟢 FHWA Example E6 — traffic barrier impact on an MSE wall {#fhwa-e6}
 
 Example E6 re-checks the [Example E4](#fhwa-e4) wall for a vehicle striking the
 traffic barrier at the top, an Extreme Event II load combination. Only the top
@@ -564,7 +564,7 @@ behind it.
 
 ---
 
-## 🟢 FHWA Example E7 — seismic loading on the E4 wall {#fhwa-e7}
+## 🟢 FHWA Example E7 — seismic loading on an MSE wall {#fhwa-e7}
 
 Example E7 re-checks the [Example E4](#fhwa-e4) wall for earthquake loading, an
 Extreme Event I load combination. Internal Step 4 reduces the pullout resistance
@@ -635,7 +635,7 @@ E7-11 to E7-14) (Berg et al., 2009).
 
 ---
 
-## 🟢 DWB Figure 10.1 — yield coefficient of a rigid wedge {#dwb-10-1}
+## 🟢 Duncan, Wright & Brandon — yield coefficient of a rigid wedge {#dwb-10-1}
 
 Duncan, Wright & Brandon (2014), Section 10.1.2, Figure 10.1, resolve the forces on a
 mass sliding on a plane inclined at β, with the seismic force kW through its center of
@@ -718,7 +718,7 @@ directions.
 
 ---
 
-## 🟢 DWB Table 10.4 — pseudostatic slope, single-stage and two-stage {#dwb-10-4}
+## 🟢 Duncan, Wright & Brandon — single- and two-stage seismic analyses {#dwb-10-4}
 
 Duncan, Wright & Brandon (2014), Section 10.4.2, compare the two ways of giving a
 pseudostatic analysis undrained strengths for a slope that has consolidated under its

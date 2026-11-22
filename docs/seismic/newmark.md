@@ -29,9 +29,9 @@ ground returns to zero. Integrating the relative velocity gives the block's perm
 
 >>$D = \displaystyle\int v\,dt$
 
-The block slides again each time the acceleration exceeds $a_y$, and never slides back up the slope (Duncan, Wright,
-and Brandon 2014, Fig. 10.3). The figure shows the process for a simple record, three cycles of a sine wave with a
-peak of 0.3 g, and $k_y$ = 0.15. The dark shading marks where the acceleration exceeds $k_y g$, and the light bands
+The block slides again each time the acceleration exceeds $a_y$, and never slides back up the slope. The figure
+shows the process for a simple record, three cycles of a sine wave with a peak of 0.3 g, and $k_y$ = 0.15 (after
+Duncan, Wright, and Brandon 2014, Fig. 10.3). The dark shading marks where the acceleration exceeds $k_y g$, and the light bands
 mark where the block is sliding. Each slip starts when the acceleration rises past $k_y g$ and ends after it has
 fallen back below, when the relative velocity returns to zero. Each cycle adds about 9.4 cm, and the block ends
 28.3 cm down the slope.

@@ -85,7 +85,7 @@ PASSFAIL_TYPES = {"mp_spencer", "gsat_pair", "roundtrip"}
 #: Types holding exactly one number, checked once: the tag's own expected value.
 SCALAR_TYPES = {"fem_ssrm", "fem_tilt", "fem_kc", "fem_elements", "fem_reliability", "seep",
                 "seep_elements", "critical_kc", "reliability", "slip_depth",
-                "support_force"}
+                "support_force", "newmark"}
 
 #: Types holding a small fixed set of independent scalars, each its own locked
 #: number and its own comparison.  The keys are the ones the matching runner in

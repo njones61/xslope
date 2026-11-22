@@ -2,15 +2,17 @@
 // lists at each release. Each entry is the end of a page's URL path; a sidebar link
 // is matched on the address it resolves to, so relative links and the current page
 // (which the theme links as "#") match alike.
-var NEW_PAGES = [                 // a pill after the page's own sidebar entry
+var NEW_PAGES = [       // a pill on the page's own entry and on every heading above it
   "/tutorials/lem14_pseudostatic/",
   "/tutorials/lem15_yield_newmark/",
 ];
-var NEW_SECTIONS = [              // a pill after the heading of the section that holds the page
+var NEW_SECTIONS = [    // a pill on the headings above the page, not on the page itself
   "/seismic/overview/",
 ];
 
 document.addEventListener("DOMContentLoaded", function () {
+  var menu = document.querySelector(".wy-menu-vertical");
+  if (!menu) return;
   function path(a) {
     var href = a.getAttribute("href");
     if (href === null) return "";
@@ -19,18 +21,25 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   function listed(a, list) {
     var p = path(a);
-    return list.some(function (end) { return p.endsWith(end); });
+    return p !== "" && list.some(function (end) { return p.endsWith(end); });
   }
-  document.querySelectorAll(".wy-menu-vertical a").forEach(function (a) {
-    if (listed(a, NEW_PAGES)) a.classList.add("nav-new");
-  });
-  document.querySelectorAll(".wy-menu-vertical p.caption").forEach(function (cap) {
-    var list = cap.nextElementSibling;
-    if (!list || list.tagName !== "UL") return;
-    var hit = Array.prototype.some.call(list.querySelectorAll("a"), function (a) {
-      return listed(a, NEW_SECTIONS);
+  function holds(list, ul) {
+    return Array.prototype.some.call(ul.querySelectorAll("a"), function (a) {
+      return listed(a, list);
     });
+  }
+  var all = NEW_PAGES.concat(NEW_SECTIONS);
+  menu.querySelectorAll("a").forEach(function (a) {
+    if (listed(a, NEW_PAGES)) a.classList.add("nav-new");
+    // A heading inside a section (an entry with no page of its own) holds a list.
+    var sub = a.nextElementSibling;
+    if (a.getAttribute("href") === null && sub && sub.tagName === "UL" && holds(all, sub)) {
+      a.classList.add("nav-new");
+    }
+  });
+  menu.querySelectorAll("p.caption").forEach(function (cap) {
+    var list = cap.nextElementSibling;
     var text = cap.querySelector(".caption-text");
-    if (hit && text) text.classList.add("nav-new");
+    if (list && list.tagName === "UL" && text && holds(all, list)) text.classList.add("nav-new");
   });
 });

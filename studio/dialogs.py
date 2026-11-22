@@ -1518,9 +1518,11 @@ class RunLemDialog(QDialog):
             "How stage 2 takes the undrained strength.\n\n"
             "Interpolated: between the Kc = 1 envelope (d, ψ) and the drained "
             "envelope (c′, φ′) by each slice's consolidation stress ratio, as in "
-            "rapid drawdown. This is the procedure the book's text describes.\n\n"
+            "rapid drawdown. This is the procedure Duncan, Wright, and Brandon (2014) "
+            "describe.\n\n"
             "Kc = 1 envelope: τff = d + σ′fc tan ψ at the stage 1 stresses, with no "
-            "interpolation. This is how the book's Table 10.4 was computed.")
+            "interpolation. Duncan, Wright, and Brandon computed their published "
+            "two-stage factors of safety this way.")
         self.seismic2_strength_label = QLabel("Stage 2 strength")
         self.seismic2_strength_label.setToolTip(self.seismic2_strength.toolTip())
         # The screening methods' strength reduction (Duncan, Wright & Brandon 2014,

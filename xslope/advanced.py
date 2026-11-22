@@ -113,7 +113,7 @@ def seismic2_strength(seismic2):
 
 def seismic2_factor(seismic2):
     """The stage 2 strength factor a ``seismic2`` argument carries: the number every
-    stage 2 undrained strength (d/psi and c/p materials) is multiplied by, 1 unless
+    stage 2 undrained strength (d/psi, cp, and ratio materials) is multiplied by, 1 unless
     ``seismic2`` is a dict with a ``"factor"``. The screening methods' strength
     reduction (Duncan, Wright & Brandon 2014, Table 10.1; 0.8 to 0.85 of the static
     undrained strength for soils that don't liquefy) goes here: in a two-stage run

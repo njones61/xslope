@@ -174,7 +174,7 @@ whatever its **u** option.
 | --- | --- | --- |
 | `mc` | Mohr-Coulomb: τ = c + σ′ tan φ | c, φ |
 | `cp` | Undrained strength increasing below an elevation: S<sub>u</sub> = c + c/p × (r-elev − y) | c, c/p, r-elev |
-| `ratio` | Undrained strength ratio: S<sub>u</sub> = max(c, c/p × σ′<sub>v</sub>), with c the minimum ([details](../lem/overview.md)) | c, c/p |
+| `ratio` | Undrained strength ratio: S<sub>u</sub> = max(c, c/p × σ′<sub>v</sub>), with c the minimum ([details](../lem/overview.md#undrained-strength-ratio)) | c, c/p |
 | `pow` | Power curve: τ = pow_a (σ′ + pow_d)<sup>pow_b</sup> + pow_c | pow_a, pow_b, pow_c, pow_d |
 | `hb` | Generalized Hoek-Brown, for rock | hb_sci, hb_gsi, hb_mi, hb_d |
 | `elastic` | Can't fail. Search surfaces may run along it but not through it | none |

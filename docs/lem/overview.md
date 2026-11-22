@@ -51,6 +51,7 @@ accepted for the consolidated-crust case — see [VP30](../verification/rocscien
 
 **Undrained strength ratio.** The `ratio` option ties the undrained strength to the vertical effective stress
 itself, the way the ratio is measured:
+{: #undrained-strength-ratio }
 
 > $S_u = \max\left(c,\; r\,\sigma'_v\right)$
 

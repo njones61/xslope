@@ -87,8 +87,8 @@ A two-stage run is refused when:
 - the run is also a rapid drawdown analysis.
 - the [stage 2 strength factor](#factor) is not greater than 0 and at most 1.
 
-A horizontal seismic coefficient of 0 draws a warning: stage 2 is then a static analysis with undrained strengths. A material
-whose strength is an undrained c/p ratio keeps that strength in both stages, and its $d$ and $\psi$ are not read.
+A horizontal seismic coefficient of 0 draws a warning: stage 2 is then a static analysis with undrained strengths. A `cp` or
+`ratio` material keeps its undrained strength in both stages, and its $d$ and $\psi$ are not read.
 [Preflight Input Checks](../usage/preflight.md) lists every rule.
 
 ## The Single-Stage R Envelope {#single-stage}

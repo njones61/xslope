@@ -135,7 +135,7 @@ and when the earthquake comes:
 | Slope | Strength | In XSLOPE |
 |---|---|---|
 | A new slope, with the earthquake soon after construction | Unconsolidated-undrained (UU) tests, total stresses | c and φ from the tests, with no pore pressure on the material |
-| An existing slope that has consolidated under its own weight | UU tests on representative samples, total stresses | As above, or a [`ratio`](../lem/overview.md) material where the undrained strength is known as a ratio of the vertical effective stress |
+| An existing slope that has consolidated under its own weight | UU tests on representative samples, total stresses | As above, or a [`ratio`](../lem/overview.md#undrained-strength-ratio) material where the undrained strength is known as a ratio of the vertical effective stress |
 | A new slope, after it consolidates | Consolidated-undrained (CU) tests | d and ψ, run as a [two-stage analysis](two_stage.md); or the R envelope's c<sub>R</sub> and φ<sub>R</sub> in a [single stage](two_stage.md#single-stage) |
 | Free-draining gravels and cobbles | Drained | c′ and φ′ |
 
@@ -161,7 +161,7 @@ In **xslope** the third step is an ordinary limit equilibrium run with no seismi
 strengths entered as each material's strength. A zone that liquefies is entered as a material of its own. Some
 correlations give a liquefied soil's residual strength as a ratio of the vertical effective stress before the
 earthquake, the liquefied strength ratio (Olson and Stark 2002; Idriss and Boulanger 2008). That zone can be a
-[`ratio`](../lem/overview.md) material, with the ratio in its **c/p** column and the water as it stood before the
+[`ratio`](../lem/overview.md#undrained-strength-ratio) material, with the ratio in its **c/p** column and the water as it stood before the
 earthquake, so that $\sigma'_v$ is the stress the ratio was correlated against.
 
 ## Pages in This Section

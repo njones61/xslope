@@ -149,30 +149,41 @@ in MPa rather than the model's own stress units.
 XSLOPE offers four ways to supply the pore pressure $u$, selected per material through the **u** column of the input
 template.
 
-**Piezometric line** (`u = piezo`, the piezo sheet's `Type` = *piezo* or blank). The line is a true piezometric
-line — the locus of pressure heads a set of piezometers would read at the slip surface. The pore pressure is the
-full static head:
+**Piezometric line** (`u = piezo`). A line on the piezo sheet gives the pore pressure from the head of the water
+at each point. The sheet's `Type` cell says how the head at a point below the line is read from the line. The figure
+shows one line read both ways, at a point on a slip surface:
 
-> $u = \Delta z \cdot \gamma_w$
+![One water line read two ways at a point on a slip surface: piezo takes the vertical distance Δz up to the line; phreatic takes Δz cos²θ, the height a standpipe at the point rises to, where the equipotential through the point meets the line at a right angle](images/piezo_phreatic.png){width=760px}
 
-where $\Delta z$ is the vertical distance from the point up to the line and $\gamma_w$ is the unit weight of water
-(upper figure).
+- **piezo** (the default; a blank `Type` cell means the same). The head at the point reaches the line directly above
+  it, as it would if the equipotentials, the lines of equal head, were vertical. The pore pressure is
 
-**Phreatic surface** (the piezo sheet's `Type` = *phreatic*). The equation above is only strictly correct when the
-water table is horizontal. When the line is instead a genuine *phreatic surface* — the water table in a slope with
-inclined, roughly surface-parallel steady seepage — the equipotentials are no longer vertical, so the head at depth
-is *less* than the static column and taking the full vertical distance overstates $u$. The static head is reduced
-by $\cos^2\theta$, where $\theta$ is the inclination of the line segment directly above the point (lower figure):
+    > $u = \gamma_w \, \Delta z$
 
-> $u = \Delta z \cdot \gamma_w \cdot \cos^2\theta$
+    where $\Delta z$ is the vertical distance from the point up to the line and $\gamma_w$ is the unit weight of
+    water.
 
-![piezo.png](images/piezo.png)
+- **phreatic**. The line is the water table in a slope with steady seepage along it. The water flows along the line,
+  so the equipotentials cross it at a right angle. A standpipe at the point rises only to where the equipotential
+  through the point meets the line. That height is $\Delta z \cos^2\theta$, where $\theta$ is the inclination of
+  the line:
 
-This is the same correction as Slide2's "Hu: Auto" and XSTABL's phreatic-surface option, and it applies in the FEM
-as well as the LEM. It matters most on steep phreatic lines — at $\theta = 20°$ it is already a 12% reduction in
-$u$ — and on a flat line the two types are identical. Choosing between them: if the line came from piezometer
-readings, a flow net, or a seepage analysis, it is a piezometric line; if all you have is the water table position,
-*phreatic* is the appropriate shortcut.
+    > $u = \gamma_w \, \Delta z \cos^2\theta$
+
+    A real water line curves, so XSLOPE takes $\theta$ from the segment of the line directly above each point.
+
+The phreatic type is the same correction as Slide2's "Hu: Auto" and XSTABL's phreatic-surface option. It applies in
+the FEM as well as the LEM. On a flat line the two types give the same pore pressure. On a line inclined at 20°,
+phreatic gives a pore pressure 12 percent lower than piezo.
+
+**Choosing the Type.** On a flat or gentle line it hardly matters, so leave it at the default, piezo. On a steep line
+with the water moving along it, as in a long natural slope, phreatic is more realistic. Piezo is the more
+conservative choice, because it can only raise the pore pressure. The one exception is a line plotted from
+piezometers with their tips at the slip surface. That line is already the head at that depth, so piezo is exact.
+
+A line is a quick and conservative way to model the water when there are no hydraulic conductivities or
+well-defined boundary conditions for a seepage analysis. A finite element seepage solution (`u = seep`, below) is the
+most accurate.
 
 **Where a line applies.** Either type assigns pore pressure only over its own horizontal extent; nothing is
 extrapolated past either end. A line may therefore stop short of the section, which is the right model when the

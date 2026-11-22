@@ -28,8 +28,8 @@ it covers which surface to compute $k_y$ for, and how **xslope** searches for th
 
 ## Planar Slip Surfaces {#one-plane}
 
-The simplest case is a mass that slides on one plane, such as a block of an infinite slope. Figure 10.1 of Duncan et
-al. shows the forces on one block, with the seismic force at the block's center of gravity:
+The simplest case is a mass that slides on one plane, such as a block of an infinite slope. The figure shows the
+forces on one block, with the seismic force at the block's center of gravity (after Duncan et al. 2014, Fig. 10.1):
 
 ![One block of an infinite slope: its weight W and the horizontal seismic force k_hW at the center of gravity, the normal force N and the shear force S on the base, the depth z, the base length l, and the slope angle beta](images/seismic_infinite_slope.png){width=620px}
 
@@ -47,8 +47,8 @@ summed. Setting $F = 1$ gives the yield coefficient in closed form:
 >>$k_y = \dfrac{c\ell/W + \cos\beta\tan\phi - \sin\beta}{\cos\beta + \sin\beta\tan\phi}$
 
 With $c = 0$ this is $\tan(\phi - \beta)$. A sand slope with $\phi = 35°$ and $\beta = 30°$ has a yield coefficient of
-$\tan 5° = 0.087$. [DWB Figure 10.1](../verification/published.md#dwb-10-1) on the verification pages checks
-**xslope** against this closed form, with and without a vertical seismic force.
+$\tan 5° = 0.087$. The [verification pages](../verification/published.md#dwb-10-1) check **xslope** against this
+closed form, with and without a vertical seismic force.
 
 ## Computing the Yield Coefficient for One Surface {#one-surface}
 
@@ -107,16 +107,16 @@ critical surface first.
 ### When the Two Candidates Differ
 
 For VP104 the two candidates nearly agree: $k_y$ = 0.1457 on the static critical circle and 0.1445 on the circle with
-the lowest $k_y$. On other slopes they can be far apart. The figure shows the slope Duncan et al. use for their
-Table 10.4 (2.5H:1V, 30 ft high, γ = 135 pcf), with soil 2's R envelope ($c_R$ = 700 psf, $\phi_R$ = 15°) and no
-water:
+the lowest $k_y$. On other slopes they can be far apart. The figure shows the slope of the
+[two-stage comparison](two_stage.md#comparison) (2.5H:1V, 30 ft high, γ = 135 pcf), with the R envelope of
+[soil 2](two_stage.md#four-soils) ($c_R$ = 700 psf, $\phi_R$ = 15°) and no water:
 
-![The slope of Duncan et al.'s Figure 10.7 with soil 2's R envelope: the static critical circle, with k_y = 0.432 on it, and the circle with the minimum k_y = 0.351, which reaches the base of the model and comes out on the crest about 140 ft back from the top of the slope](images/seismic_ky_surfaces.png){width=1000px}
+![The slope of the two-stage comparison with soil 2's R envelope: the static critical circle, with k_y = 0.432 on it, and the circle with the minimum k_y = 0.351, which reaches the base of the model and comes out on the crest about 140 ft back from the top of the slope](images/seismic_ky_surfaces.png){width=1000px}
 
 The static critical circle is shallow, and its $k_y$ is 0.432. The circle with the lowest yield coefficient is far
 larger, and its $k_y$ is 0.351. It reaches the bottom of the model, 30 ft below the toe, and comes out on the crest
-about 140 ft behind the top of the slope. Of the four soils in Duncan et al.'s Table 10.3, the two circles are this
-far apart only for soils 2 and 4, the two with the most cohesion. For soils 1 and 3 they nearly agree.
+about 140 ft behind the top of the slope. Of the [four soils](two_stage.md#four-soils) in that comparison, the two circles are this
+far apart only for soils 2 and 4, whose R envelopes have the largest intercepts. For soils 1 and 3 they nearly agree.
 
 Neither circle settles the question. Computing $k_y$ only on the static critical circle misses a surface with a much
 lower one. The deep circle has the lowest $k_y$, but Duncan et al. warn that a surface this deep gives a yield

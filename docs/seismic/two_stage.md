@@ -53,7 +53,8 @@ The undrained strength is one of two choices, set in the run:
 
     >>$\tau_{ff} = d + \sigma'_{fc} \tan \psi$
 
-    This is how Duncan et al.'s Table 10.4 was computed, and the only way to reproduce it.
+    Duncan et al. computed the factors of safety in the [comparison below](#comparison) this way, so this choice
+    reproduces them.
 
 The two choices differ where the envelopes do. Where the $K_c = 1$ envelope lies below the drained envelope at the
 stresses on the surface, the interpolation raises the strength; where it lies above, the interpolation lowers it.
@@ -105,15 +106,29 @@ in for the relation between the undrained strength and the effective consolidati
 stresses it is applied to must be the ones the soil consolidated under. It is often called a total stress envelope,
 but used this way it needs effective stresses and the right pore pressures (Duncan et al. 2014).
 
-The R envelope and the $K_c = 1$ envelope come from the same tests and often lie close together. For the four soils
-Duncan et al. compare, the R envelope lies below the $K_c = 1$ envelope:
+The R envelope and the $K_c = 1$ envelope come from the same tests and often lie close together. Duncan et al.
+(2014, Table 10.3) compare the envelopes of four soils:
+{: #four-soils }
 
-![For each of the four soils of Duncan et al. Table 10.3, the K_c = 1 envelope, the R envelope, and the drained envelope](images/seismic_envelopes.png){width=860px}
+| Soil | Description | c′ (psf) | φ′ (deg) | c<sub>R</sub> (psf) | φ<sub>R</sub> (deg) | d (psf) | ψ (deg) |
+|:-:|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| 1 | Sandy clay (CL) from Pilarcitos Dam, with envelopes fitted to confining pressures of 0 to 10 psi | 0 | 45 | 60 | 23 | 64 | 24.4 |
+| 2 | Brown sandy clay from a dam site in Rio Blanco, Colorado | 200 | 31 | 700 | 15 | 782 | 16.7 |
+| 3 | The same clay as soil 1, with envelopes fitted to confining pressures of 0 to 100 psi | 0 | 34 | 300 | 15.5 | 327 | 16.8 |
+| 4 | Fill from Hirfanli Dam | 0 | 35 | 1400 | 22.5 | 1716 | 26.9 |
+
+$c'$ and $\phi'$ define the drained envelope, $c_R$ and $\phi_R$ the R envelope, and $d$ and $\psi$ the $K_c = 1$
+envelope. Duncan et al. calculated $d$ and $\psi$ from the other four values. For all four soils, the R envelope lies
+below the $K_c = 1$ envelope:
+
+![For each of the four soils in the table above, the K_c = 1 envelope, the R envelope, and the drained envelope](images/seismic_envelopes.png){width=860px}
 
 ## Comparison with Duncan et al. (2014) {#comparison}
 
-Duncan et al. ran both procedures on one slope, 2.5H:1V and 30 ft high, with γ = 135 pcf, at a seismic coefficient of
-0.15, dry and submerged, for each of the four soils (their Fig. 10.7 and Table 10.4). **xslope** reproduces their
+Duncan et al. (2014, Fig. 10.7 and Table 10.4) ran both procedures on one slope, 2.5H:1V and 30 ft high, with
+γ = 135 pcf, at a seismic coefficient of 0.15, for each of the [four soils](#four-soils). They ran each soil dry and again
+submerged, with the whole slope under water. They give no water depth and no depth for the foundation. The runs
+here put the water 15 ft above the crest and the bottom of the model 30 ft below the toe. **xslope** reproduces their
 factors of safety, run with the Kc = 1 envelope choice, within 1.3 percent:
 
 | Soil | Water | Single-stage F, XSLOPE | Single-stage F, Duncan et al. | Two-stage F, XSLOPE | Two-stage F, Duncan et al. | Single ÷ two-stage, XSLOPE |
@@ -132,8 +147,8 @@ Duncan et al. found:
 
 ![The single-stage factor of safety against the two-stage one for the four soils, dry and submerged, XSLOPE and Duncan et al.](images/seismic_single_two_stage.png){width=560px}
 
-[DWB Table 10.4](../verification/published.md#dwb-10-4) on the verification pages gives the model and the interpolated
-choice's values on the same slope.
+The [verification pages](../verification/published.md#dwb-10-4) give the models and the interpolated choice's
+values on the same slope.
 
 ## In Studio {#studio}
 

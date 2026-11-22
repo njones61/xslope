@@ -223,9 +223,13 @@ elevation — and the three fields under it define that relation:
 elevation, and `c/p` = 3.75 is the rate the strength gains per unit of
 elevation below it:
 s<sub>u</sub> = c + c/p·max(0, r-elev − y), so at or above elevation 4 the
-strength is simply c. The option's name is the classical **c/p ratio** — c the
-undrained strength, p the effective overburden pressure — the proportionality
-a normally consolidated clay holds as both grow with depth. The plot beside the fields draws it as a profile against
+strength is simply c. The option takes its name from the classical **c/p
+ratio** of the undrained strength c to the effective overburden pressure p.
+Because p increases with depth, a clay with a constant c/p gains strength with
+depth. The `cp` option enters that gain directly. Its **c/p** field holds the
+rate of gain, in kPa per meter of elevation.
+[Part C](#part-c-strength-from-the-effective-stress) enters the ratio itself,
+with the `ratio` option. The plot beside the fields draws the strength as a profile against
 elevation, with the reference elevation marked, running from 15 kPa at the top
 of the layer to 30 kPa at the model floor.
 

@@ -864,8 +864,8 @@ def rj011():
     """RJ-11 — plowing sliding slab failure (vendor `joint #011.fez`).
 
     A 25 m slope with bedding at -50 degrees at 1.5 m (phi = 30) and two release
-    traces at phi = 20, one of which ends inside the rock at the toe. Referee:
-    UDEC 1.21. RS2 reports 1.22 without joint improvement and 1.30 with it.
+    traces at phi = 20, one of which ends inside the rock at the toe. The
+    manual's referee: UDEC 1.21. RS2 reports 1.22 without joint improvement and 1.30 with it.
     """
     return _alejano('rj011')
 
@@ -874,7 +874,7 @@ def rj012():
     """RJ-12 — plowing toppling slab failure (vendor `joint #012.fez`).
 
     Bedding at -60 degrees at 1.5 m (phi = 30) with releases at phi = 40.
-    Referee: UDEC 1.78. RS2 reports 1.39 without joint improvement and 1.75 with
+    The manual's referee: UDEC 1.78. RS2 reports 1.39 without joint improvement and 1.75 with
     it — the family's widest spread between the two RS2 runs.
     """
     return _alejano('rj012', round6=True)
@@ -884,18 +884,19 @@ def rj013():
     """RJ-13 — plowing sliding slab, example 4 (vendor `joint #013.fez`).
 
     Bedding at -55 degrees at 1.5 m (phi = 25) with releases at phi = 20.
-    Referee: UDEC 1.0. RS2 reports 1.0 without joint improvement and 1.05 with
+    The manual's referee: UDEC 1.0. RS2 reports 1.0 without joint improvement and 1.05 with
     it.
     """
     return _alejano('rj013')
 
 
 def rj014():
-    """RJ-14 — plowing sliding slab, example 5 (vendor `joint #014.fez`).
+    """RJ-14 — plowing toppling slab, example 5 (vendor `joint #014.fez`; the
+    manual titles it a sliding slab, but the paper's example 5 is its toppling case).
 
     Example 4's section with the release joint moved and the two strengths the
     other way round: bedding at -60 degrees at 1.5 m at phi = 20, releases at
-    phi = 30. Referee: UDEC 0.9. RS2 reports 0.89 without joint improvement and
+    phi = 30. The manual's referee: UDEC 0.9. RS2 reports 0.89 without joint improvement and
     1.09 with it.
     """
     return _alejano('rj014', round6=True)

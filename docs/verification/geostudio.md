@@ -53,7 +53,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.17](rocscience.md#vp28) | 🟢 | [Chowdhury & Xu (1995)](https://doi.org/10.1016/0951-8320(94)00063-T), 5 examples | XSLOPE reproduces the ten cases on SLOPE/W's own imported circles, with Taylor σ_F within ≈ 1% of SLOPE/W's Monte Carlo | *covered* (3 of 10 cases built, with their reliability checked) |
 | [2.18](#gs-2-18) | 🟢 | Borges & Cardoso Geosynthetic Emb. #2 | On SLOPE/W's own critical circle M-P 1.153 vs 1.171 (−1.5%) · vs Borges & Cardoso 1.15 (+0.3%) | |
 | [2.19](rocscience.md#vp32) | 🟢 | Borges & Cardoso Geosynthetic Emb. #3 | Two fill stages on SLOPE/W's own solves: 1.218 vs 1.229 (−0.9%) · 0.982 vs 0.972 (+1.0%) | *covered*; identical materials and geometry (verified to <1 cm), and the vendor reinforcement-friction difference (39.6° vs 31.0°) is immaterial — the fully-embedded bar develops its full 200 kN/m either way; also [RS2 #24](rs2.md#rs2-24) |
-| [2.20](rocscience.md#vp33) | 🟢 | Probabilistic – Syncrude Dyke | Bishop 1.320 on Slide's circle vs Slide 1.305 (+1.1%) · vs El-Ramly et al. 1.31 (+0.8%) | *covered* (deterministic) |
+| [2.20](rocscience.md#vp33) | 🟢 | Probabilistic – Syncrude Dike | Bishop 1.320 on Slide's circle vs Slide 1.305 (+1.1%) · vs El-Ramly et al. 1.31 (+0.8%) | *covered* (deterministic) |
 | [2.21](rocscience.md#vp34) | 🟢 | Cannon Dam | M-P 2.384 vs Wolff & Harr 2.36 (+1.0%) · Spencer 2.423 vs Slide 2.383 (+1.7%) | *covered* |
 | [2.22](#gs-2-22) | 🟢 | Cannon Dam #2 | All nine Hassan & Wolff fixed circles: Morgenstern-Price within 0.19% of SLOPE/W's own M-P · Bishop within 0.5% of Slide2 Table 35.2 on eight of nine · slice weight within 0.17% | nine fixed surfaces; the reliability side is *covered* under [Slide2 VP35](rocscience.md#vp35) |
 | [2.23](#gs-2-23) | 🟢 | Li & Lumb – Reliability Index | Bishop 1.333 vs Hassan & Wolff 1.334 (−0.1%) · β_ln 2.282 vs Hassan & Wolff 2.336 (−2.3%) | SLOPE/W instead searches for the minimum β across surfaces, so its β and FS are not on this surface |
@@ -65,7 +65,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.29](rocscience.md#vp49) | 🟢 | Snailz – Reinforced Slope | Janbu (corrected) 1.469 vs Slide 1.479 (−0.7%) | *covered* |
 | [2.30](#gs-2-30) | 🟢 | Snailz – Geotextile Layers | M-P / Spencer 1.576 vs SLOPE/W M-P 1.606 (−1.9%) · Janbu (corrected) 1.448 vs SNAILZ 1.46 (−0.8%) | |
 | [2.31](#gs-2-31) | 🟢 | Zhu – Four Layer Slope | Spencer 1.294 vs SLOPE/W 1.299 (−0.4%) · M-P 1.304 vs SLOPE/W 1.310 (−0.5%) | wider spread on the Lowe and Corps side-force assumptions |
-| [2.32](#gs-2-32) | 🟢 | Zhu & Lee – Heterogeneous Slope | Wet Spencer 1.189 vs Slide 1.189 (0.0%) | |
+| [2.32](#gs-2-32) | 🟢 | Zhu & Lee – Heterogeneous Slope | Wet Spencer 1.180 vs Slide 1.189 (−0.8%) | |
 | [2.33](#gs-2-33) | 🟢 | Priest – Rigid Blocks | M-P 1.049 vs SLOPE/W 1.049 (0.0%) · Janbu 1.049 vs Priest's hand calculation 1.049 (0.0%) | |
 | [2.34](#gs-2-34) | 🟢 | Yamagami – Stabilizing Piles | Unreinforced Bishop 1.100 vs SLOPE/W 1.102 (−0.2%) · with piles 1.185 vs Yamagami 1.20 (−1.3%) | pile-force conventions differ program to program |
 | [2.35](#gs-2-35) | 🟢 | Pockoski & Duncan – Tie-Back Wall | Bishop 1.142 vs Slide 1.147 (−0.4%) · Spencer 1.140 vs Slide 1.145 (−0.4%) | *covered* — [Slide2 VP58](rocscience.md#vp58); the vendor model was saved unsolved, so the SLOPE/W value is the one Pockoski & Duncan themselves report |
@@ -598,7 +598,7 @@ The wider spread is confined to the Lowe-Karafiath and Corps side-force assumpti
 
 ### 🟢 2.32 — Zhu & Lee – Heterogeneous Slope {#gs-2-32}
 
-The Zhu & Lee heterogeneous benched slope (four materials, water table, tension crack), verifying that an unconstrained circular search lands in the governing deep failure family.
+The Zhu & Lee heterogeneous benched slope (four materials, water table, tension crack), verifying that an unconstrained circular search lands in the governing deep failure family. Like SLOPE/W's model, it has a dry tension crack 1.015 m deep at the crest, which SLOPE/W draws as a line at y = 13.985. Its water table follows the arc through the three points of the manual's Table 88, drawn as 40 short chords.
 
 **Input:** [vp052b.xlsx](files/rocscience/vp052b.xlsx) · **Rocscience detail:** [VP52](rocscience.md#vp52)
 
@@ -606,7 +606,7 @@ The Zhu & Lee heterogeneous benched slope (four materials, water table, tension 
 
 | Method | XSLOPE | Slide | SLOPE/W |
 |---|---|---|---|
-| Spencer (wet, deep family) | 1.189 | 1.189 (0.0%) | — |
+| Spencer (wet, deep family) | 1.180 | 1.189 (−0.8%) | — |
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.32; [Zhu & Lee (2002)](https://doi.org/10.1002/nag.260).
 

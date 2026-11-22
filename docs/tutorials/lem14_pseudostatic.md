@@ -40,8 +40,9 @@ with the water table, the R envelope, and k<sub>h</sub> = 0.15; open it to start
 The slope is 15 ft high at 2H:1V, with level ground 45 ft wide behind the crest and in front of the toe. One soil fills
 the section down to a rigid base 15 ft below the toe. The water table in the sketch is added in Part 2.
 
-The soil is soil 1 of Duncan, Wright, and Brandon (2014), Table 10.3, a compacted fill from Pilarcitos Dam with a unit
-weight of 135 pcf. Its consolidated-undrained ($\overline{CU}$) tests give three strength envelopes:
+The soil is [soil 1](../seismic/two_stage.md#four-soils) of Duncan, Wright, and Brandon (2014, Table 10.3), a compacted
+fill from Pilarcitos Dam with a unit weight of 135 pcf. Its consolidated-undrained ($\overline{CU}$) tests give three
+strength envelopes:
 
 | Envelope | Intercept (psf) | Friction angle (deg) |
 | --- | :---: | :---: |
@@ -282,7 +283,8 @@ The water table lowers every factor of safety by 0.11 to 0.13. With it, the two-
 K<sub>c</sub> = 1 envelope also falls below 1, and only the interpolated one stays above it. Duncan et al. describe the
 two-stage analysis as the proper procedure and the one-stage analysis as a simpler alternative. The interpolated stage 2
 strength follows their text, which estimates the undrained strength "using the same procedures as for rapid drawdown";
-the K<sub>c</sub> = 1 envelope is how their Table 10.4 was computed.
+the K<sub>c</sub> = 1 envelope is the one they used for their own two-stage factors of safety, which
+the [comparison on the Two-Stage page](../seismic/two_stage.md#comparison) gives.
 
 ---
 

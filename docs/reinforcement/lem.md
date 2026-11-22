@@ -173,8 +173,10 @@ so the choice is set per line:
   unfactored and one factor of safety is to cover the soil and the reinforcement together, as in FHWA's design of
   reinforced soil slopes (GEC 11).
 
-The distinction matters numerically: on the classic Duncan & Wright tieback example (their Fig. 6.34), the same
-9,000 lb/ft support gives FS = 1.51 active and FS = 1.32 passive.
+The distinction matters numerically. Duncan & Wright (2005) analyze a 20 ft cut in saturated clay (γ = 98 pcf,
+c = 350 psf, φ = 0) held by one horizontal tieback carrying 9,000 lb/ft. They obtain FS = 1.51 with the force applied
+as active and FS = 1.32 with it applied as passive. XSLOPE gives 1.567 and 1.319 on the same slope, in the
+[VP85 verification problem](../verification/rocscience.md#vp85).
 
 ## Support Type Presets
 

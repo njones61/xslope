@@ -8650,7 +8650,7 @@
           "page": "verification/published/",
           "resolution": "input-link",
           "source_md": "docs/verification/published.md",
-          "title": "DWB Figure 10.1 — yield coefficient of a rigid wedge",
+          "title": "Duncan, Wright & Brandon — yield coefficient of a rigid wedge",
           "url": "https://xslope.org/en/latest/verification/published/#dwb-10-1"
         }
       ],
@@ -8728,7 +8728,7 @@
           "page": "verification/published/",
           "resolution": "input-link",
           "source_md": "docs/verification/published.md",
-          "title": "DWB Table 10.4 — pseudostatic slope, single-stage and two-stage",
+          "title": "Duncan, Wright & Brandon — single- and two-stage seismic analyses",
           "url": "https://xslope.org/en/latest/verification/published/#dwb-10-4"
         }
       ],
@@ -8806,7 +8806,7 @@
           "page": "verification/published/",
           "resolution": "input-link",
           "source_md": "docs/verification/published.md",
-          "title": "DWB Table 10.4 — pseudostatic slope, single-stage and two-stage",
+          "title": "Duncan, Wright & Brandon — single- and two-stage seismic analyses",
           "url": "https://xslope.org/en/latest/verification/published/#dwb-10-4"
         }
       ],
@@ -9171,7 +9171,7 @@
           "page": "verification/published/",
           "resolution": "input-link",
           "source_md": "docs/verification/published.md",
-          "title": "FHWA Example E6 — traffic barrier impact on the E4 wall",
+          "title": "FHWA Example E6 — traffic barrier impact on an MSE wall",
           "url": "https://xslope.org/en/latest/verification/published/#fhwa-e6"
         }
       ],
@@ -9243,7 +9243,7 @@
           "page": "verification/published/",
           "resolution": "input-link",
           "source_md": "docs/verification/published.md",
-          "title": "FHWA Example E7 — seismic loading on the E4 wall",
+          "title": "FHWA Example E7 — seismic loading on an MSE wall",
           "url": "https://xslope.org/en/latest/verification/published/#fhwa-e7"
         }
       ],

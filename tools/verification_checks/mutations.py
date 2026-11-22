@@ -209,10 +209,10 @@ MUTATIONS = [
 
     # ------------------------------------------------- zero at zero digits ---
     ("ssrm", "deltas", "Z1 a zero percentage that is not zero",
-     "| Spencer, circles forced tangent to the foundation base (false base circle) "
-     "| 1.70 | the proprietary slip-circle program's **1.7** (0%) |",
-     "| Spencer, circles forced tangent to the foundation base (false base circle) "
-     "| 1.80 | the proprietary slip-circle program's **1.7** (0%) |"),
+     "| Spencer on circles forced tangent to the foundation base, against the slip-circle "
+     "program the paper used | 1.70 | the slip-circle program's **1.7** (0%) |",
+     "| Spencer on circles forced tangent to the foundation base, against the slip-circle "
+     "program the paper used | 1.80 | the slip-circle program's **1.7** (0%) |"),
 
     # -------------------------------------------------------------- tags ---
     # Example 2 prints its 1.347 lock twice — as `| 1.35 |` in the results table

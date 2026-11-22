@@ -81,12 +81,13 @@ the firm base at toe level.
 | Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.40$ | **1.4** (0.0%) | their Table 2 and Fig. 2 |
 | SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.37 | 1.4 (−2.1%) | |
 
-Cross-bearings on the same XSLOPE number — context, not the basis of the dot:
+Two other published values for the same slope, for comparison. Neither is Griffiths & Lane's finite
+element answer, so the match dot doesn't rest on them:
 
-| Quantity | XSLOPE | Cross-bearing | Note |
+| Comparison | XSLOPE | Published | Note |
 |---|---|---|---|
-| SSRM FS, against the classical chart | 1.37 | Bishop & Morgenstern (1960) chart 1.380 (−0.7%) | printed on their Fig. 2 |
-| SSRM FS, against their trial table | 1.37 | the highest trial their Table 2 converged, **1.35** (+1.5%) | they fail at 1.40 |
+| SSRM FS, against Bishop & Morgenstern's (1960) stability chart | 1.37 | Bishop & Morgenstern (1960) chart 1.380 (−0.7%) | printed on Griffiths & Lane's Fig. 2 |
+| SSRM FS, against the last trial factor at which Griffiths & Lane's analysis converged | 1.37 | their Table 2, **1.35** (+1.5%) | it fails to converge at 1.40 |
 
 The dot is scored on the first row, XSLOPE's upturn against the displacement-based reading
 Griffiths & Lane themselves report.
@@ -142,12 +143,14 @@ limit-equilibrium search assuming a base circle is misled.
 | SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.35 | FE FOS 1.4 (−3.6%) | within the paper's one-decimal precision: 1.35 rounds to 1.4 |
 | Spencer, unconstrained circular search (toe circle) | 1.37 | the paper's "correct" FOS of **1.4** (−2.1%) | which it obtains only by forcing the circle through the toe (p. 394) |
 
-Cross-bearings on the false base circle — context, not the basis of the dot:
+Griffiths & Lane also show what a limit equilibrium search finds when its circles are forced tangent
+to the base of the foundation, an answer the paper shows is misleading. XSLOPE finds the same answer on
+those circles. These values are for comparison, and the match dot doesn't rest on them:
 
-| Quantity | XSLOPE | Cross-bearing | Note |
+| Comparison | XSLOPE | Published | Note |
 |---|---|---|---|
-| Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | the proprietary slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
-| — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
+| Spencer on circles forced tangent to the foundation base, against the slip-circle program the paper used | 1.70 | the slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
+| The same circles, against Bishop & Morgenstern's (1960) chart for a circle tangent to the base | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
 
 | Property | Value |
 |----------|-------|

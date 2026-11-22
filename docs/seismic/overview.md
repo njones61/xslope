@@ -98,28 +98,52 @@ tolerable displacement.
 
 Screening works for soils that do not lose much strength in an earthquake. Makdisi and Seed (1977) found that for
 clays, for dry or partly saturated sands, and for very dense saturated sands, cyclic loading at about 80 percent of
-the static undrained strength separates small strains from large ones. Each screening method combines five parts:
+the static undrained strength separates small strains from large ones.
 
-1. **A reference acceleration, a<sub>ref</sub>.** Usually the peak acceleration of the bedrock beneath the slope, or
-   the peak acceleration at the top of the slope, which takes a site response analysis to find. Some newer methods use
-   a spectral acceleration.
-2. **An acceleration multiplier, a/a<sub>ref</sub>.** The recommended multipliers range from 0.17 to 0.75.
-3. **A strength reduction factor.** Most methods reduce the static strength, most often by 15 to 20 percent.
-4. **A minimum factor of safety,** 1.0 or 1.15 in the older methods. In some newer ones it depends on the tolerable
-   displacement.
-5. **A tolerable permanent displacement,** from 0.15 m for landfill liners to about 1 m for dams.
+Each screening method has five parts, which are used together. The table lists the methods in common use, with the
+five parts as its columns (after Duncan et al. 2014, Table 10.1):
 
-The seismic coefficient is the reference acceleration, as a fraction of the acceleration of gravity, times the
-multiplier:
+| Method | Reference acceleration, a<sub>ref</sub> | Acceleration multiplier, a/a<sub>ref</sub> | Strength reduction factor | Minimum factor of safety | Tolerable displacement |
+|---|---|---|---|---|---|
+| Seed (1979) | 0.75g (M ≈ 6½) | 0.133 | 0.85 | 1.15 | About 1 m |
+| Seed (1979) | 0.75g (M ≈ 8¼) | 0.167 | 0.85 | 1.15 | About 1 m |
+| Hynes-Griffin and Franklin (1984) | PGA<sub>rock</sub> (M ≤ 8.3) | 0.5 | 0.8 | 1.0 | 1 m |
+| Bray et al. (1998) | PGA<sub>rock</sub> | 0.75 | Conservative strengths, such as residual strengths | 1.0 | 0.30 m for landfill covers, 0.15 m for sliding at a landfill's base |
+| Kavazanjian et al. (1997) | PGA<sub>soil</sub> | 0.17 if the PGA accounts for amplification | 0.8<sup>a</sup> | 1.0 | 1 m |
+| Kavazanjian et al. (1997) | PGA<sub>soil</sub> | 0.5 if a free-field PGA is determined | 0.8<sup>a</sup> | 1.0 | 1 m |
+| NCHRP 12-70 (2008), FHWA (2011) | PGA<sub>soil</sub> | 0.2 to 0.5, with the PGA including site amplification | 0.8 | 1.0 | 5 cm or less |
+| Bray and Travasarou (2009) | Spectral acceleration, S<sub>a</sub>, 5 percent damped, at a specified period | Depends on the slope's height and the displacement | 1.0, with median or best-estimate strengths | Varies | Varies |
 
->>$k_h = \dfrac{a_{ref}}{g}\,\dfrac{a}{a_{ref}}$
+<sup>a</sup> For fully saturated or sensitive clays.
 
-Each method is complete in itself: a factor of safety at or above its minimum, computed with its reference
-acceleration, multiplier, and strength reduction, indicates a displacement no larger than its tolerable one. Duncan et
-al. (2014), Table 10.1, compare the methods of Seed (1979), Hynes-Griffin and Franklin (1984), Kavazanjian et al.
-(1997), Bray et al. (1998), NCHRP 12-70 (2008), Bray and Travasarou (2009), and FHWA (2011). To follow a method that
-calls for a strength reduction, enter the reduced strengths in a single-stage analysis; in a two-stage analysis, set the
-[stage 2 strength factor](two_stage.md#factor).
+The five parts are:
+
+1. **The reference acceleration, a<sub>ref</sub>.** M is the earthquake's magnitude, and PGA is the peak ground
+   acceleration. PGA<sub>rock</sub> is the peak acceleration in the bedrock beneath the slope. PGA<sub>soil</sub> is
+   the peak acceleration at the top of the slope, which includes the soil's amplification of the shaking and takes a
+   site response analysis to find. A free-field PGA is one at the ground surface, unaffected by the slope or by any
+   structure. Bray and Travasarou (2009) use a spectral acceleration instead.
+2. **The acceleration multiplier, a/a<sub>ref</sub>.** The seismic coefficient is the reference acceleration, as a
+   fraction of the acceleration of gravity, times the multiplier:
+
+    >>$k_h = \dfrac{a_{ref}}{g}\,\dfrac{a}{a_{ref}}$
+
+3. **The strength reduction factor.** The static strength is multiplied by this factor. Most methods use 0.85 or 0.8,
+   a reduction of 15 or 20 percent.
+4. **The minimum factor of safety.** The older methods use 1.0 or 1.15. In some newer ones it depends on the
+   tolerable displacement.
+5. **The tolerable displacement.** It ranges from 0.15 m under a landfill to about 1 m for a dam.
+
+A method is used whole. Compute the factor of safety with the method's reference acceleration, multiplier, and
+strength reduction. If it is at or above the method's minimum, the earthquake should not displace the slope more than
+the method's tolerable displacement.
+
+Hynes-Griffin and Franklin (1984) developed their method for earth dams, and Bray et al. (1998) theirs for landfills.
+Both use the bedrock acceleration, so neither needs a site response analysis. The newer methods, NCHRP 12-70 (2008),
+Bray and Travasarou (2009), and FHWA (2011), are more complex and need careful study before they are used.
+
+To apply a method's strength reduction in a single-stage analysis, enter the reduced strengths. In a two-stage
+analysis, set the [stage 2 strength factor](two_stage.md#factor) instead.
 
 **Peak accelerations.** For a site in the United States, the U.S. Geological Survey's
 [Unified Hazard Tool](https://earthquake.usgs.gov/hazards/interactive/) gives the peak ground acceleration on rock
@@ -170,10 +194,24 @@ strengths entered as each material's strength. A zone that liquefies is entered 
 
 ## References
 
+- Bray, J.D., Rathje, E.M., Augello, A.J., and Merry, S.M. (1998). "Simplified seismic design procedure for
+  geosynthetic-lined, solid-waste landfills." *Geosynthetics International*, 5(1–2), 203–235.
+- Bray, J.D., and Travasarou, T. (2009). "Pseudostatic coefficient for use in simplified seismic slope stability
+  evaluation." *Journal of Geotechnical and Geoenvironmental Engineering*, 135(9), 1336–1340.
 - Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014). *Soil Strength and Slope Stability*, 2nd ed. Wiley, Hoboken,
   NJ. Chapter 10.
+- FHWA (2011). *LRFD Seismic Analysis and Design of Transportation Geotechnical Features and Structural
+  Foundations.* Geotechnical Engineering Circular No. 3, Report No. FHWA-NHI-11-032, Federal Highway Administration,
+  Washington, DC.
+- Hynes-Griffin, M.E., and Franklin, A.G. (1984). *Rationalizing the Seismic Coefficient Method.* Miscellaneous Paper
+  GL-84-13, U.S. Army Corps of Engineers, Waterways Experiment Station, Vicksburg, MS.
+- Kavazanjian, E., Jr., Matasovic, N., Hadj-Hamou, T., and Sabatini, P.J. (1997). *Design Guidance: Geotechnical
+  Earthquake Engineering for Highways*, Vol. 1, *Design Principles.* Geotechnical Engineering Circular No. 3,
+  Publication No. FHWA-SA-97-076, Federal Highway Administration, Washington, DC.
 - Makdisi, F.I., and Seed, H.B. (1977). *A Simplified Procedure for Estimating Earthquake-Induced Deformation in Dams
   and Embankments.* Report UCB/EERC-77/19, University of California, Berkeley.
+- NCHRP 12-70 (2008). *Seismic Analysis and Design of Retaining Walls, Buried Structures, Slopes and Embankments.*
+  NCHRP Report 611, Transportation Research Board, Washington, DC.
 - Newmark, N.M. (1965). "Effects of earthquakes on dams and embankments." *Géotechnique*, 15(2), 139–160.
 - Seed, H.B. (1979). "Considerations in the earthquake-resistant design of earth and rockfill dams." Nineteenth
   Rankine Lecture, *Géotechnique*, 29(3), 215–263.

@@ -525,9 +525,7 @@ def test_the_material_graying_is_the_sheets():
     """The editor grays a material's cells by the template mat sheet's own
     conditional formatting, for every strength option, pore-pressure model and
     unsaturated model: d and psi live only for mc, the other options' parameters
-    grayed, ru only for u = ru, and so on. The one place the editor grays more is
-    l for the Gardner model, which does not read it and whose sheet cell stays
-    live."""
+    grayed, ru only for u = ru, l grayed for the Gardner model, and so on."""
     from studio.editors import _mat_dim_keys
     rules = _sheet_gray_rules()
     env = {"AND": lambda *a: all(a), "OR": lambda *a: any(a)}
@@ -540,8 +538,6 @@ def test_the_material_graying_is_the_sheets():
         for expr, keys in rules:
             if eval(expr, {"__builtins__": {}}, names):
                 want |= keys
-        if um == "gard":
-            want.add("vg_l")
         got = set(_mat_dim_keys({"option": opt, "u": u, "unsat": um}))
         if got != want:
             out.append(f"option={opt}, u={u}, unsat={um}: the editor grays "

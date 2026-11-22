@@ -368,15 +368,15 @@ analysis. A line is used by every material on the **mat** sheet whose pore press
 applies to soils analyzed with effective-stress (drained) strengths. Below the line, pore pressures are positive;
 above it, they are zero.
 
-Each line has a **Type** cell that says how the head at a point below the line is read from the line. The figure
-shows one line read both ways, at a point on a slip surface:
+Each line has a **Type** cell that says how the head at a point below the line is read from the line. There are
+two types, piezo and phreatic. The figure shows both at the same point on a slip surface:
 
 ![One water line read two ways at a point on a slip surface: piezo takes the vertical distance Δz up to the line; phreatic takes Δz cos²θ, the height a standpipe at the point rises to, where the equipotential through the point meets the line at a right angle](../lem/images/piezo_phreatic.png){width=760px}
 
-- **piezo** (the default; a blank cell means the same): the head reaches the line directly above the point. The pore
+- **Type piezo** (the default; a blank cell means the same): the head reaches the line directly above the point. The pore
   pressure is u = γ<sub>w</sub> Δz, where Δz is the vertical distance from the point up to the line.
 
-- **phreatic**: the line is the water table in a slope with steady seepage along it. The equipotentials cross the
+- **Type phreatic**: the line is the water table in a slope with steady seepage along it. The equipotentials cross the
   line at a right angle, so a standpipe at the point rises only to Δz cos²θ, where θ is the inclination of the line
   segment directly above the point. The pore pressure is u = γ<sub>w</sub> Δz cos²θ. This is the same correction as
   Slide2's "Hu: Auto" and the phreatic-surface option in XSTABL.

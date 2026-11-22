@@ -57,7 +57,8 @@ choice changes the model, so XSLOPE asks for it rather than guessing.
 | **Undrained materials** (φ = 0, strength entered as cohesion) | `option='mc'` with c = Su, φ = 0 |
 | **Bedrock** (impenetrable) | `option='elastic'` — an impenetrable material, see below |
 | Material color | The zone color in Studio |
-| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it |
+| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it; Type `phreatic` only where the analysis applies SLOPE/W's phreatic correction |
+| **Ru**, per material | `u = ru`, with the same value |
 | **Water above the ground surface** | **A distributed load** — see below |
 | **A parent SEEP/W analysis's pore-pressure field** | The `seep` option, on SEEP/W's own mesh — see below |
 | **Surcharges** (a wedge of fill above the ground — the surcharge pressure is its *unit weight*) | `dloads`, varying with the depth of fill |
@@ -99,6 +100,18 @@ shared geometry table, and the import resolves them that way (export writes them
 under the same convention). Resolved against the wrong list, a water table can double
 back on itself or land meters off, and the model still solves, with pore pressures that
 change the factor of safety by several percent.
+
+SLOPE/W's **phreatic correction** is a setting on the analysis. Where it is on, the head
+under the line is reduced by cos² of the line's slope, and the line imports as Type
+`phreatic`, which does the same. Where it is off, which is the default, SLOPE/W uses the
+plain head under the line, and so does the import. One difference remains: SLOPE/W leaves
+the head uncorrected where the line runs along the ground surface, and XSLOPE corrects it
+there too. The caveats name that stretch when a model has one.
+
+**Ru** imports as XSLOPE's `ru` option, with each material's own value. Both programs
+take the pore pressure as ru times the weight of the soil above the slice base. SLOPE/W
+also counts a surcharge in that weight and XSLOPE does not, and the caveats report it
+when a model has both.
 
 Ponded water needs no conversion at all. GeoStudio stores no
 ponded-water object: where the water rises **above** the ground surface, SLOPE/W simply
@@ -212,16 +225,28 @@ without telling you. Read the caveats it returns.
   will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
   along a bedrock boundary), XSLOPE takes the most critical of SLOPE/W's circles that
   does build, or imports no surface if none does, and the caveats report either case. A
-  block or fully specified surface is not a circle, so no surface is imported from one.
+  block, fully specified, or automatic-search surface is not a circle, so no surface is
+  imported from one, or from an analysis that takes its surface from such a parent.
+  An *optimized* search ends on a non-circular surface, which SLOPE/W saves with a
+  circle fitted to it. XSLOPE imports the most critical circle of the search before the
+  optimization instead, and the caveats give SLOPE/W's lower, optimized factor of safety.
 - **Reinforcement *sets*** — GeoStudio's out-of-plane staging groups. The reinforcement
   itself imports; the grouping does not.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
-- **Pore pressure that is neither a piezometric surface nor a SEEP/W field.** Ru and
-  spatial pore-pressure functions import as zero, and the caveats report this. This is
-  one-way: export *writes* a spatial function (it is how a seepage field crosses), but
-  import does not read one back, so an XSLOPE model exported and re-imported returns
-  dry, with a caveat reporting it.
+- **Spatial pore-pressure functions and B-bar.** A spatial function imports as zero.
+  XSLOPE has no B-bar, so where SLOPE/W adds B-bar's excess pore pressure to a
+  piezometric line, the line imports and the excess pressure does not. The caveats
+  report both. The spatial function is one-way: export *writes* one (it is how a
+  seepage field crosses), but import does not read one back, so an XSLOPE model
+  exported and re-imported returns dry, with a caveat reporting it.
+- **A staged rapid drawdown.** SLOPE/W's staged rapid drawdown reads two piezometric
+  surfaces, before and after drawdown, and drawdown strengths for the soils that don't
+  drain. The import takes only the first surface, so the model is the slope before
+  drawdown, while SLOPE/W's factor of safety on the imported circle is the one after it.
+  The caveats say so, and give the lowered surface and the d and ψ that XSLOPE's own
+  [rapid drawdown](../lem/rapid.md) needs, converted from SLOPE/W's drawdown strengths
+  by SLOPE/W's own equations.
 - **The SEEP/W analysis itself** — its mesh is imported, but its conductivity functions
   and boundary conditions are not, so XSLOPE cannot *re-solve* the seepage problem, only
   read the answer SEEP/W already computed. An **unsolved** SEEP/W-fed file therefore

@@ -36,13 +36,15 @@ one thing the caller must choose is which analysis to import, because a single
 slip-surface definition — see ``gsz_to_slope_data``).
 
 Only what SLOPE/W and xslope have in common is imported -- regions, materials
-(Mohr-Coulomb and undrained; bedrock as ``elastic``), the piezometric surface,
-water above ground, a solved SEEP/W field, surcharges and line loads,
-reinforcement, the tension crack, the seismic coefficient and the solved
-critical circle. Everything else is reported as a caveat rather than silently
-dropped: unsupported strength models, unsupported pore-pressure options
-(ru and spatial functions), SLOPE/W's search definition, reinforcement sets,
-inclined tension cracks and the vertical seismic coefficient.
+(Mohr-Coulomb and undrained; bedrock as ``elastic``), the piezometric surface
+(with SLOPE/W's phreatic correction where the analysis applies it), Ru, water
+above ground, a solved SEEP/W field, surcharges and line loads, reinforcement,
+the tension crack, the seismic coefficient and the solved critical circle.
+Everything else is reported as a caveat rather than silently dropped:
+unsupported strength models, unsupported pore-pressure options (B-bar and
+spatial functions), a staged rapid drawdown, SLOPE/W's search definition and an
+optimized or non-circular critical surface, reinforcement sets, inclined tension
+cracks and the vertical seismic coefficient.
 """
 
 import csv
@@ -506,6 +508,27 @@ def read_gsz(path):
                                     "p1": a, "p2": b,
                                     "on_ground": rl.get("OnGroundSurface") == "true"})
 
+        # Analysis switches, e.g. <IsPiezPhreatic> (SLOPE/W's phreatic correction on
+        # the piezometric surfaces) and <IsRapidDrawdown> (its staged rapid drawdown).
+        # GeoStudio writes a switch only when it is on.
+        control = {c.tag: (c.text or "").strip() for c in entry.findall("./Control/*")}
+
+        # Ru and B-bar, per material ID. Each is read by SLOPE/W only under its own
+        # water option (Ru; PiezoSurfaceBbar or Bbar), and GeoStudio keeps the table
+        # on analyses that use neither -- often with empty values. B-bar's 'IsIncluded'
+        # marks a material whose weight drives the excess pressure ("Add weight").
+        ru = {}
+        for p in entry.findall("./MaterialUsesRuParams/MaterialUsesRuParam"):
+            pid, e = _text(p, "ID"), p.find("Entry")
+            if pid and e is not None:
+                ru[int(pid)] = (e.get("Function") or "").strip()
+        bbar = {}
+        for p in entry.findall("./MaterialUsesBBarParams/MaterialUsesBBarParam"):
+            pid, e = _text(p, "ID"), p.find("Entry")
+            if pid and e is not None:
+                bbar[int(pid)] = {"bbar": (e.get("Function") or "").strip(),
+                                  "add_weight": e.get("IsIncluded") == "true"}
+
         stability[int(_text(s, "AnalysisID"))] = {
             "k_seismic": float(kh) if kh else 0.0,
             "k_seismic_v": float(kv) if kv else 0.0,
@@ -517,6 +540,11 @@ def read_gsz(path):
             "surcharges": surcharges,
             "reinf_lines": reinf_lines,
             "line_loads": line_loads,
+            "control": control,              # analysis switches: tag -> text
+            "phreatic": control.get("IsPiezPhreatic", "").lower() == "true",
+            "rapid_drawdown": control.get("IsRapidDrawdown", "").lower() == "true",
+            "ru": ru,                        # material ID -> Ru (as written)
+            "bbar": bbar,                    # material ID -> {'bbar', 'add_weight'}
             # Everything GeoStudio put on this analysis, so gsz_to_slope_data can
             # report anything it does not import instead of dropping it in silence.
             "elements": [c.tag for c in entry],
@@ -560,9 +588,17 @@ _ENTRY_ELEMENTS = {
     "SlipSurface": None,           # the search — reported separately, deliberately skipped
     "ReinforcementLines": None,
     "LineLoadPoints": None,
+    "Control": None,               # switches; each is checked against _CONTROL_HANDLED
+    "MaterialUsesRuParams": None,  # read with the water option that uses them
+    "MaterialUsesBBarParams": None,
     # --- present, load-bearing, and NOT imported ---
     "ReinforcementSets": "reinforcement sets (out-of-plane staging groups)",
 }
+
+# The <Control> switches gsz_to_slope_data acts on: the phreatic correction is
+# imported, and a staged rapid drawdown is reported. Any other switch is reported as
+# unrecognized, the same as an unknown element.
+_CONTROL_HANDLED = {"IsPiezPhreatic", "IsRapidDrawdown"}
 
 # How GeoStudio says the tension crack is defined. 'Surface' means "by the line whose
 # points follow", which is the only form xslope can convert. A crack that is switched
@@ -579,18 +615,30 @@ _TCRACK_OPTIONS = {"Surface"}
 #   2  FullySpecified    5  entry and exit, the        6  FromOther: the parent
 #                           default (no <Option>)         analysis's surface
 #
-# 1 and 5 search circles. 6 inherits the parent's surface, which is a circle only if
-# the parent's was. 2 and 4 are not circles at all -- though SLOPE/W still writes a
-# center and radius for them, a circle FITTED to the surface, which is the trap. 7 is
-# not taken either. A 6 is counted here without looking at the parent.
-_CIRCULAR_SEARCHES = {"1", "5", "6"}
+# 1 and 5 search circles. 2 and 4 are not circles at all -- though SLOPE/W still writes
+# a center and radius for them, a circle FITTED to the surface, which is the trap. 7 is
+# not taken either. 6 inherits the parent's surface, so it is whatever the parent's
+# search was: read_gsz_results looks the parent up (_search_option) rather than count
+# a 6 as a circle -- Tandjiria's reinforced block analyses are 6s with a Block parent.
+_SEARCH_KIND = {"1": "circle", "5": "circle", "2": "specified", "4": "block",
+                "7": "automatic"}
 
-# Older files (AppVersion 11.4 in the vendor's set) write no SlipOrigSearchMethod column
-# at all, and name the radius column SlipRadius rather than SlipRadiusX. Their rows are
-# classified by the analysis's own <SlipSurface><Option> instead, read from the XML saved
-# beside the results: a grid-and-radius search, or the default (no <Option>), searches
-# circles.
-_CIRCULAR_OPTIONS = {"GridAndRadius", None}
+# The same, by the analysis's <SlipSurface><Option>, for a 6 (by its parent's) and for
+# older files (AppVersion 11.4 in the vendor's set), which write no SlipOrigSearchMethod
+# column at all and name the radius column SlipRadius rather than SlipRadiusX. None is
+# the default entry-and-exit search, which GeoStudio writes as no <Option>.
+_OPTION_KIND = {"GridAndRadius": "circle", None: "circle", "FullySpecified": "specified",
+                "Block": "block", "Automatic": "automatic"}
+
+# How a caveat names a surface that is not a circle, by its kind. 'optimized' is the
+# surface SLOPE/W's optimization makes out of the critical one (see read_gsz_results).
+_SURFACE_WORDS = {
+    "block": "a block surface",
+    "specified": "a fully specified surface",
+    "automatic": "a surface from SLOPE/W's automatic search",
+    "optimized": "an optimized surface",
+    "unknown": "a surface from a search XSLOPE does not recognize",
+}
 
 
 def list_analyses(gsz):
@@ -1056,6 +1104,100 @@ def _import_seep(gsz, analysis, step, caveats, polygons):
     return mesh, u, chosen
 
 
+def _line_on_ground(line, ground_surface, n=20):
+    """The x ranges, as ``[(x0, x1), ...]``, where a SLOPING stretch of a piezometric
+    line runs along the ground surface -- where SLOPE/W's phreatic correction leaves
+    the head alone and an XSLOPE 'phreatic' line does not (Greco's weak-layer slope,
+    the one verification file with the correction on). A level stretch is skipped:
+    cos^2 of a zero slope is 1, so the two agree there anyway. No file shows what
+    SLOPE/W does where a sloping line is above the ground, so that is not claimed."""
+    if ground_surface is None or ground_surface.is_empty or len(line) < 2:
+        return []
+    gx0, _, gx1, _ = ground_surface.bounds
+    tol = 1e-6 * max(1.0, gx1 - gx0)
+    spans = []
+    for (xa, ya), (xb, yb) in zip(line, line[1:]):
+        if abs(xb - xa) < 1e-12 or abs(yb - ya) < 1e-12:
+            continue
+        on = []
+        for k in range(n + 1):
+            x = xa + (xb - xa) * k / n
+            yg = _y_on(ground_surface, x)
+            if yg is not None and abs(ya + (yb - ya) * k / n - yg) <= tol:
+                on.append(x)
+        if on:
+            lo, hi = min(on), max(on)
+            if spans and lo <= spans[-1][1] + tol:
+                spans[-1] = (spans[-1][0], max(spans[-1][1], hi))
+            else:
+                spans.append((lo, hi))
+    return [(a, b) for a, b in spans if b - a > tol]
+
+
+def _rapid_drawdown_caveat(gsz, used, surfaces, piezo_line):
+    """The caveat for a SLOPE/W staged rapid drawdown, which the import does not carry.
+
+    SLOPE/W (after Duncan, Wright and Wong 1990) reads the higher of two piezometric
+    surfaces as the water before drawdown and the lower as the water after it, and
+    each soil that does not drain carries an R envelope, <DrawdownCohesion> and
+    <DrawdownPhi> (c_R, phi_R; a free-draining soil has neither). XSLOPE's own rapid
+    drawdown takes the same inputs as a second piezo line and the K_c = 1 envelope
+    (d, psi), which SLOPE/W computes from c_R and phi_R by its Eqs. 77-78:
+
+        d = c_R cos(phi_R) cos(phi') / (1 - sin(phi_R))
+        psi = atan( sin(phi_R) cos(phi') / (1 - sin(phi_R)) )
+
+    The caveat gives those values, so the stages can be entered by hand.
+    """
+    lines = [ln for ln in surfaces.values() if ln]
+    high = low = None
+    if len(lines) >= 2:
+        tops = [max(y for _, y in ln) for ln in lines]
+        high, low = lines[tops.index(max(tops))], lines[tops.index(min(tops))]
+
+    soils = []
+    for mid in used:
+        mat = gsz["materials"][mid]
+        s = mat["strength"]
+        try:
+            c_r = float(s.get("DrawdownCohesion") or 0.0)
+            phi_r = float(s.get("DrawdownPhi") or 0.0)
+            phi = float(s.get("PhiPrime") or 0.0)
+        except ValueError:
+            continue
+        if not (c_r or phi_r) or mat["model"] == "Bedrock":
+            continue
+        sr, cr = math.sin(math.radians(phi_r)), math.cos(math.radians(phi_r))
+        cp = math.cos(math.radians(phi))
+        d = c_r * cr * cp / (1.0 - sr)
+        psi = math.degrees(math.atan(sr * cp / (1.0 - sr)))
+        soils.append(f"{mat['name']!r} d = {d:.4g}, psi = {psi:.3g}")
+
+    if piezo_line and high is not None and list(piezo_line) == list(high):
+        took = ("XSLOPE imported only the full-pool (higher) piezometric surface, as an "
+                "ordinary piezo line, so this model is the slope before drawdown")
+    elif piezo_line and low is not None and list(piezo_line) == list(low):
+        took = ("XSLOPE imported only the lowered piezometric surface, as an ordinary "
+                "piezo line, so this model is the slope after drawdown with drained "
+                "strengths throughout")
+    elif piezo_line:
+        took = "XSLOPE imported one piezometric surface, as an ordinary piezo line"
+    else:
+        took = "XSLOPE imported none of its water"
+    return (
+        "THE FACTOR OF SAFETY IS NOT SLOPE/W'S RAPID DRAWDOWN ANSWER: SLOPE/W solved "
+        "this analysis as a staged rapid drawdown (Duncan, Wright and Wong 1990). "
+        f"{took}. The lowered surface, the drawdown strengths and the three stages "
+        "were not imported. SLOPE/W's FS on the imported circle is its after-drawdown "
+        "value. To run XSLOPE's own rapid drawdown, add the lowered surface"
+        + (f" ({', '.join(f'({x:g}, {y:g})' for x, y in low)})"
+           if low is not None and len(low) <= 12 else "")
+        + " as the second piezo line"
+        + (f" and set d and psi: {'; '.join(soils)} (SLOPE/W's drawdown strengths, "
+           f"converted by its own equations)" if soils else "")
+        + ".")
+
+
 def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     """Build an xslope ``slope_data`` for one analysis of a parsed .gsz.
 
@@ -1221,7 +1363,12 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     option = water.get("option") or "None"
     uses = stab.get("material_piezo", {})
     surfaces = stab.get("piezo", {})
-    if option == "PiezoSurface":
+    rapid = bool(stab.get("rapid_drawdown"))
+    # PiezoSurfaceBbar is a piezometric surface plus B-bar's excess pressure. The
+    # surface part is plain head, the same as PiezoSurface (SLOPE/W's own B-bar
+    # example: its per-column pressure is the head plus B-bar x the added load), so
+    # it is imported; the B-bar part is reported below.
+    if option in ("PiezoSurface", "PiezoSurfaceBbar"):
         if surfaces:
             piezo_line = list(next(iter(surfaces.values())))
             for mid, mat in zip(used, materials):
@@ -1234,13 +1381,66 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                     f"material(s) {', '.join(repr(d) for d in dry)} are not connected "
                     f"to the piezometric surface in GeoStudio — imported with no pore "
                     f"pressure")
-            if len(surfaces) > 1:
+            if len(surfaces) > 1 and not rapid:
+                # (A staged rapid drawdown has two by design; its own caveat says
+                # which was imported.)
                 caveats.append(
                     f"the file defines {len(surfaces)} piezometric surfaces; "
                     f"xslope takes one, so the first was imported")
         else:
             caveats.append("the analysis asks for a piezometric surface but the file "
                            "defines none — pore pressure imported as zero")
+    if option in ("PiezoSurfaceBbar", "Bbar"):
+        bb = stab.get("bbar") or {}
+        coef = [f"{gsz['materials'][m]['name']!r} {bb[m]['bbar']}" for m in used
+                if bb.get(m, {}).get("bbar")]
+        added = [repr(gsz["materials"][m]["name"]) for m in used
+                 if bb.get(m, {}).get("add_weight")]
+        caveats.append(
+            "THE FACTOR OF SAFETY WILL BE TOO HIGH: SLOPE/W adds excess pore pressure "
+            "from B-bar"
+            + (f" ({', '.join(coef)})" if coef else "")
+            + (f", driven by the weight of {', '.join(added)}" if added else "")
+            + ". XSLOPE has no B-bar, so that pressure was not imported. "
+            + ("Only the piezometric line was. " if option == "PiezoSurfaceBbar"
+               else "Pore pressure was imported as zero. ")
+            + "Add the excess pressure by hand before you trust the result")
+    elif option == "Ru":
+        # SLOPE/W's Ru: u = Ru x the weight of the soil column over the base, per
+        # material (<MaterialUsesRuParams>). On SLOPE/W's own Ru files every column's
+        # pressure is exactly Ru x its weight / width. XSLOPE's u = 'ru' is the same
+        # definition, so the value carries over unchanged.
+        ru, set_ru, bad = stab.get("ru") or {}, [], []
+        for mid, mat in zip(used, materials):
+            text = ru.get(mid) or ""
+            if mid in bedrock or not text:
+                continue
+            try:
+                value = float(text)
+            except ValueError:
+                bad.append(f"{mat['name']!r} ({text})")
+                continue
+            if value:
+                mat["u"], mat["ru"] = "ru", value
+                set_ru.append(f"{mat['name']!r} ru = {value:g}")
+        if set_ru:
+            caveats.append(
+                f"pore pressure is SLOPE/W's Ru, imported as XSLOPE's ru with the same "
+                f"value for each material: {', '.join(set_ru)}. Both programs take "
+                f"u = ru times the weight of the soil above the slice base")
+        elif not bad:
+            caveats.append("pore pressure is SLOPE/W's Ru, but no material has a Ru "
+                           "value, so the model is dry")
+        if bad:
+            caveats.append(
+                f"THE FACTOR OF SAFETY WILL BE WRONG: SLOPE/W's Ru for "
+                f"{', '.join(bad)} is not a number XSLOPE can read, so that material "
+                f"was imported dry. Set its ru by hand")
+        if set_ru and stab.get("surcharges"):
+            caveats.append(
+                "SLOPE/W counts the surcharge in the weight that Ru multiplies. "
+                "XSLOPE's ru uses the soil weight alone, so its pore pressure under "
+                "the surcharge is lower than SLOPE/W's")
     elif option == "Parent":
         # The water condition is a whole head field computed by a parent SEEP/W run.
         # SLOPE/W writes the TRANSFERRED field into this analysis's own result folder,
@@ -1263,11 +1463,19 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 "seepage problem from a .gsz. The soil and geometry are right; the water "
                 "is simply absent. Solve the file in GeoStudio and re-import, or set a "
                 "piezo line, before you trust any number this model produces")
-    elif option not in ("None", "", None):
+    elif option not in ("None", "", None, "PiezoSurface"):
         caveats.append(
             f"THE FACTOR OF SAFETY WILL BE WRONG: pore pressure comes from SLOPE/W's "
             f"'{option}' option, which xslope cannot read — imported as zero. Set a "
             f"piezo line, ru, or a seepage solution before solving")
+
+    # A staged rapid drawdown (Duncan, Wright and Wong 1990). SLOPE/W reads two
+    # piezometric surfaces -- the higher one before drawdown, the lower one after -- and
+    # drawdown strengths (c_R, phi_R) for the soils that do not drain. The import takes
+    # only the first surface, as an ordinary piezo line, so the model is the slope
+    # before drawdown while SLOPE/W's own factor of safety is the one after it.
+    if rapid:
+        caveats.append(_rapid_drawdown_caveat(gsz, used, surfaces, piezo_line))
 
     # SLOPE/W's unsaturated shear-strength setting rides on the piezometric surface as
     # a suction ceiling (CapSuction/MaxSuction), NOT as a per-material phi_b. It is a
@@ -1286,6 +1494,24 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             "s_cap) by hand if you want unsaturated strength credited")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
+
+    phreatic = bool(stab.get("phreatic"))
+    if piezo_line and phreatic:
+        # SLOPE/W's correction is head x cos^2 of the line's slope, the same as an
+        # XSLOPE 'phreatic' line, but SLOPE/W skips it where the line runs along the
+        # ground: on Greco's weak-layer slope its pressure there is the plain head,
+        # while every column under the buried part of the line is corrected.
+        spans = _line_on_ground(piezo_line, ground_surface)
+        caveats.append(
+            "SLOPE/W applies its phreatic correction to this analysis's piezometric "
+            "line, so the line was imported as a 'phreatic' line: the head under it "
+            "is reduced by cos² of the line's slope"
+            + ("" if not spans else
+               ". SLOPE/W leaves the head uncorrected where the line runs along the "
+               "ground surface ("
+               + ", ".join(f"x = {a:g} to {b:g}" for a, b in spans)
+               + "), and XSLOPE corrects it there too, so XSLOPE's pore pressure is "
+                 "lower than SLOPE/W's there"))
 
     slope_data = {
         "template_version": None,
@@ -1314,8 +1540,15 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         "materials": materials,
         "piezo_line": piezo_line,
         "piezo_line2": [],
-        "piezo_phreatic": True,
-        "piezo_phreatic2": True,
+        # SLOPE/W's phreatic correction is a per-analysis switch, <Control>
+        # <IsPiezPhreatic>, written only when it is on. Without it SLOPE/W's pore
+        # pressure is the plain head under the line: on every such analysis in
+        # SLOPE/W's verification files with per-column output, its pressure is
+        # gamma_w x head exactly. Importing the line as 'phreatic' regardless cut
+        # the pressure by cos^2 of the line's slope (Zhu & Lee wet: 41.7 for
+        # SLOPE/W's 52.2) and raised the factor of safety 3-4%.
+        "piezo_phreatic": phreatic,
+        "piezo_phreatic2": phreatic,
         "circular": False,
         "circles": [],
         "non_circ": [],
@@ -1357,12 +1590,20 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     # fully-specified surfaces, but they describe a circle FITTED to the surface, not
     # the surface it solved -- importing one would silently swap the mechanism.
     circular = [t for t in trials if t["circular"]]
-    best = min(circular, key=lambda t: t["fs"]) if circular else None
     if trials and not circular:
+        worst = min(trials, key=lambda t: t["fs"])
         caveats.append(
-            "SLOPE/W's critical surface here is non-circular (a block or fully "
-            "specified surface), which is not a trial circle xslope can take — no "
-            "failure surface was imported; define one, or run a search")
+            f"SLOPE/W's critical surface here is non-circular "
+            f"({_SURFACE_WORDS.get(worst['kind'], _SURFACE_WORDS['unknown'])}"
+            f"{', taken from its parent analysis' if worst.get('inherited') else ''}), "
+            f"which is not a trial circle xslope can take — no failure surface was "
+            f"imported; define one, or run a search")
+    # An optimized search's final surface is not a circle (see read_gsz_results), but
+    # the circles it searched first are, each with SLOPE/W's own FS. Rebuilding the
+    # optimized row's fitted circle scored Greco's layered slope 24.6% high; the most
+    # critical searched circle is a surface both programs can solve, so that one is
+    # imported, and the caveat says SLOPE/W's final answer is lower.
+    optimized = [t for t in trials if t["kind"] == "optimized"]
 
     # Does SLOPE/W's critical circle actually fit this model? It may not: with an
     # impenetrable bedrock, SLOPE/W truncates the circle ALONG the bedrock and reports
@@ -1393,12 +1634,18 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             f"compared on the same circle; run a search to find xslope's own critical "
             f"surface")
         if rejected is not None:
+            # The bedrock explanation is offered only where there is bedrock: on the
+            # verification files without any, the circle that will not build runs
+            # out of the model, or past the end of the piezometric line, instead.
+            bedrock_note = any(m["option"] == "elastic" for m in materials)
             caveats.append(
-                f"note that SLOPE/W's MOST critical surface (its FS = "
-                f"{rejected['fs']:.3f}) is not a circle xslope can build — most likely "
-                f"a COMPOSITE surface, truncated along the impenetrable bedrock. The "
-                f"circle imported above is the most critical one that does build, so "
-                f"its FS is higher than SLOPE/W's")
+                f"note that the MOST critical of SLOPE/W's circles"
+                f"{' before the optimization' if optimized else ''} (its FS = "
+                f"{rejected['fs']:.3f}) is one xslope can't build on this model"
+                + (" — most likely a COMPOSITE surface, truncated along the "
+                   "impenetrable bedrock" if bedrock_note else "")
+                + ". The circle imported above is the most critical one that does "
+                  "build, so its FS is higher than SLOPE/W's")
     elif circular:
         caveats.append(
             f"none of SLOPE/W's {len(circular)} trial circles can be built on this "
@@ -1411,6 +1658,16 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             "xslope equivalent, and this file carries no solved circles to take one "
             "from; define circles or a non-circular surface before solving (an input "
             "file with no surface will not re-load)")
+    if optimized and circular:
+        opt = min(optimized, key=lambda t: t["fs"])
+        caveats.append(
+            f"SLOPE/W optimized its critical circle into a non-circular surface (its "
+            f"FS = {opt['fs']:.3f}), which xslope can't take as a circle. "
+            + ("The circle imported is the most critical one SLOPE/W scored before "
+               "the optimization, so its FS is higher than SLOPE/W's final answer"
+               if chosen is not None else
+               "None of the circles SLOPE/W scored before the optimization could be "
+               "imported either"))
 
     # --- distributed loads -------------------------------------------------------
     # A GeoStudio surcharge is NOT a uniform pressure, despite its <Pressure> tag: it is
@@ -1603,7 +1860,13 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     # unrecognized rather than passed over — silence here means a wrong factor of safety
     # with nothing to warn the user.
     for tag in stab.get("elements", []):
-        if tag not in _ENTRY_ELEMENTS:
+        if tag == "Control" and set(stab.get("control") or {}) - _CONTROL_HANDLED:
+            # A switch this import neither applies nor reports on its own.
+            caveats.append(
+                f"this analysis has a GeoStudio '{tag}' that xslope does not recognize "
+                f"and did NOT import — if it affects the model, the imported factor of "
+                f"safety will be wrong")
+        elif tag not in _ENTRY_ELEMENTS:
             caveats.append(
                 f"this analysis has a GeoStudio '{tag}' that xslope does not recognize "
                 f"and did NOT import — if it affects the model, the imported factor of "
@@ -1670,9 +1933,9 @@ def _parse_rgb(text):
 def read_gsz_results(gsz, analysis_name, step=None):
     """SLOPE/W's own solved trial slip surfaces for an analysis, if the file has them.
 
-    Returns ``[{'fs','xo','yo','r','weight','circular'}, ...]`` — one entry per trial
-    surface SLOPE/W evaluated, with the factor of safety it computed. Empty if the file
-    was saved unsolved.
+    Returns ``[{'fs','xo','yo','r','weight','circular','kind','inherited'}, ...]`` — one
+    entry per trial surface SLOPE/W evaluated, with the factor of safety it computed.
+    Empty if the file was saved unsolved.
 
     ``step`` names a saved time step ('000', '001', …) for a transient analysis, which
     has a whole result set — and a different factor of safety on every surface — at each
@@ -1682,23 +1945,37 @@ def read_gsz_results(gsz, analysis_name, step=None):
     factor of safety: it checks the imported geometry and unit weights on their own,
     without the solver in the way.
 
-    ``circular`` is False for a surface SLOPE/W did not generate as a circle (a block or
-    fully-specified one). Those rows still carry a center and a radius, but they describe
-    a *fitted* circle, not the surface that was solved -- rebuilding them as circles
-    silently scores the wrong geometry. Each row's SlipOrigSearchMethod decides it; an
-    older file has no such column, and there the analysis's own search option decides
-    for every row (see ``_CIRCULAR_OPTIONS``).
+    ``kind`` says what the surface is: 'circle', 'block', 'specified', 'automatic',
+    'optimized' or 'unknown', and ``circular`` is ``kind == 'circle'``. Every row
+    carries a center and a radius, but for anything but a circle they describe a
+    *fitted* circle, not the surface that was solved -- rebuilding them as circles
+    silently scores the wrong geometry. Each row's SlipOrigSearchMethod decides it
+    (``_SEARCH_KIND``); a 6, and every row of an older file with no such column, is
+    decided by the search option of the analysis that made the surface
+    (``_OPTION_KIND``, through :func:`_search_option`). ``inherited`` marks a surface
+    taken from a parent analysis.
+
+    An optimized search (``<IsOptimizationOn>``) saves its search rows as usual, then
+    ONE more row, the last, for the surface the optimization made out of the critical
+    one: no longer a circle, though it is written with the search's own code and a
+    fitted circle, and it has the lowest factor of safety. That row is 'optimized'.
+    An analysis that inherits an optimized parent's surface solves both of the
+    parent's critical surfaces, and the file does not say which row is which, so none
+    of its rows is taken as a circle.
 
     This is not part of the model. It exists so the same surfaces can be re-solved
     in xslope and the two programs' answers compared directly, with no difference
     in search to explain away.
     """
     zf = gsz["zip"]
-    folder = analysis_name.lower() + "/"
+    folder = _result_folder(gsz, analysis_name)
+    if folder is None:
+        return []
+    prefix = folder.lower() + "/"
     if step is not None:
-        folder += step.lower() + "/"
+        prefix += step.lower() + "/"
     name = next((n for n in sorted(zf.namelist())
-                 if n.lower().startswith(folder) and n.endswith("slip_surface.csv")), None)
+                 if n.lower().startswith(prefix) and n.endswith("slip_surface.csv")), None)
     if name is None:
         return []
 
@@ -1706,13 +1983,14 @@ def read_gsz_results(gsz, analysis_name, step=None):
     text = zf.read(name).decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text))
     fields = reader.fieldnames or []
+    rows = list(reader)
     # An older file names the radius SlipRadius and records no search code per row.
     radius_col = "SlipRadiusX" if "SlipRadiusX" in fields else "SlipRadius"
     coded = "SlipOrigSearchMethod" in fields
-    if not coded:
-        found, option = _search_option(gsz, analysis_name)
-        by_option = found and option in _CIRCULAR_OPTIONS
-    for row in reader:
+    search = _search_option(gsz, analysis_name)
+    by_option = (_OPTION_KIND.get(search["option"], "unknown") if search["found"]
+                 else "unknown")
+    for i, row in enumerate(rows):
         try:
             fs = float(row["SlipFOS"])
             xo, yo = float(row["SlipCenterX"]), float(row["SlipCenterY"])
@@ -1725,38 +2003,53 @@ def read_gsz_results(gsz, analysis_name, step=None):
             weight = float(row.get("SlipWeight") or 0.0)
         except ValueError:
             weight = 0.0
-        circular = (row.get("SlipOrigSearchMethod") in _CIRCULAR_SEARCHES if coded
-                    else by_option)
+        code = (row.get("SlipOrigSearchMethod") or "").strip() if coded else None
+        kind = by_option if (code is None or code == "6") else \
+            _SEARCH_KIND.get(code, "unknown")
+        if search["optimized"]:
+            if search["inherited"]:
+                if kind == "circle":
+                    kind = "optimized"
+            elif i == len(rows) - 1:
+                kind = "optimized"
         out.append({"fs": fs, "xo": xo, "yo": yo, "r": radius, "weight": weight,
-                    "circular": circular})
+                    "circular": kind == "circle", "kind": kind,
+                    "inherited": search["inherited"]})
     return out
 
 
 def _search_option(gsz, analysis_name):
-    """An analysis's own ``<SlipSurface><Option>``, for results that do not record it.
+    """How an analysis's slip surfaces were made, for classifying its saved trial rows.
 
-    Returns ``(found, option)``. ``option`` is None for the default search, which
-    GeoStudio writes as no ``<Option>`` at all. A ``FromOther`` analysis solved its
-    parent's surface, so it answers with the parent's option. ``found`` is False when
-    the analysis or its stability entry cannot be located; the caller then treats its
-    rows as not circular rather than guess.
+    Returns ``{'found', 'option', 'optimized', 'inherited'}``. ``option`` is the
+    ``<SlipSurface><Option>`` of the search that made the surfaces: None for the default
+    entry-and-exit search, which GeoStudio writes as no ``<Option>`` at all. A
+    ``FromOther`` analysis solved its parent's surface, so it answers with the parent's
+    search (walking up a chain of them) and ``inherited`` is True. ``optimized`` is that
+    search's ``<IsOptimizationOn>``. ``found`` is False when the analysis or its
+    stability entry cannot be located; the caller then treats its rows as not circular
+    rather than guess.
 
     The XML saved in the analysis's own result folder is read first: it is the model
     SLOPE/W solved, where the root XML may have been edited since.
     """
+    none = {"found": False, "option": None, "optimized": False, "inherited": False}
     zf = gsz["zip"]
     names = zf.namelist()
-    folder = analysis_name.lower() + "/"
-    xml = next((n for n in sorted(names) if n.lower().startswith(folder)
-                and "/" not in n[len(folder):] and n.lower().endswith(".xml")), None)
+    folder = _result_folder(gsz, analysis_name)
+    xml = None
+    if folder is not None:
+        prefix = folder.lower() + "/"
+        xml = next((n for n in sorted(names) if n.lower().startswith(prefix)
+                    and "/" not in n[len(prefix):] and n.lower().endswith(".xml")), None)
     if xml is None:
         xml = next((n for n in names if "/" not in n and n.lower().endswith(".xml")), None)
     if xml is None:
-        return False, None
+        return none
     try:
         root = ET.fromstring(zf.read(xml))
     except ET.ParseError:
-        return False, None
+        return none
 
     ids, parents = {}, {}
     for a in root.findall("./Analyses/Analysis"):
@@ -1767,15 +2060,86 @@ def _search_option(gsz, analysis_name):
                for s in root.findall("./StabilityItems/StabilityItem")}
 
     aid = ids.get(analysis_name.lower())
+    inherited = False
     for _ in range(len(parents) + 1):       # bounds the walk up a FromOther chain
         entry = entries.get(aid)
         if entry is None:
-            return False, None
-        option = _text(entry.find("SlipSurface"), "Option")
+            return none
+        slip = entry.find("SlipSurface")
+        option = _text(slip, "Option")
         if option != "FromOther":
-            return True, option
+            optimized = (_text(slip, "IsOptimizationOn", "") or "").lower() == "true"
+            return {"found": True, "option": option, "optimized": optimized,
+                    "inherited": inherited}
+        inherited = True
         aid = parents.get(aid)
-    return False, None
+    return none
+
+
+# GeoStudio saves an analysis's results in a folder named after the analysis. A
+# character a folder name cannot hold is written as '&' and a code instead. Read off
+# GeoStudio's own files: '/' is '&3' ("SLOPE/W Analysis" is saved as "SLOPE&3W
+# Analysis"), ':' is '&4' ("Case 1: fixed-end anchor"), and a final '.' is '&-'
+# ("... Suction St." is saved as "... Suction St&-"; Windows drops a trailing period).
+# The other characters Windows refuses (\ * ? " < > |) and '&' itself must have codes
+# too, but none appears in any file we have, so _result_folder lets an unknown code
+# stand for any of them rather than guess which.
+_FOLDER_ESCAPES = {"/": "&3", ":": "&4"}
+_FOLDER_UNESCAPES = {code[1]: ch for ch, code in _FOLDER_ESCAPES.items()}
+_FOLDER_RESERVED = set('\\/:*?"<>|&')
+
+
+def _folder_key(text, is_folder):
+    """``text`` lower-cased, in a form an analysis name and its folder name share.
+
+    In a folder name each known code is decoded ('&3' -> '/', '&4' -> ':', a final
+    '&-' -> '.') and any other '&' code becomes a placeholder. In an analysis name a
+    character GeoStudio must escape but whose code is unknown becomes the same
+    placeholder. A known code is therefore matched exactly, so "SLOPE:W" never takes
+    the folder of "SLOPE/W"."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if is_folder and ch == "&" and i + 1 < n:
+            code = text[i + 1]
+            if code in _FOLDER_UNESCAPES:
+                out.append(_FOLDER_UNESCAPES[code])
+            elif code == "-" and i + 2 == n:
+                out.append(".")
+            else:
+                out.append("\0")
+            i += 2
+            continue
+        unknown = (not is_folder and ch in _FOLDER_RESERVED
+                   and ch not in _FOLDER_ESCAPES)
+        out.append("\0" if unknown else ch)
+        i += 1
+    return "".join(out).lower()
+
+
+def _result_folder(gsz, analysis_name):
+    """The folder in the .gsz that holds an analysis's results, or None if it has none.
+
+    Every reader of an analysis's results goes through this -- its trial surfaces, its
+    saved model, its mesh and its SEEP/W field. Taking the analysis name as the folder
+    name found nothing for an analysis named "SLOPE/W Analysis", whose folder is
+    "SLOPE&3W Analysis" (see ``_FOLDER_ESCAPES``), so six of SLOPE/W's verification
+    files imported no surface at all. The name is tried as it is, then against every
+    escaped folder name (``_folder_key``); that match must be unique, or no folder is
+    returned rather than another analysis's.
+    """
+    folders = {}
+    for n in gsz["zip"].namelist():
+        if "/" in n:
+            f = n.split("/", 1)[0]
+            folders.setdefault(f.lower(), f)
+    name = analysis_name or ""
+    if name.lower() in folders:
+        return folders[name.lower()]
+    key = _folder_key(name, is_folder=False)
+    hits = [f for f in folders.values()
+            if "&" in f and _folder_key(f, is_folder=True) == key]
+    return hits[0] if len(hits) == 1 else None
 
 
 # --------------------------------------------------------------------------------------
@@ -1872,7 +2236,10 @@ def gsz_mesh(gsz, analysis_name, polygons=None):
     elements would leave degenerate zero-area cells that no point ever falls inside.
     """
     zf = gsz["zip"]
-    want = (analysis_name + "/Mesh.ply").lower()
+    folder = _result_folder(gsz, analysis_name)
+    if folder is None:
+        return None
+    want = (folder + "/Mesh.ply").lower()
     name = next((n for n in zf.namelist() if n.lower() == want), None)
     if name is None:
         return None
@@ -1934,7 +2301,10 @@ def gsz_seep_steps(gsz, analysis_name):
     saved unsolved — in which case there is no head field to import at all.
     """
     zf = gsz["zip"]
-    prefix = (analysis_name + "/").lower()
+    folder = _result_folder(gsz, analysis_name)
+    if folder is None:
+        return []
+    prefix = (folder + "/").lower()
     steps = sorted({n[len(prefix):].split("/")[0]
                     for n in zf.namelist()
                     if n.lower().startswith(prefix) and n.lower().endswith("/node.csv")})
@@ -1970,7 +2340,7 @@ def read_gsz_seep(gsz, analysis_name, step=None, polygons=None):
         return None
 
     zf = gsz["zip"]
-    want = f"{analysis_name}/{chosen}/node.csv".lower()
+    want = f"{_result_folder(gsz, analysis_name)}/{chosen}/node.csv".lower()
     name = next((n for n in zf.namelist() if n.lower() == want), None)
     if name is None:
         return None

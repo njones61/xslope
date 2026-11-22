@@ -14320,6 +14320,496 @@ def run_gsz_trial_surfaces_test(test):
     return 0.0, None
 
 
+# The GeoStudio fixtures below share one slope -- the trial-surface fixture's, so its two
+# circles are known to build -- and one writer, which takes a list of analyses. Each is
+# a dict; only 'name' is required:
+#   name       the analysis name; its result folder is escaped as GeoStudio escapes it
+#   kind       'SLOPE/W' (default) or 'SEEP/W'
+#   option     <SlipSurface><Option>; None is the default entry-and-exit search
+#   optimized  <IsOptimizationOn>true</IsOptimizationOn> on the search
+#   parent     ParentID (1-based position in the list)
+#   material   the material ID region 1 takes (1 'fill' by default, 2 'clay')
+#   water      the water <Option> (None: no pore pressure)
+#   entry      extra XML inside the analysis's stability <Entry>
+#   rows       [(fs, xo, yo, r), ...] as SLOPE/W saved them; None for an unsolved one
+#   code       the SlipOrigSearchMethod on every row (None: an older file's columns)
+#   seep       True to save a SEEP/W pore-pressure field (the fixture seep field)
+_GSZ_ROWS = [(998.0, 25.0, 45.0, 36.4),            # a failed trial: sentinel FOS
+             (1.42, 28.0, 48.0, 39.0),
+             (1.31, 25.0, 45.0, 36.4)]             # the critical circle
+
+
+def _gsz_folder(name):
+    """GeoStudio's result folder for an analysis name: '/' -> '&3', ':' -> '&4', and a
+    final '.' -> '&-', as its own files show."""
+    out = name.replace("/", "&3").replace(":", "&4")
+    return out[:-1] + "&-" if out.endswith(".") else out
+
+
+def _write_gsz_cases(path, cases):
+    """A one-slope .gsz with one analysis per case (see the notes above)."""
+    import zipfile
+    analyses, contexts, water, stab = [], [], [], []
+    for i, c in enumerate(cases, 1):
+        par = f"<ParentID>{c['parent']}</ParentID>" if c.get("parent") else ""
+        kind = c.get("kind", "SLOPE/W")
+        method = "SteadyState" if kind == "SEEP/W" else "Spencer"
+        analyses.append(f"<Analysis><ID>{i}</ID><Name>{c['name']}</Name><Kind>{kind}"
+                        f"</Kind>{par}<Method>{method}</Method><GeometryId>1</GeometryId>"
+                        f"</Analysis>")
+        if kind == "SEEP/W":
+            continue
+        contexts.append(f"<Context><AnalysisID>{i}</AnalysisID><GeometryUsesMaterials "
+                        f"Len=\"1\"><GeometryUsesMaterial ID=\"Regions-1\" "
+                        f"Entry=\"{c.get('material', 1)}\" /></GeometryUsesMaterials>"
+                        f"</Context>")
+        opt = (f"<ResultInputInfo><Option>{c['water']}</Option></ResultInputInfo>"
+               if c.get("water") else "")
+        water.append(f"<WaterItem><AnalysisID>{i}</AnalysisID><Entry>{opt}"
+                     f"<UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>")
+        slip = (f"<Option>{c['option']}</Option>" if c.get("option") else "") + \
+            '<Grid NumXInc="4" NumYInc="4" />' + \
+            ("<IsOptimizationOn>true</IsOptimizationOn>" if c.get("optimized") else "")
+        stab.append(f"<StabilityItem><AnalysisID>{i}</AnalysisID><Entry><SlipSurface>"
+                    f"{slip}</SlipSurface><Seismic Horizontal=\"\" Vertical=\"\" />"
+                    f"{c.get('entry', '')}</Entry></StabilityItem>")
+    xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<GSIData Version="11.11" AppVersion="25.2.1.4">
+  <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
+  <Analyses Len="{len(analyses)}">{''.join(analyses)}</Analyses>
+  <Geometries Len="1"><Geometry><Name>2D</Name>
+    <Points Len="6">
+      <Point ID="1" X="0" Y="0" /><Point ID="2" X="60" Y="0" />
+      <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
+      <Point ID="5" X="20" Y="10" /><Point ID="6" X="0" Y="10" />
+    </Points>
+    <Regions Len="1"><Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region></Regions>
+  </Geometry></Geometries>
+  <Materials Len="2">
+    <Material><ID>1</ID><Name>fill</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>10</CohesionPrime>
+        <PhiPrime>30</PhiPrime></StressStrain></Material>
+    <Material><ID>2</ID><Name>clay</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><ResponseType>Undrained</ResponseType><UnitWeight>20</UnitWeight>
+        <CohesionPrime>5</CohesionPrime><PhiPrime>45</PhiPrime>
+        <DrawdownCohesion>60</DrawdownCohesion><DrawdownPhi>23</DrawdownPhi>
+      </StressStrain></Material>
+  </Materials>
+  <Contexts Len="{len(contexts)}">{''.join(contexts)}</Contexts>
+  <WaterItems Len="{len(water)}">{''.join(water)}</WaterItems>
+  <StabilityItems Len="{len(stab)}">{''.join(stab)}</StabilityItems>
+</GSIData>
+"""
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("fixture.xml", xml)
+        for c in cases:
+            folder = _gsz_folder(c["name"])
+            if c.get("seep"):
+                nodes, elements, u = _synthetic_seep_field()
+                zf.writestr(f"{folder}/fixture.xml", xml)
+                zf.writestr(f"{folder}/Mesh.ply", _synthetic_ply(nodes, elements))
+                zf.writestr(f"{folder}/000/node.csv",
+                            "Node,PoreWaterPressure,XTotalStress\n" +
+                            "".join(f"{k + 1},{v}\n" for k, v in enumerate(u)))
+            if c.get("rows") is None:
+                continue
+            zf.writestr(f"{folder}/fixture.xml", xml)
+            if c.get("code") is None:
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadius,SlipVolume,"
+                         "SlipWeight"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000"
+                          for k, (fs, x, y, r) in enumerate(c["rows"], 1)]
+            else:
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadiusX,SlipVolume,"
+                         "SlipWeight,SlipOrigSearchMethod"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000,{c['code']}"
+                          for k, (fs, x, y, r) in enumerate(c["rows"], 1)]
+            zf.writestr(f"{folder}/001/slip_surface.csv", "\n".join(lines) + "\n")
+
+
+def _gsz_import_cases(cases):
+    """Write ``cases``, read the file back, and import every SLOPE/W analysis.
+    Returns {name: (slope_data, caveats, rows)}."""
+    import tempfile
+    from xslope.geostudio import read_gsz, gsz_to_slope_data, read_gsz_results
+    out = {}
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "cases.gsz")
+        _write_gsz_cases(path, cases)
+        gsz = read_gsz(path)
+        for a in gsz["analyses"]:
+            if a["kind"] != "SLOPE/W":
+                continue
+            sd, cav = gsz_to_slope_data(gsz, a["id"])
+            out[a["name"]] = (sd, cav, read_gsz_results(gsz, a["name"]))
+    return out
+
+
+def _gsz_circles(sd):
+    return [(c["Xo"], c["Yo"], c["R"]) for c in sd["circles"]]
+
+
+def run_gsz_folders_test(test):
+    """An analysis's results are found under the folder name GeoStudio escapes.
+
+    GeoStudio cannot put '/' or ':' in a folder name, or end one in '.', so it writes
+    them as '&3', '&4' and '&-'. Six of SLOPE/W's own verification files name their
+    analysis "SLOPE/W Analysis" and save it as "SLOPE&3W Analysis", and the import --
+    reading the name as the folder -- found no results in any of them. Checked here
+    on every reader that goes to the folder: the trial surfaces (new-style and old,
+    whose search option is read from the XML saved in the same folder) and a SEEP/W
+    pore-pressure field. An unsolved "SLOPE:W Analysis" must NOT pick up
+    "SLOPE/W Analysis"'s folder: a known code is matched exactly.
+    Returns (0.0, None) or (None, message).
+    """
+    rows = _GSZ_ROWS
+    cases = [
+        {"name": "SLOPE/W Analysis", "option": "GridAndRadius", "rows": rows, "code": "1"},
+        {"name": "Case 1: anchor", "option": "GridAndRadius", "rows": rows, "code": "1"},
+        {"name": "Infil. with St.", "option": "GridAndRadius", "rows": rows, "code": "1"},
+        {"name": "Old/style", "option": "GridAndRadius", "rows": rows, "code": None},
+        {"name": "SLOPE:W Analysis", "option": "GridAndRadius", "rows": None},
+        {"name": "seepage", "kind": "SEEP/W"},
+        {"name": "Seep/stability", "parent": 6, "water": "Parent", "seep": True,
+         "rows": None},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    want = (25.0, 45.0, 36.4)
+    for name in ("SLOPE/W Analysis", "Case 1: anchor", "Infil. with St.", "Old/style"):
+        sd, cav, trows = got[name]
+        if len(trows) != 2:
+            problems.append(f"'{name}' (folder '{_gsz_folder(name)}'): read "
+                            f"{len(trows)} trial rows, expected 2")
+        elif _gsz_circles(sd) != [want]:
+            problems.append(f"'{name}': imported circles {_gsz_circles(sd)}, expected "
+                            f"SLOPE/W's critical one {want}")
+    sd, cav, trows = got["SLOPE:W Analysis"]
+    if trows or sd["circles"]:
+        problems.append("the unsolved 'SLOPE:W Analysis' read the results of 'SLOPE/W "
+                        "Analysis' -- '&3' is '/', not ':'")
+    sd, cav, _ = got["Seep/stability"]
+    if sd.get("seep_u") is None or any(m["u"] != "seep" for m in sd["materials"]):
+        problems.append("'Seep/stability' (folder 'Seep&3stability'): the SEEP/W field "
+                        "was not imported")
+    if problems:
+        return None, "GeoStudio result folders: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def _slice_frame(sd, circle=(25.0, 45.0, 36.4), n=20):
+    """The slice table for one circle on an imported model, or an error string."""
+    from xslope.slice import generate_slices
+    xo, yo, r = circle
+    ok, res = generate_slices(sd, circle={"Xo": xo, "Yo": yo, "R": r, "Depth": None,
+                                          "Y": None, "Option": "Depth",
+                                          "Movement": "Left to Right"},
+                              num_slices=n, debug=False, check_inputs=False)
+    return res[0] if ok else f"slices failed: {str(res)[:80]}"
+
+
+def _line_y(line, x):
+    for (x0, y0), (x1, y1) in zip(line, line[1:]):
+        if min(x0, x1) <= x <= max(x0, x1) and x1 != x0:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0), (y1 - y0) / (x1 - x0)
+    return None, None
+
+
+def run_gsz_phreatic_test(test):
+    """The phreatic correction follows the file.
+
+    SLOPE/W applies it only where the analysis sets <Control><IsPiezPhreatic>; on
+    every verification analysis without that switch, SLOPE/W's own per-column pore
+    pressure is the plain head under the line. The import used to make every line
+    'phreatic', which cut the pressure by cos^2 of the line's slope (Zhu & Lee wet:
+    41.7 for SLOPE/W's 52.2) and raised the factor of safety 3-4%. Checked on the
+    slices themselves: plain head where the switch is absent, head x cos^2 where it
+    is set, and a caveat naming the stretch where the line runs along the ground,
+    which SLOPE/W leaves uncorrected and XSLOPE does not.
+    Returns (0.0, None) or (None, message).
+    """
+    line = "<DataPoint Number=\"1\" X=\"0\" Y=\"8\" /><DataPoint Number=\"2\" X=\"60\" Y=\"24\" />"
+    face = ("<DataPoint Number=\"1\" X=\"0\" Y=\"9\" /><DataPoint Number=\"2\" X=\"20\" "
+            "Y=\"10\" /><DataPoint Number=\"3\" X=\"30\" Y=\"20\" /><DataPoint Number=\"4\" "
+            "X=\"60\" Y=\"22\" />")
+
+    def entry(points, n, phreatic):
+        ids = "".join(f"<DataPoint>{k}</DataPoint>" for k in range(1, n + 1))
+        ctl = ("<Control><IsPiezPhreatic>true</IsPiezPhreatic></Control>"
+               if phreatic else "")
+        return (f"<DataPoints Len=\"{n}\">{points}</DataPoints>{ctl}"
+                f"<PiezometricSurfaces Len=\"1\"><PiezometricSurface><ID>1</ID>"
+                f"<DataPoints Len=\"{n}\">{ids}</DataPoints><CapSuction>false</CapSuction>"
+                f"</PiezometricSurface></PiezometricSurfaces>")
+
+    cases = [
+        {"name": "plain", "option": "GridAndRadius", "water": "PiezoSurface",
+         "entry": entry(line, 2, False), "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "corrected", "option": "GridAndRadius", "water": "PiezoSurface",
+         "entry": entry(line, 2, True), "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "on the face", "option": "GridAndRadius", "water": "PiezoSurface",
+         "entry": entry(face, 4, True), "rows": _GSZ_ROWS, "code": "1"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    for name, want in (("plain", False), ("corrected", True), ("on the face", True)):
+        sd, cav, _ = got[name]
+        if bool(sd.get("piezo_phreatic")) != want:
+            problems.append(f"'{name}': piezo_phreatic = {sd.get('piezo_phreatic')}, "
+                            f"expected {want} -- the file "
+                            f"{'sets' if want else 'does not set'} IsPiezPhreatic")
+        if any("'Control'" in c for c in cav):
+            problems.append(f"'{name}': IsPiezPhreatic reported as an unrecognized "
+                            f"'Control'")
+        df = _slice_frame(sd)
+        if isinstance(df, str):
+            problems.append(f"'{name}': {df}")
+            continue
+        worst = 0.0
+        for x, yb, u in zip(df["x_u"], df["y_u"], df["u"]):
+            py, m = _line_y(sd["piezo_line"], float(x))
+            if py is None or py <= yb:
+                continue
+            head = 9.807 * (py - float(yb))
+            expect = head / (1.0 + m * m) if want else head
+            worst = max(worst, abs(float(u) - expect))
+        if worst > 1e-6:
+            problems.append(f"'{name}': slice pore pressure is off "
+                            f"{'head x cos^2' if want else 'the plain head'} by up to "
+                            f"{worst:.3g}")
+    cav = " | ".join(got["corrected"][1])
+    if "phreatic correction" not in cav:
+        problems.append("'corrected': no caveat says SLOPE/W applies its phreatic "
+                        "correction")
+    cav = " | ".join(got["on the face"][1])
+    if "x = 20 to 30" not in cav:
+        problems.append("'on the face': no caveat names x = 20 to 30, where the line "
+                        "runs along the ground and SLOPE/W leaves the head uncorrected")
+    if problems:
+        return None, "GeoStudio phreatic correction: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_ru_test(test):
+    """SLOPE/W's Ru imports as XSLOPE's ru, value for value.
+
+    Under the water option 'Ru', SLOPE/W reads each material's Ru from
+    <MaterialUsesRuParams> and takes u = Ru x the column's weight / width -- exactly,
+    on all three of its verification analyses that use Ru. XSLOPE's u = 'ru' is the
+    same rule, so the value carries over. It used to import as zero with a caveat
+    (Loukidis wet: +77% to +79% on SLOPE/W's own circle). Also checked: an empty Ru
+    is a dry material; a Ru table under a piezometric-surface analysis is ignored, as
+    SLOPE/W ignores it, and is not reported as unrecognized; and a B-bar analysis
+    keeps its piezometric line and says plainly that the B-bar pressure is missing.
+    Returns (0.0, None) or (None, message).
+    """
+    ru = ("<MaterialUsesRuParams Len=\"1\"><MaterialUsesRuParam><ID>1</ID>"
+          "<Entry Function=\"{v}\" /></MaterialUsesRuParam></MaterialUsesRuParams>")
+    piezo = ("<DataPoints Len=\"2\"><DataPoint Number=\"1\" X=\"0\" Y=\"8\" />"
+             "<DataPoint Number=\"2\" X=\"60\" Y=\"24\" /></DataPoints>"
+             "<PiezometricSurfaces Len=\"1\"><PiezometricSurface><ID>1</ID>"
+             "<DataPoints Len=\"2\"><DataPoint>1</DataPoint><DataPoint>2</DataPoint>"
+             "</DataPoints></PiezometricSurface></PiezometricSurfaces>")
+    bbar = ("<MaterialUsesBBarParams Len=\"1\"><MaterialUsesBBarParam><ID>1</ID>"
+            "<Entry Function=\"0.7\" /></MaterialUsesBBarParam></MaterialUsesBBarParams>")
+    cases = [
+        {"name": "ru", "water": "Ru", "entry": ru.format(v="0.3"),
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "ru blank", "water": "Ru", "entry": ru.format(v=""),
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "piezo with an ru table", "water": "PiezoSurface",
+         "entry": piezo + ru.format(v="0.5"), "option": "GridAndRadius",
+         "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "bbar", "water": "PiezoSurfaceBbar", "entry": piezo + bbar,
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+
+    def mat(name):
+        m = got[name][0]["materials"][0]
+        return m["u"], m["ru"]
+
+    if mat("ru") != ("ru", 0.3):
+        problems.append(f"'ru': material imported as u, ru = {mat('ru')}, expected "
+                        f"('ru', 0.3)")
+    else:
+        df = _slice_frame(got["ru"][0])
+        if isinstance(df, str) or not (df["u"] > 0).all():
+            problems.append("'ru': the slices carry no Ru pore pressure")
+    if mat("ru blank") != ("none", 0.0):
+        problems.append(f"'ru blank': imported as {mat('ru blank')}, expected dry")
+    if mat("piezo with an ru table") != ("piezo", 0.0):
+        problems.append(f"'piezo with an ru table': imported as "
+                        f"{mat('piezo with an ru table')}; SLOPE/W reads Ru only under "
+                        f"its Ru option")
+    for name in got:
+        if any("not recognize" in c for c in got[name][1]):
+            problems.append(f"'{name}': a Ru or B-bar table reported as unrecognized")
+    sd, cav, _ = got["bbar"]
+    if mat("bbar")[0] != "piezo" or not sd["piezo_line"]:
+        problems.append("'bbar': the piezometric line under B-bar was not imported")
+    if not any("B-bar" in c and "not imported" in c for c in cav):
+        problems.append("'bbar': no caveat says B-bar's excess pressure was not imported")
+    if problems:
+        return None, "GeoStudio Ru: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_optimized_test(test):
+    """An optimized search's last row is not a circle.
+
+    With <IsOptimizationOn>, SLOPE/W saves its search circles, then one more row --
+    the last -- for the surface the optimization bent out of the critical circle. It
+    is written with the search's own code and a FITTED circle, and has the lowest
+    factor of safety. Importing that circle scored Greco's layered slope 24.6% high;
+    where it did not build (Baker & Leschinsky), the caveat blamed a composite
+    surface. Now the most critical circle of the search is imported, and the caveat
+    gives SLOPE/W's optimized factor of safety. Without the switch the last row is an
+    ordinary circle and is imported as one.
+    Returns (0.0, None) or (None, message).
+    """
+    rows_fit = _GSZ_ROWS + [(1.10, 26.0, 46.0, 37.5)]     # the optimized row; builds
+    rows_out = _GSZ_ROWS + [(1.10, 25.0, 45.0, 50.0)]     # ...and one that does not
+    cases = [
+        {"name": "optimized", "optimized": True, "rows": rows_fit, "code": "5"},
+        {"name": "optimized, will not build", "optimized": True, "rows": rows_out,
+         "code": "5"},
+        {"name": "old optimized", "optimized": True, "rows": rows_fit, "code": None},
+        {"name": "not optimized", "rows": rows_fit, "code": "5"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    for name in ("optimized", "optimized, will not build", "old optimized"):
+        sd, cav, rows = got[name]
+        if _gsz_circles(sd) != [(25.0, 45.0, 36.4)]:
+            problems.append(f"'{name}': imported {_gsz_circles(sd)}, expected the "
+                            f"search's critical circle (25, 45, 36.4) -- not the "
+                            f"optimized row's fitted circle")
+        if [r.get("kind") for r in rows][-1:] != ["optimized"]:
+            problems.append(f"'{name}': the last row read as "
+                            f"{[r.get('kind') for r in rows][-1:]}, expected 'optimized'")
+        joined = " | ".join(cav)
+        if "optimized" not in joined or "1.100" not in joined:
+            problems.append(f"'{name}': no caveat gives SLOPE/W's optimized FS (1.100)")
+        if "COMPOSITE" in joined or "can't build" in joined:
+            problems.append(f"'{name}': a caveat blames a surface xslope cannot build")
+    if _gsz_circles(got["not optimized"][0]) != [(26.0, 46.0, 37.5)]:
+        problems.append(f"'not optimized': imported {_gsz_circles(got['not optimized'][0])}"
+                        f", expected its most critical circle (26, 46, 37.5)")
+    if problems:
+        return None, "GeoStudio optimized search: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_parent_surface_test(test):
+    """A surface taken from a parent (SlipOrigSearchMethod 6) is what the parent's was.
+
+    Tandjiria's reinforced block analyses take the surfaces of a Block parent, coded
+    6, and a 6 was counted as a circle without looking at the parent: their fitted
+    circles were tried, and the caveat blamed a composite surface. The parent's
+    search now decides: a Block or Automatic parent gives no circle; a grid-and-
+    radius parent does; and a child of an OPTIMIZED parent solves both of the
+    parent's critical surfaces without saying which row is which, so none of its
+    rows is taken as a circle.
+    Returns (0.0, None) or (None, message).
+    """
+    cases = [
+        {"name": "block", "option": "Block", "rows": _GSZ_ROWS, "code": "4"},
+        {"name": "block child", "option": "FromOther", "parent": 1,
+         "rows": _GSZ_ROWS, "code": "6"},
+        {"name": "automatic", "option": "Automatic", "rows": _GSZ_ROWS, "code": "7"},
+        {"name": "automatic child", "option": "FromOther", "parent": 3,
+         "rows": _GSZ_ROWS, "code": "6"},
+        {"name": "grid", "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "grid child", "option": "FromOther", "parent": 5,
+         "rows": _GSZ_ROWS, "code": "6"},
+        {"name": "optimized grid", "option": "GridAndRadius", "optimized": True,
+         "rows": _GSZ_ROWS + [(1.10, 26.0, 46.0, 37.5)], "code": "1"},
+        {"name": "optimized grid child", "option": "FromOther", "parent": 7,
+         "rows": _GSZ_ROWS, "code": "6"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    for name, words in (("block child", "a block surface"),
+                        ("automatic child", "automatic search"),
+                        ("optimized grid child", "an optimized surface")):
+        sd, cav, _ = got[name]
+        if sd["circles"] or sd["circular"]:
+            problems.append(f"'{name}': imported {_gsz_circles(sd)} -- the fitted "
+                            f"circle of its parent's surface, which is not a circle")
+        joined = " | ".join(cav)
+        if "non-circular" not in joined or words not in joined or "parent" not in joined:
+            problems.append(f"'{name}': no caveat says the surface is {words} taken "
+                            f"from the parent")
+        if "COMPOSITE" in joined:
+            problems.append(f"'{name}': the caveat blames a composite surface")
+    if _gsz_circles(got["grid child"][0]) != [(25.0, 45.0, 36.4)]:
+        problems.append(f"'grid child': imported {_gsz_circles(got['grid child'][0])}, "
+                        f"expected the parent's circle (25, 45, 36.4)")
+    if problems:
+        return None, "GeoStudio parent surfaces: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_rapid_drawdown_test(test):
+    """A staged rapid drawdown is named in the caveats.
+
+    SLOPE/W's staged rapid drawdown (<Control><IsRapidDrawdown>) reads two
+    piezometric surfaces -- the higher before drawdown, the lower after -- and
+    drawdown strengths for the soils that do not drain. The import carries only the
+    first surface, so the model is the slope before drawdown while SLOPE/W's FS is
+    the one after. Nothing said so: the caveats reported "2 piezometric surfaces" and
+    an unrecognized 'Control'. Now one caveat says what was imported and what was
+    not, and gives the lowered line and the d and psi XSLOPE's own rapid drawdown
+    would need (here Pilarcitos Dam's c_R = 60, phi_R = 23, phi' = 45: d = 64.1,
+    psi = 24.4, as Duncan, Wright and Brandon's conversion gives). A <Control> switch
+    the import does not handle is still reported as unrecognized.
+    Returns (0.0, None) or (None, message).
+    """
+    pts = ("<DataPoints Len=\"4\"><DataPoint Number=\"1\" X=\"0\" Y=\"25\" />"
+           "<DataPoint Number=\"2\" X=\"60\" Y=\"25\" /><DataPoint Number=\"3\" X=\"0\" "
+           "Y=\"12\" /><DataPoint Number=\"4\" X=\"60\" Y=\"12\" /></DataPoints>")
+    surfaces = ("<PiezometricSurfaces Len=\"2\"><PiezometricSurface><ID>1</ID>"
+                "<DataPoints Len=\"2\"><DataPoint>1</DataPoint><DataPoint>2</DataPoint>"
+                "</DataPoints></PiezometricSurface><PiezometricSurface><ID>2</ID>"
+                "<DataPoints Len=\"2\"><DataPoint>3</DataPoint><DataPoint>4</DataPoint>"
+                "</DataPoints></PiezometricSurface></PiezometricSurfaces>"
+                "<MaterialUsesPiezs Len=\"1\"><MaterialUsesPiez ID=\"2\" UsesID=\"1\" />"
+                "</MaterialUsesPiezs>")
+    rdd = "<Control><IsRapidDrawdown>true</IsRapidDrawdown>{extra}</Control>"
+    cases = [
+        {"name": "drawdown", "material": 2, "water": "PiezoSurface",
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1",
+         "entry": pts + rdd.format(extra="") + surfaces},
+        {"name": "drawdown, design factors", "material": 2, "water": "PiezoSurface",
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1",
+         "entry": pts + rdd.format(extra="<DesignFactorID>1</DesignFactorID>") + surfaces},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    sd, cav, _ = got["drawdown"]
+    joined = " | ".join(cav)
+    for want, why in (("staged rapid drawdown", "the analysis is a staged rapid drawdown"),
+                      ("full-pool", "which surface was imported"),
+                      ("(0, 12), (60, 12)", "the lowered surface"),
+                      ("d = 64.1, psi = 24.4", "the converted drawdown strengths")):
+        if want not in joined:
+            problems.append(f"'drawdown': no caveat says {why} ({want!r})")
+    if "2 piezometric surfaces" in joined or "'Control'" in joined:
+        problems.append("'drawdown': the generic two-surface or 'Control' caveat is "
+                        "still given in place of the rapid drawdown one")
+    if sd["piezo_line"] != [(0.0, 25.0), (60.0, 25.0)]:
+        problems.append(f"'drawdown': imported piezo line {sd['piezo_line']}, expected "
+                        f"the full-pool one")
+    if not any("'Control'" in c for c in got["drawdown, design factors"][1]):
+        problems.append("an unhandled <Control> switch (DesignFactorID) is no longer "
+                        "reported")
+    if problems:
+        return None, "GeoStudio rapid drawdown: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
 # A minimal Slide2 model in the sectioned ASCII grammar Slide2 writes. Authored here
 # rather than shipped because Rocscience's own tutorial files are their copyrighted
 # material and are not in this repository (the same reason the .gsz fixture above is
@@ -16803,6 +17293,18 @@ def _dispatch_test(test):
         return run_gsz_import_test(test)
     if test_type == 'gsz_trials':
         return run_gsz_trial_surfaces_test(test)
+    if test_type == 'gsz_folders':
+        return run_gsz_folders_test(test)
+    if test_type == 'gsz_phreatic':
+        return run_gsz_phreatic_test(test)
+    if test_type == 'gsz_ru':
+        return run_gsz_ru_test(test)
+    if test_type == 'gsz_optimized':
+        return run_gsz_optimized_test(test)
+    if test_type == 'gsz_parent_surface':
+        return run_gsz_parent_surface_test(test)
+    if test_type == 'gsz_rapid_drawdown':
+        return run_gsz_rapid_drawdown_test(test)
     if test_type == 'gsz_water':
         return run_gsz_water_corpus_test(test)
     if test_type == 'slide2':
@@ -17090,7 +17592,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_trials', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average', 'kr_gradient',
+                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_trials', 'gsz_folders', 'gsz_phreatic', 'gsz_ru', 'gsz_optimized', 'gsz_parent_surface', 'gsz_rapid_drawdown', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average', 'kr_gradient',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -18326,13 +18828,24 @@ def main():
         # results, circle searches against block and specified ones. Own fixture too.
         tests.append({'type': 'gsz_trials', 'file': '(synthetic .gsz trial surfaces)',
                       'method': '-', 'source': 'gsz'})
+        # What the import takes from a solved file, each on its own built fixture:
+        # escaped result folders, the phreatic switch, Ru, an optimized search's last
+        # row, a surface taken from a parent, and a staged rapid drawdown's caveat.
+        for _t, _f in (('gsz_folders', 'escaped result folders'),
+                       ('gsz_phreatic', 'phreatic correction'),
+                       ('gsz_ru', 'Ru and B-bar'),
+                       ('gsz_optimized', 'optimized search'),
+                       ('gsz_parent_surface', 'surface from a parent'),
+                       ('gsz_rapid_drawdown', 'staged rapid drawdown')):
+            tests.append({'type': _t, 'file': f'(synthetic .gsz {_f})',
+                          'method': '-', 'source': 'gsz'})
         # The water-load handover is pinned on Seequent's own models as well as on the
         # fixture: it reads a local, git-ignored copy of the .gsz corpus and skips
         # when absent (the files are Seequent's copyrighted material).
         tests.append({'type': 'gsz_water', 'file': '(GeoStudio corpus)',
                       'method': 'water loads', 'source': 'gsz'})
         if not run_all:
-            print("Including 3 GeoStudio import tests")
+            print("Including 9 GeoStudio import tests")
 
     # The Slide2 import test authors its own .slim fixture (Rocscience's own tutorial
     # files are their copyrighted material and are not in this repository), so it needs

@@ -206,7 +206,7 @@ VENDOR_T_CUT = {
         'Upper embankment (elastic face)': None,
         'Lower embankment (elastic face)': None,
     },
-    # RS2-25 — the Syncrude tailings dyke, vendor model 'slope stability #025.fez',
+    # RS2-25 — the Syncrude tailings dike, vendor model 'slope stability #025.fez',
     #   which states T: 0 on all five materials.
     #   The file-number join missed this one for the same reason VENDOR_E_NU records
     #   above: vp033 is named for its Slide2 problem number (VP33) while its vendor
@@ -1026,9 +1026,9 @@ VENDOR_E_NU = {
         'Upper embankment (elastic face)': (0.4, 50000.0),
         'Lower embankment (elastic face)': (0.4, 50000.0),
     },
-    # RS2-25 — the Syncrude tailings dyke. Its vendor model is the RS2-NATIVE
+    # RS2-25 — the Syncrude tailings dike. Its vendor model is the RS2-NATIVE
     # 'slope stability #025.fez' (five zones, gamma 20/17/17/17/17, phi
-    # 34/34/34/7.5/7.5 — the dyke, matching this file zone for zone), NOT
+    # 34/34/34/7.5/7.5 — the dike, matching this file zone for zone), NOT
     # '#033.fez', which is a single-material imperial slope (c = 300 psf,
     # phi = 30, gamma = 120 pcf) and a different problem altogether. The corpus
     # file is named for its Slide2 problem number (VP33) while the vendor model

@@ -1006,7 +1006,7 @@ LEM10_JB = os.path.join(REPO_ROOT, "docs/lem/files/xslope_james_bay.xlsx")
 
 
 def lem10_jb_run_lem():
-    """Part B's first run: the dyke's single seed, Spencer auto search with the
+    """Part B's first run: the dike's single seed, Spencer auto search with the
     surficial filter at the metric 2 m — the state the step dictates."""
     from studio.dialogs import RunLemDialog
 

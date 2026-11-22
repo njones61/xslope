@@ -10639,7 +10639,7 @@
           "page": "verification/rs2_joints/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2_joints.md",
-          "title": "RJ-14: Alejano et al. plowing sliding slab, example 5 (rj014)",
+          "title": "RJ-14: Alejano et al. plowing toppling slab, example 5 (rj014)",
           "url": "https://xslope.org/en/latest/verification/rs2_joints/#rj-14"
         }
       ],
@@ -11106,7 +11106,7 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)",
+          "title": "RS2-25: Syncrude tailings dike (El-Ramly et al. 2003)",
           "url": "https://xslope.org/en/latest/verification/rs2/#rs2-25"
         }
       ],
@@ -17357,7 +17357,7 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)",
+          "title": "RS2-25: Syncrude tailings dike (El-Ramly et al. 2003)",
           "url": "https://xslope.org/en/latest/verification/rs2/#rs2-25"
         }
       ],
@@ -19476,9 +19476,9 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
-        "tension_crack": false,
+        "tension_crack": true,
         "tension_crack_water": false,
         "transient_seepage": false,
         "unit_system": "si",
@@ -19501,7 +19501,9 @@
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp52"
         }
       ],
-      "topics": []
+      "topics": [
+        "tension-cracks"
+      ]
     },
     {
       "features": {
@@ -19541,9 +19543,9 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
-        "tension_crack": false,
+        "tension_crack": true,
         "tension_crack_water": false,
         "transient_seepage": false,
         "unit_system": "si",
@@ -19567,6 +19569,7 @@
         }
       ],
       "topics": [
+        "tension-cracks",
         "zoned-dams"
       ]
     },
@@ -21779,7 +21782,7 @@
           "page": "verification/rocscience/",
           "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
-          "title": "VP75: The James Bay dyke (D&W Fig. 7.16)",
+          "title": "VP75: The James Bay dike (D&W Fig. 7.16)",
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp75"
         },
         {
@@ -29053,7 +29056,7 @@
       "seepage-coupled": 76,
       "seismic": 14,
       "soil-nails": 5,
-      "tension-cracks": 21,
+      "tension-cracks": 23,
       "transient-seepage": 25,
       "zoned-dams": 51
     },
@@ -29526,6 +29529,8 @@
       "docs/verification/files/rocscience/vp039d.xlsx",
       "docs/verification/files/rocscience/vp042.xlsx",
       "docs/verification/files/rocscience/vp051.xlsx",
+      "docs/verification/files/rocscience/vp052a.xlsx",
+      "docs/verification/files/rocscience/vp052b.xlsx",
       "docs/verification/files/rocscience/vp053.xlsx",
       "docs/verification/files/rocscience/vp056.xlsx",
       "docs/verification/files/rocscience/vp057.xlsx",

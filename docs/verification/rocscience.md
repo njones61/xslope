@@ -94,8 +94,8 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp060.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.009, fs_janbu=1.073, benchmark=VP60 -->
 <!-- test: file=files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
 <!-- test: file=files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.202, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
-<!-- test: file=files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.797, fs_bishop=1.796, benchmark=VP52-dry -->
-<!-- test: file=files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.189, fs_bishop=1.176, benchmark=VP52-wet -->
+<!-- test: file=files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.794, fs_bishop=1.793, benchmark=VP52-dry -->
+<!-- test: file=files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.180, fs_bishop=1.167, benchmark=VP52-wet -->
 <!-- test: file=files/rocscience/vp053.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.048, fs_spencer=1.048, fs_mprice=1.048, fs_lowe=1.048, benchmark=VP53 -->
 <!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
@@ -258,7 +258,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [49](#vp49) | 🟢 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | Janbu(corr) 1.469 vs Slide 1.479 (−0.7%) · Janbu(corr) 1.469 vs SNAILZ 1.52 (−3.4%) |  |
 | [50](#vp50) | 🟢 | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | Janbu(corr) 1.448 vs SNAILZ 1.46 (−0.8%) · Janbu(corr) 1.448 vs Slide 1.417 (+2.2%) |  |
 | [51](#vp51) | 🟢 | Slope, (4) materials, water table, tension crack, seismic | Spencer 1.294 vs Slide 1.293 (+0.1%) · Spencer 1.294 vs Zhu 1.293 (+0.1%) | phreatic line calibrated to the agreeing published Bishop/Spencer values |
-| [52](#vp52) | 🟢 | Slope, (4) materials, water table, tension crack | dry: Spencer 1.797 vs Slide 1.804 (−0.4%) · wet: Spencer 1.189 vs Slide 1.189 (0.0%) | the shallow/noncircular surfaces need constrained searches not yet exposed |
+| [52](#vp52) | 🟢 | Slope, (4) materials, water table, tension crack | dry: Spencer 1.794 vs Slide 1.804 (−0.6%) · wet: Spencer 1.180 vs Slide 1.189 (−0.8%) | the shallow/noncircular surfaces need constrained searches not yet exposed |
 | [53](#vp53) | 🟢 | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | all methods 1.048 vs Slide / RocPlane / Priest 1.049 (−0.1%) | on a single plane every method coincides |
 | [54](#vp54) | 🟢 | Slope, homogenous, micro piles | no pile: Bishop 1.100 vs Slide 1.102 (−0.2%) · with pile: Bishop 1.185 vs Slide 1.193 (−0.7%) |  |
 | [55](#vp55) | 🟢 | Slope, homogenous, water table | Spencer 1.297 vs Slide 1.300 (−0.2%) · Bishop 1.290 vs Slide 1.293 (−0.2%) |  |
@@ -281,7 +281,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [72](#vp72) | 🟢 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | FE seepage, tangent 197: Spencer 1.341 vs Slide 1.312 (+2.2%) · piezometric line: Spencer 1.563 vs Slide 1.557 (+0.4%) |  |
 | [73](#vp73) | 🟢 | Excavated slope, (4) materials, tension crack | Spencer 1.766 vs Slide 1.758 (+0.5%) · Spencer 1.766 vs D&W 1.76 (+0.3%) |  |
 | [74](#vp74) | 🟢 | Embankment, (2) materials | Spencer 1.194 vs Slide 1.201 (−0.6%) · Spencer 1.194 vs D&W 1.19 (+0.3%) |  |
-| [75](#vp75) | 🟢 | Dyke, (4) materials | free search: Bishop 1.424 vs D&W 1.45 (−1.8%) | D&W report Bishop, so Bishop governs like-for-like |
+| [75](#vp75) | 🟢 | Dike, (4) materials | free search: Bishop 1.424 vs D&W 1.45 (−1.8%) | D&W report Bishop, so Bishop governs like-for-like |
 | [76](#vp76) | 🟢 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.073 vs Slide 1.075 (−0.2%) · piezometric line: Spencer 1.078 vs Slide 1.100 (−2.0%) | a shallow toe surface hypersensitive to the piezometric-line elevation; the line carries Slide2's own vertices |
 | [77](#vp77) | 🟢 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.724 vs Slide 1.724 (0.0%) · piezometric line: Spencer 1.659 vs Slide 1.648 (+0.7%) |  |
 | [78](#vp78) | 🟢 | Slope, homogenous | Spencer 1.135 vs Slide 1.139 (−0.4%) · Bishop 1.134 vs D&W 1.124 (+0.9%) |  |
@@ -1052,7 +1052,7 @@ which print every vertex, the clay layer boundaries, and the three published cir
 **Input files:** [vp033.xlsx](files/rocscience/vp033.xlsx)
 
 El-Ramly, Morgenstern & Cruden (2003)'s simplified probabilistic model of a Syncrude tailings
-dyke: a cohesionless section (tailing sand over glacio-fluvial sands and tills, all φ = 34°) on a
+dike: a cohesionless section (tailing sand over glacio-fluvial sands and tills, all φ = 34°) on a
 presheared disturbed clay-shale with φ = 7.5° ± 2.1°. The critical mechanism rides the clay-shale,
 and Slide's drawn circle (center (327.5, 394), R = 124) is tangent about nineteen meters below the
 model base, so the surface is **composite** — truncated at the base and running flat inside the
@@ -1533,7 +1533,12 @@ Also [SLOPE/W §2.31](geostudio.md) — the same problem in the GeoStudio corpus
 ## 🟢 VP52: Slope, (4) materials, water table, tension crack {#vp52}
 
 Slide #52 is Zhu & Lee's (2002) heterogeneous slope: a 15 m high slope at 2H:1V cut through four
-horizontal soil layers, analyzed dry and with the water table of the manual's Table 52.2. An
+horizontal soil layers, with a dry tension crack 1.015 m deep at the crest, analyzed dry and with the
+water table of the manual's Table 52.2. The crack depth is the one both vendors use: the critical
+circle in Slide's Fig. 52.4 ends at y = 13.985, 1.015 m below the crest at y = 15, and SLOPE/W's
+model draws its crack line at that elevation. The water table follows the ground surface to (10.568, 5.284)
+on the face, then the table's arc through (25.314, 9.002) to (39.149, 10.269), then runs level; the
+model draws the arc as 40 short chords that stay within 1 mm of it. An
 unconstrained circular search lands in the deep-circle family (Zhu & Lee's surface 3), where Slide runs a grid
 search and Zhu a specified deep circle, and the published values spread widely.
 
@@ -1543,17 +1548,17 @@ search and Zhu a specified deep circle, and the published values spread widely.
 
 | Method | XSLOPE | Slide | Zhu |
 |---|---|---|---|
-| Bishop | 1.796 | 1.804 (−0.4%) | 1.429 (+25.7%) |
-| Spencer | 1.797 | 1.804 (−0.4%) | 1.836 (−2.1%) |
+| Bishop | 1.793 | 1.804 (−0.6%) | 1.429 (+25.5%) |
+| Spencer | 1.794 | 1.804 (−0.6%) | 1.836 (−2.3%) |
 
 *Wet — governing deep-circle family*
 
 | Method | XSLOPE | Slide | Zhu |
 |---|---|---|---|
-| Bishop | 1.176 | 1.176 (0.0%) | 1.079 (+9.0%) |
-| Spencer | 1.189 | 1.189 (0.0%) | 1.211 (−1.8%) |
+| Bishop | 1.167 | 1.176 (−0.8%) | 1.079 (+8.2%) |
+| Spencer | 1.180 | 1.189 (−0.8%) | 1.211 (−2.6%) |
 
-*Wet Spencer and Bishop match Slide exactly; the manual itself shows a wide Slide–Zhu spread on this family.*
+*The searched critical circles end at the crack bottom, 1.015 m below the crest, as the circle in Slide's Fig. 52.4 does. The manual itself shows a wide Slide–Zhu spread on this family.*
 
 ![vp052a: inputs and representative solution](images/vp052a.png)
 
@@ -1972,9 +1977,9 @@ Slide #74 / Duncan & Wright (2005) Fig. 7.12: a 100-ft cohesionless embankment (
 
 ![vp074: inputs and representative solution](images/vp074.png)
 
-## 🟢 VP75: The James Bay dyke (D&W Fig. 7.16) {#vp75}
+## 🟢 VP75: The James Bay dike (D&W Fig. 7.16) {#vp75}
 
-Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dykes — a granular fill embankment with a wide berm (ground (−17,31)–(40,31)–(58,25)–(114,25)–(132,19)–(168,19), metric) resting on three soft clay units: a 4 m crust (c = 41 kN/m²), 8 m of marine clay (34.5) and 7 m of lacustrine clay (31.2), all φ = 0. Fill c' = 0, φ' = 30°. Free circular search.
+Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dikes — a granular fill embankment with a wide berm (ground (−17,31)–(40,31)–(58,25)–(114,25)–(132,19)–(168,19), metric) resting on three soft clay units: a 4 m crust (c = 41 kN/m²), 8 m of marine clay (34.5) and 7 m of lacustrine clay (31.2), all φ = 0. Fill c' = 0, φ' = 30°. Free circular search.
 
 **Input files:** [vp075.xlsx](files/rocscience/vp075.xlsx)
 

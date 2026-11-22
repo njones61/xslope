@@ -1863,7 +1863,7 @@ def _vp033_slope_data():
 
 def vp033():
     """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
-    tailings dyke (simplified probabilistic case). Cohesionless section over a
+    tailings dike (simplified probabilistic case). Cohesionless section over a
     presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
     surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
     is tangent to el 270, ~19 m below the model base (~289), so it truncates at
@@ -2483,10 +2483,41 @@ def vp101():
     return 'vp101.xlsx'
 
 
+def _arc_through(p1, p2, p3, n_seg):
+    """Vertices of the circular arc from p1 through p2 to p3, in n_seg chords
+    of equal angle (p1 and p3 exact, interior vertices rounded to 1e-4)."""
+    (x1, y1), (x2, y2), (x3, y3) = p1, p2, p3
+    d = 2.0 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
+    s1, s2, s3 = x1 * x1 + y1 * y1, x2 * x2 + y2 * y2, x3 * x3 + y3 * y3
+    xc = (s1 * (y2 - y3) + s2 * (y3 - y1) + s3 * (y1 - y2)) / d
+    yc = (s1 * (x3 - x2) + s2 * (x1 - x3) + s3 * (x2 - x1)) / d
+    r = math.hypot(x1 - xc, y1 - yc)
+    a1 = math.atan2(y1 - yc, x1 - xc)
+    a3 = math.atan2(y3 - yc, x3 - xc)
+    pts = [tuple(p1)]
+    for i in range(1, n_seg):
+        a = a1 + (a3 - a1) * i / n_seg
+        pts.append((round(xc + r * math.cos(a), 4), round(yc + r * math.sin(a), 4)))
+    pts.append(tuple(p3))
+    return pts
+
+
 def _zhu_lee_slope_data(wet):
-    """Zhu & Lee (2002) heterogeneous slope (Slide #52): benched 4-layer
-    profile, layers daylighting at (6,3) and (18,9); dry tension crack at the
-    crest. Wet case adds the manual's Table 52.2 water table."""
+    """Zhu & Lee (2002) heterogeneous slope (Slide #52, SLOPE/W §2.32):
+    benched 4-layer profile, layers daylighting at (6,3) and (18,9).
+
+    Both vendors cut a dry tension crack 1.015 m deep at the crest: Slide's
+    Fig. 52.4 ends the surface-3 circle at (41.663, 13.985) under the 15.0
+    crest, and SLOPE/W's .gsz draws the crack line at y = 13.985 with no water
+    in it. Built as tcrack_depth = 1.015, tcrack_water = 0.
+
+    Wet case: the manual's Table 52.2 water table, (-20,0), (0,0), (6,3), an
+    arc through (10.568,5.284), (25.314,9.002) and (39.149,10.269), then
+    (50,10.269). The arc is the circle through those three points (center
+    (40.741, -83.285), R 93.567; SLOPE/W's .gsz draws it as 20 chords of the
+    same circle), built here as 40 equal-angle chords, within 1 mm of the arc.
+    (6,3) and (10.568,5.284) both lie on the 2H:1V face, so the line follows
+    the ground down to the toe."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     props = [('Layer 1 (top)', 20.0, 18.0, 18.8), ('Layer 2', 40.0, 22.0, 18.5),
@@ -2505,9 +2536,11 @@ def _zhu_lee_slope_data(wet):
         {'mat_id': 3, 'coords': [(-20.0, -6.0), (50.0, -6.0)]},
     ]
     sd['max_depth'] = -9.0
+    sd['tcrack_depth'] = 1.015
+    sd['tcrack_water'] = 0.0
     if wet:
-        sd['piezo_line'] = [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0), (10.568, 5.284),
-                            (25.314, 9.002), (39.149, 10.269), (50.0, 10.269)]
+        arc = _arc_through((10.568, 5.284), (25.314, 9.002), (39.149, 10.269), 40)
+        sd['piezo_line'] = [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0)] + arc + [(50.0, 10.269)]
     sd['circles'] = [{'Xo': 20.0, 'Yo': 25.0, 'Depth': -5.0, 'R': 30.0}]
     return sd
 
@@ -5159,7 +5192,7 @@ def vp073():
 
 
 def vp075():
-    """Slide #75 / Duncan & Wright (2005) Fig. 7.16: the James Bay dyke -- a
+    """Slide #75 / Duncan & Wright (2005) Fig. 7.16: the James Bay dike -- a
     granular fill embankment with a berm, on a three-layer soft clay foundation.
     Fully labeled figure (metric): ground (-17,31)-(40,31)-(58,25)-(114,25)-
     (132,19)-(168,19); clay crust el 19-15, marine clay 15-7, lacustrine clay

@@ -1283,11 +1283,11 @@ def lem10_plots():
     capture("lem10_solution_filter5.png", plot_solution, sd, crit_f["slices"],
             crit_f["failure_surface"], crit_f["solver_result"], frame="content")
 
-    # The second slope: VP75, the James Bay dyke — the corpus's local-minimum
+    # The second slope: VP75, the James Bay dike — the corpus's local-minimum
     # showcase. The generated per-layer seeds settle in the fill; the grid
     # finds the deep circle through all three clays. Both at the Run dialog's
     # default 40 slices, which is the flow the page walks.
-    # Part B runs on the tutorial's own copy of VP75: the same dyke with a
+    # Part B runs on the tutorial's own copy of VP75: the same dike with a
     # single mid-depth seed on the circles sheet — the circle an engineer might
     # place expecting the failure under the crest — so the reader opens and
     # runs without editing anything.

@@ -215,9 +215,9 @@ A 30 ft soldier-pile wall held by two rows of grouted tiebacks — discrete anch
 
 ### [Finding the Global Minimum](lem10_global_minimum.md)
 
-Two slopes with competing failure mechanisms: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dyke, where a single credible seed reads 23% high — resolved with a minimum slip depth and grid seeding.
+Two slopes with competing failure mechanisms: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dike, where a single credible seed reads 23% high — resolved with a minimum slip depth and grid seeding.
 
-<p class="tut-tags"><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span><span class="tut-tag">grid seeding</span><span class="tut-tag">minimum slip depth</span><span class="tut-tag">James Bay dyke</span></p>
+<p class="tut-tags"><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span><span class="tut-tag">grid seeding</span><span class="tut-tag">minimum slip depth</span><span class="tut-tag">James Bay dike</span></p>
 
 </div>
 </div>

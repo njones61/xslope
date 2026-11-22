@@ -87,7 +87,7 @@ Status terms follow the [shared definitions](index.md#status-terms) and match do
 | [22](#rs2-22) | 🟢 | Layered slope with undulating bedrock | SSRM 1.523 vs RS2 SSRM 1.52 (+0.2%) | (SSRM variant) on the vendor's boundary-load cap, carried at the vendor's own vertical load direction. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | The vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the file carries it. Partition removed, the same model reads 0.215. |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | 1.104 / 0.975 | RS2 SSR 1.15 (−4.0%) and 0.95 (+2.6%). Modeled as the vendor models are: the mesh split along the geotextile, the two faces on a frictional slip interface, and the ~1 m elastic strip up the embankment face. |
-| [25](#rs2-25) | 🟢 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs XSLOPE non-circular Spencer 1.194 (+0.7%) | The strength reduction fails on a scarp through the tailings sand, a flat run along the bottom of the clay-shale band and an exit past the toe, a shape no circle can follow; XSLOPE's non-circular limit equilibrium on the same model finds the same slide. RS2's SSR 1.29 on the same model sits above that minimum and is shown beside. |
+| [25](#rs2-25) | 🟢 | Syncrude tailings dike (El-Ramly et al. 2003) | SSRM 1.202 vs XSLOPE non-circular Spencer 1.194 (+0.7%) | The strength reduction fails on a scarp through the tailings sand, a flat run along the bottom of the clay-shale band and an exit past the toe, a shape no circle can follow; XSLOPE's non-circular limit equilibrium on the same model finds the same slide. RS2's SSR 1.29 on the same model sits above that minimum and is shown beside. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.294 vs RS2 SSRM 2.29 (+0.2%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | |
 | [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.669 vs RS2 SSR 1.64 (+1.8%) · H = 62: SSRM 1.544 vs RS2 SSR 1.55 (−0.4%) · H = 63: SSRM 1.419 vs RS2 SSR 1.41 (+0.6%) | (three heads) The files derive from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values are the referee. |
@@ -205,7 +205,7 @@ tension crack.
 | [71](#rs2-36) | 🟢 | Homogeneous, FE seepage (Duncan & Wright Fig 6.37) | FE seepage: SSRM 1.111 vs RS2 SSRM 1.12 (−0.8%) · piezo approximation: SSRM 1.111 vs RS2 SSRM 1.12 (−0.8%) | Same build as [RS2-36](#rs2-36); Spencer 1.13 / 1.14. |
 | [72](#rs2-37) | <span class="nodata">⊘</span> | Embankment dam, 4 materials, FE seepage (D&W Fig 6.39) |  | *unconfirmed* — the two programs find different mechanisms. RS2 SSRM 1.00–1.49 vs Spencer 1.16–1.63. |
 | [74](#rs2-38) | 🟢 | Cohesionless embankment on clay (D&W Fig 7.12) | SSRM 1.201 vs RS2 SSRM 1.17 (+2.6%) | Same build as [RS2-38](#rs2-38); Spencer 1.20. |
-| [75](#rs2-42) | 🟢 | James Bay dyke, 4 materials (D&W Fig 7.16) | SSRM 1.214 vs RS2 SSRM 1.19 (+2.0%) | Same build as [RS2-42](#rs2-42). Parts I–III publish RS2 SSRM 1.26 on the input-identical native twin; circular 1.45 / non-circular 1.17. |
+| [75](#rs2-42) | 🟢 | James Bay dike, 4 materials (D&W Fig 7.16) | SSRM 1.214 vs RS2 SSRM 1.19 (+2.0%) | Same build as [RS2-42](#rs2-42). Parts I–III publish RS2 SSRM 1.26 on the input-identical native twin; circular 1.45 / non-circular 1.17. |
 | [76](#rs2-39) | <span class="nodata">⊘</span> | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) |  | *planned* — the SSRM sibling of [RS2-41/43](#rs2-39); the LEM build is Slide2 [VP76](rocscience.md#vp76). RS2 SSRM 0.97 / 0.98 vs Slide2 Spencer 1.08 / 1.10, D&W 1.08–1.19. Part 4 does not cover Slide2 VP77, the dam of [RS2-40](#rs2-40). |
 | [78](#rs2-47) | 🟢 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | 30 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 46.5 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 60 ft: SSRM 1.045 vs RS2 SSRM 1.07 (−2.3%) | Same build as [RS2-47](#rs2-47), all three thicknesses on the case-(a) models; D&W 1.12–1.14. |
 | [79](#rs2-39) | 🟢 | Earth embankment, infinite-slope failure (D&W Fig 14.4) | SSRM 1.431 vs D&W referee 1.44 (−0.6%) | Same build as [RS2-41](#rs2-39); the deep run reads 1.419. Part IV publishes RS2 SSRM 1.41 / 1.45; ref 1.40 / 1.44. |
@@ -734,7 +734,7 @@ against Part I. The limit-equilibrium side is Slide2 [VP32](rocscience.md#vp32).
 
 ![RS2-24b: the 8.75 m case, same construction — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-24b.png)
 
-### 🟢 RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
+### 🟢 RS2-25: Syncrude tailings dike (El-Ramly et al. 2003) {#rs2-25}
 
 Slide2 counterpart: [VP33](rocscience.md#vp33).
 
@@ -749,7 +749,7 @@ non-circular search's starting surface)
 
 **One mechanism, found by both engines.** Geometry, material zones, unit weights and elastic
 constants follow the RS2 vendor `.fez` (`slope stability #025.fez`). The strength reduction fails
-the dyke as one block: an active scarp through the tailings sand, a flat run along the bottom of
+the dike as one block: an active scarp through the tailings sand, a flat run along the bottom of
 the clay-shale band and a passive exit through the till past the toe. No circle can follow that
 shape. XSLOPE's non-circular Spencer search on the same model, started from a surface of that
 shape, finds the same slide at **1.194**, and the strength reduction lands on it. The circle values,

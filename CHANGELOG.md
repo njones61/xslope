@@ -8,12 +8,49 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### New
 
+- Seismic analysis, following Duncan, Wright, and Brandon (2014), Chapter 10. A
+  new Seismic Analysis section of the documentation explains each part, and
+  Tutorials LEM-14 and LEM-15 walk through them. The Analysis Report and the AI
+  assistant cover all of them.
+  - A vertical seismic coefficient, k_v, beside the horizontal one, k_h. It is
+    signed, positive downward, and makes each slice weigh W(1 + k_v) in every
+    limit equilibrium method; the finite element method applies it to the weight
+    of the soil. Enter it in Studio's Global parameters, or in cell D14 of the
+    template's main sheet.
+  - A two-stage pseudostatic analysis, for a slope that has consolidated under
+    its own weight (Run LEM, Two-stage seismic). Stage 1 finds the stresses on
+    each slice base before the earthquake. Stage 2 takes each slice's undrained
+    strength from those stresses, by the K<sub>c</sub> = 1 envelope or by
+    interpolating between it and the drained envelope as in rapid drawdown, with
+    an optional strength factor, and solves with the seismic force. XSLOPE
+    reproduces the factors of safety Duncan, Wright, and Brandon publish for four
+    soils, dry and submerged, within 1.3%.
+  - The yield coefficient, k_y: the seismic coefficient at which the factor of
+    safety is 1 (Run LEM, Find the yield coefficient k_y). XSLOPE finds it on one
+    slip surface, or by search, which reports k_y on the static critical surface
+    and the lowest k_y of any surface. In Python,
+    `xslope.seismic.fem_yield_coefficient` finds it with the finite element
+    method.
+  - Newmark's sliding-block displacement (Run, Newmark…): the permanent
+    displacement of the sliding mass under an acceleration record, a text file of
+    time and acceleration or a PEER .AT2 file, used as recorded, scaled by a
+    factor, or scaled to a target peak acceleration. It matches Newmark's (1965)
+    closed-form result for a rectangular pulse.
+- A strength ratio material (option `ratio`): the undrained strength is the ratio
+  r = S<sub>u</sub>/σ′<sub>v</sub>, entered in the c/p column, times the vertical
+  effective stress, with c as a minimum. Limit equilibrium applies it at each slice
+  base and the finite element method at each integration point. Part C of Tutorial
+  LEM-7 uses it for two clays.
 - Studio's Piezometric lines editor now sets each line's Type, piezo or
   phreatic, in a box above the line's table. Until now the Type could be set
   only in the workbook's piezo sheet.
 
 ### Fixed
 
+- A non-circular search now runs when the surface's points were entered from
+  right to left. Every move was refused, and the search returned the starting
+  surface as its answer: 1.313 on one model where the search, run from the same
+  points entered left to right, finds 1.221.
 - The non-circular search no longer settles on a notched surface that gives a
   false, far-too-low factor of safety. With the surface's points free to move,
   the search could bend the surface back down into the sliding mass until
@@ -69,6 +106,12 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### Changed
 
+- The input template is version 28. It adds k_v to the main sheet (D14) and the
+  ratio option to the mat sheet, and grays the l column for a Gardner material,
+  which doesn't use it. Workbooks made on earlier versions still load.
+- The horizontal seismic coefficient is called k_h everywhere: in Studio, the
+  model checks, the documentation, and the Analysis Report, which writes the
+  seismic force as k_hW and the slice weight as W(1 + k_v).
 - The Analysis Report's Rapid Drawdown section now gives one row per stage: the
   water the stage reads (Piezometric Line 1 or 2, a seepage boundary set's
   solution, or the transient solution at the stage time), the strengths it

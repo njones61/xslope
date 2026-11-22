@@ -50,8 +50,10 @@ plugins:
 hooks:
   - hooks/griffe_quiet.py
   - hooks/docs_packages.py
+  - hooks/changelog.py
 nav:
   - Home: index.md
+  - "What's New": whats_new.md
   - Usage Guide:
     - Installation: getting_started/install.md
     - Ways to Use XSLOPE: usage/index.md

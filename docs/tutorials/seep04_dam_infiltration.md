@@ -385,7 +385,7 @@ set **Flux value (m/sec):**, and enter or copy-paste the block's two points.
 
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 
-The list now reads `Head 1  (h = 10.0)`, the three flux blocks with their rates,
+The list now reads `Head 1  (h = 10)`, the three flux blocks with their rates,
 and `Exit face`. Flux 1 is selected in the shot — its rate in the value box
 (displayed shortened), its two points below — and the preview draws the selected
 boundary bold over its stretch of the upstream face, dimming the others.

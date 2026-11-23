@@ -146,7 +146,9 @@ from the same soil column, surface loads, and pore pressure the limit equilibriu
 results report each element's value at its centroid); `pow`
 and `hb`, the curved envelopes described next; and `elastic`, for a material that is never checked
 against a yield criterion and so stays elastic at every strength reduction factor (Rocscience RS2's
-"Plasticity: None"). Any other option is refused rather than run as zero-strength soil. The inputs
+"Plasticity: None"). Any other option is refused rather than run as zero-strength soil, and so is a
+blank option on a material the mesh uses; only a material row that no zone uses may leave it
+blank. The inputs
 for each are on the [mat worksheet](../usage/input_template.md#worksheet-mat) page.
 
 ### Curved failure envelopes
@@ -410,10 +412,12 @@ Soil strength depends on the effective stress, the part of the total stress carr
 skeleton. In the solver's tension-positive convention, $\sigma' = \sigma + u_w$, where $u_w$ is
 the pore-water pressure: a positive $u_w$ moves the effective stress toward tension and lowers the
 strength the Mohr-Coulomb criterion allows. The solver therefore needs $u_w$ at every Gauss point.
-Each material names where it comes from in the **u** column of the **mat** sheet. A model uses one
-source for all the materials that have one: `none` may be mixed with it (a dry layer above a
-`piezo` soil), but `piezo`, `ru` and `seep` cannot be combined, and the build refuses a model that
-does.
+Each material names where it comes from in the **u** column of the **mat** sheet, and every element
+takes its pore pressure from its own material's source, as each slice base does in the
+[limit equilibrium analysis](../lem/overview.md#pore-pressures). `none`, or a blank cell, means no
+pore pressure. The materials of one model may use different sources: a dry fill (`none`) over a
+`piezo` foundation, or a clay core analyzed in total stress (`none`) between shells that read a
+seepage field (`seep`). A material row that no zone of the mesh uses is not read.
 
 In the table, $\gamma_w$ is water's unit weight, $y_{piezo}$ and $y_{gp}$ are the piezometric
 line and Gauss-point elevations, $r_u$ is the pore-pressure ratio, and $\sigma_v$ is the
@@ -424,18 +428,27 @@ belongs to node $i$, with interpolation weight $N_i$.
 |:----|:-------|:-------------------------------|
 | `none` | none | $u_w = 0$; the yield check is a total-stress check |
 | `piezo` | piezometric line | $u_w = \gamma_w (y_{piezo} - y_{gp})$ from the line elevation above the point |
-| `ru` | pore-pressure ratio | $u_w = r_u\,\sigma_v$, with $\sigma_v$ the weight of the soil column above the point |
+| `ru` | pore-pressure ratio | $u_w = r_u\,\sigma_v$, with $r_u$ the material's own ratio and $\sigma_v$ the weight of the soil column above the point |
 | `seep` | seepage solution | $u_w = \sum N_i u_{w,i}$ interpolated from the seepage analysis' nodal values |
 
-All four are evaluated **once**, at `build_fem_data()` time, at every Gauss point.
+Each source is evaluated **once**, at `build_fem_data()` time, at the Gauss points of the elements
+whose material reads it. The **ru** column is read only on a row whose **u** is `ru`.
 
 For `ru`, distributed loads and crack water are excluded from $\sigma_v$. In a uniform soil,
 with depth below ground written $z$ here, the ratio is $r_u = u_w/(\gamma z)$.
 The usual `ru` model has no water table and is
 weighed moist throughout.
 
-A piezometric line must extend across the whole mesh, because pore pressure is read from it at
-every node and Gauss point; the build stops at any point the line does not cover.
+A piezometric line must extend across every material set to `piezo`, because pore pressure is read
+from it at each of their nodes and Gauss points; the build stops at any such point the line does not
+cover. A material that reads no pore pressure from the line does not need it to reach.
+
+Where a material that takes pore pressure meets one that does not, or two take it from different
+sources, the pore pressure jumps across their common boundary. Equilibrium is written in total
+stress, as the next paragraph shows, so the total stress stays continuous across that boundary and
+the effective stress takes the jump: the water in the wet material presses on the face of the dry
+one. That is how a material analyzed in total stress, or an impervious zone, stands against
+saturated soil.
 
 **How pore pressure enters the equilibrium.** Equilibrium is written in total stress, with
 $\sigma = \sigma' - u_w m$ and $m = [1, 1, 0, 1]^T$ for the four components
@@ -474,7 +487,7 @@ reduction $c_{suction}$ is divided by $F$ along with $c'$ and $\tan\phi'$.
 
 The credit needs a pore-pressure source that is negative above the water table, so it works with
 `u = piezo` or `u = seep` on an effective-stress material (`mc`, `pow`, `hb`) and does nothing for
-`none`, `ru`, `cp` or `elastic`, as in the
+`none`, `ru`, `cp`, `ratio` or `elastic`, as in the
 [LEM](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table).
 $\phi^b$ and $s_{cap}$ are the `phi_b` and `s_cap` columns of the
 [mat worksheet](../usage/input_template.md#worksheet-mat); `solve_fem()` and `solve_ssrm()`

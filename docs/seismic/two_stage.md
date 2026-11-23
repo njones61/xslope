@@ -82,14 +82,16 @@ A two-stage run is refused when:
 
 - stage 1's factor of safety is below 1, since a slope that fails before the earthquake has no consolidation stresses
   to give;
-- no material carries $d$ and $\psi$, since stage 1 would then give no slice an undrained strength to carry into stage 2;
-- a material carries $d$ or $\psi$ but not both;
-- a material with $d$ and $\psi$ uses a power-curve or Hoek-Brown envelope;
+- no `mc` material carries $d$ and $\psi$, since stage 1 would then give no slice an undrained strength to carry
+  into stage 2;
+- an `mc` material carries $d$ or $\psi$ but not both;
+- a material a slip surface can reach uses a power-curve (`pow`) or Hoek-Brown (`hb`) envelope;
 - the run is also a rapid drawdown analysis.
 - the [stage 2 strength factor](#factor) is not greater than 0 and at most 1.
 
 A horizontal seismic coefficient of 0 draws a warning: stage 2 is then a static analysis with undrained strengths. A `cp` or
-`ratio` material keeps its undrained strength in both stages, and its $d$ and $\psi$ are not read.
+`ratio` material keeps its undrained strength in both stages, and its $d$ and $\psi$ are not read: the pair is read
+on `mc` materials only, and one left on a `cp` or `ratio` row is noted as information.
 [Preflight Input Checks](../usage/preflight.md) lists every rule.
 
 ## The Single-Stage R Envelope {#single-stage}

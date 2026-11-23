@@ -440,7 +440,8 @@ slope_data = {
                                  #   Blank = plain gravity turn-on. Set 1.0 to reproduce an RS2
                                  #   model (RS2 authors an isotropic field stress). Worth a few
                                  #   percent of FS on reinforced/near-cohesionless sections.
-    'tension_srf':    None,      # v19, main!D18 (D17 before v28). reduce t_cut along with c and tan(phi)?
+    'tension_srf':    None,      # v19, main!D18 (D17 before v28). reduce t_cut (a material's, and a joints-sheet
+                                 #   line's) along with c and tan(phi)? None = the engine default, True
     'element_type':   None,      # v19, main!D19 (D18 before v28). mesh element type (see Meshing below)
     'target_size':    None,      # v19, main!D20 (D19 before v28). global target element size
     'element_size_1d': None,     # v25, main!D21 (D20 before v28). target element size ALONG the 1D members (piles
@@ -488,6 +489,8 @@ slope_data['materials'] = [
         'c':     200.0,          # cohesion
         'phi':   28.0,           # friction angle (degrees)
         'u':     'piezo',        # pore pressure: 'none', 'piezo', 'seep', or 'ru'; set slope_data['piezo_phreatic']=True for the phreatic cos^2 correction (piezo sheet Type)
+                                 #   Read per material by both the LEM and the FEM, so materials may use different
+                                 #   sources (a dry 'none' fill over a 'piezo' foundation); blank = 'none'.
         # --- option='cp' (and 'ratio') only ---
         'cp':    0.0,            # cp: rate of Su increase per unit depth below r_elev;
                                  #   ratio: the strength ratio Su/sigma'_v (about 0.05-0.3)
@@ -506,7 +509,7 @@ slope_data['materials'] = [
         #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is ignored (loader warns if
         #     any is set). Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength",
         #     SLOPE/W "Bedrock (Impenetrable)".
-        # --- rapid drawdown only (Kc=1 envelope) ---
+        # --- rapid drawdown and two-stage seismic only (Kc=1 envelope), read on mc rows only ---
         'd':     0.0,            # cohesion intercept
         'psi':   0.0,            # friction angle
         # --- tensile-strength cutoff (v16): Rankine cap on the major principal stress, stress
@@ -534,8 +537,8 @@ slope_data['materials'] = [
         #     converts to apparent cohesion c_suction = min(s, s_cap)*tan(phi_b); None/blank = uncapped.
         #     Dependency: active (read) only for option in {mc, pow, hb} combined with
         #     u in {piezo, seep} — a signed pore-pressure source the suction can be derived
-        #     from. Inert for option='cp' (Su already embodies field suction — do not also set
-        #     phi_b there) and option='elastic' (cannot fail); also inert, by construction, for
+        #     from. Inert for option='cp' and 'ratio' (Su already embodies field suction — do not
+        #     also set phi_b there) and option='elastic' (cannot fail); also inert, by construction, for
         #     u='none' or u='ru' (no signed u to read a suction from). CAUTION: with u='piezo'
         #     the hydrostatic suction above the line is UNBOUNDED with depth, so s_cap is
         #     essential to avoid an unrealistic apparent cohesion; with u='seep' the FE
@@ -560,7 +563,8 @@ slope_data['materials'] = [
         'Ss': None, 'Sy': None,
         # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,
-        # --- reliability std deviations (only when running reliability) ---
+        # --- reliability std deviations (only when running reliability). sigma_d/sigma_psi are
+        #     read only by a rapid drawdown Taylor-series run, on an mc material ---
         'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0,
         'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0,
     },
@@ -585,8 +589,8 @@ Common strength setups:
   SSRM reduces the suction term by F alongside c' and tan(phi')); set `s_cap=<stress value>` too — mandatory in
   practice with `u='piezo'` since the hydrostatic suction above the line grows unbounded with
   height, optional (self-bounding) with `u='seep'`. Leave `phi_b=None` for the pre-v17 default
-  (no suction credit). Do not set `phi_b` on a `cp` material (Su already embodies field
-  suction) or on `elastic` (cannot fail).
+  (no suction credit). Do not set `phi_b` on a `cp` or `ratio` material (Su already embodies
+  field suction; neither engine credits it there) or on `elastic` (cannot fail).
 
 #### Geometry — `profile_lines` OR `polygons` (mutually exclusive)
 
@@ -712,8 +716,9 @@ conforming zones.
 
 An **SSR zone** confines the finite-element strength reduction to part of the model. It is an
 **analysis overlay, not geometry**: it is never meshed, never a material region and never
-slice-generating, so adding one to a finished model leaves the mesh and every other answer
-untouched. Zones live on their own key — never in `polygons` — and on the **polygon** sheet they
+slice-generating, so adding one to a finished model leaves every other answer untouched, and
+the mesh too unless the zone carries a `size`, which refines the mesh inside it as a refine zone
+does. Zones live on their own key — never in `polygons` — and on the **polygon** sheet they
 are rows whose **Type** names the kind. They may overlap each other and cross material
 boundaries; the no-overlap rule above applies to material zones only. A model whose geometry is
 on the profile sheet may still carry zones.
@@ -756,8 +761,8 @@ slope_data['refine_zones'] = [
 #### Joint regions (`joint_zones`) — authoring only
 
 A polygon of Type `joints`: a region a generated joint set is clipped to, for ground no material
-boundary draws. No material, no mesh region, no slices, no effect on the mesh — only
-`xslope.joints` reads it, and only when a set names it.
+boundary draws. No material, no mesh region, no slices. A `size` on it refines the mesh inside it,
+as on a refine zone; otherwise only `xslope.joints` reads it, and only when a set names it.
 
 ```python
 slope_data['joint_zones'] = [
@@ -767,8 +772,8 @@ slope_data['joint_zones'] = [
 ```
 
 `label` is the polygon sheet's block header, and it is how a set names the region
-(`region='poly:North block'`, or `'poly:1'` by position). `size` and `mat_id` do nothing on such
-a polygon and preflight warns about either. A region no set names is fine.
+(`region='poly:North block'`, or `'poly:1'` by position). `mat_id` does nothing on such a polygon
+and preflight warns about it. A region no set names is fine.
 
 A `size` key on a **material** polygon (`slope_data['polygons'][i]['size']`) or on a **profile
 line** (`slope_data['profile_lines'][i]['size']`) does the same thing for that zone. Use those
@@ -939,8 +944,10 @@ drawing approximately is fine — the optimizer refines them. Non-circular surfa
 the search find the critical path along it.
 
 - **Entry/exit points** (first and last) sit on the **ground surface** with `Movement='Free'` —
-  the search moves them horizontally and snaps Y back to the ground surface, so give each an
-  explicit ground-elevation Y (never leave Y blank).
+  the search steps them along the ground surface itself (`'Horiz'` does the same on an end point;
+  `'Fixed'` pins it), so give each an explicit ground-elevation Y (never leave Y blank). Movement
+  matches in any case; a blank Movement is Free on an end point and Fixed on an interior one, and
+  any other word stops the search.
 - **Interior points** run through the weak layer with `Movement='Horiz'` so the optimizer slides
   them horizontally within it. **Seed them just above the bottom of the weak layer (~0.1 units
   above its base)** — the minimum-FS surface typically rides along the layer bottom.
@@ -1008,10 +1015,12 @@ slope_data['reinforcement_lines'] = [
      # v27 interface (joint) option, FEM only. 'Yes' makes the line a slip
      # surface: the mesh splits along it and a pair of interface elements
      # carries the sheet's grip, with 'adhesion'/'delta' as their Mohr-Coulomb
-     # strength (both required). '' / 'No' is the ordinary bonded bar.
+     # strength (both required). '' / 'No' is the ordinary bonded bar. Yes/No
+     # match in any case; any other word is refused by the checks.
      'joint': '',           # '', 'No' (bonded, the default) | 'Yes' (slip surface)
      'kn': float('nan'),    # interface normal stiffness; NaN = derive from the
-     'ks': float('nan'),    # softer adjacent soil over 0.1 x the 1D element size
+     'ks': float('nan'),    # softer adjacent soil over 0.1 x the 1D element size;
+                            # a stated kn/ks must be > 0. Read only when joint='Yes'
      'jred': ''},           # '' / 'Yes' = reduce the interface with the soil in
                             # the SSR (the default); 'No' holds it at full strength
 ]
@@ -1075,8 +1084,9 @@ the material: does the slip surface CUT the reinforcement or run ALONG it? A bon
 where the surface crosses the layers (a circle through a geogrid slope, a nail wall, a pile
 row) — it corresponds to the LEM treatment. A joint is right where the surface can run along
 the layer: a base geotextile under an embankment on soft clay, a wrapped-face or block-faced
-wall whose fill slides on its sheets, a smooth liner. On a jointed line `lp1`/`lp2` are not
-read (the grip is the interface traction); the bar still yields at `t_max` and softens to `t_res`
+wall whose fill slides on its sheets, a smooth liner. On a jointed line the FEM does not read
+`lp1`/`lp2` (the grip is the interface traction; the LEM, which ignores `joint`, reads them unless
+`adhesion` and `delta` are both set); the bar still yields at `t_max` and softens to `t_res`
 where one is given. A blank `tend1`/`tend2` leaves that end free to pull out, and a filled one
 ties it at that capacity. LEM ignores `joint` entirely. Preflight
 reports the geometry that indicates a bonded line should have been a joint. See
@@ -1094,17 +1104,18 @@ coincident nodes and one interface element instead of three and two.
 slope_data['joint_lines'] = [
     {'label': 'Block base',
      'x1': 6.0, 'y1': 6.0, 'x2': 6.3, 'y2': 6.0,
-     'c': 0.0,              # joint cohesion; blank/0 is a purely frictional contact
-     'phi': 34.0,           # friction angle, degrees. REQUIRED — preflight refuses a blank
+     'c': 0.0,              # joint cohesion, >= 0; blank/0 is a purely frictional contact
+     'phi': 34.0,           # friction angle, degrees, in [0, 90). REQUIRED — preflight refuses a blank
      'c_res': float('nan'),  # NaN = no residual branch: the joint keeps its peak strength.
      'phi_res': float('nan'),#   A stated pair is what it drops to the first time it slips,
                              #   permanently; neither may exceed the peak.
      'dil': float('nan'),   # NaN/0 = no dilation. An angle makes a unit of slip open the
                             #   joint by tan(dil), which builds normal stress under confinement
-     't_cut': 0.0,          # tension cutoff: the joint opens past it and closes on contact
+     't_cut': 0.0,          # tension cutoff, >= 0: the joint opens past it and closes on
+                            #   contact. Reduced with c and tan(phi) unless tension_srf is False
      'kn': float('nan'),    # NaN = derive from the softer adjacent soil over
-     'ks': float('nan'),    # 0.1 x the 1D element size, as the reinforce sheet's pair does
-     'jred': ''},           # '' / 'Yes' = reduce with the soil in the SSR; 'No' holds it
+     'ks': float('nan'),    # 0.1 x the 1D element size, as the reinforce sheet's pair does; > 0 if stated
+     'jred': ''},           # '' / 'Yes' = reduce with the soil in the SSR; 'No' holds it (any case)
 ]
 ```
 
@@ -1120,7 +1131,8 @@ jointed too (`joint='Yes'`) or stop short of it, and a pile must stop short: the
 node, and a bonded member there has no side to attach to (preflight
 `joint.crosses_constraint_line` refuses it). A thin zone crossed by many joint lines needs a per-polygon `size`
 (the polygon sheet's Size column) — a 0.3 m facing column crossed every 0.6 m does not mesh at a
-1 m target size. LEM ignores the sheet entirely. See
+1 m target size. LEM ignores the sheet entirely, and seepage ignores every joint (both sheets):
+water flows across a joint line as if the mesh were not split there. See
 https://xslope.org/en/latest/reinforcement/fem/#joints-without-reinforcement.
 
 #### Joint networks (`xslope.joints`)
@@ -2175,10 +2187,10 @@ state on dedicated sheets whose layouts mirror the first set:
 
 | Second-state data | Sheet / location | Layout |
 |---|---|---|
-| Drawn-down piezometric line | **piezo** sheet, columns D-E (Piezo Line 2) | data from row 4 |
+| Drawn-down piezometric line | **piezo** sheet, columns D-E (Piezo Line 2) | data from row 5; read only by a rapid drawdown run |
 | Drawn-down reservoir load | **dloads (2)** sheet | same block layout as dloads |
 | Drawn-down seepage BCs | **seep bc (2)** sheet | same layout as seep bc |
-| Undrained (Kc=1) envelope | **mat** sheet columns J (d) and K (psi) | per material |
+| Undrained (Kc=1) envelope | **mat** sheet columns J (d) and K (psi) | per material, read on `mc` rows only |
 
 Rules:
 - Materials with `d`/`psi` BLANK are treated as **free-draining** (drained strength in all

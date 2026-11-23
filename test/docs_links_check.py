@@ -1635,7 +1635,7 @@ SEEP02_BC_EXIT_ENTRY = "Exit face"
 #: the head rides in the list entry and that the table beside it holds points and
 #: nothing else, so a value moved out of the list entry into a field of its own
 #: makes that sentence wrong about the editor on the screen.
-SEEP02_BC_HEAD_ENTRIES = ("Head 1  (h = 160.0)", "Head 2  (h = 100.0)")
+SEEP02_BC_HEAD_ENTRIES = ("Head 1  (h = 160)", "Head 2  (h = 100)")
 
 #: Two dialog controls SEEP-2 explains and SEEP-1 does not name. Both are visible
 #: in SEEP-2's own screenshots, which is why the page covers them: Quadrilateral

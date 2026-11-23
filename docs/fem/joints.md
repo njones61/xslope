@@ -17,7 +17,10 @@ kinds; [Two ways to represent a sheet](../reinforcement/fem.md#two-ways-to-repre
 is particular to the reinforced one.
 
 A joint line is finite element geometry. The limit equilibrium engines do not read the joints
-worksheet at all.
+worksheet at all. A seepage analysis ignores joints, from either worksheet, in Studio and in scripts
+alike: water flows across a joint line as if it were not there, so a seepage solution on a jointed
+mesh is the one the same mesh gives without the split, and both faces of a joint carry the same pore
+pressure.
 
 ## When a Model Needs a Joint
 
@@ -97,8 +100,8 @@ far the faces shift past each other under a given shear stress before the joint 
 soil properties. They exist so that a joint that has not slipped or opened behaves as if it were
 not there, its two faces moving together like the material on either side, whether that is rock on
 rock or fill on a geosynthetic sheet; they need to be just large enough for that and no larger. Enter them in the `kn` and `ks` columns of the joints
-sheet, or of the reinforce sheet for a reinforcement line that is a slip surface. Left blank,
-they are derived from the softer of the two materials the joint runs between: the normal stiffness
+sheet, or of the reinforce sheet for a reinforcement line that is a slip surface; a stated value
+must be greater than zero. Left blank, they are derived from the softer of the two materials the joint runs between: the normal stiffness
 is that material's Young's modulus divided by a notional joint thickness, the shear stiffness its
 shear modulus divided by the same thickness, and the thickness is one tenth of the joint element's
 length,
@@ -130,7 +133,8 @@ as before.
 
 ![The joint's strength envelope: the Coulomb limit on the shear stress in either direction, the cohesion intercept, the tension cutoff at which the joint opens, and the residual envelope it drops to once it has slipped](images/joint_envelope.png){width=800}
 
-A joints-sheet line states `c`, `phi` and `t_cut` in columns of its own. A jointed reinforcement
+A joints-sheet line states `c`, `phi` and `t_cut` in columns of its own: `c` and `t_cut` zero or
+more, and `phi` at least 0 and less than 90 degrees. A jointed reinforcement
 line takes its `Adhesion` and `Delta` as the joint's cohesion and friction angle, and its tension
 cutoff is zero: a
 soil-geosynthetic contact carries no tension, where a rock joint may hold a little.
@@ -173,11 +177,14 @@ enough for the limit to matter is on a slope that has already failed.
 ### Strength reduction
 
 A strength reduction divides $c_j$ and $\tan\phi_j$ by the trial factor along with the soil's, on
-both the peak and the residual branch, on every jointed line. A line that sets `Jred = No` is
-left at full strength while everything else is weakened. Use that for a contact whose strength is
+both the peak and the residual branch, on every jointed line. The tension cutoff `t_cut` is divided
+with them unless **Tension SRF** on the main sheet is `NO`, the same setting a material's `t_cut`
+follows. A line that sets `Jred = No` is left at full strength, its tension cutoff included, while
+everything else is weakened. Use that for a contact whose strength is
 known and not in question, such as a wall's base on a prepared bedding or a liner with a measured
 interface friction; a natural joint whose strength is uncertain is part of the margin the search is
-looking for, and should be reduced with the rock. The stiffnesses `kn` and `ks` are not
+looking for, and should be reduced with the rock. `Jred` reads `Yes` or `No` in any case, and a
+blank is `Yes`. The stiffnesses `kn` and `ks` are not
 strengths, so they are not reduced, any more than the bar's are.
 
 The element's own law — the peak limit, the residual drop and the opening a dilating joint produces

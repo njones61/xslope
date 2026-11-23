@@ -166,7 +166,7 @@ choice among the three:
   of extra Gauss points and a center node.
 
 `build_mesh_from_polygons()` defaults to `tri6`, and Studio's *Build mesh* dialog opens
-on it. A blank **Element type** cell (`main!D18`) gives `tri6`.
+on it. A blank **Element type** cell (`main!D19`) gives `tri6`.
 An explicit type on the call or main sheet overrides the default.
 
 For seepage, `tri3` is the lighter choice, with a smaller system that solves faster.
@@ -275,8 +275,9 @@ size grades back to it across the zone boundary:
 A Size only ever refines — a value at or above the global target has no effect, and
 XSLOPE warns rather than silently ignoring it. A polygon whose **Type** is `refine`
 carries nothing *but* a Size: it is not a material, never becomes a mesh region, and only
-makes the mesh finer where it is drawn. Refine polygons reach the mesher through
-`extract_size_regions()`, passed as `size_regions`. Both are described on the
+makes the mesh finer where it is drawn. A Size on an `ssr` or `joints` polygon, which is not
+meshed as a zone either, refines the mesh inside it the same way. These polygons reach the
+mesher through `extract_size_regions()`, passed as `size_regions`. Both are described on the
 [Input Template](../usage/input_template.md#refine-regions) page.
 
 A Size resolves a zone it is entered on, however thin the zone is — the size field

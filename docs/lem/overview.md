@@ -146,7 +146,8 @@ in MPa rather than the model's own stress units.
 
 ### Pore pressures
 
-Each material takes its pore pressure $u$ from one of four sources, chosen in the **u** column of the `mat` sheet:
+Each material takes its pore pressure $u$ from one of four sources, chosen in the **u** column of the `mat` sheet
+(a blank cell means `none`). The materials of one model may use different sources:
 
 | `u` | Pore pressure from | Use it for |
 |---|---|---|
@@ -199,7 +200,8 @@ downstream. But every point that reads the line must lie within it. If the base 
 falls beyond either end of the line, XSLOPE stops with an error that names the surface, the slice, its
 x-coordinate, and the line's extent. It does not read zero pore pressure there, which would give an unconservatively
 high factor of safety. To model dry ground past the end of a line, carry the line on at an elevation below the
-section. The finite element analysis applies the same rule at every mesh node and Gauss point. XSLOPE also stops
+section. The finite element analysis applies the same rule at every mesh node and Gauss point in a `u = piezo`
+material. XSLOPE also stops
 when a material has `u = piezo` and the file has no piezometric line.
 
 #### Finite element seepage (`u = seep`)
@@ -237,7 +239,9 @@ With $u_a = 0$, the last term is $s\tan\phi^b$, where $s = \max(0,\,-u_w)$ is th
 apparent cohesion added on top of $c'$. The effective-normal term still uses the ordinary clamped $u$, so the
 base normal forces and interslice forces are computed as before; only the cohesion on the resisting side gains the
 extra term. $\phi^b$ is off unless a material is given a value, and with it off the strength is the ordinary
-Mohr-Coulomb strength.
+Mohr-Coulomb strength. Only an effective-stress material (`mc`, `pow` or `hb`) whose pore pressure comes from
+`piezo` or `seep` takes the credit. A `cp` or `ratio` material states an undrained strength, which has no
+effective-stress term for suction to add to, and `none` and `ru` give no suction to read.
 
 **Setting it up.** The **mat** sheet carries this per material — see
 [phi_b / s_cap](../usage/input_template.md#worksheet-mat) in the input template docs for the columns, the

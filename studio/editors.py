@@ -5897,7 +5897,7 @@ CIRCLES_HELP = {
     "Yo": "Y-coordinate of the circle center.",
     "Option": "How the circle's size is defined — Depth, Radius, or Intercept; "
               "only the matching field below is used.",
-    "Depth": "Depth of the circle bottom below the center (R = Yo − Depth). Option = Depth.",
+    "Depth": "Elevation of the circle's lowest point (R = Yo − Depth). Option = Depth.",
     "Xi": "X-coordinate of a point the circle passes through. Option = Intercept.",
     "Yi": "Y-coordinate of a point the circle passes through. Option = Intercept.",
     "R": "Circle radius, specified directly. Option = Radius.",

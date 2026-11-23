@@ -186,10 +186,9 @@ manual this problem comes from, entered as three points:
 | 61 | 67.069 | Free |
 
 `Free` lets a search move a point, and the two end vertices can never leave
-the ground: the search moves an end point horizontally and re-anchors its Y to
-the ground surface at the new x, so a `Free` end tracks the ground
-automatically — the behavior some programs mark with an `Auto` vertex is built
-in. In [LEM-5](lem05_weak_layer_noncircular.md) we cover the column and what the
+the ground: the search steps a `Free` end point along the ground surface itself,
+so it tracks the ground automatically — the behavior some programs mark with an
+`Auto` vertex is built in. In [LEM-5](lem05_weak_layer_noncircular.md) we cover the column and what the
 other two options do.
 
 The tables are the model, and each is laid out exactly as its destination is — the

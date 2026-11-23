@@ -33,16 +33,16 @@ compiled kernel.
 |---|---|---|---|
 | Analysis | — | `solve_fem()` or `solve_ssrm()` | [Single trial](#the-solve_fem-function) or [strength reduction search](#methodology). |
 | F (single) | — | `solve_fem(F=)` | [Strength reduction factor](#the-solve_fem-function), default 1.0. |
-| F min (SSRM) | `main!D21` | `solve_ssrm(F_min=)` | [Starting bracket](#the-solve_ssrm-function), default 1.0. |
-| F max (SSRM) | `main!D22` | `solve_ssrm(F_max=)` | [Starting bracket](#the-solve_ssrm-function), default 2.0. |
+| F min (SSRM) | `main!D22` | `solve_ssrm(F_min=)` | [Starting bracket](#the-solve_ssrm-function), default 1.0. |
+| F max (SSRM) | `main!D23` | `solve_ssrm(F_max=)` | [Starting bracket](#the-solve_ssrm-function), default 2.0. |
 | Tolerance (SSRM) | — | `solve_ssrm(tolerance=)` | [Final bracket width](#the-solve_ssrm-function), default 0.01; not the displacement convergence tolerance. |
 | Max iterations per trial | — | `max_iterations=` (both functions) | [Trial budget](#creep-trend), default 12000. |
 | Iteration ceiling | — | `max_iterations_ceiling=` (both functions) | [Hard limit on budget extensions](#creep-trend), default 50000. |
 | Accelerate convergence | — | `accelerate=` (both functions) | [Lengthen admissible iteration steps](#jointed-model-acceleration) (Irons & Tuck, 1969); `False` runs the ordinary iteration. |
-| Side BC | `main!D23` | `build_fem_data()` reads `slope_data['side_bc']`; no solve argument | [Side restraint](overview.md#what-xslope-assigns-automatically), rollers by default. |
-| K0 initial stress | `main!D16` (blank disables) | `k0=` (both functions) | [At-rest initialization and equilibration](#in-situ-equilibration), off when unspecified. |
-| K0 | `main!D16` | `k0=` (both functions) | [At-rest lateral stress coefficient](#in-situ-equilibration); the dialog value starts at 1.0 when enabled. |
-| Reduce the tensile cap with F (Tension SRF, strength reduction factor) | `main!D17` | `tension_srf=` (both functions) | [Reduce a stated positive tensile cap](#tensile-strength-in-ssrm), on by default. |
+| Side BC | `main!D24` | `build_fem_data()` reads `slope_data['side_bc']`; no solve argument | [Side restraint](overview.md#what-xslope-assigns-automatically), rollers by default. |
+| K0 initial stress | `main!D17` (blank disables) | `k0=` (both functions) | [At-rest initialization and equilibration](#in-situ-equilibration), off when unspecified. |
+| K0 | `main!D17` | `k0=` (both functions) | [At-rest lateral stress coefficient](#in-situ-equilibration); the dialog value starts at 1.0 when enabled. |
+| Reduce the tensile cap with F (Tension SRF, strength reduction factor) | `main!D18` | `tension_srf=` (both functions) | [Reduce a stated positive tensile cap](#tensile-strength-in-ssrm), on by default. |
 | Failure criterion | — | `failure_criterion=` (both functions) | [Trial classification](#ssrm-failure-criteria); the API default is `hybrid`. |
 | Ignore surficial (skin) failures | — | `min_slip_depth=None` disables (both functions) | [Depth filter](#surficial-skin-failures-and-the-minimum-slip-depth-filter), off by default. |
 | Min slip depth | — | `min_slip_depth=` (both functions) | [Depth below ground](#surficial-skin-failures-and-the-minimum-slip-depth-filter), in model length units. |
@@ -686,7 +686,8 @@ on `solve_ssrm()`, and `tension_cutoff` for a global zero cap.
 by $F$ along with $c$ and $\tan\phi$; off, it stays at its entered value through the search.
 With it on, the factor of safety reduces the whole stated envelope, shear and tensile.
 The setting changes nothing without a positive cap: $c/\tan\phi$ stays unchanged and zero
-divided by $F$ is zero. It matches RS2's tension-SRF switch.
+divided by $F$ is zero. It matches RS2's tension-SRF switch. A joint's tension cutoff follows
+the same setting ([Strength reduction](joints.md#strength-reduction) on the joints page).
 Set it with the **Tension SRF** cell on the main sheet, `tension_srf`, or the dialog checkbox,
 which is dimmed where it has nothing to act on.
 

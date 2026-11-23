@@ -168,7 +168,7 @@ Most of this sheet is already right:
    you type already mean, and drives the unit labels on the plots.
 2. Leave **Tension crack depth**, **Depth of water in crack** and **Seismic
    coefficient** at `0`.
-3. Leave `main!D24` **Water loads** at `auto`, which derives the weight of standing
+3. Leave `main!D25` **Water loads** at `auto`, which derives the weight of standing
    water from the water table rather than from a load you type. There is no water
    here, so it changes nothing — but it is the setting to leave alone.
 4. Leave **LEM method** and **Number of slices** blank. A blank run option means

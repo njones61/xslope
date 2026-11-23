@@ -148,7 +148,7 @@ run checks reject an incomplete pair; leaving both blank treats the material as 
 **A second water state** — Piezometric Line 2, a second seepage solution, or a
 transient frame; the pore pressures stages 2 and 3 read.
 
-**Water loads** = `auto` (`main!D24`) — the reservoir load on the face at stage
+**Water loads** = `auto` (`main!D25`) — the reservoir load on the face at stage
 1, and whatever is left of it at stage 2.
 
 The second and third are the same statement seen twice, which is why leaving
@@ -201,8 +201,9 @@ columns, which declares them free-draining: they keep 100 psf and 35°, and
 100 psf and 27°, through every stage.
 
 The model checks report this. Every run on this page shows one warning —
-*"2 of 3 material(s) a failure surface can cross carry no d / psi and are treated
-as free-draining through the drawdown, keeping their drained strength"* — so a
+*"2 of 3 Mohr-Coulomb (option = mc) material(s) a failure surface can cross carry
+no d / psi and are treated as free-draining through the drawdown, keeping their
+drained strength"* — so a
 blank left by mistake is easy to catch. A material with **d** and no
 **psi**, or the reverse, is an error rather than a warning: the checks refuse the
 run rather than let a half-entered envelope pass.

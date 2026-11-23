@@ -32,6 +32,8 @@ check below pins one of those promises to the engine's reading:
      only one the setting divides.
   I. LINE LOADS. Studio's mesh puts a node at each line load, as the scripts'
      meshes do; moving one makes the mesh stale, changing its magnitude does not.
+  J. RELIABILITY. The dialog's model checks judge the run it will make: its
+     engine and whether it is a rapid drawdown.
 
 Every Studio setting these dialogs read or write goes to a scratch ini (QSettings
 is replaced for the duration), and every model is loaded from a copy.
@@ -880,6 +882,62 @@ def test_studio_mesh_pins_line_loads():
     return out
 
 
+# --------------------------------------------------------------------------- #
+# J. The Reliability dialog's checks judge the run it will make
+# --------------------------------------------------------------------------- #
+def test_reliability_checks_see_engine_and_rapid():
+    """The Reliability dialog's model checks are run for the run it will make:
+    its engine and whether it is a rapid drawdown. An mc material carrying s(d)
+    beside s(φ): a Monte Carlo rapid drawdown run reads s(d), so the panel shows no
+    reliability.dead_sigma_columns finding; unchecking Rapid drawdown makes it the
+    INFO that s(d) is left out; and the panel follows both controls as they move.
+    The engine reaches the checks too (the Taylor series refuses a σ above its
+    mean, the sampling engines truncate their draws instead)."""
+    from studio.dialogs import ReliabilityDialog
+    out = []
+    with _sandbox() as load:
+        sd = load(_SIMPLE)
+        mats = sd["materials"]
+        mats[0].update(option="mc", sigma_phi=2.0, sigma_d=50.0, sigma_psi=0.0)
+
+        def dead(dlg):
+            rep = dlg.preflight.report
+            return [f.severity for f in (rep.findings if rep is not None else ())
+                    if f.rule_id == "reliability.dead_sigma_columns"]
+
+        dlg = ReliabilityDialog(defaults={"engine": "mc", "rapid": True},
+                                slope_data=sd, app_mode="lem")
+        out += _fail(dead(dlg) == [],
+                     f"Monte Carlo with rapid drawdown: the panel reports "
+                     f"dead_sigma_columns {dead(dlg)}, but that run reads s(d)")
+        dlg.rapid.setChecked(False)
+        out += _fail(dead(dlg) == ["info"],
+                     f"Monte Carlo without rapid drawdown: dead_sigma_columns "
+                     f"{dead(dlg)}, expected the INFO that s(d) is left out")
+        dlg.rapid.setChecked(True)
+        out += _fail(dead(dlg) == [], "checking Rapid drawdown again did not clear "
+                                      "the finding: the panel does not follow it")
+
+        # The engine: a σ above its mean is refused by the Taylor series only.
+        mats[0]["sigma_phi"] = float(mats[0].get("phi") or 0.0) + 5.0
+        dlg2 = ReliabilityDialog(defaults={"engine": "taylor"}, slope_data=sd,
+                                 app_mode="lem")
+
+        def exceeds(d):
+            rep = d.preflight.report
+            return any(f.rule_id == "reliability.sigma_exceeds_mean"
+                       for f in (rep.findings if rep is not None else ()))
+        out += _fail(exceeds(dlg2), "the Taylor series run shows no "
+                                    "sigma_exceeds_mean for s(φ) above φ")
+        dlg2.engine.setCurrentIndex(dlg2.engine.findData("mc"))
+        out += _fail(not exceeds(dlg2), "switching the engine to Monte Carlo left "
+                                        "sigma_exceeds_mean standing; the sampling "
+                                        "engines truncate their draws instead")
+        dlg.deleteLater()
+        dlg2.deleteLater()
+    return out
+
+
 CHECKS = [
     ("material graying = engine", test_material_graying_follows_the_engine),
     ("material form = the rule", test_material_form_follows_the_rule),
@@ -894,6 +952,7 @@ CHECKS = [
     ("seep BC blank value", test_seep_bc_blank_value_stays_blank),
     ("Tension SRF counts joints", test_tension_srf_counts_joint_lines),
     ("Studio mesh pins line loads", test_studio_mesh_pins_line_loads),
+    ("Reliability checks see the run", test_reliability_checks_see_engine_and_rapid),
 ]
 
 

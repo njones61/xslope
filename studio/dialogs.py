@@ -3196,10 +3196,7 @@ class ReliabilityDialog(QDialog):
         # before learning that a conductivity or a Poisson's ratio was blank.
         self.preflight = PreflightPanel(
             analysis="reliability", slope_data=slope_data, document=document,
-            selection_fn=lambda: {"base": self.app_mode,
-                                  "method": self.method.currentData(),
-                                  "surface": self._surface_value(),
-                                  "search": self.search.isChecked()},
+            selection_fn=lambda: self._selection(),
             notes=(() if self.app_mode == "lem" else (SEISMIC_NOTE_FEM,)),
             parent=self)
 
@@ -3216,6 +3213,14 @@ class ReliabilityDialog(QDialog):
         self.method.currentIndexChanged.connect(self.preflight.refresh)
         if self.surface is not None:
             self.surface.currentIndexChanged.connect(self.preflight.refresh)
+        # Every control whose value is in _selection re-checks the model: the
+        # engine (the Taylor series and the sampling engines have different
+        # preconditions), rapid drawdown (it decides whether s(d)/s(psi) are read),
+        # the search, and the sample count.
+        self.engine.currentIndexChanged.connect(self.preflight.refresh)
+        self.rapid.toggled.connect(self.preflight.refresh)
+        self.search.toggled.connect(self.preflight.refresh)
+        self.n_samples.editingFinished.connect(self.preflight.refresh)
         self.preflight.changed.connect(self._sync_run)
         self._sync_enabled()
         self._sync_run()
@@ -3225,10 +3230,7 @@ class ReliabilityDialog(QDialog):
         if self.app_mode == "lem":
             from xslope.preflight import capabilities
             apply_capabilities(self.method,
-                               capabilities(self.preflight.model,
-                                            {"method": self.method.currentData(),
-                                             "surface": self._surface_value(),
-                                             "search": self.search.isChecked()}
+                               capabilities(self.preflight.model, self._selection()
                                             ).get("lem_method", {}))
         blocked = self.preflight.blocked
         self._ok.setEnabled(self._has_sigma and not blocked)
@@ -3249,6 +3251,21 @@ class ReliabilityDialog(QDialog):
 
     def _engine_value(self):
         return self.engine.currentData()
+
+    def _selection(self):
+        """The run as the model checks judge it — every selection key a
+        reliability rule reads, valued as the run will be (see options()): the
+        engine (the Taylor series and the sampling engines have different
+        preconditions), whether it is a rapid drawdown (which decides whether
+        s(d) and s(psi) are read), and the Monte Carlo sample count. A finite
+        element reliability runs no drawdown, so it is never judged as one."""
+        return {"base": self.app_mode,
+                "method": self.method.currentData(),
+                "surface": self._surface_value(),
+                "search": self.search.isChecked(),
+                "engine": self._engine_value(),
+                "rapid": self.app_mode == "lem" and self.rapid.isChecked(),
+                "n_samples": self.n_samples.value()}
 
     def _surface_value(self):
         return self._fixed_surface or (self.surface.currentData()

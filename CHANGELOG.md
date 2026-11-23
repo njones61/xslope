@@ -73,11 +73,14 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - A joint's tensile cutoff is reduced with the strength reduction factor when
   Tension SRF is on, as a material's is; it was never reduced. Studio's Tension
   SRF box is live when only a joint has a cutoff.
-- In a rapid drawdown, the Taylor series reliability analysis varies d and ψ by
-  s(d) and s(ψ). These were never read, so the uncertainty in the drawdown
-  strength was left out: on Slide2's verification problem 96, β falls from 5.37
-  to 3.79. A reliability run on a fixed surface now runs the drawdown; it used
-  to solve the slope before drawdown.
+- Reliability analysis runs rapid drawdown with every engine, and varies d and ψ
+  by s(d) and s(ψ). These were never read, so the uncertainty in the drawdown
+  strength was left out: on Slide2's verification problem 96, the Taylor series'
+  β falls from 5.37 to 3.79. A Taylor series run on a fixed surface used to
+  solve the slope before drawdown, and Monte Carlo and the response surface
+  refused a rapid drawdown. A Monte Carlo sample that is unstable before the
+  water is lowered counts as a failure, and the run says how many there were.
+  Studio's Reliability dialog checks the engine and the drawdown you chose.
 - The finite element method refuses a blank strength option, as limit
   equilibrium does. It used to run it as Mohr-Coulomb.
 - A limit equilibrium run that isn't a rapid drawdown no longer reads

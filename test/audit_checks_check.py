@@ -30,6 +30,12 @@ search used to read as something else, without a word.
      a run without drawdown leaves them out. Checked against a hand combination of
      separate deterministic rapid drawdown runs at MLV +/- sigma, on the fixed
      surface (search=False), which also checks that path now runs the drawdown.
+  G. RAPID DRAWDOWN SAMPLING (Norm, 536a). Monte Carlo and the response surface
+     run the drawdown too, on every realization of their fixed-surface campaign,
+     and sample d and psi with the rest. Each sampled realization is held to a
+     separate deterministic drawdown of the same parameters; a realization unstable
+     before the drawdown is counted as a failure at its stage 1 factor of safety,
+     never dropped. Small sample counts, fixed seed.
 
 Every check here fails on the code before the fix. No solve is run: each one
 reads a workbook, a preflight report, or a refusal raised before the first trial
@@ -473,6 +479,82 @@ def check_rapid_reliability_taylor():
     return fails
 
 
+# --------------------------------------------------------------------------- #
+# G. Monte Carlo and the response surface run the drawdown
+# --------------------------------------------------------------------------- #
+def _rapid_sd():
+    sd = _load(RAPID_MODEL)
+    sd["materials"][0].update(RAPID_SIGMAS)
+    return sd
+
+
+def check_rapid_reliability_sampling():
+    import copy
+    from xslope.reliability import (reliability_mc, reliability_rs,
+                                    _fixed_surface_context)
+    fails = []
+    sd = _rapid_sd()
+    circle = sd["circles"][0]
+    f_mlv = _rapid_fs(sd, circle)
+
+    # Monte Carlo: every realization is a drawdown of the sampled parameters.
+    ok, res = _quiet(reliability_mc, sd, "spencer", rapid=True, search=False,
+                     n_samples=24, rng_seed=7)
+    if not ok:
+        return [f"rapid sampling: Monte Carlo refused a rapid drawdown ({res})"]
+    params = [p["param"] for p in res["param_info"]]
+    if sorted(params) != ["d", "phi", "psi"]:
+        fails.append(f"rapid sampling: Monte Carlo sampled {params}, expected phi, "
+                     f"d and psi")
+    if abs(float(res["F_MLV"]) - f_mlv) > 1e-9:
+        fails.append(f"rapid sampling: Monte Carlo F at the most likely values is "
+                     f"{res['F_MLV']!r}; the deterministic drawdown gives {f_mlv!r}")
+    for k in range(3):
+        sd_k = copy.deepcopy(sd)
+        for p, v in zip(res["param_info"], res["param_samples"][k]):
+            sd_k["materials"][p["material_id"] - 1][p["param"]] = float(v)
+        f_k = _rapid_fs(sd_k, circle)
+        if abs(float(res["fs_samples"][k]) - f_k) > 1e-9:
+            fails.append(f"rapid sampling: realization {k + 1} has F = "
+                         f"{res['fs_samples'][k]!r}; a drawdown of its sampled "
+                         f"parameters gives {f_k!r}")
+
+    # A realization unstable before the drawdown is a failure, not a dropped draw.
+    okc, ctx = _quiet(_fixed_surface_context, sd, "spencer", "check", rapid=True,
+                      search=False)
+    if not okc:
+        fails.append(f"rapid sampling: no fixed-surface context ({ctx})")
+    else:
+        weak = copy.deepcopy(sd)
+        weak["materials"][0]["phi"] = 10.0
+        f_weak = _quiet(ctx["evaluate"], weak)
+        if f_weak is None or not f_weak < 1.0:
+            fails.append(f"rapid sampling: a realization unstable before the "
+                         f"drawdown evaluated as {f_weak!r}; it must count as a "
+                         f"failure (its stage 1 F < 1)")
+        elif ctx.get("stage1_failed", [0])[0] != 1:
+            fails.append("rapid sampling: the stage 1 failure was not counted")
+
+    # The response surface: its design and gate are drawdowns too, and it samples
+    # d and psi. Its F at the most likely values is the same drawdown.
+    ok, res = _quiet(reliability_rs, sd, "spencer", rapid=True, search=False,
+                     n_surrogate=20_000, n_gate=40, rng_seed=7)
+    if isinstance(res, str) and "refused" not in res and not ok:
+        # The gate may decline the surrogate; a refusal must still be about the
+        # fit, not the drawdown.
+        if "rapid drawdown" in res.lower():
+            fails.append(f"rapid sampling: the response surface refused the "
+                         f"drawdown itself ({res})")
+    elif ok:
+        params = sorted(p["param"] for p in res["param_info"])
+        if params != ["d", "phi", "psi"]:
+            fails.append(f"rapid sampling: the response surface sampled {params}")
+        if abs(float(res["F_MLV"]) - f_mlv) > 1e-9:
+            fails.append(f"rapid sampling: response-surface F_MLV {res['F_MLV']!r} "
+                         f"against the drawdown's {f_mlv!r}")
+    return fails
+
+
 CHECKS = [
     ("seep bc: every block read", check_seep_bc_blocks),
     ("unsat: words kept, any case", check_unsat_words),
@@ -483,6 +565,7 @@ CHECKS = [
     ("circles: unsized circle round-trips", check_circle_size_cells_round_trip),
     ("rapid: d/psi on mc rows only", check_rapid_d_psi_rows),
     ("rapid reliability: d and psi perturbed", check_rapid_reliability_taylor),
+    ("rapid reliability: MC and RS run drawdowns", check_rapid_reliability_sampling),
 ]
 
 

@@ -148,13 +148,12 @@ it to move, so the uncertainty could never reach the factor of safety. A determi
 is not reported.
 
 The standard deviations `s(d)` and `s(ψ)` of the rapid drawdown envelope are read by
-a rapid drawdown reliability run, on an `mc` material, which perturbs `d` and `ψ` the
-way it perturbs `c` and `φ`; the Taylor series runs the drawdown with or without a
-search. Elsewhere they are unread, and the report says so in proportion: an INFO on a
-run without drawdown (the same model is often run both ways), a warning on a `cp` or
-`ratio` material in a rapid drawdown run, and an error naming them when they are the
-only deviations the run would read. Monte Carlo and the response surface do not yet
-run a rapid drawdown, and a request for one is refused.
+a rapid drawdown reliability run, on an `mc` material: every engine varies `d` and `ψ`
+the way it varies `c` and `φ`, and solves each evaluation as a drawdown. Elsewhere
+they are unread, and the report says so in proportion: an INFO on a run without
+drawdown (the same model is often run both ways), a warning on a `cp` or `ratio`
+material in a rapid drawdown run, and an error naming them when they are the only
+deviations the run would read.
 
 !!! warning "Turning the check off"
 

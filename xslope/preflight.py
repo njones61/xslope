@@ -8054,23 +8054,10 @@ def _rel_sigma_exceeds_mean(ctx):
     return None
 
 
-@rule("reliability.rapid_has_no_effect", ERROR, ("reliability",),
-      "Rapid drawdown is dropped silently by the two sampling engines.")
-def _rel_rapid_noop(ctx):
-    # The Taylor series runs the drawdown both ways: on every search, and on the
-    # fixed surface with search=False (reliability._solve_fixed).
-    if not ctx.selection.get("rapid"):
-        return None
-    if ctx.reliability_samples_sigmas:
-        name = ("Monte Carlo" if ctx.reliability_engine == "mc"
-                else "response-surface")
-        return (f"This run asks for rapid drawdown, but the {name} engine "
-                "applies it only to the single critical-surface search at the "
-                "most-likely values: every sampled realization is then solved "
-                "WITHOUT drawdown, so the probability of failure describes the "
-                "wrong analysis. Use the Taylor series engine for a rapid drawdown "
-                "reliability, or clear the rapid flag.")
-    return None
+# (reliability.rapid_has_no_effect is retired: every reliability engine runs a
+# rapid drawdown now -- the Taylor series on each search and on the fixed
+# surface, Monte Carlo and the response surface on every realization of their
+# fixed-surface campaign -- and each varies an mc material's d and psi.)
 
 
 @rule("reliability.mc_samples_too_few", ERROR, ("reliability",),

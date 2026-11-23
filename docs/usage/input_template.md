@@ -201,6 +201,13 @@ zone of the section uses is not read. Where a material with pore pressure meets 
 without, the water presses on the face of the dry material; the
 [FEM overview](../fem/overview.md#pore-pressure-options) explains how.
 
+An `elastic` material, such as a wall, a sheet pile or bedrock, reads its own **u** in the
+finite element analysis too. It cannot fail, so **u** sets how the water loads it, not its
+strength. Use `none` for a sealed wall: it carries no pore pressure, and the water in the soil
+beside it presses on its face. Use `seep` or `piezo` for a permeable wall or rock: it carries the
+same pore pressure as its neighbors, with no push at its face. Its **phi_b** and **s_cap** are
+not read.
+
 Any other entry is rejected when the file loads. A model imported from RS2 gets
 its **u** values from RS2's water settings; a pore-pressure grid or a groundwater
 solution has no counterpart and arrives as zero pore pressure, flagged in the

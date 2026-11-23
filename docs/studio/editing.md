@@ -74,7 +74,11 @@ seismic analysis, are used only by an `mc` material. A blank **u** reads as `non
 and a blank **unsat** as `lf`, as they do when the file loads, so each grays what
 that choice leaves unread: `r_u`, `phi_b` and `s_cap` for a blank **u**, and the
 van Genuchten `a`, `n` and `l` for a blank **unsat**. A Gardner (`gard`) material
-keeps `h0` live, because a transient seepage run reads it.
+keeps `h0` live, because a transient seepage run reads it. An `elastic` material
+grays its strength cells, `t_cut`, `d`, `ψ`, `phi_b` and `s_cap`, but keeps **u**
+live: the finite element analysis reads it to decide how the water loads a wall or
+rock, `none` for a sealed one and `seep` or `piezo` for one water passes through
+([Walls and other elastic materials](../fem/overview.md#pore-pressure-options)).
 
 On a Hoek-Brown material the strength envelope also reads out the rock-mass constants
 $m_b$, $s$ and $a$ that σci, GSI, mi and D derive to — the three numbers a published
@@ -268,10 +272,15 @@ pullout breakpoints marked:
 A line develops its pullout capacity one of two ways: over the development lengths
 **Lp1** and **Lp2**, or, when **Adhesion** and **Delta** are both filled, from the
 effective overburden along the line. The values decide which law is in force, so a
-file edited outside Studio opens on the law it actually uses. While Adhesion and
+file edited outside Studio opens on the law it actually uses. In the list view, a
+read-only **Pullout** line at the top of the Anchorage group names it:
+*Overburden (Adhesion, Delta)* when both are filled, *Development length (Lp1,
+Lp2)* otherwise. It changes as you fill or clear Adhesion and Delta, which is how a
+line moves from one law to the other; there is no selector. While Adhesion and
 Delta are both filled, Lp1 and Lp2 are grayed in both views, their values kept in
-the cells. Adhesion and Delta themselves are never grayed or cleared: on a jointed
-line the finite element interface reads them whatever the pullout law. A new line
+the cells. Adhesion and Delta themselves are never grayed, and Studio never clears
+them: on a jointed line the finite element interface reads them as its strength
+whatever the pullout law. A new line
 starts with Lp1 and Lp2 blank, so the model checks ask for them before a run instead
 of reading 0, a fully anchored end. **kn**, **ks** and **Jred** are grayed unless
 **Joint** is Yes, the only case in which they are read.

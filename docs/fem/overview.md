@@ -450,6 +450,16 @@ the effective stress takes the jump: the water in the wet material presses on th
 one. That is how a material analyzed in total stress, or an impervious zone, stands against
 saturated soil.
 
+**Walls and other elastic materials.** An `elastic` material (a wall, a sheet pile, or bedrock
+that is not to fail) reads its own **u** like every other material. It cannot yield, so its **u**
+never changes its strength; it changes how the water loads it. A sealed wall is `u = none`: it
+carries no pore pressure, and the water in the soil beside it presses on its face. A permeable
+wall, or rock that water passes through, is `seep` or `piezo`: it carries the same pore pressure
+as its neighbors, so there is no push at its face. GeoStudio and RS2 set a wall's pore pressure
+the same way. An elastic material takes no suction strength, so its `phi_b` and `s_cap` are not
+read. Only the finite element analysis reads an elastic material's **u**: a limit equilibrium
+surface can run along an elastic zone but never takes a slice's base pore pressure from it.
+
 **How pore pressure enters the equilibrium.** Equilibrium is written in total stress, with
 $\sigma = \sigma' - u_w m$ and $m = [1, 1, 0, 1]^T$ for the four components
 $(\sigma_x, \sigma_y, \tau_{xy}, \sigma_z)$, and the pore-pressure term is moved to the

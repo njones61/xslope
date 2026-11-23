@@ -95,14 +95,18 @@ where:
 > $x_{max}$ = maximum value of the parameter<br>
 > $x_{min}$ = minimum value of the parameter
 
-We can also look at the literature to find typical values for the standard deviation or COV of a parameter. Here are some typical values for the  COV of common soil parameters:
+We can also look at the literature to find typical values for the standard deviation or COV of a parameter. Duncan, Wright, and Brandon (2014, Table 13.4) collect published values for the soil properties XSLOPE varies:
 
-| Parameter                                  | Typical COV (%) |
-|--------------------------------------------|-----------------|
-| Soil Unit Weight ($\gamma$)                | 3 - 10%         |
-| Effective Stress Cohesion Intercept ($c'$) | 15 - 100%       |
-| Effective Stress Friction Angle ($\phi'$)  | 3 - 20%         |
-| Undrained Shear Strength ($S_u$)           | 15 - 50%        |
+| Property | Typical COV | Sources cited |
+|---|---|---|
+| Unit weight ($\gamma$) | 3–7% | Harr (1987), Kulhawy (1992) |
+| Buoyant unit weight ($\gamma_b$) | 0–10% | Lacasse and Nadim (1997), Duncan (2000) |
+| Effective stress friction angle ($\phi'$) | 2–13% | Harr (1987), Kulhawy (1992), Duncan (2000) |
+| Undrained shear strength ($S_u$) | 13–40% | Kulhawy (1992), Harr (1987), Lacasse and Nadim (1997) |
+| Undrained strength ratio ($S_u/\sigma'_v$) | 5–15% | Lacasse and Nadim (1997), Duncan (2000) |
+
+The table gives no range for an effective stress cohesion $c'$; estimate its standard deviation from a high and a
+low value with one of the rules above.
 
 ## Reliability Equation
 
@@ -189,3 +193,10 @@ On the limit-equilibrium side xslope provides the response-surface part of that
 vendor strategy as `reliability_rs`
 ([Sampling a fitted response surface](monte_carlo.md#sampling-a-fitted-response-surface));
 on the finite-element side it uses the Taylor series only.
+
+## References
+
+- Duncan, J.M. (2000). "Factors of safety and reliability in geotechnical engineering." *Journal of Geotechnical and
+  Geoenvironmental Engineering*, 126(4), 307–316.
+- Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014). *Soil Strength and Slope Stability*, 2nd ed. Wiley, Hoboken,
+  NJ. Chapter 13.

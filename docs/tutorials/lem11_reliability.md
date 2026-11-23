@@ -106,7 +106,7 @@ parameter is treated as known exactly and is not varied.
 A standard deviation is easier to judge as a fraction of its own value — the
 **coefficient of variation**, σ/x — which is 8/120 = 6.7% for the unit weight and
 100/400 = 25% for the cohesion. Both sit inside the ranges published for those
-properties: 3–10% for unit weight, 15–50% for undrained shear strength. The
+properties: 3–7% for unit weight, 13–40% for undrained shear strength. The
 [Reliability Analysis](../reliability/index.md#parameter-uncertainty) page
 tabulates the rest and gives the two rules of thumb for estimating a σ from a
 high and a low estimate rather than from a data set.

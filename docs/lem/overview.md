@@ -56,7 +56,11 @@ itself, the way the ratio is measured:
 > $S_u = \max\left(c,\; r\,\sigma'_v\right)$
 
 where $r$ is the strength ratio $S_u/\sigma'_v$, entered in the **c/p** column, and $c$ is a minimum strength.
-Typical ratios are about 0.2 to 0.3 for normally consolidated clays, and lower for soils that have liquefied. At
+Unlike a drained strength, which follows the normal stress on the slip surface as the soil fails, this strength is
+fixed by the stress the soil has consolidated under, and the soil shears without draining. It suits soft clays that
+have consolidated under the loads now on them and then fail too quickly to drain: a natural slope in normally
+consolidated clay, the soft foundation of an existing embankment, and soft mine tailings. It also gives the residual
+strength of a soil that has liquefied in an earthquake. Typical ratios are about 0.2 to 0.3 for normally consolidated clays, and lower for soils that have liquefied. At
 each slice base, $\sigma'_v$ is the weight of the soil column above it (saturated unit weight below the water
 table), plus the vertical part of the distributed load on the slice top, minus the pore pressure. Ponded water is
 part of that load: under a reservoir the pore pressure includes the water depth, and the water's weight balances it.

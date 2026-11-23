@@ -18,7 +18,8 @@ description: "What's new in XSLOPE 1.1.0, the free slope stability program: seis
   [LEM-15](tutorials/lem15_yield_newmark.md) finds the same slope's seismic yield coefficient and its Newmark
   displacement under an earthquake record.
 - **A strength ratio material.** The [`ratio` option](lem/overview.md#undrained-strength-ratio) gives an
-  undrained strength that grows with the vertical effective stress, as in a normally consolidated clay. Part C of
+  undrained strength proportional to the vertical effective stress the soil has consolidated under, for soft clays
+  that fail too quickly to drain and for soils that have liquefied. Part C of
   [Tutorial LEM-7](tutorials/lem07_strength_envelopes.md) uses it.
 - **Seepage on fine meshes.** Steady unconfined seepage converges on fine meshes, in far fewer iterations.
 

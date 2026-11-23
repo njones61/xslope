@@ -7813,6 +7813,279 @@
       "features": {
         "circular": true,
         "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 5,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_40.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-40",
+          "checks": [
+            "GS-2.40"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.40 — Rapid Drawdown – Walter Bouldin Dam",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-40"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_41.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-41",
+          "checks": [
+            "GS-2.41"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.41 — Rapid Drawdown – USACE Benchmark",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-41"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_42.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-42",
+          "checks": [
+            "GS-2.42"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.42 — Rapid Drawdown – Pumped Storage Dam",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-42"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_43.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-43",
+          "checks": [
+            "GS-2.43"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.43 — Rapid Drawdown – Pilarcitos Dam",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-43"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
         "dloads": 1,
         "element_type": null,
         "hoek_brown": false,
@@ -24113,6 +24386,81 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp092_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-53",
+          "checks": [
+            "RS2-53"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-53: Geotextile wall, water (vp092_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-53"
+        }
+      ],
+      "topics": [
+        "reinforcement",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 1,
@@ -29008,7 +29356,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 410,
+    "models": 415,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -29055,22 +29403,22 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 733,
+    "tags": 738,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 196,
+      "homogeneous": 198,
       "non-circular": 41,
       "piles": 15,
       "probabilistic": 16,
-      "rapid-drawdown": 8,
-      "reinforcement": 35,
+      "rapid-drawdown": 12,
+      "reinforcement": 36,
       "seepage-coupled": 76,
       "seismic": 14,
       "soil-nails": 5,
       "tension-cracks": 23,
       "transient-seepage": 25,
-      "zoned-dams": 51
+      "zoned-dams": 54
     },
     "unloadable": 0
   },
@@ -29149,6 +29497,8 @@
       "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/geostudio/gs2_41.xlsx",
+      "docs/verification/files/geostudio/gs2_43.xlsx",
       "docs/verification/files/geostudio/gs2_45.xlsx",
       "docs/verification/files/geostudio/gs2_46.xlsx",
       "docs/verification/files/geostudio/gs2_cons.xlsx",
@@ -29384,6 +29734,10 @@
       "docs/lem/files/xslope_johnson_rapid_KEY.xlsx",
       "docs/tutorials/files/xslope_johnson_rapid.xlsx",
       "docs/tutorials/files/xslope_johnson_rapid_start.xlsx",
+      "docs/verification/files/geostudio/gs2_40.xlsx",
+      "docs/verification/files/geostudio/gs2_41.xlsx",
+      "docs/verification/files/geostudio/gs2_42.xlsx",
+      "docs/verification/files/geostudio/gs2_43.xlsx",
       "docs/verification/files/rocscience/vp096.xlsx",
       "docs/verification/files/rocscience/vp097.xlsx",
       "docs/verification/files/rocscience/vp098.xlsx",
@@ -29420,6 +29774,7 @@
       "docs/verification/files/rocscience/vp091.xlsx",
       "docs/verification/files/rocscience/vp091_fem.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",
+      "docs/verification/files/rocscience/vp092_fem.xlsx",
       "docs/verification/files/rocscience/vp093.xlsx",
       "docs/verification/files/rocscience/vp094.xlsx",
       "docs/verification/files/rocscience/vp094_fem.xlsx",
@@ -29603,6 +29958,8 @@
       "docs/tutorials/files/xslope_johnson_rapid_start.xlsx",
       "docs/tutorials/files/xslope_johnson_res.xlsx",
       "docs/tutorials/files/xslope_johnson_res_solved.xlsx",
+      "docs/verification/files/geostudio/gs2_40.xlsx",
+      "docs/verification/files/geostudio/gs2_42.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/geostudio/gs2_wall_none.xlsx",
       "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
@@ -29625,6 +29982,7 @@
       "docs/verification/files/rocscience/vp072a.xlsx",
       "docs/verification/files/rocscience/vp072b.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",
+      "docs/verification/files/rocscience/vp092_fem.xlsx",
       "docs/verification/files/rocscience/vp098.xlsx",
       "docs/verification/files/rocscience/vp099.xlsx",
       "docs/verification/files/rocscience/vp107a.xlsx",

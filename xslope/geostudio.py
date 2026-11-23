@@ -40,13 +40,13 @@ Only what SLOPE/W and xslope have in common is imported -- regions, materials
 ``elastic``), the piezometric surface
 (with SLOPE/W's phreatic correction where the analysis applies it), Ru, water
 above ground, a solved SEEP/W field, a staged rapid drawdown (both piezometric
-surfaces and the drawdown strengths), surcharges and line loads, reinforcement,
-the tension crack, the seismic coefficient and the solved critical circle.
-Everything else is reported as a caveat rather than silently dropped:
-unsupported strength models, unsupported pore-pressure options (B-bar and
-spatial functions), SLOPE/W's search definition and an optimized or non-circular
-critical surface, reinforcement sets, inclined tension cracks and the vertical
-seismic coefficient.
+surfaces and the drawdown strengths), a separate unit weight above the water table,
+surcharges and line loads, reinforcement, the tension crack, the seismic coefficient
+and the solved critical circle. Everything else is reported as a caveat rather than
+silently dropped: unsupported strength models, unsupported pore-pressure options
+(B-bar and spatial functions), partial factors, SLOPE/W's search definition and an
+optimized or non-circular critical surface, reinforcement sets, inclined tension
+cracks and the vertical seismic coefficient.
 """
 
 import csv
@@ -404,11 +404,26 @@ def read_gsz(path):
         rid = _text(rf, "ID")
         if rid is None:
             continue
+        # The tensile capacity is <Tensile> in GeoStudio 2025.2 files, which write the
+        # plate capacity beside it as <PlateCapacity>. An earlier 2025 build wrote one
+        # <TensileCapacity> and no plate capacity: SLOPE/W's own Tie-Back Wall example
+        # comes both ways, and its 2025.2 copy carries <Tensile> and <PlateCapacity>
+        # both equal to the older file's <TensileCapacity>, with the same solved factor
+        # of safety. So the older tag is the same capacity, and stands for the plate
+        # capacity too when the file gives none.
+        tensile = _num(rf, "Tensile", None)
+        old_tag = tensile is None and _num(rf, "TensileCapacity", None) is not None
+        if old_tag:
+            tensile = _num(rf, "TensileCapacity", 0.0)
+        plate = _num(rf, "PlateCapacity", None)
+        plate_from_tensile = old_tag and plate is None
         reinforcements[int(rid)] = {
             "name": _text(rf, "Name", ""),
             "type": _text(rf, "Type", ""),                 # Nail | Geosynthetic | Anchor | ...
-            "tensile": _num(rf, "Tensile", 0.0),
-            "plate": _num(rf, "PlateCapacity", 0.0),
+            "tensile": tensile or 0.0,
+            "plate": (tensile if plate_from_tensile else plate) or 0.0,
+            "capacity_tag": "TensileCapacity" if old_tag else "Tensile",
+            "plate_from_tensile": plate_from_tensile,
             "pullout": _num(rf, "PulloutResistance", 0.0),
             "spacing": _num(rf, "Spacing", None),          # out-of-plane, None = per metre
             "distribution": _text(rf, "ForceDistribution", ""),
@@ -572,6 +587,23 @@ def read_gsz(path):
     eng = root.find("./Coordinates/EngCoords")
     unit_system = eng.get("UnitSystem") if eng is not None else None
 
+    # Partial factor sets (Eurocode 7 design approaches), shared by the analyses, which
+    # name the one they apply by <Control><DesignFactorID>. Each factor is a key and a
+    # favorable and an unfavorable value, either of which may be blank.
+    design_factors = {}
+    for ds in root.findall("./DesignFactors/DesignFactors_"):
+        did = _text(ds, "ID")
+        if did is None:
+            continue
+        factors = []
+        for f in ds.findall("./Factors/Factors_"):
+            e = f.find("Entry")
+            factors.append((_text(f, "Key", ""),
+                            (e.get("Favorable") or "").strip() if e is not None else "",
+                            (e.get("Unfavorable") or "").strip() if e is not None else ""))
+        design_factors[int(did)] = {"name": _text(ds, "Name", f"design factors {did}"),
+                                    "factors": factors}
+
     return {
         "path": str(path), "zip": zf, "analyses": analyses, "points": points,
         "regions": regions, "lines": glines, "geometries": geometries,
@@ -579,7 +611,7 @@ def read_gsz(path):
         "contexts": contexts, "water": water,
         "stability": stability, "kfns": kfns, "mfns": mfns, "bcs": bcs,
         "hyd_bcs": hyd_bcs, "reinforcements": reinforcements,
-        "unit_system": unit_system,
+        "unit_system": unit_system, "design_factors": design_factors,
     }
 
 
@@ -615,9 +647,9 @@ _ENTRY_ELEMENTS = {
 }
 
 # The <Control> switches gsz_to_slope_data acts on: the phreatic correction and a
-# staged rapid drawdown are both imported. Any other switch is reported as
-# unrecognized, the same as an unknown element.
-_CONTROL_HANDLED = {"IsPiezPhreatic", "IsRapidDrawdown"}
+# staged rapid drawdown are both imported, and a set of partial factors is named in a
+# caveat. Any other switch is reported as unrecognized, the same as an unknown element.
+_CONTROL_HANDLED = {"IsPiezPhreatic", "IsRapidDrawdown", "DesignFactorID"}
 
 # How GeoStudio says the tension crack is defined. 'Surface' means "by the line whose
 # points follow", which is the only form xslope can convert. A crack that is switched
@@ -681,6 +713,7 @@ _STRESS_STRAIN_FIELDS = {
     "IntactRockParam", "GeologicalStrengthIndex", "DisturbanceFactor",
     "MaxConfiningStress", "UseTensileStrength", "SlopeSuctionModel",
     "ShearAnisoFnNum",          # reported on its own, for every model
+    "DryWeight", "SlopeUseUnitWeightAboveWT",   # the unit weight above the water table
 }
 
 # The fields each mapped strength model reads, plus the ones GeoStudio leaves behind
@@ -1473,6 +1506,117 @@ def _rapid_drawdown(gsz, used, materials, bedrock, stab, option, piezo_line):
     return line1, line2, caveats
 
 
+# SLOPE/W's partial factor keys, in words.
+_FACTOR_WORDS = {
+    "PermanentLoads": "permanent loads", "VariableLoads": "variable loads",
+    "SoilWeight": "soil weight", "EffectiveCohesion": "c'",
+    "EffectiveTanPhi": "tan phi'", "UndrainedStrength": "undrained strength",
+    "ShearStrengthOther": "other shear strengths",
+    "PulloutResistance": "pullout resistance",
+    "StructuralCapacities": "structural capacities",
+    "CompressiveStrength": "compressive strength",
+    "SeismicCoefficients": "seismic coefficients", "EarthResistance": "earth resistance",
+}
+
+
+def _design_factor_caveat(gsz, dfid):
+    """The caveat for an analysis SLOPE/W solves with a set of partial factors.
+
+    A set (<DesignFactors>, named by the analysis's <Control><DesignFactorID>) gives
+    each factor a favorable and an unfavorable value: the strengths are divided by
+    theirs, the loads multiplied. The caveat names every factor that is not 1."""
+    try:
+        ds = gsz.get("design_factors", {}).get(int(dfid))
+    except (TypeError, ValueError):
+        ds = None
+    if ds is None:
+        return (f"SLOPE/W applies partial factor set {dfid} to this analysis, which the "
+                f"file does not define. XSLOPE applies no partial factors, so its factor "
+                f"of safety is not SLOPE/W's factored one")
+    parts = []
+    for key, fav, unfav in ds["factors"]:
+        vals = []
+        for v, side in ((fav, "favorable"), (unfav, "unfavorable")):
+            try:
+                x = float(v)
+            except ValueError:
+                continue
+            if abs(x - 1.0) > 1e-12:
+                vals.append((x, side))
+        if not vals:
+            continue
+        word = _FACTOR_WORDS.get(key, key)
+        if len(vals) == 1 and vals[0][1] == "favorable":
+            parts.append(f"{word} {vals[0][0]:g}")
+        else:
+            parts.append(f"{word} " + " and ".join(f"{x:g} ({s})" for x, s in vals))
+    if not parts:
+        return (f"SLOPE/W applies the partial factor set '{ds['name']}' to this "
+                f"analysis, and every factor in it is 1, so the model is unchanged by it")
+    return (f"SLOPE/W applies the partial factors of '{ds['name']}' to this analysis: "
+            f"{', '.join(parts)}. XSLOPE applies no partial factors, so the strengths "
+            f"and loads were imported as the file states them, and XSLOPE's factor of "
+            f"safety is not SLOPE/W's factored one. To compare the two, divide each "
+            f"strength by its factor and scale each load by its own before solving")
+
+
+def _unit_weight_above_wt(gsz, used, materials):
+    """Apply SLOPE/W's unit weight above the water table to ``materials``; the caveats.
+
+    A SLOPE/W material weighs <UnitWeight> everywhere unless its
+    <SlopeUseUnitWeightAboveWT> switch says otherwise; a <DryWeight> without the
+    switch is a value SLOPE/W keeps but does not use (its own pumped-storage rapid
+    drawdown example weighs its rockfill at <UnitWeight> 142 in every saved column,
+    its <DryWeight> 128 notwithstanding). The switch has two settings:
+
+    - ``ConstantValue``: <DryWeight> above the water table and <UnitWeight> below it,
+      which is XSLOPE's gamma and gamma_sat. On SLOPE/W's own Unit Weight Definition
+      example (Case 2, 16 above and 20 below), the split puts XSLOPE's weight within
+      0.07% of SLOPE/W's over the critical slip surface, column by column within 0.2%
+      wherever up to 46% of a column is below the water table.
+    - ``CalculateFromVolFn``: the weight above the water table from the soil's
+      volumetric water content. XSLOPE has no such weight, so the material keeps
+      <UnitWeight> throughout and is reported.
+    """
+    caveats, split = [], []
+    for mid, mat in zip(used, materials):
+        s = gsz["materials"][mid]["strength"]
+        how = (s.get("SlopeUseUnitWeightAboveWT") or "").strip()
+        if not how:
+            continue
+        if how == "ConstantValue":
+            try:
+                dry = float(s.get("DryWeight"))
+            except (TypeError, ValueError):
+                caveats.append(
+                    f"material '{mat['name']}' takes a separate unit weight above the "
+                    f"water table, but the file gives none XSLOPE can read, so it "
+                    f"weighs {mat['gamma']:g} throughout")
+                continue
+            if abs(dry - mat["gamma"]) > 1e-12:
+                mat["gamma_sat"], mat["gamma"] = mat["gamma"], dry
+                split.append(f"'{mat['name']}' {dry:g} above and {mat['gamma_sat']:g} below")
+        elif how == "CalculateFromVolFn":
+            caveats.append(
+                f"material '{mat['name']}': SLOPE/W computes its unit weight above the "
+                f"water table from its volumetric water content. XSLOPE has one unit "
+                f"weight above the water table, so the material weighs {mat['gamma']:g}, "
+                f"its saturated unit weight, throughout, and XSLOPE's slices above the "
+                f"water table are heavier than SLOPE/W's")
+        else:
+            caveats.append(
+                f"material '{mat['name']}' sets its unit weight above the water table "
+                f"by '{how}', which XSLOPE does not know, so it weighs "
+                f"{mat['gamma']:g} throughout")
+    if split:
+        caveats.insert(0, (
+            f"SLOPE/W gives {'this material' if len(split) == 1 else 'these materials'} "
+            f"a separate unit weight above the water table: {'; '.join(split)}. It was "
+            f"imported as gamma above the water table and gamma_sat below it, split where "
+            f"XSLOPE finds the water table"))
+    return caveats
+
+
 def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     """Build an xslope ``slope_data`` for one analysis of a parsed .gsz.
 
@@ -1782,21 +1926,14 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         piezo_line, piezo_line2, notes = _rapid_drawdown(
             gsz, used, materials, bedrock, stab, option, piezo_line)
         caveats.extend(notes)
-    # Unit weight above the water table. SLOPE/W's own solve of its pumped-storage
-    # rapid drawdown example weighs every column at <UnitWeight>, its rockfill's lower
-    # <DryWeight> included, so the import does the same and names the field.
-    for mid, mat in zip(used, materials):
-        dry = gsz["materials"][mid]["strength"].get("DryWeight")
-        try:
-            dry = float(dry) if dry is not None else None
-        except ValueError:
-            dry = None
-        if dry is not None and mid not in bedrock and abs(dry - mat["gamma"]) > 1e-9:
-            caveats.append(
-                f"material '{mat['name']}' also gives a unit weight above the water "
-                f"table ({dry:g}), which the import does not read: it weighs "
-                f"{mat['gamma']:g} throughout. To weigh it at {dry:g} above the water "
-                f"table, set gamma = {dry:g} and gamma_sat = {mat['gamma']:g}")
+    caveats.extend(_unit_weight_above_wt(gsz, used, materials))
+
+    # Partial factors. SLOPE/W divides the strengths and multiplies the loads by the set
+    # the analysis names before it solves; XSLOPE has no partial factors, so the set is
+    # named rather than dropped in silence.
+    dfid = (stab.get("control") or {}).get("DesignFactorID")
+    if dfid:
+        caveats.append(_design_factor_caveat(gsz, dfid))
 
     # SLOPE/W's unsaturated shear-strength setting rides on the piezometric surface as
     # a suction ceiling (CapSuction/MaxSuction), NOT as a per-material phi_b. It is a
@@ -2143,6 +2280,14 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         # interface pair could not be expressed still has to say so.
         used = [gsz["reinforcements"][rl["reinforcement"]] for rl in stab["reinf_lines"]
                 if rl["reinforcement"] in gsz["reinforcements"]]
+        older = sorted({p["name"] for p in used if p.get("plate_from_tensile")})
+        if older:
+            caveats.append(
+                f"reinforcement {', '.join(repr(n) for n in older)} states its capacity "
+                f"as <TensileCapacity>, the tag an earlier GeoStudio 2025 build wrote, "
+                f"with no plate capacity. GeoStudio 2025.2 writes the same model with a "
+                f"tensile and a plate capacity both equal to it, so the plate capacity "
+                f"was taken as the tensile capacity")
         mapped = sorted({r["label"] for r in rlines
                          if r.get("delta") == r.get("delta")})
         if mapped:
@@ -2826,6 +2971,31 @@ def _export_strength(m, mat_id, polygons):
         f"phi = {phi:g}, which is not the same strength."]
 
 
+def _has_split(m):
+    """True when an XSLOPE material weighs differently below the water table."""
+    g_sat = m.get("gamma_sat")
+    try:
+        return g_sat is not None and abs(float(g_sat) - float(m.get("gamma") or 0.0)) > 1e-12
+    except (TypeError, ValueError):
+        return False
+
+
+def _unit_weight_out(m, fields):
+    """A material's unit weight and strength fields, as SLOPE/W writes them.
+
+    Its <UnitWeight> is the saturated weight. A different weight above the water
+    table is <DryWeight>, after the strength fields, and switched on by
+    <SlopeUseUnitWeightAboveWT>ConstantValue ahead of <UnitWeight>, in the order
+    SLOPE/W's own Unit Weight Definition example writes them."""
+    gamma = float(m.get("gamma") or 0.0)
+    split = _has_split(m)
+    return ((f'<SlopeUseUnitWeightAboveWT>ConstantValue</SlopeUseUnitWeightAboveWT>'
+             if split else '')
+            + f'<UnitWeight>{(float(m["gamma_sat"]) if split else gamma):.10g}</UnitWeight>'
+            + "".join(f'<{tag}>{val:.10g}</{tag}>' for tag, val in fields)
+            + (f'<DryWeight>{gamma:.10g}</DryWeight>' if split else ''))
+
+
 def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern-Price"):
     """Write a model to a GeoStudio SLOPE/W project (.gsz).
 
@@ -2858,6 +3028,10 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     list), piles, and the power-curve and Hoek-Brown strengths. Each is reported rather
     than dropped in silence. A ``ratio`` material is written as SLOPE/W's SHANSEP and a
     ``cp`` one as S=f(depth) (see :func:`_export_strength`).
+
+    gamma_sat, where it differs from gamma, is SLOPE/W's <UnitWeight> with gamma as its
+    separate unit weight above the water table (:func:`_unit_weight_out`), and a
+    phreatic piezo line switches on SLOPE/W's <IsPiezPhreatic>.
 
     A rapid drawdown model -- piezo lines 1 and 2, and d and psi on a Mohr-Coulomb
     material -- is written as SLOPE/W's staged rapid drawdown, the way SLOPE/W's own
@@ -3125,6 +3299,43 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             caveats.append(f"{' and '.join(unused)} "
                            f"{'was' if unused == ['piezo line 2'] else 'were'} not "
                            f"written: {why}")
+
+    # SLOPE/W's phreatic correction is one switch on the analysis, for every
+    # piezometric surface in it; XSLOPE's is a Type on each piezo line.
+    switches = []
+    phreatic = bool(slope_data.get("piezo_phreatic"))
+    if piezo_ids and phreatic:
+        switches.append("IsPiezPhreatic")
+        spans = _line_on_ground(piezo_line, ground_surface)
+        if spans:
+            caveats.append(
+                "SLOPE/W's phreatic correction was switched on for the piezometric "
+                "surface. SLOPE/W leaves the head uncorrected where the line runs along "
+                "the ground surface ("
+                + ", ".join(f"x = {a:g} to {b:g}" for a, b in spans)
+                + "), where XSLOPE corrects it, so SLOPE/W's pore pressure is higher "
+                  "there")
+    if rapid and phreatic != bool(slope_data.get("piezo_phreatic2")):
+        caveats.append(
+            f"piezo line 1 is {'' if phreatic else 'not '}phreatic and line 2 is "
+            f"{'' if slope_data.get('piezo_phreatic2') else 'not '}. SLOPE/W's "
+            f"phreatic correction is one switch for both surfaces, so it was written "
+            f"{'on' if phreatic else 'off'} for both, as line 1 has it")
+    if rapid:
+        switches.append("IsRapidDrawdown")
+
+    # A unit weight below the water table. SLOPE/W's <UnitWeight> is the saturated
+    # weight, and a separate one above the water table is its <DryWeight> under the
+    # <SlopeUseUnitWeightAboveWT> switch: XSLOPE's gamma_sat and gamma.
+    split = [f"'{m.get('name')}' {float(m['gamma']):g} above and "
+             f"{float(m['gamma_sat']):g} below" for m in materials if _has_split(m)]
+    if split:
+        caveats.append(
+            f"{'this material has' if len(split) == 1 else 'these materials have'} a "
+            f"different unit weight below the water table: {'; '.join(split)}. Each was "
+            f"written as SLOPE/W's unit weight (below) and its separate unit weight above "
+            f"the water table, which SLOPE/W splits where the pore pressure turns "
+            f"negative")
 
     # v16/v17 material features SLOPE/W has no place for. They must NOT corrupt the file
     # (a .gsz material has no phi_b tag, and its TensileStrength is a LEM tension limit,
@@ -3433,8 +3644,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f'<DisturbanceFactor Missing="true" />'
             f'<MaxConfiningStress Missing="true" />'
             f'<UseTensileStrength>false</UseTensileStrength>'
-            f'<UnitWeight>{float(m.get("gamma") or 0.0):.10g}</UnitWeight>'
-            + "".join(f'<{tag}>{val:.10g}</{tag}>' for tag, val in fields)
+            + _unit_weight_out(m, fields)
             + f'<TensileStrength Missing="true" />'
             f'<OCRatio Missing="true" />'
             f'</StressStrain></Material>')
@@ -3508,12 +3718,14 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         for i, (x, y) in enumerate(local_pts, start=1):
             L.append(f'        <DataPoint Number="{i}" X="{x:.10g}" Y="{y:.10g}" />')
         L.append('      </DataPoints>')
-    # The analysis switches. SLOPE/W's own rapid drawdown examples write the staged
-    # rapid drawdown as <Control><IsRapidDrawdown>true</...></Control>, ahead of the
-    # loads and the piezometric surfaces.
-    if rapid:
+    # The analysis switches, under one <Control> ahead of the loads and the
+    # piezometric surfaces, as SLOPE/W's own files write them: the phreatic correction
+    # (<IsPiezPhreatic>, as on Greco's weak-layer slope) and the staged rapid drawdown
+    # (<IsRapidDrawdown>, as on its four rapid drawdown examples).
+    if switches:
         L.append('      <Control>')
-        L.append('        <IsRapidDrawdown>true</IsRapidDrawdown>')
+        for tag in switches:
+            L.append(f'        <{tag}>true</{tag}>')
         L.append('      </Control>')
     # SLOPE/W's vertical coefficient is positive downward, as xslope's is.
     kv = float(slope_data.get("k_vertical") or 0.0)

@@ -68,6 +68,7 @@ choice changes the model, so XSLOPE asks for it rather than guessing.
 | **Reinforcement** — nails, geosynthetics, anchors, tiebacks | `reinforcement_lines` — see below |
 | **Line loads** (magnitude + trend/plunge) | `line_loads` |
 | **Tension crack** (+ percent filled with water) | `tcrack_depth`, `tcrack_water` |
+| **Unit weight above the water table**, where the material switches it on | `gamma` above the water table and `gamma_sat` below — see below |
 | Unit weight of water | `gamma_water` |
 | Horizontal seismic coefficient | `k_seismic` |
 | SLOPE/W's critical circle, if the file was solved and it fits | A single trial circle |
@@ -120,11 +121,23 @@ SLOPE/W can also scale any strength by a function of the slice base's inclinatio
 anisotropy function). XSLOPE has no such scaling, so the import uses the unscaled
 strength and says so.
 
-A SLOPE/W material can also give a **unit weight above the water table**. The import
-gives the material its unit weight throughout, as SLOPE/W's own solve of its
-pumped-storage rapid drawdown example does for that example's rockfill. Where the two
-differ, the notes give both, and how to set XSLOPE's γ and γ<sub>sat</sub> to weigh the
-soil above the water table at the lighter one.
+**Unit weight above the water table.** A SLOPE/W material's unit weight is its
+saturated weight, and it applies everywhere unless the material switches on a
+separate weight above the water table:
+
+| SLOPE/W | XSLOPE |
+|---|---|
+| No switch (a weight above the water table may be stored, and is not used) | γ = the unit weight, throughout |
+| A constant weight above the water table | γ = that weight, γ<sub>sat</sub> = the unit weight |
+| A weight above the water table computed from the volumetric water content | γ = the unit weight, throughout, and the notes say so |
+
+XSLOPE splits the two weights at its water table, the piezometric line or the top of a
+seepage field's positive pressure, where SLOPE/W splits them where the pore pressure turns
+negative; the two are the same water table unless it is perched. On SLOPE/W's own Unit
+Weight Definition example (16 above, 20 below), the split puts the weight of the critical
+slip surface's sliding mass within 0.1% of SLOPE/W's. XSLOPE has no weight that follows
+the water content, so in the third case its slices above the water table are heavier than
+SLOPE/W's.
 
 GeoStudio's **Bedrock** is impenetrable — slip surfaces cannot enter it. XSLOPE's
 **`elastic`** option is the exact analog: an impenetrable zone that cannot fail and that
@@ -155,7 +168,8 @@ under the line is reduced by cos² of the line's slope, and the line imports as 
 `phreatic`, which does the same. Where it is off, which is the default, SLOPE/W uses the
 plain head under the line, and so does the import. One difference remains: SLOPE/W leaves
 the head uncorrected where the line runs along the ground surface, and XSLOPE corrects it
-there too. The caveats name that stretch when a model has one.
+there too. The caveats name that stretch when a model has one. Export writes a `phreatic`
+line back as SLOPE/W's switch.
 
 **Ru** imports as XSLOPE's `ru` option, with each material's own value. Both programs
 take the pore pressure as ru times the weight of the soil above the slice base. SLOPE/W
@@ -289,7 +303,9 @@ Everything is converted to XSLOPE's **per unit width** convention by dividing th
 the spacing, and GeoStudio's pullout resistance per unit length becomes the bond length
 that develops full capacity (`lp = t_max / rate`), which is the same law written the
 other way round. The plate capacity becomes the end capacity at whichever end sits at the
-face.
+face. A file from an earlier GeoStudio 2025 build states the capacity as
+`<TensileCapacity>` and gives no plate capacity; GeoStudio 2025.2 writes the same model
+with both capacities equal to it, so the import reads it that way and says so.
 
 Where a geosynthetic defines its pullout through **interface adhesion and friction**
 rather than a constant resistance, XSLOPE's constant-rate bond length is an approximation
@@ -315,6 +331,11 @@ without telling you. Read the caveats it returns.
   optimization instead, and the caveats give SLOPE/W's lower, optimized factor of safety.
 - **Reinforcement *sets*** — GeoStudio's out-of-plane staging groups. The reinforcement
   itself imports; the grouping does not.
+- **Partial factors.** SLOPE/W can solve an analysis with a set of partial factors (a
+  Eurocode 7 design approach), dividing the strengths and multiplying the loads by them.
+  XSLOPE applies none, so the model imports with the strengths and loads the file states,
+  and its factor of safety is not SLOPE/W's factored one. The notes name the set and every
+  factor in it that is not 1.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
 - **Spatial pore-pressure functions and B-bar.** A spatial function imports as zero.
@@ -364,7 +385,10 @@ omits the attribute, the system is inferred from the unit weight of water: ≈9.
 Material zones become regions, materials become SLOPE/W materials (see
 [Strength options on export](#strength-options-on-export)), a piezo line becomes a
 piezometric surface (its points written under the
-owning analysis, the mirror image of how the import reads them), a rapid drawdown model
+owning analysis, the mirror image of how the import reads them; a `phreatic` line
+switches on SLOPE/W's phreatic correction), a material with a γ<sub>sat</sub> different
+from its γ is written with SLOPE/W's unit weight (γ<sub>sat</sub>) and its separate unit
+weight above the water table (γ), a rapid drawdown model
 becomes SLOPE/W's staged rapid drawdown (see
 [Exporting a rapid drawdown](#exporting-a-rapid-drawdown)), and **distributed loads
 become surcharges** — GeoStudio's surcharge is a wedge of fill, so an XSLOPE pressure

@@ -505,10 +505,14 @@ slope_data['materials'] = [
         'hb_d':   0.0,           # disturbance factor, in [0, 1]
         # --- option='elastic' only (v16): infinite strength, cannot fail. FEM holds it out of
         #     plasticity entirely; LEM treats it as impenetrable (a failure surface may not
-        #     cross it). Uses gamma/gamma_sat/E/nu + seepage columns only — every strength key above
-        #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is ignored (loader warns if
-        #     any is set). Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength",
-        #     SLOPE/W "Bedrock (Impenetrable)".
+        #     cross it). Uses gamma/gamma_sat/E/nu, u, and the seepage columns only — every
+        #     strength key above (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is
+        #     ignored (loader warns if any is set). In the FEM its u sets how the water loads
+        #     it: a sealed wall is u='none' (no pore pressure inside, so the soil water presses
+        #     on its face); a permeable wall or rock is 'seep' or 'piezo' (the same pore
+        #     pressure as its neighbors, so no push at its face). The LEM never reads an
+        #     elastic zone's u. Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite
+        #     Strength", SLOPE/W "Bedrock (Impenetrable)".
         # --- rapid drawdown and two-stage seismic only (Kc=1 envelope), read on mc rows only ---
         'd':     0.0,            # cohesion intercept
         'psi':   0.0,            # friction angle
@@ -579,8 +583,11 @@ Common strength setups:
 - **Effective stress with a piezometric line:** `option='mc', c=c', phi=phi', u='piezo'`.
 - **Effective stress with a seepage solution:** `option='mc', c=c', phi=phi', u='seep'`.
 - **Rigid / infinite-strength zone (bedrock, a retaining wall):** `option='elastic'` — only
-  gamma/gamma_sat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
-  key is ignored, and the LEM search treats the zone as impenetrable.
+  gamma/gamma_sat/E/nu, `u` (+ seepage columns, if the zone still conducts water) matter; every
+  strength key, `phi_b` and `s_cap` included, is ignored, and the LEM search treats the zone as
+  impenetrable. In the FEM, `u` decides how the water loads it: a sealed wall is `u='none'`, so
+  the soil water presses on its face; a permeable wall or rock that water passes through is
+  `'seep'` or `'piezo'`, with the same pore pressure as its neighbors and no push at its face.
 - **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
   any mc/cp/pow/hb material; leave `t_cut=None` to let the material's own envelope decide (on mc
   the apex c/tan(phi), which the engine enforces; unbounded only at phi = 0).
@@ -1333,11 +1340,17 @@ for c in caveats:
 
 - **Always read the returned caveat list back to the user.** A clean return does not mean a
   complete model — it means nothing crashed.
-- **No import ever carries a failure surface.** Add one after importing (the generators are the
-  fastest route). An RS2 SSR model has none by construction.
+- **Check for a failure surface after importing.** A solved `.gsz` brings SLOPE/W's critical
+  circle as one trial circle (SLOPE/W's answer on it, not a search; the caveats give its factor
+  of safety). A Slide2 file brings its specified circle or non-circular surface, and a DXF the
+  circles on a layer mapped to them. An unsolved `.gsz`, a search-only Slide2 file and an RS2
+  SSR model bring none. If `circles` and `non_circ` are both empty, add one (the generators are
+  the fastest route), and run a search before reporting a critical factor of safety.
 - `import_gsz(..., analysis_id=None, step=None)` selects the analysis; a probabilistic SLOPE/W
   analysis imports its standard deviations onto the materials (`sigma_gamma`/`sigma_c`/
-  `sigma_phi`), so a reliability run is ready. A parent SEEP/W pore-pressure field does not fit
+  `sigma_phi`), so a reliability run is ready. A staged rapid drawdown imports both water lines
+  and each undrained soil's d and psi: run it with `rapid=True`. Partial factors (Eurocode 7) are
+  not applied; the caveats name them. A parent SEEP/W pore-pressure field does not fit
   in a spreadsheet and is written beside the .xlsx as `{base}_mesh.json` + `{base}_seep.csv` —
   **keep all three files together or the model silently reverts to dry.**
 - `import_slmd(..., scenario=None)` picks the scenario. `import_dxf(..., material_map=...)`
@@ -1348,7 +1361,10 @@ for c in caveats:
   by a SEEP/W field and RS2 arrive `manual` (the reservoir is an explicit load object there, or
   recovered from a field nothing downstream can re-derive). Do not "tidy" an imported model by
   moving its water between the two — that is how a reservoir gets counted twice or lost.
-- The GeoStudio path also goes outward: `export_gsz(slope_data, "out.gsz")`.
+- The GeoStudio path also goes outward: `export_gsz(slope_data, "out.gsz")`. It writes `gamma`
+  and `gamma_sat` as SLOPE/W's unit weights above and below the water table, a phreatic line as
+  SLOPE/W's phreatic switch, and a model with both piezo lines and d and psi as a staged rapid
+  drawdown. Read the returned caveats for what it could not write.
 
 Import, then load, plot, and run the input checks (next section) before analyzing.
 

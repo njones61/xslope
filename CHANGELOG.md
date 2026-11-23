@@ -142,6 +142,18 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   curve imports with none; the import's notes say so.
 - Exporting to GeoStudio writes a `ratio` material as SLOPE/W's SHANSEP and a `cp`
   material as S=f(depth). Both used to be written as Mohr-Coulomb.
+- Exporting to GeoStudio writes a material's saturated unit weight, and a
+  phreatic piezometric line as phreatic. Every material used to go out with one
+  weight, and a phreatic line came back as an ordinary piezometric line.
+- A GeoStudio import reads SLOPE/W's separate unit weight above the water table
+  when the analysis uses it, as γ above the water table and γ_sat below. On
+  SLOPE/W's Unit Weight Definition example, the sliding mass now weighs within
+  0.07% of SLOPE/W's own slices; it was 18% to 25% off.
+- Tie-back anchors in a GeoStudio 2025 file import with their capacity. An
+  earlier 2025 build writes it under another name, and those anchors imported
+  with none.
+- A GeoStudio file with Eurocode partial factors says, on import, which factors
+  it holds and that XSLOPE doesn't apply them.
 - A Slide2 Undrained material imports with its own strength, constant or rising
   with depth below the top of its layer (`cp`). The import read it as Mohr-Coulomb
   with a tension cutoff and dropped the rise with depth without saying so.

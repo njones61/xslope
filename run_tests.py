@@ -12420,6 +12420,10 @@ AUDIT_CHECK_MODULES = {
     'audit_engine': ('audit_engine_check.py', 'fem'),
     # SLOPE/W's staged rapid drawdown through the GeoStudio importer.
     'gsz_rapid': ('gsz_rapid_check.py', 'gsz'),
+    # Six GeoStudio import/export gaps: gamma_sat and the unit weight above the
+    # water table, the older tie-back capacity tag, the phreatic switch, partial
+    # factors, and what the skill says an import carries.
+    'gsz_gaps': ('gsz_gaps_check.py', 'gsz'),
 }
 
 
@@ -13406,6 +13410,11 @@ GSZ_SCHEMA_PATHS = {
     # as the R envelope its own examples carry on each soil that does not drain.
     "/GSIData/Materials/Material/StressStrain/DrawdownCohesion",
     "/GSIData/Materials/Material/StressStrain/DrawdownPhi",
+    # A unit weight below the water table that differs from the one above it: SLOPE/W's
+    # <UnitWeight> (below) and <DryWeight> under the switch, as its own Unit Weight
+    # Definition example writes them.
+    "/GSIData/Materials/Material/StressStrain/DryWeight",
+    "/GSIData/Materials/Material/StressStrain/SlopeUseUnitWeightAboveWT",
     "/GSIData/Materials@Len",
     # The reinforcement product library, and the loads that hang off the analysis. These
     # branches of the exporter went unchecked for a while because the fixture model has
@@ -13478,6 +13487,7 @@ GSZ_SCHEMA_PATHS = {
     # The analysis switches, and the one the export writes: the staged rapid drawdown.
     "/GSIData/StabilityItems/StabilityItem/Entry/Control",
     "/GSIData/StabilityItems/StabilityItem/Entry/Control/IsRapidDrawdown",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Control/IsPiezPhreatic",
     "/GSIData/StabilityItems@Len",
     "/GSIData/WaterItems",
     "/GSIData/WaterItems/WaterItem",
@@ -15350,7 +15360,8 @@ def run_gsz_rapid_drawdown_test(test):
     Eqs. 9.6-9.7). One caveat says what was imported and that the model runs as a
     rapid drawdown, in place of the generic "2 piezometric surfaces" and the
     unrecognized 'Control' it once drew. A <Control> switch the import does not
-    handle is still reported as unrecognized. SLOPE/W's own four examples are
+    handle (here one GeoStudio has never written) is still reported as unrecognized.
+    SLOPE/W's own four examples are
     checked against their XML and their answers in test/gsz_rapid_check.py.
     Returns (0.0, None) or (None, message).
     """
@@ -15369,9 +15380,10 @@ def run_gsz_rapid_drawdown_test(test):
         {"name": "drawdown", "material": 2, "water": "PiezoSurface",
          "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1",
          "entry": pts + rdd.format(extra="") + surfaces},
-        {"name": "drawdown, design factors", "material": 2, "water": "PiezoSurface",
+        {"name": "drawdown, unknown switch", "material": 2, "water": "PiezoSurface",
          "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1",
-         "entry": pts + rdd.format(extra="<DesignFactorID>1</DesignFactorID>") + surfaces},
+         "entry": pts + rdd.format(extra="<IsSomeFutureOption>true</IsSomeFutureOption>")
+         + surfaces},
     ]
     got = _gsz_import_cases(cases)
     problems = []
@@ -15397,9 +15409,9 @@ def run_gsz_rapid_drawdown_test(test):
         problems.append(f"'drawdown': clay d, psi = "
                         f"{(clay or {}).get('d')}, {(clay or {}).get('psi')}, "
                         f"expected 64.1, 24.4")
-    if not any("'Control'" in c for c in got["drawdown, design factors"][1]):
-        problems.append("an unhandled <Control> switch (DesignFactorID) is no longer "
-                        "reported")
+    if not any("'Control'" in c for c in got["drawdown, unknown switch"][1]):
+        problems.append("an unhandled <Control> switch (IsSomeFutureOption) is no "
+                        "longer reported")
     if problems:
         return None, "GeoStudio rapid drawdown: " + "; ".join(problems[:4])
     return 0.0, None
@@ -19917,8 +19929,9 @@ def main():
         # when absent (the files are Seequent's copyrighted material).
         tests.append({'type': 'gsz_water', 'file': '(GeoStudio corpus)',
                       'method': 'water loads', 'source': 'gsz'})
-        # SLOPE/W's staged rapid drawdown through the importer
-        # (test/gsz_rapid_check.py, enqueued once the module exists).
+        # SLOPE/W's staged rapid drawdown through the importer, and six import/export
+        # gaps (test/gsz_rapid_check.py, test/gsz_gaps_check.py, each enqueued once
+        # the module exists).
         _gsz_extra = _audit_module_tests('gsz')
         tests.extend(_gsz_extra)
         if not run_all:

@@ -13,9 +13,10 @@ description: "What's new in XSLOPE 1.1.0, the free slope stability program: seis
   [yield coefficient](seismic/yield_coefficient.md), on one slip surface or by search, and the
   [Newmark displacement](seismic/newmark.md) of the sliding mass under an acceleration record. Studio runs each
   of them, and the Analysis Report and the AI assistant cover them.
-- **Two new tutorials.** [LEM-14](tutorials/lem14_pseudostatic.md) analyzes a fill slope in one stage and in two,
-  and [LEM-15](tutorials/lem15_yield_newmark.md) finds the same slope's yield coefficient and its Newmark
-  displacement.
+- **Two new seismic tutorials.** [LEM-14](tutorials/lem14_pseudostatic.md) runs a pseudostatic analysis of a
+  fill slope, first in one stage and then as a two-stage seismic analysis, and
+  [LEM-15](tutorials/lem15_yield_newmark.md) finds the same slope's seismic yield coefficient and its Newmark
+  displacement under an earthquake record.
 - **A strength ratio material.** The [`ratio` option](lem/overview.md#undrained-strength-ratio) gives an
   undrained strength that grows with the vertical effective stress, as in a normally consolidated clay. Part C of
   [Tutorial LEM-7](tutorials/lem07_strength_envelopes.md) uses it.

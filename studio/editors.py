@@ -3850,13 +3850,16 @@ _MAT_ALL_OPTION_FIELDS = ["c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c",
 _MAT_SUCTION_DIM = frozenset(["phi_b", "s_cap"])
 
 # v16: an option=elastic material cannot fail — the mat sheet grays every strength
-# column, t_cut, the rapid-drawdown pair d/ψ, the matric-suction pair, u/ru and the strength
-# standard deviations for such a row (CF ranges F..N, Q..R, AA..AF on $E="elastic").
+# column, t_cut, the rapid-drawdown pair d/ψ, the matric-suction pair and the strength
+# standard deviations for such a row (CF ranges F..L, Q..R, AA..AF on $E="elastic").
 # s(γ) goes with them: reliability refuses a σ on an elastic row's unit weight.
-# g/gsat, E/ν and the seepage block stay live. The editor mirrors that: these
-# keys read-only/gray on both views when the row's option is elastic.
+# g/gsat, E/ν, u and the seepage block stay live: an elastic material reads its own
+# u (Norm, 533a) — a sealed wall is u = none, so the water presses on its face; a
+# permeable wall or rock is seep or piezo — and its ru when u = ru, so ru grays on
+# an elastic row only as on any other. The editor mirrors that: these keys
+# read-only/gray on both views when the row's option is elastic.
 _MAT_ELASTIC_DIM = frozenset(
-    _MAT_ALL_OPTION_FIELDS + ["d", "psi", "phi_b", "s_cap", "t_cut", "u", "ru",
+    _MAT_ALL_OPTION_FIELDS + ["d", "psi", "phi_b", "s_cap", "t_cut",
                               "sigma_gamma", "sigma_c", "sigma_phi", "sigma_cp",
                               "sigma_d", "sigma_psi"])
 
@@ -3886,12 +3889,13 @@ def _mat_dim_keys(row):
 
     Mirrors the mat sheet's conditional formatting, so the table, the form and the
     workbook gray the same cells, and the sheet grays what the engines do not read.
-    An elastic row grays its whole inert set, u included. Otherwise: the fields the
-    strength option does not read (``_MAT_OPTION_DIM``) and the other options' curve
-    parameters; ru unless u = ru; and the matric-suction pair unless u delivers a
-    signed pressure (piezo or seep). A blank u reads as none, as the loader reads it,
-    so it grays ru and the suction pair too. A blank option grays nothing on its own
-    account.
+    An elastic row grays its whole inert strength set (``_MAT_ELASTIC_DIM``), the
+    suction pair included, but not u: an elastic material reads its own u. Otherwise:
+    the fields the strength option does not read (``_MAT_OPTION_DIM``) and the other
+    options' curve parameters, and the matric-suction pair unless u delivers a signed
+    pressure (piezo or seep). On every row ru is grayed unless u = ru. A blank u
+    reads as none, as the loader reads it, so it grays ru and the suction pair too.
+    A blank option grays nothing on its own account.
 
     On every row, elastic included, the unsaturated-model parameters the chosen
     model does not read are grayed, a blank unsat reading as lf (the loader's
@@ -3907,11 +3911,11 @@ def _mat_dim_keys(row):
             dim |= _MAT_POW_FIELDS
         if opt and opt != "hb":
             dim |= _MAT_HB_FIELDS
-        u = str(row.get("u", "") or "").strip().lower() or "none"
-        if u != "ru":
-            dim.add("ru")
-        if u not in ("piezo", "seep"):
-            dim |= _MAT_SUCTION_DIM
+    u = str(row.get("u", "") or "").strip().lower() or "none"
+    if u != "ru":
+        dim.add("ru")
+    if u not in ("piezo", "seep"):
+        dim |= _MAT_SUCTION_DIM
     um = str(row.get("unsat", "") or "").strip().lower() or "lf"
     if um in _MAT_UNSAT_FIELDS:
         dim.update(k for k in _MAT_ALL_UNSAT_FIELDS
@@ -4271,7 +4275,7 @@ class _MaterialListView(QWidget):
         self._u_combo = self._make_edit("u")
         self._u_combo.currentIndexChanged.connect(self._on_u_changed)
         uh.addWidget(self._u_combo, 1)
-        self._u_cell = u_cell            # grayed whole for an elastic material
+        self._u_cell = u_cell            # live on every row: elastic reads u too
         gv.addWidget(self._register_cell("u", u_cell))
         gv.addWidget(self._cell("ru", "ru"))
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — LEM & FEM).
@@ -4476,14 +4480,13 @@ class _MaterialListView(QWidget):
     def _update_dim(self):
         """Gray the cells the row's choices leave unread, by the table view's own
         rule (``_mat_dim_keys``), so the two views and the mat sheet agree: d/ψ for
-        any option but mc, t_cut and u for elastic, the suction pair unless u is piezo
-        or seep, and so on. A cell the option already hides is grayed as well, which
-        shows only if it comes back. Disabling a cell grays its σ readout with it,
-        as the sheet grays s(d)/s(ψ) with d/ψ; a σ the rule grays on its own (s(γ)
-        for elastic, pow and hb) is grayed by itself, its value cell staying live.
-        Depends on the
-        option, u and unsat combos, so it is re-run whenever one changes as well as
-        on load."""
+        any option but mc, t_cut for elastic, the suction pair unless u is piezo or
+        seep (and always for cp, ratio and elastic), and so on. A cell the option
+        already hides is grayed as well, which shows only if it comes back.
+        Disabling a cell grays its σ readout with it, as the sheet grays s(d)/s(ψ)
+        with d/ψ; a σ the rule grays on its own (s(γ) for elastic, pow and hb) is
+        grayed by itself, its value cell staying live. Depends on the option, u and
+        unsat combos, so it is re-run whenever one changes as well as on load."""
         dim = _mat_dim_keys({"option": self._opt_combo.currentText(),
                              "u": self._u_combo.currentText(),
                              "unsat": self._unsat_combo.currentText()})
@@ -4642,9 +4645,11 @@ MATERIALS_HELP = {
               "at φ=0), enforced but never reduced by F — enough to hold a steep crest cut "
               "shut and inflate SSRM FS. At c=0, blank and 0 are the same. A cap you set IS "
               "reduced with F, like c and tanφ (RS2/Plaxis do the same). 0 = no tension at all."),
-    "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
-    "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
-    "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",
+    "E": "FEM elastic (Young's) modulus — with ν, the only stiffness property read for an elastic material.",
+    "nu": "FEM Poisson's ratio — with E, the only stiffness property read for an elastic material.",
+    "u": ("Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), "
+          "or ru. Read for an elastic material too: none for a sealed wall (the water "
+          "presses on its face), seep or piezo for a permeable one."),
     "ru": "Pore-pressure ratio; u = ru·σv on the soil column only (u = ru option).",
     "pow_a": "Power-curve envelope coefficient a in τ = a·(σ'n + d)^b + c (pow option).",
     "pow_b": "Power-curve exponent b; b = 1 collapses to Mohr-Coulomb (pow option).",

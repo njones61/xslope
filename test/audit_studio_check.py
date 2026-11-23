@@ -120,8 +120,9 @@ def _engine_gray(opt, u, um):
     """The keys of the audit's rules, grayed or not, from what the engines read —
     written out here rather than taken from the editor, so the two are compared.
 
-    u is read for every option but elastic; ru only when u = ru; the suction pair
-    only when u is piezo or seep and the option takes suction (not cp, ratio or
+    u is read for every option, elastic included (Norm, 533a: an elastic material
+    reads its own u); ru only when u = ru, on any option; the suction pair only
+    when u is piezo or seep and the option takes suction (not cp, ratio or
     elastic). A blank u is none and a blank unsat is lf (the loader's readings).
     kr0 is read by lf; h0 by lf and gard; a and n by vg and gard; l by vg alone.
     Reliability refuses s(γ) on elastic, pow and hb. (s(d) and s(ψ) are left to
@@ -130,8 +131,8 @@ def _engine_gray(opt, u, um):
     u = u or "none"
     um = um or "lf"
     gray = {
-        "u": opt == "elastic",
-        "ru": opt == "elastic" or u != "ru",
+        "u": False,
+        "ru": u != "ru",
         "phi_b": opt in ("cp", "ratio", "elastic") or u not in ("piezo", "seep"),
         "kr0": um in ("vg", "gard"),
         "h0": um == "vg",
@@ -191,9 +192,19 @@ def test_material_form_follows_the_rule():
     out += _fail(lv._cell_widgets["gamma"].isEnabled()
                  and not lv._edits["sigma_gamma"].isEnabled(),
                  "option = pow: γ should stay live and s(γ) gray")
+    # An elastic material reads its own u (533a): u stays live, ru follows u as
+    # on any row, and the suction pair stays gray (no strength to add it to).
     lv._opt_combo.setCurrentText("elastic")
-    out += _fail(not lv._cell_widgets["u"].isEnabled(),
-                 "option = elastic: u is live")
+    lv._u_combo.setCurrentText("ru")
+    out += _fail(lv._cell_widgets["u"].isEnabled()
+                 and lv._cell_widgets["ru"].isEnabled(),
+                 f"option = elastic, u = ru: u live={lv._cell_widgets['u'].isEnabled()}, "
+                 f"ru live={lv._cell_widgets['ru'].isEnabled()}; an elastic material "
+                 f"reads both")
+    lv._u_combo.setCurrentText("seep")
+    out += _fail(not lv._cell_widgets["phi_b"].isEnabled(),
+                 "option = elastic, u = seep: φ_b is live, but an elastic material "
+                 "takes no suction strength")
     blank = _material_view({"name": "fill", "option": ""})
     out += _fail({"c", "phi"} <= blank._model_hidden,
                  "a blank option no longer hides c and φ in the form")

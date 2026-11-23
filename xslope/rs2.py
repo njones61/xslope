@@ -370,6 +370,26 @@ def _parse_material_types(lines):
                 cur["air_entry"] = _fnum(params["Air_Entry"])
             if "UseUnsaturated" in params:
                 cur["use_unsat"] = _fnum(params["UseUnsaturated"])
+            continue
+        # A Mohr-Coulomb cohesion that changes with depth below a datum (RS2's "datum
+        # dependent" cohesion), on the line after the strength line:
+        #   Ctype: 0 CChange: 9.8 Cdatum: -20 ResCchange: 9.8 CchangeFlag: 1
+        #   CcutoffFlag: 0 Ccutoff: 0 ResCcutFlag: 0 ResCcutoff: 0
+        # CchangeFlag switches it on; C is then the cohesion at elevation Cdatum and
+        # CChange its rate of increase per unit depth below it. Ccutoff, when
+        # CcutoffFlag is on, is a maximum (a minimum if the rate is negative). Ctype
+        # is RS2's datum type: every file seen writes 0 with a datum elevation, the
+        # vertical "Depth" type; the other, "Radial", measures from a center point.
+        if stripped.startswith("Ctype:"):
+            params = {k: v for k, v in re.findall(r"(\w+):\s*(-?[\d.eE+]+)", stripped)}
+            cur["c_datum"] = {
+                "type": int(_fnum(params.get("Ctype"))),
+                "on": bool(_fnum(params.get("CchangeFlag"))),
+                "rate": _fnum(params.get("CChange")),
+                "datum": _fnum(params.get("Cdatum")),
+                "cutoff": (_fnum(params.get("Ccutoff"))
+                           if _fnum(params.get("CcutoffFlag")) else None),
+            }
     return mats
 
 
@@ -1122,6 +1142,59 @@ def _polygonize_zones(boundaries, seeds, caveats):
     return polygons, used
 
 
+def _datum_cohesion(mat, cd, polygons, mat_id):
+    """Map RS2's datum-dependent cohesion onto ``cp``; return the caveats.
+
+    RS2: c = C + CChange x (Cdatum - y) below the datum, optionally capped at Ccutoff.
+    XSLOPE's ``cp``: c + cp x max(0, r_elev - y), with phi = 0 and no cap. The two are
+    the same strength wherever the material lies below the datum and the cap is not
+    reached. Both are checked on the material's own zones, so a cap that is never
+    reached, or a datum at or above the material's top, costs nothing and says nothing.
+    """
+    name, C, phi = mat["name"], mat["c"], mat["phi"]
+    rate, datum, cutoff = cd["rate"], cd["datum"], cd["cutoff"]
+    if cd["type"] != 0:
+        return [f"material '{name}' has a cohesion that changes with distance from a "
+                f"datum (RS2 datum type {cd['type']}), which XSLOPE does not read. It "
+                f"was imported with a constant c = {C:g}. Check it before solving."]
+    if phi:
+        return [f"material '{name}' has a cohesion that changes by {rate:g} per unit "
+                f"depth below y = {datum:g}, and phi = {phi:g}. XSLOPE's depth-varying "
+                f"option (cp) has no friction, so it was imported as Mohr-Coulomb with a "
+                f"constant c = {C:g}. Below the datum its strength differs from RS2's."]
+    mat.update(option="cp", phi=0.0, cp=rate, r_elev=datum)
+    notes = [f"material '{name}' has a cohesion that changes with depth in RS2 — "
+             f"imported as option cp with c = {C:g} at r_elev = {datum:g} and c/p = "
+             f"{rate:g} per unit depth"]
+    ys = [v for p in polygons if p["mat_id"] == mat_id
+          for v in (p["polygon"].bounds[1], p["polygon"].bounds[3])]
+    if not ys or not rate:
+        return notes
+    y_lo, y_hi = min(ys), max(ys)
+    tol = 1e-6 * max(1.0, abs(y_lo), abs(y_hi))
+    if y_hi > datum + tol:
+        notes.append(
+            f"part of material '{name}' lies above its datum, up to y = {y_hi:g}. "
+            f"XSLOPE holds the strength at c = {C:g} there. RS2's help does not say "
+            f"what RS2 uses above the datum, so check those strengths.")
+    if cutoff is not None and y_lo < datum:
+        s_low = C + rate * (datum - y_lo)
+        y_cut = datum - (cutoff - C) / rate
+        if rate > 0 and s_low > cutoff + tol * max(1.0, abs(cutoff)):
+            notes.append(
+                f"RS2 caps the strength of material '{name}' at {cutoff:g}, reached at "
+                f"y = {min(y_cut, datum):g}. XSLOPE has no cap, and its strength keeps "
+                f"rising below that, to {s_low:g} at the bottom of the material, so it "
+                f"is higher than RS2's there.")
+        elif rate < 0 and s_low < cutoff - tol * max(1.0, abs(cutoff)):
+            notes.append(
+                f"RS2 holds the strength of material '{name}' at a minimum of "
+                f"{cutoff:g}, reached at y = {min(y_cut, datum):g}. XSLOPE has no "
+                f"minimum, and its strength keeps falling below that, to {s_low:g} at "
+                f"the bottom of the material, so it is lower than RS2's there.")
+    return notes
+
+
 def fez_to_slope_data(d):
     """Build an xslope ``slope_data`` from a parsed RS2 model.
 
@@ -1212,6 +1285,9 @@ def fez_to_slope_data(d):
                 f"imported as Mohr-Coulomb with c = {c:g}, phi = {phi:g}, which is NOT "
                 f"the same strength; check it before solving")
         mat.update(option="mc", gamma=gamma, c=c, phi=phi)
+        cd = src.get("c_datum")
+        if model == _MC_MODEL and cd and cd["on"]:
+            caveats.extend(_datum_cohesion(mat, cd, polygons, len(materials)))
 
         # v16 tensile cutoff: RS2's per-material T is a Rankine cap on the major
         # principal stress — the same quantity as xslope's t_cut. Carry it (FEM only;
@@ -1241,7 +1317,8 @@ def fez_to_slope_data(d):
         if not gamma:
             caveats.append(f"material '{name}' has no unit weight in the file — set "
                            f"gamma before solving")
-        if not c and not phi:
+        if not mat["c"] and not mat["phi"] and not (mat["option"] == "cp"
+                                                    and mat["cp"]):
             caveats.append(
                 f"material '{name}' came across with NO STRENGTH (c = 0, phi = 0) — set "
                 f"its strength before solving or the factor of safety is meaningless")

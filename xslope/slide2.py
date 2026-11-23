@@ -35,7 +35,8 @@ This module reads that text and builds an xslope ``slope_data``:
 
 Only what Slide2 and xslope have in common is imported. Everything else is
 reported as a caveat rather than silently dropped: strength models other than
-Mohr-Coulomb, water-pressure grids and finite-element seepage, search
+Mohr-Coulomb and Undrained (constant, or growing with depth below the top of its
+layer, as ``cp``), water-pressure grids and finite-element seepage, search
 definitions (Slide2 defines a search, not a surface), support/anchors,
 distributed and seismic loads, and design-standard partial factors.
 
@@ -51,26 +52,43 @@ import zipfile
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
-from .fileio import build_ground_surface_from_polygons, main_sheet_cell
+from .fileio import (build_ground_surface_from_polygons, cp_from_layer_top,
+                     main_sheet_cell)
 from .units import GAMMA_W, units_check, normalize_unit_system
 from .water import derive_water_loads
 
 
-# Slide2 material "type" codes and whether xslope can represent them. Only the
-# Mohr-Coulomb type (0) maps 1:1; every other type is imported with whatever c/phi
-# it carries and flagged, the same discipline geostudio.py uses. Correlated with the
-# tutorials that use each: 8 = generalized Hoek-Brown (Damage Regions), 15/16 =
-# anisotropic (Generalized Anisotropic, Sarma), 18 = SHANSEP (Staged Embankment),
-# 1 = Mohr-Coulomb with a tensile-strength cutoff (Tensile Strength tutorial).
+# Slide2 material "type" codes and whether xslope can represent them. Mohr-Coulomb
+# (0), Undrained (1) and Infinite Strength (5) map; every other type is imported with
+# whatever c/phi it carries and flagged, the same discipline geostudio.py uses.
+# Correlated with the tutorials that use each: 8 = generalized Hoek-Brown (Damage
+# Regions), 15/16 = anisotropic (Generalized Anisotropic, Sarma), 18 = SHANSEP (Staged
+# Embankment).
 _MC_TYPE = 0
+# Type 1 is Slide2's Undrained material (phi = 0, strength in c). Its lines carry no
+# phi and carry a cohesion type, 'ctype': 0 = Constant; 1 = F(Depth from Top of Layer),
+# with 'dc' the rate of increase per unit depth. Tutorial 29 (Tensile Strength) pins 1:
+# its Lower Soil (ctype 1, c 15, dc 3.75) spans y = 0 to 4, so a depth from the top of
+# the layer gives 15 to 30, where a datum at y = 0 would give a strength falling to
+# zero at the top. A Mohr-Coulomb material's tensile strength is a key on a type-0
+# line ('mat_tensile'), not a type of its own.
+_UNDRAINED_TYPE = 1
+_UNDRAINED_CONSTANT, _UNDRAINED_FROM_TOP = 0, 1
+# Every key a type-1 line was seen to carry, and the per-scenario flags merged onto it.
+# Anything else is reported by name: Slide2's undrained Cutoff (a maximum strength) has
+# a key no available file writes.
+_UNDRAINED_KEYS = {
+    "type", "ctype", "c", "dc", "uw", "wtable", "water", "withru", "hutype", "name",
+    "SK", "STYPE", "alternate_mat_index", "bbar", "correlation_length_x",
+    "correlation_length_y", "gw_aev", "gw_k_angle", "gw_k_ratio", "gw_ks", "gw_mode",
+    "gw_mv", "gw_phi_b", "gw_use_wc_for_phib", "gw_usemv", "gw_user_index", "gw_wc",
+    "gw_wcr", "mesh_size", "rd_cr", "rd_phir", "rd_type", "rd_undrained",
+    "spatially_variable_material", "stg2", "use_alternate_strength",
+}
 # Type 5 is Slide2's Infinite Strength (impenetrable) material, the exact analog of
-# xslope's v16 'elastic' option; type 1 is Mohr-Coulomb WITH a tension cutoff, whose
-# c/phi map but whose cutoff value has no verified live-file encoding.
+# xslope's v16 'elastic' option.
 _INFINITE_TYPE = 5
-_TENSILE_TYPE = 1
 _TYPE_NAMES = {
-    1: "Mohr-Coulomb with a tensile-strength cutoff",
-    2: "undrained (phi = 0)",
     5: "infinite strength / impenetrable",
     8: "generalized Hoek-Brown",
     15: "anisotropic (c/phi with a second orientation)",
@@ -381,38 +399,51 @@ def _merge_material(shared, scen):
     return out
 
 
-def _strength(props):
-    """(c, phi, gamma, type_code, caveat) for one Slide2 material.
+def _strength(name, props):
+    """``(fields, gamma, type_code, notes, from_top)`` for one Slide2 material.
 
-    Only ``type: 0`` (Mohr-Coulomb) maps 1:1. Any other type is imported with
-    whatever c/phi it lists and flagged — the same behaviour geostudio.py gives an
-    unknown SLOPE/W strength model: never silently a zero-strength soil, never
-    silently the wrong strength.
+    ``fields`` updates the xslope material (option, c, phi, cp); ``from_top`` is True
+    when r_elev is the top of the material's own layer, set by the caller once the
+    zones are built.
+
+    Mohr-Coulomb (type 0) maps 1:1, and so does Undrained (type 1) with a constant
+    cohesion or one that grows with depth below the top of its layer. Any other type
+    is imported with whatever c/phi it lists and flagged — the same behaviour
+    geostudio.py gives an unknown SLOPE/W strength model: never silently a
+    zero-strength soil, never silently the wrong strength.
     """
     tcode = int(_fnum(props.get("type", 0)))
     c = _fnum(props.get("c", 0.0))
     phi = _fnum(props.get("phi", 0.0))
     gamma = _fnum(props.get("uw", 0.0))
-    if tcode == _MC_TYPE:
-        return c, phi, gamma, tcode, None
-    if tcode == _INFINITE_TYPE:
-        # Impenetrable: handled as an elastic material by the caller, no strength note.
-        return c, phi, gamma, tcode, None
-    if tcode == _TENSILE_TYPE:
-        # A Mohr-Coulomb material WITH a tension cutoff. The c and phi map cleanly; the
-        # cutoff itself does not — xslope's t_cut is FEM-only and the Slide2 tension-
-        # cutoff value has no encoding verified against a live file, so it is reported
-        # rather than mapped to a possibly-wrong number.
-        return c, phi, gamma, tcode, (
-            "uses Slide2's Mohr-Coulomb-with-tension-cutoff model — c and phi came "
-            "across, but the tensile-strength value was NOT imported (xslope's t_cut is "
-            "FEM-only and the Slide2 cutoff encoding is not verified against a live "
-            "file); set t_cut by hand if you need the cutoff")
+    if tcode in (_MC_TYPE, _INFINITE_TYPE):
+        # Infinite Strength is handled as an elastic material by the caller.
+        return {"option": "mc", "c": c, "phi": phi}, gamma, tcode, [], False
+    if tcode == _UNDRAINED_TYPE:
+        ctype = int(_fnum(props.get("ctype", 0)))
+        # aniso_surface is a per-scenario flag; -1 means no anisotropic surface.
+        extra = sorted(k for k in set(props) - _UNDRAINED_KEYS
+                       if not (k == "aniso_surface" and _fnum(props[k]) == -1))
+        notes = [f"material '{name}' also sets Slide2 key(s) {', '.join(extra)}, which "
+                 f"XSLOPE does not read. Check whether they change its strength."
+                 ] if extra else []
+        if ctype == _UNDRAINED_CONSTANT:
+            return {"option": "mc", "c": c, "phi": 0.0}, gamma, tcode, [
+                f"material '{name}' is Slide2's undrained (phi = 0) material — imported "
+                f"as Mohr-Coulomb with c = Su = {c:g} and phi = 0"] + notes, False
+        if ctype == _UNDRAINED_FROM_TOP:
+            rate = _fnum(props.get("dc", 0.0))
+            return ({"option": "cp", "c": c, "phi": 0.0, "cp": rate}, gamma, tcode,
+                    notes, True)
+        return {"option": "mc", "c": c, "phi": 0.0}, gamma, tcode, [
+            f"material '{name}' is Slide2's undrained material with cohesion type "
+            f"{ctype}, which XSLOPE does not read from the file. It was imported with a "
+            f"constant c = {c:g} and phi = 0. Check it before solving."] + notes, False
     label = _TYPE_NAMES.get(tcode, f"strength type {tcode}")
-    return c, phi, gamma, tcode, (
-        f"material uses Slide2's {label} model, which xslope does not have — "
-        f"imported as Mohr-Coulomb with c = {c:g}, phi = {phi:g}, which is NOT the "
-        f"same strength; check it before solving")
+    return {"option": "mc", "c": c, "phi": phi}, gamma, tcode, [
+        f"material '{name}': material uses Slide2's {label} model, which xslope does "
+        f"not have — imported as Mohr-Coulomb with c = {c:g}, phi = {phi:g}, which is "
+        f"NOT the same strength; check it before solving"], False
 
 
 def slide2_to_slope_data(d, scenario=None):
@@ -468,11 +499,11 @@ def slide2_to_slope_data(d, scenario=None):
     mat_index = {name: i for i, name in enumerate(used_names)}
 
     materials = []
+    depth_from_top = []     # undrained F(Depth from Top of Layer) materials
     for name in used_names:
         props = _merge_material(d.get("shared_materials", {}).get(name), scen["materials"].get(name))
-        c, phi, gamma, tcode, note = _strength(props)
-        if note:
-            caveats.append(f"material '{name}': " + note)
+        fields, gamma, tcode, notes, from_top = _strength(name, props)
+        caveats.extend(notes)
         mat = _blank_material(name)
         if tcode == _INFINITE_TYPE:
             # Slide2's Infinite Strength material -> xslope's elastic (impenetrable)
@@ -484,7 +515,9 @@ def slide2_to_slope_data(d, scenario=None):
                 f"material — imported as an elastic material: it cannot fail and a slip "
                 f"surface cannot cut through it")
         else:
-            mat.update(option="mc", gamma=gamma, c=c, phi=phi)
+            mat.update(gamma=gamma, **fields)
+            if from_top:
+                depth_from_top.append(mat_index[name])
 
         # Unsaturated shear strength: Slide2 credits a phi^b for negative pore pressure.
         # No live .sli was available to pin the exact material token, so a small set of
@@ -506,7 +539,8 @@ def slide2_to_slope_data(d, scenario=None):
         if not gamma:
             caveats.append(f"material '{name}' has no unit weight in the file — set "
                            f"gamma before solving")
-        if tcode != _INFINITE_TYPE and not c and not phi:
+        if tcode != _INFINITE_TYPE and not mat["c"] and not mat["phi"] and not (
+                mat["option"] == "cp" and mat["cp"]):
             caveats.append(
                 f"material '{name}' came across with NO STRENGTH (c = 0, phi = 0) — set "
                 f"its strength before solving or the factor of safety is meaningless")
@@ -525,6 +559,13 @@ def slide2_to_slope_data(d, scenario=None):
                              "mat_id": mat_index[name]})
     if not polygons:
         raise ValueError("This scenario has no material zones to import.")
+
+    # Undrained F(Depth from Top of Layer) measures depth from the top of the
+    # material's own layer above each slice; cp measures it from one elevation. They
+    # agree when that top is level.
+    for i in depth_from_top:
+        caveats.extend(cp_from_layer_top(materials[i], polygons, i, "Slide2",
+                                         "undrained F(Depth from Top of Layer)"))
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
 

@@ -76,6 +76,23 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - A GeoStudio analysis that takes its slip surface from another analysis imports
   a circle only when that analysis searched circles. One used to import a circle
   fitted to an automatic search's surface, 14.9% above SLOPE/W.
+- A GeoStudio import brings in a SLOPE/W SHANSEP material with a constant ratio
+  as XSLOPE's strength ratio material, and an S=f(depth) material as `cp`, measured
+  from the top of its layer. Both used to import as Mohr-Coulomb with whatever
+  cohesion and friction angle the file held. On SLOPE/W's own circles, its SHANSEP
+  example read 34% above SLOPE/W and now reads within 0.1%; Borges and Cardoso's
+  embankment read 53% below and now reads within 0.2%. A SHANSEP ratio that grows
+  with overconsolidation imports at its lowest value, and a strength read from a
+  curve imports with none; the import's notes say so.
+- Exporting to GeoStudio writes a `ratio` material as SLOPE/W's SHANSEP and a `cp`
+  material as S=f(depth). Both used to be written as Mohr-Coulomb.
+- A Slide2 Undrained material imports with its own strength, constant or rising
+  with depth below the top of its layer (`cp`). The import read it as Mohr-Coulomb
+  with a tension cutoff and dropped the rise with depth without saying so.
+- An RS2 material whose cohesion changes with depth below a datum imports as
+  `cp`. The import kept only the cohesion at the datum: Slide2's verification
+  problems 83 and 84, imported from RS2's files, read 16% to 34% below Slide2 and
+  now read within 0.7%.
 - Importing a SLOPE/W staged rapid drawdown now says the imported model is the
   slope before drawdown, while SLOPE/W's factor of safety is the one after it, and
   gives the lowered water line and the d and ψ that XSLOPE's own rapid drawdown

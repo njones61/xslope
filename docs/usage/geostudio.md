@@ -55,6 +55,8 @@ choice changes the model, so XSLOPE asks for it rather than guessing.
 | Region→material assignment (per analysis) | `mat_id` |
 | Mohr-Coulomb materials (c′, φ′) | `option='mc'` with c′, φ′ |
 | **Undrained materials** (φ = 0, strength entered as cohesion) | `option='mc'` with c = Su, φ = 0 |
+| **SHANSEP** with a constant ratio (its older name is S=f(overburden)) | `option='ratio'` with c/p = the ratio and c = 0, see below |
+| **S=f(depth)** (undrained strength rising with depth below the top of its layer) | `option='cp'` measured from that top, see below |
 | **Bedrock** (impenetrable) | `option='elastic'` — an impenetrable material, see below |
 | Material color | The zone color in Studio |
 | Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it; Type `phreatic` only where the analysis applies SLOPE/W's phreatic correction |
@@ -76,6 +78,46 @@ The ground surface and domain are derived from the zones, as for any polygon-bas
 Mohr-Coulomb materials carry straight over as `option='mc'` with their c′ and φ′.
 GeoStudio's undrained (φ = 0) materials store the undrained strength in the cohesion
 field, and import as `option='mc'` with c = S<sub>u</sub> and φ = 0.
+
+**Strength from the vertical effective stress.** SLOPE/W's SHANSEP model with a
+constant ratio gives S<sub>u</sub> = (τ/σ′<sub>v</sub>) σ′<sub>v</sub>. It imports as the
+[`ratio` option](../lem/overview.md#undrained-strength-ratio), with c/p set to the
+ratio. SHANSEP has no minimum strength, so c is set to 0. A SHANSEP material often still
+carries a cohesion and friction angle from an earlier model; SLOPE/W does not use them,
+and neither does the import. Both programs take σ′<sub>v</sub> as the weight of the soil
+column above the slice base, plus surcharges and ponded water, minus the pore pressure.
+Neither counts point loads. On SLOPE/W's own long-term SHANSEP example, the two
+strengths agree within 0.02 kPa at every column of SLOPE/W's critical surface.
+
+Two other SHANSEP forms have no exact match:
+
+- **A ratio of S × OCR<sup>m</sup>, with OCR varying with elevation.** XSLOPE has one
+  ratio per material, so the import uses the lowest, at the smallest OCR. Its strength
+  is then at or below SLOPE/W's, and the notes give the largest difference.
+- **A strength read from a curve of σ′<sub>v</sub>.** No single ratio is that curve, so
+  the material is imported with no strength, and the notes ask you to set one.
+
+SLOPE/W often pairs SHANSEP with B-bar, to hold σ′<sub>v</sub> at its value before a
+fill is placed. XSLOPE has no B-bar (see below), so it counts the fill's weight in
+σ′<sub>v</sub>, and its strength there is higher than SLOPE/W's. The notes say so.
+
+**Strength rising with depth.** SLOPE/W's S=f(depth) gives
+S<sub>u</sub> = S<sub>top</sub> + r d, where d is the depth below the top of the
+material's own layer, measured at each slice. It imports as the
+[`cp` option](../lem/overview.md), with c = S<sub>top</sub>, c/p = r, and r_elev at the
+top of the layer. Where that top is level, the strength is the same as SLOPE/W's.
+Where it is not, r_elev is its highest point, so XSLOPE's strength is never above
+SLOPE/W's, and the notes give the largest difference. S=f(depth) can also cap the
+strength at a maximum, which XSLOPE does not have. The import names any field on these
+materials that it does not read.
+
+SLOPE/W's S=f(datum), its Spatial Mohr-Coulomb, and every other strength model XSLOPE
+does not have are imported with whatever cohesion and friction angle they carry, and
+the notes say that this is not the same strength.
+
+SLOPE/W can also scale any strength by a function of the slice base's inclination (an
+anisotropy function). XSLOPE has no such scaling, so the import uses the unscaled
+strength and says so.
 
 GeoStudio's **Bedrock** is impenetrable — slip surfaces cannot enter it. XSLOPE's
 **`elastic`** option is the exact analog: an impenetrable zone that cannot fail and that
@@ -285,8 +327,9 @@ omits the attribute, the system is inferred from the unit weight of water: ≈9.
     caveats = export_gsz(slope_data, "my_model.gsz")
     ```
 
-Material zones become regions, materials become Mohr-Coulomb materials with their
-strengths, a piezo line becomes a piezometric surface (its points written under the
+Material zones become regions, materials become SLOPE/W materials (see
+[Strength options on export](#strength-options-on-export)), a piezo line becomes a
+piezometric surface (its points written under the
 owning analysis, the mirror image of how the import reads them), and **distributed loads
 become surcharges** — GeoStudio's surcharge is a wedge of fill, so an XSLOPE pressure
 profile is written as fill whose *depth* reproduces the pressure exactly. A **seepage
@@ -306,12 +349,35 @@ is rejected rather than approximated.
     its piezometric line goes across, and GeoStudio derives the reservoir from it just
     as XSLOPE's engine does. A `manual` model's water block is recognized and skipped.
 
-A `.gsz` still cannot carry everything XSLOPE models. An **elastic** material *is* written
-— as GeoStudio's impenetrable **Bedrock** — but failure surfaces, piles, other
-non-Mohr-Coulomb strengths (c/φ, power curve, Hoek-Brown), and the material
-properties `t_cut`, `phi_b` and `s_cap` are **not written**: SLOPE/W has no material
-encoding for them, and inventing one would corrupt the file. Each omission is reported as
-a caveat so you know what to re-create on the GeoStudio side.
+A `.gsz` still cannot carry everything XSLOPE models. Failure surfaces, piles, and the
+material properties `t_cut`, `phi_b` and `s_cap` are **not written**: SLOPE/W has no
+material encoding for them, and inventing one would corrupt the file. Each omission is
+reported as a caveat so you know what to re-create on the GeoStudio side.
+
+### Strength options on export
+
+| XSLOPE | GeoStudio |
+|---|---|
+| `mc` | Mohr-Coulomb, with c′ and φ′ |
+| `elastic` | Bedrock (impenetrable) |
+| `ratio` | SHANSEP with a constant ratio, c/p |
+| `cp` | S=f(depth) |
+| `pow`, `hb` | Mohr-Coulomb, with the material's c and φ, which is not the same strength |
+
+SHANSEP has no minimum strength, so a `ratio` material's c is not written. Where
+c/p × σ′<sub>v</sub> is below c, SLOPE/W's strength is lower than XSLOPE's, and the
+caveats say so.
+
+S=f(depth) measures depth from the top of the material's own layer. A `cp` material
+whose top is level and at or below r_elev therefore crosses exactly, with the strength
+at that top and the same rate. A `cp` material that reaches above r_elev, where XSLOPE
+holds the strength at c, is written to match XSLOPE below r_elev. Above it, SLOPE/W's
+strength falls below c. A top that is not level is written from its highest point. Each
+case is reported with the size of the difference.
+
+GeoStudio has a Hoek-Brown model, but the export does not write it yet. GeoStudio has
+no power-curve model as such. Its Shear-Normal function could hold the curve as a
+table of points, which the export does not write.
 
 ### Exporting a seepage field
 

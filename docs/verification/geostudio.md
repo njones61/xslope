@@ -377,9 +377,10 @@ XSLOPE's Spencer and SLOPE/W's own Morgenstern-Price lie on opposite sides of th
 
 [Borges & Cardoso (2002)](https://doi.org/10.1016/S0266-1144(02)00014-6)'s Case 2: a 5 m geosynthetic-reinforced embankment (c′ = 0,
 φ′ = 35°, γ = 20) over four soft-clay layers whose undrained strength increases with
-depth. The two deeper clays are GeoStudio "Su-varies-with-depth" (SFnDepth) materials,
-which map onto XSLOPE's `cp` option (Su = c + cp·max(0, r_elev − y)) at rates that
-reproduce the manual's printed layer-bottom strengths to the digit. The geosynthetic
+depth. All four clays are GeoStudio "Su-varies-with-depth" (SFnDepth) materials. The upper
+two have no rate, so their strength is constant. The two deeper ones map onto XSLOPE's `cp`
+option (Su = c + cp·max(0, r_elev − y)) at rates that reproduce the manual's printed
+layer-bottom strengths to the digit. The geosynthetic
 (Tmax = 200 kN/m, interface friction 33.7°, unanchored) is laid at y = 1.0 across the
 embankment base as an axial geosynthetic; on the critical surface it is fully embedded, so
 the full 200 kN/m develops, carries a large share of the resistance, and leaves the factor

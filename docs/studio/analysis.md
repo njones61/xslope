@@ -896,6 +896,23 @@ each source becomes and which ones import as zero with a warning. RS2's stabilit
 result is an SSR field rather than a slip surface, so the import never carries a failure
 surface — you define circles afterward.
 
+**Undrained strengths.** Each importer maps the vendor's undrained strength models onto
+XSLOPE's own where the two give the same strength, and names the rest in the notes:
+
+| Vendor model | XSLOPE | When it is not exact |
+|---|---|---|
+| SLOPE/W SHANSEP, constant ratio | [`ratio`](../lem/overview.md#undrained-strength-ratio), c = 0 | Under B-bar, XSLOPE's strength is higher (no B-bar in XSLOPE) |
+| SLOPE/W SHANSEP, S × OCR<sup>m</sup> | `ratio` at the lowest OCR | OCR varies with elevation; the notes give the largest difference |
+| SLOPE/W S=f(depth) | `cp` from the top of the layer | The layer's top is not level |
+| Slide2 Undrained, constant | `mc` with φ = 0 | — |
+| Slide2 Undrained, F(Depth from Top of Layer) | `cp` from the top of the layer | The layer's top is not level |
+| RS2 Mohr-Coulomb with cohesion changing below a datum (φ = 0) | `cp` with r_elev at the datum | The zone rises above the datum, or reaches RS2's cohesion cutoff |
+
+A strength cutoff the zone never reaches changes nothing, so it crosses silently. Slide2's
+F(Depth from Horizontal Datum) and Vertical Stress Ratio, and SLOPE/W's S=f(datum) and its
+SHANSEP strength curve, are not mapped, and the notes say so. [GeoStudio import](../usage/geostudio.md#materials)
+gives the SLOPE/W definitions in full.
+
 **Export** — **File → Export to GeoStudio (SLOPE/W)…** writes the current model out as a
 `.gsz`. It needs a polygon-based model (material zones), since a profile-line model has
 no regions to map onto.

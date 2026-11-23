@@ -36,7 +36,8 @@ one thing the caller must choose is which analysis to import, because a single
 slip-surface definition — see ``gsz_to_slope_data``).
 
 Only what SLOPE/W and xslope have in common is imported -- regions, materials
-(Mohr-Coulomb and undrained; bedrock as ``elastic``), the piezometric surface
+(Mohr-Coulomb and undrained; SHANSEP as ``ratio``; S=f(depth) as ``cp``; bedrock as
+``elastic``), the piezometric surface
 (with SLOPE/W's phreatic correction where the analysis applies it), Ru, water
 above ground, a solved SEEP/W field, surcharges and line loads, reinforcement,
 the tension crack, the seismic coefficient and the solved critical circle.
@@ -60,7 +61,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from shapely.geometry import Polygon
 
-from .fileio import build_ground_surface_from_polygons, main_sheet_cell
+from .fileio import (build_ground_surface_from_polygons, cp_from_layer_top,
+                     main_sheet_cell)
 from .mesh import ensure_ccw_elements, interpolate_at_point
 from .units import GAMMA_W, require_gamma_water, units_check, normalize_unit_system
 # Water geometry lives in a neutral module. material_above_ground_dload is used here
@@ -72,9 +74,9 @@ from .water import (_y_on, derive_water_loads, material_above_ground_dload,
                     ponded_water_dload)
 
 
-# Strength models SLOPE/W offers that xslope can represent. Anything else is
-# imported as a placeholder and flagged.
-_SUPPORTED_MODELS = {"MohrCoulomb"}
+# Strength models SLOPE/W offers that xslope can represent (see _strength). Anything
+# else is imported as a placeholder and flagged.
+_SUPPORTED_MODELS = {"MohrCoulomb", "UndrainedPhiZero", "Bedrock", "SHANSEP", "SFnDepth"}
 
 # Unit weight of water, used to infer the file's unit system (see _detect_units) and
 # as the value assigned when a Metric GeoStudio file omits <UnitWaterWeight>.
@@ -343,6 +345,21 @@ def read_gsz(path):
         if pts:
             kfns[int(kid)] = {"name": _text(kfn, "Name", ""), "points": pts}
 
+    # Material functions: a shared library of (x, y) tables keyed by ID, which a
+    # material names by number -- SHANSEP's OCR against elevation (OCRFnNum) and its
+    # undrained strength against vertical effective stress (ShearVerticalFnNum).
+    # <Function> holds the fit and its input/output, e.g. Spline(OutputParam=
+    # OverconsolidationRatio,InputParam=Y,...).
+    mfns = {}
+    for fn in root.findall("./Functions/Material/Fn2Ds/Fn2D"):
+        fid = _text(fn, "ID")
+        if fid is None:
+            continue
+        pts = [(float(p.get("X")), float(p.get("Y")))
+               for p in fn.findall("./Points/Point")]
+        mfns[int(fid)] = {"name": _text(fn, "Name", ""),
+                          "function": _text(fn, "Function", ""), "points": pts}
+
     # Boundary-condition library. The hydraulic ones encode their type in an
     # expression string, e.g. HydHeadvsTime(Variability=Constant,Value=8) or
     # HydTotalFlux(Variability=Constant,Value=0,Review=true).
@@ -559,8 +576,9 @@ def read_gsz(path):
         "regions": regions, "lines": glines, "geometries": geometries,
         "materials": materials,
         "contexts": contexts, "water": water,
-        "stability": stability, "kfns": kfns, "bcs": bcs, "hyd_bcs": hyd_bcs,
-        "reinforcements": reinforcements, "unit_system": unit_system,
+        "stability": stability, "kfns": kfns, "mfns": mfns, "bcs": bcs,
+        "hyd_bcs": hyd_bcs, "reinforcements": reinforcements,
+        "unit_system": unit_system,
     }
 
 
@@ -650,17 +668,60 @@ def list_analyses(gsz):
     return list(gsz["analyses"])
 
 
-def _strength(src):
-    """(c, phi, caveat) for one GeoStudio material, according to its SlopeModel.
+# StressStrain fields that belong to SIGMA/W's stress-strain models (stiffness, Cam
+# clay, Hoek-Brown inputs GeoStudio writes as placeholders) rather than to a SLOPE/W
+# strength. Every material carries some of them whatever its SlopeModel.
+_STRESS_STRAIN_FIELDS = {
+    "UnitWeight", "ResponseType", "Rf", "OCRatio", "ConsolLambda", "OCKappa",
+    "InitVoidRatio", "YieldSurfaceShape", "LimitOfAnisotropy",
+    "RateOfAnisotropyEvolution", "YoungsPrimeModulus", "EffectivePoissonsRatio",
+    "EPrimeModulusXPrime", "EffectivePoissonsRatioXPrime", "EPrimeModulusYPrime",
+    "EffectivePoissonsRatioYPrime", "ShearModulusXYPrime", "JointEffectiveCohesion",
+    "IntactRockParam", "GeologicalStrengthIndex", "DisturbanceFactor",
+    "MaxConfiningStress", "UseTensileStrength", "SlopeSuctionModel",
+    "ShearAnisoFnNum",          # reported on its own, for every model
+}
+
+# The fields each mapped strength model reads, plus the ones GeoStudio leaves behind
+# from a material's earlier model (a SHANSEP material keeps its old CohesionPrime and
+# PhiPrime; its manual and its results show they play no part). Anything else on one
+# of these materials is reported by name rather than ignored -- SLOPE/W's S=f(depth)
+# has an optional maximum strength, and no file we have seen writes it.
+_MODEL_FIELDS = {
+    "SHANSEP": {"TauSigmaRatio", "SlopeUndrainedStrengthModel",
+                "NCUndrainedStrengthRatio", "SHANSEPExponent", "OCRFnNum",
+                "ShearVerticalFnNum", "CohesionPrime", "PhiPrime", "Cohesion"},
+    "SFnDepth": {"CTopOfLayer", "CRateOfIncrease", "CohesionPrime", "PhiPrime"},
+}
+
+
+def _strength(src, mfns=None):
+    """``(fields, notes, from_top)`` for one GeoStudio material, by its SlopeModel.
+
+    ``fields`` updates the xslope material (option, c, phi, cp); ``notes`` are its
+    caveats; ``from_top`` is True when r_elev is the top of the material's own layer,
+    which the caller sets once the zones are built.
 
     Which field holds the strength depends on the model, and getting this wrong is
     silent: a MohrCoulomb material carries CohesionPrime/PhiPrime, but an
     UndrainedPhiZero one carries its undrained shear strength in <Cohesion> and has no
     PhiPrime at all. Reading the drained fields regardless hands back c = 0, phi = 0 —
     a soil with no strength, and a factor of safety near zero, with nothing to say so.
+
+    Two SLOPE/W models map onto XSLOPE's undrained options (SLOPE/W's Slope Stability
+    Modeling book, sections 4.9 and 4.14):
+
+    - SHANSEP with a constant ratio, s_u = (tau/sigma) x sigma'_v, is ``ratio`` with
+      c/p = the ratio and no minimum (c = 0). Its older name is S=f(overburden).
+      SLOPE/W's sigma'_v is the overburden, surcharges and ponded water included,
+      point loads not, less the pore pressure: the same as XSLOPE's.
+    - S=f(depth), s_u = CTopOfLayer + CRateOfIncrease x (depth below the top of the
+      layer), is ``cp`` measured from that top.
     """
     s = src["strength"]
     model = src["model"] or ""
+    name = src["name"]
+    mfns = mfns or {}
 
     def f(key, default=0.0):
         try:
@@ -668,29 +729,99 @@ def _strength(src):
         except (KeyError, TypeError, ValueError):
             return default
 
+    def unread():
+        extra = sorted(set(s) - _STRESS_STRAIN_FIELDS - _MODEL_FIELDS.get(model, set()))
+        if not extra:
+            return []
+        return [f"material '{name}' also sets GeoStudio field(s) {', '.join(extra)}, "
+                f"which XSLOPE does not read. Check whether they change its strength."]
+
     if model == "MohrCoulomb":
-        return f("CohesionPrime"), f("PhiPrime"), None
+        return {"option": "mc", "c": f("CohesionPrime"), "phi": f("PhiPrime")}, [], False
 
     if model == "UndrainedPhiZero":
         # phi = 0 by definition; Su lives in Cohesion (CohesionPrime is sometimes
         # written alongside it, but Cohesion is the authoritative one).
         su = f("Cohesion", f("CohesionPrime"))
-        return su, 0.0, (
-            f"material '{src['name']}' is undrained (phi = 0) in GeoStudio — imported "
-            f"as Mohr-Coulomb with c = Su = {su:g} and phi = 0")
+        return {"option": "mc", "c": su, "phi": 0.0}, [
+            f"material '{name}' is undrained (phi = 0) in GeoStudio — imported "
+            f"as Mohr-Coulomb with c = Su = {su:g} and phi = 0"], False
 
     if model == "Bedrock":
         # Handled by excluding the region from the domain (see gsz_to_slope_data) —
         # xslope's impenetrable boundary is geometric, not a material property.
-        return f("CohesionPrime"), f("PhiPrime"), None
+        return {"option": "mc", "c": f("CohesionPrime"), "phi": f("PhiPrime")}, [], False
+
+    if model == "SHANSEP":
+        how = s.get("SlopeUndrainedStrengthModel") or ""
+        if not how:
+            # The constant ratio (GeoStudio writes no <SlopeUndrainedStrengthModel>).
+            r = f("TauSigmaRatio")
+            return {"option": "ratio", "c": 0.0, "phi": 0.0, "cp": r}, [
+                f"material '{name}' uses SLOPE/W's SHANSEP model with a constant "
+                f"ratio — imported as option ratio with c/p = {r:g} and no minimum "
+                f"strength (c = 0)"] + unread(), False
+        if how == "Custom":
+            # s_u = sigma'_v x S x OCR^m, OCR a function of elevation.
+            S, m = f("NCUndrainedStrengthRatio"), f("SHANSEPExponent")
+            fn = mfns.get(int(f("OCRFnNum", -1)))
+            ocrs = [y for _, y in fn["points"]] if fn and fn["points"] else []
+            if not ocrs:
+                return {"option": "ratio", "c": 0.0, "phi": 0.0, "cp": S}, [
+                    f"material '{name}' uses SLOPE/W's SHANSEP model with the ratio "
+                    f"S x OCR^m (S = {S:g}, m = {m:g}), but the file gives no OCR "
+                    f"function XSLOPE can read. It was imported as option ratio with "
+                    f"c/p = S = {S:g}, as if OCR = 1. Check it before solving."
+                ] + unread(), False
+            rs = sorted(S * max(o, 0.0) ** m for o in (min(ocrs), max(ocrs)))
+            r_lo, r_hi = rs
+            if r_hi - r_lo <= 1e-12 * max(1.0, r_hi):
+                return {"option": "ratio", "c": 0.0, "phi": 0.0, "cp": r_lo}, [
+                    f"material '{name}' uses SLOPE/W's SHANSEP model with the ratio "
+                    f"S x OCR^m and a constant OCR of {ocrs[0]:g} — imported as option "
+                    f"ratio with c/p = {r_lo:g} and no minimum strength (c = 0)"
+                ] + unread(), False
+            fname = fn["name"] or f"function {int(f('OCRFnNum'))}"
+            return {"option": "ratio", "c": 0.0, "phi": 0.0, "cp": r_lo}, [
+                f"material '{name}' uses SLOPE/W's SHANSEP model with the ratio "
+                f"S x OCR^m (S = {S:g}, m = {m:g}), and OCR varies with elevation "
+                f"('{fname}': {min(ocrs):g} to {max(ocrs):g} at its points). XSLOPE has "
+                f"one ratio per material, so it was imported as option ratio with the "
+                f"lowest, c/p = {r_lo:g}. Where OCR is higher, XSLOPE's strength is "
+                f"lower than SLOPE/W's, by up to a factor of {r_hi / r_lo:.3g}."
+                if r_lo > 0 else
+                f"material '{name}' uses SLOPE/W's SHANSEP model with the ratio "
+                f"S x OCR^m (S = {S:g}, m = {m:g}), and OCR varies with elevation "
+                f"('{fname}': {min(ocrs):g} to {max(ocrs):g} at its points). XSLOPE has "
+                f"one ratio per material, so it was imported as option ratio with the "
+                f"lowest, c/p = {r_lo:g}, which leaves it no strength. Set its strength "
+                f"before solving."] + unread(), False
+        # 'Function': s_u read off a curve against sigma'_v. No single ratio is that
+        # curve, so the material is refused rather than given a made-up one.
+        if how == "Function":
+            fn = mfns.get(int(f("ShearVerticalFnNum", -1)))
+            what = f"'{fn['name']}'" if fn and fn.get("name") else "a function"
+            why = (f"with its strength read from a curve of vertical effective stress "
+                   f"({what}). XSLOPE cannot represent that curve")
+        else:
+            why = (f"with the option '{how}', which XSLOPE does not know. It cannot "
+                   f"tell what strength SLOPE/W gives it")
+        return {"option": "mc", "c": 0.0, "phi": 0.0}, [
+            f"material '{name}' uses SLOPE/W's SHANSEP model {why}, so the material "
+            f"was imported with no strength. Set its strength before solving."
+        ] + unread(), False
+
+    if model == "SFnDepth":
+        c_top, rate = f("CTopOfLayer"), f("CRateOfIncrease")
+        return {"option": "cp", "c": c_top, "phi": 0.0, "cp": rate}, unread(), True
 
     # An unknown model. Take whatever strength fields exist, and say so plainly.
     c = f("CohesionPrime", f("Cohesion"))
     phi = f("PhiPrime")
-    return c, phi, (
-        f"material '{src['name']}' uses GeoStudio's {model or 'unnamed'} strength model, "
+    return {"option": "mc", "c": c, "phi": phi}, [
+        f"material '{name}' uses GeoStudio's {model or 'unnamed'} strength model, "
         f"which xslope does not have — imported as Mohr-Coulomb with c = {c:g}, "
-        f"phi = {phi:g}, which is NOT the same strength; check it before solving")
+        f"phi = {phi:g}, which is NOT the same strength; check it before solving"], False
 
 
 def _circle_usable(slope_data, circle):
@@ -1286,6 +1417,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     used = sorted(set(assign.values()))
     mat_index = {mid: i for i, mid in enumerate(used)}
     materials = []
+    depth_from_top = []     # S=f(depth) materials, whose r_elev is their layer's top
     for mid in used:
         src = gsz["materials"].get(mid)
         if src is None:
@@ -1305,10 +1437,19 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 caveats.append(f"material '{src['name']}' has no unit weight in the "
                                f"file — set gamma before solving")
             continue
-        c, phi, note = _strength(src)
-        if note:
-            caveats.append(note)
-        mat.update(option="mc", gamma=src["gamma"], c=c, phi=phi)
+        fields, notes, from_top = _strength(src, gsz.get("mfns"))
+        caveats.extend(notes)
+        mat.update(gamma=src["gamma"], **fields)
+        if from_top:
+            depth_from_top.append(mat_index[mid])
+        # SLOPE/W can scale any strength by a function of the base inclination (its
+        # anisotropic modifier). XSLOPE has no such scaling.
+        aniso = src["strength"].get("ShearAnisoFnNum")
+        if aniso is not None:
+            caveats.append(
+                f"material '{src['name']}' scales its strength with the slope of the "
+                f"slice base (SLOPE/W anisotropy function {aniso}). XSLOPE does not, "
+                f"so its strength is the unscaled one.")
 
         # v17 matric-suction strength. SLOPE/W's own unsaturated model is a threshold on
         # the piezometric surface (CapSuction/MaxSuction), reported below — not a per-
@@ -1328,7 +1469,9 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         if not mat["gamma"]:
             caveats.append(f"material '{src['name']}' has no unit weight in the "
                            f"file — set gamma before solving")
-        if not c and not phi:
+        # A ratio or cp material with c = 0 still has strength through c/p.
+        if not mat["c"] and not mat["phi"] and not (
+                mat["option"] in ("cp", "ratio") and mat["cp"]):
             caveats.append(
                 f"material '{src['name']}' came across with NO STRENGTH (c = 0, "
                 f"phi = 0) — it will behave as a liquid; set its strength before "
@@ -1354,6 +1497,12 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                          "mat_id": mat_index[mid]})
     if not polygons:
         raise ValueError("This analysis has no material regions to import.")
+
+    # S=f(depth) measures depth from the top of the material's own layer, column by
+    # column; cp measures it from one elevation. They agree when that top is level.
+    for i in depth_from_top:
+        caveats.extend(cp_from_layer_top(materials[i], polygons, i,
+                                         "SLOPE/W", "S=f(depth)"))
 
     # Pore pressure. SLOPE/W names the option on the analysis; only a piezometric
     # surface maps onto xslope's piezo line. <MaterialUsesPiezs> says WHICH materials
@@ -1405,6 +1554,17 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             + ("Only the piezometric line was. " if option == "PiezoSurfaceBbar"
                else "Pore pressure was imported as zero. ")
             + "Add the excess pressure by hand before you trust the result")
+        # A ratio material's strength follows sigma'_v, which the missing pressure
+        # also lowers. Leaving it out raises the strength as well as cutting u.
+        ratio_bb = [repr(m["name"]) for m, mid in zip(materials, used)
+                    if m["option"] == "ratio" and bb.get(mid, {}).get("bbar")]
+        if ratio_bb:
+            caveats.append(
+                f"material(s) {', '.join(ratio_bb)} take their strength from the "
+                f"vertical effective stress. In SLOPE/W, B-bar's excess pore pressure "
+                f"keeps that stress, and so the strength, as it was before the added "
+                f"weight. XSLOPE counts the added weight in full, so its strength there "
+                f"is higher than SLOPE/W's")
     elif option == "Ru":
         # SLOPE/W's Ru: u = Ru x the weight of the soil column over the base, per
         # material (<MaterialUsesRuParams>). On SLOPE/W's own Ru files every column's
@@ -2424,6 +2584,82 @@ def _xml_escape(text):
             .replace(">", "&gt;").replace('"', "&quot;"))
 
 
+def _export_strength(m, mat_id, polygons):
+    """``(SlopeModel, [(tag, value), ...], notes)`` for one XSLOPE material.
+
+    The reverse of :func:`_strength`. ``ratio`` is SLOPE/W's SHANSEP with a constant
+    ratio, which has no minimum strength. ``cp`` is S=f(depth), which measures depth
+    from the top of the material's own layer: the same strength when that top is level
+    and at or below r_elev. Otherwise the export writes the strength XSLOPE has at the
+    layer's highest point and the same rate, and says where the two differ.
+    """
+    name = m.get("name") or f"material {mat_id + 1}"
+    opt = (m.get("option") or "").strip().lower()
+    c, phi = float(m.get("c") or 0.0), float(m.get("phi") or 0.0)
+    rate, r_elev = float(m.get("cp") or 0.0), float(m.get("r_elev") or 0.0)
+    if opt == "elastic":
+        return "Bedrock", [("CohesionPrime", c), ("PhiPrime", phi)], []
+    if opt in ("mc", ""):
+        return "MohrCoulomb", [("CohesionPrime", c), ("PhiPrime", phi)], []
+    if opt == "ratio":
+        notes = []
+        if c > 0:
+            notes.append(
+                f"material '{name}' was written as SLOPE/W's SHANSEP model with ratio "
+                f"{rate:g}. Its minimum strength c = {c:g} was not written, because "
+                f"SHANSEP has none. Where c/p x sigma'_v is below {c:g}, SLOPE/W's "
+                f"strength is lower than XSLOPE's.")
+        return "SHANSEP", [("CohesionPrime", 0.0), ("PhiPrime", 0.0),
+                           ("TauSigmaRatio", rate)], notes
+    if opt == "cp":
+        from .fileio import material_top_range
+        lo, hi = material_top_range(polygons, mat_id)
+        if hi is None:
+            lo = hi = r_elev
+        c_top = c + rate * max(0.0, r_elev - hi)
+        notes = []
+        tol = 1e-6 * max(1.0, abs(hi), abs(r_elev))
+        if rate and hi > r_elev + tol:
+            # XSLOPE holds c above r_elev; S=f(depth) has no constant part. Writing
+            # the strength at r_elev minus the rate over the band keeps the strength
+            # exact below r_elev and lower above it, where it can be.
+            c_top = c - rate * (hi - r_elev)
+            if c_top >= 0 or rate < 0:
+                notes.append(
+                    f"material '{name}' holds c = {c:g} above r_elev = {r_elev:g}, and "
+                    f"its layer reaches y = {hi:g}. SLOPE/W's S=f(depth) has no constant "
+                    f"part, so it was written as {c_top:g} at the top of the layer, "
+                    f"changing {rate:g} per unit depth: the same strength below "
+                    f"y = {r_elev:g}, and {'less' if rate > 0 else 'more'} than "
+                    f"XSLOPE's above it.")
+            else:
+                extra = -c_top
+                c_top = 0.0
+                notes.append(
+                    f"material '{name}' holds c = {c:g} above r_elev = {r_elev:g}, and "
+                    f"its layer reaches y = {hi:g}. SLOPE/W's S=f(depth) has no constant "
+                    f"part, so it was written as 0 at the top of the layer, rising "
+                    f"{rate:g} per unit depth. Below y = {r_elev:g} that is {extra:g} "
+                    f"more than XSLOPE's strength.")
+        if rate and hi - lo > tol:
+            notes.append(
+                f"material '{name}': SLOPE/W's S=f(depth) measures depth from the top "
+                f"of the layer above each slice, and this layer's top is not level "
+                f"(y = {lo:g} to {hi:g}). Where it is lower, SLOPE/W's strength is "
+                f"{'lower' if rate > 0 else 'higher'} than XSLOPE's, by up to "
+                f"{abs(rate) * (hi - lo):g}.")
+        return "SFnDepth", [("CohesionPrime", 0.0), ("PhiPrime", 0.0),
+                            ("CTopOfLayer", c_top), ("CRateOfIncrease", rate)], notes
+    if opt == "hb":
+        why = ("SLOPE/W has a Hoek-Brown model, but the export does not write it yet. "
+               "It")
+    else:
+        why = f"SLOPE/W has no equivalent of strength option '{opt}'. It"
+    return "MohrCoulomb", [("CohesionPrime", c), ("PhiPrime", phi)], [
+        f"material '{name}': {why} was written as Mohr-Coulomb with c = {c:g} and "
+        f"phi = {phi:g}, which is not the same strength."]
+
+
 def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern-Price"):
     """Write a model to a GeoStudio SLOPE/W project (.gsz).
 
@@ -2453,8 +2689,9 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     Notes
     -----
     What is NOT written: failure surfaces (SLOPE/W defines a search, not a circle
-    list), piles, and non-Mohr-Coulomb strengths (c/phi models, power curves,
-    Hoek-Brown). Each is reported rather than dropped in silence.
+    list), piles, and the power-curve and Hoek-Brown strengths. Each is reported rather
+    than dropped in silence. A ``ratio`` material is written as SLOPE/W's SHANSEP and a
+    ``cp`` one as S=f(depth) (see :func:`_export_strength`).
 
     A finite-element seepage field crosses as DATA, not as a model: its nodal pressures
     are written as SLOPE/W's spatial pore-pressure function (a set of discrete points
@@ -2597,8 +2834,9 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f"— GeoStudio will open the model with no pore pressure from that source")
 
     # 'elastic' HAS a SLOPE/W equivalent — the impenetrable Bedrock model, written below
-    # — so it is not among the models that have no equivalent. Every other non-MC option
-    # (c/phi, power curve, Hoek-Brown) is written with its c/phi and flagged.
+    # — so it is not among the models that have no equivalent. ratio and cp have one
+    # too (SHANSEP, S=f(depth)); the power curve and Hoek-Brown are written with their
+    # c/phi and flagged (_export_strength).
     elastic_names = [m.get("name") or "?" for m in materials
                      if (m.get("option") or "") == "elastic"]
     if elastic_names:
@@ -2606,12 +2844,13 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f"elastic material(s) {', '.join(repr(n) for n in elastic_names)} were "
             f"written as GeoStudio's impenetrable Bedrock — a slip surface cannot enter "
             f"them, which is xslope's elastic behavior")
-    non_mc = sorted({(m.get("option") or "") for m in materials} - {"mc", "elastic", ""})
-    if non_mc:
-        caveats.append(
-            f"strength model(s) {', '.join(repr(o) for o in non_mc)} have no SLOPE/W "
-            f"equivalent — those materials are written with their c and phi, which for "
-            f"a non-Mohr-Coulomb model is not the same strength")
+    # Each material's SLOPE/W model and strength fields: ratio -> SHANSEP, cp ->
+    # S=f(depth) (see _export_strength); written in the <Materials> block below.
+    strength_out = []
+    for k, m in enumerate(materials):
+        model, fields, notes = _export_strength(m, k, polygons)
+        strength_out.append((model, fields))
+        caveats.extend(notes)
 
     # v16/v17 material features SLOPE/W has no place for. They must NOT corrupt the file
     # (a .gsz material has no phi_b tag, and its TensileStrength is a LEM tension limit,
@@ -2750,6 +2989,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     prob_mods, prob_dropped = [], []
     for i, m in enumerate(materials, start=1):
         elastic = (m.get("option") or "") == "elastic"
+        undrained = (m.get("option") or "") in ("ratio", "cp")
         for field, tag in (("sigma_gamma", "Applied.UnitWeight"),
                            ("sigma_c", "Applied.EffectiveCohesion"),
                            ("sigma_phi", "Applied.EffectivePhi")):
@@ -2759,6 +2999,11 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             if elastic and field != "sigma_gamma":
                 # Written as Bedrock, which has no strength to vary.
                 prob_dropped.append(f"'{m.get('name')}' {field} (elastic -> Bedrock)")
+                continue
+            if undrained and field != "sigma_gamma":
+                # SHANSEP and S=f(depth) have no effective c or phi to vary.
+                prob_dropped.append(f"'{m.get('name')}' {field} (no SLOPE/W "
+                                    f"equivalent for option {m.get('option')})")
                 continue
             prob_mods.append((i, tag, sigma))
         for field in ("sigma_cp", "sigma_d", "sigma_psi"):
@@ -2896,7 +3141,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         # model — the exact reverse of the Bedrock -> elastic import mapping. Its unit
         # weight and (harmless) c/phi ride along in the same StressStrain block, exactly
         # as a real Bedrock material carries them.
-        slope_model = "Bedrock" if (m.get("option") or "") == "elastic" else "MohrCoulomb"
+        slope_model, fields = strength_out[i - 1]
         L.append(
             f'    <Material><ID>{i}</ID><Color>RGB=({r8},{g8},{b8})</Color>'
             f'<Name>{_xml_escape(m.get("name") or f"material {i}")}</Name>'
@@ -2910,9 +3155,8 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f'<MaxConfiningStress Missing="true" />'
             f'<UseTensileStrength>false</UseTensileStrength>'
             f'<UnitWeight>{float(m.get("gamma") or 0.0):.10g}</UnitWeight>'
-            f'<CohesionPrime>{float(m.get("c") or 0.0):.10g}</CohesionPrime>'
-            f'<PhiPrime>{float(m.get("phi") or 0.0):.10g}</PhiPrime>'
-            f'<TensileStrength Missing="true" />'
+            + "".join(f'<{tag}>{val:.10g}</{tag}>' for tag, val in fields)
+            + f'<TensileStrength Missing="true" />'
             f'<OCRatio Missing="true" />'
             f'</StressStrain></Material>')
     L.append('  </Materials>')

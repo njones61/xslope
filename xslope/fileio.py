@@ -91,6 +91,69 @@ def build_ground_surface_from_polygons(polygons):
     return LineString(upper), domain
 
 
+def material_top_range(polygons, mat_id):
+    """Lowest and highest elevation of a material's top: the parts of its zones'
+    outlines that have the material just below them and none just above.
+
+    A strength that grows with depth below the top of its own layer (SLOPE/W's
+    S=f(depth), Slide2's undrained F(Depth from Top of Layer)) is exactly XSLOPE's
+    ``cp`` with r_elev at that top when the top is level, which is when the two
+    values agree. Returns (None, None) when the material has no zone.
+    """
+    zones = [p['polygon'] for p in polygons if p.get('mat_id') == mat_id]
+    if not zones:
+        return None, None
+    body = unary_union(zones)
+    minx, miny, maxx, maxy = body.bounds
+    eps = 1e-7 * max(maxx - minx, maxy - miny, 1.0)
+    ys = []
+    for g in getattr(body, 'geoms', [body]):
+        for ring in [g.exterior, *g.interiors]:
+            c = list(ring.coords)
+            for (x1, y1), (x2, y2) in zip(c[:-1], c[1:]):
+                if abs(x2 - x1) <= eps:
+                    continue                    # a vertical side has nothing on top
+                xm, ym = 0.5 * (x1 + x2), 0.5 * (y1 + y2)
+                if (body.covers(Point(xm, ym - eps))
+                        and not body.covers(Point(xm, ym + eps))):
+                    ys += [y1, y2]
+    if not ys:
+        return None, None
+    return min(ys), max(ys)
+
+
+def cp_from_layer_top(mat, polygons, mat_id, program, model):
+    """Set a ``cp`` material's r_elev to the top of its own layer, and say how close
+    that is to the vendor's strength. Returns the import caveats.
+
+    ``mat`` already holds c (the strength at the top of the layer) and cp (its rate of
+    increase with depth). The vendor measures depth from the layer's top above each
+    slice; ``cp`` measures it from the one elevation r_elev. Where the top is level
+    the two are the same strength. Where it is not, r_elev is the highest point of
+    the top, so XSLOPE's strength is never above the vendor's, and the caveat gives
+    the largest difference.
+    """
+    name = mat.get('name')
+    lo, hi = material_top_range(polygons, mat_id)
+    if hi is None:
+        return []
+    mat['r_elev'] = hi
+    c, rate = mat.get('c') or 0.0, mat.get('cp') or 0.0
+    xs = [v for p in polygons for v in p['polygon'].bounds]
+    tol = 1e-6 * max(1.0, max(abs(v) for v in xs))
+    what = (f"material '{name}' uses {program}'s {model} model — imported as option "
+            f"cp with c = {c:g} at the top of its layer (r_elev = {hi:g}) and c/p = "
+            f"{rate:g} per unit depth")
+    if hi - lo <= tol or rate == 0:
+        return [what]
+    gap = abs(rate) * (hi - lo)
+    side = "lower" if rate > 0 else "higher"
+    return [f"{what}. {program} measures depth from the top of the layer above each "
+            f"slice, and this layer's top is not level: it runs from y = {lo:g} to "
+            f"y = {hi:g}. XSLOPE measures depth from y = {hi:g}, so where the top is "
+            f"lower, XSLOPE's strength is {side} than {program}'s, by up to {gap:g}."]
+
+
 # === v20 SSR-zone sentinel Mat IDs (polygon sheet) ===
 # A polygon row whose Mat ID is NEGATIVE is not a material zone at all — it is an
 # ANALYSIS OVERLAY for the shear-strength-reduction method. Overlay rows are never

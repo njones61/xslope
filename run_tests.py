@@ -12924,6 +12924,11 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/Materials/Material/StressStrain/TensileStrength",
     "/GSIData/Materials/Material/StressStrain/TensileStrength@Missing",
     "/GSIData/Materials/Material/StressStrain/UseTensileStrength",
+    # A ratio material is written as SHANSEP (constant ratio) and a cp one as
+    # S=f(depth); these are the fields SLOPE/W's own SHANSEP and SFnDepth materials use.
+    "/GSIData/Materials/Material/StressStrain/TauSigmaRatio",
+    "/GSIData/Materials/Material/StressStrain/CTopOfLayer",
+    "/GSIData/Materials/Material/StressStrain/CRateOfIncrease",
     "/GSIData/Materials@Len",
     # The reinforcement product library, and the loads that hang off the analysis. These
     # branches of the exporter went unchecked for a while because the fixture model has
@@ -14911,6 +14916,287 @@ def run_gsz_rapid_drawdown_test(test):
     return 0.0, None
 
 
+# SLOPE/W's undrained strength models, one analysis each, on a 10 m clay layer whose top
+# is level at y = 10 (region 1) under a fill slope (region 2). Analysis 5 puts the clay
+# in both regions, so its top runs from y = 10 up to y = 20. Fields and names are the
+# ones GeoStudio writes (SLOPE/W's own example files; its Slope Stability Modeling book,
+# sections 4.9 and 4.14).
+_GSZ_STRENGTH_MATERIALS = {
+    1: ("fill", "MohrCoulomb",
+        "<UnitWeight>20</UnitWeight><CohesionPrime>5</CohesionPrime>"
+        "<PhiPrime>30</PhiPrime>"),
+    # SHANSEP, constant ratio. CohesionPrime/PhiPrime are left over from another model
+    # and play no part: GeoStudio's own files carry them.
+    2: ("shansep const", "SHANSEP",
+        "<ResponseType>Undrained</ResponseType><UnitWeight>18</UnitWeight>"
+        "<CohesionPrime>5</CohesionPrime><PhiPrime>20</PhiPrime>"
+        "<TauSigmaRatio>0.3</TauSigmaRatio>"),
+    # SHANSEP S x OCR^m with OCR from function 1 (1 to 2).
+    3: ("shansep ocr", "SHANSEP",
+        "<SlopeUndrainedStrengthModel>Custom</SlopeUndrainedStrengthModel>"
+        "<UnitWeight>18</UnitWeight><OCRFnNum>1</OCRFnNum>"
+        "<NCUndrainedStrengthRatio>0.25</NCUndrainedStrengthRatio>"
+        "<SHANSEPExponent>0.8</SHANSEPExponent>"),
+    # SHANSEP strength read off a curve of sigma'_v (function 2).
+    4: ("shansep curve", "SHANSEP",
+        "<SlopeUndrainedStrengthModel>Function</SlopeUndrainedStrengthModel>"
+        "<UnitWeight>18</UnitWeight><ShearVerticalFnNum>2</ShearVerticalFnNum>"
+        "<TauSigmaRatio>0.3</TauSigmaRatio>"),
+    5: ("su depth", "SFnDepth",
+        "<UnitWeight>18</UnitWeight><CTopOfLayer>12</CTopOfLayer>"
+        "<CRateOfIncrease>2</CRateOfIncrease>"),
+    # The same, with SLOPE/W's anisotropy modifier and a field XSLOPE does not know.
+    6: ("su depth aniso", "SFnDepth",
+        "<UnitWeight>18</UnitWeight><CTopOfLayer>12</CTopOfLayer>"
+        "<CRateOfIncrease>2</CRateOfIncrease><ShearAnisoFnNum>1</ShearAnisoFnNum>"
+        "<CMaximumTest>40</CMaximumTest>"),
+}
+# analysis -> (clay material, fill material, water option, entry XML)
+_GSZ_STRENGTH_ANALYSES = [
+    (2, 1, "", ""), (3, 1, "", ""), (4, 1, "", ""), (5, 1, "", ""), (5, 5, "", ""),
+    (6, 1, "", ""),
+    (2, 1, "Bbar", "<MaterialUsesBBarParams Len=\"1\"><MaterialUsesBBarParam><ID>2</ID>"
+                   "<Entry Function=\"1\" /></MaterialUsesBBarParam>"
+                   "</MaterialUsesBBarParams>"),
+]
+
+
+def _write_gsz_strength(path):
+    """The .gsz above: one analysis per _GSZ_STRENGTH_ANALYSES row."""
+    import zipfile
+    mats = "".join(
+        f"<Material><ID>{k}</ID><Name>{n}</Name><SlopeModel>{model}</SlopeModel>"
+        f"<StressStrain>{ss}</StressStrain></Material>"
+        for k, (n, model, ss) in _GSZ_STRENGTH_MATERIALS.items())
+    analyses, contexts, water, stab = [], [], [], []
+    for i, (clay, fill, opt, entry) in enumerate(_GSZ_STRENGTH_ANALYSES, 1):
+        analyses.append(f"<Analysis><ID>{i}</ID><Name>a{i}</Name><Kind>SLOPE/W</Kind>"
+                        f"<Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>")
+        contexts.append(
+            f"<Context><AnalysisID>{i}</AnalysisID><GeometryUsesMaterials Len=\"2\">"
+            f"<GeometryUsesMaterial ID=\"Regions-1\" Entry=\"{clay}\" />"
+            f"<GeometryUsesMaterial ID=\"Regions-2\" Entry=\"{fill}\" />"
+            f"</GeometryUsesMaterials></Context>")
+        o = f"<ResultInputInfo><Option>{opt}</Option></ResultInputInfo>" if opt else ""
+        water.append(f"<WaterItem><AnalysisID>{i}</AnalysisID><Entry>{o}"
+                     f"<UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>")
+        stab.append(f"<StabilityItem><AnalysisID>{i}</AnalysisID><Entry>"
+                    f"<Seismic Horizontal=\"\" Vertical=\"\" />{entry}</Entry>"
+                    f"</StabilityItem>")
+    xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<GSIData Version="11.11" AppVersion="25.2.1.4">
+  <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
+  <Analyses Len="{len(analyses)}">{''.join(analyses)}</Analyses>
+  <Geometries Len="1"><Geometry><Name>2D</Name>
+    <Points Len="7">
+      <Point ID="1" X="0" Y="0" /><Point ID="2" X="60" Y="0" />
+      <Point ID="3" X="60" Y="10" /><Point ID="4" X="20" Y="10" />
+      <Point ID="5" X="0" Y="10" /><Point ID="6" X="60" Y="20" />
+      <Point ID="7" X="40" Y="20" />
+    </Points>
+    <Regions Len="2"><Region><ID>1</ID><PointIDs>1,2,3,4,5</PointIDs></Region>
+      <Region><ID>2</ID><PointIDs>4,3,6,7</PointIDs></Region></Regions>
+  </Geometry></Geometries>
+  <Materials Len="{len(_GSZ_STRENGTH_MATERIALS)}">{mats}</Materials>
+  <Functions><Material><Fn2Ds Len="2">
+    <Fn2D><ID>1</ID><Name>OCR</Name>
+      <Function>Spline(OutputParam=OverconsolidationRatio,InputParam=Y)</Function>
+      <Points Len="2"><Point X="0" Y="1" /><Point X="10" Y="2" /></Points></Fn2D>
+    <Fn2D><ID>2</ID><Name>Su curve</Name>
+      <Function>Spline(OutputParam=UndrainedShearStrength,InputParam=YEffectiveStress)</Function>
+      <Points Len="2"><Point X="10" Y="8" /><Point X="100" Y="30" /></Points></Fn2D>
+  </Fn2Ds></Material></Functions>
+  <Contexts Len="{len(contexts)}">{''.join(contexts)}</Contexts>
+  <WaterItems Len="{len(water)}">{''.join(water)}</WaterItems>
+  <StabilityItems Len="{len(stab)}">{''.join(stab)}</StabilityItems>
+</GSIData>
+"""
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("fixture.xml", xml)
+
+
+def run_gsz_strength_test(test):
+    """SLOPE/W's undrained strength models import as XSLOPE's ratio and cp, and export
+    back, on a .gsz built here.
+
+    Each mapping is checked against SLOPE/W's own definition, and each was a silent
+    wrong strength before: every SHANSEP and S=f(depth) material imported as
+    Mohr-Coulomb with whatever c and phi it carried (a SHANSEP ratio of 0.3 became
+    c = 5, phi = 20; an S=f(depth) clay became c = 0, phi = 0), with a caveat but no
+    strength anything like SLOPE/W's.
+
+      - SHANSEP with a constant ratio -> ratio, c/p = the ratio, no minimum (c = 0);
+        the leftover CohesionPrime is not a minimum.
+      - SHANSEP S x OCR^m with OCR varying -> ratio at the lowest OCR, with a caveat
+        giving the largest shortfall; a strength curve -> no strength, refused.
+      - S=f(depth) on a level top -> cp from that top, exact: slice by slice the base
+        strength is CTopOfLayer + rate x (top - y). On a top that is not level, cp
+        from its highest point, with the largest difference stated.
+      - the anisotropy modifier and unknown fields are named; a ratio material under
+        B-bar is told its strength is too high.
+      - export writes ratio as SHANSEP and cp as S=f(depth), the tags conform to
+        GeoStudio's vocabulary, and the model comes back identical.
+    """
+    import tempfile
+    import zipfile as _zip
+    import xml.etree.ElementTree as _ET
+    from xslope.geostudio import read_gsz, gsz_to_slope_data, export_gsz
+
+    problems = []
+
+    def mat(sd, name):
+        return next((m for m in sd["materials"] if m["name"] == name), None)
+
+    def has(cav, *words):
+        return any(all(w in c for w in words) for c in cav)
+
+    def close(a, b, tol=1e-9):
+        return abs(float(a) - float(b)) <= tol * max(1.0, abs(float(b)))
+
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "strength.gsz")
+        _write_gsz_strength(path)
+        gsz = read_gsz(path)
+        got = {a["id"]: gsz_to_slope_data(gsz, a["id"]) for a in gsz["analyses"]}
+
+        # 1. SHANSEP constant -> ratio 0.3, c = 0.
+        sd, cav = got[1]
+        m = mat(sd, "shansep const")
+        if (m["option"], m["c"], m["phi"], m["cp"]) != ("ratio", 0.0, 0.0, 0.3):
+            problems.append(f"SHANSEP constant came in as option={m['option']} "
+                            f"c={m['c']} phi={m['phi']} c/p={m['cp']}, expected ratio "
+                            f"with c/p 0.3 and c = phi = 0")
+        if has(cav, "shansep const", "NOT the same strength") or \
+                has(cav, "shansep const", "NO STRENGTH"):
+            problems.append("SHANSEP constant still carries the unmapped-model caveat")
+        if not has(cav, "shansep const", "constant ratio", "c/p = 0.3"):
+            problems.append("SHANSEP constant mapping was not reported")
+
+        # 2. S x OCR^m, OCR 1 to 2: the lowest ratio, and the shortfall 2^0.8.
+        sd, cav = got[2]
+        m = mat(sd, "shansep ocr")
+        if m["option"] != "ratio" or not close(m["cp"], 0.25):
+            problems.append(f"SHANSEP OCR came in as {m['option']} c/p={m['cp']}, "
+                            f"expected ratio 0.25 (S at the lowest OCR, 1)")
+        if not has(cav, "shansep ocr", f"{2 ** 0.8:.3g}"):
+            problems.append("SHANSEP OCR caveat does not give the largest shortfall "
+                            f"(a factor of {2 ** 0.8:.3g})")
+
+        # 3. A strength curve is refused: no strength, said plainly.
+        sd, cav = got[3]
+        m = mat(sd, "shansep curve")
+        if (m["option"], m["c"], m["phi"]) != ("mc", 0.0, 0.0) or \
+                not has(cav, "shansep curve", "cannot represent"):
+            problems.append(f"SHANSEP curve was not refused: {m['option']} c={m['c']} "
+                            f"c/p={m['cp']}")
+
+        # 4. S=f(depth) on a level top: cp from y = 10, and the slices agree with
+        # SLOPE/W's definition, base by base.
+        sd, cav = got[4]
+        m = mat(sd, "su depth")
+        if (m["option"], m["c"], m["cp"], m["r_elev"]) != ("cp", 12.0, 2.0, 10.0):
+            problems.append(f"S=f(depth) came in as {m['option']} c={m['c']} "
+                            f"c/p={m['cp']} r_elev={m['r_elev']}, expected cp 12 / 2 / 10")
+        if has(cav, "su depth", "not level"):
+            problems.append("a level layer top was reported as not level")
+        from xslope.slice import generate_slices
+        ok, res = generate_slices(sd, circle={"Xo": 35.0, "Yo": 30.0, "R": 26.0,
+                                              "Depth": None},
+                                  num_slices=30, check_inputs=False)
+        if not ok:
+            problems.append(f"S=f(depth) model did not slice: {res}")
+        else:
+            df = res[0]
+            clay = df[df["mat"] == 1 + sd["materials"].index(m)]
+            if len(clay) < 5:
+                problems.append("the check circle barely enters the clay")
+            else:
+                # SLOPE/W: CTopOfLayer + rate x depth below the top, at the point on
+                # the base where the strength is read.
+                yb = clay["y_u"].to_numpy()
+                diff = abs(clay["c"].to_numpy() - (12.0 + 2.0 * (10.0 - yb))).max()
+                if diff > 1e-9:
+                    problems.append(f"slice strengths differ from SLOPE/W's S=f(depth) "
+                                    f"by up to {diff:.3g}")
+
+        # 5. Clay in both regions: the top runs from 10 to 20.
+        sd, cav = got[5]
+        m = mat(sd, "su depth")
+        if m["r_elev"] != 20.0 or not has(cav, "su depth", "not level", "by up to 20"):
+            problems.append(f"a layer top from y = 10 to 20 gave r_elev={m['r_elev']} "
+                            f"and no caveat with the difference (2 x 10 = 20)")
+
+        # 6. Anisotropy modifier and an unknown field are named.
+        sd, cav = got[6]
+        if not has(cav, "su depth aniso", "anisotropy function 1"):
+            problems.append("the anisotropy modifier was not reported")
+        if not has(cav, "su depth aniso", "CMaximumTest"):
+            problems.append("an unknown field on an S=f(depth) material was not named")
+
+        # 7. A ratio material under B-bar: its strength is too high, said so.
+        sd, cav = got[7]
+        if not has(cav, "shansep const", "B-bar", "higher than SLOPE/W"):
+            problems.append("a ratio material under B-bar was not told its strength "
+                            "is too high")
+
+        # Export: ratio -> SHANSEP, cp -> SFnDepth, conforming tags, identical return.
+        for aid, name, model in ((1, "shansep const", "SHANSEP"),
+                                 (4, "su depth", "SFnDepth")):
+            sd = got[aid][0]
+            out = os.path.join(td, f"rt{aid}.gsz")
+            export_gsz(sd, out, analysis_name="rt")
+            zf = _zip.ZipFile(out)
+            root = _ET.fromstring(zf.read(zf.namelist()[0]))
+            emitted = set()
+
+            def _walk(e, p=""):
+                q = f"{p}/{e.tag}"
+                emitted.add(q)
+                for a in e.attrib:
+                    emitted.add(f"{q}@{a}")
+                for c in e:
+                    _walk(c, q)
+            _walk(root)
+            unknown = sorted(emitted - GSZ_SCHEMA_PATHS)
+            if unknown:
+                problems.append(f"export writes tag(s) GeoStudio does not use: "
+                                f"{', '.join(unknown[:3])}")
+            models = {e.findtext("Name"): e.findtext("SlopeModel")
+                      for e in root.findall("./Materials/Material")}
+            if models.get(name) != model:
+                problems.append(f"'{name}' exported as {models.get(name)}, expected "
+                                f"{model}")
+            back, _ = gsz_to_slope_data(read_gsz(out), 1)
+            for k in ("option", "c", "phi", "cp", "r_elev", "gamma"):
+                if not close(mat(back, name)[k], mat(sd, name)[k]) \
+                        if isinstance(mat(sd, name)[k], float) \
+                        else mat(back, name)[k] != mat(sd, name)[k]:
+                    problems.append(f"'{name}' {k} did not round-trip: "
+                                    f"{mat(sd, name)[k]!r} -> {mat(back, name)[k]!r}")
+
+        # A ratio minimum and a cp held above r_elev are reported, not dropped.
+        sd = got[1][0]
+        mat(sd, "shansep const")["c"] = 4.0
+        cav = export_gsz(sd, os.path.join(td, "min.gsz"), analysis_name="rt")
+        if not has(cav, "shansep const", "minimum strength c = 4"):
+            problems.append("a ratio material's minimum c was dropped on export "
+                            "without a caveat")
+        sd = got[4][0]
+        mat(sd, "su depth")["r_elev"] = 6.0       # c = 12 held from y = 10 down to 6
+        out = os.path.join(td, "band.gsz")
+        cav = export_gsz(sd, out, analysis_name="rt")
+        back, _ = gsz_to_slope_data(read_gsz(out), 1)
+        if not close(mat(back, "su depth")["c"], 12.0 - 2.0 * 4.0) or \
+                not has(cav, "su depth", "above r_elev = 6"):
+            problems.append(f"a cp material held above its r_elev exported with "
+                            f"c_top={mat(back, 'su depth')['c']}, expected 4 (exact "
+                            f"below y = 6), or without a caveat")
+
+    if problems:
+        return None, "GeoStudio strength models: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 # A minimal Slide2 model in the sectioned ASCII grammar Slide2 writes. Authored here
 # rather than shipped because Rocscience's own tutorial files are their copyrighted
 # material and are not in this repository (the same reason the .gsz fixture above is
@@ -15150,6 +15436,107 @@ def run_slide2_import_test(test):
 
     if problems:
         return None, "Slide2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
+def run_slide2_strength_test(test):
+    """Slide2's Undrained material (type 1) imports with its own strength, on .slim
+    files built here from the fixture above.
+
+    Type 1 lines carry no phi and carry a cohesion type ('ctype'): 0 = Constant, 1 =
+    F(Depth from Top of Layer) with 'dc' the rate per unit depth. Before, type 1 was
+    read as Mohr-Coulomb with a tension cutoff: c came across, dc was dropped without a
+    word, and the caveat named a cutoff the material does not have.
+
+      - ctype 1 on a level layer top (y = 6) -> cp from that top; slice by slice the
+        base strength is c + dc x (6 - y), Slide2's definition.
+      - ctype 1 on a top running from y = 6 to 18 -> cp from y = 18, with the largest
+        difference (dc x 12) stated.
+      - ctype 0 -> c with phi = 0, reported as undrained, no tension-cutoff caveat.
+      - a cohesion type XSLOPE does not read, and a key it does not know, are named.
+    """
+    import tempfile
+    import zipfile
+    from xslope.slide2 import read_slim, slide2_to_slope_data
+    from xslope.slice import generate_slices
+
+    base = ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
+            "withru: 0 phib: 15\n"
+            "  soil2 = type: 5 water: 1 wtable: 1 c: 25 phi: 32 uw: 20 hutype: 0 "
+            "withru: 0\n")
+    assert base in _SYNTH_SLI
+    variants = {
+        # soil1 is the slope (top from y = 6 to 18), soil2 the layer below (top y = 6)
+        "depth": ("  soil1 = type: 1 ctype: 1 c: 20 wtable: 0 dc: 2 uw: 19 withru: 0\n"
+                  "  soil2 = type: 1 ctype: 1 c: 15 wtable: 0 dc: 3 uw: 20 withru: 0 "
+                  "cmax_test: 40\n"),
+        "constant": ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
+                     "withru: 0\n"
+                     "  soil2 = type: 1 ctype: 0 c: 25 wtable: 0 uw: 20 withru: 0\n"),
+        "other": ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
+                  "withru: 0\n"
+                  "  soil2 = type: 1 ctype: 2 c: 25 wtable: 0 dc: 1 uw: 20 withru: 0\n"),
+    }
+    problems = []
+    got = {}
+    with tempfile.TemporaryDirectory() as td:
+        for key, lines in variants.items():
+            path = os.path.join(td, f"{key}.slim")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr(f"{key}.sli", _SYNTH_SLI.replace(base, lines))
+            got[key] = slide2_to_slope_data(read_slim(path))
+
+    def has(cav, *words):
+        return any(all(w in c for w in words) for c in cav)
+
+    sd, cav = got["depth"]
+    s1, s2 = sd["materials"]
+    if (s2["option"], s2["c"], s2["phi"], s2["cp"], s2["r_elev"]) != \
+            ("cp", 15.0, 0.0, 3.0, 6.0):
+        problems.append(f"undrained F(depth) on a level top came in as {s2['option']} "
+                        f"c={s2['c']} c/p={s2['cp']} r_elev={s2['r_elev']}, expected cp "
+                        f"15 / 3 from y = 6")
+    if has(cav, "soil2", "not level"):
+        problems.append("a level layer top was reported as not level")
+    if (s1["option"], s1["r_elev"]) != ("cp", 18.0) or \
+            not has(cav, "soil1", "not level", "by up to 24"):
+        problems.append(f"a layer top from y = 6 to 18 gave {s1['option']} r_elev="
+                        f"{s1['r_elev']} and no caveat with the difference (2 x 12 = 24)")
+    if not has(cav, "soil2", "cmax_test"):
+        problems.append("an unknown key on an undrained material was not named")
+    if has(cav, "tension"):
+        problems.append("an undrained material is still reported as a tension cutoff")
+    ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=30,
+                              check_inputs=False)
+    if not ok:
+        problems.append(f"the undrained F(depth) model did not slice: {res}")
+    else:
+        df = res[0]
+        lower = df[df["mat"] == 2]
+        if len(lower) < 3:
+            problems.append("the check circle barely enters the lower layer")
+        else:
+            diff = abs(lower["c"].to_numpy()
+                       - (15.0 + 3.0 * (6.0 - lower["y_u"].to_numpy()))).max()
+            if diff > 1e-9:
+                problems.append(f"slice strengths differ from Slide2's F(Depth from Top "
+                                f"of Layer) by up to {diff:.3g}")
+
+    sd, cav = got["constant"]
+    s2 = sd["materials"][1]
+    if (s2["option"], s2["c"], s2["phi"]) != ("mc", 25.0, 0.0) or \
+            not has(cav, "soil2", "undrained") or has(cav, "tension"):
+        problems.append(f"undrained constant came in as {s2['option']} c={s2['c']} "
+                        f"phi={s2['phi']}, or was reported as a tension cutoff")
+
+    sd, cav = got["other"]
+    s2 = sd["materials"][1]
+    if (s2["option"], s2["c"]) != ("mc", 25.0) or \
+            not has(cav, "soil2", "cohesion type 2"):
+        problems.append("an undrained cohesion type XSLOPE does not read was not named")
+
+    if problems:
+        return None, "Slide2 strength models: " + "; ".join(problems[:5])
     return 0.0, None
 
 
@@ -16025,6 +16412,80 @@ def run_rs2_import_test(test):
 
     if problems:
         return None, "RS2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
+def run_rs2_strength_test(test):
+    """RS2's datum-dependent cohesion imports as cp, on .fez files built here from the
+    fixture above.
+
+    RS2 writes it on the line after a Mohr-Coulomb strength line:
+    ``Ctype: 0 CChange: r Cdatum: y ... CchangeFlag: 1 CcutoffFlag: f Ccutoff: m``, so
+    c = C + r x (y - elevation) below the datum, capped at m. Before, only the strength
+    line was read: the cohesion came in constant, and nothing said so.
+
+      - datum at the zone's top -> cp, c = C, c/p = r, r_elev = the datum; no caveat.
+      - a zone above its datum, a cap the zone reaches, a phi > 0, and a datum type
+        XSLOPE does not read are each reported; a cap it never reaches is not.
+    """
+    import tempfile
+    import zipfile
+    from xslope.rs2 import read_fez, fez_to_slope_data
+
+    line = ("  C: 5 phi: 30 dil: 0 T: 5 Cr: 5 phir: 30 Tr: 5 Apply_SSR: 1 Phi_b: 12 "
+            "Air_Entry: 5 UseUnsaturated: 1\n")
+    assert line in _SYNTH_FEA
+
+    def fea(phi=0, ctype=0, datum=18, cut_on=0, cut=0):
+        return _SYNTH_FEA.replace(line, (
+            f"  C: 20 phi: {phi} dil: 0 T: 0 Cr: 20 phir: {phi} Tr: 0 Apply_SSR: 1 "
+            f"Phi_b: 0 Air_Entry: 0 UseUnsaturated: 0\n"
+            f"  Ctype: {ctype} CChange: 2 Cdatum: {datum} ResCchange: 2 CchangeFlag: 1 "
+            f"CcutoffFlag: {cut_on} Ccutoff: {cut} ResCcutFlag: 0 ResCcutoff: 0\n"))
+
+    # soilA spans y = 4.5 to 18: at its base, 20 + 2 x 13.5 = 47.
+    variants = {"top": fea(), "above": fea(datum=10), "cap": fea(cut_on=1, cut=30),
+                "cap_unreached": fea(cut_on=1, cut=47), "phi": fea(phi=25),
+                "radial": fea(ctype=1)}
+    problems, got = [], {}
+    with tempfile.TemporaryDirectory() as td:
+        for key, text in variants.items():
+            path = os.path.join(td, f"{key}.fez")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr(f"{key}.fea", text)
+            sd, cav = fez_to_slope_data(read_fez(path))
+            got[key] = (next(m for m in sd["materials"] if m["name"] == "soilA"), cav)
+
+    def has(cav, *words):
+        return any(all(w in c for w in words) for c in cav)
+
+    m, cav = got["top"]
+    if (m["option"], m["c"], m["phi"], m["cp"], m["r_elev"]) != \
+            ("cp", 20.0, 0.0, 2.0, 18.0):
+        problems.append(f"datum cohesion came in as {m['option']} c={m['c']} "
+                        f"c/p={m['cp']} r_elev={m['r_elev']}, expected cp 20 / 2 / 18")
+    if has(cav, "soilA", "above its datum") or has(cav, "soilA", "caps"):
+        problems.append("an exact datum cohesion carried a caveat")
+    m, cav = got["above"]
+    if m["r_elev"] != 10.0 or not has(cav, "soilA", "above its datum", "y = 18"):
+        problems.append("a zone above its datum was not reported")
+    m, cav = got["cap"]
+    if not has(cav, "soilA", "caps", "30", "y = 13", "47"):
+        problems.append("a cap the zone reaches was not reported (reached at y = 13, "
+                        "47 at the base)")
+    m, cav = got["cap_unreached"]
+    if m["option"] != "cp" or has(cav, "soilA", "caps"):
+        problems.append("a cap the zone never reaches was reported, or the material "
+                        "did not map")
+    m, cav = got["phi"]
+    if (m["option"], m["phi"]) != ("mc", 25.0) or not has(cav, "soilA", "no friction"):
+        problems.append("a datum cohesion with phi > 0 was not refused with a caveat")
+    m, cav = got["radial"]
+    if m["option"] != "mc" or not has(cav, "soilA", "datum type 1"):
+        problems.append("a datum type XSLOPE does not read was not named")
+
+    if problems:
+        return None, "RS2 strength models: " + "; ".join(problems[:5])
     return 0.0, None
 
 
@@ -17408,16 +17869,22 @@ def _dispatch_test(test):
         return run_gsz_rapid_drawdown_test(test)
     if test_type == 'gsz_water':
         return run_gsz_water_corpus_test(test)
+    if test_type == 'gsz_strength':
+        return run_gsz_strength_test(test)
     if test_type == 'slide2':
         return run_slide2_import_test(test)
     if test_type == 'slide2_water':
         return run_slide2_water_corpus_test(test)
+    if test_type == 'slide2_strength':
+        return run_slide2_strength_test(test)
     if test_type == 'rs2':
         return run_rs2_import_test(test)
     if test_type == 'rs2_water':
         return run_rs2_water_mode_test(test)
     if test_type == 'rs2_loads':
         return run_rs2_load_deck_test(test)
+    if test_type == 'rs2_strength':
+        return run_rs2_strength_test(test)
     if test_type == 'submerged_oracle':
         return run_submerged_oracle_test(test)
     if test_type == 'no_void':
@@ -17693,7 +18160,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_trials', 'gsz_folders', 'gsz_phreatic', 'gsz_ru', 'gsz_optimized', 'gsz_parent_surface', 'gsz_rapid_drawdown', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average', 'kr_gradient',
+                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_trials', 'gsz_folders', 'gsz_phreatic', 'gsz_ru', 'gsz_optimized', 'gsz_parent_surface', 'gsz_rapid_drawdown', 'gsz_water', 'gsz_strength', 'slide2', 'slide2_water', 'slide2_strength', 'rs2', 'rs2_water', 'rs2_loads', 'rs2_strength', 'vg_kr', 'kr_average', 'kr_gradient',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -18934,13 +19401,15 @@ def main():
                       'method': '-', 'source': 'gsz'})
         # What the import takes from a solved file, each on its own built fixture:
         # escaped result folders, the phreatic switch, Ru, an optimized search's last
-        # row, a surface taken from a parent, and a staged rapid drawdown's caveat.
+        # row, a surface taken from a parent, a staged rapid drawdown's caveat, and
+        # SLOPE/W's undrained strength models (SHANSEP, S=f(depth)) in and out.
         for _t, _f in (('gsz_folders', 'escaped result folders'),
                        ('gsz_phreatic', 'phreatic correction'),
                        ('gsz_ru', 'Ru and B-bar'),
                        ('gsz_optimized', 'optimized search'),
                        ('gsz_parent_surface', 'surface from a parent'),
-                       ('gsz_rapid_drawdown', 'staged rapid drawdown')):
+                       ('gsz_rapid_drawdown', 'staged rapid drawdown'),
+                       ('gsz_strength', 'SHANSEP and S=f(depth)')):
             tests.append({'type': _t, 'file': f'(synthetic .gsz {_f})',
                           'method': '-', 'source': 'gsz'})
         # The water-load handover is pinned on Seequent's own models as well as on the
@@ -18949,7 +19418,7 @@ def main():
         tests.append({'type': 'gsz_water', 'file': '(GeoStudio corpus)',
                       'method': 'water loads', 'source': 'gsz'})
         if not run_all:
-            print("Including 9 GeoStudio import tests")
+            print("Including 10 GeoStudio import tests")
 
     # The Slide2 import test authors its own .slim fixture (Rocscience's own tutorial
     # files are their copyrighted material and are not in this repository), so it needs
@@ -18961,8 +19430,11 @@ def main():
         # Rocscience's own tutorial models from a local copy, skipped when absent.
         tests.append({'type': 'slide2_water', 'file': '(Slide2 tutorial models)',
                       'method': 'water loads', 'source': 'slide2'})
+        # The Undrained material's cohesion types, on fixtures built from the one above.
+        tests.append({'type': 'slide2_strength', 'file': '(synthetic .slim undrained)',
+                      'method': '-', 'source': 'slide2'})
         if not run_all:
-            print("Including 2 Slide2 import tests")
+            print("Including 3 Slide2 import tests")
 
     # The RS2 import test authors its own .fez fixture (Rocscience's own verification
     # files are their copyrighted material and are not in this repository), so it needs
@@ -18979,8 +19451,11 @@ def main():
         # transcription: both are scored against the vendor's own solved files.
         tests.append({'type': 'rs2_loads', 'file': '(RS2 verification models)',
                       'method': 'load deck', 'source': 'rs2'})
+        # Datum-dependent cohesion -> cp, on fixtures built from the synthetic .fez.
+        tests.append({'type': 'rs2_strength', 'file': '(synthetic .fez datum cohesion)',
+                      'method': '-', 'source': 'rs2'})
         if not run_all:
-            print("Including 3 RS2 import tests")
+            print("Including 4 RS2 import tests")
 
     # Interface (joint) elements. The mesh split's fixture rides the round trip;
     # --joints wants it too, and adds it only when that scope is not already

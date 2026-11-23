@@ -127,7 +127,7 @@ tension crack.
 | [50](#rs2-50) | 🟢 | Geotextile wall, 4.2 m reinforcement variant | SSRM 0.998 vs L&amp;H FDM referee 0.98 (+1.8%) | RS2 SSR 0.93 shown beside — see [RS2-48](#rs2-48). |
 | [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type |  | *unconfirmed* — the search closed at 1.018, but a finer mesh moves the factor by twice the search tolerance of 0.02. |
 | [52](#rs2-52) | 🔴 | Geotextile wall, weak-foundation variant | SSRM 0.783 vs L&amp;H FDM referee 0.86 (−9.0%) | RS2 SSR 0.84 beside; the two codes fail this wall in different ways — see [RS2-52](#rs2-52). |
-| [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant |  | *unconfirmed* — the search closed at 1.037, but a finer mesh moves the factor by six times the search tolerance of 0.02. |
+| [53](#rs2-53) | 🟢 | Geotextile wall, water variant | SSRM 1.037 vs L&amp;H FDM referee 1.01 (+2.7%) | RS2 SSR 1.03 shown beside — see [RS2-48](#rs2-48). |
 | [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant |  | *unconfirmed* — the search closed at 1.037, but a finer mesh moves the factor by twice the search tolerance of 0.02; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10. |
 | [55](#rs2-55) | 🟢 | Geotextile wall, tier-count variant | SSRM 1.018 vs L&amp;H FDM referee 1.00 (+1.8%) | RS2 SSR 1.04 shown beside — see [RS2-48](#rs2-48). |
 | [56](#rs2-56) | 🟢 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | The weakest and strongest cases are scored; case 5 is the wider of them and sets the dot. |
@@ -1366,8 +1366,8 @@ constrained values anyway, at the 4.0 m mesh.
 Leshchinsky & Han (2004) modeled a 9 m geotextile-reinforced wall, three tiers of granular fill
 each 3 m tall behind a facing of stacked blocks, with the finite-difference program FLAC, and
 published a factor of safety for it and for seven variants: weaker fill, shorter sheets, two
-grades of sheet, a weak foundation, water behind the wall, a surcharge on top, and five short tiers
-in place of three tall ones. The RS2 manual re-runs the eight as its problems 48 to 55 by strength
+grades of sheet, a weak foundation, water on both sides of the wall, a surcharge on top, and five
+short tiers in place of three tall ones. The RS2 manual re-runs the eight as its problems 48 to 55 by strength
 reduction and prints its own factors beside the paper's, together with Slide2's Bishop, Spencer
 and GLE factors for the same walls. Slide2 counterparts: [VP87](rocscience.md#vp87)–VP94.
 
@@ -1377,8 +1377,9 @@ along every sheet so that the fill can slide on it (each sheet is a reinforcemen
 `Joint = Yes`). One thing is deliberately different. The paper gives its facing blocks a cohesion
 of 2.5 kPa, and a column of blocks 0.3 m wide and 3 m tall with that little cohesion cannot hold up
 its own weight in a continuum model, so XSLOPE's facing is a stack of elastic blocks resting on
-friction joints, which is also how the paper's own model articulates it. The water variant's fill
-is free-draining, as in the paper.
+friction joints, which is also how the paper's own model articulates it. In the water variant the
+water table stands 3 m above the foundation on both sides of the wall, so the fill and the facing
+below it carry pore pressure as well as the foundation, as in the paper and in RS2's model.
 
 The paper's FLAC factor is each row's referee. RS2's factor is shown beside it, and the manual's
 limit-equilibrium factors are in the second table.
@@ -1492,19 +1493,23 @@ tension.
 
 ![RS2-52: cohesionless foundation (vp091_fem, c = 0, φ = 18°) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The strain leaves the reinforced fill almost entirely and concentrates in the weak foundation directly under the toe of the lowest facing column, where the wall bears on it](images/RS2-52.png)
 
-#### ⊘ RS2-53: Geotextile wall, water (vp092_fem) {#rs2-53}
+#### 🟢 RS2-53: Geotextile wall, water (vp092_fem) {#rs2-53}
 
-A pond stands against the wall, with the reinforced fill free-draining. *Unconfirmed*: every
-trial came to rest, but the 0.7 m mesh moves the factor by six times the search tolerance, the
-most in the family.
+The water table stands 3 m above the foundation on both sides of the wall: a 3 m pond in front
+of the lowest tier, and the same level inside the fill behind it. Everything below that level
+carries pore pressure, the reinforced fill and the lowest facing column as well as the
+foundation. That is the water the paper describes, "3 m high above the toe in either side of the
+wall", and the water RS2's model applies. The sheets are at the paper's 9.25 kN/m.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
-| 1.037 *unconfirmed* | 1.01 | 1.03 |
+| **1.037** | 1.01 (+2.7%) | 1.03 |
+
+<!-- test: file=files/rocscience/vp092_fem.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-53, tier=gate, expected_elements=2194, expected_nodes=5544, f_stand=1.02734375, f_fail=1.046875, check=edges -->
 
 **Input file:** [vp092_fem.xlsx](files/rocscience/vp092_fem.xlsx).
 
-![RS2-53: pond against the wall (vp092_fem, piezometric line at y = 9 with a 3 m pond on the lower tier, Ta = 9.25 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. The reinforced fill is modeled free-draining, so pore pressure acts on the foundation only and the pond enters as a distributed load on the lower tier](images/RS2-53.png)
+![RS2-53: water 3 m above the foundation on both sides of the wall (vp092_fem, piezometric line at y = 9 with a 3 m pond against the lower tier, Ta = 9.25 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. Everything below the line carries pore pressure, the reinforced fill and the lowest facing column as well as the foundation, and the pond enters as a distributed load on the ground in front of the wall and on the face of the lowest column](images/RS2-53.png)
 
 #### ⊘ RS2-54: Geotextile wall, crest surcharge (vp093_fem) {#rs2-54}
 

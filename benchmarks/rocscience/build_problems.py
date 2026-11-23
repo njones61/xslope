@@ -2841,17 +2841,32 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
     sd = load_slope_data(LEVEE_POLY)
     base = dict(sd['materials'][0])
     mats = []
-    # the paper's hw is the water level above the FOUNDATION soil: the MSE
-    # fill and blocks drain (u=0); only the foundation carries pore pressure.
-    # (This follows L&H (2004) and Slide2's VP92 model, which this file is
-    # locked against. The RS2 vendor .fez #053 instead applies the piezo-line
-    # pore pressure mesh-wide, wetting the granular fill below the pond as well;
-    # adopting that drops the Slide2 Bishop lock from 1.010 to 0.885 vs Slide's
-    # published 1.037, so it is not used here -- documented in the wall section.)
+    # Where the water is (water=True, the hw = 3 m case).
+    #
+    # The strength-reduction build (joint=True) puts it in EVERY material. That
+    # is the water both of its references ran. Leshchinsky & Han: "the water
+    # table is 3 m high above the toe in either side of the wall" and "the
+    # horizontal phreatic surface on both sides of the wall" (p. 1232, and
+    # conclusion 8, p. 1235);
+    # their Table 2 defines hw as the "height of water table above the
+    # foundation soil", a level, not a wet layer. RS2's own model of the case,
+    # vendor `slope stability #053.fez`, assigns piezometric line 1 (y = 9) to
+    # all its materials, and its nodal pore pressures are 9.81 (9 - y) at every
+    # node below the line: 696 nodes of the reinforced fill between y = 6 and 9
+    # and every node of the lowest facing column, as well as the foundation.
+    #
+    # The limit-equilibrium build (joint=False) keeps the fill and blocks dry
+    # and wets the foundation only. It is scored against Slide2's printed VP92
+    # circle, and only the dry fill reproduces it: on that circle at the
+    # baseline's Ta = 10 (the value Slide2's results were computed with, see
+    # the Slide2 page), Bishop reads 1.039 dry against Slide's 1.037, and 0.936
+    # with the fill wet, 0.915 with fill and blocks wet. At the case's 9.25 the
+    # dry file locks at 1.010 (0.907 / 0.885 wet).
     for name, (c, phi) in (('Reinforced and retained fill', fill),
                            ('Foundation soil', fnd), ('Blocks', (2.5, 34.0))):
         m = dict(base)
-        uopt = 'piezo' if (water and name == 'Foundation soil') else 'none'
+        uopt = ('piezo' if (water and (joint or name == 'Foundation soil'))
+                else 'none')
         m.update(name=name, c=c, phi=phi, gamma=18.0, option='mc', u=uopt)
         # The dry-stack facing is concrete: it does not yield, and the strength
         # reduction leaves it alone (ssr_exclude on the tag). The paper's 2.5 kPa
@@ -3140,7 +3155,12 @@ def vp091_fem():
 
 
 def vp092_fem():
-    """RS2-53 — water (piezo at y = 9 with a 3 m pond, Ta = 9.25), jointed dry stack."""
+    """RS2-53 — water (piezo at y = 9 with a 3 m pond, Ta = 9.25), jointed dry stack.
+
+    Every material reads the piezometric line, the fill and the facing as well as
+    the foundation, as in Leshchinsky & Han and RS2's #053; the limit-equilibrium
+    sibling vp092 wets the foundation only. See :func:`_lh_wall_slope_data`.
+    """
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 9.25, water=True, joint=True)
     sd['circles'] = []
     sd['non_circ'] = []

@@ -66,6 +66,10 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 #: A slope with one clearly weakest seam: the generator picks that zone on its own,
@@ -650,6 +654,7 @@ CHECKS = [("a finding carries every remedy", test_finding_carries_remedies),
           ("the header counts what the list shows", test_header_counts_entries)]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

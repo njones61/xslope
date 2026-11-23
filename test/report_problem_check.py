@@ -24,6 +24,10 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+# The window this check builds reads and writes Studio's machine-wide settings
+# store; it gets a scratch one instead (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 FORM = os.path.join(_REPO, ".github", "ISSUE_TEMPLATE", "bug_report.yml")
 #: Every label studio_platform_label() can return, whatever this machine is.
 LABELS = ("XSLOPE Studio on macOS", "XSLOPE Studio on Windows", "Other")
@@ -36,6 +40,7 @@ def _form_fields():
     return {item.get("id"): item for item in form.get("body", []) if item.get("id")}
 
 
+@studio_settings.isolated
 def run():
     try:
         from PySide6.QtWidgets import QApplication

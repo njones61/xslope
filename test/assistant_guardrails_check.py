@@ -131,6 +131,10 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# Every Studio object this builds reads and writes Studio's machine-wide settings
+# store; the whole run gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 #: One Mohr-Coulomb material, every field the schema names, so the model the
@@ -3382,6 +3386,7 @@ CHECKS = [
 ]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

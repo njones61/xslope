@@ -35,8 +35,9 @@ check below pins one of those promises to the engine's reading:
   J. RELIABILITY. The dialog's model checks judge the run it will make: its
      engine and whether it is a rapid drawdown.
 
-Every Studio setting these dialogs read or write goes to a scratch ini (QSettings
-is replaced for the duration), and every model is loaded from a copy.
+Every Studio setting these dialogs read or write goes to a scratch ini
+(tools/studio_settings.py, for the whole run and again per check), and every model
+is loaded from a copy.
 
 Skips cleanly when PySide6 is not installed.
 """
@@ -56,6 +57,8 @@ if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from tools import studio_settings                      # noqa: E402
 
 _SIMPLE = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_simple1.xlsx")
 _DAM = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_dam.xlsx")
@@ -79,21 +82,13 @@ def _blank(v):
 def _sandbox():
     """Scratch settings and scratch model copies for one check.
 
-    Studio's dialogs construct ``QSettings("XSlope", "XSlope Studio")`` with a local
-    import, and on macOS that store cannot be redirected (welcome_window_check.py
-    measured it), so the class itself is replaced while the check runs: every store
-    a dialog opens is one ini in the scratch folder. Yields a function that copies a
-    shipped model into the scratch folder and loads the copy."""
-    import PySide6.QtCore as QtCore
+    Every Studio settings store a dialog opens inside the block is one ini in the
+    scratch folder (tools/studio_settings.py, the suite's own mechanism; it nests
+    inside run()'s redirection). Yields a function that copies a shipped model into
+    the scratch folder and loads the copy."""
     from xslope.fileio import load_slope_data
 
-    real = QtCore.QSettings
     tmp = tempfile.mkdtemp(prefix="audit_studio_")
-    ini = os.path.join(tmp, "studio.ini")
-
-    class _Scratch(real):
-        def __init__(self, *args, **kwargs):
-            super().__init__(ini, real.IniFormat)
 
     def load(path):
         dst = os.path.join(tmp, os.path.basename(path))
@@ -102,11 +97,10 @@ def _sandbox():
         with contextlib.redirect_stdout(io.StringIO()):
             return load_slope_data(dst)
 
-    QtCore.QSettings = _Scratch
     try:
-        yield load
+        with studio_settings.redirected(os.path.join(tmp, "studio.ini")):
+            yield load
     finally:
-        QtCore.QSettings = real
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -956,6 +950,7 @@ CHECKS = [
 ]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

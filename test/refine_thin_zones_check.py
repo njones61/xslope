@@ -51,6 +51,10 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 #: The Griffiths thin-band section: a soft seam through an otherwise uniform slope,
@@ -616,6 +620,7 @@ CHECKS = [("the toggle + its default", test_control),
           ("the refinement cap + the warning that admits it", test_cap_and_warning)]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

@@ -52,6 +52,14 @@ if REPO_ROOT not in sys.path:
 import matplotlib
 matplotlib.use("Agg")
 
+# Studio's machine-wide settings store (recent files, editor toggles, the
+# assistant's provider) is replaced by a scratch ini for every capture that builds
+# a window or opens a file: a screenshot run must never edit the settings of
+# whoever runs it. main() runs the whole sweep inside one redirection, and every
+# function that builds a MainWindow carries its own, so calling one directly is
+# just as safe. See tools/studio_settings.py.
+from tools import studio_settings                     # noqa: E402
+
 try:
     from PySide6.QtWidgets import QApplication, QMessageBox
 except Exception:                       # engine-only install — no studio layer
@@ -390,6 +398,7 @@ SHOTS = {
 
 
 
+@studio_settings.isolated
 def lem01_canvas():
     """The main window at the end of the Studio path's step 3: geometry entered,
     no circles yet. A full-window offscreen grab — the deferred canvas render
@@ -428,6 +437,7 @@ SHOTS["lem01_canvas"] = lem01_canvas
 # --------------------------------------------------------------------------- #
 # Tutorial 0 — Building Models Three Ways
 # --------------------------------------------------------------------------- #
+@studio_settings.isolated
 def t0_studio_window():
     """The whole Studio window, with both of the paths it hosts on screen at once.
 
@@ -458,8 +468,8 @@ def t0_studio_window():
     from studio.ai.config import PROVIDERS
     from studio.main_window import MainWindow
 
-    #: The settings the app itself uses — the real ones, which is why every write
-    #: below is undone in the finally block.
+    #: The settings the app itself uses — a scratch store here (studio_settings),
+    #: and every write below is undone in the finally block all the same.
     settings = QSettings("XSlope", "XSlope Studio")
     pinned = {"ai/provider": "anthropic",
               "ai/model/anthropic": PROVIDERS["anthropic"]["models"][0]}
@@ -3982,6 +3992,7 @@ def w01_settings():
         return _grab(dlg, "w01_settings.png")
 
 
+@studio_settings.isolated
 def w01_chat_dock():
     """The Assistant dock, empty, on an open project.
 
@@ -4101,6 +4112,7 @@ def _skip(shot, path, source):
     return None
 
 
+@studio_settings.isolated
 def _main_window(model_or_builder, name, width=1500, height=950):
     """The whole Studio window on a model, offscreen.
 
@@ -4569,7 +4581,7 @@ def main(argv=None):
         print("no shot matching %s; known shots: %s\nknown sessions: %s"
               % (argv, ", ".join(sorted(SHOTS)), ", ".join(sorted(SESSIONS))))
         return 1
-    with _app_defaults():
+    with studio_settings.redirected(prefix="capture_tutorial"), _app_defaults():
         for name in names:
             SHOTS[name]()
         for name in sessions:

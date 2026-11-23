@@ -1075,21 +1075,12 @@ def mat_engine():
 # --- Studio, materials ---------------------------------------------------------
 @contextlib.contextmanager
 def studio_sandbox():
-    """Studio's settings go to a scratch ini while a dialog is open (its dialogs
-    construct QSettings with a local import, so the class itself is replaced)."""
-    import PySide6.QtCore as QtCore
-    real = QtCore.QSettings
-    ini = os.path.join(_scratch(), "studio.ini")
-
-    class _Scratch(real):
-        def __init__(self, *args, **kwargs):
-            super().__init__(ini, real.IniFormat)
-
-    QtCore.QSettings = _Scratch
-    try:
+    """Studio's settings go to a scratch ini while a dialog is open, through the
+    suite's own mechanism (tools/studio_settings.py), which also nests inside a
+    caller's redirection (table_paste_check.run is isolated as a whole)."""
+    from tools import studio_settings
+    with studio_settings.redirected(os.path.join(_scratch(), "studio.ini")):
         yield
-    finally:
-        QtCore.QSettings = real
 
 
 def _table_gray(table, i, keys):

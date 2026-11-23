@@ -31,6 +31,10 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 #: A shipped model with a piezometric line on line 1.
@@ -54,6 +58,7 @@ def _set(dlg, i, phreatic):
     combo.setCurrentIndex(values.index(phreatic))
 
 
+@studio_settings.isolated
 def run():
     try:
         from PySide6.QtWidgets import QApplication, QTabWidget

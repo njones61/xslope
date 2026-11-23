@@ -4277,6 +4277,13 @@ def _editor_norm(key, val):
     return val
 
 
+# The tests below build Studio editors and dialogs, which read and write Studio's
+# machine-wide settings store (editor toggles, recent files); each runs against a
+# scratch store instead (tools/studio_settings.py).
+from tools import studio_settings                                 # noqa: E402
+
+
+@studio_settings.isolated
 def run_editor_roundtrip_test(test):
     """Open each studio CategoryEditor on a fully-populated record, apply with NO
     changes, and assert its managed keys are deep-equal in -> out.
@@ -5367,6 +5374,7 @@ def run_pullout_law_test(test):
     return 0.0, None
 
 
+@studio_settings.isolated
 def run_pullout_switch_test(test):
     """The reinforcement editor's Pullout read-out, driven offscreen on a real model.
 

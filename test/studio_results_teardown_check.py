@@ -12,6 +12,10 @@ wrong, so the only symptom is a reader who cannot make a second run.
 Each leg opens a results view, closes it the way the action does, lets Qt delete the
 widgets, and then updates the Run menu exactly as the window does.
 
+Every window here is built against a scratch settings store
+(``tools.studio_settings``): opening a file appends it to Studio's recent-files list,
+and a check must never reorder the person's own.
+
 Skips cleanly (exit 0) when PySide6 is not installed.
 """
 import contextlib
@@ -25,6 +29,8 @@ if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from tools import studio_settings                      # noqa: E402
 
 #: FEM-5's toppling model: a FEM model with joint lines, the case that met this.
 MODEL = os.path.join(_REPO, "docs/tutorials/files/xslope_rock_joints.xlsx")
@@ -63,6 +69,7 @@ def _leg(mw, name, close):
     return fails
 
 
+@studio_settings.isolated
 def run():
     try:
         from PySide6.QtWidgets import QApplication

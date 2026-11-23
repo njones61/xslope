@@ -45,6 +45,10 @@ import warnings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 REINF_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                           'docs', 'lem', 'files', 'xslope_reinforce.xlsx')
 TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -480,6 +484,7 @@ def _report_units_leg():
     return failures
 
 
+@studio_settings.isolated
 def run():
     warnings.simplefilter('ignore')
     if not os.path.exists(REINF_FILE):

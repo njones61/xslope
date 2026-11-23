@@ -44,6 +44,10 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 #: A model to open the dialog on — read only for its default title and output
@@ -473,6 +477,7 @@ CHECKS = [check_opens_on_the_shipped_template, check_browse_and_reset,
           check_a_letterhead_carries_into_every_header]
 
 
+@studio_settings.isolated
 def run():
     """Returns a list of failure descriptions (empty on success)."""
     failures = []

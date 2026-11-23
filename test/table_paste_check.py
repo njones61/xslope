@@ -57,6 +57,10 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _TUTORIALS = os.path.join(_REPO, "docs", "tutorials")
@@ -528,12 +532,10 @@ _GRAYING_EXCEPTIONS = [
     #     reads them, on an mc row; the probe's reading is every analysis's
     #     together, rapid reliability included, so they read where d and psi do
     #     and gray with them elsewhere, as the sheet and Studio have them.
-    # (c) u on an elastic row, and its ru when u = ru. The FEM reads an elastic
-    #     row's own u (an elastic wall in a seepage field takes its own pore
-    #     pressure) while the template and Studio gray both. Whether the engine or
-    #     the graying changes is pending with Norm; until he decides, the graying
-    #     stands and this entry says so.
-    ("mat", {"option": "elastic"}, {"u", "ru"}),
+    # (c) u on an elastic row needs no entry any more: an elastic material reads
+    #     its own u, and its ru when u = ru (Norm, 533a), so Studio leaves both live
+    #     and the template's elastic rule stops graying them (O11:R52 becomes
+    #     Q11:R52). Until that template edit lands, this check reports the sheet.
 ]
 # (d) Rows the template's formatting leaves out by Norm's decision (532a):
 #     (sheet, switch column, first row left out). Circles rows 43-52 take an
@@ -2077,6 +2079,7 @@ CHECKS = [
 ]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

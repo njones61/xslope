@@ -9,6 +9,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 from PySide6.QtCore import Qt                                 # noqa: E402
 from PySide6.QtWidgets import QApplication                    # noqa: E402
 
@@ -17,6 +21,7 @@ TIMES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 100, 130, 170,
          220, 300, 400, 500]
 
 
+@studio_settings.isolated
 def main():
     app = QApplication.instance() or QApplication(sys.argv)   # noqa: F841
     from xslope.fileio import load_slope_data

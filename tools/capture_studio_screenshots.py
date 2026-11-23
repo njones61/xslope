@@ -118,6 +118,11 @@ if REPO_ROOT not in sys.path:
 import matplotlib
 matplotlib.use("Agg")
 
+# Studio's machine-wide settings store is replaced by a scratch ini for the run:
+# main() works inside one redirection, and the window builder carries its own, so
+# a capture called directly is just as safe. See tools/studio_settings.py.
+from tools import studio_settings                     # noqa: E402
+
 try:
     from PySide6.QtWidgets import QApplication, QMessageBox
 except Exception:                       # engine-only install — no studio layer
@@ -1000,6 +1005,7 @@ def capture_assistant_confirm():
 _MW = None
 
 
+@studio_settings.isolated
 def _main_window(path=DAM_LEM):
     """A real Studio window, built offscreen, with ``path`` loaded.
 
@@ -1577,6 +1583,11 @@ PARAMETRIC_SHOTS = (capture_parametric_dialog, capture_parametric_design_dialog,
 
 
 def main():
+    with studio_settings.redirected(prefix="capture_studio"):
+        _main()
+
+
+def _main():
     if len(sys.argv) > 1 and sys.argv[1] == "parametric":
         print("capture_studio_screenshots: regenerating the Parametric images")
         for fn in PARAMETRIC_SHOTS:

@@ -2210,7 +2210,7 @@ exits exactly tangent to the crest and needs a hair of extra radius to intersect
 | 93 | Surcharge q=20 (Ta=10) | Bishop | 0.961 | 0.958 (+0.3%) | 1.02 | 1.00 |
 | 94 | Five 1.8-m tiers (Ta=10.1) | Bishop | 1.020 | 1.040 (−1.9%) | — | 1.00 |
 
-*VP92 models the paper's hw as pore pressure in the foundation soil only (a drained MSE fill), plus the 3-m pond standing against the lower tier; treating the fill as saturated instead reconciles with neither program. XSLOPE's free circular search finds slightly more critical circles than Slide's grid on several of these.*
+*The paper puts the water 3 m above the toe on both sides of the wall, inside the fill as well, but Slide2's answer is reproduced only with the fill dry, so VP92 follows Slide2's model, with pore pressure in the foundation only and the 3-m pond standing against the lower tier. RS2's version of this wall wets the fill; see [RS2-53](rs2.md#rs2-53). XSLOPE's free circular search finds slightly more critical circles than Slide's grid on several of these.*
 
 ![vp087: inputs and representative solution](images/vp087.png)
 

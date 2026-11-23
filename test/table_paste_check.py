@@ -34,6 +34,14 @@ both halves of it.
      model's own worksheet (``_sheet_cells``), because the loader reads a blank and
      a default the same way and so cannot see a page that prints one for the
      other.
+  C. THE GRAYING. A grayed cell promises that nothing reads it. On the mat,
+     circles, polygon and reinforce sheets, for every case a row can be in --
+     blank switches included -- the template's conditional formatting, every
+     Studio view of the same field, and the engine's own reading (probed by
+     nudging the value, never looked up) must agree, but for a short list of
+     deliberate exceptions (``_GRAYING_EXCEPTIONS``). Each rule must also reach
+     every row its switch's dropdown does. The readings are taken in
+     test/graying_probe.py.
 
 Skips cleanly (exit 0) when PySide6 is not installed.
 """
@@ -485,65 +493,159 @@ def test_tab_past_the_last_cell_of_a_plain_grid():
                  f"cursor at row {grid.currentRow()}, column {grid.currentColumn()}")
 
 
-# The mat sheet's columns by header, as the editor's field keys.
-_SHEET_KEYS = {"c": "c", "f": "phi", "c/p": "cp", "r-elev": "r_elev", "d": "d",
-               "psi": "psi", "t_cut": "t_cut", "E": "E", "nu": "nu", "u": "u",
-               "ru": "ru", "phi_b": "phi_b", "s_cap": "s_cap",
-               "pow_a": "pow_a", "pow_b": "pow_b", "pow_c": "pow_c", "pow_d": "pow_d",
-               "hb_sci": "hb_sci", "hb_gsi": "hb_gsi", "hb_mi": "hb_mi",
-               "hb_d": "hb_d", "s(g)": "sigma_gamma", "s(c)": "sigma_c",
-               "s(f)": "sigma_phi", "s(c/p)": "sigma_cp", "s(d)": "sigma_d",
-               "s(psi)": "sigma_psi", "kr0": "kr0", "h0": "h0", "a": "vg_a",
-               "n": "vg_n", "l": "vg_l"}
+# --------------------------------------------------------------------------- #
+# C. The graying: the template, Studio and the engine, held to one another
+# --------------------------------------------------------------------------- #
+# What each of the three says is read in test/graying_probe.py, from the thing
+# itself: the template's conditional formatting evaluated cell by cell, Studio's
+# editors read off their widgets, and the engine probed by nudging each field and
+# watching what it is handed. Here they are held to one rule -- the sheet grays a
+# cell, every Studio view grays it, and nothing reads it, all three together --
+# for every case, blanks included.
+#
+# Deliberate exceptions, where the engine's reading is not what decides the
+# graying. Each names the sheet, the cases (switch -> value) and the fields ("*"
+# for all); there the sheet's own graying stands, and every Studio view must still
+# show the same. An entry that also names a Studio view excuses that view alone
+# from showing the same there; the sheet and the other views are still held to
+# each other. Keep this short: an exception added here is a decision, and it
+# should show up as a diff.
+_MAT_OPTION_FIELDS = {"c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c", "pow_d",
+                      "hb_sci", "hb_gsi", "hb_mi", "hb_d",
+                      "sigma_c", "sigma_phi", "sigma_cp"}
+_GRAYING_EXCEPTIONS = [
+    # (a) A blank strength option is a row still being filled in. The FEM and the
+    #     LEM refuse it, so nothing reads its fields, but the sheet leaves them
+    #     live so it can be finished. A blank circle Option is the same kind of
+    #     row: the loader keeps the circle with no size, and the checks refuse it
+    #     until an Option is picked.
+    ("mat", {"option": ""}, "*"),
+    # The list view is a form showing the chosen option's fields: with none chosen
+    # it shows none (the table cannot hide per row, so it stays held to the sheet).
+    ("mat", {"option": ""}, _MAT_OPTION_FIELDS, "list view"),
+    ("circles", {"Option": ""}, "*"),
+    # (b) s(d) and s(psi) need no entry. Only a rapid drawdown reliability run
+    #     reads them, on an mc row; the probe's reading is every analysis's
+    #     together, rapid reliability included, so they read where d and psi do
+    #     and gray with them elsewhere, as the sheet and Studio have them.
+    # (c) u on an elastic row, and its ru when u = ru. The FEM reads an elastic
+    #     row's own u (an elastic wall in a seepage field takes its own pore
+    #     pressure) while the template and Studio gray both. Whether the engine or
+    #     the graying changes is pending with Norm; until he decides, the graying
+    #     stands and this entry says so.
+    ("mat", {"option": "elastic"}, {"u", "ru"}),
+]
+# (d) Rows the template's formatting leaves out by Norm's decision (532a):
+#     (sheet, switch column, first row left out). Circles rows 43-52 take an
+#     Option from the dropdown but are not grayed. The piles sheet carries no
+#     graying rule at all, so its rows 13 onward have nothing to flag.
+_GRAYING_STRUCTURE_EXCEPTIONS = [("circles", "D", 43)]
 
 
-def _sheet_gray_rules():
-    """The template mat sheet's conditional formatting as (test, keys) pairs: each
-    rule's formula as a function of (option, u, unsat), and the editor fields its
-    ranges cover. Read from the workbook, so the check below follows the sheet."""
-    import openpyxl
-    from openpyxl.utils import range_boundaries
-    ws = openpyxl.load_workbook(os.path.join(_REPO, "docs", "inputs",
-                                             "input_template.xlsx"))["mat"]
-    header = {c.column: c.value for c in ws[10] if c.value is not None}
-    rules = []
-    for rng, cf in ws.conditional_formatting._cf_rules.items():
-        keys = set()
-        for part in str(rng.sqref).split():
-            lo, _, hi, _ = range_boundaries(part)
-            keys |= {_SHEET_KEYS[header[c]] for c in range(lo, hi + 1)
-                     if header.get(c) in _SHEET_KEYS}
-        for r in cf:
-            expr = (r.formula[0].replace("$E11", "OPT").replace("$O11", "U")
-                    .replace("$AJ11", "UNSAT").replace("<>", "\0")
-                    .replace("=", "==").replace("\0", "!="))
-            rules.append((expr, keys))
-    return rules
+def _gp():
+    if _HERE not in sys.path:
+        sys.path.insert(0, _HERE)
+    import graying_probe
+    return graying_probe
 
 
-def test_the_material_graying_is_the_sheets():
-    """The editor grays a material's cells by the template mat sheet's own
-    conditional formatting, for every strength option, pore-pressure model and
-    unsaturated model: d and psi live only for mc, the other options' parameters
-    grayed, ru only for u = ru, l grayed for the Gardner model, and so on."""
-    from studio.editors import _mat_dim_keys
-    rules = _sheet_gray_rules()
-    env = {"AND": lambda *a: all(a), "OR": lambda *a: any(a)}
+def _excepted(row):
+    """(whether the sheet's graying stands for this row, the Studio views excused
+    from it)."""
+    stands, views = False, set()
+    for sheet, match, fields, *view in _GRAYING_EXCEPTIONS:
+        if row["sheet"] != sheet or (fields != "*" and row["field"] not in fields):
+            continue
+        if all(row["case"].get(k) == v for k, v in match.items()):
+            if view:
+                views |= {v for v in row["studio"] if v.startswith(view[0])}
+            else:
+                stands = True
+    return stands, views
+
+
+def _graying_failures(rows):
+    """Every case where the sheet, a Studio view and the engine's reading do not
+    agree, one line per set of fields that disagree the same way in the same
+    cases."""
+    gp = _gp()
+    by_field = {}
+    for r in rows:
+        exc, excused = _excepted(r)
+        want = r["sheet_gray"] if exc else gp.expect_gray(r["verdict"])
+        studio = {v: g for v, g in r["studio"].items() if v not in excused}
+        if all(s is want for s in [r["sheet_gray"]] + list(studio.values())):
+            continue
+        key = (r["sheet"], r["label"], r["sheet_gray"],
+               tuple(studio.items()), r["verdict"], tuple(r["who"]), want, exc)
+        by_field.setdefault(key, []).append(
+            tuple(sorted(r["case"].items(), key=lambda kv: list(r["case"]).index(kv[0]))))
+    groups = {}
+    for (sheet, label, *rest), cases in by_field.items():
+        groups.setdefault((sheet, tuple(rest), tuple(cases)), []).append(label)
+
+    def says(g):
+        return "grays it" if g is True else ("leaves it live" if g is False else g)
+
+    reasons = {gp.READ: "the engine reads it", gp.REFUSES: "a check refuses a run "
+               "over its value", gp.NOTES: "only a note mentions it",
+               gp.UNREAD: "nothing reads it"}
     out = []
-    for opt, u, um in itertools.product(
-            ["mc", "cp", "ratio", "pow", "hb", "elastic"],
-            ["none", "piezo", "seep", "ru"], ["lf", "vg", "gard"]):
-        names = dict(env, OPT=opt, U=u, UNSAT=um)
-        want = set()
-        for expr, keys in rules:
-            if eval(expr, {"__builtins__": {}}, names):
-                want |= keys
-        got = set(_mat_dim_keys({"option": opt, "u": u, "unsat": um}))
-        if got != want:
-            out.append(f"option={opt}, u={u}, unsat={um}: the editor grays "
-                       f"{sorted(got - want)} the sheet leaves live and leaves "
-                       f"{sorted(want - got)} live the sheet grays")
+    for (sheet, (sg, studio, verdict, who, want, by_exc), cases), labels in \
+            groups.items():
+        sides = [f"the sheet {says(sg)}"] + [f"the {v} {says(g)}" for v, g in studio]
+        if by_exc:
+            why = (f"an exception lets the sheet's graying stand, and Studio must "
+                   f"show it {'gray' if want else 'live'} too")
+        else:
+            why = reasons[verdict] + (f" ({', '.join(who)})" if who else "")
+        eg = " | ".join(", ".join(f"{k}={v or '(blank)'}" for k, v in c)
+                        for c in cases[:3])
+        more = f" | and {len(cases) - 3} more" if len(cases) > 3 else ""
+        out.append(f"{sheet} {', '.join(labels)} [{len(cases)} case(s): {eg}{more}]: "
+                   f"{', '.join(sides)}, but {why}")
     return out
+
+
+def test_mat_graying_agrees():
+    """The mat sheet over every strength option, pore-pressure model and
+    unsaturated model, blank included as a case of its own (140 cases), on a named
+    row: the sheet's graying, the Materials table's and the list view's (grayed or
+    hidden), and the engine's reading agree field by field. A blank u and unsat,
+    which Studio cannot hold, are shown as the loader reads them and grayed as the
+    sheet grays that reading."""
+    gp = _gp()
+    return _graying_failures(gp.mat_rows()) + gp.mat_shown_blank_failures()
+
+
+def test_circles_graying_agrees():
+    """The circles sheet for each Option, blank included: the sheet, the Circles
+    table and the loader agree on which of Depth, Xi, Yi and R the circle is
+    sized by."""
+    gp = _gp()
+    return _graying_failures(gp.circle_rows()) + gp.circle_shown_blank_failures()
+
+
+def test_polygon_graying_agrees():
+    """The polygon sheet for each Type, blank included: every block's own rule
+    (its $B$5-style reference read at its own Type cell), the Polygons editor's
+    Material and Size, and what reaches the mesher and the slicer agree."""
+    gp = _gp()
+    return _graying_failures(gp.polygon_rows()) + gp.polygon_shown_blank_failures()
+
+
+def test_reinforce_graying_agrees():
+    """The reinforce sheet for Joint {blank, Yes, No} x the pullout pair {neither,
+    Adhesion only, Delta only, both} x Type {blank and the four}: the sheet, the
+    Reinforcement table and list view, and the engine's reading agree."""
+    gp = _gp()
+    return _graying_failures(gp.reinforce_rows())
+
+
+def test_graying_rules_cover_their_dropdowns():
+    """Each graying rule reaches every row its switch's dropdown offers a choice
+    on, and every polygon block's Type cell has a rule reading it."""
+    return _gp().structural_failures(allow=_GRAYING_STRUCTURE_EXCEPTIONS)
 
 
 def test_a_pasted_option_defines_the_row():
@@ -1919,7 +2021,11 @@ CHECKS = [
     ("hidden columns are not filled", test_hidden_columns_are_not_filled),
     ("read-only cells are skipped", test_read_only_cells_are_skipped),
     ("a pasted option defines its row", test_a_pasted_option_defines_the_row),
-    ("material graying is the mat sheet's", test_the_material_graying_is_the_sheets),
+    ("mat graying: sheet = Studio = engine", test_mat_graying_agrees),
+    ("circles graying: sheet = Studio = engine", test_circles_graying_agrees),
+    ("polygon graying: sheet = Studio = engine", test_polygon_graying_agrees),
+    ("reinforce graying: sheet = Studio = engine", test_reinforce_graying_agrees),
+    ("graying rules cover their dropdowns", test_graying_rules_cover_their_dropdowns),
     ("the form grays d and ψ but for mc", test_the_material_form_grays_d_and_psi),
     ("a pasted rounding keeps the stored value",
      test_a_pasted_rounding_keeps_the_stored_value),
@@ -1988,6 +2094,8 @@ def run():
             fs = [f"{name} raised: {exc!r}"]
         print(f"  {name:44s} {'ok' if not fs else f'FAIL ({len(fs)})'}")
         failures += fs
+    if "graying_probe" in sys.modules:
+        sys.modules["graying_probe"].cleanup()       # its scratch workbooks
     return failures
 
 

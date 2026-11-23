@@ -21,7 +21,10 @@ check below pins one of those promises to the engine's reading:
      zone's Size) marks the mesh stale; a property the mesher does not read does not.
   D. NON-CIRCULAR MOVEMENT. A blank or an unrecognized word is shown as the search
      reads it and saved as it was: never turned into Free on OK.
-  E. CIRCLES. The Option grays the size fields it does not read.
+  E. CIRCLES. The Option grays the size fields it does not read; a blank or
+     unknown Option is shown and saved as it is, unsized, and grays nothing; any
+     unsized circle (that, or an Option whose cell is blank) keeps its Option and
+     what was typed in its size cells until it is sized.
   F. POLYGONS. Size stays live for every Type.
   G. SEEPAGE BOUNDARIES. A value never entered stays blank through the editor, on
      both sets, so the model checks can name it; it never becomes a 0.
@@ -540,6 +543,150 @@ def test_circles_option_grays_the_unread_fields():
     return out
 
 
+def _same_cells(a, b):
+    """Two size-cell dicts hold the same numbers, a blank matching a blank."""
+    if not isinstance(a, dict) or set(a) != set(b):
+        return False
+    return all((_blank(a[k]) and _blank(b[k])) or a[k] == b[k] for k in b)
+
+
+def test_circles_blank_option_stays_blank():
+    """A circle with a blank Option (the loader keeps it, unsized) is shown blank,
+    grays nothing — the sheet grays nothing for it — and is saved blank and unsized
+    unless an Option is picked: a Depth typed beside a blank Option must not size it.
+    A word that is none of the three is shown and saved as typed."""
+    from PySide6.QtCore import Qt
+    from studio.editors import CirclesEditor
+    out = []
+    keys = [f.key for f in CirclesEditor.FIELDS]
+    col = keys.index("Option")
+    rows = [{"Xo": 10.0, "Yo": 40.0, "Option": None, "Depth": _NAN, "R": _NAN},
+            {"Xo": 12.0, "Yo": 40.0, "Option": "dpth", "Depth": _NAN, "R": _NAN},
+            {"Xo": 14.0, "Yo": 40.0, "Depth": 0.0, "R": 40.0}]
+    with _sandbox() as load:
+        sd = load(_SIMPLE)
+        sd["circles"] = copy.deepcopy(rows)
+        editor = CirclesEditor()
+        dlg = editor.build(sd, None)
+        t = dlg._editable.table
+        shown = [t.cellWidget(i, col).currentText() for i in range(3)]
+        out += _fail(shown == ["", "dpth", "Depth"],
+                     f"the Option cells show {shown}: a blank Option must stay blank "
+                     f"and an unknown word as typed")
+        for i in (0, 1):
+            gray = [k for k in ("Depth", "Xi", "Yi", "R")
+                    if not t.item(i, keys.index(k)).flags() & Qt.ItemIsEditable]
+            out += _fail(not gray, f"row {i + 1} (Option {rows[i]['Option']!r}) "
+                                   f"grays {gray}; the sheet grays nothing for it")
+        # A Depth typed beside the blank Option is not a size, but it is kept.
+        t.item(0, keys.index("Depth")).setText("5")
+        editor.apply(sd, dlg)
+        got = sd["circles"]
+        out += _fail(_blank(got[0].get("Option")) and _blank(got[0]["R"])
+                     and _blank(got[0]["Depth"]),
+                     f"the blank-Option circle saved Option={got[0].get('Option')!r}, "
+                     f"R={got[0]['R']!r}, Depth={got[0]['Depth']!r}; it states no size")
+        cells = got[0].get("size_cells") or {}
+        out += _fail(cells.get("Depth") == 5.0
+                     and all(_blank(cells.get(k)) for k in ("Xi", "Yi", "R")),
+                     f"the Depth typed beside a blank Option was not kept: size cells "
+                     f"{cells!r}; want Depth 5 and the untyped cells blank")
+        out += _fail(got[1].get("Option") == "dpth" and _blank(got[1]["R"]),
+                     f"the unknown Option saved as {got[1].get('Option')!r}, "
+                     f"R={got[1]['R']!r}")
+        out += _fail(got[2]["R"] == 40.0, f"the Depth circle saved R={got[2]['R']!r}")
+        dlg.deleteLater()
+
+        # A loaded blank-Option circle shows the size cells it was saved with, and
+        # picking an Option sizes it from the one that Option names.
+        kept = {"Xo": 10.0, "Yo": 40.0, "Option": None, "Depth": _NAN, "R": _NAN,
+                "size_cells": {"Depth": 8.0, "Xi": 3.0, "Yi": _NAN, "R": 31.0}}
+        sd["circles"] = [copy.deepcopy(kept)]
+        dlg = editor.build(sd, None)
+        t = dlg._editable.table
+        shown = [t.item(0, keys.index(k)).text() for k in ("Depth", "Xi", "Yi", "R")]
+        out += _fail(shown == ["8", "3", "", "31"],
+                     f"a blank-Option circle's kept size cells show as {shown}")
+        editor.apply(sd, dlg)
+        out += _fail(_same_cells(sd["circles"][0].get("size_cells"),
+                                 kept["size_cells"]),
+                     f"OK on an untouched blank-Option circle changed its size cells "
+                     f"to {sd['circles'][0].get('size_cells')!r}")
+        dlg.deleteLater()
+        sd["circles"] = [copy.deepcopy(kept)]
+        dlg = editor.build(sd, None)
+        dlg._editable.table.cellWidget(0, col).setCurrentText("Depth")
+        editor.apply(sd, dlg)
+        got = sd["circles"][0]
+        out += _fail((got["Depth"], got["R"]) == (8.0, 32.0)
+                     and "size_cells" not in got,
+                     f"picking Depth on a circle carrying Depth = 8 saved Depth="
+                     f"{got['Depth']!r}, R={got['R']!r}, size cells "
+                     f"{got.get('size_cells')!r}")
+        dlg.deleteLater()
+
+        # A circle whose Option names a blank cell (Radius, R empty) is unsized
+        # too: its Option and typed cells survive OK untouched, and filling R
+        # sizes it.
+        radius = {"Xo": 10.0, "Yo": 40.0, "Option": "Radius", "Depth": _NAN,
+                  "R": _NAN,
+                  "size_cells": {"Depth": 8.0, "Xi": 3.0, "Yi": _NAN, "R": _NAN}}
+        sd["circles"] = [copy.deepcopy(radius)]
+        dlg = editor.build(sd, None)
+        t = dlg._editable.table
+        shown = ([t.cellWidget(0, col).currentText()]
+                 + [t.item(0, keys.index(k)).text() for k in ("Depth", "Xi", "Yi", "R")])
+        out += _fail(shown == ["Radius", "8", "3", "", ""],
+                     f"a Radius circle with R blank shows as {shown}")
+        editor.apply(sd, dlg)
+        got = sd["circles"][0]
+        out += _fail(got.get("Option") == "Radius" and _blank(got["R"])
+                     and _same_cells(got.get("size_cells"), radius["size_cells"]),
+                     f"OK on an untouched Radius circle with R blank saved Option="
+                     f"{got.get('Option')!r}, R={got['R']!r}, size cells "
+                     f"{got.get('size_cells')!r}")
+        dlg.deleteLater()
+        sd["circles"] = [copy.deepcopy(radius)]
+        dlg = editor.build(sd, None)
+        dlg._editable.table.item(0, keys.index("R")).setText("30")
+        editor.apply(sd, dlg)
+        got = sd["circles"][0]
+        out += _fail((got["R"], got["Depth"]) == (30.0, 10.0)
+                     and "size_cells" not in got,
+                     f"filling R on that circle saved R={got['R']!r}, Depth="
+                     f"{got['Depth']!r}, size cells {got.get('size_cells')!r}")
+        dlg.deleteLater()
+
+        # Picking Intercept with only Xi typed leaves it unsized, Xi kept.
+        sd["circles"] = copy.deepcopy(rows[:1])
+        dlg = editor.build(sd, None)
+        t = dlg._editable.table
+        t.cellWidget(0, col).setCurrentText("Intercept")
+        t.item(0, keys.index("Xi")).setText("6")
+        editor.apply(sd, dlg)
+        got = sd["circles"][0]
+        out += _fail(got.get("Option") == "Intercept" and _blank(got["R"])
+                     and (got.get("size_cells") or {}).get("Xi") == 6.0,
+                     f"Intercept picked with Yi blank saved Option="
+                     f"{got.get('Option')!r}, R={got['R']!r}, size cells "
+                     f"{got.get('size_cells')!r}")
+        dlg.deleteLater()
+
+        # Picking an Option sizes the circle from the cell it names.
+        sd["circles"] = copy.deepcopy(rows)
+        dlg = editor.build(sd, None)
+        t = dlg._editable.table
+        t.cellWidget(0, col).setCurrentText("Radius")
+        t.item(0, keys.index("R")).setText("30")
+        editor.apply(sd, dlg)
+        got = sd["circles"][0]
+        out += _fail((got.get("Option"), got["R"], got["Depth"]) == ("Radius", 30.0, 10.0),
+                     f"picking Radius with R = 30 saved {got.get('Option')!r}, "
+                     f"R={got['R']!r}, Depth={got['Depth']!r}")
+        dlg.deleteLater()
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # F. Polygons
 # --------------------------------------------------------------------------- #
@@ -659,6 +806,7 @@ CHECKS = [
     ("mesh signature", test_mesh_signature_sees_what_the_mesher_reads),
     ("non-circ Movement as read", test_noncirc_movement_is_shown_and_saved_as_read),
     ("circles Option graying", test_circles_option_grays_the_unread_fields),
+    ("circles blank Option", test_circles_blank_option_stays_blank),
     ("polygon Size live", test_polygon_size_is_live_for_every_type),
     ("seep BC blank value", test_seep_bc_blank_value_stays_blank),
     ("Tension SRF counts joints", test_tension_srf_counts_joint_lines),

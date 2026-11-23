@@ -1627,24 +1627,37 @@ def _draw_polygon_preview(ax, polys, selected, slope_data, style):
     _finish_preview_axes(ax)
 
 
+def _cell_number(v):
+    """A typed cell as a number, NaN when it is blank or not a number."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return float("nan")
+    return v
+
+
 def _circle_radius_depth(c):
     """(Xo, Yo, R, Depth) from a pending circle row, resolving R/Depth from the row's
     Option EXACTLY as CirclesEditor.apply does — so the preview tracks the option live
-    (a Radius/Intercept row previews from R, a Depth row from Depth)."""
+    (a Radius/Intercept row previews from R, a Depth row from Depth). A blank Option,
+    or a word that is none of the three, states no size: R and Depth are NaN, and the
+    circle is not drawn."""
     def f(key):
         try:
             return float(c.get(key, 0) or 0)
         except (TypeError, ValueError):
             return 0.0
     Xo, Yo = f("Xo"), f("Yo")
-    opt = str(c.get("Option", "Depth"))
-    if opt == "Radius":
+    opt = str(c.get("Option", "Depth") or "").strip().lower()
+    if opt == "radius":
         R = f("R"); depth = Yo - R
-    elif opt == "Intercept":
+    elif opt == "intercept":
         R = ((f("Xi") - Xo) ** 2 + (f("Yi") - Yo) ** 2) ** 0.5
         depth = Yo - R
-    else:
+    elif opt == "depth":
         depth = f("Depth"); R = Yo - depth
+    else:
+        R = depth = float("nan")
     return Xo, Yo, R, depth
 
 
@@ -1758,7 +1771,7 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style, window=None)
 
     for i, c in enumerate(circles):
         Xo, Yo, R, depth = _circle_radius_depth(c)
-        if R <= 0:
+        if not R > 0:                  # unsized (NaN) or degenerate: nothing to draw
             continue
         emph = (i == selected)
         arc = _circle_arc(slope_data, Xo, Yo, R, depth)
@@ -2235,7 +2248,7 @@ def _pick_circles(rows, x, y, tol, slope_data):
     best_i, best_d = None, float("inf")
     for i, c in enumerate(rows):
         Xo, Yo, R, depth = _circle_radius_depth(c)
-        if R <= 0:
+        if not R > 0:                  # unsized (NaN) or degenerate: nothing to pick
             continue
         d = pt.distance(_Point(Xo, Yo))                         # center marker
         arc = _circle_arc(slope_data, Xo, Yo, R, depth)
@@ -6072,7 +6085,12 @@ class CirclesEditor(CategoryEditor):
     # Mirror the 'circles' worksheet: Xo, Yo, Option, Depth, Xi, Yi, R.
     FIELDS = [
         Field("Xo", "Xo"), Field("Yo", "Yo"),
-        Field("Option", "Option", "choice", choices=["Depth", "Radius", "Intercept"]),
+        # A blank Option, or a word that is none of the three, is a circle the loader
+        # keeps with no size (surface.circle_size_missing refuses the runs that read
+        # it). Shown as it is and saved as it was unless an Option is picked
+        # (Field.as_typed); it grays nothing, as the sheet grays nothing for it.
+        Field("Option", "Option", "choice", choices=["Depth", "Radius", "Intercept"],
+              as_typed=True, blank_text="blank"),
         Field("Depth", "Depth"), Field("Xi", "Xi"), Field("Yi", "Yi"), Field("R", "R"),
     ]
 
@@ -6090,6 +6108,26 @@ class CirclesEditor(CategoryEditor):
         opt = str(row.get("Option", "") or "").strip().lower()
         return cls._OPTION_DIM.get(opt, frozenset())
 
+    # The size cells a circle whose Option names no size keeps as entered (the
+    # loader's 'size_cells'), in the table's own columns.
+    _SIZE_CELLS = ("Depth", "Xi", "Yi", "R")
+
+    @classmethod
+    def _shown_row(cls, c):
+        """A model circle as its table row. An unsized circle (its Option blank or
+        unknown, or the cell its Option names blank) carries its typed size cells
+        apart from its undefined R and Depth; the row shows those cells, so what
+        was typed is what the table shows, and a cell nobody typed in shows blank
+        rather than a 0 nobody entered."""
+        cells = c.get("size_cells") if isinstance(c.get("size_cells"), dict) else None
+        opt = str(c.get("Option", "Depth") or "").strip().lower()
+        if cells is None and opt in ("depth", "radius", "intercept"):
+            return c
+        cells = cells or {}
+        row = dict(c)
+        row.update({k: cells.get(k, c.get(k, float("nan"))) for k in cls._SIZE_CELLS})
+        return row
+
     def build(self, slope_data, parent):
         style = _doc_style(parent)
         window = _SearchWindowGroup(slope_data.get("search_window"),
@@ -6100,7 +6138,9 @@ class CirclesEditor(CategoryEditor):
                                   window=window.result_values())
 
         return TableEditorDialog(
-            "Circles", self.FIELDS, slope_data.get("circles", []), _new_circle, parent,
+            "Circles", self.FIELDS,
+            [self._shown_row(c) for c in slope_data.get("circles", [])],
+            _new_circle, parent,
             help_text="Option sets how each circle's size is defined (only the matching "
                       "field is used):\n"
                       "  • Depth — elevation of the circle bottom at the center (R = Yo − Depth)\n"
@@ -6128,14 +6168,33 @@ class CirclesEditor(CategoryEditor):
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
         for c in rows:
-            opt = str(c.get("Option", "Depth"))
-            if opt == "Radius":
+            # The size cells as typed, before the sizing below writes Depth or R.
+            typed = {k: c.get(k) for k in self._SIZE_CELLS}
+            opt = str(c.get("Option", "Depth") or "").strip().lower()
+            if opt == "radius":
                 c["Depth"] = c["Yo"] - c["R"]
-            elif opt == "Intercept":
+            elif opt == "intercept":
                 c["R"] = ((c["Xi"] - c["Xo"]) ** 2 + (c["Yi"] - c["Yo"]) ** 2) ** 0.5
                 c["Depth"] = c["Yo"] - c["R"]
-            else:  # Depth
+            elif opt == "depth":
                 c["R"] = c["Yo"] - c["Depth"]
+            sized = (opt in ("radius", "intercept", "depth")
+                     and not math.isnan(_cell_number(c.get("R")))
+                     and not math.isnan(_cell_number(c.get("Depth"))))
+            if sized:
+                c.pop("size_cells", None)            # sized now, from the cell named
+            else:
+                # Unsized — a blank or unrecognized Option, or the cell a picked
+                # Option names left blank — as the loader reads it: R and Depth
+                # undefined. The Option stays as it is, and what was typed into the
+                # size cells is kept as entered, under 'size_cells', as the loader
+                # keeps it, so it is saved back and is there when the cell is filled
+                # or an Option picked; the model Studio leaves is the one the saved
+                # file reopens as.
+                c["size_cells"] = {k: _cell_number(typed.get(k)) for k in self._SIZE_CELLS}
+                c.pop("Xi", None)
+                c.pop("Yi", None)
+                c["R"] = c["Depth"] = float("nan")
         slope_data["circles"] = rows
         slope_data["circular"] = len(rows) > 0
         # Only the filled limits are stored, and a window nobody filled in leaves no

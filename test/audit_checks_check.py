@@ -19,6 +19,9 @@ search used to read as something else, without a word.
      sheet's formatting and dropdown do ("depth" used to stop the file opening).
      A blank Option opens too, with the circle's size undefined, and preflight's
      surface.circle_size_missing refuses the runs that read the circles sheet.
+     Any unsized circle (blank Option, a word that is none of the three, or the
+     cell its Option names left blank) keeps its Option and the Depth, Xi, Yi and
+     R it was typed with through load and save.
   E. RAPID DRAWDOWN. Only an mc row's d / psi count toward the model having a
      low-permeability material: a stale pair on a cp row (whose cells the
      template grays) is read by nothing.
@@ -303,6 +306,70 @@ def check_circle_option_case():
     return fails
 
 
+def check_circle_size_cells_round_trip():
+    """Any UNSIZED circle round-trips exactly as entered: a blank Option, a word
+    that is none of the three, or one of the three whose cell is blank (Radius
+    with R empty, Intercept with Yi empty, Depth with Depth empty). Its Option and
+    every size cell typed (Depth, Xi, Yi, R) are kept through load and save,
+    reopening in the same cells, and the circle stays unsized for analysis — R
+    undefined, so surface.circle_size_missing still refuses the run — until the
+    cell is filled or an Option picked."""
+    import math
+    import openpyxl
+    from xslope.fileio import save_slope_data_to_xlsx
+    from xslope.preflight import preflight
+
+    def blank(v):
+        return v is None or (isinstance(v, float) and math.isnan(v))
+
+    fails = []
+    # (Option, Depth E3, Xi F3, Yi G3, R H3): each one leaves the circle unsized.
+    cases = ((None, 8.0, 3.0, None, 31.0),
+             ("dpth", 8.0, 3.0, None, 31.0),
+             ("Radius", 8.0, 3.0, None, None),
+             ("Intercept", 8.0, 3.0, None, 31.0),
+             ("depth", None, 3.0, 4.0, 31.0))
+    for option, *cells in cases:
+        tag = "a blank Option" if option is None else f"Option {option!r}"
+        edits = dict(zip(("D3", "E3", "F3", "G3", "H3"), [option] + cells))
+        want = dict(zip(("Depth", "Xi", "Yi", "R"), cells))
+        with _edited(LEM_MODEL, {"circles": edits}) as path:
+            sd = _load(path)
+            c = sd["circles"][0]
+            kept = c.get("size_cells") or {}
+            for key, value in want.items():
+                ok = blank(kept.get(key)) if value is None else kept.get(key) == value
+                if not ok:
+                    fails.append(f"circles: {tag} loaded {key} = {kept.get(key)!r}, "
+                                 f"the cell holds {value!r}")
+            if c.get("Option") != option:
+                fails.append(f"circles: {tag} loaded its Option as "
+                             f"{c.get('Option')!r}")
+            if not (blank(c.get("R")) and blank(c.get("Depth"))):
+                fails.append(f"circles: {tag} loaded as sized (R = {c.get('R')!r}, "
+                             f"Depth = {c.get('Depth')!r})")
+            rep = _quiet(preflight, sd, "lem", {"surface": "circular"})
+            if not any(f.rule_id == "surface.circle_size_missing" for f in rep.errors):
+                fails.append(f"circles: {tag} reached a circular run with no "
+                             f"surface.circle_size_missing error")
+            out = os.path.join(os.path.dirname(path), "saved.xlsx")
+            _quiet(save_slope_data_to_xlsx, sd, out)
+            again = _load(out)["circles"][0]
+            ws = openpyxl.load_workbook(out, data_only=True)["circles"]
+            row = [ws[ref].value for ref in ("D3", "E3", "F3", "G3", "H3")]
+        if row != [option] + cells:
+            fails.append(f"circles: {tag} saved D3:H3 as {row}; the file held "
+                         f"{[option] + cells}")
+        if (again.get("Option") != option
+                or not all((blank(again.get("size_cells", {}).get(k)) and blank(v))
+                           or again.get("size_cells", {}).get(k) == v
+                           for k, v in want.items())
+                or not blank(again.get("R"))):
+            fails.append(f"circles: {tag} reopened as Option {again.get('Option')!r}, "
+                         f"size cells {again.get('size_cells')!r}, R {again.get('R')!r}")
+    return fails
+
+
 # --------------------------------------------------------------------------- #
 # E. rapid drawdown: d / psi on mc rows only
 # --------------------------------------------------------------------------- #
@@ -413,6 +480,7 @@ CHECKS = [
     ("non-circ Movement: what each entry does", check_movement_meaning),
     ("non-circ Movement: search refuses", check_movement_search_refuses),
     ("circles Option: any case", check_circle_option_case),
+    ("circles: unsized circle round-trips", check_circle_size_cells_round_trip),
     ("rapid: d/psi on mc rows only", check_rapid_d_psi_rows),
     ("rapid reliability: d and psi perturbed", check_rapid_reliability_taylor),
 ]

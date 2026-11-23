@@ -2411,6 +2411,12 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     circles_df = xls.parse('circles', header=1)
     raw = circles_df.dropna(subset=['Xo', 'Yo'], how='any')
     circles = []
+
+    def _size_cell(v):
+        """A circles-sheet size cell as entered: its number, or NaN when blank."""
+        v = pd.to_numeric(v, errors='coerce')
+        return float(v) if pd.notna(v) else float('nan')
+
     for _ci, row in raw.iterrows():
         Xo = row['Xo']
         Yo = row['Yo']
@@ -2424,6 +2430,10 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # formatting and dropdown do.
         _opt_key = (str(Option).strip().lower()
                     if isinstance(Option, str) else None)
+        # The size cells as typed, before the Option turns one of them into R and
+        # Depth: what an unsized circle keeps (below).
+        size_cells = {k: _size_cell(v) for k, v in
+                      (('Depth', Depth), ('Xi', Xi), ('Yi', Yi), ('R', R))}
         if _opt_key == 'depth':
             R = Yo - Depth
         elif _opt_key == 'intercept':
@@ -2433,10 +2443,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             Depth = Yo - R
         else:
             # A blank Option, or a word that is not one of the three, states no
-            # size. The circle is kept as entered -- a file saved mid-edit must
-            # reopen -- with its size undefined and the Option it carries, and
-            # preflight's surface.circle_size_missing refuses the runs that read
-            # the circles sheet.
+            # size.
             Depth = R = float('nan')
         circle = {
             "Xo": Xo,
@@ -2444,9 +2451,20 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             "Depth": Depth,
             "R": R,
         }
-        if _opt_key not in ('depth', 'intercept', 'radius'):
+        if pd.isna(_size_cell(R)) or pd.isna(_size_cell(Depth)):
+            # An UNSIZED circle: a blank Option, a word that is not one of the
+            # three, or one of the three whose cell is blank. It is kept as entered
+            # -- a file saved mid-edit must reopen -- with its size undefined, and
+            # preflight's surface.circle_size_missing refuses the runs that read
+            # the circles sheet. The Option is kept as typed and so is every size
+            # cell, under 'size_cells' (NaN for a blank cell): nothing reads them
+            # while the circle has no size, the writer puts them back in the same
+            # cells, and Studio shows them, so filling the cell or picking an
+            # Option later sizes the circle from the values already there.
+            circle["Depth"] = circle["R"] = float('nan')
             circle["Option"] = (str(Option).strip() or None) if isinstance(Option, str) \
                 else (None if Option is None or pd.isna(Option) else str(Option))
+            circle["size_cells"] = size_cells
         circles.append(circle)
 
     # --- optional search window (v19, circles!J7 header, J8:K17 label/value pairs) ---
@@ -3275,9 +3293,12 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     them are, and :func:`write_cells_to_xlsx` flags the workbook for a full
     recalculation on open so the dependent formulas refresh.
 
-    Circle surfaces are always written with ``Option = "Depth"`` (the loader
-    collapses every circle to ``Xo/Yo/Depth/R`` with ``R = Yo - Depth``, so this
-    reproduces the radius regardless of how the original was specified). The pile
+    Circle surfaces are written with ``Option = "Depth"`` (the loader collapses
+    every sized circle to ``Xo/Yo/Depth/R`` with ``R = Yo - Depth``, so this
+    reproduces the radius regardless of how the original was specified). An
+    unsized circle -- its Option blank or not one of the three, or the cell its
+    Option names blank -- is written with its Option and its size cells as they
+    were entered (``size_cells``), so it reopens as it was. The pile
     force direction is auto-derived by the loader from the pile endpoints (the
     pre-v23 templates' ``qp`` override column, when the target carries one, is
     left blank).
@@ -3707,6 +3728,13 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             _opt = c.get('Option', 'Depth')
             circ[cell_ref(row, 4)] = (None if _opt is None or _isnan(_opt)
                                       else str(_opt))
+            # An unsized circle (its Option blank or unknown, or the cell it names
+            # blank) keeps its Option and the size cells it was given (the
+            # loader's 'size_cells'): Depth, Xi, Yi, R in E:H.
+            for _col, _key in ((5, 'Depth'), (6, 'Xi'), (7, 'Yi'), (8, 'R')):
+                _v = (c.get('size_cells') or {}).get(_key)
+                if not _isnan(_v):
+                    circ[cell_ref(row, _col)] = _f(_v)
         else:
             circ[cell_ref(row, 4)] = 'Depth'
             circ[cell_ref(row, 5)] = _f(c['Depth'])

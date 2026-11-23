@@ -7,6 +7,12 @@ The slip surface, the method and the geometry are then all held fixed, so any
 disagreement is the *import* -- a dropped load, a mis-read strength, a crack that should
 not be there.
 
+A staged rapid drawdown is scored as one: SLOPE/W's factor of safety on each of its
+circles is the after-drawdown answer of Duncan, Wright and Wong's three stages, so each
+circle is solved with xslope's rapid drawdown (both piezometric lines, and d and psi
+from SLOPE/W's drawdown strengths) by the same method. Scored as a single-stage
+analysis it would compare the slope before drawdown with SLOPE/W's after.
+
 That is how the tension-crack bug was caught. GeoStudio keeps a switched-off crack's
 geometry, so the importer applied a 2 m water-filled crack to a model that had none. It
 was invisible in the phi=0 clay analyses (pore pressure cannot touch an undrained
@@ -37,6 +43,7 @@ from xslope.geostudio import (read_gsz, gsz_to_slope_data, read_gsz_results,  # 
                               gsz_seep_steps)
 from xslope.slice import generate_slices  # noqa: E402
 from xslope import solve  # noqa: E402
+from xslope.advanced import rapid_drawdown  # noqa: E402
 
 # GeoStudio's method name -> the xslope solver that means the same thing. Comparing
 # xslope's Spencer to SLOPE/W's Morgenstern-Price is a ~1% error all by itself.
@@ -49,9 +56,25 @@ METHODS = {
     "Ordinary":           lambda df: solve.oms(df),
     "Fellenius":          lambda df: solve.oms(df),
     "Janbu":              lambda df: solve.janbu(df),
-    "CorpsEngineers1":    lambda df: solve.corps_engineers(df),
-    "LoweKarafiath":      lambda df: solve.lowe_karafiath(df),
+    "CorpsEngineers1":    lambda df: solve.corps(df, variant=1),
+    "LoweKarafiath":      lambda df: solve.lowe(df),
 }
+
+# The same, for a staged rapid drawdown, which takes its method by name and runs it
+# with the solver's defaults (Morgenstern-Price's half-sine among them). The Corps #1
+# convention is not the default Corps variant, so it has no entry here.
+RAPID_METHODS = {
+    "Spencer": "spencer", "MorgensternPrice": "mprice", "Morgenstern-Price": "mprice",
+    "Bishop": "bishop", "BishopSimplified": "bishop", "Ordinary": "oms",
+    "Fellenius": "oms", "Janbu": "janbu", "LoweKarafiath": "lowe",
+}
+
+# Slices made for a rapid drawdown also break where a surface crosses line 2.
+try:
+    import inspect as _inspect
+    _RAPID_SLICES = "rapid" in _inspect.signature(generate_slices).parameters
+except (TypeError, ValueError):
+    _RAPID_SLICES = False
 
 
 def score_analysis(gsz, analysis, slices):
@@ -63,13 +86,21 @@ def score_analysis(gsz, analysis, slices):
     would compare two different problems.
     """
     name, method = analysis["name"], (analysis["method"] or "")
+    rapid = bool((gsz["stability"].get(analysis["id"]) or {}).get("rapid_drawdown"))
     out = {"analysis": name, "method": method, "n": 0, "skipped": 0, "noncirc": 0,
-           "median": None, "worst": None, "wmedian": None, "note": "", "steps": 1}
+           "median": None, "worst": None, "wmedian": None, "note": "", "steps": 1,
+           "rapid": rapid}
 
     solver = METHODS.get(method)
+    if rapid:
+        rname = RAPID_METHODS.get(method)
+        solver = None if rname is None else (
+            lambda df, _m=rname: rapid_drawdown(df.copy(), _m, debug_level=0))
     if solver is None:
-        out["note"] = f"no xslope equivalent of '{method}'"
+        out["note"] = (f"no xslope equivalent of '{method}'"
+                       + (" for a staged rapid drawdown" if rapid else ""))
         return out
+    slice_kw = {"rapid": True} if (rapid and _RAPID_SLICES) else {}
 
     # No seepage field -> one state, imported as-is (step stays None).
     steps = [s["step"] for s in gsz_seep_steps(gsz, name)] or [None]
@@ -100,7 +131,7 @@ def score_analysis(gsz, analysis, slices):
                 # imported model carries no circles sheet, so the preflight surface
                 # rule would refuse every run this script exists to make.
                 ok, res = generate_slices(slope_data, circle=circle, num_slices=slices,
-                                          debug=False, check_inputs=False)
+                                          debug=False, check_inputs=False, **slice_kw)
                 if not ok:
                     out["skipped"] += 1
                     continue
@@ -165,7 +196,7 @@ def main():
             r = score_analysis(gsz, a, args.slices)
             r["file"] = os.path.basename(path)
             table.append(r)
-            label = f"  {r['analysis'][:46]}"
+            label = f"  {r['analysis'][:46 - 9 * r['rapid']]}" + (" [rapid]" if r["rapid"] else "")
             if r["n"]:
                 flag = "" if abs(r["median"]) < 1.0 else "   <-- OFF"
                 wm = f"{r['wmedian']:>+7.2f}%" if r["wmedian"] is not None else f"{'-':>8}"

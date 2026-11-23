@@ -63,6 +63,7 @@ choice changes the model, so XSLOPE asks for it rather than guessing.
 | **Ru**, per material | `u = ru`, with the same value |
 | **Water above the ground surface** | **A distributed load** — see below |
 | **A parent SEEP/W analysis's pore-pressure field** | The `seep` option, on SEEP/W's own mesh — see below |
+| **A staged rapid drawdown**: two piezometric surfaces and the drawdown strengths | XSLOPE's rapid drawdown: piezometric lines 1 and 2, and d and ψ — see below |
 | **Surcharges** (a wedge of fill above the ground — the surcharge pressure is its *unit weight*) | `dloads`, varying with the depth of fill |
 | **Reinforcement** — nails, geosynthetics, anchors, tiebacks | `reinforcement_lines` — see below |
 | **Line loads** (magnitude + trend/plunge) | `line_loads` |
@@ -118,6 +119,12 @@ the notes say that this is not the same strength.
 SLOPE/W can also scale any strength by a function of the slice base's inclination (an
 anisotropy function). XSLOPE has no such scaling, so the import uses the unscaled
 strength and says so.
+
+A SLOPE/W material can also give a **unit weight above the water table**. The import
+gives the material its unit weight throughout, as SLOPE/W's own solve of its
+pumped-storage rapid drawdown example does for that example's rockfill. Where the two
+differ, the notes give both, and how to set XSLOPE's γ and γ<sub>sat</sub> to weigh the
+soil above the water table at the lighter one.
 
 GeoStudio's **Bedrock** is impenetrable — slip surfaces cannot enter it. XSLOPE's
 **`elastic`** option is the exact analog: an impenetrable zone that cannot fail and that
@@ -225,6 +232,40 @@ unless you replace the field with a water definition the engine can read.
     full list of steps and their factors of safety are all reported, and `step='NNN'`
     takes any other.
 
+### Staged rapid drawdown {#staged-rapid-drawdown}
+
+SLOPE/W's staged rapid drawdown uses the three-stage method of Duncan, Wright, and Wong
+(1990), the same method as XSLOPE's [rapid drawdown](../lem/rapid.md), and it states the
+problem with the same three inputs, so it imports whole:
+
+| SLOPE/W | XSLOPE |
+|---|---|
+| The higher of the analysis's two piezometric surfaces, the water before drawdown | Piezometric line 1 |
+| The lower surface, the water after drawdown | Piezometric line 2 |
+| Drawdown strengths c<sub>R</sub> and φ<sub>R</sub> on a Mohr-Coulomb soil that does not drain | d and ψ, the K<sub>c</sub> = 1 envelope |
+| A soil with no drawdown strengths | A free-draining material, with d and ψ blank |
+
+SLOPE/W's drawdown strengths are an R envelope drawn tangent to the Mohr circles. SLOPE/W
+turns them into the K<sub>c</sub> = 1 envelope with Duncan, Wright, and Brandon's (2014)
+equations, and the import uses the same ones (see
+[When the lab reports an R envelope](../lem/rapid.md#r-envelope)):
+
+>>$d = c_R \dfrac{\cos \phi_R \cos \phi'}{1 - \sin \phi_R} \qquad \psi = \arctan \dfrac{\sin \phi_R \cos \phi'}{1 - \sin \phi_R}$
+
+An XSLOPE input file does not record which analysis to run, so there is no rapid drawdown
+switch to carry. Run the imported model as a rapid drawdown: in Studio, **Run → Run LEM…**
+with Rapid drawdown ticked; in a script, `rapid=True`. Run as an ordinary analysis, it is
+the slope before drawdown. The critical circle imported from a solved file carries
+SLOPE/W's rapid drawdown factor of safety, so the two programs can be compared on it; the
+[verification page](../verification/geostudio.md#gs-2-40) does this for SLOPE/W's four
+rapid drawdown examples.
+
+The notes report anything that is not simply two surfaces, one above the other: a third
+surface, two surfaces that cross, a soil assigned to the lowered surface, drawdown
+strengths on a soil that is not Mohr-Coulomb, and a staged rapid drawdown whose water is
+not two piezometric surfaces. XSLOPE needs both d and ψ, and reads a zero in either as a
+blank, so a soil whose c<sub>R</sub> or φ<sub>R</sub> is zero is named too.
+
 ### Tension cracks
 
 A tension crack imports as `tcrack_depth`, with its percent filled with water as
@@ -282,13 +323,6 @@ without telling you. Read the caveats it returns.
   report both. The spatial function is one-way: export *writes* one (it is how a
   seepage field crosses), but import does not read one back, so an XSLOPE model
   exported and re-imported returns dry, with a caveat reporting it.
-- **A staged rapid drawdown.** SLOPE/W's staged rapid drawdown reads two piezometric
-  surfaces, before and after drawdown, and drawdown strengths for the soils that don't
-  drain. The import takes only the first surface, so the model is the slope before
-  drawdown, while SLOPE/W's factor of safety on the imported circle is the one after it.
-  The caveats say so, and give the lowered surface and the d and ψ that XSLOPE's own
-  [rapid drawdown](../lem/rapid.md) needs, converted from SLOPE/W's drawdown strengths
-  by SLOPE/W's own equations.
 - **The SEEP/W analysis itself** — its mesh is imported, but its conductivity functions
   and boundary conditions are not, so XSLOPE cannot *re-solve* the seepage problem, only
   read the answer SEEP/W already computed. An **unsolved** SEEP/W-fed file therefore
@@ -330,7 +364,9 @@ omits the attribute, the system is inferred from the unit weight of water: ≈9.
 Material zones become regions, materials become SLOPE/W materials (see
 [Strength options on export](#strength-options-on-export)), a piezo line becomes a
 piezometric surface (its points written under the
-owning analysis, the mirror image of how the import reads them), and **distributed loads
+owning analysis, the mirror image of how the import reads them), a rapid drawdown model
+becomes SLOPE/W's staged rapid drawdown (see
+[Exporting a rapid drawdown](#exporting-a-rapid-drawdown)), and **distributed loads
 become surcharges** — GeoStudio's surcharge is a wedge of fill, so an XSLOPE pressure
 profile is written as fill whose *depth* reproduces the pressure exactly. A **seepage
 field** is written as SLOPE/W's spatial pore-pressure function, described below. Export
@@ -378,6 +414,24 @@ case is reported with the size of the difference.
 GeoStudio has a Hoek-Brown model, but the export does not write it yet. GeoStudio has
 no power-curve model as such. Its Shear-Normal function could hold the curve as a
 table of points, which the export does not write.
+
+### Exporting a rapid drawdown
+
+A model with both piezometric lines and a d and ψ on a Mohr-Coulomb material is written
+as SLOPE/W's staged rapid drawdown, the way SLOPE/W's own examples write one: the rapid
+drawdown switch on the analysis, line 1 and line 2 as its two piezometric surfaces, and
+each d and ψ as the drawdown strengths c<sub>R</sub> and φ<sub>R</sub> that SLOPE/W turns
+back into the same d and ψ. The XSLOPE file does not say whether a model is to be run as
+a rapid drawdown, so a model that carries both is always exported as one. To solve it in
+GeoStudio as an ordinary analysis, turn its rapid drawdown off there.
+
+SLOPE/W checks that a soil's c<sub>R</sub> is above its c′ and its φ<sub>R</sub> below its
+φ′. XSLOPE has no such rule, so an envelope that fails the check is written as it is, and
+the notes name the soil. Distributed loads after drawdown (the `dloads (2)` sheet) are not
+written, because SLOPE/W applies one set of surcharges in every stage; the lowered pool
+needs no load of its own, since GeoStudio derives it from the lower surface. A model whose
+water is a seepage field cannot become a staged rapid drawdown, which takes its water as
+two piezometric surfaces, so its d and ψ are left out, and the notes say so.
 
 ### Exporting a seepage field
 
@@ -448,7 +502,8 @@ it straight back out, and diffs XSLOPE's XML against the vendor's.
   analyses. XSLOPE imports the SLOPE/W ones, and reads a SEEP/W analysis's **solved
   pore-pressure field** where a stability analysis depends on it — but it does not import
   a seepage *problem* to re-solve, and writes no analysis but SLOPE/W.
-- Only one piezometric surface is imported; a file defining several uses the first.
+- Only one piezometric surface is imported, except from a staged rapid drawdown, which
+  takes two; any other analysis that defines several uses the first.
 - Import replaces the current project. In Studio you are prompted to discard unsaved
   changes first, exactly as when opening a file; the imported model is then left unsaved
   so you can review it and **Save As**.

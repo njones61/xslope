@@ -44,9 +44,65 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 - Studio's Piezometric lines editor now sets each line's Type, piezo or
   phreatic, in a box above the line's table. Until now the Type could be set
   only in the workbook's piezo sheet.
+- GeoStudio import and export carry SLOPE/W's staged rapid drawdown. The
+  import takes SLOPE/W's water surfaces before and after drawdown as
+  Piezometric Lines 1 and 2, and converts each soil's R envelope (c_R, φ_R) to
+  XSLOPE's d and ψ; the export writes them back. On SLOPE/W's own critical
+  circles, its four rapid drawdown examples read within 0.3%, 1.8%, 0.8%, and
+  0.0% of SLOPE/W, and are on the GeoStudio verification page.
 
 ### Fixed
 
+- The finite element method takes each material's pore pressure from that
+  material's own u, as limit equilibrium does. It used to apply one source to
+  the whole model: a single piezo row gave every material the line's pressure,
+  including materials set to none, and one ru row applied every row's r_u.
+  Materials may now use different sources in one model. The Analysis Report
+  names each material's source.
+- Suction strength (φ_b, s_cap) is no longer added to cp or ratio materials, in
+  either engine, as the documentation says. These are undrained strengths, which
+  already include it.
+- Studio's seepage analysis lets water flow across joints. Studio's mesh is
+  split along each joint for the finite element method, and seepage on that
+  mesh treated the joint as a sealed wall: one joint cut an earth dam's flow
+  from 42.23 to 36.73. A Python script, which builds no split, gave a different
+  answer from Studio.
+- A mesh Size on an ssr reduce, ssr hold, ssr elastic, or joints polygon refines
+  the mesh inside it, as it does on material and refine polygons. It was
+  ignored.
+- A joint's tensile cutoff is reduced with the strength reduction factor when
+  Tension SRF is on, as a material's is; it was never reduced. Studio's Tension
+  SRF box is live when only a joint has a cutoff.
+- In a rapid drawdown, the Taylor series reliability analysis varies d and ψ by
+  s(d) and s(ψ). These were never read, so the uncertainty in the drawdown
+  strength was left out: on Slide2's verification problem 96, β falls from 5.37
+  to 3.79. A reliability run on a fixed surface now runs the drawdown; it used
+  to solve the slope before drawdown.
+- The finite element method refuses a blank strength option, as limit
+  equilibrium does. It used to run it as Mohr-Coulomb.
+- A limit equilibrium run that isn't a rapid drawdown no longer reads
+  Piezometric Line 2. A short line 2 could stop the run.
+- A seepage boundary block with a blank value no longer drops every block after
+  it. The block is kept, and the model checks report the missing value. Studio
+  keeps a blank boundary value blank instead of saving it as 0.
+- An unsaturated-model word other than lf, vg, or gard is refused; it used to
+  run as lf. A non-circular point's Movement other than Free, Horiz, or Fixed is
+  refused; any other word used to fix an interior point. Both, and the circles
+  sheet's Option, are matched whatever their case, and a circle with a blank
+  Option opens and is reported when a run reads circles.
+- The model checks no longer stop runs that don't read the field they check,
+  such as reinforcement checks on a seepage run, and they check what joints
+  read: Joint and Jred words, kn and ks above zero, and the joints sheet's c, φ,
+  and t_cut. d and ψ are checked only on mc rows, the only rows that read them.
+- Studio's editors gray only what nothing reads: a Gardner material keeps h0,
+  which transient seepage reads; a blank u or unsat grays what it leaves
+  unread; Adhesion and Delta stay live on a jointed reinforcement line, whose
+  interface reads them, and are no longer cleared; Lp1 and Lp2 gray when
+  Adhesion and Delta are both filled; the circles table grays by Option. New
+  reinforcement lines start with Lp blank instead of 0, which passed every
+  check as fully anchored. Studio rebuilds the mesh when a line's Joint or
+  Tend changes, and shows a blank or unrecognized Movement as it is instead of
+  saving it as Free.
 - A material property left blank in Studio's Materials editor now reads as the
   value a blank workbook cell loads as: 0 for c, φ, γ, d, ψ, E, ν, r_u, and k1,
   and 0.5 for l. A cp or ratio material with a blank c failed with "Solve
@@ -93,11 +149,9 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   `cp`. The import kept only the cohesion at the datum: Slide2's verification
   problems 83 and 84, imported from RS2's files, read 16% to 34% below Slide2 and
   now read within 0.7%.
-- Importing a SLOPE/W staged rapid drawdown now says the imported model is the
-  slope before drawdown, while SLOPE/W's factor of safety is the one after it, and
-  gives the lowered water line and the d and ψ that XSLOPE's own rapid drawdown
-  analysis needs. A B-bar analysis imports its piezometric line, and the notes say
-  the excess pore pressure from B-bar is not included; it used to import dry.
+- A B-bar analysis imports from GeoStudio with its piezometric line, and the
+  notes say the excess pore pressure from B-bar is not included; it used to
+  import dry.
 - A non-circular search now runs when the surface's points were entered from
   right to left. Every move was refused, and the search returned the starting
   surface as its answer: 1.313 on one model where the search, run from the same
@@ -158,8 +212,11 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 ### Changed
 
 - The input template is version 28. It adds k_v to the main sheet (D14) and the
-  ratio option to the mat sheet, and grays the l column for a Gardner material,
-  which doesn't use it. Workbooks made on earlier versions still load.
+  ratio option to the mat sheet. Its gray cells follow what the analysis reads:
+  ru, φ_b, and s_cap gray when u is blank; a, n, and l when unsat is blank; l
+  and kr0 for a Gardner material, which reads h0; s(γ) for hb, pow, and
+  elastic; and Lp1 and Lp2 when Adhesion and Delta are both filled. Workbooks
+  made on earlier versions still load.
 - The horizontal seismic coefficient is called k_h everywhere: in Studio, the
   model checks, the documentation, and the Analysis Report, which writes the
   seismic force as k_hW and the slice weight as W(1 + k_v).

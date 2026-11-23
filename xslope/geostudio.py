@@ -39,13 +39,14 @@ Only what SLOPE/W and xslope have in common is imported -- regions, materials
 (Mohr-Coulomb and undrained; SHANSEP as ``ratio``; S=f(depth) as ``cp``; bedrock as
 ``elastic``), the piezometric surface
 (with SLOPE/W's phreatic correction where the analysis applies it), Ru, water
-above ground, a solved SEEP/W field, surcharges and line loads, reinforcement,
+above ground, a solved SEEP/W field, a staged rapid drawdown (both piezometric
+surfaces and the drawdown strengths), surcharges and line loads, reinforcement,
 the tension crack, the seismic coefficient and the solved critical circle.
 Everything else is reported as a caveat rather than silently dropped:
 unsupported strength models, unsupported pore-pressure options (B-bar and
-spatial functions), a staged rapid drawdown, SLOPE/W's search definition and an
-optimized or non-circular critical surface, reinforcement sets, inclined tension
-cracks and the vertical seismic coefficient.
+spatial functions), SLOPE/W's search definition and an optimized or non-circular
+critical surface, reinforcement sets, inclined tension cracks and the vertical
+seismic coefficient.
 """
 
 import csv
@@ -613,8 +614,8 @@ _ENTRY_ELEMENTS = {
     "ReinforcementSets": "reinforcement sets (out-of-plane staging groups)",
 }
 
-# The <Control> switches gsz_to_slope_data acts on: the phreatic correction is
-# imported, and a staged rapid drawdown is reported. Any other switch is reported as
+# The <Control> switches gsz_to_slope_data acts on: the phreatic correction and a
+# staged rapid drawdown are both imported. Any other switch is reported as
 # unrecognized, the same as an unknown element.
 _CONTROL_HANDLED = {"IsPiezPhreatic", "IsRapidDrawdown"}
 
@@ -1265,68 +1266,211 @@ def _line_on_ground(line, ground_surface, n=20):
     return [(a, b) for a, b in spans if b - a > tol]
 
 
-def _rapid_drawdown_caveat(gsz, used, surfaces, piezo_line):
-    """The caveat for a SLOPE/W staged rapid drawdown, which the import does not carry.
+def _kc1_envelope(c_r, phi_r, phi):
+    """XSLOPE's K_c = 1 envelope ``(d, psi)`` from SLOPE/W's drawdown strengths.
 
-    SLOPE/W (after Duncan, Wright and Wong 1990) reads the higher of two piezometric
-    surfaces as the water before drawdown and the lower as the water after it, and
-    each soil that does not drain carries an R envelope, <DrawdownCohesion> and
-    <DrawdownPhi> (c_R, phi_R; a free-draining soil has neither). XSLOPE's own rapid
-    drawdown takes the same inputs as a second piezo line and the K_c = 1 envelope
-    (d, psi), which SLOPE/W computes from c_R and phi_R by its Eqs. 77-78:
+    A SLOPE/W material's <DrawdownCohesion> and <DrawdownPhi> are c_R and phi_R, the
+    intercept and slope of the R (total stress) envelope drawn tangent to the Mohr
+    circles. SLOPE/W turns them into the isotropic-consolidation envelope by its
+    Eqs. 77-78 (Slope Stability Modeling, sec. 9.3), the same as Duncan, Wright and
+    Brandon's (2014) Eqs. 9.6-9.7:
 
-        d = c_R cos(phi_R) cos(phi') / (1 - sin(phi_R))
+        d   = c_R cos(phi_R) cos(phi') / (1 - sin(phi_R))
         psi = atan( sin(phi_R) cos(phi') / (1 - sin(phi_R)) )
 
-    The caveat gives those values, so the stages can be entered by hand.
+    That envelope is XSLOPE's d and psi. On SLOPE/W's four rapid drawdown examples,
+    scored on SLOPE/W's own critical circles, the converted pair lands within 1.9% of
+    SLOPE/W's factor of safety; c_R and phi_R taken as d and psi unchanged land 4-10%
+    low. ``None`` when phi_R or phi' is 90 degrees or more, where the equations fail.
     """
-    lines = [ln for ln in surfaces.values() if ln]
-    high = low = None
-    if len(lines) >= 2:
-        tops = [max(y for _, y in ln) for ln in lines]
-        high, low = lines[tops.index(max(tops))], lines[tops.index(min(tops))]
+    if not (phi_r < 90.0 and phi < 90.0):
+        return None
+    sr, cr = math.sin(math.radians(phi_r)), math.cos(math.radians(phi_r))
+    cp = math.cos(math.radians(phi))
+    return (c_r * cr * cp / (1.0 - sr),
+            math.degrees(math.atan(sr * cp / (1.0 - sr))))
 
-    soils = []
-    for mid in used:
-        mat = gsz["materials"][mid]
-        s = mat["strength"]
+
+def _r_envelope(d, psi, phi):
+    """The inverse of :func:`_kc1_envelope`: the ``(c_R, phi_R)`` that SLOPE/W converts
+    back to exactly this ``(d, psi)``. With t = tan(psi) / cos(phi'), Eq. 78 gives
+    sin(phi_R) = t / (1 + t), and Eq. 77 then gives c_R. ``None`` when phi' is 90
+    degrees or more, or psi is negative."""
+    if not (0.0 <= psi < 90.0 and phi < 90.0):
+        return None
+    cp = math.cos(math.radians(phi))
+    t = math.tan(math.radians(psi)) / cp
+    sr = t / (1.0 + t)
+    phi_r = math.degrees(math.asin(sr))
+    return d * (1.0 - sr) / (math.cos(math.radians(phi_r)) * cp), phi_r
+
+
+def _y_along(line, x):
+    """The elevation of a polyline at ``x``, or None outside its x-extent."""
+    for (xa, ya), (xb, yb) in zip(line, line[1:]):
+        lo, hi = min(xa, xb), max(xa, xb)
+        if lo <= x <= hi:
+            return ya if xb == xa else ya + (yb - ya) * (x - xa) / (xb - xa)
+    return None
+
+
+def _before_after(a, b):
+    """Which of two piezometric surfaces is the water before drawdown.
+
+    Returns ``(high, low, crossing)``: ``high`` stands at or above ``low`` wherever
+    both are defined unless ``crossing`` is the x of a point where the order flips, in
+    which case ``high`` is the one that is higher on average over their common
+    extent."""
+    xs = sorted({x for x, _ in a} | {x for x, _ in b})
+    diffs = []
+    for x in xs:
+        ya, yb = _y_along(a, x), _y_along(b, x)
+        if ya is not None and yb is not None:
+            diffs.append((x, ya - yb))
+    if not diffs:                       # no common extent: compare their averages
+        ma = sum(y for _, y in a) / len(a)
+        mb = sum(y for _, y in b) / len(b)
+        return (a, b, None) if ma >= mb else (b, a, None)
+    ys = [y for _, y in a + b]
+    tol = 1e-9 * max(1.0, max(ys) - min(ys))
+    signs = [(x, 1 if dy > tol else -1) for x, dy in diffs if abs(dy) > tol]
+    if all(s > 0 for _, s in signs):
+        return a, b, None
+    if all(s < 0 for _, s in signs):
+        return b, a, None
+    flip = next(x for (x, s), (_, s0) in zip(signs[1:], signs) if s != s0)
+    mean = sum(dy for _, dy in diffs) / len(diffs)
+    return (a, b, flip) if mean >= 0 else (b, a, flip)
+
+
+def _rapid_drawdown(gsz, used, materials, bedrock, stab, option, piezo_line):
+    """Map a SLOPE/W staged rapid drawdown onto XSLOPE's own.
+
+    SLOPE/W (after Duncan, Wright and Wong 1990) reads two piezometric surfaces, the
+    higher as the water before drawdown and the lower as the water after it, and an R
+    envelope (c_R, phi_R) on each soil that does not drain; a free-draining soil has
+    neither. XSLOPE's rapid drawdown takes the same three things: piezo line 1, piezo
+    line 2, and the K_c = 1 envelope (d, psi) on each Mohr-Coulomb material that does
+    not drain, converted from c_R and phi_R by SLOPE/W's own equations
+    (:func:`_kc1_envelope`).
+
+    Sets ``d`` and ``psi`` on ``materials`` in place and returns ``(line1, line2,
+    caveats)``. Anything that is not simply two surfaces, one above the other, with
+    drawdown strengths on Mohr-Coulomb soils, is reported.
+    """
+    caveats, soils, free = [], [], []
+    for mid, mat in zip(used, materials):
+        src = gsz["materials"][mid]
+        s = src["strength"]
         try:
             c_r = float(s.get("DrawdownCohesion") or 0.0)
             phi_r = float(s.get("DrawdownPhi") or 0.0)
-            phi = float(s.get("PhiPrime") or 0.0)
         except ValueError:
+            caveats.append(
+                f"material '{src['name']}' has drawdown strengths XSLOPE cannot read "
+                f"(c_R = {s.get('DrawdownCohesion')!r}, phi_R = "
+                f"{s.get('DrawdownPhi')!r}), so it was imported as free-draining. Set "
+                f"its d and psi by hand")
             continue
-        if not (c_r or phi_r) or mat["model"] == "Bedrock":
+        if mid in bedrock:
             continue
-        sr, cr = math.sin(math.radians(phi_r)), math.cos(math.radians(phi_r))
-        cp = math.cos(math.radians(phi))
-        d = c_r * cr * cp / (1.0 - sr)
-        psi = math.degrees(math.atan(sr * cp / (1.0 - sr)))
-        soils.append(f"{mat['name']!r} d = {d:.4g}, psi = {psi:.3g}")
+        if not (c_r or phi_r):
+            free.append(repr(src["name"]))
+            continue
+        if src["model"] != "MohrCoulomb":
+            caveats.append(
+                f"material '{src['name']}' carries drawdown strengths (c_R = {c_r:g}, "
+                f"phi_R = {phi_r:g}), but SLOPE/W's staged rapid drawdown reads them only "
+                f"on a Mohr-Coulomb soil, and this one is {src['model'] or 'unnamed'}. "
+                f"They were not imported")
+            continue
+        env = _kc1_envelope(c_r, phi_r, mat["phi"])
+        if env is None:
+            caveats.append(
+                f"material '{src['name']}' has drawdown strengths c_R = {c_r:g}, "
+                f"phi_R = {phi_r:g} with phi' = {mat['phi']:g}, which SLOPE/W's "
+                f"conversion cannot take, so it was imported as free-draining. Set its "
+                f"d and psi by hand")
+            continue
+        mat["d"], mat["psi"] = env
+        soils.append(f"'{src['name']}' c_R = {c_r:g}, phi_R = {phi_r:g} -> "
+                     f"d = {env[0]:.4g}, psi = {env[1]:.3g}")
+        if (env[0] == 0.0) != (env[1] == 0.0):
+            caveats.append(
+                f"material '{src['name']}' has c_R = {c_r:g} and phi_R = {phi_r:g}, so "
+                f"one of its d and psi is zero. XSLOPE reads a zero there as a blank "
+                f"and refuses a rapid drawdown on a material with only one of the "
+                f"two, so this model will not run as one until that is resolved")
 
-    if piezo_line and high is not None and list(piezo_line) == list(high):
-        took = ("XSLOPE imported only the full-pool (higher) piezometric surface, as an "
-                "ordinary piezo line, so this model is the slope before drawdown")
-    elif piezo_line and low is not None and list(piezo_line) == list(low):
-        took = ("XSLOPE imported only the lowered piezometric surface, as an ordinary "
-                "piezo line, so this model is the slope after drawdown with drained "
-                "strengths throughout")
-    elif piezo_line:
-        took = "XSLOPE imported one piezometric surface, as an ordinary piezo line"
+    # The water before and after drawdown.
+    line1, line2, how = list(piezo_line), [], None
+    surfaces = stab.get("piezo", {})
+    lines = [(sid, list(pts)) for sid, pts in surfaces.items() if len(pts) >= 2]
+    if option not in ("PiezoSurface", "PiezoSurfaceBbar"):
+        caveats.append(
+            f"SLOPE/W's staged rapid drawdown here takes its pore pressure from its "
+            f"'{option}' option. XSLOPE's takes the water before and after drawdown "
+            f"as piezo lines 1 and 2, and this file states neither, so set both before "
+            f"running XSLOPE's rapid drawdown")
+    elif len(lines) < 2:
+        caveats.append(
+            f"SLOPE/W's staged rapid drawdown reads two piezometric surfaces, the water "
+            f"before and after drawdown, and this analysis has {len(lines)}. "
+            + ("It was imported as piezo line 1. " if lines else "")
+            + "Draw piezo line 2, the water after drawdown, before running XSLOPE's "
+              "rapid drawdown")
     else:
-        took = "XSLOPE imported none of its water"
-    return (
-        "THE FACTOR OF SAFETY IS NOT SLOPE/W'S RAPID DRAWDOWN ANSWER: SLOPE/W solved "
-        "this analysis as a staged rapid drawdown (Duncan, Wright and Wong 1990). "
-        f"{took}. The lowered surface, the drawdown strengths and the three stages "
-        "were not imported. SLOPE/W's FS on the imported circle is its after-drawdown "
-        "value. To run XSLOPE's own rapid drawdown, add the lowered surface"
-        + (f" ({', '.join(f'({x:g}, {y:g})' for x, y in low)})"
-           if low is not None and len(low) <= 12 else "")
-        + " as the second piezo line"
-        + (f" and set d and psi: {'; '.join(soils)} (SLOPE/W's drawdown strengths, "
-           f"converted by its own equations)" if soils else "")
-        + ".")
+        if len(lines) > 2:
+            mean = {sid: sum(y for _, y in pts) / len(pts) for sid, pts in lines}
+            hi_id = max(mean, key=mean.get)
+            lo_id = min(mean, key=mean.get)
+            caveats.append(
+                f"SLOPE/W's staged rapid drawdown reads two piezometric surfaces, and "
+                f"this analysis has {len(lines)}. XSLOPE took the highest (ID {hi_id}) "
+                f"as the water before drawdown and the lowest (ID {lo_id}) as the water "
+                f"after it; the others were not imported")
+            lines = [(sid, pts) for sid, pts in lines if sid in (hi_id, lo_id)]
+        (ida, a), (idb, b) = lines
+        high, low, crossing = _before_after(a, b)
+        hi_id, lo_id = (ida, idb) if high is a else (idb, ida)
+        line1, line2 = high, low
+        if crossing is not None:
+            caveats.append(
+                f"SLOPE/W's two piezometric surfaces cross near x = {crossing:g}, so "
+                f"neither is the water before drawdown everywhere. XSLOPE took surface "
+                f"{hi_id}, the higher on average, as piezo line 1 (before drawdown) and "
+                f"surface {lo_id} as piezo line 2. Check them against the GeoStudio "
+                f"model")
+        uses = stab.get("material_piezo", {})
+        lowered = [repr(gsz["materials"][mid]["name"]) for mid in used
+                   if uses.get(mid) == lo_id and mid not in bedrock]
+        if lowered:
+            caveats.append(
+                f"SLOPE/W assigns {', '.join(lowered)} to the lowered piezometric "
+                f"surface. In XSLOPE's rapid drawdown every material that takes its "
+                f"pore pressure from a line reads line 1 before drawdown and line 2 "
+                f"after it, so check that material's water against the GeoStudio model")
+        how = ("the full-pool piezometric surface as piezo line 1, the lowered one "
+               + (f"({', '.join(f'({x:g}, {y:g})' for x, y in low)}) "
+                  if len(low) <= 12 else "")
+               + "as piezo line 2")
+
+    caveats.insert(0, (
+        "SLOPE/W solved this analysis as a staged rapid drawdown (Duncan, Wright and "
+        "Wong 1990), and it was imported as XSLOPE's rapid drawdown"
+        + (f": {how}" if how else "")
+        + (f"{', and' if how else ':'} the drawdown strengths as d and psi, converted "
+           f"from SLOPE/W's R envelope by its own equations ({'; '.join(soils)})"
+           if soils else
+           ". No soil carries drawdown strengths, so every soil drains and XSLOPE's "
+           "rapid drawdown refuses the model until one is given d and psi")
+        + (f". {', '.join(free)} carr{'ies' if len(free) == 1 else 'y'} none and "
+           f"drain{'s' if len(free) == 1 else ''} freely" if free and soils else "")
+        + ". An XSLOPE file does not record which analysis to run, so run it as a rapid "
+          "drawdown (in Studio, Run LEM with Rapid drawdown ticked; in a script, "
+          "rapid=True). Run as an ordinary analysis it is the slope before drawdown, "
+          "and its factor of safety is not SLOPE/W's"))
+    return line1, line2, caveats
 
 
 def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
@@ -1531,8 +1675,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                     f"to the piezometric surface in GeoStudio — imported with no pore "
                     f"pressure")
             if len(surfaces) > 1 and not rapid:
-                # (A staged rapid drawdown has two by design; its own caveat says
-                # which was imported.)
+                # (A staged rapid drawdown has two by design, the water before and
+                # after drawdown; _rapid_drawdown imports both.)
                 caveats.append(
                     f"the file defines {len(surfaces)} piezometric surfaces; "
                     f"xslope takes one, so the first was imported")
@@ -1631,11 +1775,28 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
 
     # A staged rapid drawdown (Duncan, Wright and Wong 1990). SLOPE/W reads two
     # piezometric surfaces -- the higher one before drawdown, the lower one after -- and
-    # drawdown strengths (c_R, phi_R) for the soils that do not drain. The import takes
-    # only the first surface, as an ordinary piezo line, so the model is the slope
-    # before drawdown while SLOPE/W's own factor of safety is the one after it.
+    # drawdown strengths (c_R, phi_R) for the soils that do not drain. XSLOPE's rapid
+    # drawdown takes the same three things: piezo lines 1 and 2, and d and psi.
+    piezo_line2 = []
     if rapid:
-        caveats.append(_rapid_drawdown_caveat(gsz, used, surfaces, piezo_line))
+        piezo_line, piezo_line2, notes = _rapid_drawdown(
+            gsz, used, materials, bedrock, stab, option, piezo_line)
+        caveats.extend(notes)
+    # Unit weight above the water table. SLOPE/W's own solve of its pumped-storage
+    # rapid drawdown example weighs every column at <UnitWeight>, its rockfill's lower
+    # <DryWeight> included, so the import does the same and names the field.
+    for mid, mat in zip(used, materials):
+        dry = gsz["materials"][mid]["strength"].get("DryWeight")
+        try:
+            dry = float(dry) if dry is not None else None
+        except ValueError:
+            dry = None
+        if dry is not None and mid not in bedrock and abs(dry - mat["gamma"]) > 1e-9:
+            caveats.append(
+                f"material '{mat['name']}' also gives a unit weight above the water "
+                f"table ({dry:g}), which the import does not read: it weighs "
+                f"{mat['gamma']:g} throughout. To weigh it at {dry:g} above the water "
+                f"table, set gamma = {dry:g} and gamma_sat = {mat['gamma']:g}")
 
     # SLOPE/W's unsaturated shear-strength setting rides on the piezometric surface as
     # a suction ceiling (CapSuction/MaxSuction), NOT as a per-material phi_b. It is a
@@ -1699,7 +1860,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         "tcrack_surface": None,
         "materials": materials,
         "piezo_line": piezo_line,
-        "piezo_line2": [],
+        "piezo_line2": piezo_line2,
         # SLOPE/W's phreatic correction is a per-analysis switch, <Control>
         # <IsPiezPhreatic>, written only when it is on. Without it SLOPE/W's pore
         # pressure is the plain head under the line: on every such analysis in
@@ -1788,7 +1949,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                                   "Depth": chosen["yo"] - chosen["r"]}]
         slope_data["circular"] = True
         caveats.append(
-            f"the failure surface is a trial circle of SLOPE/W's own (its FS = "
+            f"the failure surface is a trial circle of SLOPE/W's own (its "
+            f"{'rapid drawdown ' if rapid else ''}FS = "
             f"{chosen['fs']:.3f} by {analysis['method'] or 'its method'}), not a search "
             f"— it is imported so the model is complete and the two programs can be "
             f"compared on the same circle; run a search to find xslope's own critical "
@@ -1876,8 +2038,12 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             f"sheet's {_water_loads_cell()} is set to auto, and the engine measures "
             f"the reservoir off {derived['source']} at solve time), which comes to "
             f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
-            f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
-            f"written to the dloads sheet, and nothing should be added there by hand")
+            f"({derived['peak']:.1f} pressure at the deepest point)"
+            + (f". In a rapid drawdown's later stages it measures the lowered pool off "
+               f"{derive_water_loads(slope_data, stage=2)['source']} the same way"
+               if piezo_line2 else "")
+            + ". Nothing was written to the dloads sheet, and nothing should be added "
+              "there by hand")
         for note in derived["cut"]:
             caveats.append(
                 f"the derived water load stops where a boundary ends: {note}. Check "
@@ -2693,6 +2859,13 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     than dropped in silence. A ``ratio`` material is written as SLOPE/W's SHANSEP and a
     ``cp`` one as S=f(depth) (see :func:`_export_strength`).
 
+    A rapid drawdown model -- piezo lines 1 and 2, and d and psi on a Mohr-Coulomb
+    material -- is written as SLOPE/W's staged rapid drawdown, the way SLOPE/W's own
+    examples write one: the <IsRapidDrawdown> switch under the analysis's <Control>,
+    both lines as piezometric surfaces (before drawdown first), and each d and psi as
+    the <DrawdownCohesion> and <DrawdownPhi> (c_R, phi_R) that SLOPE/W converts back to
+    them (:func:`_r_envelope`).
+
     A finite-element seepage field crosses as DATA, not as a model: its nodal pressures
     are written as SLOPE/W's spatial pore-pressure function (a set of discrete points
     GeoStudio interpolates between), with no SEEP/W analysis and no fabricated solution.
@@ -2756,7 +2929,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     # surcharge, and to sit a surcharge's fill wedge on top of the ground.
     ground_surface = slope_data.get("ground_surface")
     if ground_surface is None or getattr(ground_surface, "is_empty", True):
-        ground_surface = build_ground_surface_from_polygons(polygons)
+        ground_surface, _ = build_ground_surface_from_polygons(polygons)
 
     # A finite-element seepage field. The MODEL behind it (mesh, conductivity functions,
     # boundary conditions) has no place in a SLOPE/W-only .gsz, and fabricating a SEEP/W
@@ -2852,6 +3025,107 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         strength_out.append((model, fields))
         caveats.extend(notes)
 
+    # A rapid drawdown. XSLOPE's takes the water before and after drawdown as piezo
+    # lines 1 and 2 and a K_c = 1 envelope (d, psi) on each Mohr-Coulomb material that
+    # does not drain; SLOPE/W's staged rapid drawdown takes two piezometric surfaces
+    # and an R envelope (c_R, phi_R), which it converts to the same (d, psi). An XSLOPE
+    # file records no analysis type, so a model carrying both lines and the envelope is
+    # written as a staged rapid drawdown, and the caveat says so.
+    piezo_line2 = slope_data.get("piezo_line2") or []
+    drawdown = [k for k, m in enumerate(materials)
+                if (m.get("option") or "mc").strip().lower() == "mc"
+                and (float(m.get("d") or 0.0) or float(m.get("psi") or 0.0))]
+    rapid = (len(piezo_line) >= 2 and len(piezo_line2) >= 2 and bool(drawdown)
+             and not seep_pts)
+    drawdown_out = []
+    if rapid:
+        for k in drawdown:
+            m = materials[k]
+            name = m.get("name") or f"material {k + 1}"
+            d, psi = float(m.get("d") or 0.0), float(m.get("psi") or 0.0)
+            c, phi = float(m.get("c") or 0.0), float(m.get("phi") or 0.0)
+            r = _r_envelope(d, psi, phi)
+            if r is None:
+                caveats.append(
+                    f"material '{name}': d = {d:g}, psi = {psi:g} with phi' = {phi:g} "
+                    f"has no R envelope SLOPE/W's conversion gives back, so its drawdown "
+                    f"strengths were not written and GeoStudio will treat it as "
+                    f"free-draining")
+                continue
+            c_r, phi_r = r
+            strength_out[k] = (strength_out[k][0], list(strength_out[k][1])
+                               + [("DrawdownCohesion", c_r), ("DrawdownPhi", phi_r)])
+            drawdown_out.append(f"'{name}' d = {d:g}, psi = {psi:g} -> c_R = {c_r:.4g}, "
+                                f"phi_R = {phi_r:.3g}")
+            # SLOPE/W's own check on an undrained material (Slope Stability Modeling,
+            # sec. 9.3): c_R above c' and phi_R below phi'.
+            if not (c_r > c and phi_r < phi):
+                caveats.append(
+                    f"material '{name}' was written with c_R = {c_r:.4g} and phi_R = "
+                    f"{phi_r:.3g}. SLOPE/W checks that a soil's c_R is above its c' "
+                    f"({c:g}) and its phi_R below its phi' ({phi:g}), so GeoStudio may "
+                    f"refuse to solve it. XSLOPE has no such rule")
+        # SLOPE/W tells the two surfaces apart by elevation, not by order.
+        p1 = list(piezo_line)
+        high, _low, crossing = _before_after(p1, list(piezo_line2))
+        if crossing is not None or high is not p1:
+            caveats.append(
+                "piezo line 2 stands above line 1"
+                + (f" near x = {crossing:g}" if crossing is not None else "")
+                + ". SLOPE/W takes the higher of its two piezometric surfaces as the "
+                  "water before drawdown, so check the two in GeoStudio")
+        caveats.append(
+            "this model was written as SLOPE/W's staged rapid drawdown (Duncan, Wright "
+            "and Wong 1990): piezo line 1 as the piezometric surface before drawdown, "
+            "line 2 as the one after, and the d and psi of each material that does not "
+            "drain as the R envelope that SLOPE/W converts back to the same d and psi"
+            + (f" ({'; '.join(drawdown_out)})" if drawdown_out else "")
+            + ". An XSLOPE file does not say whether a model is to be run as a rapid "
+              "drawdown, so the export writes one whenever the model has both lines "
+              "and a d and psi. To solve it in GeoStudio as an ordinary analysis, turn "
+              "its rapid drawdown off there")
+        # GeoStudio derives the lowered pool from the lower surface, as XSLOPE's
+        # automatic water loads do. A stage-2 load that is anything else has no place
+        # in the file: SLOPE/W applies one set of surcharges in every stage.
+        ponded2 = material_above_ground_dload(ground_surface, piezo_line2, gamma_water)
+        extra2 = [b for b in (slope_data.get("dloads2") or [])
+                  if not all(abs(p["Normal"] - _dload_pressure_at(ponded2, p["X"]))
+                             <= 1e-6 * max(1.0, abs(p["Normal"])) for p in b)]
+        if extra2:
+            caveats.append(
+                f"{len(extra2)} distributed load(s) after drawdown (the dloads (2) "
+                f"sheet) were not written: SLOPE/W's staged rapid drawdown applies the "
+                f"same surcharges in every stage, so only those before drawdown were "
+                f"written")
+    else:
+        unused = []
+        if drawdown:
+            unused.append(
+                f"the d and psi of {', '.join(repr(materials[k].get('name')) for k in drawdown)}")
+        if len(piezo_line2) >= 2:
+            unused.append("piezo line 2")
+        if (slope_data.get("dloads2") or []) and str(
+                slope_data.get("water_loads") or "").lower() == "manual":
+            unused.append("the distributed loads after drawdown (the dloads (2) sheet)")
+        if unused:
+            have = [n for n, ln in (("line 1", piezo_line), ("line 2", piezo_line2))
+                    if len(ln) >= 2]
+            if seep_pts or any((m.get("u") or "") == "seep" for m in materials):
+                why = ("this model's water is a seepage field, and SLOPE/W's staged "
+                       "rapid drawdown takes the water before and after drawdown as two "
+                       "piezometric surfaces")
+            elif len(have) < 2:
+                why = ("SLOPE/W's staged rapid drawdown takes the water before and "
+                       "after drawdown as piezo lines 1 and 2, and this model has "
+                       + (f"only {have[0]}" if have else "neither"))
+            else:
+                why = (f"only a rapid drawdown reads "
+                       f"{'it' if unused == ['piezo line 2'] else 'them'}, and no "
+                       f"Mohr-Coulomb material in this model carries d and psi")
+            caveats.append(f"{' and '.join(unused)} "
+                           f"{'was' if unused == ['piezo line 2'] else 'were'} not "
+                           f"written: {why}")
+
     # v16/v17 material features SLOPE/W has no place for. They must NOT corrupt the file
     # (a .gsz material has no phi_b tag, and its TensileStrength is a LEM tension limit,
     # not xslope's FEM Rankine cut), so they are dropped from the export and reported.
@@ -2939,6 +3213,11 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     # p(x) becomes the line y_ground(x) + p(x)/gamma. Any gamma reproduces p exactly; the
     # unit weight of water is used because it is already in the file and unit-consistent.
     local_pts = list(piezo_line)                        # numbered 1..n
+    # A rapid drawdown's second surface, the water after drawdown, follows the first.
+    piezo2_ids = []
+    if rapid:
+        local_pts += list(piezo_line2)
+        piezo2_ids = list(range(len(piezo_line) + 1, len(local_pts) + 1))
     sc_ids = []
     gamma_s = gamma_water or 1.0
     for block in surcharges:
@@ -3229,6 +3508,13 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         for i, (x, y) in enumerate(local_pts, start=1):
             L.append(f'        <DataPoint Number="{i}" X="{x:.10g}" Y="{y:.10g}" />')
         L.append('      </DataPoints>')
+    # The analysis switches. SLOPE/W's own rapid drawdown examples write the staged
+    # rapid drawdown as <Control><IsRapidDrawdown>true</...></Control>, ahead of the
+    # loads and the piezometric surfaces.
+    if rapid:
+        L.append('      <Control>')
+        L.append('        <IsRapidDrawdown>true</IsRapidDrawdown>')
+        L.append('      </Control>')
     # SLOPE/W's vertical coefficient is positive downward, as xslope's is.
     kv = float(slope_data.get("k_vertical") or 0.0)
     L.append(f'      <Seismic Horizontal="{k:.10g}" Vertical="{kv:.10g}" />'
@@ -3262,12 +3548,17 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
                      f'</LineLoad></LineLoadPoint>')
         L.append('      </LineLoadPoints>')
     if piezo_ids:
-        L.append('      <PiezometricSurfaces Len="1">')
-        L.append('        <PiezometricSurface><ID>1</ID>'
-                 f'<DataPoints Len="{len(piezo_ids)}">'
-                 + "".join(f'<DataPoint>{i}</DataPoint>' for i in piezo_ids)
-                 + '</DataPoints><CapSuction>false</CapSuction>'
-                 '<MaxSuction>0</MaxSuction></PiezometricSurface>')
+        # A staged rapid drawdown has two: SLOPE/W reads the higher as the water before
+        # drawdown and the lower as the water after it. Each material that takes pore
+        # pressure from a line is assigned the first, as in SLOPE/W's own examples.
+        surfaces = [piezo_ids] + ([piezo2_ids] if piezo2_ids else [])
+        L.append(f'      <PiezometricSurfaces Len="{len(surfaces)}">')
+        for sid, ids in enumerate(surfaces, start=1):
+            L.append(f'        <PiezometricSurface><ID>{sid}</ID>'
+                     f'<DataPoints Len="{len(ids)}">'
+                     + "".join(f'<DataPoint>{i}</DataPoint>' for i in ids)
+                     + '</DataPoints><CapSuction>false</CapSuction>'
+                     '<MaxSuction>0</MaxSuction></PiezometricSurface>')
         L.append('      </PiezometricSurfaces>')
         wet = [i for i, m in enumerate(materials, start=1)
                if (m.get("u") or "none") == "piezo"] or list(range(1, len(materials) + 1))

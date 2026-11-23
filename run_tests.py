@@ -932,7 +932,8 @@ def run_lem_test(test):
             circle = {"Xo": _xo, "Yo": _yo, "Depth": _yo - _r, "R": _r}
             success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
                                               composite=composite, right_facing=right_facing,
-                                              suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+                                              suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                                              rapid=rapid)
             if not success:
                 return None, f"generate_slices failed: {result}"
             slice_df, failure_surface = result
@@ -953,7 +954,8 @@ def run_lem_test(test):
         circle = circles[ci]
         success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
                                           composite=composite, right_facing=right_facing,
-                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                                          rapid=rapid)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
@@ -987,7 +989,8 @@ def run_lem_test(test):
         # the "predefined slip surface" form of the verification problems.
         success, result = generate_slices(slope_data, non_circ=slope_data['non_circ'],
                                           num_slices=num_slices, right_facing=right_facing,
-                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                                          rapid=rapid)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
@@ -4437,15 +4440,22 @@ def run_editor_roundtrip_test(test):
     #      mix of blank and 0 (dimmed — no material has a cutoff above zero). The
     #      dimming reads xslope.preflight.has_reducible_tensile_cap, the same
     #      predicate main.tension_srf_unset reads, so this row and the preflight
-    #      row for that rule are the two halves of one guarantee.
+    #      row for that rule are the two halves of one guarantee. A joints-sheet
+    #      line's t_cut follows Tension SRF too, so the fixture's joint lines are
+    #      held at 0 in the four material cases, and a fifth case gives a joint
+    #      line the only cutoff (live).
     _tsd = _editor_fixture()
     for _caps, _live, _why in ((50.0, True, "a positive cutoff"),
                                (0.0, False, "every cutoff 0"),
                                (None, False, "every cutoff blank"),
-                               ("mixed", False, "cutoffs mixing blank and 0")):
+                               ("mixed", False, "cutoffs mixing blank and 0"),
+                               ("joint", True, "only a joint line's cutoff")):
         _m = copy.deepcopy(_tsd)
         for _k, _mat in enumerate(_m["materials"]):
-            _mat["t_cut"] = (None if _k % 2 else 0.0) if _caps == "mixed" else _caps
+            _mat["t_cut"] = ((None if _k % 2 else 0.0) if _caps == "mixed"
+                             else 0.0 if _caps == "joint" else _caps)
+        for _jl in _m.get("joint_lines") or []:
+            _jl["t_cut"] = 5.0 if _caps == "joint" else 0.0
         _fd = RunFemDialog(defaults={"analysis": "ssrm"}, slope_data=_m)
         _got = _fd.tension_srf.isEnabled()
         if _got != _live:
@@ -5358,19 +5368,26 @@ def run_pullout_law_test(test):
 
 
 def run_pullout_switch_test(test):
-    """The reinforcement editor's Pullout switch, driven offscreen on a real model.
+    """The reinforcement editor's Pullout read-out, driven offscreen on a real model.
 
-    The switch is a reading of the line, not a stored field, so the checks are
-    about what it reads and what it leaves behind: a file with no Adhesion/Delta
-    opens on the development lengths; switching to Overburden dims Lp1/Lp2 without
-    touching their values; switching back parks Adhesion/Delta rather than losing
-    them; and the table view grays the same pair the list view dims.
+    Which pullout law a line uses is not a stored field and not a selector: the
+    row's own values say it. A filled Adhesion/Delta pair IS the overburden law;
+    anything else is the development-length law. The list view shows that as a
+    read-only label, and the checks are about what follows from it: the label
+    follows the values as they are typed; Lp1/Lp2 gray (values intact) exactly
+    while both Adhesion and Delta are filled; Adhesion and Delta are never grayed
+    and never cleared, since on a jointed line the finite element interface reads
+    them whatever the law; kn, ks and Jred gray unless Joint is Yes; the table
+    view grays by the same rule; and a new line starts with its development
+    lengths BLANK (a missing length preflight names), never 0, which would be a
+    fully anchored end that passes every check.
     """
+    import math as _math
     import os as _os
     _os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     from PySide6.QtWidgets import QApplication
     from xslope.fileio import load_slope_data
-    from studio.editors import ReinforcementEditor
+    from studio.editors import ReinforcementEditor, _new_reinf
 
     app = QApplication.instance() or QApplication([])
     path = _repo('docs/tutorials/files/xslope_reinforced_slope_start.xlsx')
@@ -5387,55 +5404,103 @@ def run_pullout_switch_test(test):
     lv.list.setCurrentRow(0)
     problems = []
 
-    combo = lv._switch_combo
-    if combo is None:
-        return None, "the reinforcement list view has no Pullout switch"
-    if combo.currentText() != "Development length (Lp1, Lp2)":
-        problems.append(f"a file with no Adhesion/Delta opened on "
-                        f"{combo.currentText()!r}")
+    if getattr(lv, '_switch_combo', None) is not None:
+        problems.append("the list view still carries a Pullout selector; the law is "
+                        "read from the values, not chosen")
+    label = getattr(lv, '_readout_label', None)
+    if label is None:
+        return None, "the reinforcement list view has no Pullout read-out"
+    lp_text = "Development length (Lp1, Lp2)"
+    ob_text = "Overburden (Adhesion, Delta)"
+
+    def _type(key, text):
+        w = lv._edits[key]
+        w.setText(text)
+        w.editingFinished.emit()            # the way a typed value is committed
+
+    # 1. A file with no Adhesion/Delta reads as the development lengths.
+    if label.text() != lp_text:
+        problems.append(f"a line with no Adhesion/Delta reads {label.text()!r}")
     if not lv._cells['lp1'].isEnabled():
-        problems.append("Lp1 is dimmed on a line that uses the development lengths")
-    if lv._cells['adhesion'].isEnabled():
-        problems.append("Adhesion is live on a line that uses the development lengths")
+        problems.append("Lp1 is grayed on a line that uses the development lengths")
+    for key in ('adhesion', 'delta'):
+        if not lv._cells[key].isEnabled():
+            problems.append(f"{key} is grayed on a development-length line, which "
+                            f"leaves no way to fill it")
 
+    # 2. One of the pair filled: still the lengths, and the other stays typable.
     lp1_text = lv._edits['lp1'].text()
-    combo.setCurrentIndex(1)                      # -> Overburden
-    if lv._cells['lp1'].isEnabled():
-        problems.append("Lp1 stayed live after the switch to Overburden")
-    if not lv._cells['adhesion'].isEnabled():
-        problems.append("Adhesion stayed dimmed after the switch to Overburden")
-    if lv._edits['lp1'].text() != lp1_text:
-        problems.append(f"the switch changed Lp1 from {lp1_text!r} to "
-                        f"{lv._edits['lp1'].text()!r} — values must survive it")
+    _type('adhesion', "5")
+    if label.text() != lp_text:
+        problems.append(f"Adhesion alone switched the read-out to {label.text()!r}")
+    if not lv._cells['delta'].isEnabled() or not lv._cells['lp1'].isEnabled():
+        problems.append("filling Adhesion alone grayed Delta or Lp1")
 
-    lv._edits['adhesion'].setText("5")
-    lv._edits['delta'].setText("30")
-    lv._commit()
+    # 3. Both filled: the overburden law; Lp1/Lp2 gray with their values intact.
+    _type('delta', "30")
     row = lv._rows[0]
+    if label.text() != ob_text:
+        problems.append(f"a filled Adhesion/Delta pair reads {label.text()!r}")
     if ReinforcementEditor.pullout_mode(row) != "overburden":
-        problems.append("a filled Adhesion/Delta pair did not read as the "
-                        "overburden law")
-    if ReinforcementEditor.dim_keys(row) != frozenset(("lp1", "lp2")):
-        problems.append(f"the table view grays {sorted(ReinforcementEditor.dim_keys(row))} "
-                        f"on an overburden line, not Lp1/Lp2")
-
-    combo.setCurrentIndex(0)                      # -> back to the lengths
-    row = lv._rows[0]
-    if ReinforcementEditor.pullout_mode(row) != "lp":
-        problems.append("switching back to the development lengths left the "
-                        "overburden law in force")
+        problems.append("the committed row does not read as the overburden law")
+    for key in ('lp1', 'lp2'):
+        if lv._cells[key].isEnabled():
+            problems.append(f"{key} stayed live on an overburden line")
     if lv._edits['lp1'].text() != lp1_text:
-        problems.append("Lp1 did not survive the round trip through Overburden")
-    combo.setCurrentIndex(1)                      # -> Overburden again
-    if (lv._edits['adhesion'].text(), lv._edits['delta'].text()) != ("5", "30"):
-        problems.append(f"the parked Adhesion/Delta came back as "
-                        f"{lv._edits['adhesion'].text()!r}/"
-                        f"{lv._edits['delta'].text()!r}, not '5'/'30'")
+        problems.append(f"the overburden law changed Lp1 from {lp1_text!r} to "
+                        f"{lv._edits['lp1'].text()!r}; values must survive it")
+    dim = ReinforcementEditor.dim_keys(row)
+    if not {'lp1', 'lp2'} <= dim or {'adhesion', 'delta'} & dim:
+        problems.append(f"the table view grays {sorted(dim)} on an overburden line; "
+                        f"it must gray Lp1/Lp2 and never Adhesion/Delta")
 
-    if ReinforcementEditor.dim_keys({'adhesion': float('nan'),
-                                     'delta': float('nan')}):
-        problems.append("the table view grays a pair on a development-length line, "
-                        "which would leave Adhesion untypable there")
+    # 4. Clearing one of the pair goes back to the lengths and clears nothing else.
+    _type('adhesion', "")
+    row = lv._rows[0]
+    if label.text() != lp_text:
+        problems.append(f"clearing Adhesion left the read-out at {label.text()!r}")
+    if not lv._cells['lp1'].isEnabled():
+        problems.append("Lp1 stayed grayed after Adhesion was cleared")
+    if lv._edits['delta'].text() != "30":
+        problems.append(f"Delta was {lv._edits['delta'].text()!r} after Adhesion was "
+                        f"cleared; the editor must never clear it")
+    if lv._edits['lp1'].text() != lp1_text:
+        problems.append("Lp1 did not survive the round trip through the overburden law")
+
+    # 5. Joint: kn, ks and Jred gray unless Joint is Yes; Adhesion/Delta never.
+    def _dim(**kw):
+        return ReinforcementEditor.dim_keys(dict(_new_reinf(), **kw))
+    if not {'kn', 'ks', 'jred'} <= _dim(joint=''):
+        problems.append("kn/ks/Jred are live on a line whose Joint is blank")
+    if {'kn', 'ks', 'jred', 'adhesion', 'delta'} & _dim(joint='yes', adhesion=5.0,
+                                                         delta=30.0):
+        problems.append(f"a jointed overburden line grays "
+                        f"{sorted(_dim(joint='yes', adhesion=5.0, delta=30.0))}; "
+                        f"only Lp1/Lp2 may gray there")
+
+    # 6. A new line starts with blank development lengths, in the editor and in the
+    #    model the dialog hands back.
+    new = _new_reinf()
+    if not all(isinstance(new.get(k), float) and _math.isnan(new[k])
+               for k in ('lp1', 'lp2')):
+        problems.append(f"a new line starts with Lp1/Lp2 = {new.get('lp1')!r}/"
+                        f"{new.get('lp2')!r}; a blank is a length still to enter, "
+                        f"a 0 a fully anchored end")
+    n0 = len(lv._rows)
+    lv._add()
+    if len(lv._rows) != n0 + 1:
+        problems.append("Add did not add a line")
+    elif lv._edits['lp1'].text() or lv._edits['lp2'].text():
+        problems.append(f"the added line shows Lp1/Lp2 "
+                        f"{lv._edits['lp1'].text()!r}/{lv._edits['lp2'].text()!r}, "
+                        f"not blank")
+    else:
+        sd2 = dict(sd)
+        editor.apply(sd2, dlg)
+        added = sd2['reinforcement_lines'][-1]
+        if not all(_math.isnan(float(added.get(k))) for k in ('lp1', 'lp2')):
+            problems.append(f"the added line reached the model with Lp1/Lp2 = "
+                            f"{added.get('lp1')!r}/{added.get('lp2')!r}")
 
     dlg.deleteLater()
     if problems:
@@ -6084,6 +6149,9 @@ def _pf_joint_on_boundary(sd, on=True):
 #:   mutation  callable(slope_data) breaking exactly that requirement
 #:   control   callable(slope_data) applied instead, to prove the rule is silent
 #:             on a model that satisfies it (default: leave the file alone)
+#:   control_analysis   the analysis the control is checked as, when it is not the
+#:             spec's own: the SAME broken model, run by an analysis that never
+#:             reads the field, must say nothing (a rule scoped to its readers)
 #:   mode      'excel' round-trips the mutated model through the writer and the
 #:             loader, so the rule is exercised on a file a user could actually
 #:             save; 'dict' mutates in memory, which is the honest mode for the
@@ -6123,6 +6191,22 @@ def _pf_overlap(sd):
     p = sd['polygons'][0]
     sd['polygons'].append(dict(p))
     return sd
+
+
+def _pf_movement(sd, **by_point):
+    """Set the Movement of non-circular points by 0-based index:
+    ``_pf_movement(sd, p1='sideways')`` sets point 2's."""
+    for key, word in by_point.items():
+        sd['non_circ'][int(key[1:])]['Movement'] = word
+    return sd
+
+
+def _pf_elastic_u(sd, u, **kw):
+    """Every material dry (u = none) except material 1, which takes ``u`` (and
+    ``kw``): the row a u-reading rule is about. Pass ``option='elastic'`` for the
+    control, where that row is one no engine reads u from."""
+    _pf_mats(sd, u='none')
+    return _pf_mat(sd, 0, u=u, **kw)
 
 
 def _pf_bc2(sd, **head_kw):
@@ -6956,6 +7040,14 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
          expect='has H = 0'),
+    # H is the limit equilibrium pile force; the finite element engine never
+    # reads it.
+    dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
+         control=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
+         control_analysis='ssrm',
+         expect='has H = 0'),
     dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', V_cap=-5.0),
          expect='has Vcap = -5'),
@@ -6985,6 +7077,8 @@ PREFLIGHT_RULE_SPECS = [
          expect='E is blank'),
     dict(rule='pile.units_convention', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=100.0),
+         control=lambda sd: _pf_rows(sd, 'pile_lines', H=100.0),
+         control_analysis='fem',
          expect='different conventions'),
     dict(rule='pile.section_derived', base=PREFLIGHT_BASE_PILES_FEM, mode='dict',
          analysis='ssrm',
@@ -6996,9 +7090,20 @@ PREFLIGHT_RULE_SPECS = [
          expect='crosses any failure surface'),
 
     # --- reinforcement -----------------------------------------------------
+    # Dir, Appl and Type are read by the limit equilibrium engine alone, so the
+    # same broken line is no finding for a strength-reduction run (the FEM's bar
+    # acts along its own axis) or a seepage run (which reads no reinforcement).
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control_analysis='ssrm',
+         expect='is not a direction'),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control_analysis='seep',
          expect='is not a direction'),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
@@ -7011,7 +7116,7 @@ PREFLIGHT_RULE_SPECS = [
     # engine then applied the line axially. Each of the three vocabulary columns
     # carries the mutation, since they were all read the same way.
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
          expect='is not a direction'),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
@@ -7019,16 +7124,24 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
          load_error="unrecognized Dir"),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', appl=0.0),
          expect='is not an application'),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=0.0),
          expect='is not a support type'),
     dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
+         expect='has no tensile capacity'),
+    # A seepage run reads no reinforcement, so a line with no capacity cannot
+    # stop one.
+    dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
+         control_analysis='seep',
          expect='has no tensile capacity'),
     dict(rule='reinforce.fem_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
@@ -7043,9 +7156,26 @@ PREFLIGHT_RULE_SPECS = [
          control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
                                      type='geosynthetic'),
          expect='leave Type blank'),
+    # The direction and application a blank Type defaults to are LEM inputs: the
+    # finite element bar acts along its own axis whatever Type says.
+    dict(rule='reinforce.type_blank', base=PREFLIGHT_BASE_REINF_FEM, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=''),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=''),
+         control_analysis='ssrm',
+         expect='leave Type blank'),
     dict(rule='reinforce.pullout_negative', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=-2.0),
+         expect='read as FULLY ANCHORED'),
+    # A jointed line's pullout is its interface in the finite element engine, which
+    # then reads no Lp; the limit equilibrium engine ignores Joint and still does.
+    dict(rule='reinforce.pullout_negative', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                      lp1=-2.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                     lp1=-2.0),
+         control_analysis='ssrm',
          expect='read as FULLY ANCHORED'),
     # A development length a hundred times too long (Lp = 4 entered as 400 on a
     # 20-long line) holds the line to 2.5% of Tmax. The control is the entry the
@@ -7238,9 +7368,10 @@ PREFLIGHT_RULE_SPECS = [
          control=lambda sd: _pf_joint(sd),
          expect='a reinforced wall'),
     # The INFO: which bonded-bar inputs a jointed line stops reading.
-    # The two joint-network REGIONS rules. Both are about a cell filled in expecting
-    # it to do something the region cannot, so each control is the same region with
-    # that cell empty -- which is the ordinary, silent case.
+    # The joint-network REGION rule: a cell filled in expecting it to do something
+    # the region cannot, so the control is the same region with that cell empty --
+    # which is the ordinary, silent case. (A region's Size is no such cell: it
+    # refines the mesh inside the region, mesh.zone_size_not_finer.)
     dict(rule='joint_region.material_assigned', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_set(sd, joint_zones=[
@@ -7250,15 +7381,6 @@ PREFLIGHT_RULE_SPECS = [
              {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
               'label': 'North block', 'size': None, 'mat_id': None}]),
          expect='is not a soil zone'),
-    dict(rule='joint_region.size_inert', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
-         mutation=lambda sd: _pf_set(sd, joint_zones=[
-             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
-              'label': 'North block', 'size': 0.4, 'mat_id': None}]),
-         control=lambda sd: _pf_set(sd, joint_zones=[
-             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
-              'label': 'North block', 'size': None, 'mat_id': None}]),
-         expect='never meshed as a region'),
     # The control keeps the file's Tres (600 on every line): the bar on a
     # jointed line still softens to it, so a filled Tres is no finding.
     dict(rule='joint.bond_inputs_ignored', base=PREFLIGHT_BASE_REINF_FEM,
@@ -7298,9 +7420,12 @@ PREFLIGHT_RULE_SPECS = [
                                          seep_u2=None),
                               _pf_mats(sd, gamma_sat=135.0, u='none'))[-1],
          expect='never applies'),
+    # A finite element input: the limit equilibrium engine reads no member modulus.
     dict(rule='structural.modulus_off_band', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
+         control_analysis='lem',
          expect='outside that range'),
     # The units slip itself: 30 MPa of intact rock typed as the bare 30 into a
     # model whose stress unit is the kPa. The control is the same material with
@@ -7371,6 +7496,18 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
                                       sigma_gamma=0.0, sigma_cp=0.0),
          expect='Standard Deviations'),
+    # s(d) on an mc material is a standard deviation a rapid drawdown run reads
+    # (531a), so the same model is not "carrying none" there.
+    dict(rule='reliability.no_standard_deviations', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         control_selection={'rapid': True},
+         mutation=lambda sd: _pf_mat(_pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
+                                              sigma_gamma=0.0, sigma_cp=0.0),
+                                     0, d=500.0, psi=15.0, sigma_d=50.0),
+         control=lambda sd: _pf_mat(_pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
+                                             sigma_gamma=0.0, sigma_cp=0.0),
+                                    0, d=500.0, psi=15.0, sigma_d=50.0),
+         expect='Standard Deviations'),
     dict(rule='reliability.elastic_carries_sigma', base=PREFLIGHT_BASE_RELIABILITY,
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mat(sd, 0, option='elastic'),
@@ -7383,18 +7520,51 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mat(sd, 0, sigma_cp=2.0),
          expect='does not read that parameter'),
+    # s(d) and s(psi) are read by a rapid drawdown reliability run on an mc
+    # material (531a), and by nothing else. Without drawdown, beside other
+    # standard deviations, they are an INFO; as the only ones, the run is refused
+    # and this says why; in a rapid run on a cp row, a WARNING.
     dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
          mode='excel', analysis='reliability',
-         mutation=lambda sd: _pf_mat(sd, 0, sigma_d=1.0),
-         expect='no reliability engine reads'),
+         control_selection={'rapid': True},
+         mutation=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         control=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         expect='only a rapid drawdown reliability run reads'),
+    dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mat(_pf_mats(sd, sigma_c=0.0, sigma_phi=0.0),
+                                     0, d=500.0, psi=15.0, sigma_d=50.0),
+         control=lambda sd: _pf_mats(sd, sigma_d=0.0, sigma_psi=0.0),
+         expect='refused for carrying none at all'),
+    dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         selection={'rapid': True}, control_selection={'rapid': True},
+         mutation=lambda sd: _pf_mat(sd, 0, option='cp', cp=1.0, sigma_cp=0.0,
+                                     sigma_phi=0.0, sigma_d=50.0),
+         control=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         expect='which takes no d or psi'),
     dict(rule='reliability.sigma_exceeds_mean', base=PREFLIGHT_BASE_RELIABILITY,
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mat(sd, 0, sigma_phi=999.0),
+         expect='exceeds the mean'),
+    # d is a perturbed parameter only in a rapid drawdown run.
+    dict(rule='reliability.sigma_exceeds_mean', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         selection={'rapid': True}, control_selection={},
+         mutation=lambda sd: _pf_mat(sd, 0, d=100.0, psi=15.0, sigma_d=150.0),
+         control=lambda sd: _pf_mat(sd, 0, d=100.0, psi=15.0, sigma_d=150.0),
          expect='exceeds the mean'),
     dict(rule='reliability.rapid_has_no_effect', base=PREFLIGHT_BASE_RELIABILITY,
          mode='dict', analysis='reliability',
          selection={'engine': 'mc', 'rapid': True},
          control_selection={'engine': 'taylor', 'rapid': True, 'search': True},
+         mutation=lambda sd: sd,
+         expect='solved WITHOUT drawdown'),
+    # The Taylor series' fixed-surface path runs the drawdown now (531a).
+    dict(rule='reliability.rapid_has_no_effect', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='dict', analysis='reliability',
+         selection={'engine': 'rs', 'rapid': True, 'search': False},
+         control_selection={'engine': 'taylor', 'rapid': True, 'search': False},
          mutation=lambda sd: sd,
          expect='solved WITHOUT drawdown'),
     dict(rule='reliability.mc_samples_too_few', base=PREFLIGHT_BASE_RELIABILITY,
@@ -7515,6 +7685,17 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=float('nan')),
          expect='leaves Lp1 blank'),
+    # The same blank Lp on a jointed line: the limit equilibrium engine reads it
+    # (it ignores Joint), the finite element engine does not (the interface
+    # carries the pullout).
+    dict(rule='reinforce.pullout_length_missing', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                      lp1=float('nan')),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                     lp1=float('nan')),
+         control_analysis='ssrm',
+         expect='leaves Lp1 blank'),
     dict(rule='reinforce.spacing_nonpositive', base=PREFLIGHT_BASE_REINF,
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', spacing=0.0),
@@ -7566,13 +7747,241 @@ PREFLIGHT_RULE_SPECS = [
                   'coords': sd['seepage_bc']['specified_heads'][0]['coords'][:1]}])),
          control=lambda sd: _pf_bc2(sd),
          expect='of boundary set 2 has fewer than two points'),
+
+    # --- the gray-cell audit (Norm, 2026-11): checks scoped to what the engines
+    # read, and the loader fixes that let the vocabulary rules fire at all ------
+    # A seep bc block drawn with its Value cell blank. The loader once ended the
+    # sheet there, dropping that block and every one after it; it now keeps the
+    # block, the writer saves the blank as a blank, and the runs that read it
+    # refuse it. A stability run reads the head boundaries only for the automatic
+    # water load, so the same block on a manual-water model is no finding.
+    dict(rule='seep.bc_value_missing', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc_head(sd, 0, None),
+         expect='has points but no head'),
+    dict(rule='seep.bc_value_missing', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc2(sd, head=None),
+         control=lambda sd: _pf_bc2(sd),
+         expect='of boundary set 2 has points but no head'),
+    dict(rule='seep.bc_value_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_bc_head(sd, 0, None),
+         control=lambda sd: _pf_set(_pf_bc_head(sd, 0, None), water_loads='manual'),
+         expect='Water loads is auto'),
+    # A circle that states no size: a blank Option or a word outside Depth /
+    # Radius / Intercept (which once stopped the whole file opening), or the cell
+    # the Option names left blank. The loader keeps it and the writer saves it as
+    # it was; every run that reads the circles sheet refuses it, and a run that
+    # does not (seepage) says nothing.
+    dict(rule='surface.circle_size_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: (sd['circles'][0].update(
+             Option=None, Depth=float('nan'), R=float('nan')) or sd),
+         control=lambda sd: (sd['circles'][0].update(
+             Option=None, Depth=float('nan'), R=float('nan')) or sd),
+         control_analysis='seep',
+         expect='its Option is blank'),
+    dict(rule='surface.circle_size_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: (sd['circles'][-1].update(
+             Option='diameter', Depth=float('nan'), R=float('nan')) or sd),
+         expect="its Option is 'diameter'"),
+    dict(rule='surface.circle_size_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: (sd['circles'][0].update(
+             Depth=float('nan'), R=float('nan')) or sd),
+         expect='the cell its Option names'),
+    # Movement is read by the non-circular search alone. A word outside Free /
+    # Horiz / Fixed is refused; the three match in any case (the control's
+    # lowercase "free" was once read as Fixed on an interior point); and a
+    # single-surface run, which never moves a point, says nothing.
+    dict(rule='surface.movement_vocabulary', base=PREFLIGHT_BASE_NONCIRC,
+         mode='excel', selection={'surface': 'noncircular', 'search': True},
+         mutation=lambda sd: _pf_movement(sd, p1='sideways'),
+         control=lambda sd: _pf_movement(sd, p0='FIXED', p1='free', p2='horiz'),
+         expect="has Movement 'sideways'"),
+    dict(rule='surface.movement_vocabulary', base=PREFLIGHT_BASE_NONCIRC,
+         mode='excel', selection={'surface': 'noncircular', 'search': True},
+         control_selection={'surface': 'noncircular'},
+         mutation=lambda sd: _pf_movement(sd, p1='sideways'),
+         control=lambda sd: _pf_movement(sd, p1='sideways'),
+         expect='which is not a movement'),
+    # Through the writer and the loader: the loader keeps a word outside the three
+    # (it once read every one as lf), so the rule can fire on a saved file, and it
+    # matches the three in any case.
+    dict(rule='mat.unsat_vocabulary', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, unsat='vgn'),
+         control=lambda sd: _pf_mats(sd, unsat='VG', vg_a=0.5, vg_n=1.5),
+         expect='is not an unsaturated conductivity model'),
+    # The finite element engine refuses a blank option on a row the mesh carries
+    # (it once ran it as mc on whatever c and phi the row held).
+    dict(rule='mat.option_missing', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_mats(sd, option=''),
+         expect='finite element mesh gives elements this material'),
+    # u on an elastic row is read by no engine (the LEM never takes a base there,
+    # the FEM keeps elastic elements dry), so it can neither stop a run nor stand
+    # in for a row that does read it. Each control is its mutation with that one
+    # row made elastic.
+    dict(rule='piezo.line_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line=[]), 'piezo'),
+         control=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line=[]), 'piezo',
+                                          option='elastic'),
+         expect='fewer than two points'),
+    dict(rule='mat.ru_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.0),
+         control=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.0, option='elastic'),
+         expect='selects u = ru'),
+    dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_elastic_u(sd, 'seep'),
+         control=lambda sd: _pf_elastic_u(sd, 'seep', option='elastic'),
+         expect='carries no mesh'),
+    dict(rule='piezo.no_consumer', base=PREFLIGHT_BASE_LEM, mode='excel',
+         manual_water=True,
+         mutation=lambda sd: _pf_elastic_u(_pf_mats(sd, gamma_sat=None), 'ru',
+                                           ru=0.3, option='elastic'),
+         control=lambda sd: _pf_elastic_u(_pf_mats(sd, gamma_sat=None), 'ru',
+                                          ru=0.3),
+         expect='no material uses u = piezo'),
+    dict(rule='mat.gamma_sat_without_water', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: (sd.update(piezo_line=[], piezo_line2=[], seep_u=None,
+                                         seep_u2=None),
+                              _pf_elastic_u(_pf_mats(sd, gamma_sat=135.0), 'piezo',
+                                            option='elastic'))[-1],
+         expect='never applies'),
+    dict(rule='rapid.stage2_water_missing', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line2=[]), 'piezo'),
+         control=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line2=[]), 'piezo',
+                                          option='elastic'),
+         expect='Piezometric Line 2'),
+    dict(rule='rapid.ru_has_no_stage2', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.3),
+         control=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.3, option='elastic'),
+         expect='no staged variant'),
+    # d and psi are read on an mc row only: the slicer gives every other option
+    # zeros, and the template and Studio gray the two cells there, so a value left
+    # in them must not decide a finding. VP99's rockfill (row 1) carries no pair
+    # and its two clays do.
+    dict(rule='rapid.d_psi_incomplete', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_mat(sd, 0, d=100.0, psi=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='cp', c=500.0, cp=0.0,
+                                    d=100.0, psi=0.0),
+         expect='carries d but not psi'),
+    dict(rule='rapid.no_low_k_material', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_mat(_pf_mats(sd, d=0.0, psi=0.0), 0, option='cp',
+                                     c=500.0, cp=0.0, d=2250.0, psi=20.0),
+         expect='no low-permeability material'),
+    dict(rule='rapid.free_draining_materials', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_mat(sd, 0, option='cp', c=500.0, cp=0.0),
+         expect='treated as free-draining'),
+    dict(rule='seismic2.no_low_k_material', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='excel', analysis='seismic2',
+         mutation=lambda sd: _pf_mat(sd, 0, option='cp', c=1000.0, cp=0.0),
+         expect='undrained already'),
+    dict(rule='seismic2.d_psi_incomplete', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='excel', analysis='seismic2',
+         mutation=lambda sd: _pf_mat(sd, 0, psi=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='cp', c=1000.0, cp=0.0, psi=0.0),
+         expect='carries d but not psi'),
+    # Joint and Jred read Yes or No in any case (blank: Joint no, Jred yes); any
+    # other word would silently mean the other answer. Joint is a finite element
+    # input and Jred a strength-reduction one.
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='y'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='YES',
+                                     adhesion=5.0, delta=25.0),
+         expect="sets Joint = 'y'"),
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='y'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='y'),
+         control_analysis='lem',
+         expect="sets Joint = 'y'"),
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint(sd, jred='maybe'),
+         control=lambda sd: _pf_joint(sd, jred='maybe'),
+         control_analysis='fem',
+         expect="sets Jred = 'maybe'"),
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, jred='nah'),
+         control=lambda sd: _pf_joint_sheet(sd, jred='NO'),
+         expect="sets Jred = 'nah'"),
+    # A stated kn or ks of zero or less was replaced by the derived stiffness
+    # without a word (joint.build_joint_data); blank is how to ask for that.
+    dict(rule='joint.stiffness_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_joint(sd, kn=0.0),
+         control=lambda sd: _pf_joint(sd, kn=1.0e5),
+         expect='has kn = 0'),
+    dict(rule='joint.stiffness_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_joint_sheet(sd, ks=-1.0),
+         control=lambda sd: _pf_joint_sheet(sd, ks=1.0e4),
+         expect='has ks = -1'),
+    dict(rule='joint.strength_out_of_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, c=-1.0),
+         control=lambda sd: _pf_joint_sheet(sd, c=0.0),
+         expect='states c = -1'),
+    dict(rule='joint.strength_out_of_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, phi=95.0),
+         control=lambda sd: _pf_joint_sheet(sd, phi=0.0, c=5.0),
+         expect='states phi = 95 degrees'),
+    dict(rule='joint.strength_out_of_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, t_cut=-2.0),
+         control=lambda sd: _pf_joint_sheet(sd, t_cut=0.0),
+         expect='states t_cut = -2'),
+    # A strength-reduction zone's Size and a joint region's reach the mesher the
+    # way a refine polygon's does, so one at or above the target refines nothing.
+    dict(rule='mesh.zone_size_not_finer', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, target_size=2.0, ssr_zones=[
+             {'kind': 'reduce', 'label': 'SSR reduce', 'size': 4.0,
+              'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)]}]),
+         control=lambda sd: _pf_set(sd, target_size=2.0, ssr_zones=[
+             {'kind': 'reduce', 'label': 'SSR reduce', 'size': 0.5,
+              'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)]}]),
+         expect='SSR zone #1 declares Size = 4'),
+    dict(rule='mesh.zone_size_not_finer', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, target_size=2.0, joint_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'label': 'blocks',
+              'size': 2.0, 'mat_id': None}]),
+         control=lambda sd: _pf_set(sd, target_size=2.0, joint_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'label': 'blocks',
+              'size': 0.5, 'mat_id': None}]),
+         expect='Joint region #1 declares Size = 2'),
+    # A joints-sheet line's t_cut follows Tension SRF the way a material's does.
+    # The base's materials carry t_cut = 0, so only the joint can make it speak.
+    dict(rule='main.tension_srf_unset', base=PREFLIGHT_BASE_REINF_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(_pf_set(sd, tension_srf=None),
+                                             t_cut=5.0),
+         control=lambda sd: _pf_joint_sheet(_pf_set(sd, tension_srf=None),
+                                            t_cut=0.0),
+         expect='1 joint line(s) carry a tensile'),
 ]
 
 
-def _preflight_eval(sd, spec, selection_key='selection'):
-    """Run preflight for a spec and return the findings from its rule."""
+def _preflight_eval(sd, spec, selection_key='selection', analysis_key='analysis'):
+    """Run preflight for a spec and return the findings from its rule.
+
+    ``analysis_key='control_analysis'`` checks the negative control as a different
+    run (falling back to the spec's own analysis): the same broken model, checked
+    for an analysis that never reads the field, must say nothing.
+    """
     from xslope.preflight import preflight
-    analysis = spec.get('analysis', 'lem')
+    analysis = spec.get(analysis_key) or spec.get('analysis', 'lem')
     sel = spec.get(selection_key)
     if sel is None:
         sel = spec.get('selection')
@@ -7670,7 +8079,8 @@ def run_preflight_rules_test(test):
                 problems.append(f"{rid}: control model failed to round-trip: "
                                 f"{load_err0[:110]}")
                 continue
-            still = _preflight_eval(sd0, spec, selection_key='control_selection')
+            still = _preflight_eval(sd0, spec, selection_key='control_selection',
+                                    analysis_key='control_analysis')
             if still:
                 problems.append(f"{rid}: fired on the control model "
                                 f"({still[0].message[:80]!r})")
@@ -11994,6 +12404,69 @@ def run_table_paste_test(test):
     return 0.0, None
 
 
+#: The input-graying audit's standing checks (Norm, 2026-11), one module each in
+#: test/, wired the way table_paste_check is: test type -> (file, the flag group it
+#: rides with). Each module exposes ``run()`` returning a list of failure strings
+#: and runs on its own as a script. A module is enqueued only when its file exists,
+#: so one still being written cannot fail the suite as "missing".
+AUDIT_CHECK_MODULES = {
+    # The loader, preflight and search fixes, and rapid drawdown reliability's d
+    # and psi against a hand combination of deterministic runs.
+    'audit_checks': ('audit_checks_check.py', 'preflight'),
+    # What Studio's editors gray, show and save, held to what the engines read.
+    'audit_studio': ('audit_studio_check.py', 'roundtrip'),
+    # The engine fixes (per-material FEM pore pressure, suction scope, joints in
+    # seepage, SSR and joints Size, the joint tension cutoff, the blank option).
+    'audit_engine': ('audit_engine_check.py', 'fem'),
+    # SLOPE/W's staged rapid drawdown through the GeoStudio importer.
+    'gsz_rapid': ('gsz_rapid_check.py', 'gsz'),
+}
+
+
+def _audit_module_path(test_type):
+    return Path(__file__).parent / 'test' / AUDIT_CHECK_MODULES[test_type][0]
+
+
+def run_audit_module_test(test):
+    """One of the input-graying audit's standing check modules (AUDIT_CHECK_MODULES).
+
+    The module owns the story in its own docstring; this runs it exactly as
+    run_table_paste_test runs table_paste_check: offscreen Qt for the Studio
+    checks, then ``run()``, whose failure strings are the result.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = _audit_module_path(test['type'])
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: a Studio module skips itself
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(str(f) for f in failures)
+    return 0.0, None
+
+
+def _audit_module_tests(group):
+    """The AUDIT_CHECK_MODULES rows that ride with flag ``group`` and whose module
+    file exists, as test dicts."""
+    out = []
+    for t, (filename, g) in AUDIT_CHECK_MODULES.items():
+        if g == group and _audit_module_path(t).exists():
+            out.append({'type': t, 'file': f'test/{filename}', 'method': '-',
+                        'source': t})
+    return out
+
+
 def run_project_package_test(test):
     """Project packaging: a project collected into one ``.xslz`` and taken apart
     again.
@@ -12398,7 +12871,7 @@ def run_drawdown_guard_test(test):
             for key in ('c', 'phi', 'd', 'psi'):
                 m[key] = m.get(key, 0) * scale
         ok, payload = generate_slices(data, circle=data['circles'][0],
-                                      num_slices=40, debug=False)
+                                      num_slices=40, debug=False, rapid=True)
         if not ok:
             return None
         return rapid_drawdown(payload[0], 'bishop', debug_level=0)
@@ -12929,6 +13402,10 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/Materials/Material/StressStrain/TauSigmaRatio",
     "/GSIData/Materials/Material/StressStrain/CTopOfLayer",
     "/GSIData/Materials/Material/StressStrain/CRateOfIncrease",
+    # A rapid drawdown model is written as SLOPE/W's staged rapid drawdown: d and psi
+    # as the R envelope its own examples carry on each soil that does not drain.
+    "/GSIData/Materials/Material/StressStrain/DrawdownCohesion",
+    "/GSIData/Materials/Material/StressStrain/DrawdownPhi",
     "/GSIData/Materials@Len",
     # The reinforcement product library, and the loads that hang off the analysis. These
     # branches of the exporter went unchecked for a while because the fixture model has
@@ -12998,6 +13475,9 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/StabilityItems/StabilityItem/Entry/Seismic",
     "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Horizontal",
     "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Vertical",
+    # The analysis switches, and the one the export writes: the staged rapid drawdown.
+    "/GSIData/StabilityItems/StabilityItem/Entry/Control",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Control/IsRapidDrawdown",
     "/GSIData/StabilityItems@Len",
     "/GSIData/WaterItems",
     "/GSIData/WaterItems/WaterItem",
@@ -14859,18 +15339,19 @@ def run_gsz_parent_surface_test(test):
 
 
 def run_gsz_rapid_drawdown_test(test):
-    """A staged rapid drawdown is named in the caveats.
+    """A staged rapid drawdown imports as XSLOPE's rapid drawdown, on a built fixture.
 
     SLOPE/W's staged rapid drawdown (<Control><IsRapidDrawdown>) reads two
     piezometric surfaces -- the higher before drawdown, the lower after -- and
-    drawdown strengths for the soils that do not drain. The import carries only the
-    first surface, so the model is the slope before drawdown while SLOPE/W's FS is
-    the one after. Nothing said so: the caveats reported "2 piezometric surfaces" and
-    an unrecognized 'Control'. Now one caveat says what was imported and what was
-    not, and gives the lowered line and the d and psi XSLOPE's own rapid drawdown
-    would need (here Pilarcitos Dam's c_R = 60, phi_R = 23, phi' = 45: d = 64.1,
-    psi = 24.4, as Duncan, Wright and Brandon's conversion gives). A <Control> switch
-    the import does not handle is still reported as unrecognized.
+    drawdown strengths (c_R, phi_R) for the soils that do not drain. The import takes
+    the higher as piezo line 1, the lower as piezo line 2, and each c_R and phi_R as
+    d and psi through SLOPE/W's own conversion (here Pilarcitos Dam's c_R = 60,
+    phi_R = 23, phi' = 45: d = 64.1, psi = 24.4, Duncan, Wright and Brandon's
+    Eqs. 9.6-9.7). One caveat says what was imported and that the model runs as a
+    rapid drawdown, in place of the generic "2 piezometric surfaces" and the
+    unrecognized 'Control' it once drew. A <Control> switch the import does not
+    handle is still reported as unrecognized. SLOPE/W's own four examples are
+    checked against their XML and their answers in test/gsz_rapid_check.py.
     Returns (0.0, None) or (None, message).
     """
     pts = ("<DataPoints Len=\"4\"><DataPoint Number=\"1\" X=\"0\" Y=\"25\" />"
@@ -14908,6 +15389,14 @@ def run_gsz_rapid_drawdown_test(test):
     if sd["piezo_line"] != [(0.0, 25.0), (60.0, 25.0)]:
         problems.append(f"'drawdown': imported piezo line {sd['piezo_line']}, expected "
                         f"the full-pool one")
+    if sd["piezo_line2"] != [(0.0, 12.0), (60.0, 12.0)]:
+        problems.append(f"'drawdown': imported piezo line 2 {sd['piezo_line2']}, "
+                        f"expected the lowered one")
+    clay = next((m for m in sd["materials"] if m["name"] == "clay"), None)
+    if clay is None or round(clay["d"], 1) != 64.1 or round(clay["psi"], 1) != 24.4:
+        problems.append(f"'drawdown': clay d, psi = "
+                        f"{(clay or {}).get('d')}, {(clay or {}).get('psi')}, "
+                        f"expected 64.1, 24.4")
     if not any("'Control'" in c for c in got["drawdown, design factors"][1]):
         problems.append("an unhandled <Control> switch (DesignFactorID) is no longer "
                         "reported")
@@ -17983,6 +18472,8 @@ def _dispatch_test(test):
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
         return run_table_paste_test(test)
+    if test_type in AUDIT_CHECK_MODULES:
+        return run_audit_module_test(test)
     if test_type == 'project_package':
         return run_project_package_test(test)
     if test_type == 'docs_links':
@@ -18173,7 +18664,7 @@ def _expected_and_tol(test, default_tolerance):
                        'noncircular_generator', 'circles_editor', 'studio_results_teardown',
                        'report_problem', 'log_font', 'drop_open',
                        'release_notes',
-                       'seep_bc_series', 'table_paste',
+                       'seep_bc_series', 'table_paste', *AUDIT_CHECK_MODULES,
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'report_template_field', 'report_no_resolve',
@@ -18386,6 +18877,9 @@ def main():
         # Side-roller assignment on an off-vertical truncation face.
         tests.append({'type': 'side_roller', 'file': 'off-vertical side face (fem)',
                       'method': '-', 'source': 'side_roller'})
+        # The input-graying audit's engine fixes, each against a hand number
+        # (test/audit_engine_check.py, enqueued once the module exists).
+        tests.extend(_audit_module_tests('fem'))
         # The two-trial lock check's tag guard. It belongs to the SSRM locks, so
         # --fem wants it; it is registered with the other tag guards under
         # --roundtrip, and added here only when that scope is not already running.
@@ -18814,6 +19308,9 @@ def main():
         # same session and the same check module.
         tests.append({'type': 'steady_seep_save', 'file': '(steady field + save path)',
                       'method': '-', 'source': 'preflight'})
+        # The input-graying audit's loader, preflight and search fixes, and rapid
+        # drawdown reliability's d and psi (test/audit_checks_check.py).
+        tests.extend(_audit_module_tests('preflight'))
         _preflight_sources = ([
             _repo('docs/lem/samples.md'), _repo('docs/lem/design.md'),
             _repo('docs/parametric/sensitivity.md'), _repo('docs/parametric/reliability.md'),
@@ -19163,6 +19660,9 @@ def main():
         # tell the reader to paste rather than retype; this is what keeps that true.
         tests.append({'type': 'table_paste', 'file': 'Studio table copy/paste',
                       'method': '-', 'source': 'table_paste'})
+        # The Studio half of the input-graying audit: what each editor grays, shows
+        # and saves, held to what the engines read (test/audit_studio_check.py).
+        tests.extend(_audit_module_tests('roundtrip'))
         # Guard the Table sub-tab every Parametric result view carries: one row per
         # thing the run produced, the face and stage columns that keep a march's
         # grid saying what its figure says, and a Save CSV… file that is the grid
@@ -19417,8 +19917,12 @@ def main():
         # when absent (the files are Seequent's copyrighted material).
         tests.append({'type': 'gsz_water', 'file': '(GeoStudio corpus)',
                       'method': 'water loads', 'source': 'gsz'})
+        # SLOPE/W's staged rapid drawdown through the importer
+        # (test/gsz_rapid_check.py, enqueued once the module exists).
+        _gsz_extra = _audit_module_tests('gsz')
+        tests.extend(_gsz_extra)
         if not run_all:
-            print("Including 10 GeoStudio import tests")
+            print(f"Including {10 + len(_gsz_extra)} GeoStudio import tests")
 
     # The Slide2 import test authors its own .slim fixture (Rocscience's own tutorial
     # files are their copyrighted material and are not in this repository), so it needs

@@ -73,10 +73,10 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.37](#gs-2-37) | 🟢 | Pockoski & Duncan – Soil Nails | Spencer 1.009 vs SLOPE/W's own 1.000 (+0.9%) · vs Slide 1.009 (0.0%) | *covered* — [Slide2 VP60](rocscience.md#vp60) |
 | [2.38](#gs-2-38) | 🟢 | Loukidis – Seismic Coefficient | Spencer 1.001 in both cases vs SLOPE/W 1.00 (+0.1%) | |
 | [2.39](#gs-2-39) | 🟢 | Loukidis – Seismic Coefficient #2 | Spencer FS 1.001 at the paper's k꜀ = 0.155 vs Loukidis 1.000 (+0.1%) | *covered* — [Slide2 VP63](rocscience.md#vp63); the `critical_kc` analysis also solves k꜀ directly, landing inside the paper's rigorous bounds |
-| [2.40](#gs-2-40) | 🟢 | Rapid Drawdown – Walter Bouldin Dam | Spencer 1.047 vs the published DWW 1.04 (+0.7%) · vs SLOPE/W's Spencer 1.02 (+2.6%) | Duncan-Wright-Wong 3-stage |
-| [2.41](#gs-2-41) | 🟢 | Rapid Drawdown – USACE Benchmark | Spencer 1.434 vs the published 1.44 (−0.4%) · Bishop 1.432 vs 1.44 (−0.6%) | Duncan-Wright-Wong 3-stage, on the specified circle |
-| [2.42](#gs-2-42) | 🟢 | Rapid Drawdown – Pumped Storage Dam | Spencer 1.527 vs SLOPE/W 1.550 (−1.5%) · vs DWW 1.56 (−2.1%) | Duncan-Wright-Wong 3-stage |
-| [2.43](#gs-2-43) | 🟢 | Rapid Drawdown – Pilarcitos Dam | Spencer 1.044 vs Slide 1.043 (+0.1%) · vs DWW 1.05 (−0.6%) | Duncan-Wright-Wong 3-stage |
+| [2.40](#gs-2-40) | 🟢 | Rapid Drawdown – Walter Bouldin Dam | Spencer 1.047 vs the published DWW 1.04 (+0.7%) · vs SLOPE/W's Spencer 1.026 (+2.0%) · SLOPE/W's own model on its critical circle: Spencer 1.023 vs SLOPE/W 1.026 (−0.3%) | Duncan-Wright-Wong 3-stage |
+| [2.41](#gs-2-41) | 🟢 | Rapid Drawdown – USACE Benchmark | Spencer 1.434 vs the published 1.44 (−0.4%) · Bishop 1.432 vs 1.44 (−0.6%) · SLOPE/W's own model on its critical circle: Spencer 1.434 vs SLOPE/W 1.461 (−1.8%) | Duncan-Wright-Wong 3-stage, on the specified circle; SLOPE/W's answer sits above USACE's and Slide2's |
+| [2.42](#gs-2-42) | 🟢 | Rapid Drawdown – Pumped Storage Dam | Spencer 1.527 vs SLOPE/W 1.550 (−1.5%) · vs DWW 1.56 (−2.1%) · SLOPE/W's own model on its critical circle: M-P 1.538 vs SLOPE/W 1.550 (−0.8%) | Duncan-Wright-Wong 3-stage |
+| [2.43](#gs-2-43) | 🟢 | Rapid Drawdown – Pilarcitos Dam | Spencer 1.044 vs Slide 1.043 (+0.1%) · vs DWW 1.05 (−0.6%) · SLOPE/W's own model on its critical circle: M-P 1.050 vs SLOPE/W 1.050 (0.0%) | Duncan-Wright-Wong 3-stage |
 | [2.44](rocscience.md#vp75) | 🟢 | Probability – James Bay Case History | Bishop free search 1.424 vs Duncan & Wright 1.45 (−1.8%) · vs SLOPE/W 1.46 (−2.5%) | *covered* (deterministic); probabilistic case *blocked* — the 8 Bishop analyses are a pure spatial-averaging study differing *only* in a `SamplingDistance` (autocorrelation length): every-slice (0 m) / 30 / 40 / 50 / 80 / 100 m / none, over one set of plain σ's (marine-clay c σ = 8.14, lacustrine c σ = 8.65, fill γ and φ σ = 1). SLOPE/W's own results trace the variance-reduction curve directly: mean FS ≈ 1.46 throughout, **σ_F 0.065 → 0.215** and **PF 0 → 1.45%** as the averaging length grows. Only the "no spatial consideration" point-variance case (σ_F 0.215, PF 1.45%) is reproducible; the other seven vary a spatial-averaging length, and XSLOPE has no autocorrelation-length input — the same absence [Slide2 #33](rocscience.md#vp33) names |
 | [2.45](#gs-2-45) | 🟢 | Eurocode 7 – Cutting in Clay | Spencer 1.173 vs SLOPE/W's Overdesign Factor 1.174 (−0.1%) · Bishop 1.172 vs 1.173 (−0.1%) | Design Approach 3 partial factors baked into the material |
 | [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | M-P free search 1.073 vs SLOPE/W's composite minimum 1.091 (−1.6%) · Bishop free search 1.075 vs Bishop 1.07 in *Smith's Elements of Soil Mechanics* (+0.5%) | DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage |
@@ -774,22 +774,29 @@ no circle can follow, and the value falls inside the paper's rigorous bounds [0.
 
 The Walter Bouldin Dam is a rolled earthfill dam that failed during a rapid drawdown in 1975; this case verifies XSLOPE's Duncan-Wright-Wong three-stage rapid drawdown procedure.
 
-**Input:** [vp098.xlsx](files/rocscience/vp098.xlsx) · **Rocscience detail:** [VP98](rocscience.md#vp98)
+**Input:** [vp098.xlsx](files/rocscience/vp098.xlsx) · **SLOPE/W's own model:** [gs2_40.xlsx](files/geostudio/gs2_40.xlsx) · **Rocscience detail:** [VP98](rocscience.md#vp98)
 
 ![vp098: inputs and representative solution](images/vp098.png)
 
 | Method | XSLOPE | SLOPE/W | DWW |
 |---|:---:|:---:|:---:|
-| DWW 3-stage (Spencer) | 1.047 | 1.02 (+2.6%) | 1.04 (+0.7%) |
-| DWW 3-stage (Bishop) | — | 1.016 | — |
+| DWW 3-stage (Spencer) | 1.047 | 1.026 (+2.0%) | 1.04 (+0.7%) |
+| DWW 3-stage (Bishop) | — | 1.017 | — |
+| DWW 3-stage (Spencer), SLOPE/W's own model on its critical circle | 1.023 | 1.026 (−0.3%) | — |
+
+The last row is SLOPE/W's own model, read from its file with the
+[GeoStudio importer](../usage/geostudio.md#staged-rapid-drawdown), rapid drawdown
+included, and solved on SLOPE/W's own critical circle with SLOPE/W's method.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.40; Duncan, Wright & Wong (1990).
+
+<!-- test: file=files/geostudio/gs2_40.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.023, benchmark=GS-2.40 -->
 
 ### 🟢 2.41 — Rapid Drawdown – USACE Benchmark {#gs-2-41}
 
 A homogeneous embankment dam rapid-drawdown benchmark from USACE EM 1110-2-1902 (2003) Appendix G, evaluated with the Duncan-Wright-Wong 3-stage procedure on the specified circle.
 
-**Input:** [vp096.xlsx](files/rocscience/vp096.xlsx) · **Rocscience detail:** [VP96](rocscience.md#vp96)
+**Input:** [vp096.xlsx](files/rocscience/vp096.xlsx) · **SLOPE/W's own model:** [gs2_41.xlsx](files/geostudio/gs2_41.xlsx) · **Rocscience detail:** [VP96](rocscience.md#vp96)
 
 ![vp096: inputs and representative solution](images/vp096.png)
 
@@ -797,30 +804,47 @@ A homogeneous embankment dam rapid-drawdown benchmark from USACE EM 1110-2-1902 
 |---|---|---|---|
 | Bishop | 1.432 | 1.44 (−0.6%) | — |
 | Spencer | 1.434 | 1.44 (−0.4%) | — |
+| Spencer, SLOPE/W's own model on its critical circle | 1.434 | — | 1.461 (−1.8%) |
+
+The last row is SLOPE/W's own model, read from its file with the
+[GeoStudio importer](../usage/geostudio.md#staged-rapid-drawdown), rapid drawdown
+included, and solved on SLOPE/W's own critical circle with SLOPE/W's method. SLOPE/W's
+answer is the one that reads high: USACE publishes 1.44, Slide2 gives 1.443 on USACE's
+circle ([VP96](rocscience.md#vp96)), and XSLOPE's own build of the problem from the USACE
+figures, in the first two rows, agrees with both.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.41; USACE EM 1110-2-1902 (2003) Appendix G (Duncan, Wright & Wong 3-stage procedure).
+
+<!-- test: file=files/geostudio/gs2_41.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, benchmark=GS-2.41 -->
 
 ### 🟢 2.42 — Rapid Drawdown – Pumped Storage Dam {#gs-2-42}
 
 Rapid drawdown (285 → 120 ft) of a hypothetical pumped-storage dam — silty-clay core and free-draining rockfill shells — analyzed with the Duncan-Wright-Wong 3-stage procedure.
 
-**Input:** [vp099.xlsx](files/rocscience/vp099.xlsx) · **Rocscience detail:** [VP99](rocscience.md#vp99)
+**Input:** [vp099.xlsx](files/rocscience/vp099.xlsx) · **SLOPE/W's own model:** [gs2_42.xlsx](files/geostudio/gs2_42.xlsx) · **Rocscience detail:** [VP99](rocscience.md#vp99)
 
 ![vp099: inputs and representative solution](images/vp099.png)
 
 | Method | XSLOPE | Slide | SLOPE/W | DWW |
 |---|---|---|---|---|
 | Spencer (DWW 3-stage) | 1.527 | 1.534 (−0.5%) | 1.550 (−1.5%) | 1.56 (−2.1%) |
+| Morgenstern-Price (DWW 3-stage), SLOPE/W's own model on its critical circle | 1.538 | — | 1.550 (−0.8%) | — |
 
 The geometry is taken from this model's own .gsz (read with `xslope.geostudio.read_gsz`) rather than traced from Slide's unlabeled figure.
 
+The last row is SLOPE/W's own model, read from its file with the
+[GeoStudio importer](../usage/geostudio.md#staged-rapid-drawdown), rapid drawdown
+included, and solved on SLOPE/W's own critical circle with SLOPE/W's method.
+
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.42; Duncan, Wright & Wong (1990).
+
+<!-- test: file=files/geostudio/gs2_42.xlsx, type=single_circle, rapid=true, num_slices=60, fs_mprice=1.538, benchmark=GS-2.42 -->
 
 ### 🟢 2.43 — Rapid Drawdown – Pilarcitos Dam {#gs-2-43}
 
 A three-stage rapid-drawdown analysis of Pilarcitos Dam — a homogeneous earthfill embankment (Duncan, Wright & Wong 1990) drawn down from 72 to 37 ft, a documented drawdown-failure case. It verifies XSLOPE's staged rapid-drawdown procedure.
 
-**Input:** [vp097.xlsx](files/rocscience/vp097.xlsx) · **Rocscience detail:** [VP97](rocscience.md#vp97)
+**Input:** [vp097.xlsx](files/rocscience/vp097.xlsx) · **SLOPE/W's own model:** [gs2_43.xlsx](files/geostudio/gs2_43.xlsx) · **Rocscience detail:** [VP97](rocscience.md#vp97)
 
 ![vp097: inputs and representative solution](images/vp097.png)
 
@@ -828,8 +852,15 @@ A three-stage rapid-drawdown analysis of Pilarcitos Dam — a homogeneous earthf
 |---|---|---|---|---|
 | Bishop | 1.042 | 1.05 (−0.8%) | 1.043 (−0.1%) | — |
 | Spencer | 1.044 | 1.05 (−0.6%) | 1.043 (+0.1%) | — |
+| Morgenstern-Price, SLOPE/W's own model on its critical circle | 1.050 | — | — | 1.050 (0.0%) |
+
+The last row is SLOPE/W's own model, read from its file with the
+[GeoStudio importer](../usage/geostudio.md#staged-rapid-drawdown), rapid drawdown
+included, and solved on SLOPE/W's own critical circle with SLOPE/W's method.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.43; Duncan, Wright & Wong (1990).
+
+<!-- test: file=files/geostudio/gs2_43.xlsx, type=single_circle, rapid=true, num_slices=60, fs_mprice=1.050, benchmark=GS-2.43 -->
 
 ### 🟢 2.45 — Eurocode 7: Cutting in Clay {#gs-2-45}
 

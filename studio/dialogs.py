@@ -698,14 +698,15 @@ class RunFemDialog(QDialog):
                            "(sigma_h = K0·sigma_v).")
         form.addRow("K0", self.k0)
 
-        # Tension SRF (v19). A no-op wherever no material declares a cutoff above
-        # zero — see _has_reducible_tensile_cap, which is what dims it.
+        # Tension SRF (v19). A no-op wherever no material and no joints-sheet line
+        # declares a cutoff above zero — see _has_reducible_tensile_cap, which is
+        # what dims it.
         self.tension_srf = QCheckBox("Reduce the tensile cap with F (Tension SRF)")
         self.tension_srf.setChecked(bool(defaults.get("tension_srf", True)))
         self._tension_srf_tip = (
-            "Divide each material's tensile-strength cap by the trial F alongside c "
-            "and tan(phi), so the factor of safety is the factor on the WHOLE "
-            "strength envelope — shear and tensile.\n\n"
+            "Divide each material's and each joint line's tensile-strength cap by "
+            "the trial F alongside c and tan(phi), so the factor of safety is the "
+            "factor on the WHOLE strength envelope — shear and tensile.\n\n"
             "This is RS2's tensilestrength_SRF = 1 (the setting behind its published "
             "verification set) and what Plaxis does. Off holds each cap at its "
             "authored value through the bisection.")
@@ -918,18 +919,31 @@ class RunFemDialog(QDialog):
         return "hybrid" if jointed else "non_convergence"
 
     def _has_reducible_tensile_cap(self):
-        """Whether some material declares a tensile cutoff above zero.
+        """Whether some material or some joints-sheet line declares a tensile
+        cutoff above zero.
 
-        The rule lives in :func:`xslope.preflight.has_reducible_tensile_cap`, so
-        the control this dims and the ``main.tension_srf_unset`` note beside it in
-        the checks column read the same model the same way. A blank cutoff is no
-        cap at all and a cutoff of 0 divides to 0 at every trial factor; a model
-        whose materials are each blank or 0, in any mix, leaves the trial factor
-        nothing to reduce.
+        A material asks :func:`xslope.preflight.has_reducible_tensile_cap`, so the
+        control this dims and the ``main.tension_srf_unset`` note beside it in the
+        checks column read the same model the same way. A joints-sheet line's
+        t_cut follows the same setting (``xslope.joint.joint_reduced_tcut``), and
+        the note counts a line whose t_cut is above zero; so does this. A blank
+        cutoff is no cap at all and a cutoff of 0 divides to 0 at every trial
+        factor; a model whose materials and joint lines are each blank or 0, in any
+        mix, leaves the trial factor nothing to reduce.
         """
         from xslope.preflight import has_reducible_tensile_cap
-        mats = (self._sd or {}).get("materials") or []
-        return any(has_reducible_tensile_cap(m) for m in mats)
+        sd = self._sd or {}
+        if any(has_reducible_tensile_cap(m) for m in (sd.get("materials") or [])):
+            return True
+
+        def positive(v):
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                return False
+            return v == v and v > 0.0
+        return any(positive(j.get("t_cut")) for j in (sd.get("joint_lines") or [])
+                   if isinstance(j, dict))
 
     def _sync_enabled(self):
         a = self.analysis.currentData()
@@ -943,17 +957,17 @@ class RunFemDialog(QDialog):
         # K0 initialization applies to both a single trial and the SSRM.
         self.k0.setEnabled(self.k0_on.isChecked())
         # The tensile cap is only reduced during a strength reduction, and only
-        # where some material declares a cutoff ABOVE ZERO: a blank t_cut is no
-        # cap at all, and a cutoff of 0 divides to 0 at every trial factor. In
-        # both cases the box changes no number, so it is dimmed rather than
-        # offered, with the reason in its tooltip.
+        # where some material or joints-sheet line declares a cutoff ABOVE ZERO:
+        # a blank t_cut is no cap at all, and a cutoff of 0 divides to 0 at every
+        # trial factor. In both cases the box changes no number, so it is dimmed
+        # rather than offered, with the reason in its tooltip.
         reducible = self._has_reducible_tensile_cap()
         self.tension_srf.setEnabled((not single) and reducible)
         self.tension_srf.setToolTip(self._tension_srf_tip + ("" if reducible else
-            "\n\nDimmed: no material on this model declares a tensile cutoff above "
-            "zero. Each is either blank (no cap at all) or 0 (a soil that carries "
-            "no tension, and 0 divided by the trial factor is still 0), so there "
-            "is nothing here to reduce."))
+            "\n\nDimmed: no material and no joint line on this model declares a "
+            "tensile cutoff above zero. Each is either blank (no cap at all) or 0 "
+            "(no tension carried, and 0 divided by the trial factor is still 0), so "
+            "there is nothing here to reduce."))
         # Surficial-failure filter applies to the SSRM criterion only.
         self.min_slip_on.setEnabled(a == "ssrm")
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())

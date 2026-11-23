@@ -25,6 +25,8 @@ check below pins one of those promises to the engine's reading:
   F. POLYGONS. Size stays live for every Type.
   G. SEEPAGE BOUNDARIES. A value never entered stays blank through the editor, on
      both sets, so the model checks can name it; it never becomes a 0.
+  H. TENSION SRF. Run FEM's box is live when a joints-sheet line's cutoff is the
+     only one the setting divides.
 
 Every Studio setting these dialogs read or write goes to a scratch ini (QSettings
 is replaced for the duration), and every model is loaded from a copy.
@@ -53,6 +55,8 @@ _DAM = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_dam.xlsx")
 _POLYGONS = os.path.join(_REPO, "docs", "tutorials", "files",
                          "xslope_rock_toppling.xlsx")
 _LINER = os.path.join(_REPO, "docs", "tutorials", "files", "xslope_liner_jointed.xlsx")
+_ROCK_JOINTS = os.path.join(_REPO, "docs", "tutorials", "files",
+                            "xslope_rock_joints.xlsx")
 
 
 def _fail(cond, message):
@@ -609,6 +613,43 @@ def test_seep_bc_blank_value_stays_blank():
     return out
 
 
+# --------------------------------------------------------------------------- #
+# H. Tension SRF
+# --------------------------------------------------------------------------- #
+def test_tension_srf_counts_joint_lines():
+    """Run FEM's Tension SRF box is live on a strength reduction whenever the
+    setting changes a number: a material OR a joints-sheet line with a tensile
+    cutoff above zero (a joint's t_cut is divided by the trial F under the same
+    setting). Dimmed when every cutoff is blank or 0, and the tooltip says why."""
+    from studio.dialogs import RunFemDialog
+    out = []
+    with _sandbox() as load:
+        sd = load(_ROCK_JOINTS)
+        if not sd.get("joint_lines"):
+            return ["xslope_rock_joints.xlsx no longer carries joints-sheet lines"]
+        for m in sd.get("materials") or []:
+            m["t_cut"] = 0.0
+        for j in sd["joint_lines"]:
+            j["t_cut"] = 0.0
+
+        def box(model):
+            dlg = RunFemDialog(defaults={"analysis": "ssrm"}, slope_data=model)
+            dlg._sync_enabled()
+            state = (dlg.tension_srf.isEnabled(), dlg.tension_srf.toolTip())
+            dlg.deleteLater()
+            return state
+
+        live, tip = box(sd)
+        out += _fail(not live, "every t_cut is 0, yet the Tension SRF box is live")
+        out += _fail("joint" in tip.lower(),
+                     "the dimmed box's tooltip names materials only")
+        sd["joint_lines"][0]["t_cut"] = 5.0
+        live, _ = box(sd)
+        out += _fail(live, "a joints-sheet line has t_cut = 5, which the Tension SRF "
+                           "setting divides by F, yet the box is dimmed")
+    return out
+
+
 CHECKS = [
     ("material graying = engine", test_material_graying_follows_the_engine),
     ("material form = the rule", test_material_form_follows_the_rule),
@@ -620,6 +661,7 @@ CHECKS = [
     ("circles Option graying", test_circles_option_grays_the_unread_fields),
     ("polygon Size live", test_polygon_size_is_live_for_every_type),
     ("seep BC blank value", test_seep_bc_blank_value_stays_blank),
+    ("Tension SRF counts joints", test_tension_srf_counts_joint_lines),
 ]
 
 

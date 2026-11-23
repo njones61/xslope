@@ -30,6 +30,8 @@ check below pins one of those promises to the engine's reading:
      both sets, so the model checks can name it; it never becomes a 0.
   H. TENSION SRF. Run FEM's box is live when a joints-sheet line's cutoff is the
      only one the setting divides.
+  I. LINE LOADS. Studio's mesh puts a node at each line load, as the scripts'
+     meshes do; moving one makes the mesh stale, changing its magnitude does not.
 
 Every Studio setting these dialogs read or write goes to a scratch ini (QSettings
 is replaced for the duration), and every model is loaded from a copy.
@@ -797,6 +799,76 @@ def test_tension_srf_counts_joint_lines():
     return out
 
 
+# --------------------------------------------------------------------------- #
+# I. Line loads in Studio's mesh
+# --------------------------------------------------------------------------- #
+def test_studio_mesh_pins_line_loads():
+    """Studio's Build mesh passes each line load's point of application to the
+    mesher as a point constraint, as every scripted build does — so the FEM finds
+    a node at the load rather than moving it to the nearest one with a warning —
+    and passes none on a model without line loads, whose mesh is built exactly as
+    before. Moving a line load makes the mesh stale; changing its magnitude or
+    angle does not. The builder is stood in for, so nothing is meshed here."""
+    import xslope.mesh as mesh_mod
+    from studio.main_window import MainWindow
+    from studio.runners import MeshWorker
+    out = []
+    with _sandbox() as load:
+        sd = load(_SIMPLE)
+    gs = list(sd["ground_surface"].coords)
+    k = max(range(len(gs) - 1), key=lambda i: abs(gs[i + 1][0] - gs[i][0]))
+    (x0, y0), (x1, y1) = gs[k], gs[k + 1]
+    point = (x0 + 0.37 * (x1 - x0), y0 + 0.37 * (y1 - y0))   # mid-segment, no vertex
+
+    seen = []
+    real = mesh_mod.build_mesh_from_polygons
+
+    def recorder(polygons, **kwargs):
+        seen.append(kwargs)
+        return {"nodes": [], "elements": [], "element_types": [],
+                "element_materials": []}
+
+    def build(model):
+        worker = MeshWorker()
+        errors = []
+        worker.failed.connect(errors.append)
+        with contextlib.redirect_stdout(io.StringIO()):
+            worker.build(model, {"element_type": "tri6"})
+        return errors
+
+    mesh_mod.build_mesh_from_polygons = recorder
+    try:
+        plain = copy.deepcopy(sd)
+        plain["line_loads"] = []
+        errors = build(plain)
+        out += _fail(not errors and seen and seen[-1].get("point_constraints") is None,
+                     f"a model with no line load reached the mesher with "
+                     f"point_constraints={seen[-1].get('point_constraints') if seen else '?'!r}"
+                     f"{' (' + errors[0] + ')' if errors else ''}; it must mesh as before")
+        loaded = copy.deepcopy(sd)
+        loaded["line_loads"] = [{"x": point[0], "y": point[1], "P": 100.0,
+                                 "angle": -90.0, "label": "L1"}]
+        errors = build(loaded)
+        got = seen[-1].get("point_constraints") if seen else None
+        out += _fail(not errors and got and [tuple(p) for p in got] == [point],
+                     f"Studio's mesh build passed point_constraints={got!r} for a line "
+                     f"load at {point}; the mesher puts no node there without it")
+    finally:
+        mesh_mod.build_mesh_from_polygons = real
+
+    sig = MainWindow.mesh_signature
+    base = sig(loaded)
+    moved = copy.deepcopy(loaded)
+    moved["line_loads"][0]["x"] += 1.0
+    out += _fail(sig(moved) != base, "moving a line load keeps the mesh, which has a "
+                                     "node at its old point and none at the new one")
+    pushed = copy.deepcopy(loaded)
+    pushed["line_loads"][0].update(P=250.0, angle=-60.0)
+    out += _fail(sig(pushed) == base, "changing a line load's magnitude or angle "
+                                      "throws the mesh away")
+    return out
+
+
 CHECKS = [
     ("material graying = engine", test_material_graying_follows_the_engine),
     ("material form = the rule", test_material_form_follows_the_rule),
@@ -810,6 +882,7 @@ CHECKS = [
     ("polygon Size live", test_polygon_size_is_live_for_every_type),
     ("seep BC blank value", test_seep_bc_blank_value_stays_blank),
     ("Tension SRF counts joints", test_tension_srf_counts_joint_lines),
+    ("Studio mesh pins line loads", test_studio_mesh_pins_line_loads),
 ]
 
 

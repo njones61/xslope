@@ -288,7 +288,8 @@ class MeshWorker(QObject):
     def build(self, slope_data, options):
         from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                                  extract_constraint_line_geometry, extract_size_regions,
-                                 extract_joint_options, MeshInputError, _REFINE_FEATURES)
+                                 extract_joint_options, extract_point_constraints,
+                                 MeshInputError, _REFINE_FEATURES)
         try:
             sd = slope_data
             element_type = options["element_type"]
@@ -358,6 +359,11 @@ class MeshWorker(QObject):
             if thin_plan:
                 print("  ('Refine thin zones' in the Build mesh dialog disables this)")
             joint_lines = extract_joint_options(sd)
+            # A node exactly at each line load's point of application, as every
+            # scripted mesh is built: without one the FEM moves the load to the
+            # nearest node and warns. None (not []) on a model with no line load,
+            # so its mesh is built exactly as it always was.
+            point_constraints = extract_point_constraints(sd) or None
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,
@@ -366,7 +372,8 @@ class MeshWorker(QObject):
                                             refine_features=refine_features,
                                             size_regions=size_regions,
                                             quad_style=quad_style,
-                                            joint_lines=joint_lines)
+                                            joint_lines=joint_lines,
+                                            point_constraints=point_constraints)
             n1d = len(mesh.get("elements_1d", []))
             njt = len(mesh.get("elements_joint", []))
             print(f"Mesh built: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} "

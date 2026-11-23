@@ -2190,10 +2190,13 @@ class MainWindow(QMainWindow):
     #   * the refine, joint-network and SSR regions, whose Sizes size the mesh;
     #   * the points the mesher pins as polygon vertices so element edges meet
     #     them: every distributed-load vertex (and, with automatic water loads, the
-    #     derived ones) and every seepage boundary-condition vertex.
+    #     derived ones) and every seepage boundary-condition vertex;
+    #   * the point constraints it puts a node at: each line load's point of
+    #     application (its position, not its magnitude or angle).
     MESH_KEYS = ("profile_lines", "polygons", "max_depth", "reinforcement_lines",
                  "pile_lines", "joint_lines", "refine_zones", "joint_zones",
-                 "ssr_zones", "dloads", "dloads2", "seepage_bc", "seepage_bc2")
+                 "ssr_zones", "dloads", "dloads2", "seepage_bc", "seepage_bc2",
+                 "line_loads")
 
     @staticmethod
     def mesh_signature(sd):
@@ -2264,6 +2267,10 @@ class MainWindow(QMainWindow):
                     return out
                 if key in ("dloads", "dloads2"):
                     return load_points(rows)
+                if key == "line_loads":
+                    # Where each load acts is mesh input (a node is put there);
+                    # how hard it pushes, and in which direction, is not.
+                    return [[clean(r.get("x")), clean(r.get("y"))] for r in rows]
                 if key in ("seepage_bc", "seepage_bc2"):
                     # Only the vertices are mesh input (pinned by
                     # mesh.add_seep_bc_points_to_polygons); heads and fluxes are not.

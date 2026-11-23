@@ -2179,15 +2179,32 @@ class MainWindow(QMainWindow):
         "transient": "Transient Seepage",
     }
 
-    # Source inputs whose change makes the mesh stale (the domain geometry, the
-    # reinforcement/pile/joint lines baked in as mesh constraint lines, and the
-    # refinement and joint-network regions).
+    # Source inputs whose change makes the mesh stale — everything the Build mesh
+    # runner hands the mesher (runners.MeshBuilder.build) that comes from the model
+    # rather than the dialog:
+    #   * the domain geometry and its zones' Sizes (profile lines, polygons, bottom);
+    #   * the reinforcement, pile and joint lines baked in as constraint lines, and
+    #     for a reinforcement line also whether it is a joint (the mesh is split
+    #     along it) and, when it is, its end anchorages (a tied end is recorded in
+    #     the mesh with its capacity, which the FEM reads from there);
+    #   * the refine, joint-network and SSR regions, whose Sizes size the mesh;
+    #   * the points the mesher pins as polygon vertices so element edges meet
+    #     them: every distributed-load vertex (and, with automatic water loads, the
+    #     derived ones) and every seepage boundary-condition vertex.
     MESH_KEYS = ("profile_lines", "polygons", "max_depth", "reinforcement_lines",
-                 "pile_lines", "joint_lines", "refine_zones", "joint_zones")
+                 "pile_lines", "joint_lines", "refine_zones", "joint_zones",
+                 "ssr_zones", "dloads", "dloads2", "seepage_bc", "seepage_bc2")
 
     @staticmethod
     def mesh_signature(sd):
-        """JSON signature of the mesh-affecting inputs, to detect geometry edits."""
+        """JSON signature of the mesh-affecting inputs, to detect geometry edits.
+
+        Built from the model's own keys (``MESH_KEYS``), each cut down to what the
+        mesher reads of it, so a property edit — a Tmax, a pile's D, a load's
+        magnitude, a head value — keeps the mesh. Two parts come from the mesher's
+        own readers, so the signature follows them: the size regions
+        (``extract_size_regions``) and, in automatic water-load mode, the derived
+        water-load blocks whose vertices the mesher pins (``with_water_loads``)."""
         def clean(o):
             if hasattr(o, "wkt"):
                 return o.wkt
@@ -2204,22 +2221,89 @@ class MainWindow(QMainWindow):
             if isinstance(o, (list, tuple)):
                 return [clean(x) for x in o]
             return o
+        def load_points(blocks):
+            # A distributed-load block's vertices, in either of the forms a block
+            # takes (a list of X/Y/Normal points, or a dict carrying 'xy'), as
+            # mesh.add_dload_points_to_polygons reads them. The magnitudes are not
+            # mesh input.
+            out = []
+            for block in blocks or []:
+                if isinstance(block, list):
+                    out.append([[clean(p.get("X")), clean(p.get("Y"))]
+                                for p in block if isinstance(p, dict)])
+                elif isinstance(block, dict) and "xy" in block:
+                    out.append(clean(block["xy"]))
+            return out
+
         def geometry_only(key, rows):
             # A reinforcement, pile or joint row enters the mesh as a constraint
-            # line and nothing more: only its endpoints (and how many rows there
-            # are) can change the mesh. Editing S, D, Tmax, Appl, a joint's
-            # strength or any other property on a row must not throw the mesh away.
-            if key not in ("reinforcement_lines", "pile_lines",
-                           "joint_lines") or not rows:
+            # line: its endpoints (and how many rows there are) can change the
+            # mesh. A reinforcement line's Joint column also does — a jointed line
+            # is split, and each of its ends with an anchorage is tied in the mesh
+            # at that capacity — so a jointed line carries its Tend1/Tend2 too.
+            # Editing S, D, Tmax, Appl, a joint's strength or any other property
+            # must not throw the mesh away.
+            if not rows:
                 return clean(rows)
             try:
-                return [[clean(r.get("x1")), clean(r.get("y1")),
-                         clean(r.get("x2")), clean(r.get("y2"))] for r in rows]
+                if key in ("reinforcement_lines", "pile_lines", "joint_lines"):
+                    from xslope.mesh import line_is_jointed
+                    out = []
+                    for r in rows:
+                        sig = [clean(r.get("x1")), clean(r.get("y1")),
+                               clean(r.get("x2")), clean(r.get("y2"))]
+                        if key == "reinforcement_lines" and line_is_jointed(r):
+                            # The values extract_joint_options hands the mesher, to
+                            # 12 digits: the editor stores Tend per unit width by
+                            # dividing what it shows by Spacing, and that round trip
+                            # can move the last bit of an untouched value.
+                            sig += ["joint"] + [
+                                f"{float(clean(r.get(k)) or 0.0):.12g}"
+                                for k in ("tend1", "tend2")]
+                        out.append(sig)
+                    return out
+                if key in ("dloads", "dloads2"):
+                    return load_points(rows)
+                if key in ("seepage_bc", "seepage_bc2"):
+                    # Only the vertices are mesh input (pinned by
+                    # mesh.add_seep_bc_points_to_polygons); heads and fluxes are not.
+                    return {"blocks": [clean(b.get("coords"))
+                                       for b in ((rows.get("specified_heads") or [])
+                                                 + (rows.get("specified_fluxes") or []))],
+                            "exit_face": clean(rows.get("exit_face"))}
+                if key == "ssr_zones":
+                    # An SSR overlay is not meshed; only a Size on one sizes the
+                    # mesh. Its kind and label are analysis input, not mesh input.
+                    return [[clean(z.get("polygon")), clean(z.get("size"))]
+                            for z in rows if z.get("size") is not None]
             except Exception:
-                return clean(rows)
+                pass
+            return clean(rows)
+
+        def mesher_view():
+            # What the mesher's own readers make of the model, where it is not a
+            # key read directly: the size regions it is handed, and the water
+            # loads it derives in automatic mode and pins vertices for.
+            out = {}
+            try:
+                from xslope.mesh import extract_size_regions
+                out["size_regions"] = clean(extract_size_regions(sd))
+            except Exception as e:
+                out["size_regions"] = f"error: {type(e).__name__}"
+            try:
+                from xslope.water import DERIVED_KEYS, water_loads_mode, with_water_loads
+                if water_loads_mode(sd) == "auto":
+                    derived = with_water_loads(sd)
+                    out["water_loads"] = [load_points(derived.get(DERIVED_KEYS[s]))
+                                          for s in (1, 2)]
+            except Exception as e:
+                out["water_loads"] = f"error: {type(e).__name__}"
+            return out
+
         try:
-            return json.dumps({k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS},
-                              sort_keys=True, default=str)
+            sig = {k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS}
+            sig["_mesher"] = mesher_view()
+            return json.dumps(sig, sort_keys=True, default=str)
         except Exception:
             return None
 

@@ -20,7 +20,8 @@ diagnostic = False # @param {"type":"boolean"}
 if analysis_type == 'single_surface': # analyze the specified failure surface
   circle = slope_data['circles'][0] if slope_data['circular'] else None
   non_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
-  success, result = generate_slices(slope_data, circle=circle, non_circ=non_circ, num_slices=num_slices)
+  success, result = generate_slices(slope_data, circle=circle, non_circ=non_circ, num_slices=num_slices,
+                                    rapid=rapid_drawdown)
   if success:
       slice_df, failure_surface = result
       results = solve_selected(method, slice_df, rapid=rapid_drawdown)

@@ -26,6 +26,12 @@ from .hoekbrown import hb_tangent
 
 _ito_matsui_warned = False  # module-level flag: warn once about large H
 
+#: The strength options that take matric-suction strength (phi_b, s_cap): the
+#: effective-stress envelopes. cp and ratio are undrained strengths, with no
+#: effective-stress term for suction to add to; the finite element engine keeps
+#: the same list (fem.SUCTION_OPTIONS).
+SUCTION_OPTIONS = ("mc", "pow", "hb")
+
 
 def _support_choice(row, key, vocabulary, default, index, what):
     """One structural-row vocabulary field (Dir, Appl), or a loud refusal.
@@ -1195,7 +1201,7 @@ def pile_force_angle(x1, y1, x2, y2, right_facing=None):
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
                     composite=False, right_facing=None,
                     suction_phi_b=None, suction_cap=None, check_inputs=True,
-                    material_breakdown=False):
+                    material_breakdown=False, rapid=False):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -1219,7 +1225,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             (Fredlund extended Mohr-Coulomb), LEM only. Maps ``{material name:
             phi_b degrees}``. Default None auto-wires from the materials' template
             (v17) ``phi_b`` values; an explicit dict overrides the file, and an empty
-            dict forces suction off. For a slice whose base material is named in the dict,
+            dict forces suction off. For a slice whose base material is named in the
+            dict and has an effective-stress envelope (mc, pow or hb; cp and ratio
+            take no suction credit),
             the base matric suction ``s = max(0, -u)`` (from the UNCLAMPED pore
             pressure: a piezometric line's hydrostatic negative head above the
             line, or an unsaturated seepage solution's negative u) contributes an
@@ -1243,6 +1251,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             the searches do this after gating once at their own entry (the model
             does not change between trial surfaces), and the sweep engines do it
             because a deliberately perturbed value is not a user mistake.
+        rapid (bool, optional): True when the slices are for a rapid drawdown
+            analysis (:func:`xslope.advanced.rapid_drawdown`), the only analysis
+            that reads the second piezometric line. Then, as for the first line,
+            the slices break where a surface crosses Line 2, and a slice whose
+            base takes u = piezo and falls outside Line 2's x-extent is refused.
+            Default False: Line 2 shapes nothing and refuses nothing, so a
+            single-stage run (and the two-stage seismic analysis, which reads the
+            stage 1 water in both stages) is the same with or without it. The
+            stage-2 column ``u2`` is still filled from Line 2 where it is defined
+            and is NaN where a drawn Line 2 does not reach, so a drawdown solved
+            on slices made without ``rapid=True`` cannot read zero there.
 
     Returns:
         tuple:
@@ -1663,7 +1682,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Find intersections with piezometric lines. A single point is not a line: it
     # cannot become a LineString and it cannot be interpolated, so it is treated as
     # no line here and reported by the u='piezo' guard below.
-    for pl in (piezo_line, piezo_line2):
+    # The second line only where the analysis reads it (rapid drawdown): in any
+    # other run it must not move the slice boundaries, or a line nobody's run uses
+    # would change the factor of safety.
+    for pl in ((piezo_line, piezo_line2) if rapid else (piezo_line,)):
         if pl and len(pl) >= 2:
             fixed_xs.update(_crossing_xs(LineString(pl)))
 
@@ -2571,7 +2593,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 raise _piezo_extent_error(
                     i, x_u, materials[base_material_idx]['name'], _pz_ext,
                     "piezometric line")
-            if _pz2_ext is not None and np.isnan(piezo_y2):
+            # The second line is read only by rapid drawdown, so only a rapid
+            # run is refused for a slice outside it. Any other run leaves u2
+            # undefined (NaN) there rather than zero: nothing reads it, and a
+            # drawdown that did would fail rather than lose the water.
+            _u2_undefined = _pz2_ext is not None and np.isnan(piezo_y2)
+            if rapid and _u2_undefined:
                 raise _piezo_extent_error(
                     i, x_u, materials[base_material_idx]['name'], _pz2_ext,
                     "second piezometric line")
@@ -2580,7 +2607,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if not np.isnan(piezo_y2) and piezo_y2 > y_u:
                 hw2 = piezo_y2 - y_u
             u = hw * gamma_w if not np.isnan(piezo_y) else 0
-            u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
+            u2 = (np.nan if _u2_undefined
+                  else (hw2 * gamma_w if not np.isnan(piezo_y2) else 0))
             # Signed head to the piezometric line: negative above the line, where
             # its magnitude is the hydrostatic matric suction. No phreatic cos^2
             # correction (that models steady parallel seepage below the line).
@@ -2864,8 +2892,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         # solvers add this to c in the resisting term c*dl; the effective-normal
         # term keeps the clamped u, so this is exactly the (u_a - u_w) tan(phi_b)
         # term with u_a = 0. Default (suction_phi_b None) => 0.0, bit-identical.
+        # Only an effective-stress envelope takes the credit (mc, pow, hb): the
+        # (u_a - u_w) tan(phi_b) term adds to c' + sigma' tan(phi'), and an
+        # undrained strength (cp, ratio) has no effective-stress term to add it to.
+        # The finite element engine follows the same rule (fem.SUCTION_OPTIONS).
         c_suction = 0.0
-        if suction_phi_b and base_material_idx is not None:
+        if (suction_phi_b and base_material_idx is not None
+                and materials[base_material_idx].get('option') in SUCTION_OPTIONS):
             _bm_name = materials[base_material_idx]['name']
             phi_b_deg = suction_phi_b.get(_bm_name)
             if phi_b_deg:

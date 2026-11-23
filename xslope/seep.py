@@ -212,6 +212,129 @@ def bc_node_tolerance(nodes):
     return BC_NODE_TOL_FRAC * max(x_range, y_range)
 
 
+# =============================================================================
+# Joints
+#
+# A mesh built with joint lines (the joints sheet, or a reinforcement line with
+# Joint = Yes) is SPLIT along each of them: every station on the line carries one
+# node per side (and a bar's own node), at the same coordinates, joined only by
+# the interface elements the finite element solver reads. A joint is a mechanical
+# discontinuity; it has no hydraulic meaning here. Solved on the split mesh as
+# it stands, each joint would be a no-flow wall. So the seepage solvers merge
+# every set of coincident nodes into one unknown, solve on the merged mesh (which
+# IS the unsplit mesh), and copy the answer back onto every node of the set, so
+# a stability run reading the field finds it on both faces of the joint.
+# =============================================================================
+
+
+def joint_node_merge(mesh):
+    """Map every node of a joint-split mesh to its merged node, or None.
+
+    Returns an int array, one entry per mesh node, numbering the distinct node
+    positions 0..m-1 in order of their first appearance (so a split mesh's own
+    nodes keep their order and each copy joins the node it was copied from). None
+    when the mesh carries no joint elements or no two nodes coincide, which is
+    every mesh without a joint: nothing is merged and nothing changes.
+    """
+    if not isinstance(mesh, dict):
+        return None
+    ej = mesh.get("elements_joint")
+    if ej is None or len(ej) == 0:
+        return None
+    nodes = np.asarray(mesh["nodes"], dtype=float)
+    _, first, inv = np.unique(nodes, axis=0, return_index=True, return_inverse=True)
+    if len(first) == len(nodes):
+        return None
+    order = np.argsort(first)
+    rank = np.empty(len(order), dtype=int)
+    rank[order] = np.arange(len(order))
+    return rank[np.asarray(inv).ravel()]
+
+
+def _joint_merged(seep_data):
+    """``(merged seep_data, rep, keep)`` for a seep_data built on a joint-split
+    mesh, else None.
+
+    ``rep`` maps each node to its merged node and ``keep`` each merged node to the
+    first node of its set. Elements are renumbered onto the merged nodes; the
+    node-indexed boundary data are merged too: a node set takes the strongest
+    boundary condition any of its nodes carries (they share coordinates, so they
+    carry the same one), and the specified-flux loads and series flux loads are
+    summed, so the water a boundary admits is unchanged.
+    """
+    rep = seep_data.get("node_merge")
+    if rep is None:
+        return None
+    rep = np.asarray(rep, dtype=int)
+    nodes = np.asarray(seep_data["nodes"], dtype=float)
+    if len(rep) != len(nodes):
+        raise SeepInputError(
+            f"The seep data's joint node map has {len(rep)} entries but the mesh "
+            f"has {len(nodes)} nodes; rebuild it with build_seep_data.")
+    m = int(rep.max()) + 1
+    keep = np.empty(m, dtype=int)
+    keep[rep[::-1]] = np.arange(len(rep))[::-1]      # first node of each set
+
+    sd = dict(seep_data)
+    sd.pop("node_merge", None)
+    sd["nodes"] = nodes[keep]
+    elements = np.array(seep_data["elements"], copy=True)
+    element_types = seep_data.get("element_types")
+    if element_types is None:
+        element_types = np.full(len(elements), elements.shape[1] if elements.ndim == 2 else 3)
+    element_types = np.asarray(element_types, dtype=int)
+    cols = np.arange(elements.shape[1])[None, :]
+    active = cols < element_types[:, None]
+    elements[active] = rep[elements[active]]
+    sd["elements"] = elements
+
+    bc_type = np.asarray(seep_data["bc_type"])
+    bc_values = np.asarray(seep_data["bc_values"], dtype=float)
+    by = np.argsort(bc_type, kind="stable")           # the strongest condition wins
+    bt = np.zeros(m, dtype=bc_type.dtype)
+    bv = np.zeros(m)
+    bt[rep[by]] = bc_type[by]
+    bv[rep[by]] = bc_values[by]
+    sd["bc_type"], sd["bc_values"] = bt, bv
+    fn = seep_data.get("flux_nodal")
+    if fn is not None:
+        f = np.zeros(m)
+        np.add.at(f, rep, np.asarray(fn, dtype=float))
+        sd["flux_nodal"] = f
+    hb = []
+    for b in seep_data.get("head_series_bindings") or []:
+        mask = np.zeros(m, dtype=bool)
+        np.logical_or.at(mask, rep, np.asarray(b["mask"], dtype=bool))
+        hb.append(dict(b, mask=mask))
+    sd["head_series_bindings"] = hb
+    fb = []
+    for b in seep_data.get("flux_series_bindings") or []:
+        f = np.zeros(m)
+        np.add.at(f, rep, np.asarray(b["unit_flux_nodal"], dtype=float))
+        fb.append(dict(b, unit_flux_nodal=f))
+    sd["flux_series_bindings"] = fb
+    return sd, rep, keep
+
+
+def _spread(values, rep):
+    """A merged node field back onto every node of the split mesh."""
+    if values is None:
+        return None
+    return np.asarray(values)[rep]
+
+
+def _spread_sum(values, rep, keep, n):
+    """A merged nodal LOAD back onto the split mesh: the whole of it on the first
+    node of each set and zero on the copies, so a sum over the nodes is the
+    merged sum."""
+    if values is None:
+        return None
+    values = np.asarray(values)
+    out = np.zeros((n,) + values.shape[1:], dtype=values.dtype)
+    out[keep] = values
+    return out
+
+
 def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     """
     Build a seep_data dictionary from a mesh and data dictionary.
@@ -258,6 +381,9 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
             - kr0_by_mat: np.ndarray (n_materials,) of relative conductivity values
             - h0_by_mat: np.ndarray (n_materials,) of suction head values
             - unit_weight: float, unit weight of water
+            - node_merge: on a mesh split along joints only, the merged node of
+              every node (see :func:`joint_node_merge`); the solvers solve on the
+              merged mesh and return every field on all the nodes
     """
     
     # === PREFLIGHT ===
@@ -546,6 +672,13 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         # so a caller can build a specific error message without re-deriving it.
         "missing_unsat_detail": bad_mats if missing_unsat_params else [],
     }
+
+    # A mesh split along joints seeps as if unsplit (see joint_node_merge): the
+    # solvers merge each set of coincident nodes into one unknown. Recorded only
+    # on a split mesh, so every other seep_data is what it always was.
+    _merge = joint_node_merge(mesh)
+    if _merge is not None:
+        seep_data["node_merge"] = _merge
 
     # Carry the unit declaration through as provenance so it survives into
     # save_seep_data_to_json (units plan phase 2, sec 2a). Recorded only when set, so an
@@ -4062,6 +4195,24 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     if report is not None:
         report.raise_for_errors()
 
+    # A mesh split along joints: solve on the merged (unsplit) mesh, then put the
+    # answer on every node, both faces of each joint included.
+    _merged = _joint_merged(seep_data)
+    if _merged is not None:
+        sd_m, rep, keep = _merged
+        sd_m.pop("_preflight", None)            # checked above, on the model itself
+        sol = run_seepage_analysis(sd_m, tol=tol, closure_tol=closure_tol,
+                                   max_iter=max_iter)
+        n = len(rep)
+        out = dict(sol)
+        for key in ("head", "u", "velocity", "gradient", "v_mag", "i_mag", "phi"):
+            if key in sol:
+                out[key] = _spread(sol[key], rep)
+        for key in ("q", "flux_nodal"):
+            if key in sol:
+                out[key] = _spread_sum(sol[key], rep, keep, n)
+        return out
+
     # A boundary value bound to a tseep time series has no meaning in a steady
     # solve — there is no time axis to read the series at, and silently leaving
     # those nodes free would solve a different problem than the file describes.
@@ -4749,6 +4900,27 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         raise NotImplementedError(
             "run_transient_seepage: consistent-mass (lumped=False) is not implemented "
             "in v1; the lumped (HRZ) mass matrix is the default and only option.")
+    # A mesh split along joints: march on the merged (unsplit) mesh, then put every
+    # frame's field on every node, both faces of each joint included.
+    _merged = _joint_merged(seep_data)
+    if _merged is not None:
+        sd_m, rep, keep = _merged
+        out = run_transient_seepage(
+            sd_m, tseep_data, theta=theta, lumped=lumped, dt_max=dt_max,
+            growth=growth, max_head_change_frac=max_head_change_frac,
+            h_init=None if h_init is None else np.asarray(h_init, dtype=float)[keep],
+            verbose=verbose, progress_callback=progress_callback,
+            max_iter=max_iter, time_error_frac=time_error_frac)
+        out = dict(out)
+        frames = []
+        for fr in out.get("frames") or []:
+            fr = dict(fr)
+            for key in ("head", "u", "phi"):
+                if fr.get(key) is not None:
+                    fr[key] = _spread(fr[key], rep)
+            frames.append(fr)
+        out["frames"] = frames
+        return out
     if tseep_data is None:
         raise SeepInputError("run_transient_seepage requires tseep_data (this model "
                              "has no 'tseep' sheet).")
@@ -5689,6 +5861,19 @@ def _transient_frame_solution(seep_data, head, u, phi, inflow, outflow,
     ``None`` for a current run and is accepted only so a legacy 5-column file still
     loads. ``flowrate`` mirrors the boundary inflow; ``inflow``/``outflow`` (which
     differ under transient storage exchange) and ``time`` drive the title variant."""
+    _merged = _joint_merged(seep_data)
+    if _merged is not None:
+        # A joint-split mesh: derive on the merged mesh, as the field was solved,
+        # so both faces of a joint read the same velocity.
+        sd_m, rep, keep = _merged
+        sol = _transient_frame_solution(
+            sd_m, np.asarray(head, dtype=float)[keep], np.asarray(u, dtype=float)[keep],
+            None if phi is None else np.asarray(phi, dtype=float)[keep],
+            inflow, outflow, unconfined, time=time)
+        for key in ("head", "u", "velocity", "v_mag", "gradient", "i_mag", "phi"):
+            if sol.get(key) is not None:
+                sol[key] = _spread(sol[key], rep)
+        return sol
     nodes = seep_data["nodes"]
     (elements, element_types, k1, k2, angle, kr0, h0,
      vg_a, vg_n, vg_l, model) = _elem_props(seep_data)

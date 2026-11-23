@@ -286,11 +286,15 @@ class ProjectDocument(QObject):
                 # reinforcement line, defined by its two extreme endpoints.
                 chains = [c for c in geom["open"] if len(c) >= 2]
                 chains += chain_segments(geom["lines"]) if geom["lines"] else []
+                # Lp1/Lp2 and Tres blank, as the editor's new line has them
+                # (editors._new_reinf): a 0 development length is a fully anchored
+                # end that passes every check, and a 0 Tres is brittle rupture.
+                nan = float("nan")
                 for chain in chains:
                     a, b = chain[0], chain[-1]
                     reinforcement_lines.append(
                         {"x1": a[0], "y1": a[1], "x2": b[0], "y2": b[1], "t_max": 0.0,
-                         "t_res": 0.0, "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0})
+                         "t_res": nan, "lp1": nan, "lp2": nan, "E": 0.0, "area": 0.0})
                 placeholder = placeholder or bool(chains)
             elif t == "circles":
                 for cx, cy, r in geom["circles"]:

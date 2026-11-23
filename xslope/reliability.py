@@ -305,14 +305,21 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         if circular:
             ok_, res_ = generate_slices(sd_, circle=sd_['circles'][0],
                                         num_slices=40, composite=composite,
-                                        check_inputs=False)
+                                        check_inputs=False, rapid=rapid)
         else:
             ok_, res_ = generate_slices(sd_, non_circ=sd_['non_circ'], num_slices=40,
-                                        check_inputs=False)
+                                        check_inputs=False, rapid=rapid)
         if not ok_:
             return None
         df_, surf_ = res_
-        ok2, r_ = getattr(_solve, method)(df_)
+        # A rapid drawdown run solves the drawdown on the fixed surface too, the
+        # same three stages the search runs on each trial surface. (This path once
+        # solved the single-stage model, and preflight refused the combination.)
+        if rapid:
+            from .advanced import rapid_drawdown
+            ok2, r_ = rapid_drawdown(df_, method, debug_level=0)
+        else:
+            ok2, r_ = getattr(_solve, method)(df_)
         if not ok2:
             return None
         return [{"FS": r_['FS'], "slices": df_, "failure_surface": surf_,
@@ -358,13 +365,15 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
     # Step 2: Identify parameters with standard deviations
     materials = slope_data['materials']
     
-    # Find parameters that have standard deviations
+    # Find parameters that have standard deviations: the ones each material's
+    # strength model reads in THIS analysis -- d and psi join an mc material's set
+    # in a rapid drawdown run (_strength_param_mapping).
     param_info = []
     
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
 
-        param_mappings = _strength_param_mapping(material, mat_name)
+        param_mappings = _strength_param_mapping(material, mat_name, rapid=rapid)
 
         for param, std_key in param_mappings.items():
             if std_key in material and material[std_key] > 0:
@@ -536,13 +545,19 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
     return True, result
 
 
-def _strength_param_mapping(material, mat_name):
+def _strength_param_mapping(material, mat_name, rapid=False):
     """Map the strength parameters a material's model actually uses to their sigma keys.
 
     Perturbing a field the model does not use (e.g. phi on a cp material) would do
     nothing and silently drop that material's strength uncertainty from COV_F. gamma
     applies to every model. A blank option carries no strength parameters -- legal on
     seep-only material rows; generate_slices raises if one reaches a failure surface.
+
+    ``rapid``: a rapid drawdown analysis also reads an mc material's Kc = 1
+    envelope, d and psi -- stage 2 takes its undrained strength from them -- so
+    their s(d) and s(psi) are perturbed the same way as c and phi. Outside a rapid
+    drawdown nothing reads d or psi, and on any other option the slicer zeroes
+    them, so they stay out of the set there.
 
     An ``elastic`` material is the same kind of legal-but-empty row. It cannot fail and
     a slip surface cannot enter it, so it has NOTHING to perturb -- and a deterministic
@@ -560,6 +575,8 @@ def _strength_param_mapping(material, mat_name):
     mapping = {'gamma': 'sigma_gamma'}
     if option == 'mc':
         mapping.update({'c': 'sigma_c', 'phi': 'sigma_phi'})
+        if rapid:
+            mapping.update({'d': 'sigma_d', 'psi': 'sigma_psi'})
     elif option in ('cp', 'ratio'):
         mapping.update({'c': 'sigma_c', 'cp': 'sigma_cp'})
     elif option == 'elastic':
@@ -573,23 +590,38 @@ def _strength_param_mapping(material, mat_name):
     return mapping
 
 
-def _reliability_param_info(materials):
+def _has_sigmas(materials, rapid=False):
+    """True when any material carries a standard deviation this analysis reads:
+    s(g), s(c), s(f) or s(c/p) anywhere, and in a rapid drawdown s(d) or s(psi)
+    on an mc material too."""
+    def _pos(v):
+        try:
+            return float(v or 0) != 0
+        except (TypeError, ValueError):
+            return False
+    keys = ('sigma_gamma', 'sigma_c', 'sigma_phi', 'sigma_cp')
+    for m in materials:
+        if any(_pos(m.get(k)) for k in keys):
+            return True
+        if (rapid and m.get('option') == 'mc'
+                and (_pos(m.get('sigma_d')) or _pos(m.get('sigma_psi')))):
+            return True
+    return False
+
+
+def _reliability_param_info(materials, rapid=False):
     """Build the list of uncertain strength parameters to perturb for TSPM, shared
     by the LEM and FEM reliability paths. Perturbs only the parameters a material's
-    strength model uses — see :func:`_strength_param_mapping`. Returns (param_info,
-    error) — error is a message string if no sigmas are set or a mean-minus-sigma
-    would go negative (non-physical), else None."""
-    has_std = any(
-        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
-        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
-        for m in materials)
-    if not has_std:
+    strength model uses in this analysis — see :func:`_strength_param_mapping`.
+    Returns (param_info, error) — error is a message string if no sigmas are set or
+    a mean-minus-sigma would go negative (non-physical), else None."""
+    if not _has_sigmas(materials, rapid=rapid):
         return None, no_sigmas_message()
 
     param_info = []
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
-        param_mappings = _strength_param_mapping(material, mat_name)
+        param_mappings = _strength_param_mapping(material, mat_name, rapid=rapid)
         for param, std_key in param_mappings.items():
             if std_key in material and material[std_key] > 0:
                 param_info.append({
@@ -825,23 +857,25 @@ MC_DEFAULT_SAMPLES = 10000
 _MC_FLOOR = {'gamma': 1e-6, 'c': 0.0, 'phi': 0.0, 'cp': 0.0}
 
 
-def _mc_param_info(materials):
+def _mc_param_info(materials, rapid=False):
     """Uncertain strength/weight parameters for Monte Carlo, as a list of dicts
     (material_id, param, mlv, std). Same parameter set as the Taylor-series path
     (:func:`_reliability_param_info`) but WITHOUT its mean-minus-sigma>=0 rejection:
     Monte Carlo handles COV>100% by truncating samples at the physical floor, so a
     high-COV parameter that TSPM must decline is admissible here. Returns
-    (param_info, error); error is a message when no sigmas are set."""
-    has_std = any(
-        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
-        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
-        for m in materials)
-    if not has_std:
+    (param_info, error); error is a message when no sigmas are set.
+
+    ``rapid`` adds an mc material's d and psi, as for the Taylor series. The
+    sampling engines do not run a rapid drawdown today (preflight's
+    reliability.rapid_has_no_effect refuses the combination), so it is passed for
+    the set to describe the analysis asked for."""
+    if not _has_sigmas(materials, rapid=rapid):
         return None, no_sigmas_message()
     param_info = []
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
-        for param, std_key in _strength_param_mapping(material, mat_name).items():
+        for param, std_key in _strength_param_mapping(material, mat_name,
+                                                      rapid=rapid).items():
             if std_key in material and material[std_key] > 0:
                 param_info.append({'material_id': i + 1, 'material_name': mat_name,
                                    'param': param, 'mlv': material[param],
@@ -934,7 +968,7 @@ def _truncate_samples(col, param):
     against the coordinate that was actually solved.
     """
     col = np.maximum(col, _MC_FLOOR.get(param, 0.0))
-    if param == 'phi':
+    if param in ('phi', 'psi'):
         col = np.minimum(col, 89.0)
     return col
 
@@ -1045,12 +1079,12 @@ def _fixed_surface_context(slope_data, method, label, rapid=False, circular=True
                                             num_slices=num_slices,
                                             composite=composite,
                                             check_inputs=False,
-                                            material_breakdown=True)
+                                            material_breakdown=True, rapid=rapid)
             else:
                 okt, rest = generate_slices(slope_data, non_circ=fixed_noncirc,
                                             num_slices=num_slices,
                                             check_inputs=False,
-                                            material_breakdown=True)
+                                            material_breakdown=True, rapid=rapid)
             if okt:
                 cand = rest[0]
                 probe = cand.copy()
@@ -1089,10 +1123,12 @@ def _fixed_surface_context(slope_data, method, label, rapid=False, circular=True
     def _eval_rebuild(sd):
         if circular:
             ok, res = generate_slices(sd, circle=fixed_circle, num_slices=num_slices,
-                                      composite=composite, check_inputs=False)
+                                      composite=composite, check_inputs=False,
+                                      rapid=rapid)
         else:
             ok, res = generate_slices(sd, non_circ=fixed_noncirc,
-                                      num_slices=num_slices, check_inputs=False)
+                                      num_slices=num_slices, check_inputs=False,
+                                      rapid=rapid)
         if not ok:
             return None
         ok2, r = solver(res[0], **_seed_kw)
@@ -1265,7 +1301,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     if gate:
         return False, gate
 
-    param_info, err = _mc_param_info(materials)
+    param_info, err = _mc_param_info(materials, rapid=rapid)
     if err:
         return False, err
 
@@ -1664,7 +1700,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
     if gate_msg:
         return False, gate_msg
 
-    param_info, err = _mc_param_info(materials)
+    param_info, err = _mc_param_info(materials, rapid=rapid)
     if err:
         return False, err
 

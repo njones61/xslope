@@ -6393,7 +6393,7 @@ def _combo02_detail(model, crit):
 
     with contextlib.redirect_stdout(io.StringIO()):
         ok, out = generate_slices(model, circle=_combo02_circle(crit),
-                                  num_slices=COMBO02_SLICES)
+                                  num_slices=COMBO02_SLICES, rapid=True)
     if not ok:
         raise RuntimeError(out)
     as_built = out[0]

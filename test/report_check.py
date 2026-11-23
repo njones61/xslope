@@ -2392,7 +2392,7 @@ def _rapid_case(which):
         # search's own trial circles are built.
         ok, out = generate_slices(
             slope_data, circle=dict(circle, R=circle["Yo"] - circle["Depth"]),
-            num_slices=40)
+            num_slices=40, rapid=True)
         if not ok:
             raise RuntimeError(f"COMBO-2 ({which}) would not slice: {out}")
         slice_df, _surface = out

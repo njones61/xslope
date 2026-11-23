@@ -308,7 +308,14 @@ def _c_eff(slice_df):
     """
     c = slice_df['c'].values
     if 'c_suction' in slice_df.columns:
-        return c + slice_df['c_suction'].values
+        c_suc = slice_df['c_suction'].values
+        # An undrained base (cp or ratio) takes no suction credit, whatever the
+        # column holds: generate_slices writes zero there, and a table assembled
+        # some other way is held to the same rule.
+        for flag in ('cp_flag', 'ratio_flag'):
+            if flag in slice_df.columns:
+                c_suc = np.where(slice_df[flag].values.astype(bool), 0.0, c_suc)
+        return c + c_suc
     return c
 
 

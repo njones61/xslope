@@ -135,9 +135,11 @@ def _slope_data(base, piezo_x, piezo2_x=None):
     return sd
 
 
-def _slices(sd):
+def _slices(sd, rapid=False):
+    # rapid=True slices for a rapid drawdown, the only run that reads (and so is
+    # refused outside) the SECOND piezometric line.
     ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=_NUM_SLICES,
-                              debug=False)
+                              debug=False, rapid=rapid)
     if not ok:
         raise RuntimeError(f"generate_slices failed: {res}")
     return res[0]
@@ -510,14 +512,15 @@ def check_lem_extent():
     # the same treatment — named separately so the message points at the right line.
     ok, msg = _raises(
         lambda: _slices(_slope_data(base, (x_lo - 2.0, x_hi + 2.0),
-                                    piezo2_x=(x_lo - 2.0, x_stop))),
+                                    piezo2_x=(x_lo - 2.0, x_stop)), rapid=True),
         "second piezometric line", f"{x_stop:.6g}")
     if not ok:
         failures.append(f"lem: a slice base beyond the SECOND line's right end {msg}")
 
-    # An absent second line is not "outside" anything — it must stay silent.
+    # An absent second line is not "outside" anything — it must stay silent, in a
+    # rapid drawdown run too.
     try:
-        _slices(_slope_data(base, (x_lo - 2.0, x_hi + 2.0)))
+        _slices(_slope_data(base, (x_lo - 2.0, x_hi + 2.0)), rapid=True)
     except ValueError as exc:
         failures.append(f"lem: no second piezo line must not trip the guard: {exc}")
     return failures

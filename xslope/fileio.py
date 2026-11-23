@@ -1080,8 +1080,12 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
 
     Layout (v15): exit face in B/C from row 5 down; then up to 5 BC blocks in
     E/F, H/I, K/L, N/O, Q/R. Row 3 of a block holds the TYPE cell (x column) and
-    the VALUE (y column); coordinates start at row 5. A block ends the scan when
-    its VALUE cell is empty.
+    the VALUE (y column); coordinates start at row 5. Every block is read: one
+    with neither a value nor a point is empty and skipped, and one with points
+    but a blank VALUE cell is kept with the value ``None`` -- a half-filled block
+    a file saved mid-edit can carry. Preflight's ``seep.bc_value_missing`` names
+    it for the runs that read it. (A blank value once ended the scan, which
+    silently dropped that block and every block after it.)
 
     Backward compatibility: templates v14 and earlier put the literal label
     "Head:" in the type cell, so a block is a flux BC only when the type text
@@ -1097,21 +1101,21 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
     Value cells (v18): a block's VALUE cell may hold either a number (a constant
     head/flux, as always) or a string naming a ``tseep`` time series (a
     time-varying BC). This reader keeps whichever it finds — a numeric string is
-    coerced to float, anything else is kept as the trimmed series-name string —
-    and ``load_slope_data`` validates any string against the tseep series headers
-    once both sheets are parsed. Files without a tseep sheet therefore still
-    reject a non-numeric value there (see the load-time check).
+    coerced to float, anything else is kept as the trimmed series-name string.
+    A name the tseep sheet does not define is kept too; preflight's
+    ``seep.series_undefined`` names it when a seepage analysis is checked.
     """
     bc = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
 
     def _bc_value(v):
-        """Float when the cell is numeric; otherwise the trimmed string (a tseep
-        series name, validated later). NaN/None never reach here — the caller
-        breaks the block scan on an empty VALUE cell first."""
+        """Float when the cell is numeric; the trimmed string (a tseep series
+        name) when it holds text; ``None`` when it is blank."""
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
         try:
             return float(v)
         except (TypeError, ValueError):
-            return str(v).strip()
+            return str(v).strip() or None
 
     def _read_coords(x_col, y_col, start_row=4):
         coords = []
@@ -1136,9 +1140,11 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
     while col + 1 < seep_df.shape[1]:
         if seep_df.shape[0] <= type_row:
             break
-        value = seep_df.iloc[type_row, col + 1]
-        if pd.isna(value):
-            break  # empty VALUE cell ends the block scan
+        value = _bc_value(seep_df.iloc[type_row, col + 1])
+        coords = _read_coords(col, col + 1)
+        if value is None and not coords:
+            col += 3   # an empty block: the template's preset Type cell alone
+            continue
 
         type_cell = seep_df.iloc[type_row, col]
         type_text = str(type_cell).strip().lower() if pd.notna(type_cell) else ""
@@ -1151,15 +1157,14 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
         # at every node of the polyline.
         is_reservoir = type_text.startswith("reservoir")
 
-        coords = _read_coords(col, col + 1)
         if is_flux:
             # A flux polyline with fewer than two points binds no mesh edge. It is
             # kept as entered; preflight's seep.bc_polyline_too_short names it.
-            bc["specified_fluxes"].append({"flux": _bc_value(value), "coords": coords})
+            bc["specified_fluxes"].append({"flux": value, "coords": coords})
         elif coords:
             kind = "reservoir" if is_reservoir else "head"
             bc["specified_heads"].append(
-                {"head": _bc_value(value), "coords": coords, "kind": kind})
+                {"head": value, "coords": coords, "kind": kind})
 
         col += 3  # E -> H -> K -> ...
 
@@ -1863,14 +1868,21 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # Unsaturated relative-permeability model (template v11+): 'lf' (linear
         # front, kr0/h0 apply), 'vg' (van Genuchten) or 'gard' (Gardner, v14+).
         # The last two share the a/n parameter pair. Older templates lack the
-        # column -> default 'lf' (current behavior). Read by header name, so
-        # column position is version-independent.
+        # column, and a blank cell means the same -> 'lf'. Read by header name, so
+        # column position is version-independent. The three words match in any
+        # case; any other word is kept as entered (it used to be read as 'lf',
+        # silently), and preflight's mat.unsat_vocabulary refuses it for the runs
+        # that read it.
         unsat_raw = row.get('unsat', 'lf')
-        unsat_val = str(unsat_raw).strip().lower() if (
-            pd.notna(unsat_raw) and str(unsat_raw).strip().lower() not in ('', 'nan')
-        ) else 'lf'
-        if unsat_val not in ('lf', 'vg', 'gard'):
+        unsat_txt = ('' if unsat_raw is None or (isinstance(unsat_raw, float)
+                                                 and pd.isna(unsat_raw))
+                     else str(unsat_raw).strip())
+        if unsat_txt.lower() in ('', 'nan'):
             unsat_val = 'lf'
+        elif unsat_txt.lower() in UNSAT_MODELS:
+            unsat_val = unsat_txt.lower()
+        else:
+            unsat_val = unsat_txt
 
         # Excel row number: first data row sits just below the located header
         excel_row = _mat_hdr + 1 + i
@@ -1886,7 +1898,8 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             )
 
         # Strength model. Blank is allowed -- seep-only material rows carry no
-        # strength -- but slice.py raises if a blank one reaches a failure surface.
+        # strength -- and preflight's mat.option_missing refuses a blank one that
+        # a failure surface (LEM) or a mesh element (FEM) reaches.
         # 'elastic' (v16): infinite strength / cannot fail -- the FEM holds it out
         # of plasticity entirely and the LEM treats it as impenetrable.
         option_val = _choice(row.get('option'), '')
@@ -1934,8 +1947,11 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         _tcut_num = pd.to_numeric(row.get('tcut'), errors='coerce')
         t_cut_val = float(_tcut_num) if pd.notna(_tcut_num) else None
 
-        # Matric-suction strength (v17). Two LEM-only columns for the Fredlund
-        # extended Mohr-Coulomb apparent cohesion (xslope.slice generate_slices):
+        # Matric-suction strength (v17). Two columns for the Fredlund extended
+        # Mohr-Coulomb apparent cohesion, read by both engines (xslope.slice
+        # generate_slices and xslope.fem) where the material's own u is piezo or
+        # seep. Neither engine credits suction to a cp, ratio or
+        # elastic material, whose strength does not take pore pressure:
         #   phi_b -- the unsaturated friction angle phi^b (degrees). BLANK -> None:
         #     no suction strength credited, exactly the pre-v17 behavior (the default).
         #   s_cap -- the maximum credited suction (stress units), a cap on the base
@@ -2010,7 +2026,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             "psi": _num(row.get('psi', 0)) if pd.notna(row.get('psi')) else 0,
             # v16: tensile-strength cutoff. None = blank (no cutoff); FEM-only.
             "t_cut": t_cut_val,
-            # v17: matric-suction strength (LEM only, Fredlund extended MC).
+            # v17: matric-suction strength (Fredlund extended MC; LEM and FEM).
             # phi_b None = no suction strength (default); s_cap None = uncapped.
             "phi_b": phi_b_val,
             "s_cap": s_cap_val,
@@ -2403,28 +2419,34 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         Xi = row.get('Xi', None)
         Yi = row.get('Yi', None)
         R = row.get('R', None)
-        # For each circle, fill in the radius and depth values depending on the circle option
-        if Option == 'Depth':
+        # For each circle, fill in the radius and depth values depending on the
+        # circle option. The three words match in any case, as the sheet's own
+        # formatting and dropdown do.
+        _opt_key = (str(Option).strip().lower()
+                    if isinstance(Option, str) else None)
+        if _opt_key == 'depth':
             R = Yo - Depth
-        elif Option == 'Intercept':
+        elif _opt_key == 'intercept':
             R = ((Xi - Xo) ** 2 + (Yi - Yo) ** 2) ** 0.5
             Depth = Yo - R
-        elif Option == 'Radius':
+        elif _opt_key == 'radius':
             Depth = Yo - R
         else:
-            _opt_txt = ('blank' if Option is None or (isinstance(Option, float)
-                                                      and pd.isna(Option))
-                        else repr(str(Option)))
-            raise ValueError(
-                f"The circle in row {_ci + 3} of the 'circles' sheet has Option "
-                f"{_opt_txt}. Option says how the circle's size is given: enter "
-                f"Depth, Intercept or Radius.")
+            # A blank Option, or a word that is not one of the three, states no
+            # size. The circle is kept as entered -- a file saved mid-edit must
+            # reopen -- with its size undefined and the Option it carries, and
+            # preflight's surface.circle_size_missing refuses the runs that read
+            # the circles sheet.
+            Depth = R = float('nan')
         circle = {
             "Xo": Xo,
             "Yo": Yo,
             "Depth": Depth,
             "R": R,
         }
+        if _opt_key not in ('depth', 'intercept', 'radius'):
+            circle["Option"] = (str(Option).strip() or None) if isinstance(Option, str) \
+                else (None if Option is None or pd.isna(Option) else str(Option))
         circles.append(circle)
 
     # --- optional search window (v19, circles!J7 header, J8:K17 label/value pairs) ---
@@ -2456,11 +2478,14 @@ def load_slope_data(filepath, dest=None, overwrite=False):
 
     # === NON-CIRCULAR SURFACES ===
     noncirc_df = xls.parse('non-circ')
+    # Movement: Free / Horiz / Fixed in any case, stored in the sheet's spelling;
+    # blank is None; any other entry is kept as typed for preflight to name
+    # (fileio.noncirc_movement).
     non_circ = list(noncirc_df.iloc[1:].dropna(subset=['Unnamed: 0']).apply(
         lambda row: {
             "X": float(row['Unnamed: 0']),
             "Y": float(row['Unnamed: 1']),
-            "Movement": row['Unnamed: 2']
+            "Movement": noncirc_movement(row.get('Unnamed: 2'))
         }, axis=1))
 
     # === REINFORCEMENT LINES ===
@@ -2562,11 +2587,13 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 "tend1": tend1 / _div,
                 "tend2": tend2 / _div,
                 "spacing": spacing,
-                # v27 joint (slip) option, stored as entered ('Yes' / 'No' / '')
+                # v27 joint (slip) option, stored lowercased ('yes' / 'no' / '')
                 # so a file round-trips blank as blank. Readers: the line is a
-                # joint iff joint.lower() == 'yes'; its strength is reduced in the
-                # SSR unless jred.lower() == 'no'. kn / ks blank = NaN = derived
-                # from the adjacent soil.
+                # joint iff joint == 'yes' (blank = no); its strength is reduced
+                # in the SSR unless jred == 'no' (blank = yes). Any other word is
+                # kept as entered and preflight's joint.yes_no_vocabulary refuses
+                # it. kn / ks blank = NaN = derived from the adjacent soil; a value
+                # of zero or less is joint.stiffness_nonpositive.
                 "joint": _choice(row.get('joint'), ''),
                 "kn": float(row['kn']) if pd.notna(row.get('kn')) else float('nan'),
                 "ks": float(row['ks']) if pd.notna(row.get('ks')) else float('nan'),
@@ -2646,7 +2673,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                     # rule the reinforce sheet's kn/ks columns carry.
                     "kn": float(row['kn']) if pd.notna(row.get('kn')) else float('nan'),
                     "ks": float(row['ks']) if pd.notna(row.get('ks')) else float('nan'),
-                    # Stored as entered so a blank round-trips blank; blank = yes.
+                    # Stored lowercased so a blank round-trips blank; blank = yes.
                     "jred": _choice(row.get('jred'), ''),
                 })
             except ValueError:
@@ -3001,6 +3028,35 @@ def default_template_path():
 #: choices reads them from here (:func:`strength_options_text`), so no message can
 #: offer a different set from the one the loader accepts.
 STRENGTH_OPTIONS = ("mc", "cp", "ratio", "pow", "hb", "elastic")
+
+#: The mat sheet's unsat column (unsaturated conductivity model): linear front,
+#: van Genuchten, Gardner. A blank cell is 'lf'.
+UNSAT_MODELS = ("lf", "vg", "gard")
+
+#: The non-circ sheet's Movement column, in the sheet's own spelling. Matched in
+#: any case (:func:`noncirc_movement`).
+NONCIRC_MOVEMENTS = ("Free", "Horiz", "Fixed")
+
+
+def noncirc_movement(value):
+    """A non-circ Movement cell read: ``'Free'``, ``'Horiz'`` or ``'Fixed'`` for
+    one of the three words in any case, ``None`` for a blank cell, and the
+    trimmed text itself for any other entry.
+
+    Only the non-circular search reads the column. A blank keeps its standing
+    meaning there (an end point slides along the ground surface, an interior
+    point stays where it is); a word outside the three is preflight's
+    ``surface.movement_vocabulary`` and the search refuses it.
+    """
+    if value is None or (isinstance(value, float) and value != value):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    for word in NONCIRC_MOVEMENTS:
+        if text.lower() == word.lower():
+            return word
+    return text
 
 
 def strength_options_text(conjunction="or"):
@@ -3635,15 +3691,25 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
     if piezo:
         updates['piezo'] = piezo
 
-    # === circles ===  (header row 2, data rows 3+; always written as Option="Depth")
+    # === circles ===  (header row 2, data rows 3+; written as Option="Depth")
+    # Every circle with a size is written as Option = Depth and its Depth, whatever
+    # Option it was entered with. One with no size (a blank Option, a word outside
+    # the three, or a blank size cell) is written with the Option it carries, if
+    # any, and a blank Depth, so it reopens as it was saved and preflight's
+    # surface.circle_size_missing still names it.
     circ = {}
     for n, c in enumerate(slope_data.get('circles') or []):
         row = 3 + n
         circ[cell_ref(row, 1)] = n + 1
         circ[cell_ref(row, 2)] = _f(c['Xo'])
         circ[cell_ref(row, 3)] = _f(c['Yo'])
-        circ[cell_ref(row, 4)] = 'Depth'
-        circ[cell_ref(row, 5)] = _f(c['Depth'])
+        if _isnan(c.get('Depth')):
+            _opt = c.get('Option', 'Depth')
+            circ[cell_ref(row, 4)] = (None if _opt is None or _isnan(_opt)
+                                      else str(_opt))
+        else:
+            circ[cell_ref(row, 4)] = 'Depth'
+            circ[cell_ref(row, 5)] = _f(c['Depth'])
     # v19 search window (K8:K17, in SEARCH_WINDOW_KEYS order). Written on a v19
     # destination only; every one of the ten is written unconditionally so an
     # unset limit is a blank cell rather than a leftover.
@@ -3940,8 +4006,13 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             y_col = x_col + 1
             u[cell_ref(3, x_col)] = kind                      # type cell (head/reservoir/flux)
             # v18: a string value is a tseep series name (time-varying BC) -- written
-            # verbatim; a number is a constant head/flux.
-            u[cell_ref(3, y_col)] = value if isinstance(value, str) else _f(value)
+            # verbatim; a number is a constant head/flux. A blank value (a block
+            # still being filled in) stays a blank cell, so the block reopens as it
+            # was saved and preflight's seep.bc_value_missing still names it.
+            if isinstance(value, str):
+                u[cell_ref(3, y_col)] = value
+            elif not _isnan(value):
+                u[cell_ref(3, y_col)] = _f(value)
             for i, (x, y) in enumerate(coords):
                 u[cell_ref(5 + i, x_col)] = _f(x)
                 u[cell_ref(5 + i, y_col)] = _f(y)

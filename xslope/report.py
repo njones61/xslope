@@ -10314,13 +10314,33 @@ def _ssrm_scope(recorded):
 
 
 #: Where the finite element analysis takes pore pressure from, in the same words
-#: the limit equilibrium section uses for the same sources. Keyed by
-#: ``fem_data['pp_option']``, which is what build_fem_data resolved off the
-#: materials and what the assembly reads — so the sentence names the field the
-#: elements were actually solved with. The consolidation ratio the limit
-#: equilibrium slicer reads is not here: the finite element assembly has no
+#: the limit equilibrium section uses for the same sources. Keyed by each
+#: material's source as build_fem_data recorded it (``fem_data['pp_option_by_mat']``),
+#: which is what the assembly reads, element by element — so the sentence names
+#: the field the elements were actually solved with. The consolidation ratio the
+#: limit equilibrium slicer reads is not here: the finite element assembly has no
 #: branch for it.
 FEM_PORE_SOURCES = {key: PORE_SOURCES[key] for key in ("piezo", "seep", "ru")}
+
+
+def _fem_pore_groups(fem_data):
+    """``{source: [material names]}`` over the materials the mesh uses, in
+    materials order, or ``None`` for a fem_data that records only one source for
+    the whole model (one built before each material took its own)."""
+    by_mat = fem_data.get("pp_option_by_mat")
+    if by_mat is None:
+        return None
+    names = list(fem_data.get("material_names") or [])
+    em = fem_data.get("element_materials")
+    used = (sorted({int(v) for v in em}) if em is not None
+            else range(1, len(by_mat) + 1))
+    groups = {}
+    for k in used:
+        if 1 <= k <= len(by_mat):
+            src = str(by_mat[k - 1] or "none").strip().lower()
+            name = names[k - 1] if k - 1 < len(names) else f"Material {k}"
+            groups.setdefault(src, []).append(str(name))
+    return groups
 
 
 def _fem_pore_basis(fem_data, solutions, opts):
@@ -10331,19 +10351,40 @@ def _fem_pore_basis(fem_data, solutions, opts):
     which one it was. A model whose materials take no pore pressure says nothing
     — there is nothing to state — and one whose option the assembly has no
     branch for is not credited with a source it never read.
+
+    Each material takes pore pressure from its own source. Where every material
+    in the mesh shares one, the sentence says so for the whole section; where
+    they differ, or some carry none, it names each source with its materials,
+    since "every node" would put water where there is none.
     """
-    said = FEM_PORE_SOURCES.get(str(fem_data.get("pp_option") or "").lower())
-    if not said:
+    groups = _fem_pore_groups(fem_data)
+    if groups is None:
+        src = str(fem_data.get("pp_option") or "").lower()
+        groups = {src: []}
+    credited = [s for s in groups if s in FEM_PORE_SOURCES]
+    if not credited:
         return None
-    text = f"Pore pressure at every node is taken from {said}."
+    if len(groups) == 1:
+        text = f"Pore pressure at every node is taken from {FEM_PORE_SOURCES[credited[0]]}."
+    else:
+        clauses = [f"in {_join(groups[s])} "
+                   f"{'is taken ' if n == 0 else ''}from {FEM_PORE_SOURCES[s]}"
+                   for n, s in enumerate(credited)]
+        text = f"Pore pressure {_join(clauses)}"
+        dry = groups.get("none") or []
+        if dry:
+            text += f"; {_join(dry)} {'carries' if len(dry) == 1 else 'carry'} none"
+        text += "."
     links = []
     # The field is an outcome of the flow analysis, and where this report
     # documents that analysis the reader is sent to it rather than told twice
     # what it computed.
-    if (said == PORE_SOURCES["seep"] and opts["seep"]
-            and seepage_documented(solutions)):
+    if "seep" in credited and opts["seep"] and seepage_documented(solutions):
         there, links = cite_section(SEEPAGE_ANCHOR)
-        text += f" That is the field the seepage analysis of {there} reports."
+        text += (f" That is the field the seepage analysis of {there} reports."
+                 if len(groups) == 1 else
+                 f" The seepage field is the one the seepage analysis of {there} "
+                 f"reports.")
     return Prose(text, links=links)
 
 

@@ -178,11 +178,13 @@ def check_numbers_still_parse():
     for text, want in (("1e-08", 1e-08),
                        ("0.00000001", 1e-08),
                        ("-2.5", -2.5),
-                       ("", 0.0)):
+                       ("", None)):
         w = _widget(d["seepage_bc"])
         got = _type_flux(w, 1, text)["specified_fluxes"][0]["flux"]
-        failures += _fail(isinstance(got, float) and got == want,
-                          f"flux text {text!r} parsed to {got!r}, not {want!r}")
+        # An emptied field saves blank (None), not 0: a blank is "not entered",
+        # which seep.bc_value_missing reports; 0 is a real no-flow flux.
+        ok = got is None if want is None else (isinstance(got, float) and got == want)
+        failures += _fail(ok, f"flux text {text!r} parsed to {got!r}, not {want!r}")
     # An untouched field is a display rounding nobody typed over: the stored value
     # must survive, not the six digits the widget showed.
     stored = d["seepage_bc"]["specified_fluxes"][0]["flux"]

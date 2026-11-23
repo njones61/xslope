@@ -251,7 +251,8 @@ def _solve_case(sd, kind, method, suction_phi_b=None, search=None):
         # VP22's circle dips below the model base: it is a composite surface.
         composite = sd['circles'][0]['Depth'] < sd['domain_polygon'].bounds[1]
         ok, res = generate_slices(sd, circle=sd['circles'][0], num_slices=60,
-                                  composite=composite, suction_phi_b=suction_phi_b)
+                                  composite=composite, suction_phi_b=suction_phi_b,
+                                  rapid=(kind == 'rapid_circle'))
         if not ok:
             raise RuntimeError(res)
         df, fs = res

@@ -30,6 +30,7 @@ from shapely.ops import unary_union
 from .hoekbrown import hb_constants, hb_tangent_const
 from .joint import (mesh_has_joints as _joint_mesh_has_joints,
                     joint_reduced_strength, joint_reduced_residual_strength,
+                    joint_reduced_tcut,
                     joint_vp_sweep, tie_vp_sweep,
                     joint_internal_force, tie_internal_force,
                     joint_state, joint_yield_violation, joint_advisories,
@@ -2373,6 +2374,41 @@ def _beam_rotation(cos_t, sin_t, n_node):
     return T
 
 
+#: The pore-pressure sources a material's u may name in the finite element
+#: analysis, the same four the limit equilibrium slicer reads.
+PORE_PRESSURE_OPTIONS = ("none", "piezo", "seep", "ru")
+
+#: The strength options that take matric-suction strength (phi_b, s_cap): the
+#: effective-stress envelopes. An undrained strength (cp, ratio) has no
+#: effective-stress term for suction to add to, and an elastic material cannot
+#: yield, so none of them is credited.
+SUCTION_OPTIONS = ("mc", "pow", "hb")
+
+
+def _normalize_pp_option(val):
+    """A material's u as one of PORE_PRESSURE_OPTIONS' words (or the word as typed):
+    None, NaN and a blank cell are 'none'."""
+    if (val is None or (isinstance(val, float) and np.isnan(val))
+            or (isinstance(val, str) and val.strip().lower() in ("", "nan"))):
+        return "none"
+    return str(val).lower().strip()
+
+
+def _pp_option_by_elem(fem_data):
+    """Each element's pore-pressure source, one word per element.
+
+    Read from the per-material sources build_fem_data records; a fem_data built
+    before pore pressure was per material carries only the model-wide
+    ``pp_option``, which then applies to every element as it always did.
+    """
+    em = np.asarray(fem_data["element_materials"], dtype=int)
+    by_mat = fem_data.get("pp_option_by_mat")
+    if by_mat is None:
+        return np.full(len(em), str(fem_data.get("pp_option", "none")), dtype=object)
+    by_mat = np.asarray(list(by_mat), dtype=object)
+    return by_mat[em - 1]
+
+
 def build_fem_data(slope_data, mesh=None, verbose=False):
     """
     Build a fem_data dictionary from slope_data and optional mesh.
@@ -2384,7 +2420,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     The function:
     1. Extracts or loads mesh information (nodes, elements, element types, element materials)
     2. Builds material property arrays (c, phi, E, nu, gamma) from the materials table
-    3. Computes pore pressure field if needed (piezo or seep options)
+    3. Computes each material's pore pressure field from its own u (none, piezo,
+       seep or ru); materials with different sources may share a mesh
     4. Processes reinforcement lines into 1D truss elements with material properties
     5. Constructs boundary conditions (fixed, roller, force) based on mesh geometry
     6. Converts distributed loads to equivalent nodal forces
@@ -2397,7 +2434,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             - k_seismic: seismic coefficient
             - reinforcement_lines: list of reinforcement line definitions
             - distributed_loads: list of distributed load definitions
-            - seepage_solution: pore pressure data if pp_option is 'seep'
+            - seep_u: nodal seepage pore pressures, read where a material has u = 'seep'
             - max_depth: maximum depth for fixed boundary conditions
         mesh (dict, optional): Mesh dictionary from build_mesh_from_polygons containing:
             - nodes: np.ndarray (n_nodes, 2) of node coordinates
@@ -2430,7 +2467,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
               gamma_sat equal to gamma)
             - water_table: (xs, ys, ends_nan) sample of the water table the weight
               split is measured from, or None when the model defines none
-            - u: np.ndarray (n_nodes,) of pore pressures (if applicable)
+            - u: np.ndarray (n_nodes,) of nodal pore pressures for display (where
+              materials with different sources meet, the largest of them)
+            - pp_option_by_mat: list of each material's pore-pressure source; every
+              element's Gauss points read its own material's
+            - pp_option: the one source every material with one shares, 'mixed'
+              when the meshed materials name different ones, else 'none'
             - elements_1d: np.ndarray (n_1d_elements, 3) of 1D element node indices
             - element_types_1d: np.ndarray (n_1d_elements,) indicating 2 for linear elements and 3 for quadratic elements
             - element_materials_1d: np.ndarray (n_1d_elements,) of material IDs (1-based) corresponding to reinforcement lines
@@ -2514,21 +2556,33 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     gamma_sat_by_mat = np.full(n_materials, np.nan)
     material_names = []
     
-    # Check for consistent pore pressure options
-    # Material "u" key may contain "none", "piezo", "seep", or NaN-like values from empty Excel cells
-    def _normalize_pp_option(val):
-        if val is None or (isinstance(val, str) and val.lower() == "nan") or (isinstance(val, float) and np.isnan(val)):
-            return "none"
-        return str(val).lower().strip()
+    # The materials the mesh actually uses (0-based). A row no zone uses carries
+    # nothing into the analysis: not a strength, not a pore-pressure source.
+    _used_mat_idx = sorted({int(v) - 1 for v in
+                            np.unique(np.asarray(element_materials, dtype=int))})
 
-    pp_options = [_normalize_pp_option(mat.get("u", "none")) for mat in materials]
-    unique_pp_options = set([opt for opt in pp_options if opt != "none"])
-    
-    if len(unique_pp_options) > 1:
-        raise ValueError(f"Mixed pore pressure options not allowed: {unique_pp_options}")
-    
-    pp_option = list(unique_pp_options)[0] if unique_pp_options else "none"
-    
+    # Pore pressure is PER MATERIAL, as it is in the limit equilibrium slicer: every
+    # element takes it from its own material's u -- none (or blank) is zero, piezo the
+    # piezometric line, seep the seepage solution, ru that material's own ru times the
+    # soil column. An elastic row's elements read its own u like any other (the
+    # vendor models of a wall in a seepage field set u = seep on it), and a row no
+    # zone uses selects nothing for anyone: neither can switch the source of
+    # another material's elements.
+    pp_option_by_mat = [_normalize_pp_option(mat.get("u", "none")) for mat in materials]
+    for i in _used_mat_idx:
+        if 0 <= i < n_materials and pp_option_by_mat[i] not in PORE_PRESSURE_OPTIONS:
+            raise ValueError(
+                f"Material {i+1} ({materials[i].get('name', f'Material {i+1}')}): "
+                f"unrecognized pore pressure option u='{pp_option_by_mat[i]}'. "
+                f"Expected one of: {', '.join(PORE_PRESSURE_OPTIONS)}.")
+    # The one-word summary the report and the debug print read: the source every
+    # material with one shares, 'mixed' where materials in the mesh name different
+    # ones, 'none' where none does. The assembly itself reads pp_option_by_mat.
+    _used_sources = sorted({pp_option_by_mat[i] for i in _used_mat_idx
+                            if 0 <= i < n_materials} - {"none"})
+    pp_option = (_used_sources[0] if len(_used_sources) == 1
+                 else ("mixed" if _used_sources else "none"))
+
     for i, material in enumerate(materials):
         strength_option = material.get("option", "mc")
         
@@ -2564,18 +2618,29 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             c_by_mat[i] = 0.0
             phi_by_mat[i] = 0.0
         else:
-            # A blank option is legal on rows that never carry strength; any
-            # OTHER option is not implemented in the FEM, and the material's
-            # c/phi columns would be zeros - silently running it as
-            # zero-strength soil is the failure mode this refuses.
+            # Any option the FEM does not implement is refused: the material's
+            # c/phi columns would be zeros, and silently running it as zero-strength
+            # soil is the failure mode this refuses. A BLANK option is legal only on
+            # a row no zone uses (a seep-only row, a row drawn ahead of its zone):
+            # on a row the mesh carries it names no strength at all, and the limit
+            # equilibrium slicer refuses the same row when a surface crosses it.
+            # Reading it as Mohr-Coulomb would run whatever c and phi the row
+            # happens to hold.
+            from .fileio import STRENGTH_OPTIONS
+            _nm = material.get('name', f'Material {i+1}')
             if strength_option:
-                from .fileio import STRENGTH_OPTIONS
                 raise ValueError(
-                    f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
+                    f"Material {i+1} ({_nm}): "
                     f"strength option '{strength_option}' is not supported by the "
                     f"FEM (supported: {', '.join(STRENGTH_OPTIONS)}).")
-            c_by_mat[i] = material.get("c", 0.0)
-            phi_by_mat[i] = material.get("phi", 0.0)
+            if i in _used_mat_idx:
+                raise ValueError(
+                    f"Material {i+1} ({_nm}) has no strength option, and the mesh "
+                    f"has elements of it. The finite element analysis needs every "
+                    f"material it meshes to name one: set the option column on the "
+                    f"mat sheet to one of {', '.join(STRENGTH_OPTIONS)}.")
+            c_by_mat[i] = 0.0
+            phi_by_mat[i] = 0.0
 
         # Require critical material properties to be explicitly specified
         if "E" not in material:
@@ -2758,8 +2823,32 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             c_by_elem[elem_idx] = c_by_mat[mat_id]
             phi_by_elem[elem_idx] = phi_by_mat[mat_id]
     
-    # Process pore pressures
-    u = np.zeros(n_nodes)
+    # === PORE PRESSURES, PER MATERIAL ===
+    # Each element reads its own material's source (pp_option_by_mat above). The
+    # nodal fields below are computed only at the nodes of the elements that read
+    # them, so a piezometric line need span only the materials that take pore
+    # pressure from it, as in the limit equilibrium slicer, and a seepage field is
+    # read only where a seep material lies. The solver's pore pressure is the
+    # Gauss-point field _prepare_fem_model builds from these, element by element.
+    #
+    # Where two materials with different sources meet, the pore pressure jumps
+    # across their boundary. Equilibrium is written in TOTAL stress (the load term
+    # int B^T m u dV, element by element), so the total traction stays continuous
+    # across that boundary and the effective traction jumps by the difference: the
+    # water on the wet side presses on the face of the dry one, which is what a
+    # material taking no pore pressure (an undrained clay analyzed in total stress,
+    # an impervious body) is.
+    pp_by_elem = np.asarray([pp_option_by_mat[int(m) - 1] for m in element_materials],
+                            dtype=object)
+    _src_nodes = {}
+    for _src in ("piezo", "seep", "ru"):
+        _sel = np.flatnonzero(pp_by_elem == _src)
+        if _sel.size:
+            _ids = set()
+            for _e in _sel:
+                _ids.update(int(_n) for _n in elements[_e][:element_types[_e]])
+            _src_nodes[_src] = np.array(sorted(_ids), dtype=int)
+
     # Signed nodal pore pressure for the opt-in matric-suction option: identical to
     # u below the water table, but NOT clamped above it, so the negative (suction)
     # part of an unsaturated seepage field survives (the effective-normal u keeps its
@@ -2768,12 +2857,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # suction machinery in solve_fem (gated on suction_phi_b), so it is inert by
     # default.
     u_signed = None
-    sigma_v = None          # nodal vertical soil stress (ru option only)
+    u_piezo = None          # nodal piezometric pore pressure (piezo materials)
+    u_seep = None           # nodal seepage pore pressure, clamped (seep materials)
+    sigma_v = None          # nodal vertical soil stress (ru materials only)
     piezo_line_coords = None
 
-    if pp_option == "piezo":
-        # Find nodes and compute pore pressure from piezometric line
-        # Look for piezometric line in various possible locations
+    if "piezo" in _src_nodes:
+        _pz_ids = _src_nodes["piezo"]
+        u_piezo = np.zeros(n_nodes)
+        # Find the piezometric line in the places a model keeps one
         if "piezo_line" in slope_data:
             piezo_line_coords = slope_data["piezo_line"]
         elif "profile_lines" in slope_data:
@@ -2782,7 +2874,6 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 if line.get('type') == 'piezo':
                     piezo_line_coords = line['coords']
                     break
-        
         if piezo_line_coords and len(piezo_line_coords) >= 2:
             gamma_water = require_gamma_water(slope_data, "FEM piezometric pore pressure")
             # u = gamma_w * VERTICAL distance below the piezometric line at
@@ -2799,34 +2890,35 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             # phreatic-inclination correction (same flag and formula as the
             # LEM slicer): u = gamma_w * h_vertical * cos^2(local slope).
             _phreatic = bool(slope_data.get('piezo_phreatic', False))
-            # Every node reads this line, so every node must lie inside it.
-            # Extrapolating the end elevation would invent a water body the file
-            # does not declare; reading zero would delete one it does. Both are
-            # silent, so an out-of-extent node is an error (see
+            # Every node of a piezo material reads this line, so every such node
+            # must lie inside it. Extrapolating the end elevation would invent a
+            # water body the file does not declare; reading zero would delete one
+            # it does. Both are silent, so an out-of-extent node is an error (see
             # _check_piezo_extent).
-            _check_piezo_extent(nodes[:, 0], px, py, "mesh node")
-            for i, node in enumerate(nodes):
+            _check_piezo_extent(nodes[_pz_ids, 0], px, py, "mesh node", ids=_pz_ids)
+            for i in _pz_ids:
+                node = nodes[i]
                 # every node is inside the line (guarded above), so np.interp's
                 # end-clamping only ever bites within floating-point noise
                 piezo_elevation = float(np.interp(node[0], px, py))
                 if node[1] < piezo_elevation:
-                    u[i] = gamma_water * (piezo_elevation - node[1])
+                    u_piezo[i] = gamma_water * (piezo_elevation - node[1])
                     if _phreatic:
-                        u[i] *= float(_piezo_cos2(node[0], px, py))
+                        u_piezo[i] *= float(_piezo_cos2(node[0], px, py))
                 else:
-                    u[i] = 0.0
+                    u_piezo[i] = 0.0
         else:
             # u='piezo' and no line to read: refused, not silently zeroed.
             raise _no_piezo_line_error(
-                [m.get('name') for m in materials
-                 if _normalize_pp_option(m.get("u", "none")) == "piezo"])
+                [materials[i].get('name') for i in _used_mat_idx
+                 if 0 <= i < n_materials and pp_option_by_mat[i] == "piezo"])
 
-    elif pp_option == "seep":
+    if "seep" in _src_nodes:
         # Use existing seep solution
         if "seep_u" in slope_data:
             seep_u = slope_data["seep_u"]
             if isinstance(seep_u, np.ndarray) and len(seep_u) == n_nodes:
-                u = np.maximum(0.0, seep_u)
+                u_seep = np.maximum(0.0, np.asarray(seep_u, dtype=float))
                 # Keep the raw signed field for the suction option (see u_signed
                 # above). max(0, signed) == u, so the effective normal is unchanged.
                 u_signed = np.asarray(seep_u, dtype=float)
@@ -2838,7 +2930,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     "which over-predicts the factor of safety — run the FEM on the same mesh as "
                     "the seepage solution.")
 
-    elif pp_option == "ru":
+    if "ru" in _src_nodes:
         # Pore-pressure ratio (template v12): u = ru * sigma_v, where sigma_v
         # is the vertical total stress of the SOIL column above the point —
         # the same definition the LEM slicer uses (slice.py mat_u == 'ru':
@@ -2849,9 +2941,9 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         # the way the slicer weighs a slice: gamma_sat below the water table,
         # gamma above it, and moist throughout on the usual ru model, which
         # carries no water table at all. ru itself is PER MATERIAL, so the
-        # shared nodal u array (ambiguous on material boundaries) stays zero
-        # here; the Gauss-point precompute applies the element material's ru
-        # to sigma_v interpolated from the nodes.
+        # Gauss-point precompute applies the element material's own ru to
+        # sigma_v interpolated from the nodes; sigma_v is integrated only at the
+        # nodes of ru materials.
         from shapely.geometry import LineString as _RayLS, Polygon as _RayPoly
         from .mesh import get_material_polygons as _gmp
         _ray_polys = []
@@ -2864,7 +2956,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                                if _midx < n_materials else float('nan')))
         _y_top = float(np.max(nodes[:, 1])) + 1.0
         sigma_v = np.zeros(n_nodes)
-        for i, node in enumerate(nodes):
+        for i in _src_nodes["ru"]:
+            node = nodes[i]
             _x0, _y0 = float(node[0]), float(node[1])
             _ray = _RayLS([(_x0, _y0), (_x0, _y_top)])
             _yw = float(water_table_elevation(_water_table, _x0))
@@ -2888,6 +2981,33 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 if not _inter.is_empty:
                     _sv += _g * _inter.length
             sigma_v[i] = _sv
+
+    # Each material's ru, zero on every row whose u is not 'ru': a stale ratio left
+    # on a row that takes its pore pressure elsewhere is not read.
+    ru_by_mat = np.array([float(m.get("ru", 0.0) or 0.0) if pp_option_by_mat[i] == "ru"
+                          else 0.0 for i, m in enumerate(materials)])
+
+    def _elem_node_u(e):
+        """Pore pressure at element e's own nodes, from its own material's source."""
+        idx = elements[e][:element_types[e]]
+        src = pp_by_elem[e]
+        if src == "piezo" and u_piezo is not None:
+            return u_piezo[idx]
+        if src == "seep" and u_seep is not None:
+            return u_seep[idx]
+        if src == "ru" and sigma_v is not None:
+            return np.maximum(0.0, ru_by_mat[int(element_materials[e]) - 1] * sigma_v[idx])
+        return np.zeros(len(idx))
+
+    # The nodal field as a single array, one number per node, for display and for
+    # any caller that wants one: each node carries the pore pressure of the
+    # elements around it, and where materials with different sources meet, the
+    # largest of their values. The assembly never reads it; the Gauss points read
+    # each element's own source.
+    u = np.zeros(n_nodes)
+    for _e in np.flatnonzero(pp_by_elem != "none"):
+        _idx = elements[_e][:element_types[_e]]
+        u[_idx] = np.maximum(u[_idx], _elem_node_u(_e))
     
     # Process 1D reinforcement elements
     elements_1d = np.array([]).reshape(0, 3) if 'elements_1d' not in mesh else mesh['elements_1d']
@@ -3866,8 +3986,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 "each element, which is integrated over the material zones, and this "
                 "model's zones could not be built"
                 + (f" ({_overburden_error})." if _overburden_error else "."))
+        # Each ratio element's centroid pore pressure, from its own material's
+        # source (the mean over its nodes, as the c/p option takes its centroid).
+        _u_centroid = np.zeros(n_elements)
+        for _e in range(n_elements):
+            if (str(materials[int(element_materials[_e]) - 1].get("option") or "")
+                    .strip().lower() == "ratio"):
+                _u_centroid[_e] = float(np.mean(_elem_node_u(_e)))
         _ratio_element_strengths(slope_data, materials, nodes, elements, element_types,
-                                 element_materials, u, _overburden_columns,
+                                 element_materials, _u_centroid, _overburden_columns,
                                  _water_table, c_by_elem, phi_by_elem)
         _ratio_gp = _ratio_gauss_point_inputs(slope_data, materials, element_materials)
     else:
@@ -3933,6 +4060,14 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "phi_b_by_mat": np.array([
             float(m["phi_b"]) if m.get("phi_b") is not None else 0.0
             for m in materials]),
+        # Which materials can take that credit at all: an effective-stress
+        # envelope (SUCTION_OPTIONS) whose pore pressure comes from a source that
+        # is negative above the water table (piezo, seep). Every other row's phi_b
+        # is inert, whether it comes from the file or from a suction_phi_b kwarg.
+        "suction_ok_by_mat": np.array([
+            (str(m.get("option", "mc") or "").strip().lower() in SUCTION_OPTIONS
+             and pp_option_by_mat[i] in ("piezo", "seep"))
+            for i, m in enumerate(materials)], dtype=bool),
         "s_cap_by_mat": np.array([
             float(m["s_cap"]) if m.get("s_cap") is not None else np.inf
             for m in materials]),
@@ -3978,10 +4113,18 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "overburden_columns": _overburden_columns,
         **({} if _overburden_error is None
            else {"overburden_columns_error": _overburden_error}),
+        # Nodal pore pressure, one number per node for display (see above: the
+        # largest of the sources that meet at a node). The assembly reads each
+        # element's own source instead: pp_option_by_mat, and the per-source
+        # nodal fields below.
         "u": u,
+        "u_seep": u_seep,  # clamped nodal seep field (seep materials; else None)
         "u_signed": u_signed,  # raw (un-clamped) nodal seep field for the suction option; None if no seep suction
-        "sigma_v": sigma_v,  # nodal vertical soil stress (ru option; else None)
-        "ru_by_mat": np.array([float(m.get("ru", 0.0) or 0.0) for m in materials]),
+        "sigma_v": sigma_v,  # nodal vertical soil stress (ru materials' nodes; else None)
+        "ru_by_mat": ru_by_mat,  # each ru material's ratio, 0 on every other row
+        # Each material's pore-pressure source, one of PORE_PRESSURE_OPTIONS. Every
+        # element reads its own material's.
+        "pp_option_by_mat": list(pp_option_by_mat),
         "elements_1d": elements_1d,
         "element_types_1d": element_types_1d,
         "element_materials_1d": element_materials_1d,
@@ -4140,6 +4283,14 @@ def _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_mater
     else:
         scap_by_mat = np.full(n_mat, float(suction_cap))
     tanphib_by_mat = np.tan(np.radians(phib_by_mat))
+    # Only an effective-stress material on a piezo or seep source takes the credit
+    # (build_fem_data's suction_ok_by_mat): an undrained cp or ratio strength has
+    # no effective-stress term for suction to add to, an elastic one cannot yield,
+    # and none or ru carries no suction. Applied to a kwarg's phi_b as to the
+    # file's. A fem_data built before the gate existed carries no mask.
+    _ok = fem_data.get("suction_ok_by_mat")
+    if _ok is not None and len(_ok) == n_mat:
+        tanphib_by_mat = np.where(np.asarray(_ok, dtype=bool), tanphib_by_mat, 0.0)
     tanphib_by_elem = tanphib_by_mat[element_materials - 1]
     scap_by_elem = scap_by_mat[element_materials - 1]
     active = bool(np.any(tanphib_by_elem > 0.0))
@@ -4286,17 +4437,19 @@ def surface_vertical_load(slope_data, x):
 
 
 def _ratio_element_strengths(slope_data, materials, nodes, elements, element_types,
-                             element_materials, u, overburden_columns, water_table,
-                             c_by_elem, phi_by_elem):
+                             element_materials, u_centroid, overburden_columns,
+                             water_table, c_by_elem, phi_by_elem):
     """Set c (phi = 0) on every element of an option = ratio material, in place:
     s_u = max(c, c/p * sigma'_v) at the element's centroid, where sigma'_v is the
     soil column above it (gamma_sat below the water table), plus the vertical
     surface load above it, ponded water included, minus the pore pressure there.
     The centroid and its pore pressure are the means over the element's nodes,
     exact for a field linear across the element, as the c/p option takes its
-    centroid. Fixed for the run, as the limit equilibrium slicer fixes it. This is
-    the element's strength the results report; the solver yields at each Gauss
-    point's own value (:func:`_ratio_gauss_point_strengths`)."""
+    centroid; ``u_centroid`` holds that mean per element, taken from the
+    element's own material's source. Fixed for the run, as the limit equilibrium
+    slicer fixes it. This is the element's strength the results report; the
+    solver yields at each Gauss point's own value
+    (:func:`_ratio_gauss_point_strengths`)."""
     polys = [(Polygon(c[0]), c[1], c[2] if len(c) > 2 else np.nan)
              for c in overburden_columns]
     y_top = float(np.max(nodes[:, 1])) + 1.0
@@ -4306,7 +4459,7 @@ def _ratio_element_strengths(slope_data, materials, nodes, elements, element_typ
             continue
         idx = elements[e][:element_types[e]]
         x, y = float(np.mean(nodes[idx, 0])), float(np.mean(nodes[idx, 1]))
-        u_c = float(np.mean(np.asarray(u)[idx]))
+        u_c = float(u_centroid[e])
         sv = (_column_stress_at(polys, water_table, x, y, y_top)
               + surface_vertical_load(slope_data, x))
         c_by_elem[e] = max(float(m.get("c", 0.0) or 0.0),
@@ -4780,128 +4933,104 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         elem_gp_data.append(gp_list)
 
     # ---- Pore pressure at each Gauss point ----
-    u_nodes = fem_data.get("u", np.zeros(n_nodes))
+    # Element by element, from the element's OWN material's source (see
+    # build_fem_data): none is zero, piezo reads the piezometric line at the point,
+    # seep interpolates the seepage field over the element's nodes, ru is the
+    # material's own ru times the soil column interpolated likewise. A fem_data
+    # built before the sources were per material carries one source for every
+    # element, which _pp_option_by_elem hands back unchanged.
     pp_option = fem_data.get("pp_option", "none")
+    pp_by_elem = _pp_option_by_elem(fem_data)
+    u_nodes = fem_data.get("u", np.zeros(n_nodes))
+    _u_seep_nodes = fem_data.get("u_seep")
+    if _u_seep_nodes is None:
+        # a fem_data from before per-material sources kept the seep field in "u"
+        _u_seep_nodes = u_nodes
+    _u_seep_nodes = np.asarray(_u_seep_nodes, dtype=float)
 
-    u_gp = []
-    if pp_option == "none":
-        for elem_idx in range(n_elements):
-            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
-    elif pp_option == "piezo":
+    _has_piezo = bool(np.any(pp_by_elem == "piezo"))
+    if _has_piezo:
         piezo_line_coords = fem_data.get("piezo_line_coords", None)
         gamma_water = require_gamma_water(fem_data, "FEM pore-pressure assembly")
-        if piezo_line_coords and len(piezo_line_coords) >= 2:
-            px = np.array([p[0] for p in piezo_line_coords], dtype=float)
-            py = np.array([p[1] for p in piezo_line_coords], dtype=float)
-            order = np.argsort(px)
-            px, py = px[order], py[order]
-            _phreatic = bool(fem_data.get('piezo_phreatic', False))
-            # No piezometric surface outside the line's x-extent (see the nodal path
-            # in build_fem_data), and reading zero there would silently delete pore
-            # pressure -> raise. Guarded here too, independently of the nodal check,
-            # so a fem_data assembled elsewhere cannot slip a short line past it.
-            _pz_tol = _piezo_extent_tol(px)
-            for elem_idx in range(n_elements):
-                elem_type = element_types[elem_idx]
-                elem_nodes_idx = elements[elem_idx][:elem_type]
-                elem_coords = nodes[elem_nodes_idx]
-                gp_u_list = []
-                for gp_data in elem_gp_data[elem_idx]:
-                    N = gp_data['N']
-                    x_gp = N @ elem_coords[:, 0]
-                    y_gp = N @ elem_coords[:, 1]
-                    if x_gp < px[0] - _pz_tol or x_gp > px[-1] + _pz_tol:
-                        _check_piezo_extent(x_gp, px, py,
-                                            f"Gauss point of element {elem_idx}")
-                    piezo_elev = float(np.interp(x_gp, px, py))
-                    u_val = max(0.0, gamma_water * (piezo_elev - y_gp))
-                    if _phreatic and u_val > 0.0:
-                        u_val *= float(_piezo_cos2(x_gp, px, py))
-                    gp_u_list.append(u_val)
-                u_gp.append(gp_u_list)
-        else:
+        if not (piezo_line_coords and len(piezo_line_coords) >= 2):
             # u='piezo' and no line to read (see build_fem_data): refused, not
             # silently zeroed. Guarded here too, so a fem_data assembled elsewhere
             # cannot reach the solver with no water at all.
             raise _no_piezo_line_error(None)
-    elif pp_option == "seep":
-        for elem_idx in range(n_elements):
-            elem_type = element_types[elem_idx]
-            elem_nodes_idx = elements[elem_idx][:elem_type]
-            u_elem_nodes = u_nodes[elem_nodes_idx]
-            gp_u_list = []
-            for gp_data in elem_gp_data[elem_idx]:
-                N = gp_data['N']
-                gp_u_list.append(max(0.0, float(N @ u_elem_nodes)))
-            u_gp.append(gp_u_list)
-    elif pp_option == "ru":
-        sigma_v_nodes = fem_data.get("sigma_v")
-        ru_by_mat = fem_data.get("ru_by_mat")
-        if sigma_v_nodes is None or ru_by_mat is None:
-            for elem_idx in range(n_elements):
-                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
-        else:
-            ru_by_elem_pp = ru_by_mat[element_materials - 1]
-            for elem_idx in range(n_elements):
-                ru_e = float(ru_by_elem_pp[elem_idx])
-                elem_type = element_types[elem_idx]
-                elem_nodes_idx = elements[elem_idx][:elem_type]
-                sv_elem = sigma_v_nodes[elem_nodes_idx]
-                gp_u_list = []
-                for gp_data in elem_gp_data[elem_idx]:
-                    N = gp_data['N']
-                    gp_u_list.append(max(0.0, ru_e * float(N @ sv_elem)))
-                u_gp.append(gp_u_list)
-    else:
-        for elem_idx in range(n_elements):
-            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+        px = np.array([p[0] for p in piezo_line_coords], dtype=float)
+        py = np.array([p[1] for p in piezo_line_coords], dtype=float)
+        order = np.argsort(px)
+        px, py = px[order], py[order]
+        _phreatic = bool(fem_data.get('piezo_phreatic', False))
+        # No piezometric surface outside the line's x-extent (see the nodal path
+        # in build_fem_data), and reading zero there would silently delete pore
+        # pressure -> raise. Guarded here too, independently of the nodal check,
+        # so a fem_data assembled elsewhere cannot slip a short line past it.
+        _pz_tol = _piezo_extent_tol(px)
 
-    # Signed pore-pressure field for the opt-in matric-suction option.
+    def _piezo_gp(elem_idx, signed):
+        elem_type = element_types[elem_idx]
+        elem_coords = nodes[elements[elem_idx][:elem_type]]
+        vals = []
+        for gp_data in elem_gp_data[elem_idx]:
+            N = gp_data['N']
+            x_gp = N @ elem_coords[:, 0]
+            y_gp = N @ elem_coords[:, 1]
+            if x_gp < px[0] - _pz_tol or x_gp > px[-1] + _pz_tol:
+                _check_piezo_extent(x_gp, px, py,
+                                    f"Gauss point of element {elem_idx}")
+            piezo_elev = float(np.interp(x_gp, px, py))
+            u_val = gamma_water * (piezo_elev - y_gp)
+            if not signed:
+                u_val = max(0.0, u_val)
+            if _phreatic and u_val > 0.0:
+                u_val *= float(_piezo_cos2(x_gp, px, py))
+            vals.append(u_val)
+        return vals
+
+    sigma_v_nodes = fem_data.get("sigma_v")
+    ru_by_mat = fem_data.get("ru_by_mat")
+    u_gp = []
+    for elem_idx in range(n_elements):
+        src = pp_by_elem[elem_idx]
+        n_gp_e = len(elem_gp_data[elem_idx])
+        if src == "piezo":
+            u_gp.append(_piezo_gp(elem_idx, signed=False))
+        elif src == "seep":
+            elem_nodes_idx = elements[elem_idx][:element_types[elem_idx]]
+            u_elem_nodes = _u_seep_nodes[elem_nodes_idx]
+            u_gp.append([max(0.0, float(gp_data['N'] @ u_elem_nodes))
+                         for gp_data in elem_gp_data[elem_idx]])
+        elif src == "ru" and sigma_v_nodes is not None and ru_by_mat is not None:
+            ru_e = float(ru_by_mat[element_materials[elem_idx] - 1])
+            elem_nodes_idx = elements[elem_idx][:element_types[elem_idx]]
+            sv_elem = sigma_v_nodes[elem_nodes_idx]
+            u_gp.append([max(0.0, ru_e * float(gp_data['N'] @ sv_elem))
+                         for gp_data in elem_gp_data[elem_idx]])
+        else:
+            u_gp.append([0.0] * n_gp_e)
+
+    # Signed pore-pressure field for the opt-in matric-suction option: the
+    # piezometric and seepage elements' own fields before the clamp; zero on every
+    # other element, whose source has no suction to give.
     u_gp_signed = None
-    if suction_active and pp_option in ("piezo", "seep"):
+    if suction_active and bool(np.any((pp_by_elem == "piezo") | (pp_by_elem == "seep"))):
         u_gp_signed = []
-        if pp_option == "piezo":
-            piezo_line_coords = fem_data.get("piezo_line_coords", None)
-            gamma_water = require_gamma_water(fem_data, "FEM suction pore-pressure assembly")
-            if piezo_line_coords and len(piezo_line_coords) >= 2:
-                px = np.array([p[0] for p in piezo_line_coords], dtype=float)
-                py = np.array([p[1] for p in piezo_line_coords], dtype=float)
-                order = np.argsort(px)
-                px, py = px[order], py[order]
-                _phreatic = bool(fem_data.get('piezo_phreatic', False))
-                _pz_tol = _piezo_extent_tol(px)
-                for elem_idx in range(n_elements):
-                    elem_type = element_types[elem_idx]
-                    elem_nodes_idx = elements[elem_idx][:elem_type]
-                    elem_coords = nodes[elem_nodes_idx]
-                    gp_list = []
-                    for gp_data in elem_gp_data[elem_idx]:
-                        N = gp_data['N']
-                        x_gp = N @ elem_coords[:, 0]
-                        y_gp = N @ elem_coords[:, 1]
-                        if x_gp < px[0] - _pz_tol or x_gp > px[-1] + _pz_tol:
-                            _check_piezo_extent(x_gp, px, py,
-                                                f"Gauss point of element {elem_idx}")
-                        piezo_elev = float(np.interp(x_gp, px, py))
-                        u_val = gamma_water * (piezo_elev - y_gp)
-                        if _phreatic and u_val > 0.0:
-                            u_val *= float(_piezo_cos2(x_gp, px, py))
-                        gp_list.append(u_val)
-                    u_gp_signed.append(gp_list)
-            else:
-                raise _no_piezo_line_error(None)
-        else:  # seep
-            u_nodes_signed = fem_data.get("u_signed")
-            if u_nodes_signed is None:
-                u_nodes_signed = u_nodes
-            u_nodes_signed = np.asarray(u_nodes_signed, dtype=float)
-            for elem_idx in range(n_elements):
-                elem_type = element_types[elem_idx]
-                elem_nodes_idx = elements[elem_idx][:elem_type]
+        u_nodes_signed = fem_data.get("u_signed")
+        if u_nodes_signed is None:
+            u_nodes_signed = _u_seep_nodes
+        u_nodes_signed = np.asarray(u_nodes_signed, dtype=float)
+        for elem_idx in range(n_elements):
+            src = pp_by_elem[elem_idx]
+            if src == "piezo":
+                u_gp_signed.append(_piezo_gp(elem_idx, signed=True))
+            elif src == "seep":
+                elem_nodes_idx = elements[elem_idx][:element_types[elem_idx]]
                 u_elem_nodes = u_nodes_signed[elem_nodes_idx]
-                gp_list = [float(gp_data['N'] @ u_elem_nodes)
-                           for gp_data in elem_gp_data[elem_idx]]
-                u_gp_signed.append(gp_list)
+                u_gp_signed.append([float(gp_data['N'] @ u_elem_nodes)
+                                    for gp_data in elem_gp_data[elem_idx]])
+            else:
+                u_gp_signed.append([0.0] * len(elem_gp_data[elem_idx]))
 
     if debug_level >= 1 and pp_option != "none":
         all_u = [u_gp[e][g] for e in range(n_elements) for g in range(len(u_gp[e]))]
@@ -7660,6 +7789,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         continue
                     _jg['cj_r'], _jg['tanphi_r'] = joint_reduced_strength(
                         _jg['jd'], F_new)
+                    # and the tension cutoff with them, where Tension SRF says
+                    _jg['tcut_r'] = joint_reduced_tcut(_jg['jd'], F_new,
+                                                       tension_srf)
                     if _jg.get('slipped') is not None:
                         _jg['res_r'] = joint_reduced_residual_strength(
                             _jg['jd'], F_new)
@@ -7671,7 +7803,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
             max_disp_factor=max_disp_factor, _nr_export=_nr_export,
-            k0=k0, _nr_init_state=_init_state,
+            k0=k0, _nr_init_state=_init_state, tension_srf=tension_srf,
             debug_level=debug_level, progress_callback=progress_callback)
         # P3: on a model already known to be carried only from a seed, the cold
         # attempt is skipped and the chain starts at the first rung (see
@@ -7859,7 +7991,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             finv_by_elem=1.0 / F_by_elem, _nr_env_F=F_by_elem,
             force_tol=force_tol, min_slip_depth=min_slip_depth,
             max_iterations=max_iterations, max_disp_factor=max_disp_factor,
-            k0=k0, _nr_init_state=_init_state,
+            k0=k0, _nr_init_state=_init_state, tension_srf=tension_srf,
             debug_level=max(0, debug_level - 1))
 
     def _try_corrector(u_now, groups_now, where, vp_iterations, softened_now=None):
@@ -8354,6 +8486,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     _cyc = _ContactCycle() if (JOINT_CYCLE_ON and has_joints) else None
     if has_joints:
         joint_cj_r, joint_tanphi_r = joint_reduced_strength(joint_data, F)
+        # The tension cutoff follows the Tension SRF setting, as a material's
+        # t_cut does: divided by F when it is on (the default), held when off.
+        joint_tcut_r = joint_reduced_tcut(joint_data, F, tension_srf)
         joint_slip = np.zeros((joint_data["n"], 3))
         joint_open = np.zeros((joint_data["n"], 3), dtype=bool)
         # Which pairs were slipping on the last sweep: the one-sided stick/slip
@@ -9621,7 +9756,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                         joint_data, u, joint_cj_r, joint_tanphi_r,
                         slip_p=joint_slip, open_prev=joint_open,
                         slipped=joint_slipped, res_r=joint_res_r,
-                        dil_p=joint_dil, slip_prev=joint_slip_prev))
+                        dil_p=joint_dil, slip_prev=joint_slip_prev,
+                        tcut_r=joint_tcut_r))
                     if joint_relief_open_only:
                         _code_now = np.where(_code_now == 2, 2, 0).astype(np.int8)
                     # Hysteresis: a pair is relieved only once it has held the
@@ -9704,7 +9840,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     ks_slip_factor=joint_slip_stiffness_factor,
                     ks_asm=joint_ks_asm, kn_asm=joint_kn_asm,
                     loads_relief=joint_relief_load,
-                    slip_state=joint_slip_prev)
+                    slip_state=joint_slip_prev, tcut_r=joint_tcut_r)
                 # The active set's movement (see joint_code_prev). 0 sticking,
                 # 1 slipping, 2 open.
                 _jcode = (joint_state_last["slipping"].astype(np.int8)
@@ -9995,7 +10131,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                             slip_p=_s_try, open_prev=joint_open,
                             slipped=joint_slipped, res_r=joint_res_r,
                             dil_p=joint_dil,
-                            slip_prev=joint_state_last["slipping"])
+                            slip_prev=joint_state_last["slipping"],
+                            tcut_r=joint_tcut_r)
                         if (bool(np.any(_st_try["open"]
                                         != joint_state_last["open"]))
                                 or bool(np.any(_st_try["slipping"]
@@ -11043,7 +11180,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         joint_state_last = joint_state(joint_data, u, joint_cj_r, joint_tanphi_r,
                                        slip_p=joint_slip, open_prev=joint_open,
                                        slipped=joint_slipped, res_r=joint_res_r,
-                                       dil_p=joint_dil)
+                                       dil_p=joint_dil, tcut_r=joint_tcut_r)
 
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
@@ -12118,14 +12255,15 @@ def _nr_build_bars(fem_data):
     return bars or None
 
 
-def _nr_build_joints(fem_data, F, state=None, cross=None):
+def _nr_build_joints(fem_data, F, state=None, cross=None, tension_srf=True):
     """The model's interface (joint) element and tie groups, or ``None``.
 
     One group per kind, shaped like the bar groups the same assembly pattern
     walks: a dense ``dof`` map, an element matrix stashed on ``_Ke`` at every
     tangent re-form, and a force law evaluated from the current displacement
-    alone. The joint's interface strengths carry the trial's reduction; its
-    stiffnesses, and the ties, do not.
+    alone. The joint's interface strengths carry the trial's reduction, and its
+    tension cutoff too when ``tension_srf`` is on; its stiffnesses, and the
+    ties, do not.
     """
     jd = fem_data.get("joint_data")
     if jd is None or jd["n"] == 0:
@@ -12139,6 +12277,7 @@ def _nr_build_joints(fem_data, F, state=None, cross=None):
     st = state or {}
     groups = [{'kind': 'joint', 'jd': jd, 'dof': jd['dof'],
                'cj_r': cj_r, 'tanphi_r': tanphi_r,
+               'tcut_r': joint_reduced_tcut(jd, F, tension_srf),
                'slip_p': st.get('slip_p'), 'open_prev': st.get('open_prev'),
                'slipped': st.get('slipped'),
                'res_r': joint_reduced_residual_strength(jd, F)
@@ -12249,7 +12388,8 @@ def _nr_joint_force(jg, u, want_tangent):
                                          slipped=jg.get('slipped'),
                                          res_r=jg.get('res_r'),
                                          dil_p=jg.get('dil_p'),
-                                         cross=jg.get('cross', False))
+                                         cross=jg.get('cross', False),
+                                         tcut_r=jg.get('tcut_r'))
         jg['_state'] = st
     else:
         f, Ke, at_cap = tie_internal_force(jg['td'], u, want_tangent=want_tangent)
@@ -13702,7 +13842,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP,
                       _nr_seed=None, k0=None, _nr_init_state=None,
                       _nr_seed_state=None, _nr_env_F=None, _softened_seed=None,
-                      _nr_joint_state=None):
+                      _nr_joint_state=None, tension_srf=True):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
 
     Returns the same result dictionary solve_fem returns, so the SSRM bisection
@@ -13844,7 +13984,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             if _src is not None and _src.get("joint") is not None:
                 _nr_joint_state = _src["joint"]
                 break
-    joints = _nr_build_joints(fem_data, F, state=_nr_joint_state)
+    joints = _nr_build_joints(fem_data, F, state=_nr_joint_state,
+                              tension_srf=tension_srf)
     # The joint law this driver can carry on a COLD start is the stateless one:
     # with no interface history handed in, a line's residual strength and its
     # dilation are never armed (see _nr_build_joints). Not a refusal (the ramp and
@@ -18342,7 +18483,7 @@ def _piezo_extent_tol(px):
     return 1e-9 * max(1.0, float(px[-1] - px[0]))
 
 
-def _check_piezo_extent(xq, px, py, what):
+def _check_piezo_extent(xq, px, py, what, ids=None):
     """Every point that samples a piezometric line must lie inside it.
 
     ``xq`` may be a scalar or an array of x-coordinates that are about to read a
@@ -18358,6 +18499,8 @@ def _check_piezo_extent(xq, px, py, what):
     elevation below the mesh -- rather than leaning on a silent default.
 
     ``what`` names the sampling layer for the message (e.g. "mesh node").
+    ``ids`` are the points' own numbers when ``xq`` is a subset (the nodes of the
+    materials that read the line), so the message names the right one.
     """
     xq = np.atleast_1d(np.asarray(xq, dtype=float))
     tol = _piezo_extent_tol(px)
@@ -18366,7 +18509,8 @@ def _check_piezo_extent(xq, px, py, what):
         return
     bad = np.flatnonzero(outside)
     first = int(bad[0])
-    where = f"{what} {first}" if xq.size > 1 else what
+    label = first if ids is None else int(np.asarray(ids)[first])
+    where = f"{what} {label}" if (xq.size > 1 or ids is not None) else what
     tally = (f" ({bad.size} of {xq.size} sampled points are outside, x from "
              f"{xq[outside].min():.6g} to {xq[outside].max():.6g})"
              if xq.size > 1 else "")

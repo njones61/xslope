@@ -148,7 +148,7 @@ def search(sd, ttype, num_slices, rapid=False, tag_win=None, seed="circles"):
     win.update(file_search_window(sd, already=win))
     with contextlib.redirect_stdout(io.StringIO()):
         if ttype == "single_circle":
-            ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=num_slices)
+            ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=num_slices, rapid=rapid)
             slice_df, surface = res
             result = solve_selected(METHOD, slice_df, rapid=rapid)
             crit = {"slices": slice_df, "failure_surface": surface, "solver_result": result}

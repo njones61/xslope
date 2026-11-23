@@ -29,6 +29,7 @@ from .advanced import (no_low_k_sentence, rapid_drawdown, seismic2_strength, sei
 # so the preflight remedy can build a starting set without pulling in the solvers.
 from .generators import (generate_noncircular_surface, generate_starting_circles,
                          rank_weak_zones, slope_geometry)
+from .fileio import NONCIRC_MOVEMENTS, noncirc_movement
 from .preflight import preflight
 from .slice import crossings_above_center, generate_slices
 
@@ -539,7 +540,7 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                 success, result = generate_slices(slope_data, circle=circle,
                                                   num_slices=sweep_slices,
                                                   composite=composite,
-                                                  check_inputs=False)
+                                                  check_inputs=False, rapid=rapid)
                 if not success:
                     continue
                 df_slices, failure_surface = result
@@ -596,6 +597,35 @@ SEARCH_WINDOW_KEYS = ('entry_x_min', 'entry_x_max', 'exit_x_min', 'exit_x_max',
                       'center_box_x_min', 'center_box_y_min',
                       'center_box_x_max', 'center_box_y_max',
                       'max_tangent_depth', 'min_slip_depth')
+
+
+def noncirc_point_movements(non_circ):
+    """How the non-circular search moves each point: ``'Free'``, ``'Horiz'`` or
+    ``'Fixed'``, one per point of ``non_circ`` in its own order.
+
+    The Movement column matches in any case. A blank cell keeps its standing
+    meaning: an END point slides along the ground surface (as ``Free`` or
+    ``Horiz`` would -- that is an end point's only admissible direction) and an
+    INTERIOR point is held where it is (``Fixed``). Any other entry raises
+    ValueError rather than being read as ``Fixed``, which once froze a point
+    typed as lowercase "free" without a word.
+    """
+    pts = list(non_circ or [])
+    out = []
+    for i, p in enumerate(pts):
+        raw = p.get('Movement') if isinstance(p, dict) else None
+        word = noncirc_movement(raw)
+        if word is None:
+            word = 'Free' if i in (0, len(pts) - 1) else 'Fixed'
+        elif word not in NONCIRC_MOVEMENTS:
+            raise ValueError(
+                f"Point {i + 1} of the non-circular surface has Movement "
+                f"{str(raw).strip()!r}, which is not a movement. Enter Free, Horiz "
+                f"or Fixed, or leave it blank (an end point then slides along the "
+                f"ground surface and an interior point stays where it is) "
+                f"(Non-circular surface; non-circ sheet).")
+        out.append(word)
+    return out
 
 
 def noncirc_left_to_right(non_circ):
@@ -886,7 +916,8 @@ def circular_search(slope_data, method_name, rapid=False, seismic2=False, tol=1e
             seed_ok, _seed_res = generate_slices(
                 slope_data,
                 circle={'Xo': x, 'Yo': y, 'Depth': depth_guess, 'R': y - depth_guess},
-                num_slices=num_slices, composite=composite, check_inputs=False)
+                num_slices=num_slices, composite=composite, check_inputs=False,
+                rapid=rapid)
             if seed_ok:
                 floor = depth_guess
         best_depth = max(depth_guess, floor)
@@ -912,7 +943,7 @@ def circular_search(slope_data, method_name, rapid=False, seismic2=False, tol=1e
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d, 'R': y - d}
                 success, result = generate_slices(slope_data, circle=test_circle,
                                                   num_slices=num_slices, composite=composite,
-                                                  check_inputs=False)
+                                                  check_inputs=False, rapid=rapid)
                 if not success:
                     FS = fs_fail
                     df_slices = None
@@ -1063,7 +1094,8 @@ def circular_search(slope_data, method_name, rapid=False, seismic2=False, tol=1e
         try:
             seed_ok, seed_msg = generate_slices(
                 slope_data, circle={'Xo': x0, 'Yo': y0, 'Depth': depth_guess, 'R': r0},
-                num_slices=num_slices, composite=composite, check_inputs=False)
+                num_slices=num_slices, composite=composite, check_inputs=False,
+                rapid=rapid)
         except Exception:
             seed_ok, seed_msg = True, ''
         if not seed_ok:
@@ -1318,7 +1350,8 @@ def noncircular_search(slope_data, method_name, rapid=False, seismic2=False, dia
 
         # Generate slices and compute FS
         success, result = generate_slices(slope_data, non_circ=non_circ,
-                                          num_slices=num_slices, check_inputs=False)
+                                          num_slices=num_slices, check_inputs=False,
+                                          rapid=rapid)
         if not success:
             return float('inf'), None, None, None, fs_cache
             
@@ -1367,7 +1400,10 @@ def noncircular_search(slope_data, method_name, rapid=False, seismic2=False, dia
     # between its neighbors' x, so points listed right to left could never move.
     non_circ = noncirc_left_to_right(slope_data['non_circ'])
     points = np.array([[p['X'], p['Y']] for p in non_circ])
-    movements = [p['Movement'] for p in non_circ]
+    # Free / Horiz / Fixed in any case; a blank resolves by position (an end point
+    # slides, an interior point stays); any other word is refused here as well as
+    # by preflight's surface.movement_vocabulary above.
+    movements = noncirc_point_movements(non_circ)
     ground_surface = slope_data['ground_surface']
     # Each vertex may bend back as far as the guard allows or as far as it was
     # entered, whichever is more: the search may not make a bend, or deepen one.
@@ -1929,7 +1965,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                   f"{num_slices} slices{tag}…")
 
     ok, out = generate_slices(slope_data, circle=circle, non_circ=non_circ,
-                              num_slices=num_slices, composite=composite)
+                              num_slices=num_slices, composite=composite,
+                              rapid=rapid)
     if not ok:
         raise AnalysisError(str(out))
     slice_df, failure_surface = out

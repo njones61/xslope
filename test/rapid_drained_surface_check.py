@@ -242,7 +242,8 @@ def run():
     shell = next(m for m in sd["materials"] if m["name"] == "shell")
     shell["c"], shell["phi"] = 0.0, 20.0
     with contextlib.redirect_stdout(io.StringIO()):
-        ok, made = generate_slices(sd, circle=dict(SHELL_CIRCLE), num_slices=40)
+        ok, made = generate_slices(sd, circle=dict(SHELL_CIRCLE), num_slices=40,
+                                   rapid=True)
     if not ok:
         fails.append(f"stage 1 rule: the shell circle would not slice: {made}")
     else:
@@ -257,7 +258,8 @@ def run():
     # --- E: the core circle is unchanged ----------------------------------
     sd = _load(STARTER_XLSX)
     with contextlib.redirect_stdout(io.StringIO()):
-        ok, made = generate_slices(sd, circle=dict(CORE_CIRCLE), num_slices=40)
+        ok, made = generate_slices(sd, circle=dict(CORE_CIRCLE), num_slices=40,
+                                   rapid=True)
         ok, res = rapid_drawdown(made[0], "spencer", debug_level=0)
     if not ok:
         fails.append(f"core circle: refused: {res}")

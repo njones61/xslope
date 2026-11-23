@@ -961,9 +961,10 @@ def _apply_size_regions(gmsh, regions, target_size, debug=False):
 
     ``regions`` is a list of ``(ring, size)`` pairs: a closed (x, y) list and the
     target element size inside it. Two kinds of input arrive here as the same thing —
-    a material zone (or SSR overlay) that carries a Size, and a Type='refine' overlay
-    that carries nothing else — because the effect is identical: inside the ring, the
-    element size is at most ``size``.
+    a material zone that carries a Size, and an overlay that is not meshed as a zone
+    (a Type='refine' region, an SSR zone or a joints region; see
+    :func:`extract_size_regions`) — because the effect is identical: inside the ring,
+    the element size is at most ``size``.
 
     A CALLBACK rather than a gmsh size field, for two reasons. gmsh's region-restricted
     fields (Constant + SurfacesList) can only name surfaces that exist in the model, and
@@ -1542,7 +1543,8 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       get the same Distance+Threshold band as the line features. Ignored otherwise.
         size_regions : Optional list of {'polygon': [(x, y), ...], 'size': float} local mesh
                       size OVERLAYS — regions that are not material zones (the template's
-                      Type='refine' polygons). A polygon dict in `polygons` may also carry
+                      Type='refine', SSR-zone and joints polygons that carry a Size; see
+                      extract_size_regions). A polygon dict in `polygons` may also carry
                       its own 'size', which does the same thing for that material zone.
                       Both are USER-DECLARED sizes and are independent of refine_factor's
                       automatic feature detection; they compose with it (and with each other)
@@ -2295,8 +2297,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # are off, so the geometry cannot impose a size the field did not ask for.
     _install_background_size_field(gmsh, target_size, _feature_fields, debug=debug)
 
-    # User-declared local mesh sizes: a Size on a material zone / SSR overlay, and
-    # the Type='refine' overlays handed in as size_regions. Both cap the element size
+    # User-declared local mesh sizes: a Size on a material zone, and the overlays
+    # handed in as size_regions (Type='refine', the SSR zones and the joints regions
+    # that carry one; see extract_size_regions). Both cap the element size
     # inside their ring, and both mean the same element on a quad mesh as on a
     # triangular one because neither path rescales the requested size. Empty => the
     # callback is never installed and the mesh is unchanged.
@@ -4825,18 +4828,28 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
 
 
 def extract_size_regions(slope_data):
-    """The model's mesh size OVERLAYS — the polygon sheet's Type='refine' rows.
+    """The model's mesh size OVERLAYS: every polygon-sheet region that carries a
+    Size and is not itself meshed as a zone.
 
     Companion to :func:`get_material_polygons`: that returns the regions that ARE the
     section, this returns the regions that only say how finely to mesh. Pass the
-    result to ``build_mesh_from_polygons(size_regions=...)``. A Size declared on a
-    material zone or a profile line needs nothing here — it rides on the polygon dict
-    itself, since the zone is already being meshed.
+    result to ``build_mesh_from_polygons(size_regions=...)``. Three kinds arrive here,
+    and a Size means the same on each, the element size inside the ring:
 
-    Returns [] for every model that declares no refine polygon (all pre-v21 files).
+    * Type = 'refine', which says nothing else;
+    * the SSR zones ('ssr reduce', 'ssr hold', 'ssr elastic'), analysis overlays the
+      loader keeps out of the section's polygons;
+    * Type = 'joints', the joint network generators' authoring regions.
+
+    A Size declared on a material zone or a profile line needs nothing here — it
+    rides on the polygon dict itself, since the zone is already being meshed. A
+    region with no Size contributes nothing.
+
+    Returns [] for every model that declares no sized overlay (all pre-v21 files).
     """
     return [{'polygon': list(z['polygon']), 'size': float(z['size'])}
-            for z in (slope_data.get('refine_zones') or [])
+            for key in ('refine_zones', 'ssr_zones', 'joint_zones')
+            for z in (slope_data.get(key) or [])
             if z.get('size') is not None]
 
 

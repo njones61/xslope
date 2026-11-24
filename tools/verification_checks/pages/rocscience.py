@@ -97,10 +97,12 @@ CONFIG = PageConfig(
         r"of the displacement",
         r"filled",
     ],
-    # Quantities identified by what PRECEDES them: a coefficient of variation
-    # is a value, not a difference.
+    # Quantities identified by what PRECEDES them: a coefficient of variation,
+    # and a probability of failure (a range's upper end included), are values,
+    # not differences.
     not_a_comparison_prefix=[
         r"COV(?: of)? ",
+        r"probability of failure at about (?:\d+(?:\.\d+)?–)?",
     ],
     # Reliability tables: the beta / probability-of-failure columns hold
     # probabilities, not comparisons

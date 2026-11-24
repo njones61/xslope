@@ -146,8 +146,9 @@ The distribution is strongly right-skewed, as is typical of a large-COV input pa
 through a nonlinear factor-of-safety response: mean FS = 2.532, $\sigma_F$ = 0.801,
 and an empirical probability of failure of 1.49% (9,880 of the 10,000 draws
 converged to a valid Spencer solution; the rest are excluded rather than counted as
-failures). This is inside the 0.36%–6.2% band spanned by the three published
-estimates for this problem, a case for which the Taylor series gives no result (see
+failures). This lies between the two published estimates for this problem, Slide's
+Monte Carlo 0.355% and Wolff and Harr's point estimate 4.55%, a case for which the
+Taylor series gives no result (see
 [VP34](../verification/rocscience.md#vp34) for the full comparison). This is the same
 plot XSLOPE Studio renders on the **Reliability · MC** result tab — see
 [Reliability analysis](../studio/analysis.md#reliability-analysis).

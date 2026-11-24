@@ -78,8 +78,8 @@ Rapid drawdown: False
 Circular search: True
 Performing circular search...
   ... (search iterations) ...
-[✅ converged] Iter=9, FS=1.3334 (ΔFS<0.0005) at (x=3.92, y=19.55, depth=4.96), elapsed time=1.73 seconds
-Critical factor of safety (F_MLV): 1.3334
+[✅ converged] Iter=10, FS=1.3336 (ΔFS<0.0005) at (x=4.04, y=19.42, depth=4.97), elapsed time=2.61 seconds
+Critical factor of safety (F_MLV): 1.3336
 Found 3 parameters with standard deviations:
   Material 1: gamma = 18.000 ± σ=0.900
   Material 1: c = 18.000 ± σ=3.600
@@ -87,52 +87,52 @@ Found 3 parameters with standard deviations:
 
 Processing parameter 1/3: Material 1, gamma
   ... (search iterations) ...
-[✅ converged] Iter=13, FS=1.2993 (ΔFS<0.0005) at (x=3.97, y=19.47, depth=4.96), elapsed time=2.15 seconds
+[✅ converged] Iter=10, FS=1.2996 (ΔFS<0.0005) at (x=4.04, y=19.30, depth=4.97), elapsed time=2.35 seconds
   ... (search iterations) ...
-[✅ converged] Iter=9, FS=1.3710 (ΔFS<0.0005) at (x=3.88, y=19.92, depth=4.96), elapsed time=1.78 seconds
-  F+ = 1.2993, F- = 1.3710, ΔF = 0.0717
+[✅ converged] Iter=12, FS=1.3708 (ΔFS<0.0005) at (x=4.16, y=19.42, depth=4.98), elapsed time=2.96 seconds
+  F+ = 1.2996, F- = 1.3708, ΔF = 0.0712
 
 Processing parameter 2/3: Material 1, c
   ... (search iterations) ...
-[✅ converged] Iter=15, FS=1.4752 (ΔFS<0.0005) at (x=3.88, y=20.16, depth=4.96), elapsed time=2.35 seconds
+[✅ converged] Iter=8, FS=1.4735 (ΔFS<0.0005) at (x=4.52, y=19.06, depth=4.99), elapsed time=2.63 seconds
   ... (search iterations) ...
-[✅ converged] Iter=10, FS=1.1886 (ΔFS<0.0005) at (x=3.31, y=19.74, depth=4.90), elapsed time=1.87 seconds
-  F+ = 1.4752, F- = 1.1886, ΔF = 0.2867
+[✅ converged] Iter=8, FS=1.1901 (ΔFS<0.0005) at (x=2.75, y=20.85, depth=4.84), elapsed time=2.17 seconds
+  F+ = 1.4735, F- = 1.1901, ΔF = 0.2834
 
 Processing parameter 3/3: Material 1, phi
   ... (search iterations) ...
-[✅ converged] Iter=16, FS=1.4098 (ΔFS<0.0005) at (x=3.84, y=19.43, depth=4.95), elapsed time=2.66 seconds
+[✅ converged] Iter=12, FS=1.4104 (ΔFS<0.0005) at (x=3.80, y=19.42, depth=4.95), elapsed time=2.76 seconds
   ... (search iterations) ...
-[✅ converged] Iter=10, FS=1.2602 (ΔFS<0.0005) at (x=3.88, y=20.04, depth=4.96), elapsed time=1.74 seconds
-  F+ = 1.4098, F- = 1.2602, ΔF = 0.1496
+[✅ converged] Iter=13, FS=1.2600 (ΔFS<0.0005) at (x=4.04, y=19.72, depth=4.97), elapsed time=2.91 seconds
+  F+ = 1.4104, F- = 1.2600, ΔF = 0.1504
 
-σ_F = 0.1656
-COV_F = 0.1242
-β_ln = 2.2635
-Reliability = 98.82%
-Probability of failure = 1.18%
+σ_F = 0.1643
+COV_F = 0.1232
+β_ln = 2.2838
+Reliability = 98.88%
+Probability of failure = 1.12%
 
 === RELIABILITY ANALYSIS RESULTS ===
 +-------------+-------+-----+---------+---------+-------+-------+-------+
 | Parameter   |  MLV  |  σ  |  MLV+σ  |  MLV-σ  |  F+   |  F-   |  ΔF   |
 +=============+=======+=====+=========+=========+=======+=======+=======+
-| Mat 1 gamma |  18   | 0.9 |  18.9   |  17.1   | 1.299 | 1.371 | 0.072 |
+| Mat 1 gamma |  18   | 0.9 |  18.9   |  17.1   |  1.3  | 1.371 | 0.071 |
 +-------------+-------+-----+---------+---------+-------+-------+-------+
-| Mat 1 c     |  18   | 3.6 |  21.6   |  14.4   | 1.475 | 1.189 | 0.287 |
+| Mat 1 c     |  18   | 3.6 |  21.6   |  14.4   | 1.473 | 1.19  | 0.283 |
 +-------------+-------+-----+---------+---------+-------+-------+-------+
 | Mat 1 phi   |  30   |  3  |   33    |   27    | 1.41  | 1.26  | 0.15  |
 +-------------+-------+-----+---------+---------+-------+-------+-------+
 
 Summary Statistics:
-F_MLV: 1.333
-σ_F: 0.166
-COV_F: 0.124
-β_ln: 2.263
-Reliability: 98.82%
-Probability of failure: 1.18%
+F_MLV: 1.334
+σ_F: 0.164
+COV_F: 0.123
+β_ln: 2.284
+Reliability: 98.88%
+Probability of failure: 1.12%
 
-Reliability analysis completed in 14.29 seconds.
+Reliability analysis completed in 18.45 seconds.
 ```
 
-$F_{MLV}$ = 1.333 and $\beta_{ln}$ = 2.263 match the values quoted for VP36 in the
-[verification corpus](../verification/rocscience.md#vp36).
+$F_{MLV}$ and $\beta_{ln}$ agree with the values the
+[verification corpus](../verification/rocscience.md#vp36) holds for VP36, within its tolerance.

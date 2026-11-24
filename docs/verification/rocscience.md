@@ -951,17 +951,19 @@ trace of the drawn surface, and `reliability(search=False)` evaluates it directl
 | F, most likely values | 1.145 | 1.17 (−2.1%) | 1.157 (−1.0%), mean 1.166 |
 | β_ln → PF | 0.936 → **17.5%** | ≈0.9 → **18%** | 1.088 → 13.96% (Monte Carlo — cross-estimator) |
 
-*Both published sources are reproduced. The deterministic factor of safety brackets between
-them on Duncan's surface, represented as a smooth least-squares arc (RMS 1.1 ft against the
+*Both published sources are reproduced. The deterministic factor of safety sits just below
+both on Duncan's surface, represented as a smooth least-squares arc (RMS 1.1 ft against the
 pixel trace), and the probability of failure reproduces Duncan's own 18% almost exactly.
 Slide's Table 29.2 renders Duncan's whole-envelope ±σ as a rate-only σ (±1.2 psf/ft), the
 only form a c/cp parameterization can express, which is why Slide's Monte Carlo PF (14%)
 sits below Duncan's 18%.*
 
 *The same slope carries three published probabilities of failure — 14% (Slide MC),
-18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, on a wider 2σ-rule envelope). Two TSPM
-analyses by the same author differ by more than TSPM differs from Monte Carlo, so the
-σ-input choice, not the estimator, dominates probabilistic comparisons.*
+18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, on a wider 2σ-rule envelope). The last
+does not follow from the book's own Table 13.8, whose entries give σ_F = 0.242 and a COV of
+20.7%. Worked through, those put the probability of failure at about 24–25%. Two TSPM analyses
+by the same author differ by more than TSPM differs from Monte Carlo, so the σ-input choice,
+not the estimator, dominates probabilistic comparisons.*
 
 ![vp029: inputs and representative solution](images/vp029.png)
 
@@ -1112,8 +1114,8 @@ evaluation would use a negative friction angle and `reliability()` declines the 
 published probabilities themselves differ by 13× — W&H's point estimate 4.55×10⁻² against Slide's
 Monte-Carlo 3.55×10⁻³ — so at a COV of 124% the sampling treatment of the φ ≥ 0 bound dwarfs the
 estimator choice. `reliability_mc` carries the case past that boundary, truncating the negative φ
-draws at zero as the published samplers do, and lands inside the band the three published
-estimates span. It carries no match because the two published probabilities are 13× apart, so
+draws at zero as the published samplers do, and lands between the two published
+probabilities. It carries no match because they are 13× apart, so
 there is no single target to hold a sampled probability to; the row's dot scores the
 deterministic factor of safety.*
 

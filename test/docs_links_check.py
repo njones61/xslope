@@ -1542,7 +1542,7 @@ def _seep01_editor_labels(mw):
 
     # Read against the app's own toggle defaults, then ticked the way the page's
     # step leaves them: Seepage on, everything else off.
-    with _default_editor_toggles():
+    with _default_editor_toggles(), _first_open_materials_view():
         mats = MaterialsEditor().build(data, None)
         toggles = getattr(mats, "_toggles", None) or {}
         if SEEP01_MATERIALS_TOGGLE not in {cb.text() for cb in toggles.values()}:
@@ -1672,7 +1672,7 @@ def _seep02_editor_labels():
                          "other")
     data = _quiet(load_slope_data, SEEP02_FILE)
 
-    with _default_editor_toggles():
+    with _default_editor_toggles(), _first_open_materials_view():
         mats = MaterialsEditor().build(data, None)
         for tag, cb in (getattr(mats, "_toggles", None) or {}).items():
             cb.setChecked(cb.text() == SEEP01_MATERIALS_TOGGLE)
@@ -1859,7 +1859,7 @@ def _lem11_reliability_labels():
     # coded default is only readable with this machine's remembered state out of
     # the way — the same reason tools/capture_tutorial_screenshots._app_defaults
     # clears it. Without this the pin reads whoever ran Studio last, not the app.
-    with _default_editor_toggles():
+    with _default_editor_toggles(), _first_open_materials_view():
         mat = MaterialsEditor().build(data, None)
         toggles = {cb.text()
                    for cb in (getattr(mat, "_toggles", None) or {}).values()}
@@ -1900,36 +1900,71 @@ def _lem11_reliability_labels():
     return fails
 
 
+def _session_start_value(module, name):
+    """What a module-level name holds when a new Studio session imports the module,
+    read off the module's source: its live value is whatever code earlier in this
+    process last set it to."""
+    import ast
+    import inspect
+
+    for node in ast.parse(inspect.getsource(module)).body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            return ast.literal_eval(node.value)
+    raise LookupError(f"{module.__name__} assigns no module-level {name}")
+
+
+@contextlib.contextmanager
+def _first_open_materials_view():
+    """Build the materials editor as a new session's first open would.
+
+    studio.editors remembers the last materials view for the session in a module
+    global, and the suite runs many checks in one worker process, several of
+    which leave it on List view (and the List view never builds the table's
+    buttons). Inside this block the remembered view is the one a new session
+    starts with, read off the module's source; afterwards the live value is put
+    back. A check here neither inherits the view an earlier check left nor
+    decides the one the next editor opens on. Yields the start view.
+    """
+    import studio.editors as editors_mod
+
+    live = editors_mod._LAST_MATERIALS_VIEW
+    first = _session_start_value(editors_mod, "_LAST_MATERIALS_VIEW")
+    editors_mod._LAST_MATERIALS_VIEW = first
+    try:
+        yield first
+    finally:
+        editors_mod._LAST_MATERIALS_VIEW = live
+
+
 def _lem01_editor_labels():
     """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
 
     Driven rather than read, because the page's step is a *route* — the editor
     opens on one view and the reader is sent to the other — and only the route is
-    wrong when the two views' buttons drift apart. The module remembers the last
-    view for the session, so the remembered value is saved and restored: this
-    check must not decide which view the next editor built here opens on.
+    wrong when the two views' buttons drift apart. The open is staged as a new
+    session's first (``_first_open_materials_view``).
     """
     from PySide6.QtWidgets import QLabel, QPushButton
 
     from xslope.fileio import load_slope_data
 
-    import studio.editors as editors_mod
     from studio.editors import MaterialsEditor
 
     fails = []
-    remembered = editors_mod._LAST_MATERIALS_VIEW
-    try:
-        if remembered != LEM01_MATERIALS_OPENS_ON:
+    with _first_open_materials_view() as first:
+        if first != LEM01_MATERIALS_OPENS_ON:
             fails.append(f"the materials editor's first open lands on "
-                         f"{remembered!r}, not {LEM01_MATERIALS_OPENS_ON!r} — "
+                         f"{first!r}, not {LEM01_MATERIALS_OPENS_ON!r} — "
                          f"Tutorial LEM-1 tells the reader which view they arrive "
                          f"in before sending them to the other one")
         data = _quiet(load_slope_data, LEM01_FILE)
         mats = MaterialsEditor().build(data, None)
-        if mats._mode != remembered:
-            fails.append(f"the materials editor opened on {mats._mode!r} with "
-                         f"{remembered!r} remembered; Tutorial LEM-1's step assumes "
-                         f"the view it opens on is the remembered one")
+        if mats._mode != first:
+            fails.append(f"the materials editor's first open came up on "
+                         f"{mats._mode!r} where a new session starts on "
+                         f"{first!r}; Tutorial LEM-1's step assumes the view it "
+                         f"opens on is the one a new session starts on")
         # Both panes live in the same stack, so every button exists whichever view
         # is up; what the page's route turns on is which of them the reader can
         # actually press, which is visibility within the dialog.
@@ -1967,8 +2002,6 @@ def _lem01_editor_labels():
                              f"LEM-1's first step names it. Its rows read "
                              f"{sorted(r for r in rows if r)}")
         glob.deleteLater()
-    finally:
-        editors_mod._LAST_MATERIALS_VIEW = remembered
     return fails
 
 
@@ -1990,7 +2023,8 @@ def _lem03_editor_labels():
     fails = []
     data = _quiet(load_slope_data, LEM03_FILE)
 
-    mats = MaterialsEditor().build(data, None)
+    with _first_open_materials_view():
+        mats = MaterialsEditor().build(data, None)
     buttons = {b.text() for b in mats.findChildren(QPushButton)}
     for label in LEM03_MATERIALS_BUTTONS:
         if label not in buttons:

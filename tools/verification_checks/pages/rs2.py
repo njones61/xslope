@@ -36,10 +36,6 @@ CONFIG = PageConfig(
         # VP51 is an LEM row; the vendor catalog's RS2 SSRM value is quoted, not scored.
         ('1.22', 'the RS2 SSRM value of 1.22 in the catalog'),
         ('1.19', 'The 1.19 published for this problem'),
-        # the geotextile wall rows that print the factor their search found
-        # without confirming it (RS2-49, 51, 52, 53, 54)
-        ('1.018', 'unconfirmed'),
-        ('1.037', 'unconfirmed'),
         # Source papers' own numbers quoted in prose, each named as the paper's:
         # El-Ramly et al.'s deterministic Bishop on measured band pressures
         # (RS2-25, shown, not scored); Cheng et al.'s Fig. 13c value for the

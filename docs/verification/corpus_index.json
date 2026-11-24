@@ -24165,6 +24165,154 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp090_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-51-wall",
+          "checks": [
+            "RS2-51-wall"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-51: Geotextile wall, dual reinforcement type (vp090_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-51-wall"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp090_fem_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-51-wall",
+          "checks": [
+            "RS2-51-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-51: Geotextile wall, dual reinforcement type (vp090_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-51-wall"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -24526,6 +24674,154 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp093_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-54",
+          "checks": [
+            "RS2-54"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-54: Geotextile wall, crest surcharge (vp093_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-54"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp093_fem_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-54",
+          "checks": [
+            "RS2-54-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-54: Geotextile wall, crest surcharge (vp093_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-54"
         }
       ],
       "topics": [
@@ -29356,7 +29652,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 415,
+    "models": 419,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -29403,7 +29699,7 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 738,
+    "tags": 742,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
@@ -29412,7 +29708,7 @@
       "piles": 15,
       "probabilistic": 16,
       "rapid-drawdown": 12,
-      "reinforcement": 36,
+      "reinforcement": 40,
       "seepage-coupled": 76,
       "seismic": 14,
       "soil-nails": 5,
@@ -29771,11 +30067,15 @@
       "docs/verification/files/rocscience/vp089.xlsx",
       "docs/verification/files/rocscience/vp089_fem.xlsx",
       "docs/verification/files/rocscience/vp090.xlsx",
+      "docs/verification/files/rocscience/vp090_fem.xlsx",
+      "docs/verification/files/rocscience/vp090_fem_fine.xlsx",
       "docs/verification/files/rocscience/vp091.xlsx",
       "docs/verification/files/rocscience/vp091_fem.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",
       "docs/verification/files/rocscience/vp092_fem.xlsx",
       "docs/verification/files/rocscience/vp093.xlsx",
+      "docs/verification/files/rocscience/vp093_fem.xlsx",
+      "docs/verification/files/rocscience/vp093_fem_fine.xlsx",
       "docs/verification/files/rocscience/vp094.xlsx",
       "docs/verification/files/rocscience/vp094_fem.xlsx",
       "docs/verification/files/rocscience/vp107b.xlsx",

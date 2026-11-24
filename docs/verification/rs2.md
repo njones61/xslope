@@ -125,10 +125,10 @@ tension crack.
 | [48](#rs2-48) | 🟡 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 1.037 vs Leshchinsky &amp; Han FDM referee 0.99 (+4.7%) | Modeled as the paper's dry stack — elastic blocks on friction joints, sheets on their own interfaces — at the paper's reinforcement stiffness J = 1000 kN/m. RS2's own SSR 1.05 comes from a facing meshed as one body and is shown beside it, not scored against. |
 | [49](#rs2-49) | 🔴 | Geotextile wall, fill-quality variant | SSRM 1.096 vs L&amp;H FDM referee 0.99 (+10.7%) | RS2 SSR 1.08 beside; both codes sit above the paper, whose wall fails through a facing neither program lets fail that way — see [RS2-48](#rs2-48). |
 | [50](#rs2-50) | 🟢 | Geotextile wall, 4.2 m reinforcement variant | SSRM 0.998 vs L&amp;H FDM referee 0.98 (+1.8%) | RS2 SSR 0.93 shown beside — see [RS2-48](#rs2-48). |
-| [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type |  | *unconfirmed* — the search closed at 1.018, but a finer mesh lowers the factor by twice the search tolerance of 0.02. |
+| [51](#rs2-51-wall) | 🟢 | Geotextile wall, dual reinforcement type | SSRM 1.018 vs L&amp;H FDM referee 1.01 (+0.8%) | RS2 SSR 1.00 shown beside; the factor depends on the mesh — see [RS2-51](#rs2-51-wall). |
 | [52](#rs2-52) | 🔴 | Geotextile wall, weak-foundation variant | SSRM 0.783 vs L&amp;H FDM referee 0.86 (−9.0%) | RS2 SSR 0.84 beside; the two codes fail this wall in different ways — see [RS2-52](#rs2-52). |
 | [53](#rs2-53) | 🟢 | Geotextile wall, water variant | SSRM 1.037 vs L&amp;H FDM referee 1.01 (+2.7%) | RS2 SSR 1.03 shown beside — see [RS2-48](#rs2-48). |
-| [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant |  | *unconfirmed* — the search closed at 1.037, but a finer mesh lowers the factor by three times the search tolerance of 0.02; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10. |
+| [54](#rs2-54) | 🟢 | Geotextile wall, crest-surcharge variant | SSRM 1.037 vs L&amp;H FDM referee 1.02 (+1.7%) | RS2 SSR 0.92 beside; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10; the factor depends on the mesh — see [RS2-54](#rs2-54). |
 | [55](#rs2-55) | 🟢 | Geotextile wall, tier-count variant | SSRM 1.018 vs L&amp;H FDM referee 1.00 (+1.8%) | RS2 SSR 1.04 shown beside — see [RS2-48](#rs2-48). |
 | [56](#rs2-56) | 🟢 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | The weakest and strongest cases are scored; case 5 is the wider of them and sets the dot. |
 | [57](#rs2-57) | 🟢 | Pruska H = 10.5 m, 6 cases | Case 1 (weakest): SSRM 0.439 vs RS2 SSRM 0.44 (−0.2%) · Case 6 (strongest): SSRM 1.401 vs RS2 SSRM 1.42 (−1.3%) | The weakest and strongest cases are scored; case 6 is the wider of them and sets the dot. |
@@ -1400,8 +1400,10 @@ limit-equilibrium factors are in the second table.
 | 55 — tier number | 1.00 | 1.04 | 0.92 / 0.94 / 0.94 |
 
 Every row allows 250,000 iterations per trial, extended up to a
-million while a trial is still slowing, and is searched to a tolerance of 0.02 on a 1.0 m mesh; a
-row mentions a finer mesh, 0.7 m, only where it moves the factor by more than that.
+million while a trial is still slowing, and is searched to a tolerance of 0.02 on a 1.0 m mesh,
+where it is scored. Where a finer mesh, 0.7 m with the sheets, joints and facing refined in
+proportion, moves the factor by more than that tolerance, the row prints the finer factor beside
+it.
 
 #### 🟡 RS2-48: Multi-tiered geotextile wall, baseline (vp087_fem) {#rs2-48-baseline}
 
@@ -1457,16 +1459,22 @@ crossing the lower sheets and passing behind the ends of the upper ones, which n
 
 ![RS2-50: shortened 4.2 m geotextile layers (vp089_fem, Ta = 11.4 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. Shortening the sheets pulls the mechanism back into the reinforced mass behind their ends](images/RS2-50.png)
 
-#### ⊘ RS2-51: Geotextile wall, dual reinforcement type (vp090_fem) {#rs2-51-wall}
+#### 🟢 RS2-51: Geotextile wall, dual reinforcement type (vp090_fem) {#rs2-51-wall}
 
 Two grades of sheet in one wall: the lower seven at 11.0 kN/m, the upper eight at 7.5, with the
-vendor's shear stiffness of 10,000 on the lower seven against 100,000 above. *Unconfirmed*: every
-trial on both meshes came to rest, but the 0.7 m mesh lowers the factor by twice the search
-tolerance.
+vendor's shear stiffness of 10,000 on the lower seven against 100,000 above.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
-| 1.018 *unconfirmed* | 1.01 | 1.00 |
+| **1.018** | 1.01 (+0.8%) | 1.00 |
+
+<!-- test: file=files/rocscience/vp090_fem.xlsx, type=fem_ssrm, expected_fs=1.018, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-51-wall, f_stand=1.0078125, f_fail=1.02734375, check=edges, expected_elements=2194, expected_nodes=5544 -->
+
+The factor depends on the mesh. On the 0.7 m mesh, with the sheets, joints and facing refined in
+proportion ([vp090_fem_fine.xlsx](files/rocscience/vp090_fem_fine.xlsx)), it is 0.979, and every
+trial on both meshes comes to rest. The referee's 1.01 lies between the two.
+
+<!-- test: file=files/rocscience/vp090_fem_fine.xlsx, type=fem_ssrm, expected_fs=0.979, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-51-fine, tier=gate, f_stand=0.96875, f_fail=0.98828125, check=edges, expected_elements=3922, expected_nodes=9450 -->
 
 **Input file:** [vp090_fem.xlsx](files/rocscience/vp090_fem.xlsx).
 
@@ -1512,15 +1520,22 @@ wall", and the water RS2's model applies. The sheets are at the paper's 9.25 kN/
 
 ![RS2-53: water 3 m above the foundation on both sides of the wall (vp092_fem, piezometric line at y = 9 with a 3 m pond against the lower tier, Ta = 9.25 kN/m) — FEM inputs, mesh, max shear strain and the deformed mesh at the critical SRF, the blocks the joints cut drawn at the scale the panel states. Everything below the line carries pore pressure, the reinforced fill and the lowest facing column as well as the foundation, and the pond enters as a distributed load on the ground in front of the wall and on the face of the lowest column](images/RS2-53.png)
 
-#### ⊘ RS2-54: Geotextile wall, crest surcharge (vp093_fem) {#rs2-54}
+#### 🟢 RS2-54: Geotextile wall, crest surcharge (vp093_fem) {#rs2-54}
 
 A uniform 20 kPa surcharge on the top tier, from the back of the top facing column to the far
-boundary, as the vendor's model applies it. *Unconfirmed*: every trial on both meshes came to
-rest, but the 0.7 m mesh lowers the factor by three times the search tolerance.
+boundary, as the vendor's model applies it.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
-| 1.037 *unconfirmed* | 1.02 | 0.92 |
+| **1.037** | 1.02 (+1.7%) | 0.92 |
+
+<!-- test: file=files/rocscience/vp093_fem.xlsx, type=fem_ssrm, expected_fs=1.037, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-54, tier=gate, f_stand=1.02734375, f_fail=1.046875, check=edges, expected_elements=2194, expected_nodes=5544 -->
+
+The factor depends on the mesh. On the 0.7 m mesh, with the sheets, joints and facing refined in
+proportion ([vp093_fem_fine.xlsx](files/rocscience/vp093_fem_fine.xlsx)), it is 0.979, and every
+trial on both meshes comes to rest. The referee's 1.02 lies between the two.
+
+<!-- test: file=files/rocscience/vp093_fem_fine.xlsx, type=fem_ssrm, expected_fs=0.979, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.5, f_max=3.0, max_iter=250000, max_iter_ceiling=1000000, ssr_exclude=Blocks, tension_srf=false, k0=1, benchmark=RS2-54-fine, tier=gate, f_stand=0.96875, f_fail=0.98828125, check=edges, expected_elements=3922, expected_nodes=9450 -->
 
 This is the one variant whose two published models are not the same wall. The paper says the
 surcharge "increased the required strength of reinforcement from 10 kN/m to 11.6 kN/m", and the

@@ -3122,7 +3122,23 @@ def vp089_fem():
     return 'vp089_fem.xlsx'
 
 
-def vp090_fem():
+def _wall_fine(sd, name):
+    """Write a wall's refinement-step twin as ``name``.
+
+    The same model with the 1D elements along the sheets and joints at 0.5 m
+    (main D20) and every polygon's mesh Size cut by 0.7 (the facing columns'
+    0.15 m to 0.105 m), meshed at 0.7 m where the plain file is meshed at 1.0 m.
+    The plain file's row is the one scored; the twin's factor is printed beside
+    it as the row's mesh sensitivity (Norm, 573a)."""
+    sd['element_size_1d'] = 0.5
+    for p in sd['polygons']:
+        if p.get('size') is not None:
+            p['size'] = round(p['size'] * 0.7, 6)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, name))
+    return name
+
+
+def vp090_fem(fine=False):
     """RS2-51 — two geotextile grades, jointed dry stack.
 
     Vendor `#051` gives the lower seven sheets Ks = 10 000 against the upper
@@ -3133,8 +3149,15 @@ def vp090_fem():
                              ks_of=lambda i, n: 1.0e4 if i < 7 else 1.0e5)
     sd['circles'] = []
     sd['non_circ'] = []
+    if fine:
+        return _wall_fine(sd, 'vp090_fem_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp090_fem.xlsx'))
     return 'vp090_fem.xlsx'
+
+
+def vp090_fem_fine():
+    """RS2-51's refinement-step twin (see :func:`_wall_fine`)."""
+    return vp090_fem(fine=True)
 
 
 def vp091_fem():
@@ -3168,7 +3191,7 @@ def vp092_fem():
     return 'vp092_fem.xlsx'
 
 
-def vp093_fem():
+def vp093_fem(fine=False):
     """RS2-54 — 20 kPa crest surcharge (Ta = 11.6), jointed dry stack.
 
     The tensile strength is the paper's, not the vendor .fez's. Leshchinsky &
@@ -3188,8 +3211,15 @@ def vp093_fem():
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.6, surcharge=20.0, joint=True)
     sd['circles'] = []
     sd['non_circ'] = []
+    if fine:
+        return _wall_fine(sd, 'vp093_fem_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093_fem.xlsx'))
     return 'vp093_fem.xlsx'
+
+
+def vp093_fem_fine():
+    """RS2-54's refinement-step twin (see :func:`_wall_fine`)."""
+    return vp093_fem(fine=True)
 
 
 def vp094_fem():
@@ -5530,7 +5560,8 @@ BUILDERS = [
     vp072b, vp073, vp074, vp075, vp076a, vp076b, vp077a, vp077b, vp078, vp078b, vp078c,
     vp079, vp080a, vp080b, vp081, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d,
     vp085a, vp085b, vp086, vp087, vp087_fem, vp088, vp088_fem, vp089, vp089_fem,
-    vp090, vp090_fem, vp091, vp091_fem, vp092, vp092_fem, vp093, vp093_fem,
+    vp090, vp090_fem, vp090_fem_fine, vp091, vp091_fem, vp092, vp092_fem, vp093,
+    vp093_fem, vp093_fem_fine,
     vp094, vp094_fem, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
     vp103d, vp104a, vp104b, vp106a, vp106b, vp106c, vp106d, vp106e, vp107a, vp107b, vp108a,
     vp108b, vp109,

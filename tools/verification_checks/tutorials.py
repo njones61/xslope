@@ -36,9 +36,14 @@ Each number lands in one of three buckets:
     reading taken off a solved field: reproducible only by hand, and nothing
     tells anyone when it goes stale.
 
-The sweep REPORTS.  It returns a count, never a failure: a tutorial legitimately
-re-runs a sample under settings the sample's own tag does not use, and every
-finding is a sentence someone has to read before it is a defect.
+A DISAGREEING number fails the suite row (``disagreements``); the tally and the
+unguarded numbers are reported only.  Measured on the 1.1.0 pages with every
+stale tutorial tag re-recorded at today's value, all 62 disagreeing numbers were
+stale restatements and none was a correct one misread, so the bucket is a defect
+list as it stands.  A number that legitimately reports a different run of a
+named method (other settings, another surface) is guarded by tagging that run.
+The unguarded bucket is not enforced: a sweep row, a variant run and a stale
+number whose sentence names no method all land there alike.
 
 Usage: python -m tools.verification_checks.tutorials [page.md ...]
 """
@@ -497,12 +502,28 @@ def tutorial_pages(repo=None):
             if os.path.basename(p) != "index.md"]
 
 
+def _disagreeing_line(name, f):
+    """One disagreeing restatement, as the report and the suite row print it."""
+    return (f"{name} L{f.line} prints {f.token} ({f.context[:48]}) but the lock "
+            f"is {f.lock.key}={f.lock.value} [{f.lock.benchmark}], tagged at "
+            f"{f.lock.origin}")
+
+
+def disagreements(paths=None, repo=None):
+    """Every disagreeing restatement on the tutorials, one line each: what the
+    suite row fails on.  Empty when every number a page ties to a method agrees
+    with that method's lock."""
+    by_file = doc_locks(repo)
+    return [_disagreeing_line(os.path.basename(path), f)
+            for path in (paths or tutorial_pages(repo))
+            for f in scan(path, by_file)[0] if f.verdict == "disagreeing"]
+
+
 def run(paths=None, report=print, verbose=True, repo=None):
     """Sweep the tutorials and report the per-page tally.
 
-    Returns the number of disagreeing restatements, which the suite prints and
-    does not fail on: the guard reports until every page's residue has been
-    read.
+    Returns the number of disagreeing restatements, the count the suite row
+    fails on (see ``disagreements``).
     """
     by_file = doc_locks(repo)
     pages = paths or tutorial_pages(repo)
@@ -519,7 +540,7 @@ def run(paths=None, report=print, verbose=True, repo=None):
     report(f"tutorial restatements: {sum(total.values())} attributed numbers "
            f"read across {len(rows)} pages — guarded {total['guarded']}, "
            f"disagreeing {total['disagreeing']}, unguarded "
-           f"{total['unguarded']}  (reported, not enforced)")
+           f"{total['unguarded']}  (disagreeing fails; unguarded is reported)")
     report(f"  {'page'.ljust(width)}  guarded  disagreeing  unguarded")
     for name, tally, _f in rows:
         report(f"  {name.ljust(width)}  {tally['guarded']:7d}  "
@@ -530,10 +551,7 @@ def run(paths=None, report=print, verbose=True, repo=None):
                 if f.verdict == "guarded":
                     continue
                 if f.verdict == "disagreeing":
-                    report(f"  {name} L{f.line} prints {f.token} "
-                           f"({f.context[:48]}) but the lock is "
-                           f"{f.lock.key}={f.lock.value} [{f.lock.benchmark}], "
-                           f"tagged at {f.lock.origin}")
+                    report(f"  {_disagreeing_line(name, f)}")
                 else:
                     report(f"  {name} L{f.line} {f.token} unguarded "
                            f"({f.context[:48]})")

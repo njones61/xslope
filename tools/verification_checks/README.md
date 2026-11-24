@@ -250,7 +250,7 @@ ceiling rather than at a mechanism.
 
 ## Tutorial restatements
 
-`tutorials.py` sweeps the 28 tutorial pages under `docs/tutorials`, which carry
+`tutorials.py` sweeps the 31 tutorial pages under `docs/tutorials`, which carry
 no configs and no certification manifest. A tutorial walks the reader through
 runs it prints the answers to, and those answers drift the moment a solver round
 moves them: the sample table and the verification section are re-measured
@@ -282,10 +282,21 @@ fence — a verbatim console transcript — only the numbers the log itself labe
 `FS`, `FOS` or `SRF` are read, and lines reporting an intermediate search
 iteration are skipped.
 
-The sweep REPORTS. `run_tests.py --tutorials` prints the per-page tally and
-passes; it fails only if the checker raises. A tutorial legitimately re-runs a
-sample under settings the sample's own tag does not use, so every finding is a
-sentence someone reads before it is a defect.
+A **disagreeing** number fails the suite row (`run_tests.py --tutorials`),
+which names each one; the per-page tally and the unguarded numbers are reported
+only. Measured on the 1.1.0 pages with every stale tutorial tag re-recorded at
+today's value, all 62 disagreeing numbers were stale restatements and none was a
+correct one misread. A page that legitimately prints a different run of a named
+method (other settings, another surface) tags that run, which guards it. The
+unguarded bucket stays a report: it holds sweep rows and variant runs alongside
+stale numbers whose sentence names no method (64 of the 1.1.0 stale numbers
+landed there), and only a reader can tell them apart.
+
+The tags the sweep reads are kept current by the suite itself: a tag on a
+tutorial page is checked at the precision it writes its number, not only inside
+its tolerance (`_as_written_miss` in `run_tests.py`), so a solver change that
+moves a printed digit fails the tag, the re-recorded tag then disagrees with the
+prose, and this row names the lines to fix.
 
 ## Re-cutting a lock so it can be checked on its edges
 
@@ -331,7 +342,7 @@ python -m tools.verification_checks.certify                  # all six pages
 python -m tools.verification_checks.certify rs2 seep         # named pages
 python -m tools.verification_checks.certify --force          # ignore the manifest
 python -m tools.verification_checks.mutations                # the mutation suite
-python -m tools.verification_checks.tutorials                # the 28 tutorials
+python -m tools.verification_checks.tutorials                # the 31 tutorials
 python -m tools.verification_checks.tutorials docs/tutorials/lem03_layered_slope.md
 ```
 

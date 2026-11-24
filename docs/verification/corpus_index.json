@@ -1244,7 +1244,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,

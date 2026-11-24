@@ -4550,7 +4550,9 @@ def plot_reliability_convergence(result, figsize=(9, 5.5), save_png=False,
     Monte Carlo samples the histogram draws.
 
     The line is the cumulative empirical P_f after each realization; the band is
-    its 95% confidence interval, 1.96·sqrt(p(1-p)/n). The plot is readable off
+    its 95% confidence interval, 1.96·sqrt(p(1-p)/n), cut off at 0% and 100%:
+    over the first few realizations that interval runs past both, and a
+    probability cannot. The plot is readable off
     ANY :func:`xslope.reliability.reliability_mc` result — the running estimate
     is recomputed from ``fs_samples`` in order, so a run made without the
     convergence option still shows how (and whether) its answer settled. When
@@ -4574,7 +4576,8 @@ def plot_reliability_convergence(result, figsize=(9, 5.5), save_png=False,
     half = 1.96 * np.sqrt(np.maximum(p * (1 - p), 0.0) / np.maximum(valid, 1))
     ax.plot(n, p * 100, color='tab:blue', lw=1.4,
             label='running $P_f$ (empirical)')
-    ax.fill_between(n, (p - half) * 100, (p + half) * 100, color='tab:blue',
+    ax.fill_between(n, np.clip(p - half, 0.0, 1.0) * 100,
+                    np.clip(p + half, 0.0, 1.0) * 100, color='tab:blue',
                     alpha=0.18, label='95% confidence band')
     p_final = p[-1] if samples.size else float('nan')
     ax.axhline(p_final * 100, color='k', lw=0.8, ls='--',

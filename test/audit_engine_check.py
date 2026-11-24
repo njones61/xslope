@@ -25,6 +25,10 @@ before the fix:
      single-stage factor of safety is the same with or without it.
   8. The report's finite element section names each material's pore-pressure
      source: "at every node" only where every meshed material shares one.
+  9. The Taylor-series reliability takes a slice count (Studio's Reliability and
+     Variance Pareto dialogs offer one, and the run used to ignore it and always
+     take 40): none given is exactly 40 on a specified surface, and 60 slices is a
+     different answer.
 
 Every model is small and nothing is strength-reduced: the seepage check makes two
 unconfined solves of one earth dam, and the joint check runs two viscoplastic
@@ -629,6 +633,42 @@ def check_report_pore_basis():
     return fails
 
 
+# ---------------------------------------------------------------------------
+# 9. The Taylor-series reliability takes a slice count
+# ---------------------------------------------------------------------------
+
+RELIABILITY = os.path.join(_REPO, "docs", "lem", "files", "xslope_reliability.xlsx")
+
+
+def check_taylor_num_slices():
+    from xslope.reliability import reliability
+    from xslope.sensitivity import variance_contribution
+    fails = []
+    got = {}
+    for n in (None, 40, 60):
+        sd = _load(RELIABILITY)
+        with _quiet():
+            ok, res = reliability(sd, "spencer", engine="taylor", search=False,
+                                  debug_level=-1, num_slices=n)
+        if not ok:
+            return [f"Taylor reliability failed at num_slices={n}: {res}"]
+        got[n] = res["F_MLV"]
+    if got[None] != got[40]:
+        fails.append(f"no slice count gives F_MLV {got[None]!r}, 40 slices "
+                     f"{got[40]!r}: the default must stay 40")
+    if got[60] == got[40]:
+        fails.append(f"60 slices gives the 40-slice F_MLV {got[60]!r}: the slice "
+                     f"count does not reach the run")
+    sd = _load(RELIABILITY)
+    with _quiet():
+        ok, var = variance_contribution(sd, "spencer", search=False, num_slices=60)
+    if not ok or var["F_MLV"] != got[60]:
+        fails.append(f"variance contribution at 60 slices gives "
+                     f"{var.get('F_MLV') if ok else var!r}, not the Taylor "
+                     f"run's {got[60]!r}")
+    return fails
+
+
 CHECKS = [
     ("522 FEM pore pressure per material", check_fem_pore_pressure_per_material),
     ("523 suction only on mc/pow/hb", check_suction_effective_stress_only),
@@ -638,6 +678,7 @@ CHECKS = [
     ("FEM refuses a blank strength option", check_fem_blank_option),
     ("piezo line 2 only in rapid drawdown", check_piezo_line2_single_stage),
     ("report names each material's pore source", check_report_pore_basis),
+    ("Taylor reliability takes a slice count", check_taylor_num_slices),
 ]
 
 

@@ -78,7 +78,8 @@ def solve():
     sol = _quiet(run_transient_seepage, seep, build_tseep_data(sd), verbose=False)
     sd = stage_transient_for_drawdown(sd, sol)
     sd["mesh"] = mesh
-    ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=40, debug=False)
+    ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=40, debug=False,
+                              rapid=True)
     assert ok, res
     slice_df, failure_surface = res
     ok, results = rapid_drawdown(slice_df.copy(), METHOD, debug_level=0)

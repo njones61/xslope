@@ -201,7 +201,9 @@ Do NOT call `doc.new()` or reassign `doc.slope_data`; your edits are detected an
 the canvas re-renders automatically.
 
 - materials[i]: name, gamma, gamma_sat (saturated unit weight, weighed below the water table
-  when set; the key is gamma_sat, never gsat), option ('mc' Mohr-Coulomb | 'cp' | 'elastic' —
+  when set; the key is gamma_sat, never gsat), option ('mc' Mohr-Coulomb | 'cp' (undrained,
+  c at r_elev plus cp per unit depth below it) | 'ratio' (undrained, max(c, cp * sigma'_v):
+  cp is the strength ratio) | 'elastic' —
   infinite strength, cannot fail; ignores every strength key below, uses only
   gamma/gamma_sat/E/nu (+ seepage); LEM
   treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
@@ -332,7 +334,8 @@ the canvas re-renders automatically.
 - scalars: gamma_water, max_depth (elevation of the hard base — the lowest
   elevation the PROBLEM describes, never one you chose; see iron rule 1),
   k_seismic (pseudo-static horizontal seismic coefficient, a fraction of g, applied to
-  each slice's weight in the driving direction), tcrack_depth, tcrack_water,
+  each slice's weight in the driving direction), k_vertical (vertical seismic
+  coefficient, signed, + downward), tcrack_depth, tcrack_water,
   circular (bool), surface_family ('circular'|'noncircular'|None — which surface the
   model declares), water_loads ('auto'|'manual', see §5), unit_system, time_unit,
   template_version (the file's, not editable).
@@ -611,8 +614,8 @@ _SOURCE_KEYS = (
     # circle does, so it belongs here: without it the flip left no undo step, no
     # dirty flag, and (once the checks were keyed off this same comparison) no
     # input check either.
-    "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "max_depth",
-    "circular",
+    "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "k_vertical",
+    "max_depth", "circular",
     "materials", "profile_lines", "polygons", "circles", "non_circ", "piezo_line",
     "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "joint_lines",
     "pile_lines",
@@ -623,7 +626,8 @@ _SOURCE_KEYS = (
 # to the same tag (e.g. both piezo lines -> "piezo") so a multi-key edit reads cleanly.
 _KEY_LABELS = {
     "gamma_water": "global", "tcrack_depth": "global", "tcrack_water": "global",
-    "k_seismic": "global", "max_depth": "global", "circular": "surface family",
+    "k_seismic": "global", "k_vertical": "global", "max_depth": "global",
+    "circular": "surface family",
     "materials": "materials", "profile_lines": "profile", "polygons": "polygons",
     "circles": "circles", "non_circ": "non-circular", "piezo_line": "piezo",
     "piezo_line2": "piezo", "dloads": "dloads", "dloads2": "dloads",
@@ -1079,6 +1083,12 @@ def _material_line(i, m):
         for key in ("cp", "d", "r_elev"):
             if m.get(key):
                 bits.append(f"{key}={_num(m.get(key))}")
+    elif opt == "cp":
+        bits.append(f"c={_num(m.get('c') or 0)} at r_elev={_num(m.get('r_elev') or 0)}")
+        bits.append(f"cp={_num(m.get('cp') or 0)} per unit depth")
+    elif opt == "ratio":
+        bits.append(f"s_u = max(c={_num(m.get('c') or 0)}, "
+                    f"cp={_num(m.get('cp') or 0)} * sigma'_v)")
     if opt == "elastic":
         bits.append("(infinite strength)")
     bits.append(f"u={m.get('u') or 'none'}")
@@ -1189,8 +1199,8 @@ def _surface_line(sd):
 
 def _settings_line(sd):
     bits = []
-    for key, label in (("k_seismic", "k_seismic"), ("tcrack_depth", "tcrack_depth"),
-                       ("tcrack_water", "tcrack_water")):
+    for key, label in (("k_seismic", "k_seismic"), ("k_vertical", "k_vertical"),
+                       ("tcrack_depth", "tcrack_depth"), ("tcrack_water", "tcrack_water")):
         if sd.get(key):
             bits.append(f"{label}={_num(sd.get(key))}")
     for key, label in (("lem_method", "declared LEM method"),

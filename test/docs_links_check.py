@@ -976,7 +976,7 @@ LEM02_DLOAD_TABS = ("Set 1", "Set 2 (rapid drawdown)")
 LEM02_DLOAD_DIRECTION_LABEL = "Direction:"
 
 #: The Global-parameters row LEM-2's seismic section sends the reader to.
-LEM02_GLOBAL_ROW = "Seismic coefficient k"
+LEM02_GLOBAL_ROW = "Horizontal seismic coefficient k_h"
 
 #: The line-loads table's column headers, in the order the page dictates values
 #: into them (**Label** `footing`, **x** `30`, **y** `20`, **P** `7500`,
@@ -1542,7 +1542,7 @@ def _seep01_editor_labels(mw):
 
     # Read against the app's own toggle defaults, then ticked the way the page's
     # step leaves them: Seepage on, everything else off.
-    with _default_editor_toggles():
+    with _default_editor_toggles(), _first_open_materials_view():
         mats = MaterialsEditor().build(data, None)
         toggles = getattr(mats, "_toggles", None) or {}
         if SEEP01_MATERIALS_TOGGLE not in {cb.text() for cb in toggles.values()}:
@@ -1635,7 +1635,7 @@ SEEP02_BC_EXIT_ENTRY = "Exit face"
 #: the head rides in the list entry and that the table beside it holds points and
 #: nothing else, so a value moved out of the list entry into a field of its own
 #: makes that sentence wrong about the editor on the screen.
-SEEP02_BC_HEAD_ENTRIES = ("Head 1  (h = 160.0)", "Head 2  (h = 100.0)")
+SEEP02_BC_HEAD_ENTRIES = ("Head 1  (h = 160)", "Head 2  (h = 100)")
 
 #: Two dialog controls SEEP-2 explains and SEEP-1 does not name. Both are visible
 #: in SEEP-2's own screenshots, which is why the page covers them: Quadrilateral
@@ -1672,7 +1672,7 @@ def _seep02_editor_labels():
                          "other")
     data = _quiet(load_slope_data, SEEP02_FILE)
 
-    with _default_editor_toggles():
+    with _default_editor_toggles(), _first_open_materials_view():
         mats = MaterialsEditor().build(data, None)
         for tag, cb in (getattr(mats, "_toggles", None) or {}).items():
             cb.setChecked(cb.text() == SEEP01_MATERIALS_TOGGLE)
@@ -1859,7 +1859,7 @@ def _lem11_reliability_labels():
     # coded default is only readable with this machine's remembered state out of
     # the way — the same reason tools/capture_tutorial_screenshots._app_defaults
     # clears it. Without this the pin reads whoever ran Studio last, not the app.
-    with _default_editor_toggles():
+    with _default_editor_toggles(), _first_open_materials_view():
         mat = MaterialsEditor().build(data, None)
         toggles = {cb.text()
                    for cb in (getattr(mat, "_toggles", None) or {}).values()}
@@ -1900,36 +1900,71 @@ def _lem11_reliability_labels():
     return fails
 
 
+def _session_start_value(module, name):
+    """What a module-level name holds when a new Studio session imports the module,
+    read off the module's source: its live value is whatever code earlier in this
+    process last set it to."""
+    import ast
+    import inspect
+
+    for node in ast.parse(inspect.getsource(module)).body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            return ast.literal_eval(node.value)
+    raise LookupError(f"{module.__name__} assigns no module-level {name}")
+
+
+@contextlib.contextmanager
+def _first_open_materials_view():
+    """Build the materials editor as a new session's first open would.
+
+    studio.editors remembers the last materials view for the session in a module
+    global, and the suite runs many checks in one worker process, several of
+    which leave it on List view (and the List view never builds the table's
+    buttons). Inside this block the remembered view is the one a new session
+    starts with, read off the module's source; afterwards the live value is put
+    back. A check here neither inherits the view an earlier check left nor
+    decides the one the next editor opens on. Yields the start view.
+    """
+    import studio.editors as editors_mod
+
+    live = editors_mod._LAST_MATERIALS_VIEW
+    first = _session_start_value(editors_mod, "_LAST_MATERIALS_VIEW")
+    editors_mod._LAST_MATERIALS_VIEW = first
+    try:
+        yield first
+    finally:
+        editors_mod._LAST_MATERIALS_VIEW = live
+
+
 def _lem01_editor_labels():
     """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
 
     Driven rather than read, because the page's step is a *route* — the editor
     opens on one view and the reader is sent to the other — and only the route is
-    wrong when the two views' buttons drift apart. The module remembers the last
-    view for the session, so the remembered value is saved and restored: this
-    check must not decide which view the next editor built here opens on.
+    wrong when the two views' buttons drift apart. The open is staged as a new
+    session's first (``_first_open_materials_view``).
     """
     from PySide6.QtWidgets import QLabel, QPushButton
 
     from xslope.fileio import load_slope_data
 
-    import studio.editors as editors_mod
     from studio.editors import MaterialsEditor
 
     fails = []
-    remembered = editors_mod._LAST_MATERIALS_VIEW
-    try:
-        if remembered != LEM01_MATERIALS_OPENS_ON:
+    with _first_open_materials_view() as first:
+        if first != LEM01_MATERIALS_OPENS_ON:
             fails.append(f"the materials editor's first open lands on "
-                         f"{remembered!r}, not {LEM01_MATERIALS_OPENS_ON!r} — "
+                         f"{first!r}, not {LEM01_MATERIALS_OPENS_ON!r} — "
                          f"Tutorial LEM-1 tells the reader which view they arrive "
                          f"in before sending them to the other one")
         data = _quiet(load_slope_data, LEM01_FILE)
         mats = MaterialsEditor().build(data, None)
-        if mats._mode != remembered:
-            fails.append(f"the materials editor opened on {mats._mode!r} with "
-                         f"{remembered!r} remembered; Tutorial LEM-1's step assumes "
-                         f"the view it opens on is the remembered one")
+        if mats._mode != first:
+            fails.append(f"the materials editor's first open came up on "
+                         f"{mats._mode!r} where a new session starts on "
+                         f"{first!r}; Tutorial LEM-1's step assumes the view it "
+                         f"opens on is the one a new session starts on")
         # Both panes live in the same stack, so every button exists whichever view
         # is up; what the page's route turns on is which of them the reader can
         # actually press, which is visibility within the dialog.
@@ -1967,8 +2002,6 @@ def _lem01_editor_labels():
                              f"LEM-1's first step names it. Its rows read "
                              f"{sorted(r for r in rows if r)}")
         glob.deleteLater()
-    finally:
-        editors_mod._LAST_MATERIALS_VIEW = remembered
     return fails
 
 
@@ -1990,7 +2023,8 @@ def _lem03_editor_labels():
     fails = []
     data = _quiet(load_slope_data, LEM03_FILE)
 
-    mats = MaterialsEditor().build(data, None)
+    with _first_open_materials_view():
+        mats = MaterialsEditor().build(data, None)
     buttons = {b.text() for b in mats.findChildren(QPushButton)}
     for label in LEM03_MATERIALS_BUTTONS:
         if label not in buttons:
@@ -3157,7 +3191,7 @@ def test_main_sheet_cells():
       inserted above the block cannot go unnoticed (D23 became D24 at v25);
     * the writer: a model saved into the current template carries each run option
       in the cell the lookup names;
-    * the messages: no import note, remedy or save refusal spells a cell from D20
+    * the messages: no import note, remedy or save refusal spells a cell from D14
       down as text -- the rows that move -- instead of asking the lookup. A remedy
       label names the cell of the model's own template (D23 on a v23 file).
     """
@@ -3189,7 +3223,7 @@ def test_main_sheet_cells():
                          f"{template_main_sheet_cell(label)}, not "
                          f"{main_sheet_cell(key)}")
 
-    stated = {"lem_method": ("bishop", "bishop"), "num_slices": (33, 33),
+    stated = {"k_vertical": (-0.05, -0.05), "lem_method": ("bishop", "bishop"), "num_slices": (33, 33),
               "k0": (0.6, 0.6), "tension_srf": (False, "NO"),
               "element_type": ("tri6", "tri6"), "target_size": (1.3, 1.3),
               "element_size_1d": (0.7, 0.7), "ssrm_f_min": (1.1, 1.1),
@@ -3211,7 +3245,7 @@ def test_main_sheet_cells():
     finally:
         wb.close()
 
-    moving = re.compile(r"\bD2\d\b")
+    moving = re.compile(r"\bD(?:1[4-9]|2\d)\b")
     for rel in ("xslope/fileio.py", "xslope/geostudio.py", "xslope/slide2.py",
                 "xslope/rs2.py", "xslope/remedies.py", "studio/document.py"):
         tree = ast.parse(open(os.path.join(_REPO, rel), encoding="utf-8").read())

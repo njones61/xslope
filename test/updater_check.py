@@ -73,6 +73,11 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+# Two legs build a real MainWindow, which reads and writes Studio's machine-wide
+# settings store; the whole run gets a scratch one (tools/studio_settings.py). A
+# store a leg opens at its own path is passed through untouched.
+from tools import studio_settings                      # noqa: E402
+
 from studio import updater
 
 CURRENT = "0.1.58"
@@ -969,6 +974,7 @@ CHECKS = [("version comparison", test_version_comparison),
 _QT_CHECKS = (test_menu_and_paths, test_download_path)
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:

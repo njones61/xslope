@@ -948,7 +948,8 @@ class PythonKernel:
             return sd.get("ground_surface")
 
         def run_lem(method=None, num_slices=40, rapid=False, plot=True,
-                    slope_data=None, search=False, seep_time=None):
+                    slope_data=None, search=False, seep_time=None, seismic2=False,
+                    ky=False):
             """Run an LEM analysis on the loaded project and return the result dict
             (includes 'FS'). `method` is one of oms, bishop, janbu, spencer, corps,
             lowe, mprice; left out, it is THE METHOD THE MODEL DECLARES (main!D14 —
@@ -976,6 +977,24 @@ class PythonKernel:
             stage times are staged instead, exactly as the Run LEM dialog stages
             them. It is stated in the log which instant was used; for the whole
             curve rather than one instant, `fs_vs_time()`.
+
+            `seismic2` runs the two-stage pseudostatic seismic analysis (Duncan,
+            Wright & Brandon 2014, Sec. 10.4.2) with the model's seismic coefficient:
+            `'interpolated'` (or True) takes stage 2's undrained strengths the rapid
+            drawdown way, `'kc1'` from the Kc = 1 envelope alone. Not with `rapid`.
+            A dict, `{'strength': 'kc1', 'factor': 0.8}`, also multiplies every stage
+            2 undrained strength (d/psi, cp, and ratio materials) by the factor (0 < factor <= 1): a screening
+            method's strength reduction (0.85 in Seed 1979, 0.8 in Hynes-Griffin and Franklin
+            1984 and most later methods, each with its own k and minimum F), which can't go on the inputs
+            because they also set stage 1. The result carries 'seismic_stage1_FS' (static) and 'seismic_stage2_FS'
+            (the pseudostatic factor of safety, the same as 'FS').
+
+            `ky=True` finds the seismic yield coefficient instead (Duncan, Wright &
+            Brandon 2014, Sec. 10.1.3): the k at which F = 1, on the model's own
+            surface, or with `search=True` the lowest over the search. The model's
+            k is not used, and `seismic2` may be set as well. The result is solved
+            at k = k_y (its 'FS' is 1) and carries 'k_y'; with `search=True` it also
+            carries 'k_y_static', k_y on the critical surface with no seismic force.
 
             The returned dict is the solver's, plus the surface it was solved on:
             'Xo', 'Yo', 'R', 'Depth' (the circle, None on a non-circular surface)
@@ -1010,7 +1029,7 @@ class PythonKernel:
                         sd, method,
                         analysis="auto_search" if search else "single_surface",
                         surface=family, num_slices=num_slices, rapid=rapid,
-                        announce=False)
+                        seismic2=seismic2, ky=ky, announce=False)
             except AnalysisError as exc:
                 raise RuntimeError(str(exc)) from None
             result = bundle.get("results")
@@ -1025,7 +1044,14 @@ class PythonKernel:
                 where = (f" on the circle Xo={surface['Xo']:.2f}, "
                          f"Yo={surface['Yo']:.2f}, R={surface['R']:.2f}")
             head = f"{method} (auto search, {family})" if search else method
-            print(f"{head}: FS = {result['FS']:.3f}{where}")
+            ky_info = bundle.get("yield")
+            if ky_info:
+                from xslope.seismic import yield_line
+                from xslope.search import analyzed_surface_noun
+                print(f"{head}: " + yield_line(
+                    ky_info, analyzed_surface_noun(search, family == "circular")))
+            else:
+                print(f"{head}: FS = {result['FS']:.3f}{where}")
             info = bundle.get("search") or {}
             unsolved = (info.get("unsolved") or {}) if info else {}
             if unsolved.get("sentence"):
@@ -1053,9 +1079,67 @@ class PythonKernel:
             if plot:
                 from xslope.plot import plot_solution
                 import matplotlib.pyplot as plt
-                plot_solution(sd, bundle["slice_df"], bundle["failure_surface"],
+                plot_solution(dict(sd, k_seismic=ky_info["k_y"]) if ky_info else sd,
+                              bundle["slice_df"], bundle["failure_surface"],
                               result, fig=plt.figure(figsize=(11, 6)))
-            return dict(result, **surface)
+            out = dict(result, **surface)
+            if ky_info:
+                out["k_y"] = ky_info["k_y"]
+                if ky_info.get("static"):
+                    out["k_y_static"] = ky_info["static"]["k_y"]
+            return out
+
+        def newmark(record, ky=None, scale=1.0, target_pga=None):
+            """Newmark's permanent displacement under an acceleration record
+            (:func:`xslope.seismic.newmark_displacement`), as Run → Newmark…
+            computes it.
+
+            `record` is a PEER .AT2 file or two columns of time (s) and
+            acceleration (g); a relative path is taken from the project's folder,
+            then the working directory. `ky` defaults to the yield coefficient of
+            the session's last `run_lem(ky=True)`. `scale` multiplies the record;
+            `target_pga` (g) scales it to that peak instead. The record is run
+            with each sign pushing the block downslope, and the larger
+            displacement governs. The run is stored where the dialog stores it,
+            so the LEM · Newmark tab shows it and the report documents it.
+            """
+            import os as _os
+            from xslope.seismic import (newmark_displacement, newmark_line,
+                                        read_record, scale_for_pga)
+            from xslope.units import (infer_system_from_gamma_water,
+                                      normalize_unit_system)
+            path = str(record)
+            if not _os.path.isabs(path):
+                base = _os.path.dirname(getattr(doc, "path", "") or "")
+                cand = _os.path.join(base, path) if base else path
+                path = cand if _os.path.exists(cand) else _os.path.abspath(path)
+            rec = read_record(path)
+            source = "given"
+            if ky is None:
+                info = (doc.results.get("lem_solution") or {}).get("yield")
+                if not info:
+                    raise RuntimeError("No yield coefficient: run "
+                                       "run_lem(ky=True, search=True) first, or "
+                                       "pass ky=.")
+                ky = info["k_y"]
+                source = f"the session's last k_y run, k_y = {ky:.4f}"
+            if target_pga is not None:
+                scale = scale_for_pga(rec, target_pga)
+            sd = doc.slope_data
+            units = (normalize_unit_system(sd.get("unit_system"))
+                     or infer_system_from_gamma_water(sd.get("gamma_water"))
+                     or "si")
+            result = newmark_displacement(rec, ky, scale=scale, units=units)
+            result["ky_source"] = source
+            print(newmark_line(result))
+            _store_result("newmark", result, show=[("_show_newmark", ())],
+                          lead="newmark_canvas")
+            d = result["directions"]
+            return {"D": result["D"], "D_unit": result["D_unit"],
+                    "D_positive": d[+1]["D"], "D_negative": d[-1]["D"],
+                    "episodes": d[result["governing"]]["episodes"],
+                    "ky": result["ky"], "scale": result["scale"],
+                    "pga": result["pga"]}
 
         def _ensure_mesh(sd, quiet=False):
             """The model's finite-element mesh, building one from the FILE'S OWN
@@ -2236,6 +2320,7 @@ class PythonKernel:
                     "text": doc["text"]}
 
         return {"run_lem": run_lem, "run_seep": run_seep, "run_fem": run_fem,
+                "newmark": newmark,
                 "run_tseep": run_tseep, "fs_vs_time": fs_vs_time,
                 "transient_solution": transient_solution,
                 "corpus_index": corpus_index,

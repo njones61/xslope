@@ -37,7 +37,8 @@ from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
     MAX_ITERATIONS_LIMIT as _MAX_ITERATIONS_LIMIT,
-    RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
+    NewmarkDialog, RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog,
+    Slide2ImportDialog,
     UnpackPackageDialog,
 )
 from .display_panels import (
@@ -191,17 +192,79 @@ def _drained_rapid_note(bundle):
                                                    circular))
 
 
+def _seismic2_note(bundle):
+    """The stage line a two-stage seismic result carries on the LEM Solution tab,
+    or ``""`` — the Log's own line (:func:`xslope.advanced.seismic_stages_line`)."""
+    from xslope.advanced import seismic_stages_line
+    from xslope.search import analyzed_surface_noun
+    results = (bundle or {}).get("results")
+    if not isinstance(results, dict) or "seismic_stage1_FS" not in results:
+        return ""
+    circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
+    where = "the " + analyzed_surface_noun(bool(bundle.get("search")), circular)
+    return seismic_stages_line(results, where)
+
+
+def _yield_note(bundle):
+    """The k_y sentence a yield coefficient result carries on the LEM Solution
+    tab, or ``""`` — the Log's own last line (:func:`xslope.seismic.yield_line`)."""
+    from xslope.seismic import yield_line
+    from xslope.search import analyzed_surface_noun
+    info = (bundle or {}).get("yield")
+    if not info:
+        return ""
+    circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
+    return yield_line(info, analyzed_surface_noun(bool(info.get("search")), circular)
+                      ).replace("\n", " ")
+
+
+def _ky_of_run(bundle, method=None):
+    """``(k_y, phrase)`` from a yield coefficient run, for the Newmark dialog: the
+    coefficient, and the method and surface it was found on. ``(None, None)``
+    when the run found no k_y."""
+    from xslope.report import method_label
+    from xslope.search import analyzed_surface_noun
+    info = (bundle or {}).get("yield")
+    if not info:
+        return None, None
+    circular = ((bundle or {}).get("options") or {}).get("surface") != "noncircular"
+    name = method_label(method or (bundle.get("results") or {}).get("method")
+                        or bundle.get("method"))
+    noun = analyzed_surface_noun(bool(info.get("search")), circular)
+    return info["k_y"], f"{name}, on the {noun}, k_y = {info['k_y']:.4f}"
+
+
+def _at_k(slope_data, k):
+    """The model as a view should draw it for a run made at coefficient ``k``:
+    a yield coefficient run is solved at k_y, not at the model's own k, and the
+    seismic arrow on the plot says which."""
+    if k is None:
+        return slope_data
+    # A vertical coefficient rides with k at the model's own ratio, so a view drawn
+    # at k_y shows k_v at it too.
+    from xslope.seismic import model_at
+    return model_at(slope_data, k)
+
+
 def lem_done_message(bundle):
     """The status-bar line a finished LEM run leaves: the method and its factor of
     safety, and, for a rapid drawdown whose surface crossed no material with d
     and ψ, the first clause of :func:`_drained_rapid_note` — the status bar is
     one line, and the LEM Solution tab carries the whole sentence."""
     res = bundle["results"]
+    info = bundle.get("yield")
+    if info:
+        message = f"LEM done — {res.get('method')} k_y = {info['k_y']:.4f}"
+        if "seismic_stage1_FS" in res:
+            message += " (two-stage seismic)"
+        return message
     message = f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}"
     drained = _drained_rapid_note(bundle)
     if drained:
         clause = drained.split(", so ")[0]
         message += f"; {clause[:1].lower()}{clause[1:]}"
+    if "seismic_stage1_FS" in res:
+        message += f" (two-stage seismic; stage 1 FS = {res['seismic_stage1_FS']:.3f})"
     return message
 
 
@@ -433,6 +496,10 @@ class SweepCanvas(MplCanvas):
         self._draw(lambda fig: plot_sensitivity(df, target_fs=target_fs, fig=fig),
                    dxf=False)
 
+    def render_newmark(self, result):
+        from xslope.plot import plot_newmark
+        self._draw(lambda fig: plot_newmark(result, fig=fig), dxf=False)
+
     def render_fs_vs_time(self, result, slope_data=None):
         from xslope.plot import plot_fs_vs_time
         self._draw(lambda fig: plot_fs_vs_time(result, slope_data=slope_data,
@@ -521,6 +588,7 @@ class MainWindow(QMainWindow):
         self.search_canvas = None
         self.solution_canvas = None
         self.reliability_canvas = None
+        self.newmark_canvas = None
         self.reliability_hist_canvas = None      # Monte Carlo FS histogram
         # Sensitivity / design study result tabs.
         self.sens_canvas = None            # tornado
@@ -856,6 +924,8 @@ class MainWindow(QMainWindow):
                                        triggered=self.run_sensitivity)
         self.act_reliability = QAction("&Reliability…", self, enabled=False,
                                        triggered=self.run_reliability)
+        self.act_newmark = QAction("&Newmark…", self, enabled=False,
+                                   triggered=self.run_newmark)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
         self.act_report = QAction("&Generate Report…", self, enabled=False,
@@ -894,6 +964,7 @@ class MainWindow(QMainWindow):
         m_run.addAction(self.act_run)
         m_run.addAction(self.act_sensitivity)
         m_run.addAction(self.act_reliability)
+        m_run.addAction(self.act_newmark)
 
         m_view = mb.addMenu("&View")
         m_view.addAction(self.inputs_dock.toggleViewAction())
@@ -940,6 +1011,9 @@ class MainWindow(QMainWindow):
         # Reliability is a sibling of Parametric: deterministic what-ifs vs the
         # probabilistic (β / probability-of-failure) study.
         tb.addAction(self.act_reliability)
+        # Newmark follows a yield coefficient run, and is rerun with each record
+        # and scale, so it is one click away like the studies beside it.
+        tb.addAction(self.act_newmark)
         # The report is the end of the workflow, so it sits at the end of the strip.
         tb.addSeparator()
         tb.addAction(self.act_report)
@@ -1921,6 +1995,10 @@ class MainWindow(QMainWindow):
             self.act_reliability.setEnabled(open_ and has_mesh and not busy)
             self.act_reliability.setToolTip(
                 "" if has_mesh else "Build a mesh first (Build Mesh…).")
+        # Newmark integrates a limit equilibrium yield coefficient, so it is an
+        # LEM tool; it runs in the GUI thread in a fraction of a second.
+        self.act_newmark.setVisible(mode == "lem")
+        self.act_newmark.setEnabled(open_ and not busy and mode == "lem")
         if mode == "lem":
             self.act_run.setEnabled(open_ and not busy)
             self.act_run.setToolTip("")
@@ -2101,15 +2179,35 @@ class MainWindow(QMainWindow):
         "transient": "Transient Seepage",
     }
 
-    # Source inputs whose change makes the mesh stale (the domain geometry, the
-    # reinforcement/pile/joint lines baked in as mesh constraint lines, and the
-    # refinement and joint-network regions).
+    # Source inputs whose change makes the mesh stale — everything the Build mesh
+    # runner hands the mesher (runners.MeshBuilder.build) that comes from the model
+    # rather than the dialog:
+    #   * the domain geometry and its zones' Sizes (profile lines, polygons, bottom);
+    #   * the reinforcement, pile and joint lines baked in as constraint lines, and
+    #     for a reinforcement line also whether it is a joint (the mesh is split
+    #     along it) and, when it is, its end anchorages (a tied end is recorded in
+    #     the mesh with its capacity, which the FEM reads from there);
+    #   * the refine, joint-network and SSR regions, whose Sizes size the mesh;
+    #   * the points the mesher pins as polygon vertices so element edges meet
+    #     them: every distributed-load vertex (and, with automatic water loads, the
+    #     derived ones) and every seepage boundary-condition vertex;
+    #   * the point constraints it puts a node at: each line load's point of
+    #     application (its position, not its magnitude or angle).
     MESH_KEYS = ("profile_lines", "polygons", "max_depth", "reinforcement_lines",
-                 "pile_lines", "joint_lines", "refine_zones", "joint_zones")
+                 "pile_lines", "joint_lines", "refine_zones", "joint_zones",
+                 "ssr_zones", "dloads", "dloads2", "seepage_bc", "seepage_bc2",
+                 "line_loads")
 
     @staticmethod
     def mesh_signature(sd):
-        """JSON signature of the mesh-affecting inputs, to detect geometry edits."""
+        """JSON signature of the mesh-affecting inputs, to detect geometry edits.
+
+        Built from the model's own keys (``MESH_KEYS``), each cut down to what the
+        mesher reads of it, so a property edit — a Tmax, a pile's D, a load's
+        magnitude, a head value — keeps the mesh. Two parts come from the mesher's
+        own readers, so the signature follows them: the size regions
+        (``extract_size_regions``) and, in automatic water-load mode, the derived
+        water-load blocks whose vertices the mesher pins (``with_water_loads``)."""
         def clean(o):
             if hasattr(o, "wkt"):
                 return o.wkt
@@ -2126,22 +2224,93 @@ class MainWindow(QMainWindow):
             if isinstance(o, (list, tuple)):
                 return [clean(x) for x in o]
             return o
+        def load_points(blocks):
+            # A distributed-load block's vertices, in either of the forms a block
+            # takes (a list of X/Y/Normal points, or a dict carrying 'xy'), as
+            # mesh.add_dload_points_to_polygons reads them. The magnitudes are not
+            # mesh input.
+            out = []
+            for block in blocks or []:
+                if isinstance(block, list):
+                    out.append([[clean(p.get("X")), clean(p.get("Y"))]
+                                for p in block if isinstance(p, dict)])
+                elif isinstance(block, dict) and "xy" in block:
+                    out.append(clean(block["xy"]))
+            return out
+
         def geometry_only(key, rows):
             # A reinforcement, pile or joint row enters the mesh as a constraint
-            # line and nothing more: only its endpoints (and how many rows there
-            # are) can change the mesh. Editing S, D, Tmax, Appl, a joint's
-            # strength or any other property on a row must not throw the mesh away.
-            if key not in ("reinforcement_lines", "pile_lines",
-                           "joint_lines") or not rows:
+            # line: its endpoints (and how many rows there are) can change the
+            # mesh. A reinforcement line's Joint column also does — a jointed line
+            # is split, and each of its ends with an anchorage is tied in the mesh
+            # at that capacity — so a jointed line carries its Tend1/Tend2 too.
+            # Editing S, D, Tmax, Appl, a joint's strength or any other property
+            # must not throw the mesh away.
+            if not rows:
                 return clean(rows)
             try:
-                return [[clean(r.get("x1")), clean(r.get("y1")),
-                         clean(r.get("x2")), clean(r.get("y2"))] for r in rows]
+                if key in ("reinforcement_lines", "pile_lines", "joint_lines"):
+                    from xslope.mesh import line_is_jointed
+                    out = []
+                    for r in rows:
+                        sig = [clean(r.get("x1")), clean(r.get("y1")),
+                               clean(r.get("x2")), clean(r.get("y2"))]
+                        if key == "reinforcement_lines" and line_is_jointed(r):
+                            # The values extract_joint_options hands the mesher, to
+                            # 12 digits: the editor stores Tend per unit width by
+                            # dividing what it shows by Spacing, and that round trip
+                            # can move the last bit of an untouched value.
+                            sig += ["joint"] + [
+                                f"{float(clean(r.get(k)) or 0.0):.12g}"
+                                for k in ("tend1", "tend2")]
+                        out.append(sig)
+                    return out
+                if key in ("dloads", "dloads2"):
+                    return load_points(rows)
+                if key == "line_loads":
+                    # Where each load acts is mesh input (a node is put there);
+                    # how hard it pushes, and in which direction, is not.
+                    return [[clean(r.get("x")), clean(r.get("y"))] for r in rows]
+                if key in ("seepage_bc", "seepage_bc2"):
+                    # Only the vertices are mesh input (pinned by
+                    # mesh.add_seep_bc_points_to_polygons); heads and fluxes are not.
+                    return {"blocks": [clean(b.get("coords"))
+                                       for b in ((rows.get("specified_heads") or [])
+                                                 + (rows.get("specified_fluxes") or []))],
+                            "exit_face": clean(rows.get("exit_face"))}
+                if key == "ssr_zones":
+                    # An SSR overlay is not meshed; only a Size on one sizes the
+                    # mesh. Its kind and label are analysis input, not mesh input.
+                    return [[clean(z.get("polygon")), clean(z.get("size"))]
+                            for z in rows if z.get("size") is not None]
             except Exception:
-                return clean(rows)
+                pass
+            return clean(rows)
+
+        def mesher_view():
+            # What the mesher's own readers make of the model, where it is not a
+            # key read directly: the size regions it is handed, and the water
+            # loads it derives in automatic mode and pins vertices for.
+            out = {}
+            try:
+                from xslope.mesh import extract_size_regions
+                out["size_regions"] = clean(extract_size_regions(sd))
+            except Exception as e:
+                out["size_regions"] = f"error: {type(e).__name__}"
+            try:
+                from xslope.water import DERIVED_KEYS, water_loads_mode, with_water_loads
+                if water_loads_mode(sd) == "auto":
+                    derived = with_water_loads(sd)
+                    out["water_loads"] = [load_points(derived.get(DERIVED_KEYS[s]))
+                                          for s in (1, 2)]
+            except Exception as e:
+                out["water_loads"] = f"error: {type(e).__name__}"
+            return out
+
         try:
-            return json.dumps({k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS},
-                              sort_keys=True, default=str)
+            sig = {k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS}
+            sig["_mesher"] = mesher_view()
+            return json.dumps(sig, sort_keys=True, default=str)
         except Exception:
             return None
 
@@ -2155,7 +2324,7 @@ class MainWindow(QMainWindow):
             return
         single = ["search_canvas", "solution_canvas", "reliability_canvas",
                   "sens_canvas", "sens_curve_canvas", "design_canvas",
-                  "fs_time_canvas",
+                  "fs_time_canvas", "newmark_canvas",
                   "fem_data_canvas", "fem_results_canvas"]
         if clear_mesh:
             single.append("mesh_canvas")
@@ -2186,7 +2355,8 @@ class MainWindow(QMainWindow):
         self.seep_solution_canvas = {}
         self.transient_seep_view = None
         for key in ("lem_solution", "seep_solutions", "transient_seep",
-                    "fem_solution", "design", "sensitivity", "fs_vs_time"):
+                    "fem_solution", "design", "sensitivity", "fs_vs_time",
+                    "newmark"):
             self.doc.results.pop(key, None)
         if clear_mesh:
             self.doc.slope_data["mesh"] = None
@@ -3202,6 +3372,9 @@ class MainWindow(QMainWindow):
         fem = self.doc.results.get("fem_solution")
         if fem:
             out["fem"] = [fem]
+        newmark = self.doc.results.get("newmark")
+        if newmark:
+            out["newmark"] = [newmark]
         return out
 
     def generate_report(self):
@@ -3300,7 +3473,9 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(self.search_canvas)
         if search and panel and self.search_canvas is not None:
             try:
-                self.search_canvas.render_search(self.doc.slope_data, search,
+                self.search_canvas.render_search(_at_k(self.doc.slope_data,
+                                                       search.get("k_seismic")),
+                                                 search,
                                                  panel.options(), style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
@@ -3365,6 +3540,64 @@ class MainWindow(QMainWindow):
             try:
                 self.reliability_hist_canvas.render_reliability_histogram(
                     rel, panel.options())
+            except Exception:
+                traceback.print_exc()
+
+    # --- Newmark ----------------------------------------------------------
+    def run_newmark(self):
+        """Run → Newmark…: integrate an acceleration record as a rigid sliding
+        block at the yield coefficient (:func:`xslope.seismic.newmark_displacement`).
+
+        k_y comes from the last LEM run when that run found one. The record is
+        read when the dialog picks it, and the integration takes a fraction of a
+        second, so it runs here rather than on a worker thread.
+        """
+        from xslope.seismic import newmark_displacement, newmark_line
+        from xslope.units import infer_system_from_gamma_water, normalize_unit_system
+        if not self.doc.is_open or self._mode != "lem":
+            return
+        sd = self.doc.slope_data
+        ky, source = _ky_of_run(self.doc.results.get("lem_solution"),
+                                (self._last_lem_opts or {}).get("method"))
+        units = (normalize_unit_system(sd.get("unit_system"))
+                 or infer_system_from_gamma_water(sd.get("gamma_water")) or "si")
+        last = self.settings.value("newmark_last_record", "") or ""
+        dlg = NewmarkDialog(self, ky=ky, ky_source=source, units=units,
+                            last_path=last)
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self.settings.setValue("newmark_last_record", opts["path"])
+        try:
+            result = newmark_displacement(opts["record"], opts["ky"],
+                                          scale=opts["scale"], units=units)
+        except ValueError as e:
+            QMessageBox.warning(self, "Newmark", str(e))
+            return
+        result["ky_source"] = opts["ky_source"]
+        self.doc.results["newmark"] = result
+        print(newmark_line(result))
+        self._show_newmark()
+        self.view_tabs.setCurrentWidget(self.newmark_canvas)
+        self.statusBar().showMessage(
+            f"Newmark done — D = {result['D']:.2f} {result['D_unit']} at "
+            f"k_y = {result['ky']:.4f}")
+        self._update_run_actions()       # the report now has a run to document
+
+    def _show_newmark(self):
+        if self.newmark_canvas is None:
+            self.newmark_canvas = SweepResultView(SweepCanvas(self), self)
+            self.view_tabs.addTab(self.newmark_canvas, "LEM · Newmark")
+        self._rerender_newmark()
+
+    def _rerender_newmark(self):
+        from .sweep_table import newmark_table
+        result = self.doc.results.get("newmark")
+        if result and self.newmark_canvas is not None:
+            try:
+                self.newmark_canvas.render_newmark(result)
+                self._fill_result_table(self.newmark_canvas, newmark_table(result))
+                self.newmark_canvas.show_plot()
             except Exception:
                 traceback.print_exc()
 
@@ -3524,11 +3757,21 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(self.solution_canvas)
         if (bundle and panel and self.solution_canvas is not None
                 and isinstance(bundle.get("results"), dict)):
-            self.solution_canvas.set_note("Rapid drawdown",
-                                          _drained_rapid_note(bundle))
+            seismic2 = _seismic2_note(bundle)
+            ky = _yield_note(bundle)
+            if ky:
+                self.solution_canvas.set_note(
+                    "Yield coefficient", " ".join(t for t in (ky, seismic2) if t))
+            elif seismic2:
+                self.solution_canvas.set_note("Two-stage seismic", seismic2)
+            else:
+                self.solution_canvas.set_note("Rapid drawdown",
+                                              _drained_rapid_note(bundle))
+            info = bundle.get("yield")
             try:
                 self.solution_canvas.render_solution(
-                    self.doc.slope_data, bundle["slice_df"],
+                    _at_k(self.doc.slope_data, info["k_y"] if info else None),
+                    bundle["slice_df"],
                     bundle["failure_surface"], bundle["results"], panel.options(),
                     style=self.doc.style or None)
             except Exception:
@@ -3804,7 +4047,7 @@ class MainWindow(QMainWindow):
         single = ("mesh_canvas", "search_canvas", "solution_canvas",
                   "reliability_canvas", "reliability_hist_canvas", "sens_canvas",
                   "sens_curve_canvas", "design_canvas", "fs_time_canvas",
-                  "fem_data_canvas", "fem_results_canvas")
+                  "newmark_canvas", "fem_data_canvas", "fem_results_canvas")
         # The seep canvases are per-BC dicts; flatten them in with the rest, along
         # with the transient view (frames + play bar) when present.
         canvases = [getattr(self, a) for a in single]

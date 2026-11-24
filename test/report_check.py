@@ -406,6 +406,77 @@ def test_a_declared_zero_cutoff_prints():
     return fails
 
 
+def test_the_tables_print_what_each_option_reads():
+    """Each materials table prints a strength property only where the material's
+    option reads it, keeps every digit a property was entered with, and says what c
+    and c/p mean on an undrained material.
+
+    The model is LEM-7 Part C's: both clays entered as strength ratios, the lower
+    one still carrying the r elev. of 4 its cp profile had. The walk of that page
+    found the report printing that 4.0 (an input the ratio never reads, under a
+    sentence saying the table shows "the properties that option uses"), c/p
+    rounded to 0.188 from 0.1875, no c/p at all in the finite element table, and
+    nothing saying what c and c/p are under the ratio option.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.report import (_Counter, _fem_materials_table, _materials_table,
+                               _strength_option_notes)
+
+    fails = []
+    sd = load_slope_data(os.path.join(_REPO, "docs", "lem", "files",
+                                      "xslope_low_clay.xlsx"))
+    lower = sd["materials"][2]
+    if (str(lower["option"]), lower["r_elev"]) != ("cp", 4.0):
+        return [f"the shipped model's lower clay is no longer cp with r elev. 4: "
+                f"{lower['option']!r}, {lower['r_elev']!r}"]
+    for m in sd["materials"][1:]:
+        m.update(option="ratio", c=15.0, phi=0.0, cp=0.1875)
+
+    for table in (_materials_table(sd, _Counter()),
+                  _fem_materials_table(sd, _Counter())):
+        where = table.caption
+        heads = [str(h) for h in table.headers]
+        if any(h.startswith("r elev.") for h in heads):
+            fails.append(f"{where}: an r elev. column on a model whose only "
+                         f"r elev. is a ratio material's, which nothing reads")
+        if "c/p" not in heads or "Strength" not in heads:
+            fails.append(f"{where}: no c/p or Strength column on a model with "
+                         f"ratio materials: {heads}")
+            continue
+        col = {h: i for i, h in enumerate(heads)}
+        got = [(r[col["Strength"]], r[col["c/p"]]) for r in table.rows]
+        want = [("MC", ""), ("RATIO", "0.1875"), ("RATIO", "0.1875")]
+        if got != want:
+            fails.append(f"{where}: (Strength, c/p) by row read {got}, not {want}")
+
+    notes = _strength_option_notes(sd)
+    for phrase in ("strength ratio S_u/σ_v′", "c is a minimum strength"):
+        if phrase not in notes:
+            fails.append(f"the option note does not say {phrase!r}: {notes!r}")
+    if "CP option" in notes:
+        fails.append(f"the option note explains cp on a model with no cp "
+                     f"material: {notes!r}")
+
+    # The control: the shipped model, its lower clay still cp. r elev. is read
+    # there and prints, the column carries the column's three decimals, and an mc
+    # row's leftover c/p or r elev. would print nothing.
+    sd = load_slope_data(os.path.join(_REPO, "docs", "lem", "files",
+                                      "xslope_low_clay.xlsx"))
+    table = _materials_table(sd, _Counter())
+    heads = [str(h) for h in table.headers]
+    rel = next((i for i, h in enumerate(heads) if h.startswith("r elev.")), None)
+    if rel is None:
+        fails.append(f"the cp model prints no r elev. column: {heads}")
+    else:
+        got = [(r[heads.index("c/p")], r[rel]) for r in table.rows]
+        if got != [("", ""), ("", ""), ("3.750", "4.0")]:
+            fails.append(f"the cp model's (c/p, r elev.) by row read {got}")
+    if "Under the CP option" not in _strength_option_notes(sd):
+        fails.append("the cp model's report does not say what c and c/p are "
+                     "under the cp option")
+    return fails
+
+
 def test_figures_rendered():
     """Every figure block points at a real, non-trivial PNG."""
     fails = []
@@ -1984,6 +2055,292 @@ def test_rapid_drawdown_names_the_governing_stage():
     return fails
 
 
+#: Duncan, Wright & Brandon's Table 10.4 dry slope: k = 0.15, one zone in a
+#: material with d and psi (Soil 1, the Pilarcitos fill).
+SEISMIC2_XLSX = os.path.join(_REPO, "docs", "verification", "files", "published",
+                             "dwb_t10_4_dry.xlsx")
+
+
+def test_seismic2_section():
+    """The two-stage seismic block: one row per stage, stage 2's factor reported,
+    the strength choice named, and nothing for a run that was not two-stage.
+
+    Solved on the starting circle of the Table 10.4 slope, once per stage 2
+    strength choice, and once with d and psi cleared, where both stages are
+    drained and the block says so.
+    """
+    fails = []
+    import contextlib
+    import io
+    from xslope.fileio import load_slope_data
+    from xslope.report import _Counter, _seismic2_section
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    def block(sub, kind):
+        return [b for b in sub.blocks if b.kind == kind]
+
+    def _solve(sd, strength):
+        ok, (df, _surf) = generate_slices(sd, circle=sd["circles"][0], num_slices=40)
+        with contextlib.redirect_stdout(io.StringIO()):
+            res = solve_selected("spencer", df, seismic2=strength)
+        return df, res
+
+    sd = load_slope_data(SEISMIC2_XLSX)
+    for strength, phrase in (("kc1", "from the K_c = 1 envelope at its stage 1 stresses"),
+                             ("interpolated", "interpolated from its stage 1 stresses")):
+        where = f"two-stage seismic ({strength})"
+        df, res = _solve(sd, strength)
+        sub = _seismic2_section(res, _Counter(), sd, df, surface="specified circle")
+        if sub is None:
+            fails.append(f"{where}: no block for a two-stage result")
+            continue
+        tables = block(sub, "table")
+        if len(tables) != 1 or [r[0] for r in tables[0].rows] != ["1", "2"]:
+            fails.append(f"{where}: the stage table is not one table of stages 1 and 2")
+            continue
+        rows = tables[0].rows
+        if rows[0][3] != f"{res['seismic_stage1_FS']:.3f}" or \
+                rows[1][3] != f"{res['FS']:.3f}":
+            fails.append(f"{where}: the stage factors read {rows[0][3]}, {rows[1][3]} "
+                         f"against {res['seismic_stage1_FS']:.3f}, {res['FS']:.3f}")
+        if rows[0][1] != "none" or rows[1][1] != "k = 0.15":
+            fails.append(f"{where}: the seismic force column reads "
+                         f"{rows[0][1]!r}, {rows[1][1]!r}")
+        prose = " ".join(b.text for b in block(sub, "prose"))
+        if phrase not in prose:
+            fails.append(f"{where}: the procedure does not say {phrase!r}")
+        if f"Table {tables[0].number}" not in prose:
+            fails.append(f"{where}: the stage table is not cited by number")
+        kv = [v for b in block(sub, "keyvalues") for _l, v in b.items]
+        if kv != [f"{res['FS']:.3f}"]:
+            fails.append(f"{where}: the reported factor reads {kv}")
+
+    # The stage 2 strength factor: named in the procedure and in the stage 2 row
+    # when it is below 1, absent at 1 (466a).
+    df, res = _solve(sd, {"strength": "kc1", "factor": 0.8})
+    sub = _seismic2_section(res, _Counter(), sd, df, surface="specified circle")
+    prose = " ".join(b.text for b in block(sub, "prose")) if sub else ""
+    if "multiplied by the stage 2 strength factor, 0.80" not in prose:
+        fails.append("factor 0.8: the procedure does not name the stage 2 strength factor")
+    rows = block(sub, "table")[0].rows if sub else []
+    if not rows or "× 0.80" not in rows[1][2]:
+        fails.append(f"factor 0.8: the stage 2 strengths read {rows[1][2] if rows else None!r}")
+    df1, res1 = _solve(sd, "kc1")
+    sub1 = _seismic2_section(res1, _Counter(), sd, df1, surface="specified circle")
+    if "strength factor" in " ".join(b.text for b in block(sub1, "prose")):
+        fails.append("factor 1: the procedure names a strength factor")
+    from xslope.report import analysis_options
+    for r, want in ((res, {"strength": "kc1", "factor": 0.8}), (res1, "kc1")):
+        got = analysis_options(sd, {"lem": {"results": r, "slice_df": df}}
+                               ).get("seismic2")
+        if got != want:
+            fails.append(f"analysis_options rebuilt seismic2 = {got!r}, not {want!r}")
+
+    # Not a two-stage result: no block.
+    df, res = _solve(sd, False)
+    if _seismic2_section(res, _Counter(), sd, df) is not None:
+        fails.append("a single-stage result drew a two-stage block")
+
+    # A surface in no material with d and psi: both stages drained, said once.
+    drained = load_slope_data(SEISMIC2_XLSX)
+    for m in drained["materials"]:
+        m["d"], m["psi"] = 0.0, 0.0
+    df, res = _solve(drained, "interpolated")
+    sub = _seismic2_section(res, _Counter(), drained, df, surface="specified circle")
+    prose = " ".join(b.text for b in block(sub, "prose")) if sub else ""
+    if "crosses no material with d and ψ" not in prose:
+        fails.append("a surface with no d/ψ material did not say both stages were "
+                     "drained")
+    return fails
+
+
+#: The rigid wedge of Duncan, Wright & Brandon's Figure 10.1, whose yield
+#: coefficient has a closed form (docs/verification/published.md#dwb-10-1).
+KY_WEDGE_XLSX = os.path.join(_REPO, "docs", "verification", "files", "published",
+                             "dwb_fig10_1_wedge.xlsx")
+
+
+def test_ky_section():
+    """The yield coefficient block and the rest of a k_y report.
+
+    A single surface (the Figure 10.1 wedge, whose k_y is 0.2366 in closed form):
+    the coefficients tried, the last bold and solved to F = 1, k_y reported, the
+    table cited. A search, from a hand-made record: one row for the search with no
+    seismic force and one per confirming search, the row that found k_y in bold,
+    and the unsettled case said. Then the comparison table and the analysis
+    options, which a report that reruns a method reads.
+    """
+    fails = []
+    import contextlib
+    import io
+    from xslope.fileio import load_slope_data
+    from xslope.report import (_Counter, _fs_table, _ky_section, analysis_options)
+    from xslope.search import run_lem_analysis
+
+    def block(sub, kind):
+        return [b for b in sub.blocks if b.kind == kind]
+
+    sd = load_slope_data(KY_WEDGE_XLSX)
+    keep = [m for m in sd["materials"] if m["name"] == "c-phi"][0]
+    sd["materials"] = [dict(keep) for _ in sd["materials"]]
+    with contextlib.redirect_stdout(io.StringIO()):
+        b = run_lem_analysis(sd, "spencer", analysis="single_surface",
+                             surface="noncircular", num_slices=40, ky=True)
+    info = b.get("yield") or {}
+    if abs(info.get("k_y", 0.0) - 0.23660) > 5e-5:
+        fails.append(f"the wedge's k_y is {info.get('k_y')}, against 0.23660 in "
+                     f"closed form")
+    if abs(b["results"]["FS"] - 1.0) > 1e-3:
+        fails.append(f"the k_y bundle has F = {b['results']['FS']:.4f}, not 1")
+    if b["options"].get("ky") is not True:
+        fails.append("the k_y bundle does not record ky=True among its options")
+    sub = _ky_section(info, b["results"], _Counter(), noun="surface")
+    if sub is None:
+        return fails + ["no yield coefficient block for a k_y result"]
+    tables = block(sub, "table")
+    trace = info.get("trace") or []
+    if len(tables) != 1 or len(tables[0].rows) != len(trace):
+        fails.append("the single-surface block is not one row per coefficient tried")
+    elif tables[0].bold_rows != [len(trace) - 1]:
+        fails.append(f"the bold row is {tables[0].bold_rows}, not the last")
+    prose = " ".join(x.text for x in block(sub, "prose"))
+    if tables and f"Table {tables[0].number}" not in prose:
+        fails.append("the coefficient table is not cited by number")
+    kv = [v for x in block(sub, "keyvalues") for _l, v in x.items]
+    if not kv or kv[0] != f"{info['k_y']:.4f}":
+        fails.append(f"the reported k_y reads {kv[:1]}")
+
+    # A search, from a record: static, then two confirming searches, the first
+    # of which found the k_y surface.
+    rec = {"k_y": 0.1445, "FS_k0": 1.375, "search": True, "converged": True,
+           "static": {"FS": 1.372, "k_y": 0.1457, "surface": None},
+           "rounds": [{"k": 0.1457, "FS": 0.9975, "k_y": 0.1445},
+                      {"k": 0.1445, "FS": 1.0003, "k_y": None}],
+           "confirm_tol": 0.001}
+    sub = _ky_section(rec, {"FS": 1.0}, _Counter(), noun="circle")
+    rows = block(sub, "table")[0].rows
+    if [r[0] for r in rows] != ["1", "2", "3"] or rows[0][1] != "0 (no seismic force)":
+        fails.append(f"the search table's rows read {[r[:2] for r in rows]}")
+    if block(sub, "table")[0].bold_rows != [1]:
+        fails.append("the row that found k_y is not the bold one")
+    if rows[2][3] != "—":
+        fails.append("a search that found nothing below F = 1 shows a k_y")
+    if "did not settle" in " ".join(x.text for x in block(sub, "prose")):
+        fails.append("a settled search says it did not settle")
+    sub = _ky_section(dict(rec, converged=False), {"FS": 1.0}, _Counter(),
+                      noun="circle")
+    if "did not settle" not in " ".join(x.text for x in block(sub, "prose")):
+        fails.append("an unsettled search does not say so")
+    if _ky_section(None, {"FS": 1.2}, _Counter()) is not None:
+        fails.append("a result with no k_y drew a yield coefficient block")
+
+    # The comparison table and the options a rerun is made under.
+    sols = {"lem": [dict(b, method="spencer"),
+                    dict(b, method="corps", **{"yield": dict(info, k_y=0.2366)})]}
+    table = _fs_table(sd, sols, {"method": ["spencer", "corps"]}, _Counter())
+    if table is None or table.headers[1] != "Yield coefficient k_y":
+        fails.append("the comparison table of a k_y run does not list k_y")
+    if analysis_options(sd, {"lem": [b]}).get("ky") is not True:
+        fails.append("a report rerunning a method would not find k_y")
+    return fails
+
+
+def _write_newmark_record(folder):
+    """A synthetic test record as a two-column text file in ``folder``: two sine
+    waves under a rise-and-decay envelope, 20 s at 0.005 s, stronger one way than
+    the other. Returns its path."""
+    import numpy as np
+    t = np.arange(0.0, 20.0 + 0.0025, 0.005)
+    env = np.minimum(t / 2.0, 1.0) * np.exp(-np.maximum(t - 8.0, 0.0) / 4.0)
+    a = env * (0.25 * np.sin(2 * np.pi * 1.3 * t)
+               + 0.12 * np.sin(2 * np.pi * 2.9 * t + 1.0)
+               + 0.06 * np.sin(2 * np.pi * 0.35 * t) ** 2)
+    path = os.path.join(folder, "test_record.txt")
+    with open(path, "w") as fh:
+        fh.write("# A synthetic test record\n")
+        fh.writelines(f"{ti:.3f}  {ai:.8f}\n" for ti, ai in zip(t, a))
+    return path
+
+
+def test_newmark_section():
+    """The Newmark section of a report that carries a Newmark run.
+
+    A synthetic record at k_y = 0.139, scaled by 1.2: the record named and described,
+    its scaling and both peaks, k_y and where it came from, the displacement each
+    way with the governing one first and stated in bold, and the histories figure
+    drawn and cited. The figure count a build plans includes it, a report with
+    the option off or with no run has no such section, and a report of nothing
+    but a Newmark run still carries it.
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as rec_dir:
+        return _newmark_section_fails(_write_newmark_record(rec_dir))
+
+
+def _newmark_section_fails(record_path):
+    import tempfile
+    fails = []
+    from xslope.fileio import load_slope_data
+    from xslope.report import (_Counter, _newmark_section, build_report,
+                               planned_figures, resolve_options)
+    from xslope.seismic import newmark_displacement, read_record
+
+    record = read_record(record_path)
+    pga = record["pga"]
+    r = newmark_displacement(record, 0.139, scale=1.2)
+    r["ky_source"] = "Spencer's Method, on the critical circle, k_y = 0.1390"
+    opts = resolve_options({})
+    with tempfile.TemporaryDirectory() as tmp:
+        sec = _newmark_section({"newmark": [r]}, opts, _Counter(), tmp)
+        if sec is None:
+            return ["no Newmark section for a Newmark run"]
+        kv = dict(item for b in sec.blocks if b.kind == "keyvalues"
+                  for item in b.items)
+        want = {"Record file": "test_record.txt",
+                "Record": "A synthetic test record",
+                "Scale factor": "1.2",
+                "Peak acceleration as recorded": f"{pga:.3f} g",
+                "Peak acceleration as analyzed": f"{pga * 1.2:.3f} g"}
+        for k, v in want.items():
+            if kv.get(k) != v:
+                fails.append(f"{k} reads {kv.get(k)!r}, not {v!r}")
+        if "Spencer's Method" not in kv.get("Yield coefficient k_y", ""):
+            fails.append("k_y does not say where it came from")
+        labels = [k for k in kv if k.startswith("Displacement")]
+        gov = "negative" if r["governing"] < 0 else "positive"
+        if len(labels) != 2 or gov not in labels[0]:
+            fails.append(f"the displacements read {labels}, governing {gov} first")
+        prose = [b for b in sec.blocks if b.kind == "prose"]
+        stated = f"D = {r['D']:.2f} cm"
+        if not any(stated in b.text and stated in b.bold for b in prose):
+            fails.append(f"{stated} is not stated in bold")
+        figs = [b for b in sec.blocks if b.kind == "figure"]
+        if len(figs) != 1 or not os.path.exists(figs[0].path):
+            fails.append("the histories figure was not drawn")
+        elif not any(f"Figure {figs[0].number}" in b.text for b in prose):
+            fails.append("the histories figure is not cited by number")
+
+    sd = load_slope_data(KY_WEDGE_XLSX)
+    n_with = planned_figures(sd, {"newmark": [r]}, opts)
+    n_off = planned_figures(sd, {"newmark": [r]}, resolve_options({"lem_newmark": False}))
+    if n_with - n_off != 1:
+        fails.append(f"the planned figures change by {n_with - n_off} with the "
+                     f"Newmark run, not 1")
+    with tempfile.TemporaryDirectory() as tmp:
+        heads = [x.title for x in build_report(sd, {"newmark": [r]}, {}, tmp).sections]
+        if "Newmark Displacement" not in heads:
+            fails.append(f"a report of a Newmark run alone has sections {heads}")
+        off = [x.title for x in build_report(sd, {"newmark": [r]},
+                                             {"lem_newmark": False}, tmp).sections]
+        if "Newmark Displacement" in off:
+            fails.append("the Newmark section is there with its option off")
+        none = [x.title for x in build_report(sd, {}, {}, tmp).sections]
+        if "Newmark Displacement" in none:
+            fails.append("a report with no Newmark run has a Newmark section")
+    return fails
+
+
 #: COMBO-2's two rapid drawdown routes on the Johnson dam. The starter file
 #: carries two piezometric lines; the full file is run as the tutorial runs it,
 #: meshing and marching its own transient seepage and staging the frames at the
@@ -2035,7 +2392,7 @@ def _rapid_case(which):
         # search's own trial circles are built.
         ok, out = generate_slices(
             slope_data, circle=dict(circle, R=circle["Yo"] - circle["Depth"]),
-            num_slices=40)
+            num_slices=40, rapid=True)
         if not ok:
             raise RuntimeError(f"COMBO-2 ({which}) would not slice: {out}")
         slice_df, _surface = out
@@ -4149,7 +4506,7 @@ def test_column_registry():
 
     # drop_empty removes a column of zeros, and never a geometry one.
     kept = {h.split(" (")[0] for h in headers}
-    if "kW" in kept:
+    if "k_hW" in kept:
         fails.append("a seismic column was printed for a model with no seismic load")
     for needed in ("Δx", "α", "W", "c", "φ"):
         if needed not in kept:
@@ -5064,6 +5421,66 @@ def _quoted_numbers(sentence, fs, bounds):
             if abs(n - fs) > 5e-7 and not low <= n <= high]
 
 
+def test_the_vertical_seismic_force_reaches_the_working():
+    """A model with a vertical seismic coefficient prints working that returns
+    its solution, for every method.
+
+    The vertical seismic force k_v·W acts through the slice's center of gravity
+    with the weight, and the documentation's equations carry the two together as
+    W(1 + k_v). Read without it, the weight terms are the static weight, the
+    quotient misses k_v·W, and every method whose normal force depends on it
+    refuses its own working. The mutation drops the column the force arrives in
+    and requires the refusals back, so a check that cannot see the force fails.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    methods = ("oms", "bishop", "janbu", "spencer", "corps", "lowe", "mprice")
+    opts = {"input_path": RFACE_XLSX, "method": list(methods), "pd_figure": False,
+            "lem_search_figure": False, "lem_solution_figure": False}
+    fails = []
+    for kv in (0.1, -0.1):
+        slope_data = load_slope_data(RFACE_XLSX)
+        slope_data["k_seismic"], slope_data["k_vertical"] = 0.15, kv
+        ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
+                                  num_slices=20)
+        if not ok:
+            return [f"the model produced no slices: {out}"]
+        slice_df, surface = out
+        bundles = []
+        for method in methods:
+            solved = slice_df.copy()
+            with contextlib.redirect_stdout(io.StringIO()):
+                results = solve_selected(method, solved)
+            bundles.append({"slice_df": solved, "failure_surface": surface,
+                            "results": results, "search": None,
+                            "method": method})
+        for mutated in (False, True):
+            if mutated:
+                bundles = [dict(b, slice_df=b["slice_df"].drop(columns=["kvw"]))
+                           for b in bundles]
+            with tempfile.TemporaryDirectory() as tmp:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    built = build_report(slope_data, {"lem": bundles}, opts, tmp)
+            refusals = [p for p in _prose(built)
+                        if "does not return the solution" in p]
+            if not mutated and refusals:
+                fails.append(f"k_v = {kv:+g}: {len(refusals)} method(s) refused "
+                             f"their working: {refusals[0]!r}")
+            if not mutated and "W(1 + k_v)" not in repr(built):
+                fails.append(f"k_v = {kv:+g}: no equation writes the weight "
+                             f"as W(1 + k_v)")
+            if mutated and not refusals:
+                fails.append(f"k_v = {kv:+g}: with the vertical seismic force "
+                             f"dropped every method still returned its "
+                             f"solution, so this check cannot see the force")
+    return fails
+
+
 def test_a_refusal_prints_no_number_it_cannot_stand_behind():
     """A refused calculation states the mismatch; it does not typeset a
     degenerate quotient as a measurement.
@@ -5310,7 +5727,7 @@ def test_calculation_terms_follow_the_model():
                          f"{maths}")
         # The general moment arms write the forces out; the named sums give
         # each its letter.
-        for absent in ("P ", "P·", "kW", "H cos", "T·a_t",
+        for absent in ("P ", "P·", "k_hW", "H cos", "T·a_t",
                        "D_P", "D_k", "D_H", "D_T"):
             if absent in equation_line:
                 fails.append(f"the equation prints a {absent!r} term for a model "
@@ -5894,7 +6311,7 @@ def test_spencer_force_sums():
     # reinforcement, pile, line load or tension-crack term survives the
     # reduction.
     for notation in reduced:
-        for absent in ("kW", "R cos", "R sin", "H cos", "H sin", "L cos",
+        for absent in ("k_hW", "R cos", "R sin", "H cos", "H sin", "L cos",
                        "L sin", "V"):
             if absent in notation:
                 fails.append(f"{notation!r} prints a {absent!r} term for a model "
@@ -6143,7 +6560,7 @@ def test_spencer_mirror_rule():
 #: load there and the reinforcement everywhere else.
 _FEATURE_SYMBOLS = {
     "distributed load": ("D",),
-    "seismic load": ("kW",),
+    "seismic load": ("k_hW",),
     "tension-crack water force": ("T",),
     "reinforcement crossing the failure surface": ("P", "P_p"),
     "pile force": ("H", "H_p"),
@@ -6298,7 +6715,17 @@ def _terms_printed(notation):
     body = notation.split(" = ", 1)[-1].strip()
     if body == "0":
         return []
-    return [bare(p) for p in re.split(r" [−+] ", body.lstrip("−"))]
+    # An operator inside parentheses belongs to the term that holds it: the
+    # weight is written W(1 + k_v), and the line load's direction cos(α − δ).
+    pieces, depth, start = [], 0, 0
+    body = body.lstrip("−")
+    for at, ch in enumerate(body):
+        depth += (ch == "(") - (ch == ")")
+        if not depth and body[at:at + 3] in (" + ", " − "):
+            pieces.append(body[start:at])
+            start = at + 3
+    pieces.append(body[start:])
+    return [bare(p) for p in pieces if p.strip()]
 
 
 #: How the prose names a documentation equation. One form, so that a number
@@ -7290,7 +7717,7 @@ def test_the_full_forms_match_their_pages():
     found = re.search(r"\$([^$]*?)\\q?quad ?\(7\)\$", page)
     want, _why = _canonical(found.group(1))
     want = want.replace("sumNsinα", "sumN'sinα+sumuΔlsinα")
-    drifted = full[0].replace(" + sum{kW}", "")
+    drifted = full[0].replace(" + sum{k_hW}", "")
     if drifted == full[0]:
         fails.append("the mutation dropped nothing, so it tests nothing")
     elif _canonical(drifted)[0] == want:
@@ -7433,7 +7860,7 @@ def test_the_whole_mass_balance_is_published_then_reduced():
     # published equation has to stop matching the page, and the reduced form
     # printed in its place has to stop being the published form.
     method, full = sorted(printed_full.items())[0]
-    dropped = full.replace(" + sum{kW}", "")
+    dropped = full.replace(" + sum{k_hW}", "")
     if dropped == full:
         fails.append("the mutation dropped nothing, so it tests nothing")
     elif not _whole_mass_is_the_page(dropped, want_num, want_den, "the mutation"):
@@ -8525,7 +8952,7 @@ def test_the_wide_quotient_is_narrowed():
     # And the construction reaches the document. Read off the compiled OMML, so
     # a stack that is built and then not emitted is caught.
     wide = ("F = frac{sum{(c·Δl + N'·tan φ)·cos α}}"
-            "{sum{N'·sin α} + sum{u·Δl·sin α} + sum{kW} + sum{T} "
+            "{sum{N'·sin α} + sum{u·Δl·sin α} + sum{k_hW} + sum{T} "
             "− sum{D·sin β} − sum{P cos ψ} − sum{H cos θ_p} − sum{L cos δ}}")
     if _sole_fraction(wide) is None:
         fails.append("the wide quotient is not read as a quotient at all")
@@ -8728,6 +9155,9 @@ DOC_SYMBOLS = {
     "F_h": ("F_h",),
     "P_p": (r"P\cos \psi", r"P \cos \psi"),
     "H_p": (r"H \cos \theta_p",),
+    "k_hW": ("k_hW",),
+    "k_h": ("k_h",),
+    "k_v": ("k_v",),
 }
 
 
@@ -21183,6 +21613,8 @@ CHECKS = [
     ("the content tree and its section order", test_tree),
     ("the tables carry the model's numbers", test_tables_carry_the_model),
     ("a declared zero tensile cutoff prints", test_a_declared_zero_cutoff_prints),
+    ("the tables print what each option reads",
+     test_the_tables_print_what_each_option_reads),
     ("every figure is rendered to a file", test_figures_rendered),
     ("the traceability stamp", test_traceability),
     ("the content toggles remove what they name", test_toggles),
@@ -21330,6 +21762,9 @@ CHECKS = [
      test_a_report_run_method_is_run_at_the_analysis_discretization),
     ("a method that is not run says why",
      test_a_method_that_is_not_run_says_why),
+    ("the two-stage seismic block", test_seismic2_section),
+    ("the yield coefficient block", test_ky_section),
+    ("the Newmark section", test_newmark_section),
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
     ("the rapid drawdown stage table (COMBO-2's two routes)",
@@ -21371,6 +21806,8 @@ CHECKS = [
     ("a method block never goes quiet", test_a_method_block_never_goes_quiet),
     ("a refusal prints no number it cannot stand behind",
      test_a_refusal_prints_no_number_it_cannot_stand_behind),
+    ("the vertical seismic force reaches the working",
+     test_the_vertical_seismic_force_reaches_the_working),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",

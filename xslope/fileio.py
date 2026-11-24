@@ -91,6 +91,69 @@ def build_ground_surface_from_polygons(polygons):
     return LineString(upper), domain
 
 
+def material_top_range(polygons, mat_id):
+    """Lowest and highest elevation of a material's top: the parts of its zones'
+    outlines that have the material just below them and none just above.
+
+    A strength that grows with depth below the top of its own layer (SLOPE/W's
+    S=f(depth), Slide2's undrained F(Depth from Top of Layer)) is exactly XSLOPE's
+    ``cp`` with r_elev at that top when the top is level, which is when the two
+    values agree. Returns (None, None) when the material has no zone.
+    """
+    zones = [p['polygon'] for p in polygons if p.get('mat_id') == mat_id]
+    if not zones:
+        return None, None
+    body = unary_union(zones)
+    minx, miny, maxx, maxy = body.bounds
+    eps = 1e-7 * max(maxx - minx, maxy - miny, 1.0)
+    ys = []
+    for g in getattr(body, 'geoms', [body]):
+        for ring in [g.exterior, *g.interiors]:
+            c = list(ring.coords)
+            for (x1, y1), (x2, y2) in zip(c[:-1], c[1:]):
+                if abs(x2 - x1) <= eps:
+                    continue                    # a vertical side has nothing on top
+                xm, ym = 0.5 * (x1 + x2), 0.5 * (y1 + y2)
+                if (body.covers(Point(xm, ym - eps))
+                        and not body.covers(Point(xm, ym + eps))):
+                    ys += [y1, y2]
+    if not ys:
+        return None, None
+    return min(ys), max(ys)
+
+
+def cp_from_layer_top(mat, polygons, mat_id, program, model):
+    """Set a ``cp`` material's r_elev to the top of its own layer, and say how close
+    that is to the vendor's strength. Returns the import caveats.
+
+    ``mat`` already holds c (the strength at the top of the layer) and cp (its rate of
+    increase with depth). The vendor measures depth from the layer's top above each
+    slice; ``cp`` measures it from the one elevation r_elev. Where the top is level
+    the two are the same strength. Where it is not, r_elev is the highest point of
+    the top, so XSLOPE's strength is never above the vendor's, and the caveat gives
+    the largest difference.
+    """
+    name = mat.get('name')
+    lo, hi = material_top_range(polygons, mat_id)
+    if hi is None:
+        return []
+    mat['r_elev'] = hi
+    c, rate = mat.get('c') or 0.0, mat.get('cp') or 0.0
+    xs = [v for p in polygons for v in p['polygon'].bounds]
+    tol = 1e-6 * max(1.0, max(abs(v) for v in xs))
+    what = (f"material '{name}' uses {program}'s {model} model — imported as option "
+            f"cp with c = {c:g} at the top of its layer (r_elev = {hi:g}) and c/p = "
+            f"{rate:g} per unit depth")
+    if hi - lo <= tol or rate == 0:
+        return [what]
+    gap = abs(rate) * (hi - lo)
+    side = "lower" if rate > 0 else "higher"
+    return [f"{what}. {program} measures depth from the top of the layer above each "
+            f"slice, and this layer's top is not level: it runs from y = {lo:g} to "
+            f"y = {hi:g}. XSLOPE measures depth from y = {hi:g}, so where the top is "
+            f"lower, XSLOPE's strength is {side} than {program}'s, by up to {gap:g}."]
+
+
 # === v20 SSR-zone sentinel Mat IDs (polygon sheet) ===
 # A polygon row whose Mat ID is NEGATIVE is not a material zone at all — it is an
 # ANALYSIS OVERLAY for the shear-strength-reduction method. Overlay rows are never
@@ -889,13 +952,19 @@ def ensure_reinforce_pullout(slope_data):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 27
+SUPPORTED_TEMPLATE_VERSION = 28
 
 # The template version that inserted the 1D element size cell at main!D20, pushing
 # every main-sheet run option below it down one row. Files at or above it are read
 # (and written) with that one-row shift; older ones keep their original layout and
 # carry no 1D size at all.
 _ELEMENT_SIZE_1D_TEMPLATE_VERSION = 25
+
+# The template version that inserted the vertical seismic coefficient at main!D14,
+# directly under the horizontal one, pushing every run option (D14 down) one row
+# lower. Files at or above it are read and written with that shift on top of the
+# v25 one; older files carry no vertical coefficient, which reads as 0.
+_VERTICAL_SEISMIC_TEMPLATE_VERSION = 28
 
 # The template version that introduced the water-load mode cell (main!D23). Below it
 # a file cannot say who supplies the weight of standing water, so it always means
@@ -927,9 +996,13 @@ SURFACE_FAMILY_CELL = {'circular': 'circular', 'noncircular': 'non-circular'}
 #: The main sheet's run-option block (column D), by the ``slope_data`` key each cell
 #: holds: the label in column C, the row on the template version that introduced the
 #: cell, and that version. Every row from D20 down moved one row lower at v25, when
-#: the 1D element size was inserted at D20 (:data:`_ELEMENT_SIZE_1D_TEMPLATE_VERSION`)
-#: -- the same one-row shift the loader and writer apply.
+#: the 1D element size was inserted at D20 (:data:`_ELEMENT_SIZE_1D_TEMPLATE_VERSION`),
+#: and every run option moved one more row at v28, when the vertical seismic
+#: coefficient was inserted at D14 (:data:`_VERTICAL_SEISMIC_TEMPLATE_VERSION`) --
+#: the same shifts the loader and writer apply.
 MAIN_SHEET_CELLS = {
+    'k_vertical': ('Vert. seismic coefficient (kv)', 14,
+                   _VERTICAL_SEISMIC_TEMPLATE_VERSION),
     'lem_method': ('LEM method', 14, 19),
     'num_slices': ('Number of slices', 15, 19),
     'k0': ('K0 initial stress (FEM)', 16, 19),
@@ -948,7 +1021,8 @@ MAIN_SHEET_CELLS = {
 def main_sheet_cell(key, version=None):
     """The 'main' sheet cell that holds ``slope_data[key]`` on a template of
     ``version`` -- the current template when ``None`` -- e.g.
-    ``main_sheet_cell('water_loads')`` is ``'D24'``, and ``'D23'`` on a v22-v24 file.
+    ``main_sheet_cell('water_loads')`` is ``'D25'``, ``'D24'`` on a v25-v27 file, and
+    ``'D23'`` on a v22-v24 file.
     ``None`` when that version has no such cell.
 
     The one place a message, a remedy or an import note looks up which cell a reader
@@ -963,12 +1037,14 @@ def main_sheet_cell(key, version=None):
         return None
     if key != 'element_size_1d' and row >= 20 and v >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
         row += 1
+    if key != 'k_vertical' and v >= _VERTICAL_SEISMIC_TEMPLATE_VERSION:
+        row += 1
     return f"D{row}"
 
 
 def template_main_sheet_cell(label, template=None):
     """The 'main' sheet cell a template itself labels ``label`` (column C, the
-    trailing colon ignored), e.g. ``'D24'`` for ``'Water loads'`` on the current
+    trailing colon ignored), e.g. ``'D25'`` for ``'Water loads'`` on the current
     template; ``None`` when the workbook cannot be read or has no such row.
 
     ``template`` is a workbook path, the bundled template by default. This reads
@@ -1004,8 +1080,12 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
 
     Layout (v15): exit face in B/C from row 5 down; then up to 5 BC blocks in
     E/F, H/I, K/L, N/O, Q/R. Row 3 of a block holds the TYPE cell (x column) and
-    the VALUE (y column); coordinates start at row 5. A block ends the scan when
-    its VALUE cell is empty.
+    the VALUE (y column); coordinates start at row 5. Every block is read: one
+    with neither a value nor a point is empty and skipped, and one with points
+    but a blank VALUE cell is kept with the value ``None`` -- a half-filled block
+    a file saved mid-edit can carry. Preflight's ``seep.bc_value_missing`` names
+    it for the runs that read it. (A blank value once ended the scan, which
+    silently dropped that block and every block after it.)
 
     Backward compatibility: templates v14 and earlier put the literal label
     "Head:" in the type cell, so a block is a flux BC only when the type text
@@ -1021,21 +1101,21 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
     Value cells (v18): a block's VALUE cell may hold either a number (a constant
     head/flux, as always) or a string naming a ``tseep`` time series (a
     time-varying BC). This reader keeps whichever it finds — a numeric string is
-    coerced to float, anything else is kept as the trimmed series-name string —
-    and ``load_slope_data`` validates any string against the tseep series headers
-    once both sheets are parsed. Files without a tseep sheet therefore still
-    reject a non-numeric value there (see the load-time check).
+    coerced to float, anything else is kept as the trimmed series-name string.
+    A name the tseep sheet does not define is kept too; preflight's
+    ``seep.series_undefined`` names it when a seepage analysis is checked.
     """
     bc = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
 
     def _bc_value(v):
-        """Float when the cell is numeric; otherwise the trimmed string (a tseep
-        series name, validated later). NaN/None never reach here — the caller
-        breaks the block scan on an empty VALUE cell first."""
+        """Float when the cell is numeric; the trimmed string (a tseep series
+        name) when it holds text; ``None`` when it is blank."""
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
         try:
             return float(v)
         except (TypeError, ValueError):
-            return str(v).strip()
+            return str(v).strip() or None
 
     def _read_coords(x_col, y_col, start_row=4):
         coords = []
@@ -1060,9 +1140,11 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
     while col + 1 < seep_df.shape[1]:
         if seep_df.shape[0] <= type_row:
             break
-        value = seep_df.iloc[type_row, col + 1]
-        if pd.isna(value):
-            break  # empty VALUE cell ends the block scan
+        value = _bc_value(seep_df.iloc[type_row, col + 1])
+        coords = _read_coords(col, col + 1)
+        if value is None and not coords:
+            col += 3   # an empty block: the template's preset Type cell alone
+            continue
 
         type_cell = seep_df.iloc[type_row, col]
         type_text = str(type_cell).strip().lower() if pd.notna(type_cell) else ""
@@ -1075,15 +1157,14 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
         # at every node of the polyline.
         is_reservoir = type_text.startswith("reservoir")
 
-        coords = _read_coords(col, col + 1)
         if is_flux:
             # A flux polyline with fewer than two points binds no mesh edge. It is
             # kept as entered; preflight's seep.bc_polyline_too_short names it.
-            bc["specified_fluxes"].append({"flux": _bc_value(value), "coords": coords})
+            bc["specified_fluxes"].append({"flux": value, "coords": coords})
         elif coords:
             kind = "reservoir" if is_reservoir else "head"
             bc["specified_heads"].append(
-                {"head": _bc_value(value), "coords": coords, "kind": kind})
+                {"head": value, "coords": coords, "kind": kind})
 
         col += 3  # E -> H -> K -> ...
 
@@ -1377,6 +1458,9 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # including the cell names the error messages quote, which must name the row the
     # user is actually looking at.
     _shift = 1 if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
+    # v28 inserted the vertical seismic coefficient at main!D14, directly under the
+    # horizontal one, so the whole run-option block moved down one more row.
+    _top = 1 if _tv >= _VERTICAL_SEISMIC_TEMPLATE_VERSION else 0
 
     # === MAIN-SHEET GLOBALS (version-gated positional map) ===
     # v18 inserted two declaration cells at the top of the block and shifted the three
@@ -1413,11 +1497,27 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             tcrack_depth = float(main_df.iloc[10, 3])           # D11
             tcrack_water = float(main_df.iloc[11, 3])           # D12
             k_seismic = float(main_df.iloc[12, 3])              # D13
+            # v28 D14: the vertical seismic coefficient, signed, positive acting
+            # downward (Slide2's and SLOPE/W's convention). Blank is 0, and a file
+            # older than v28 has none.
+            k_vertical = 0.0
+            if _top:
+                _kv_raw = main_df.iloc[13, 3] if main_df.shape[0] > 13 else None
+                if _cell_str(_kv_raw) != '':
+                    try:
+                        k_vertical = float(_kv_raw)
+                    except (TypeError, ValueError):
+                        raise ValueError(
+                            f"The 'main' sheet cell "
+                            f"{main_sheet_cell('k_vertical')} (vertical seismic "
+                            f"coefficient) contains {_kv_raw!r}, which is not a "
+                            "number. Enter 0 or leave it blank for none.")
         else:
             gamma_water = float(main_df.iloc[7, 3])             # D8
             tcrack_depth = float(main_df.iloc[8, 3])            # D9
             tcrack_water = float(main_df.iloc[9, 3])            # D10
             k_seismic = float(main_df.iloc[10, 3])              # D11
+            k_vertical = 0.0
             unit_system = infer_system_from_gamma_water(gamma_water)
     except ValueError:
         raise
@@ -1467,28 +1567,31 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # free text once someone types over the dropdown; an unrecognized value
         # RAISES rather than falling back, so a typo can never silently run a
         # different method than the file says.
-        _lem_raw = _cell_str(main_df.iloc[13, 3]) if main_df.shape[0] > 13 else ''
+        _lem_raw = (_cell_str(main_df.iloc[13 + _top, 3])
+                    if main_df.shape[0] > 13 + _top else '')
         if _lem_raw:
             lem_method = _lem_raw.lower()
             if lem_method not in LEM_METHODS:
                 raise ValueError(
                     f"The 'main' sheet declares an unrecognized LEM method "
-                    f"{_lem_raw!r} in cell D14. Expected one of: "
+                    f"{_lem_raw!r} in cell D{14 + _top}. Expected one of: "
                     f"{', '.join(LEM_METHODS)} (or leave it blank).")
 
         # D15-D22 are read as entered. Whether a value is usable (at least two
         # slices, a positive K0 or mesh size, an increasing SSRM bracket) is a
         # preflight rule for the analysis that reads it.
-        num_slices_opt = _opt_num(14, 'number of slices', integer=True)   # D15
+        num_slices_opt = _opt_num(14 + _top, 'number of slices',
+                                  integer=True)                       # D15
 
         # -- D16 K0. At-rest lateral earth pressure coefficient for the FEM
         # initial stress state. Blank -> None -> gravity turn-on (the historical
         # initialization), so no existing model moves.
-        k0 = _opt_num(15, 'K0 initial stress')
+        k0 = _opt_num(15 + _top, 'K0 initial stress')
 
         # -- D17 Tension SRF. YES/NO/blank -> True/False/None. None is NOT False:
         # it means unspecified, and the engine default (True) applies.
-        _tsrf_raw = _cell_str(main_df.iloc[16, 3]) if main_df.shape[0] > 16 else ''
+        _tsrf_raw = (_cell_str(main_df.iloc[16 + _top, 3])
+                     if main_df.shape[0] > 16 + _top else '')
         if _tsrf_raw:
             _t = _tsrf_raw.strip().lower()
             if _t in ('yes', 'true', 'y'):
@@ -1498,29 +1601,31 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             else:
                 raise ValueError(
                     f"The 'main' sheet has an unrecognized Tension SRF value "
-                    f"{_tsrf_raw!r} in cell D17. Expected YES or NO (or blank).")
+                    f"{_tsrf_raw!r} in cell D{17 + _top}. Expected YES or NO (or "
+                    "blank).")
 
         # -- D18/D19 mesh defaults.
-        _et_raw = _cell_str(main_df.iloc[17, 3]) if main_df.shape[0] > 17 else ''
+        _et_raw = (_cell_str(main_df.iloc[17 + _top, 3])
+                   if main_df.shape[0] > 17 + _top else '')
         if _et_raw:
             element_type = _et_raw.lower()
             if element_type not in MESH_ELEMENT_TYPES:
                 raise ValueError(
                     f"The 'main' sheet declares an unrecognized mesh element type "
-                    f"{_et_raw!r} in cell D18. Expected one of: "
+                    f"{_et_raw!r} in cell D{18 + _top}. Expected one of: "
                     f"{', '.join(MESH_ELEMENT_TYPES)} (or leave it blank).")
-        target_size = _opt_num(18, 'mesh target size')                   # D19
+        target_size = _opt_num(18 + _top, 'mesh target size')            # D19
 
         # -- D20 1D element size (v25). The target edge length along the 1D
         # members -- piles and reinforcement lines. Blank means unspecified, and
         # the mesher's own subdivision applies, so a v24 file (which has no such
         # cell at all) and a v25 file with the cell empty are the same model.
         if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
-            element_size_1d = _opt_num(19, '1D element size')            # D20
+            element_size_1d = _opt_num(19 + _top, '1D element size')     # D20
 
         # -- SSRM bracket (D20/D21 through v24, D21/D22 from v25).
-        ssrm_f_min = _opt_num(19 + _shift, 'SSRM F min')
-        ssrm_f_max = _opt_num(20 + _shift, 'SSRM F max')
+        ssrm_f_min = _opt_num(19 + _shift + _top, 'SSRM F min')
+        ssrm_f_max = _opt_num(20 + _shift + _top, 'SSRM F max')
 
     # === SIDE BOUNDARY CONDITION (v21, main D22) ===
     # How the FEM restrains the left and right truncation boundaries:
@@ -1532,7 +1637,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # untouched cell is the same model as its v20 original.
     side_bc = None
     if _tv >= 21:
-        _sbc_row = 21 + _shift
+        _sbc_row = 21 + _shift + _top
         _sbc_raw = (_cell_str(main_df.iloc[_sbc_row, 3])
                     if main_df.shape[0] > _sbc_row else '')
         if _sbc_raw:
@@ -1558,7 +1663,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # under them would count the reservoir twice.
     water_loads = 'manual'
     if _tv >= 22:
-        _wl_row = 22 + _shift
+        _wl_row = 22 + _shift + _top
         _wl_raw = (_cell_str(main_df.iloc[_wl_row, 3])
                    if main_df.shape[0] > _wl_row else '')
         if _wl_raw:
@@ -1586,7 +1691,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # spells the second one with a hyphen.
     surface_family = None
     if _tv >= 22:
-        _sf_row = 23 + _shift
+        _sf_row = 23 + _shift + _top
         _sf_raw = (_cell_str(main_df.iloc[_sf_row, 3])
                    if main_df.shape[0] > _sf_row else '')
         if _sf_raw:
@@ -1763,14 +1868,21 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         # Unsaturated relative-permeability model (template v11+): 'lf' (linear
         # front, kr0/h0 apply), 'vg' (van Genuchten) or 'gard' (Gardner, v14+).
         # The last two share the a/n parameter pair. Older templates lack the
-        # column -> default 'lf' (current behavior). Read by header name, so
-        # column position is version-independent.
+        # column, and a blank cell means the same -> 'lf'. Read by header name, so
+        # column position is version-independent. The three words match in any
+        # case; any other word is kept as entered (it used to be read as 'lf',
+        # silently), and preflight's mat.unsat_vocabulary refuses it for the runs
+        # that read it.
         unsat_raw = row.get('unsat', 'lf')
-        unsat_val = str(unsat_raw).strip().lower() if (
-            pd.notna(unsat_raw) and str(unsat_raw).strip().lower() not in ('', 'nan')
-        ) else 'lf'
-        if unsat_val not in ('lf', 'vg', 'gard'):
+        unsat_txt = ('' if unsat_raw is None or (isinstance(unsat_raw, float)
+                                                 and pd.isna(unsat_raw))
+                     else str(unsat_raw).strip())
+        if unsat_txt.lower() in ('', 'nan'):
             unsat_val = 'lf'
+        elif unsat_txt.lower() in UNSAT_MODELS:
+            unsat_val = unsat_txt.lower()
+        else:
+            unsat_val = unsat_txt
 
         # Excel row number: first data row sits just below the located header
         excel_row = _mat_hdr + 1 + i
@@ -1786,15 +1898,16 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             )
 
         # Strength model. Blank is allowed -- seep-only material rows carry no
-        # strength -- but slice.py raises if a blank one reaches a failure surface.
+        # strength -- and preflight's mat.option_missing refuses a blank one that
+        # a failure surface (LEM) or a mesh element (FEM) reaches.
         # 'elastic' (v16): infinite strength / cannot fail -- the FEM holds it out
         # of plasticity entirely and the LEM treats it as impenetrable.
         option_val = _choice(row.get('option'), '')
-        if option_val not in ('', 'mc', 'cp', 'pow', 'hb', 'elastic'):
+        if option_val not in ('',) + STRENGTH_OPTIONS:
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized strength option option='{option_val}'. "
-                "Expected one of: mc, cp, pow, hb, elastic."
+                f"Expected one of: {', '.join(STRENGTH_OPTIONS)}."
             )
 
         # v12 columns, read by header name. Older templates lack them entirely:
@@ -1834,8 +1947,11 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         _tcut_num = pd.to_numeric(row.get('tcut'), errors='coerce')
         t_cut_val = float(_tcut_num) if pd.notna(_tcut_num) else None
 
-        # Matric-suction strength (v17). Two LEM-only columns for the Fredlund
-        # extended Mohr-Coulomb apparent cohesion (xslope.slice generate_slices):
+        # Matric-suction strength (v17). Two columns for the Fredlund extended
+        # Mohr-Coulomb apparent cohesion, read by both engines (xslope.slice
+        # generate_slices and xslope.fem) where the material's own u is piezo or
+        # seep. Neither engine credits suction to a cp, ratio or
+        # elastic material, whose strength does not take pore pressure:
         #   phi_b -- the unsaturated friction angle phi^b (degrees). BLANK -> None:
         #     no suction strength credited, exactly the pre-v17 behavior (the default).
         #   s_cap -- the maximum credited suction (stress units), a cap on the base
@@ -1910,7 +2026,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             "psi": _num(row.get('psi', 0)) if pd.notna(row.get('psi')) else 0,
             # v16: tensile-strength cutoff. None = blank (no cutoff); FEM-only.
             "t_cut": t_cut_val,
-            # v17: matric-suction strength (LEM only, Fredlund extended MC).
+            # v17: matric-suction strength (Fredlund extended MC; LEM and FEM).
             # phi_b None = no suction strength (default); s_cap None = uncapped.
             "phi_b": phi_b_val,
             "s_cap": s_cap_val,
@@ -2295,6 +2411,12 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     circles_df = xls.parse('circles', header=1)
     raw = circles_df.dropna(subset=['Xo', 'Yo'], how='any')
     circles = []
+
+    def _size_cell(v):
+        """A circles-sheet size cell as entered: its number, or NaN when blank."""
+        v = pd.to_numeric(v, errors='coerce')
+        return float(v) if pd.notna(v) else float('nan')
+
     for _ci, row in raw.iterrows():
         Xo = row['Xo']
         Yo = row['Yo']
@@ -2303,28 +2425,46 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         Xi = row.get('Xi', None)
         Yi = row.get('Yi', None)
         R = row.get('R', None)
-        # For each circle, fill in the radius and depth values depending on the circle option
-        if Option == 'Depth':
+        # For each circle, fill in the radius and depth values depending on the
+        # circle option. The three words match in any case, as the sheet's own
+        # formatting and dropdown do.
+        _opt_key = (str(Option).strip().lower()
+                    if isinstance(Option, str) else None)
+        # The size cells as typed, before the Option turns one of them into R and
+        # Depth: what an unsized circle keeps (below).
+        size_cells = {k: _size_cell(v) for k, v in
+                      (('Depth', Depth), ('Xi', Xi), ('Yi', Yi), ('R', R))}
+        if _opt_key == 'depth':
             R = Yo - Depth
-        elif Option == 'Intercept':
+        elif _opt_key == 'intercept':
             R = ((Xi - Xo) ** 2 + (Yi - Yo) ** 2) ** 0.5
             Depth = Yo - R
-        elif Option == 'Radius':
+        elif _opt_key == 'radius':
             Depth = Yo - R
         else:
-            _opt_txt = ('blank' if Option is None or (isinstance(Option, float)
-                                                      and pd.isna(Option))
-                        else repr(str(Option)))
-            raise ValueError(
-                f"The circle in row {_ci + 3} of the 'circles' sheet has Option "
-                f"{_opt_txt}. Option says how the circle's size is given: enter "
-                f"Depth, Intercept or Radius.")
+            # A blank Option, or a word that is not one of the three, states no
+            # size.
+            Depth = R = float('nan')
         circle = {
             "Xo": Xo,
             "Yo": Yo,
             "Depth": Depth,
             "R": R,
         }
+        if pd.isna(_size_cell(R)) or pd.isna(_size_cell(Depth)):
+            # An UNSIZED circle: a blank Option, a word that is not one of the
+            # three, or one of the three whose cell is blank. It is kept as entered
+            # -- a file saved mid-edit must reopen -- with its size undefined, and
+            # preflight's surface.circle_size_missing refuses the runs that read
+            # the circles sheet. The Option is kept as typed and so is every size
+            # cell, under 'size_cells' (NaN for a blank cell): nothing reads them
+            # while the circle has no size, the writer puts them back in the same
+            # cells, and Studio shows them, so filling the cell or picking an
+            # Option later sizes the circle from the values already there.
+            circle["Depth"] = circle["R"] = float('nan')
+            circle["Option"] = (str(Option).strip() or None) if isinstance(Option, str) \
+                else (None if Option is None or pd.isna(Option) else str(Option))
+            circle["size_cells"] = size_cells
         circles.append(circle)
 
     # --- optional search window (v19, circles!J7 header, J8:K17 label/value pairs) ---
@@ -2356,11 +2496,14 @@ def load_slope_data(filepath, dest=None, overwrite=False):
 
     # === NON-CIRCULAR SURFACES ===
     noncirc_df = xls.parse('non-circ')
+    # Movement: Free / Horiz / Fixed in any case, stored in the sheet's spelling;
+    # blank is None; any other entry is kept as typed for preflight to name
+    # (fileio.noncirc_movement).
     non_circ = list(noncirc_df.iloc[1:].dropna(subset=['Unnamed: 0']).apply(
         lambda row: {
             "X": float(row['Unnamed: 0']),
             "Y": float(row['Unnamed: 1']),
-            "Movement": row['Unnamed: 2']
+            "Movement": noncirc_movement(row.get('Unnamed: 2'))
         }, axis=1))
 
     # === REINFORCEMENT LINES ===
@@ -2462,11 +2605,13 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 "tend1": tend1 / _div,
                 "tend2": tend2 / _div,
                 "spacing": spacing,
-                # v27 joint (slip) option, stored as entered ('Yes' / 'No' / '')
+                # v27 joint (slip) option, stored lowercased ('yes' / 'no' / '')
                 # so a file round-trips blank as blank. Readers: the line is a
-                # joint iff joint.lower() == 'yes'; its strength is reduced in the
-                # SSR unless jred.lower() == 'no'. kn / ks blank = NaN = derived
-                # from the adjacent soil.
+                # joint iff joint == 'yes' (blank = no); its strength is reduced
+                # in the SSR unless jred == 'no' (blank = yes). Any other word is
+                # kept as entered and preflight's joint.yes_no_vocabulary refuses
+                # it. kn / ks blank = NaN = derived from the adjacent soil; a value
+                # of zero or less is joint.stiffness_nonpositive.
                 "joint": _choice(row.get('joint'), ''),
                 "kn": float(row['kn']) if pd.notna(row.get('kn')) else float('nan'),
                 "ks": float(row['ks']) if pd.notna(row.get('ks')) else float('nan'),
@@ -2546,7 +2691,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                     # rule the reinforce sheet's kn/ks columns carry.
                     "kn": float(row['kn']) if pd.notna(row.get('kn')) else float('nan'),
                     "ks": float(row['ks']) if pd.notna(row.get('ks')) else float('nan'),
-                    # Stored as entered so a blank round-trips blank; blank = yes.
+                    # Stored lowercased so a blank round-trips blank; blank = yes.
                     "jred": _choice(row.get('jred'), ''),
                 })
             except ValueError:
@@ -2765,6 +2910,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     globals_data["tcrack_depth"] = tcrack_depth
     globals_data["tcrack_water"] = tcrack_water
     globals_data["k_seismic"] = k_seismic
+    globals_data["k_vertical"] = k_vertical
     globals_data["max_depth"] = max_depth
     globals_data["profile_lines"] = profile_lines
     globals_data["polygons"] = polygons
@@ -2892,6 +3038,50 @@ def default_template_path():
     """
     return os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "resources", "input_template.xlsx")
+
+
+#: The strength options a material row may name in the mat sheet's 'option' column.
+#: A blank is accepted too, on a row that carries no strength (a seep-only material).
+#: The loader checks the column against this tuple, and every message that lists the
+#: choices reads them from here (:func:`strength_options_text`), so no message can
+#: offer a different set from the one the loader accepts.
+STRENGTH_OPTIONS = ("mc", "cp", "ratio", "pow", "hb", "elastic")
+
+#: The mat sheet's unsat column (unsaturated conductivity model): linear front,
+#: van Genuchten, Gardner. A blank cell is 'lf'.
+UNSAT_MODELS = ("lf", "vg", "gard")
+
+#: The non-circ sheet's Movement column, in the sheet's own spelling. Matched in
+#: any case (:func:`noncirc_movement`).
+NONCIRC_MOVEMENTS = ("Free", "Horiz", "Fixed")
+
+
+def noncirc_movement(value):
+    """A non-circ Movement cell read: ``'Free'``, ``'Horiz'`` or ``'Fixed'`` for
+    one of the three words in any case, ``None`` for a blank cell, and the
+    trimmed text itself for any other entry.
+
+    Only the non-circular search reads the column. A blank keeps its standing
+    meaning there (an end point slides along the ground surface, an interior
+    point stays where it is); a word outside the three is preflight's
+    ``surface.movement_vocabulary`` and the search refuses it.
+    """
+    if value is None or (isinstance(value, float) and value != value):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    for word in NONCIRC_MOVEMENTS:
+        if text.lower() == word.lower():
+            return word
+    return text
+
+
+def strength_options_text(conjunction="or"):
+    """The strength options read out for a message: ``"mc, cp, ratio, pow, hb, or
+    elastic"``."""
+    *head, last = STRENGTH_OPTIONS
+    return f"{', '.join(head)}, {conjunction} {last}"
 
 
 # in-memory material key -> 'mat' sheet header text. Shared by the writer and by the
@@ -3103,9 +3293,12 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     them are, and :func:`write_cells_to_xlsx` flags the workbook for a full
     recalculation on open so the dependent formulas refresh.
 
-    Circle surfaces are always written with ``Option = "Depth"`` (the loader
-    collapses every circle to ``Xo/Yo/Depth/R`` with ``R = Yo - Depth``, so this
-    reproduces the radius regardless of how the original was specified). The pile
+    Circle surfaces are written with ``Option = "Depth"`` (the loader collapses
+    every sized circle to ``Xo/Yo/Depth/R`` with ``R = Yo - Depth``, so this
+    reproduces the radius regardless of how the original was specified). An
+    unsized circle -- its Option blank or not one of the three, or the cell its
+    Option names blank -- is written with its Option and its size cells as they
+    were entered (``size_cells``), so it reopens as it was. The pile
     force direction is auto-derived by the loader from the pile endpoints (the
     pre-v23 templates' ``qp`` override column, when the target carries one, is
     left blank).
@@ -3184,6 +3377,9 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
     # down one row; the same offset the loader uses, applied to the DESTINATION's
     # layout so an archived template is still written at its own positions.
     _dshift = 1 if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
+    # v28 inserted the vertical seismic coefficient at main!D14 and pushed the whole
+    # run-option block down one more row.
+    _dtop = 1 if _dest_version >= _VERTICAL_SEISMIC_TEMPLATE_VERSION else 0
 
     # === main === (version-gated positional map; see load_slope_data)
     if _dest_version >= 18:
@@ -3193,6 +3389,10 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             'D12': _f(slope_data['tcrack_water']),
             'D13': _f(slope_data['k_seismic']),
         }
+        if _dtop:
+            # v28 vertical seismic coefficient (D14), signed, positive downward.
+            # Written as a number, 0 where the model has none, like k above.
+            main_u['D14'] = _f(slope_data.get('k_vertical') or 0.0)
         # Units selector (D8) and Time selector (D9) are written UNCONDITIONALLY --
         # blank (None) when undeclared -- so the template's pre-filled defaults never
         # leak into a saved file (e.g. a model with no time_unit must not inherit the
@@ -3209,26 +3409,31 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             # the blank template ships with D17 pre-filled 'YES', and a model that
             # declares nothing must not silently inherit it on save.
             _srf = slope_data.get('tension_srf')
-            main_u['D14'] = str(slope_data['lem_method']) if slope_data.get('lem_method') else None
-            main_u['D15'] = (int(slope_data['num_slices'])
-                             if slope_data.get('num_slices') is not None else None)
-            main_u['D16'] = (_f(slope_data['k0'])
-                             if slope_data.get('k0') is not None else None)
-            main_u['D17'] = None if _srf is None else ('YES' if _srf else 'NO')
-            main_u['D18'] = str(slope_data['element_type']) if slope_data.get('element_type') else None
-            main_u['D19'] = (_f(slope_data['target_size'])
-                             if slope_data.get('target_size') is not None else None)
+            main_u[f'D{14 + _dtop}'] = (str(slope_data['lem_method'])
+                                        if slope_data.get('lem_method') else None)
+            main_u[f'D{15 + _dtop}'] = (int(slope_data['num_slices'])
+                                        if slope_data.get('num_slices') is not None
+                                        else None)
+            main_u[f'D{16 + _dtop}'] = (_f(slope_data['k0'])
+                                        if slope_data.get('k0') is not None else None)
+            main_u[f'D{17 + _dtop}'] = (None if _srf is None
+                                        else ('YES' if _srf else 'NO'))
+            main_u[f'D{18 + _dtop}'] = (str(slope_data['element_type'])
+                                        if slope_data.get('element_type') else None)
+            main_u[f'D{19 + _dtop}'] = (_f(slope_data['target_size'])
+                                        if slope_data.get('target_size') is not None
+                                        else None)
             if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
                 # v25 1D element size (D20). Written unconditionally like the rest
                 # of the block: the template ships the cell blank, and a model that
                 # declares no 1D size must save as blank rather than inherit one.
-                main_u['D20'] = (_f(slope_data['element_size_1d'])
+                main_u[f'D{20 + _dtop}'] = (_f(slope_data['element_size_1d'])
                                  if slope_data.get('element_size_1d') is not None
                                  else None)
-            main_u[f'D{20 + _dshift}'] = (
+            main_u[f'D{20 + _dshift + _dtop}'] = (
                 _f(slope_data['ssrm_f_min'])
                 if slope_data.get('ssrm_f_min') is not None else None)
-            main_u[f'D{21 + _dshift}'] = (
+            main_u[f'D{21 + _dshift + _dtop}'] = (
                 _f(slope_data['ssrm_f_max'])
                 if slope_data.get('ssrm_f_max') is not None else None)
         if _dest_version >= 21:
@@ -3236,7 +3441,7 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             # the run options above: the blank template ships D22 pre-filled
             # 'rollers', and a model that declares nothing must not inherit it.
             _sbc = slope_data.get('side_bc')
-            main_u[f'D{22 + _dshift}'] = str(_sbc).lower() if _sbc else None
+            main_u[f'D{22 + _dshift + _dtop}'] = str(_sbc).lower() if _sbc else None
         if _dest_version >= 22:
             # v22 water loads (D23). Written EXPLICITLY, never blank, and this one
             # matters more than the leak cases above: the template ships D23
@@ -3252,9 +3457,9 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 # and the answer decides whether the reservoir is counted once.
                 raise ValueError(
                     f"Cannot save this model: its water-load mode is {_wl!r}, which "
-                    f"is not a value cell D{23 + _dshift} of the 'main' sheet can "
+                    f"is not a value cell D{23 + _dshift + _dtop} of the 'main' sheet can "
                     f"hold. Expected one of: {', '.join(WATER_LOAD_OPTIONS)}.")
-            main_u[f'D{23 + _dshift}'] = _wl
+            main_u[f'D{23 + _dshift + _dtop}'] = _wl
             # v22 amendment: the surface family (D24). Written unconditionally, so a
             # model that states nothing writes a blank cell -- the normal state, and
             # the template ships blank, so there is nothing here to leak. A model that
@@ -3268,12 +3473,12 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 if _sf_key not in SURFACE_FAMILY_CELL:
                     raise ValueError(
                         f"Cannot save this model: its surface family is {_sf!r}, which "
-                        f"is not a value cell D{24 + _dshift} of the 'main' sheet "
+                        f"is not a value cell D{24 + _dshift + _dtop} of the 'main' sheet "
                         f"can hold. Expected one of: "
                         f"{', '.join(SURFACE_FAMILY_OPTIONS)}.")
-                main_u[f'D{24 + _dshift}'] = SURFACE_FAMILY_CELL[_sf_key]
+                main_u[f'D{24 + _dshift + _dtop}'] = SURFACE_FAMILY_CELL[_sf_key]
             else:
-                main_u[f'D{24 + _dshift}'] = None
+                main_u[f'D{24 + _dshift + _dtop}'] = None
         updates['main'] = main_u
     else:
         updates['main'] = {
@@ -3507,15 +3712,32 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
     if piezo:
         updates['piezo'] = piezo
 
-    # === circles ===  (header row 2, data rows 3+; always written as Option="Depth")
+    # === circles ===  (header row 2, data rows 3+; written as Option="Depth")
+    # Every circle with a size is written as Option = Depth and its Depth, whatever
+    # Option it was entered with. One with no size (a blank Option, a word outside
+    # the three, or a blank size cell) is written with the Option it carries, if
+    # any, and a blank Depth, so it reopens as it was saved and preflight's
+    # surface.circle_size_missing still names it.
     circ = {}
     for n, c in enumerate(slope_data.get('circles') or []):
         row = 3 + n
         circ[cell_ref(row, 1)] = n + 1
         circ[cell_ref(row, 2)] = _f(c['Xo'])
         circ[cell_ref(row, 3)] = _f(c['Yo'])
-        circ[cell_ref(row, 4)] = 'Depth'
-        circ[cell_ref(row, 5)] = _f(c['Depth'])
+        if _isnan(c.get('Depth')):
+            _opt = c.get('Option', 'Depth')
+            circ[cell_ref(row, 4)] = (None if _opt is None or _isnan(_opt)
+                                      else str(_opt))
+            # An unsized circle (its Option blank or unknown, or the cell it names
+            # blank) keeps its Option and the size cells it was given (the
+            # loader's 'size_cells'): Depth, Xi, Yi, R in E:H.
+            for _col, _key in ((5, 'Depth'), (6, 'Xi'), (7, 'Yi'), (8, 'R')):
+                _v = (c.get('size_cells') or {}).get(_key)
+                if not _isnan(_v):
+                    circ[cell_ref(row, _col)] = _f(_v)
+        else:
+            circ[cell_ref(row, 4)] = 'Depth'
+            circ[cell_ref(row, 5)] = _f(c['Depth'])
     # v19 search window (K8:K17, in SEARCH_WINDOW_KEYS order). Written on a v19
     # destination only; every one of the ten is written unconditionally so an
     # unset limit is a blank cell rather than a leftover.
@@ -3812,8 +4034,13 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
             y_col = x_col + 1
             u[cell_ref(3, x_col)] = kind                      # type cell (head/reservoir/flux)
             # v18: a string value is a tseep series name (time-varying BC) -- written
-            # verbatim; a number is a constant head/flux.
-            u[cell_ref(3, y_col)] = value if isinstance(value, str) else _f(value)
+            # verbatim; a number is a constant head/flux. A blank value (a block
+            # still being filled in) stays a blank cell, so the block reopens as it
+            # was saved and preflight's seep.bc_value_missing still names it.
+            if isinstance(value, str):
+                u[cell_ref(3, y_col)] = value
+            elif not _isnan(value):
+                u[cell_ref(3, y_col)] = _f(value)
             for i, (x, y) in enumerate(coords):
                 u[cell_ref(5 + i, x_col)] = _f(x)
                 u[cell_ref(5 + i, y_col)] = _f(y)

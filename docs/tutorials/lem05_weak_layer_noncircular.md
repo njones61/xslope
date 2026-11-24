@@ -171,7 +171,8 @@ Three rules govern the non-circular failure surface table:
   same *"Expected at least 2 intersection points"* error.
 - **Movement applies to the search, not to a single-surface solve.** The column
   sets how the search may move each point and has no effect on the surface being
-  solved, and a blank cell does not mean unrestricted — it means `Fixed`.
+  solved. A blank cell does not mean unrestricted: it means `Fixed` on an interior
+  point, and `Free` only on the first and last points.
 
 ---
 
@@ -336,8 +337,10 @@ Click **Piezometric lines** and, on the **Line 1** tab, **Add row** twice for
 ### 2. The failure surface
 
 Click **Non-circular pts** in the **Inputs** tree. The editor is a vertex table
-with the preview beside it, and its help line states the two rules the table has
-to obey: *"Points ordered left→right. Entry/exit points use Movement='Free'."*
+with the preview beside it, and its help line states the order the table takes
+and what a blank Movement means: *"Points ordered left→right. A blank Movement is
+Free for the first and last points (they slide along the ground surface) and Fixed
+for the points between; Fixed pins an end point too."*
 
 Press **Add row** four times and fill them from the table above: `0, 0, Free`,
 `10.6823, -5.8, Horiz`, `30, -5.8, Horiz`, `39.1221, 10, Free` — or skip the
@@ -448,8 +451,8 @@ Both seam points slid along the seam toward the toe — 6.6 ft and 2.8 ft — an
 neither left y = −5.8. This is the effect of `Horiz`: the flat run stretched from
 19.3 ft to 23.1 ft without either end climbing out of the clay. The two end
 points traveled 7.6 ft and 1.7 ft and stayed on the ground surface, at y = 0 and
-y = 10, which is what an entry or exit point does whatever its Movement says —
-`Free` lets it move at all. The entry point moved out past the toe onto the flat
+y = 10, which is what an entry or exit point does under `Free` or `Horiz`;
+`Fixed` would have pinned it. The entry point moved out past the toe onto the flat
 ground, which lengthens the sliding mass.
 
 With other Movement settings the search returns different results, and here
@@ -457,8 +460,8 @@ With other Movement settings the search returns different results, and here
 leave the track — one drops to the base of the seam at y = −6.00, the other
 climbs to −4.30 near its top contact — and the tilted run they leave behind
 returns **1.727**. With the interior pair `Fixed` they cannot move at all, the ends
-still slide, and the best the search reaches is **1.763**. A blank cell is
-`Fixed`, not a default.
+still slide, and the best the search reaches is **1.763**. A blank cell on an
+interior point is `Fixed`.
 
 ![Spencer on the surface the search found](images/lem05_solution.png){width=1000}
 
@@ -624,7 +627,8 @@ This tutorial covered:
 - A failure surface entered as a table of vertices, with explicit
   ground-surface elevations at its ends.
 - The **Movement** column shaping the search: `Horiz` sliding points along the
-  seam, `Free` moving the ends along the ground, blank holding a point fixed.
+  seam, `Free` moving the ends along the ground, blank holding an interior point
+  fixed.
 - OMS and Bishop declining a non-circular surface — they take moments about a
   circle center — and each remaining method searching its own surface.
 - Comparisons made deliberately on a fixed surface: where the track sits inside

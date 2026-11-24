@@ -124,6 +124,19 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   search-driven analyses.
 - **Seepage time** and the **rapid-drawdown stage times** — shown when the model
   carries transient seepage. See [Seepage time](#seepage-time).
+- **Seismic** — **Find the yield coefficient k_y** finds the seismic coefficient at
+  which the factor of safety is 1, in place of the model's own (see
+  [Yield Coefficient](../seismic/yield_coefficient.md)). **Two-stage seismic** runs the two-stage
+  pseudostatic analysis, and **Stage 2 strength** under it chooses how stage 2 takes
+  the undrained strength: **Interpolated (as in rapid drawdown)** or **Kc = 1
+  envelope** (see [Two-Stage Analysis](../seismic/two_stage.md)). **Strength factor**
+  multiplies the stage 2 undrained strengths, including those of `cp` and `ratio` materials: 1
+  leaves them as computed, and a screening
+  method's reduction, such as 0.8, goes here (see
+  [Stage 2 Strength Factor](../seismic/two_stage.md#factor)). The two can be
+  combined. Neither runs with **Rapid drawdown**: checking one clears the other.
+
+![Run LEM dialog with Two-stage seismic checked](images/analysis_run_lem_seismic.png)
 
 The result depends on the analysis type:
 
@@ -168,6 +181,22 @@ described in [Forces at the Crossings](../reinforcement/lem.md#forces-at-the-cro
 Both circular and non-circular surfaces are supported for single solves and
 searches. Search iteration progress streams to the Log pane, and a search can be
 **cancelled** from the status bar.
+
+### Newmark displacement {#newmark}
+
+In **LEM** mode, **Newmark…** on the **Run** menu and the toolbar integrates an
+acceleration record as a rigid sliding block at the yield coefficient. The dialog
+takes the **Record** (a PEER `.AT2` file, or two columns of time and acceleration),
+shows its header line, number of points, time step, and peak, and offers **As
+recorded**, a **Scale factor**, or a **Target peak acceleration (g)** (see
+[Scaling a Record](../seismic/newmark.md#scaling)). **Yield
+coefficient k_y** is filled from the last run that found one, or typed.
+
+![Newmark dialog](images/analysis_newmark_dialog.png)
+
+The result opens in the **LEM · Newmark** view: the record, the block's velocity
+relative to the ground, and its displacement, both directions, with a table. See
+[Newmark Displacement](../seismic/newmark.md).
 
 ---
 
@@ -668,7 +697,7 @@ Options start from the open file and are remembered for the session, not written
 
 Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)).
 
-The seismic note in the dialog explains the entered sign: **+k** pushes right and **−k** left; see [Seismic forces](../fem/overview.md#seismic-forces).
+The seismic note in the dialog explains the entered sign: **+k_h** pushes right and **−k_h** left; see [Seismic forces](../fem/overview.md#seismic-forces).
 
 **SSR exclusions…** opens the picker below; uncheck a material zone to hold it at full strength. The button and selection summary appear only for SSRM, and the selection is not saved; see [SSR exclusions](../fem/solver.md#ssr-exclusion-zones).
 
@@ -866,6 +895,23 @@ r<sub>u</sub> ratio, pressure grid, or a groundwater analysis) is read per mater
 each source becomes and which ones import as zero with a warning. RS2's stability
 result is an SSR field rather than a slip surface, so the import never carries a failure
 surface — you define circles afterward.
+
+**Undrained strengths.** Each importer maps the vendor's undrained strength models onto
+XSLOPE's own where the two give the same strength, and names the rest in the notes:
+
+| Vendor model | XSLOPE | When it is not exact |
+|---|---|---|
+| SLOPE/W SHANSEP, constant ratio | [`ratio`](../lem/overview.md#undrained-strength-ratio), c = 0 | Under B-bar, XSLOPE's strength is higher (no B-bar in XSLOPE) |
+| SLOPE/W SHANSEP, S × OCR<sup>m</sup> | `ratio` at the lowest OCR | OCR varies with elevation; the notes give the largest difference |
+| SLOPE/W S=f(depth) | `cp` from the top of the layer | The layer's top is not level |
+| Slide2 Undrained, constant | `mc` with φ = 0 | — |
+| Slide2 Undrained, F(Depth from Top of Layer) | `cp` from the top of the layer | The layer's top is not level |
+| RS2 Mohr-Coulomb with cohesion changing below a datum (φ = 0) | `cp` with r_elev at the datum | The zone rises above the datum, or reaches RS2's cohesion cutoff |
+
+A strength cutoff the zone never reaches changes nothing, so it crosses silently. Slide2's
+F(Depth from Horizontal Datum) and Vertical Stress Ratio, and SLOPE/W's S=f(datum) and its
+SHANSEP strength curve, are not mapped, and the notes say so. [GeoStudio import](../usage/geostudio.md#materials)
+gives the SLOPE/W definitions in full.
 
 **Export** — **File → Export to GeoStudio (SLOPE/W)…** writes the current model out as a
 `.gsz`. It needs a polygon-based model (material zones), since a profile-line model has

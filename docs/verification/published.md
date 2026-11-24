@@ -25,6 +25,13 @@ shared [References](references.md) page.
 Match dots and status terms follow the shared [definitions](index.md#status-terms) and
 [scoring](index.md#how-the-match-dots-are-scored).
 
+Duncan, Wright & Brandon's comparison of single-stage and two-stage seismic analyses
+(2014, Table 10.4) is a worked comparison rather than a hand calculation. The authors
+computed it with their own program and printed the factors of safety, so it is the
+published answer for the procedure it illustrates. The rigid-wedge yield coefficient
+(their Figure 10.1) is a closed form. Their two equilibrium equations for a mass sliding
+on a plane are solved for the seismic coefficient at which F = 1.
+
 A worked example frequently publishes one part of a design and defers the rest,
 and where XSLOPE computes a quantity the example does not carry, that quantity is reported as
 XSLOPE's own with no published counterpart and takes no dot.
@@ -39,6 +46,9 @@ XSLOPE's own with no published counterpart and takes no dot.
 | [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.637 has no published counterpart |
 | [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands rather than properties of the reinforcement, so they leave the capacity envelope where it stands, and XSLOPE's searched Spencer 1.542 has no published counterpart |
 | [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.122 has no published counterpart |
+| [Wedge](#dwb-10-1) | 🟢 | Yield coefficient of a rigid wedge (Duncan, Wright & Brandon, Figure 10.1) | c–φ wedge: k<sub>y</sub> 0.2366 vs closed form 0.2366 (0.0%) · frictional wedge: k<sub>y</sub> 0.0875 vs closed form 0.0875 (0.0%) | **built**; Spencer's method finds no solution on the frictional wedge, which the Corps of Engineers and Lowe & Karafiath rows cover |
+| [Two-stage](#dwb-10-4) | 🟢 | Pseudostatic slope, single-stage and two-stage (Duncan, Wright & Brandon, Table 10.4) | All 16 values within 1.3%: dry within 0.4%, submerged within 1.3% | **built**; the two-stage columns are XSLOPE's two-stage analysis with the K<sub>c</sub> = 1 envelope; its default interpolated values have no published counterpart |
+| [Newmark](#newmark-1965) | 🟢 | Rigid sliding block under a rectangular pulse (Newmark 1965) | k<sub>y</sub> = 0.1: D 73.575 cm vs closed form 73.575 cm (0.0%) · k<sub>y</sub> = 0.2: D 18.394 cm vs closed form 18.394 cm (0.0%) · imperial: D 28.957 in vs closed form 28.957 in (0.0%) | **built**; the record's other sign never pushes the block, so that direction stays at zero |
 
 </div>
 
@@ -241,13 +251,17 @@ in.
 
 $F^{*}$ for steel strips interpolates from $1.2 + \log_{10}C_u$ at the top of the
 wall to $\tan\varphi_r$ at 20 ft depth, which for this backfill is 2.000 down to
-0.675. A reinforcement layer is horizontal, so its depth is a single number and
+0.675. $C_u$ is the backfill's coefficient of uniformity, 7.0 here, so the top value
+would be $1.2 + \log_{10}7.0 = 2.045$, which the manual caps at 2.0. A reinforcement layer is horizontal, so its depth is a single number and
 its $F^{*}$ is a single number: one Delta per level, taken from the manual's own
 column.
 
 **Per-level pullout resistance.** The internal failure surface for inextensible
-reinforcement is the bilinear surface of Figure E3-5, and $L_e$ is the embedment
-beyond it. Reading XSLOPE's envelope at the station L − L<sub>e</sub> where that
+reinforcement is bilinear (the manual's Figure E3-5), and $L_e$ is the embedment
+beyond it. The sloping backfill raises the surface's height to
+$H_1 = H + 0.3H\tan\beta/(1 - 0.3\tan\beta) = 35.29$ ft. Over the upper half of $H_1$
+the surface stands at $0.3H_1 = 10.59$ ft from the face and $L_e = L - 0.3H_1$; below
+that it runs straight down to the toe of the wall and $L_e = L - 0.6(H - Z)$. Reading XSLOPE's envelope at the station L − L<sub>e</sub> where that
 surface crosses each level gives the resistance the resisting zone alone
 develops, which is the quantity Table E3-7.3 publishes:
 
@@ -333,7 +347,8 @@ for the four-wire mats and 1.0 ft for the three-wire mat at level 2. The
 element's horizontal spacing is the 5 ft panel width, so Spacing is 5 ft and
 each line's Tmax is the whole mat, $N$ wires' worth. The pullout resistance
 factor for a bar mat runs from $20(t/S_t)$ at the top of the wall to $10(t/S_t)$
-at 20 ft depth, with the transverse wire spacing $S_t$ stepping from 6 in on the
+at 20 ft depth, where $t$ is the transverse wire diameter (0.374 in for W11 wire),
+with the transverse wire spacing $S_t$ stepping from 6 in on the
 top four levels to 12 in and then 18 in below them; that step is what makes
 $F^{*}$ fall abruptly between levels 4 and 5 and again between 7 and 8.
 
@@ -480,7 +495,7 @@ own number with no published value behind it.
 
 ---
 
-## 🟢 FHWA Example E6 — traffic barrier impact on the E4 wall {#fhwa-e6}
+## 🟢 FHWA Example E6 — traffic barrier impact on an MSE wall {#fhwa-e6}
 
 Example E6 re-checks the [Example E4](#fhwa-e4) wall for a vehicle striking the
 traffic barrier at the top, an Extreme Event II load combination. Only the top
@@ -555,7 +570,7 @@ behind it.
 
 ---
 
-## 🟢 FHWA Example E7 — seismic loading on the E4 wall {#fhwa-e7}
+## 🟢 FHWA Example E7 — seismic loading on an MSE wall {#fhwa-e7}
 
 Example E7 re-checks the [Example E4](#fhwa-e4) wall for earthquake loading, an
 Extreme Event I load combination. Internal Step 4 reduces the pullout resistance
@@ -623,3 +638,215 @@ E7-11 to E7-14) (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e7.xlsx, type=pullout_envelope, expected_pullout=7.69:1374;7.69:2000;7.69:4390;7.69:5535;7.69:3216;6.76:3867;5.26:4642;3.76:3542;2.26:4296;0.76:5243, expected_envelope=7.69:1374;7.69:2000;7.69:4136;7.69:4136;7.69:3216;6.76:3867;5.26:4642;3.76:3542;2.26:4296;0.76:5243, tolerance=0.002, benchmark=FHWA-E7 -->
 <!-- test: file=files/published/fhwa_e7.xlsx, type=circular_search, method=spencer, expected_fs=1.122, num_slices=30, benchmark=FHWA-E7-global -->
+
+---
+
+## 🟢 Duncan, Wright & Brandon — yield coefficient of a rigid wedge {#dwb-10-1}
+
+Duncan, Wright & Brandon (2014), Section 10.1.2, Figure 10.1, resolve the forces on a
+mass sliding on a plane inclined at β, with the seismic force kW through its center of
+gravity:
+
+$$N = W\cos\beta - kW\sin\beta, \qquad T = W\sin\beta + kW\cos\beta, \qquad
+F = \frac{cL + N\tan\phi}{T}$$
+
+Duncan, Wright & Brandon apply them to an infinite slope. They hold exactly for any mass that slides
+on one plane: every slice base lies in that plane, and the interslice forces cancel
+when the slices are summed, so every method that satisfies force equilibrium gives this
+F at any k. Setting F = 1 gives the yield coefficient in closed form,
+
+$$k_y = \frac{cL/W + \cos\beta\tan\phi - \sin\beta}{\cos\beta + \sin\beta\tan\phi},$$
+
+which is tan(φ − β) when c = 0.
+
+**Input:** [dwb_fig10_1_wedge.xlsx](files/published/dwb_fig10_1_wedge.xlsx) · built by
+`benchmarks/published/build_dwb_fig10_1.py`
+
+The slope is 1H:1V and 10 m high, with γ = 20 kN/m³, and dry. The surface is a single
+plane at β = 30° from the toe to the crest, so the wedge weighs W = 732.05 kN/m on a
+base L = 20 m long. The workbook carries two soils, and each run picks one. Every run
+finds k<sub>y</sub> on that surface with 40 slices.
+
+| Soil | Closed form | Spencer | Corps of Engineers | Lowe & Karafiath |
+|---|:-:|:-:|:-:|:-:|
+| c = 10 kPa, φ = 30° | 0.2366 | 0.2366 (0.0%) | 0.2366 (0.0%) | 0.2366 (0.0%) |
+| c = 0, φ = 35° | 0.0875 (tan 5°) | no solution | 0.0875 (0.0%) | 0.0875 (0.0%) |
+
+Spencer's method finds no solution on the frictional wedge at any k tried from 0.02 to
+0.2, a range that contains its k<sub>y</sub>. Morgenstern-Price's finds none on the
+frictional wedge from k = 0.02 or on the c–φ wedge from about k = 0.06. The
+force-equilibrium methods solve at every k.
+
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=spencer, surface=noncircular, search=false, material=c-phi, num_slices=40, expected_kc=0.2366, kc_tol=0.0005, benchmark=DWB-10.1-wedge-cphi-spencer -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=c-phi, num_slices=40, expected_kc=0.2366, kc_tol=0.0005, benchmark=DWB-10.1-wedge-cphi-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=c-phi, num_slices=40, expected_kc=0.2366, kc_tol=0.0005, benchmark=DWB-10.1-wedge-cphi-lowe -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=frictional, num_slices=40, expected_kc=0.0875, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=frictional, num_slices=40, expected_kc=0.0875, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-lowe -->
+
+**With a vertical seismic force.** A vertical force k<sub>v</sub>W through the same center
+of gravity, positive downward, scales the weight in both equations by 1 + k<sub>v</sub>:
+
+$$N = W(1+k_v)\cos\beta - kW\sin\beta, \qquad T = W(1+k_v)\sin\beta + kW\cos\beta$$
+
+The factor of safety is again exact on the wedge. The yield coefficient search holds
+k<sub>v</sub> at a fixed ratio r = k<sub>v</sub>/k as it varies k, and with that ratio
+
+$$k_y = \frac{cL/W + \cos\beta\tan\phi - \sin\beta}{\cos\beta + \sin\beta\tan\phi
++ r(\sin\beta - \cos\beta\tan\phi)}.$$
+
+On the c–φ wedge φ equals β, so the term in r is zero and k<sub>v</sub> leaves its
+k<sub>y</sub> unchanged. The frictional wedge shows the ratio.
+
+| Soil | Quantity | Closed form | Spencer | Corps of Engineers | Lowe & Karafiath |
+|---|---|:-:|:-:|:-:|:-:|
+| c = 10 kPa, φ = 30° | F at k = 0.1, k<sub>v</sub> = 0.05 down | 1.2579 | 1.2579 (0.0%) | 1.2579 (0.0%) | 1.2579 (0.0%) |
+| c = 10 kPa, φ = 30° | F at k = 0.1, k<sub>v</sub> = 0.05 up | 1.2809 | 1.2809 (0.0%) | 1.2809 (0.0%) | 1.2809 (0.0%) |
+| c = 0, φ = 35° | F at k = 0.1, k<sub>v</sub> = 0.05 down | 0.9838 | no solution | 0.9838 (0.0%) | 0.9838 (0.0%) |
+| c = 0, φ = 35° | F at k = 0.1, k<sub>v</sub> = 0.05 up | 0.9634 | no solution | 0.9634 (0.0%) | 0.9634 (0.0%) |
+| c = 0, φ = 35° | k<sub>y</sub> with k<sub>v</sub> = 0.5k down | 0.0915 | no solution | 0.0915 (0.0%) | 0.0915 (0.0%) |
+| c = 0, φ = 35° | k<sub>y</sub> with k<sub>v</sub> = 0.5k up | 0.0838 | no solution | 0.0838 (0.0%) | 0.0838 (0.0%) |
+
+With k = 0.1 and no vertical force, F is 1.2689 on the c–φ wedge and 0.9741 on the
+frictional wedge. A downward k<sub>v</sub> lowers F on the c–φ wedge and raises it on the
+frictional one, and an upward k<sub>v</sub> does the opposite, so a design check runs both
+directions.
+
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=c-phi, k_seismic=0.1, k_vertical=0.0, num_slices=40, fs_spencer=1.2689, fs_corps=1.2689, fs_lowe=1.2689, benchmark=DWB-10.1-wedge-cphi-kv-none -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=frictional, k_seismic=0.1, k_vertical=0.0, num_slices=40, fs_corps=0.9741, fs_lowe=0.9741, benchmark=DWB-10.1-wedge-frictional-kv-none -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=c-phi, k_seismic=0.1, k_vertical=0.05, num_slices=40, fs_spencer=1.2579, fs_corps=1.2579, fs_lowe=1.2579, benchmark=DWB-10.1-wedge-cphi-kv-down -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=c-phi, k_seismic=0.1, k_vertical=-0.05, num_slices=40, fs_spencer=1.2809, fs_corps=1.2809, fs_lowe=1.2809, benchmark=DWB-10.1-wedge-cphi-kv-up -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=frictional, k_seismic=0.1, k_vertical=0.05, num_slices=40, fs_corps=0.9838, fs_lowe=0.9838, benchmark=DWB-10.1-wedge-frictional-kv-down -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=single_noncirc, material=frictional, k_seismic=0.1, k_vertical=-0.05, num_slices=40, fs_corps=0.9634, fs_lowe=0.9634, benchmark=DWB-10.1-wedge-frictional-kv-up -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=0.1, num_slices=40, expected_kc=0.0915, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-down-ky-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=0.1, num_slices=40, expected_kc=0.0915, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-down-ky-lowe -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=corps, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=-0.1, num_slices=40, expected_kc=0.0838, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-up-ky-corps -->
+<!-- test: file=files/published/dwb_fig10_1_wedge.xlsx, type=critical_kc, method=lowe, surface=noncircular, search=false, material=frictional, k_seismic=0.2, k_vertical=-0.1, num_slices=40, expected_kc=0.0838, kc_tol=0.0005, benchmark=DWB-10.1-wedge-frictional-kv-up-ky-lowe -->
+
+---
+
+## 🟢 Duncan, Wright & Brandon — single- and two-stage seismic analyses {#dwb-10-4}
+
+Duncan, Wright & Brandon (2014), Section 10.4.2, compare the two ways of giving a
+pseudostatic analysis undrained strengths for a slope that has consolidated under its
+own weight. The **single-stage** analysis enters c<sub>R</sub> and φ<sub>R</sub>, the
+intercept and slope of the R envelope (the Corps' consolidated-undrained strength envelope;
+see [R envelope](../lem/rapid.md#r-envelope)), as an ordinary c and φ, with the pore
+pressures from before the earthquake. The **two-stage** analysis first solves the slope with no seismic force
+and drained strengths, which gives each slice's consolidation stresses
+σ′<sub>fc</sub> and τ<sub>fc</sub>; the second stage gives every slice its undrained
+strength from those stresses and adds the seismic force. Their Table 10.4 runs both on
+the slope of Figure 10.7 with k = 0.15, for [the four soils](../seismic/two_stage.md#four-soils)
+of their Table 10.3, dry and submerged.
+
+**Input:** [dwb_t10_4_dry.xlsx](files/published/dwb_t10_4_dry.xlsx) ·
+[dwb_t10_4_submerged.xlsx](files/published/dwb_t10_4_submerged.xlsx) · built by
+`benchmarks/published/build_dwb_t10_4.py`
+
+The slope is 2.5H:1V and 30 ft high, with γ = 135 pcf throughout. Each workbook carries
+all eight strength sets of Table 10.3, each soil once with c′, φ′, d, and ψ for the
+two-stage analysis (d and ψ, the intercept and slope of the K<sub>c</sub> = 1 envelope; see
+[two envelopes](../lem/rapid.md#two-envelopes)) and once with c<sub>R</sub> and φ<sub>R</sub> for the single-stage
+analysis; the profile line points at the soil being run. The figure gives no foundation
+depth and no water depth, so the model sets the base 30 ft (one slope height) below the
+toe and, in the submerged case, the water 15 ft above the crest. The dry results do not
+depend on the base, because their critical circles stay above it. In the submerged case
+the critical circles for soils 2 and 4 reach the base, so those four values depend on the
+assumed depth, and a deeper base lowers them further below the published values.
+
+Every run is Spencer's method, a circular search, and 40 slices.
+
+| Soil | Water | XSLOPE single-stage | Duncan et al. single-stage | XSLOPE two-stage | Duncan et al. two-stage |
+|:-:|:-:|:-:|:-:|:-:|:-:|
+| 1 | dry | 0.946 | 0.95 (−0.4%) | 1.056 | 1.06 (−0.4%) |
+| 2 | dry | 1.557 | 1.56 (−0.2%) | 1.764 | 1.77 (−0.3%) |
+| 3 | dry | 1.068 | 1.07 (−0.2%) | 1.192 | 1.19 (+0.2%) |
+| 4 | dry | 2.759 | 2.76 (−0.0%) | 3.416 | 3.42 (−0.1%) |
+| 1 | submerged | 0.829 | 0.83 (−0.1%) | 0.949 | 0.95 (−0.1%) |
+| 2 | submerged | 1.570 | 1.59 (−1.3%) | 1.776 | 1.79 (−0.8%) |
+| 3 | submerged | 1.086 | 1.10 (−1.3%) | 1.209 | 1.21 (−0.1%) |
+| 4 | submerged | 2.815 | 2.83 (−0.5%) | 3.486 | 3.49 (−0.1%) |
+
+XSLOPE reproduces Duncan, Wright & Brandon's finding that the single-stage analysis gives 80 to 90 percent
+of the two-stage factor of safety.
+
+Duncan, Wright & Brandon say to estimate the undrained strengths in the second stage "using the
+same procedures as for rapid drawdown", which interpolates between the K<sub>c</sub> = 1
+envelope and the drained envelope according to each slice's consolidation stress ratio
+K<sub>c</sub>. Their Table 10.4 was computed from the K<sub>c</sub> = 1 envelope alone,
+τ<sub>ff</sub> = d + σ′<sub>fc</sub> tan ψ, and XSLOPE matches the table only that way.
+The two-stage analysis offers both. The table's two-stage columns above use the
+K<sub>c</sub> = 1 choice; the default interpolated choice gives these values, which are
+XSLOPE's own with no published counterpart:
+
+| Soil | Dry, K<sub>c</sub> = 1 | Dry, interpolated | Submerged, K<sub>c</sub> = 1 | Submerged, interpolated |
+|:-:|:-:|:-:|:-:|:-:|
+| 1 | 1.056 | 1.287 | 0.949 | 1.117 |
+| 2 | 1.764 | 1.773 | 1.776 | 1.778 |
+| 3 | 1.192 | 1.314 | 1.209 | 1.271 |
+| 4 | 3.416 | 3.039 | 3.486 | 3.255 |
+
+Where the K<sub>c</sub> = 1 envelope lies below the drained envelope over the stresses
+on the surface (soils 1 and 3), the interpolation raises the strength; where it lies
+above (soil 4), the interpolation lowers it. For soil 2 the two envelopes cross within
+that range of stresses, and the two choices nearly agree.
+
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 1 R envelope, num_slices=40, expected_fs=0.946, tolerance=0.005, benchmark=DWB-10.4-dry-1-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 2 R envelope, num_slices=40, expected_fs=1.557, tolerance=0.005, benchmark=DWB-10.4-dry-2-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 3 R envelope, num_slices=40, expected_fs=1.068, tolerance=0.005, benchmark=DWB-10.4-dry-3-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 4 R envelope, num_slices=40, expected_fs=2.759, tolerance=0.005, benchmark=DWB-10.4-dry-4-single -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.056, tolerance=0.005, benchmark=DWB-10.4-dry-1-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.764, tolerance=0.005, benchmark=DWB-10.4-dry-2-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.192, tolerance=0.005, benchmark=DWB-10.4-dry-3-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=kc1, num_slices=40, expected_fs=3.416, tolerance=0.005, benchmark=DWB-10.4-dry-4-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.287, tolerance=0.005, benchmark=DWB-10.4-dry-1-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.773, tolerance=0.005, benchmark=DWB-10.4-dry-2-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.314, tolerance=0.005, benchmark=DWB-10.4-dry-3-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_dry.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=interpolated, num_slices=40, expected_fs=3.039, tolerance=0.005, benchmark=DWB-10.4-dry-4-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 1 R envelope, num_slices=40, expected_fs=0.829, tolerance=0.005, benchmark=DWB-10.4-submerged-1-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 R envelope, num_slices=40, expected_fs=1.570, tolerance=0.005, benchmark=DWB-10.4-submerged-2-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 R envelope, num_slices=40, expected_fs=1.086, tolerance=0.005, benchmark=DWB-10.4-submerged-3-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 R envelope, num_slices=40, expected_fs=2.815, tolerance=0.005, benchmark=DWB-10.4-submerged-4-single -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=kc1, num_slices=40, expected_fs=0.949, tolerance=0.005, benchmark=DWB-10.4-submerged-1-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.776, tolerance=0.005, benchmark=DWB-10.4-submerged-2-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=kc1, num_slices=40, expected_fs=1.209, tolerance=0.005, benchmark=DWB-10.4-submerged-3-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=kc1, num_slices=40, expected_fs=3.486, tolerance=0.005, benchmark=DWB-10.4-submerged-4-kc1 -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 1 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.117, tolerance=0.005, benchmark=DWB-10.4-submerged-1-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 2 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.778, tolerance=0.005, benchmark=DWB-10.4-submerged-2-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 3 two-stage, seismic2=interpolated, num_slices=40, expected_fs=1.271, tolerance=0.005, benchmark=DWB-10.4-submerged-3-interpolated -->
+<!-- test: file=files/published/dwb_t10_4_submerged.xlsx, type=circular_search, method=spencer, material=Soil 4 two-stage, seismic2=interpolated, num_slices=40, expected_fs=3.255, tolerance=0.005, benchmark=DWB-10.4-submerged-4-interpolated -->
+
+---
+
+## 🟢 Newmark (1965) — rigid sliding block under a rectangular pulse {#newmark-1965}
+
+Newmark (1965) treats the mass above a failure surface as a rigid block on an inclined
+base, which slides whenever the base acceleration exceeds the block's yield acceleration
+k<sub>y</sub>·g. His first case is a base given one rectangular pulse of acceleration
+A·g lasting t<sub>0</sub>. While the pulse lasts, the block gains velocity relative to the
+base at (A − k<sub>y</sub>)·g; when it ends, the block slows at k<sub>y</sub>·g until it
+stops. The displacement is
+
+$$D = \frac{g\,t_0^2}{2}\,\frac{A\,(A - k_y)}{k_y},$$
+
+which is Newmark's V²/(2gN)·(1 − N/A) with V = A·g·t<sub>0</sub> and N = k<sub>y</sub>.
+
+**Input:** [newmark_pulse.txt](files/published/newmark_pulse.txt) · built by
+`benchmarks/published/build_newmark_pulse.py`
+
+The record is a pulse of A = 0.3 g for t<sub>0</sub> = 0.5 s, then zero to 3 s, written as
+two columns of time and acceleration every 0.01 s. The pulse ends between a sample at
+0.5 s holding 0.3 g and one a nanosecond later holding zero, so the record is the
+rectangle to within that nanosecond. XSLOPE takes a record as linear between samples and
+integrates each step exactly on that line, so the displacement does not depend on the
+time step. It runs the record both ways, and its negative sign is zero throughout, so
+only the positive pulse moves the block.
+
+| k<sub>y</sub> | Units | XSLOPE | closed form |
+|:-:|:-:|:-:|:-:|
+| 0.1 | SI (g = 9.81 m/s²) | 73.575 cm | 73.575 cm (0.0%) |
+| 0.2 | SI (g = 9.81 m/s²) | 18.394 cm | 18.394 cm (0.0%) |
+| 0.1 | imperial (g = 32.174 ft/s²) | 28.957 in | 28.957 in (0.0%) |
+
+<!-- test: file=files/published/newmark_pulse.txt, type=newmark, ky=0.1, expected_d=73.575, tolerance=0.001, benchmark=Newmark-1965-k0.1 -->
+<!-- test: file=files/published/newmark_pulse.txt, type=newmark, ky=0.2, expected_d=18.394, tolerance=0.001, benchmark=Newmark-1965-k0.2 -->
+<!-- test: file=files/published/newmark_pulse.txt, type=newmark, ky=0.1, units=imperial, expected_d=28.957, tolerance=0.001, benchmark=Newmark-1965-imperial -->

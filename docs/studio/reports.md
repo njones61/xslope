@@ -138,6 +138,15 @@ Then **one block per method**, under that method's own heading:
   strength on any slice, how many slices it applied to. A surface that
   [crosses no material with d and ψ](../lem/rapid.md#drained-surfaces) is
   stated as such, with c′, φ′ in all materials for stage 2.
+- **Two-stage seismic**, for a [two-stage seismic](../seismic/two_stage.md) run —
+  the factor of safety of each stage on the surface, how stage 2 took the
+  undrained strength, and the stage 2 strength factor when it is below 1.
+- **Yield coefficient**, for a run that found [k<sub>y</sub>](../seismic/yield_coefficient.md)
+  — k<sub>y</sub> and the factor of safety on that surface with no seismic force;
+  after a search, a table of the searches that located the minimum, each with the
+  coefficient it was made at, the critical factor of safety it found, and
+  k<sub>y</sub> on that surface; on a single surface, the factor of safety at each
+  coefficient tried.
 - **The slice table** — geometry, forces and strengths on a landscape page, with
   column totals at the foot and a legend beneath defining every column. Columns
   that carry nothing for the model are left out — except a few that print
@@ -184,6 +193,14 @@ solver. Where a model uses a feature the compact form cannot show — passive su
 in a force-equilibrium method, whose capacity mobilizes with the soil and so carries
 1/F on both sides — the section states this rather than printing an equation that
 does not reproduce.
+
+### Newmark displacement
+
+After a [Newmark](../seismic/newmark.md) run, a section of its own: the record's
+file and header line, its number of points, time step, duration, and peak
+acceleration, the scale factor where it is not 1, k<sub>y</sub> and where it came from, the
+displacement each way and the number of slip episodes, and the figure of the three
+histories. The record's values are not printed.
 
 ### Deformation and strength reduction
 

@@ -34,6 +34,14 @@ both halves of it.
      model's own worksheet (``_sheet_cells``), because the loader reads a blank and
      a default the same way and so cannot see a page that prints one for the
      other.
+  C. THE GRAYING. A grayed cell promises that nothing reads it. On the mat,
+     circles, polygon and reinforce sheets, for every case a row can be in --
+     blank switches included -- the template's conditional formatting, every
+     Studio view of the same field, and the engine's own reading (probed by
+     nudging the value, never looked up) must agree, but for a short list of
+     deliberate exceptions (``_GRAYING_EXCEPTIONS``). Each rule must also reach
+     every row its switch's dropdown does. The readings are taken in
+     test/graying_probe.py.
 
 Skips cleanly (exit 0) when PySide6 is not installed.
 """
@@ -48,6 +56,10 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
+
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -225,7 +237,7 @@ def test_read_only_cells_are_skipped():
     fields = MaterialsEditor.FIELDS
     keys = [f.key for f in fields]
     row = {f.key: f.default for f in fields}
-    row.update(name="clay", option="mc", u="none", ru=None, phi_b=None, s_cap=None)
+    row.update(name="clay", option="mc", u="ru", ru=None, phi_b=None, s_cap=None)
     t = _new_table(fields, [row], dim_rule=_mat_dim_keys)
     # Anchored on the live cell to their left and running across them — the only way
     # a block reaches a grayed cell, since a grayed cell cannot be made the current
@@ -483,6 +495,226 @@ def test_tab_past_the_last_cell_of_a_plain_grid():
                  == (3, 2, 0),
                  f"Tab from the last cell left {grid.rowCount()} rows with the "
                  f"cursor at row {grid.currentRow()}, column {grid.currentColumn()}")
+
+
+# --------------------------------------------------------------------------- #
+# C. The graying: the template, Studio and the engine, held to one another
+# --------------------------------------------------------------------------- #
+# What each of the three says is read in test/graying_probe.py, from the thing
+# itself: the template's conditional formatting evaluated cell by cell, Studio's
+# editors read off their widgets, and the engine probed by nudging each field and
+# watching what it is handed. Here they are held to one rule -- the sheet grays a
+# cell, every Studio view grays it, and nothing reads it, all three together --
+# for every case, blanks included.
+#
+# Deliberate exceptions, where the engine's reading is not what decides the
+# graying. Each names the sheet, the cases (switch -> value) and the fields ("*"
+# for all); there the sheet's own graying stands, and every Studio view must still
+# show the same. An entry that also names a Studio view excuses that view alone
+# from showing the same there; the sheet and the other views are still held to
+# each other. Keep this short: an exception added here is a decision, and it
+# should show up as a diff.
+_MAT_OPTION_FIELDS = {"c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c", "pow_d",
+                      "hb_sci", "hb_gsi", "hb_mi", "hb_d",
+                      "sigma_c", "sigma_phi", "sigma_cp"}
+_GRAYING_EXCEPTIONS = [
+    # (a) A blank strength option is a row still being filled in. The FEM and the
+    #     LEM refuse it, so nothing reads its fields, but the sheet leaves them
+    #     live so it can be finished. A blank circle Option is the same kind of
+    #     row: the loader keeps the circle with no size, and the checks refuse it
+    #     until an Option is picked.
+    ("mat", {"option": ""}, "*"),
+    # The list view is a form showing the chosen option's fields: with none chosen
+    # it shows none (the table cannot hide per row, so it stays held to the sheet).
+    ("mat", {"option": ""}, _MAT_OPTION_FIELDS, "list view"),
+    ("circles", {"Option": ""}, "*"),
+    # (b) s(d) and s(psi) need no entry. Only a rapid drawdown reliability run
+    #     reads them, on an mc row; the probe's reading is every analysis's
+    #     together, rapid reliability included, so they read where d and psi do
+    #     and gray with them elsewhere, as the sheet and Studio have them.
+    # (c) u on an elastic row needs no entry any more: an elastic material reads
+    #     its own u, and its ru when u = ru (Norm, 533a), so Studio leaves both live
+    #     and the template's elastic rule stops graying them (O11:R52 becomes
+    #     Q11:R52). Until that template edit lands, this check reports the sheet.
+]
+# (d) Rows the template's formatting leaves out by Norm's decision (532a):
+#     (sheet, switch column, first row left out). Circles rows 43-52 take an
+#     Option from the dropdown but are not grayed. The piles sheet carries no
+#     graying rule at all, so its rows 13 onward have nothing to flag.
+_GRAYING_STRUCTURE_EXCEPTIONS = [("circles", "D", 43)]
+
+
+def _gp():
+    if _HERE not in sys.path:
+        sys.path.insert(0, _HERE)
+    import graying_probe
+    return graying_probe
+
+
+def _excepted(row):
+    """(whether the sheet's graying stands for this row, the Studio views excused
+    from it)."""
+    stands, views = False, set()
+    for sheet, match, fields, *view in _GRAYING_EXCEPTIONS:
+        if row["sheet"] != sheet or (fields != "*" and row["field"] not in fields):
+            continue
+        if all(row["case"].get(k) == v for k, v in match.items()):
+            if view:
+                views |= {v for v in row["studio"] if v.startswith(view[0])}
+            else:
+                stands = True
+    return stands, views
+
+
+def _graying_failures(rows):
+    """Every case where the sheet, a Studio view and the engine's reading do not
+    agree, one line per set of fields that disagree the same way in the same
+    cases."""
+    gp = _gp()
+    by_field = {}
+    for r in rows:
+        exc, excused = _excepted(r)
+        want = r["sheet_gray"] if exc else gp.expect_gray(r["verdict"])
+        studio = {v: g for v, g in r["studio"].items() if v not in excused}
+        if all(s is want for s in [r["sheet_gray"]] + list(studio.values())):
+            continue
+        key = (r["sheet"], r["label"], r["sheet_gray"],
+               tuple(studio.items()), r["verdict"], tuple(r["who"]), want, exc)
+        by_field.setdefault(key, []).append(
+            tuple(sorted(r["case"].items(), key=lambda kv: list(r["case"]).index(kv[0]))))
+    groups = {}
+    for (sheet, label, *rest), cases in by_field.items():
+        groups.setdefault((sheet, tuple(rest), tuple(cases)), []).append(label)
+
+    def says(g):
+        return "grays it" if g is True else ("leaves it live" if g is False else g)
+
+    reasons = {gp.READ: "the engine reads it", gp.REFUSES: "a check refuses a run "
+               "over its value", gp.NOTES: "only a note mentions it",
+               gp.UNREAD: "nothing reads it"}
+    out = []
+    for (sheet, (sg, studio, verdict, who, want, by_exc), cases), labels in \
+            groups.items():
+        sides = [f"the sheet {says(sg)}"] + [f"the {v} {says(g)}" for v, g in studio]
+        if by_exc:
+            why = (f"an exception lets the sheet's graying stand, and Studio must "
+                   f"show it {'gray' if want else 'live'} too")
+        else:
+            why = reasons[verdict] + (f" ({', '.join(who)})" if who else "")
+        eg = " | ".join(", ".join(f"{k}={v or '(blank)'}" for k, v in c)
+                        for c in cases[:3])
+        more = f" | and {len(cases) - 3} more" if len(cases) > 3 else ""
+        out.append(f"{sheet} {', '.join(labels)} [{len(cases)} case(s): {eg}{more}]: "
+                   f"{', '.join(sides)}, but {why}")
+    return out
+
+
+def test_mat_graying_agrees():
+    """The mat sheet over every strength option, pore-pressure model and
+    unsaturated model, blank included as a case of its own (140 cases), on a named
+    row: the sheet's graying, the Materials table's and the list view's (grayed or
+    hidden), and the engine's reading agree field by field. A blank u and unsat,
+    which Studio cannot hold, are shown as the loader reads them and grayed as the
+    sheet grays that reading."""
+    gp = _gp()
+    return _graying_failures(gp.mat_rows()) + gp.mat_shown_blank_failures()
+
+
+def test_circles_graying_agrees():
+    """The circles sheet for each Option, blank included: the sheet, the Circles
+    table and the loader agree on which of Depth, Xi, Yi and R the circle is
+    sized by."""
+    gp = _gp()
+    return _graying_failures(gp.circle_rows()) + gp.circle_shown_blank_failures()
+
+
+def test_polygon_graying_agrees():
+    """The polygon sheet for each Type, blank included: every block's own rule
+    (its $B$5-style reference read at its own Type cell), the Polygons editor's
+    Material and Size, and what reaches the mesher and the slicer agree."""
+    gp = _gp()
+    return _graying_failures(gp.polygon_rows()) + gp.polygon_shown_blank_failures()
+
+
+def test_reinforce_graying_agrees():
+    """The reinforce sheet for Joint {blank, Yes, No} x the pullout pair {neither,
+    Adhesion only, Delta only, both} x Type {blank and the four}: the sheet, the
+    Reinforcement table and list view, and the engine's reading agree."""
+    gp = _gp()
+    return _graying_failures(gp.reinforce_rows())
+
+
+def test_graying_rules_cover_their_dropdowns():
+    """Each graying rule reaches every row its switch's dropdown offers a choice
+    on, and every polygon block's Type cell has a rule reading it."""
+    return _gp().structural_failures(allow=_GRAYING_STRUCTURE_EXCEPTIONS)
+
+
+def test_a_pasted_option_defines_the_row():
+    """A block that sets a row's strength option lands whole, though the row's old
+    option grayed some of its cells: a cp material pasted over an mc row keeps its
+    c/p and r-elev. The row is then grayed for cp. A block that leaves the option
+    alone still skips the cells the row's option grays."""
+    from studio.editors import MaterialsEditor, _mat_dim_keys
+
+    fields = MaterialsEditor.FIELDS
+    keys = [f.key for f in fields]
+    row = {f.key: f.default for f in fields}
+    row.update(name="clay", option="mc", c=10.0, phi=30.0, cp=0.0, r_elev=0.0,
+               u="none")
+    t = _new_table(fields, [row], dim_rule=_mat_dim_keys)
+    _paste(t, _tsv([["cp", 15, 0, 3.75, 4]]), row=0, col=keys.index("option"))
+    got = t.result_rows()[0]
+    out = _fail((got["option"], got["c"], got["cp"], got["r_elev"])
+                == ("cp", 15.0, 3.75, 4.0),
+                f"the pasted cp row read option={got['option']!r}, c={got['c']!r}, "
+                f"c/p={got['cp']!r}, r-elev={got['r_elev']!r}")
+    out += _fail(_summary(t) == "Pasted 1 row × 5 columns.",
+                 f"the status line read {_summary(t)!r}")
+    phi_item = t.table.item(0, keys.index("phi"))
+    cp_item = t.table.item(0, keys.index("cp"))
+    from PySide6.QtCore import Qt
+    out += _fail(not (phi_item.flags() & Qt.ItemIsEditable)
+                 and bool(cp_item.flags() & Qt.ItemIsEditable),
+                 "after the paste the row is not grayed for cp (φ live or c/p gray)")
+
+    # Anchored on the live c to the left of the grayed pair: a grayed cell cannot
+    # be made the current one.
+    t2 = _new_table(fields, [row], dim_rule=_mat_dim_keys)
+    _paste(t2, _tsv([[12, 32, 3.75, 4]]), row=0, col=keys.index("c"))
+    got2 = t2.result_rows()[0]
+    out += _fail((got2["c"], got2["phi"]) == (12.0, 32.0),
+                 f"the live c and φ took {got2['c']!r}, {got2['phi']!r}")
+    out += _fail((got2["cp"], got2["r_elev"]) == (0.0, 0.0),
+                 f"c/p and r-elev on an mc row took {got2['cp']!r}, "
+                 f"{got2['r_elev']!r} from a block that left the option alone")
+    out += _fail("2 cells skipped (2 read-only)" in _summary(t2),
+                 f"the status line read {_summary(t2)!r}")
+    return out
+
+
+def test_the_material_form_grays_d_and_psi():
+    """The list view's form grays d and ψ, with their σ fields, for every option
+    but mc, the one whose Kc = 1 envelope they are; and switching the option back
+    to mc makes them live again."""
+    from studio.editors import MaterialsEditor, _MaterialListView, _new_material
+
+    out = []
+    for opt in ("mc", "cp", "ratio", "pow", "hb", "elastic"):
+        lv = _MaterialListView(MaterialsEditor.FIELDS,
+                               [dict(_new_material(), name="clay", option=opt)],
+                               _new_material, False)
+        lv._load(0)
+        live = [k for k in ("d", "psi", "sigma_d", "sigma_psi")
+                if lv._edits[k].isEnabled()]
+        want = ["d", "psi", "sigma_d", "sigma_psi"] if opt == "mc" else []
+        out += _fail(live == want, f"option={opt}: live d/ψ fields {live}, "
+                                   f"expected {want}")
+        if opt == "ratio":
+            lv._opt_combo.setCurrentText("mc")
+            out += _fail(lv._edits["d"].isEnabled() and lv._edits["psi"].isEnabled(),
+                         "switching a ratio material to mc left d/ψ grayed")
+    return out
 
 
 def test_the_material_form_waits_for_a_material():
@@ -1297,6 +1529,12 @@ def test_lem09_materials():
 #: the three adjacent mat columns option/c/φ, pasted onto a row the file already
 #: carries. The header run is contiguous, so a rectangular copy still lands.
 _MAT_HEADERS_STRENGTH = ["option", "c", "φ"]
+#: Part C's ratio edit runs one column further, to c/p, which sits right of φ in the
+#: Table view and the sheet: a block printed without its φ column puts the ratio
+#: into φ.
+_MAT_HEADERS_RATIO = ["option", "c", "φ", "c/p"]
+#: The material key behind each printed strength header.
+_STRENGTH_KEYS = {"option": "option", "c": "c", "φ": "phi", "c/p": "cp"}
 
 #: How close a pasted model's answer must come to the number the page prints.
 #: It is the tutorial test tags' line: a page number is re-recorded when the
@@ -1307,7 +1545,8 @@ _PAGE_TOL = 0.005
 
 
 def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
-                       expected_fs, occurrence=0):
+                       expected_fs, occurrence=0, headers=_MAT_HEADERS_STRENGTH,
+                       also=()):
     """One of LEM-7's strength-option edits, pasted onto the real material row.
 
     The page ships the model in its PRE-edit state, so — unlike every other
@@ -1318,9 +1557,12 @@ def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
     * The row's option in the shipped file is still ``was``. A page teaching a
       change from `pow` to `mc` stops being true the moment the file it ships
       already holds `mc`.
-    * The block lands in option, c and φ and nowhere else — every other field on
-      the row comes back exactly as the file had it, which is what makes a
-      three-column slice safe to print.
+    * The block lands in its own columns (option, c and φ, and c/p for a ratio)
+      and nowhere else — every other field on the row comes back exactly as the
+      file had it, which is what makes a slice of the row safe to print.
+
+    ``also`` names further ``(row, was)`` pairs the same block is pasted onto, for
+    a page that makes one edit on two materials.
     * The pasted model reproduces ``expected_fs``, the factor of safety the page
       prints beside the figure for the edited state, within ``_PAGE_TOL``.
       That is the oracle: a block that lands in the wrong columns, drops
@@ -1329,12 +1571,17 @@ def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
     from studio.editors import MaterialsEditor
     from xslope.search import circular_search
 
-    printed = _taught(page, _MAT_HEADERS_STRENGTH, occurrence)
+    printed = _taught(page, headers, occurrence)
+    block = [_STRENGTH_KEYS[h] for h in headers]
     model = _load(model_path)
-    before = model["materials"][row]
-    out = _fail(str(before["option"]).lower() == was,
-                f"{label}: the shipped file's row {row + 1} carries option "
-                f"{before['option']!r}, but the page teaches an edit from {was!r}")
+    targets = [(row, was)] + list(also)
+    befores = {r: dict(model["materials"][r]) for r, _w in targets}
+    out = []
+    for r, w in targets:
+        out += _fail(str(befores[r]["option"]).lower() == w,
+                     f"{label}: the shipped file's row {r + 1} carries option "
+                     f"{befores[r]['option']!r}, but the page teaches an edit "
+                     f"from {w!r}")
     out += _fail(len(printed) == 1,
                  f"{label}: the page prints {len(printed)} rows; the edit is one")
 
@@ -1343,24 +1590,27 @@ def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
     for cb in (getattr(dlg, "_toggles", None) or {}).values():
         cb.setChecked(True)
     keys = [f.key for f in MaterialsEditor.FIELDS]
-    _paste(dlg._table, _tsv(printed), row=row, col=keys.index("option"))
-    out += _fail(_summary(dlg._table) == "Pasted 1 row × 3 columns.",
-                 f"{label}: the status line read {_summary(dlg._table)!r}")
+    for r, _w in targets:
+        _paste(dlg._table, _tsv(printed), row=r, col=keys.index("option"))
+        out += _fail(_summary(dlg._table) == f"Pasted 1 row × {len(headers)} columns.",
+                     f"{label}: the status line read {_summary(dlg._table)!r}")
 
     landed = dict(model)
     editor.apply(landed, dlg)
-    got = landed["materials"][row]
-    for key, cell in zip(("option", "c", "phi"), printed[0]):
-        want = cell if key == "option" else float(cell)
-        out += _fail(_matches(got[key], cell, want),
-                     f"{label}: {key} came back {got[key]!r} from {cell!r}")
-    # Nothing outside the three-column block moved.
-    for key in keys:
-        if key in ("option", "c", "phi"):
-            continue
-        out += _fail(got[key] == before[key],
-                     f"{label}: the block also changed {key}, {before[key]!r} "
-                     f"-> {got[key]!r}")
+    for r, _w in targets:
+        got, before = landed["materials"][r], befores[r]
+        for key, cell in zip(block, printed[0]):
+            want = cell if key == "option" else float(cell)
+            out += _fail(_matches(got[key], cell, want),
+                         f"{label}: row {r + 1}'s {key} came back {got[key]!r} "
+                         f"from {cell!r}")
+        # Nothing outside the block moved.
+        for key in keys:
+            if key in block:
+                continue
+            out += _fail(got[key] == before[key],
+                         f"{label}: the block also changed row {r + 1}'s {key}, "
+                         f"{before[key]!r} -> {got[key]!r}")
 
     with contextlib.redirect_stdout(io.StringIO()):
         fs_cache, _, _, _ = circular_search(landed, method,
@@ -1389,6 +1639,17 @@ def test_lem07_profile_to_constant():
         "LEM-7 c/p -> constant", "lem07_strength_envelopes.md",
         os.path.join(_MODELS, "xslope_low_clay.xlsx"), row=2, was="cp",
         method="bishop", num_slices=50, expected_fs=1.084, occurrence=1)
+
+
+def test_lem07_both_clays_to_ratio():
+    """Part C's edit: both clays entered as strength ratios, the one block pasted
+    onto the lower clay (a `cp` profile in the shipped file) and the middle clay (a
+    constant `mc` strength)."""
+    return _strength_edit_leg(
+        "LEM-7 both clays -> ratio", "lem07_strength_envelopes.md",
+        os.path.join(_MODELS, "xslope_low_clay.xlsx"), row=2, was="cp",
+        method="bishop", num_slices=50, expected_fs=1.613,
+        headers=_MAT_HEADERS_RATIO, also=((1, "mc"),))
 
 
 def test_lem10_seed_circle():
@@ -1761,6 +2022,13 @@ CHECKS = [
      test_extra_columns_are_dropped_and_counted),
     ("hidden columns are not filled", test_hidden_columns_are_not_filled),
     ("read-only cells are skipped", test_read_only_cells_are_skipped),
+    ("a pasted option defines its row", test_a_pasted_option_defines_the_row),
+    ("mat graying: sheet = Studio = engine", test_mat_graying_agrees),
+    ("circles graying: sheet = Studio = engine", test_circles_graying_agrees),
+    ("polygon graying: sheet = Studio = engine", test_polygon_graying_agrees),
+    ("reinforce graying: sheet = Studio = engine", test_reinforce_graying_agrees),
+    ("graying rules cover their dropdowns", test_graying_rules_cover_their_dropdowns),
+    ("the form grays d and ψ but for mc", test_the_material_form_grays_d_and_psi),
     ("a pasted rounding keeps the stored value",
      test_a_pasted_rounding_keeps_the_stored_value),
     ("a paste is one edit", test_paste_notifies_once),
@@ -1794,6 +2062,7 @@ CHECKS = [
     ("LEM-6 materials", test_lem06_materials),
     ("LEM-7 power -> Mohr-Coulomb", test_lem07_power_to_mohr_coulomb),
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),
+    ("LEM-7 both clays -> ratio", test_lem07_both_clays_to_ratio),
     ("LEM-10 seed circle", test_lem10_seed_circle),
     ("LEM-11 σ block", test_lem11_sigma_block),
     ("LEM-12 pile rows", test_lem12_pile_rows),
@@ -1810,6 +2079,7 @@ CHECKS = [
 ]
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     try:
@@ -1827,6 +2097,8 @@ def run():
             fs = [f"{name} raised: {exc!r}"]
         print(f"  {name:44s} {'ok' if not fs else f'FAIL ({len(fs)})'}")
         failures += fs
+    if "graying_probe" in sys.modules:
+        sys.modules["graying_probe"].cleanup()       # its scratch workbooks
     return failures
 
 

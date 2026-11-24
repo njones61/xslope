@@ -20,7 +20,7 @@ from scipy.optimize import minimize_scalar, root_scalar, newton
 from shapely.geometry import LineString, Point
 from tabulate import tabulate
 
-from .advanced import rapid_drawdown
+from .advanced import rapid_drawdown, seismic_two_stage
 from .hoekbrown import hb_tangent
 from .preflight import method_surface_reason
 
@@ -284,6 +284,17 @@ def failure_kind(message):
 
 
 
+def _weight(slice_df):
+    """The vertical body force on each slice: its weight W, plus the vertical
+    seismic force k_v·W (column ``kvw``, positive downward) where the slices carry
+    one. Both act through the slice's center of gravity, so every method takes
+    their sum wherever it takes W: in force equilibrium and in moments alike."""
+    w = slice_df['w'].values
+    if 'kvw' in slice_df.columns:
+        return w + slice_df['kvw'].values
+    return w
+
+
 def _c_eff(slice_df):
     """Effective (apparent) cohesion per slice: base cohesion ``c`` plus the
     matric-suction apparent cohesion ``c_suction`` when present.
@@ -297,7 +308,14 @@ def _c_eff(slice_df):
     """
     c = slice_df['c'].values
     if 'c_suction' in slice_df.columns:
-        return c + slice_df['c_suction'].values
+        c_suc = slice_df['c_suction'].values
+        # An undrained base (cp or ratio) takes no suction credit, whatever the
+        # column holds: generate_slices writes zero there, and a table assembled
+        # some other way is held to the same rule.
+        for flag in ('cp_flag', 'ratio_flag'):
+            if flag in slice_df.columns:
+                c_suc = np.where(slice_df[flag].values.astype(bool), 0.0, c_suc)
+        return c + c_suc
     return c
 
 
@@ -335,7 +353,7 @@ def _driving_load(slice_df):
     return total
 
 
-def solve_selected(method_name, slice_df, rapid=False):
+def solve_selected(method_name, slice_df, rapid=False, seismic2=False):
     """
     Executes a specified limit equilibrium solution method and displays results.
 
@@ -351,6 +369,13 @@ def solve_selected(method_name, slice_df, rapid=False):
     rapid : bool, optional
         If True, performs rapid drawdown analysis using the specified method.
         Default is False.
+    seismic2 : bool, str, or dict, optional
+        If set, performs the two-stage pseudostatic seismic analysis
+        (:func:`xslope.advanced.seismic_two_stage`) with the specified method:
+        True or ``"interpolated"`` for the rapid drawdown interpolation, ``"kc1"``
+        for the K_c = 1 envelope alone, or ``{"strength": ..., "factor": f}`` to
+        also multiply the stage 2 undrained strengths by f. Default is False. Not
+        with ``rapid``.
 
     Returns
     -------
@@ -369,8 +394,14 @@ def solve_selected(method_name, slice_df, rapid=False):
 
     func = globals()[method_name]
 
+    if rapid and seismic2:
+        raise ValueError("Rapid drawdown and the two-stage seismic analysis each "
+                         "run their own stages on the same slices, so a run takes "
+                         "one or the other.")
     if rapid:
         success, result = rapid_drawdown(slice_df, method_name)
+    elif seismic2:
+        success, result = seismic_two_stage(slice_df, method_name, strength=seismic2)
     else:
         success, result = func(slice_df)
     if not success:
@@ -499,7 +530,9 @@ def _moment_arms(slice_df, Xo, Yo, alpha, right_facing):
 
 def oms(slice_df, debug=False):
     """
-    Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
+    Computes FS by the Ordinary Method of Slices: equation (8) on
+    https://xslope.org/en/latest/lem/oms/ (its moment-arm form, (8a), on a
+    composite surface).
 
     Inputs
     ------
@@ -545,7 +578,7 @@ def oms(slice_df, debug=False):
     alpha_deg = slice_df['alpha'].values    # αᵢ in degrees
     phi_deg   = slice_df['phi'].values      # φᵢ in degrees
     c     = _c_eff(slice_df)            # cᵢ (+ apparent cohesion from matric suction, if any)
-    W     = slice_df['w'].values        # Wᵢ
+    W     = _weight(slice_df)        # Wᵢ (+ k_v·Wᵢ)
     u     = slice_df['u'].values        # uᵢ (pore‐force per unit length)
     dl     = slice_df['dl'].values       # Δℓᵢ
     D     = slice_df['dload'].values        # Dᵢ
@@ -752,7 +785,8 @@ def oms(slice_df, debug=False):
 
 def bishop(slice_df, debug=False, tol=1e-6, max_iter=100, fs_seed=None):
     """
-    Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
+    Computes FS using the complete Bishop's Simplified Method (equation (10) on
+    https://xslope.org/en/latest/lem/bishop/) and computes N_eff (equation (8) there).
     Requires circular slip surface and full input data structure consistent with OMS.
 
     Parameters:
@@ -777,7 +811,7 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100, fs_seed=None):
     alpha = np.radians(slice_df['alpha'].values)
     phi   = np.radians(slice_df['phi'].values)
     c     = _c_eff(slice_df)
-    W     = slice_df['w'].values
+    W     = _weight(slice_df)
     u     = slice_df['u'].values
     dl    = slice_df['dl'].values
     D     = slice_df['dload'].values
@@ -971,7 +1005,7 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     alpha = np.radians(slice_df['alpha'].values)
     phi = np.radians(slice_df['phi'].values)
     c = _c_eff(slice_df)
-    W = slice_df['w'].values
+    W = _weight(slice_df)
     u = slice_df['u'].values
     dl = slice_df['dl'].values
     D = slice_df['dload'].values
@@ -1352,7 +1386,7 @@ def _mp_extract(slice_df, right_facing):
     g = lambda col: slice_df[col].values.astype(float)
     A = dict(
         alpha=np.radians(slice_df['alpha'].values), phi=np.radians(slice_df['phi'].values),
-        c=_c_eff(slice_df).astype(float), w=g('w'), u=g('u'), dl=g('dl'), D=g('dload'),
+        c=_c_eff(slice_df).astype(float), w=_weight(slice_df).astype(float), u=g('u'), dl=g('dl'), D=g('dload'),
         beta=np.radians(slice_df['beta'].values), kw=g('kw'), V=g('t'), P=g('p'),
         H_pile=g('h_pile') if 'h_pile' in slice_df.columns else np.zeros(n),
         theta_p=g('theta_p') if 'theta_p' in slice_df.columns else np.zeros(n),
@@ -1729,7 +1763,7 @@ def _force_closure(slice_df, theta_list, right_facing=False):
     alpha   = np.radians(slice_df['alpha'].values)
     phi     = np.radians(slice_df['phi'].values)
     c       = _c_eff(slice_df)
-    w       = slice_df['w'].values
+    w       = _weight(slice_df)
     u       = slice_df['u'].values
     dl      = slice_df['dl'].values
     D       = slice_df['dload'].values
@@ -2165,7 +2199,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
     c     = _c_eff(slice_df)  # cohesion (+ apparent cohesion from matric suction, if any)
     dx    = slice_df['dx'].values  # slice width
     dl    = slice_df['dl'].values  # slice base length
-    W     = slice_df['w'].values  # slice weight
+    W     = _weight(slice_df)  # slice weight (+ k_v·W)
     u     = slice_df['u'].values  # pore presssure
     x_c   = slice_df['x_c'].values  # center of base x-coordinate
     y_cb  = slice_df['y_cb'].values  # center of base y-coordinate

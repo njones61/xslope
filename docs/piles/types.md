@@ -244,6 +244,7 @@ along its base and up through the backfill. On the right, the FEM's base joint a
 |---|---|---|
 | Unit weight | Unit weight γ of the concrete material. | 150 lb/ft³ (23.6 kN/m³) for reinforced concrete ([GEC 4][gec4] p. A-13). |
 | `E` (FEM) | Modulus of the concrete material. | E<sub>c</sub> = 1,820 √f′<sub>c</sub> ksi: 4.9 × 10⁸ to 5.9 × 10⁸ psf (2.35 × 10⁷ to 2.81 × 10⁷ kPa) for f′<sub>c</sub> = 3.5 to 5.0 ksi ([GEC 10][gec10] p. 16-3). |
+| Pore pressure `u` (FEM) | `u` of the concrete material: `none` for a sealed wall, so the water in the soil presses on its faces; `seep` or `piezo` for one water passes through ([Walls and other elastic materials](../fem/overview.md#pore-pressure-options)). | — |
 | Base joint (FEM) | `c` = 0, since the sources give friction only; `phi` = δ, the friction angle of concrete on the foundation; `t_cut` = 0. | Mass concrete on clean sound rock 35°; on clean gravel or coarse sand 29 to 31°; on clean fine to medium sand 24 to 29°; on fine sand, silty or clayey 19 to 24°; on very stiff to hard clay 22 to 26°; on medium stiff to stiff clay 17 to 19° ([GEC 10][gec10] p. 12-50). |
 | Back-face joint (FEM) | `c` = 0; `phi` = δ, the friction angle of the wall against the backfill; `t_cut` = 0. | About two thirds of the backfill's φ′ in GEC 10's example: 24° against sand at 36°, 19° against clay at 28° (pp. 12-52, 12-53). |
 

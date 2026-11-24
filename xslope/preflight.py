@@ -127,7 +127,7 @@ _SEVERITY_RANK = {s: i for i, s in enumerate(SEVERITY_ORDER)}
 # Where an input lives: the trailing locator every message ends with.
 #
 # The message itself leads with the parameter's own name, in the words the
-# interface labels it with -- "Tension crack depth", "Seismic coefficient k",
+# interface labels it with -- "Tension crack depth", "Horizontal seismic coefficient k_h",
 # "Material 3 ('Core')". These say WHERE to go and change it: the Studio editor
 # that owns the input, then the sheet cell for anyone working in the spreadsheet
 # instead. Both, in that order, because a Studio user never sees a cell reference
@@ -162,10 +162,11 @@ def _at_dloads(stage):
     return _AT_DLOADS if stage == 1 else _AT_DLOADS2
 
 
-#: Every analysis type the registry knows. ``rapid``, ``sensitivity`` and
-#: ``reliability`` are *composite*: they inherit a base analysis's requirements and
-#: add their own (see :func:`expand_analysis`).
-ANALYSES = ("lem", "rapid", "seep", "tseep", "fem", "ssrm",
+#: Every analysis type the registry knows. ``rapid``, ``seismic2`` (the two-stage
+#: pseudostatic seismic analysis), ``sensitivity`` and ``reliability`` are
+#: *composite*: they inherit a base analysis's requirements and add their own (see
+#: :func:`expand_analysis`).
+ANALYSES = ("lem", "rapid", "seismic2", "seep", "tseep", "fem", "ssrm",
             "sensitivity", "reliability")
 
 #: Composition. A composite analysis satisfies every rule of the analyses it
@@ -174,6 +175,7 @@ ANALYSES = ("lem", "rapid", "seep", "tseep", "fem", "ssrm",
 #: ``selection={"base": "fem"}`` (default ``lem``).
 _INHERITS = {
     "rapid": ("lem",),
+    "seismic2": ("lem",),
     "tseep": ("seep",),
     "ssrm": ("fem",),
 }
@@ -233,7 +235,7 @@ REMEDIES = {
 #: is evaluated once per option with that option pinned into the selection, and a
 #: rule that fires makes the option unavailable with its message as the reason.
 CAPABILITY_GROUPS = {
-    "analysis": ("lem", "rapid", "seep", "tseep", "fem", "ssrm",
+    "analysis": ("lem", "rapid", "seismic2", "seep", "tseep", "fem", "ssrm",
                  "sensitivity", "reliability"),
     "lem_method": LEM_METHOD_OPTIONS,
 }
@@ -1100,18 +1102,40 @@ class _Ctx:
                 continue
             yield i, m
 
+    def pore_pressure_materials(self):
+        """``(index, material)`` for every row whose ``u`` this run's engine reads.
+
+        A limit-equilibrium run reads ``u`` on the rows a failure surface can
+        cross (:meth:`strength_materials`) less ``option = elastic``: a surface
+        may ride along an elastic zone but never takes a base pore pressure from
+        it. A finite element run reads each element's own material's ``u``,
+        elastic rows included (a wall in a seepage field takes u = seep), on the
+        rows the mesh carries (:meth:`seepage_materials`); a row no zone uses
+        chooses nothing. A rule about ``u`` reads these rows, so a ``u`` left on a
+        row the engine never asks about can never stop the run.
+        """
+        if "lem" not in self.analyses:
+            yield from self.seepage_materials()
+            return
+        for i, m in self.strength_materials():
+            if str(m.get("option") or "").strip().lower() == "elastic":
+                continue
+            yield i, m
+
     # -- water and loads ---------------------------------------------------
     @property
     def uses_piezo(self):
-        """True when any material takes its pore pressure from a piezometric line."""
+        """True when any material an engine reads takes its pore pressure from a
+        piezometric line (:meth:`pore_pressure_materials`)."""
         return any(str(m.get("u", "")).strip().lower() == "piezo"
-                   for _, m in self.strength_materials())
+                   for _, m in self.pore_pressure_materials())
 
     @property
     def uses_seep_u(self):
-        """True when any material takes its pore pressure from a seepage field."""
+        """True when any material an engine reads takes its pore pressure from a
+        seepage field (:meth:`pore_pressure_materials`)."""
         return any(str(m.get("u", "")).strip().lower() == "seep"
-                   for _, m in self.strength_materials())
+                   for _, m in self.pore_pressure_materials())
 
     def dload_blocks(self, stage=1):
         """``(label, points)`` for every distributed-load block of a stage.
@@ -1534,7 +1558,8 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
         reading it from the sheet), ``search`` (bool), ``base`` (the underlying
         analysis for a sensitivity or reliability run), ``seep_frame`` (a transient
         seepage frame this run will stage into ``seep_u`` before the solver starts;
-        see :attr:`_Ctx.seep_frame`).
+        see :attr:`_Ctx.seep_frame`), ``ky`` (bool -- the run finds the seismic
+        yield coefficient, so the model's own k is not used).
     ids : iterable of str, optional
         Evaluate only these rule ids -- for testing one rule in isolation.
     skip : iterable of str, optional
@@ -1662,8 +1687,9 @@ def _as_findings(r, out):
     """Normalize a check's return value into findings."""
     if out is None:
         return []
-    if isinstance(out, str):
-        out = [out]
+    if isinstance(out, str) or (isinstance(out, tuple) and len(out) == 2
+                                and out[0] in (ERROR, WARNING, INFO)):
+        out = [out]            # one message, or one (severity, message) pair
     made = []
     for item in out:
         if isinstance(item, Finding):
@@ -1970,7 +1996,7 @@ def _piezo_line_missing(ctx):
         return None
     if len(ctx.piezo) >= 2:
         return None
-    names = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+    names = [ctx.mat_label(i) for i, m in ctx.pore_pressure_materials()
              if str(m.get("u", "")).strip().lower() == "piezo"]
     # The wording is the migrated guard's own (slice.py / fem.py), deliberately: the
     # phrase "no piezometric line" is the one users and the guard benchmark know.
@@ -2018,7 +2044,7 @@ def _piezo_no_consumer(ctx):
     if ctx.uses_piezo:
         return None
     if any(str(m.get("u", "")).strip().lower() in ("seep", "ru")
-           for _, m in ctx.strength_materials()):
+           for _, m in ctx.pore_pressure_materials()):
         return None
     if any(m.get("gamma_sat") is not None for _, m in ctx.strength_materials()):
         # The line is doing a second, legitimate job: it is the water table that
@@ -2309,46 +2335,61 @@ def _mat_u_vocabulary(ctx):
                    f"pressure, silently inflating the factor of safety {_AT_MAT}.")
 
 
-@rule("mat.unsat_vocabulary", ERROR, ("seep", "fem"),
+@rule("mat.unsat_vocabulary", ERROR, ("seep",),
       "The unsaturated model unsat must be one of lf / vg / gard.")
 def _mat_unsat_vocabulary(ctx):
-    ok = ("lf", "vg", "gard")
+    # Seepage only: the stability engines never read unsat. The loader keeps a
+    # word outside the three as entered (a blank is lf), so this is where it is
+    # caught -- the seepage engine would run it as the linear front.
+    from .fileio import UNSAT_MODELS
     for i, m in ctx.seepage_materials():
         v = m.get("unsat")
         if v is None or (isinstance(v, str) and not v.strip()):
             continue
-        if str(v).strip().lower() not in ok:
+        if str(v).strip().lower() not in UNSAT_MODELS:
             yield (f"{ctx.mat_label(i)} sets unsat = {v!r}, which is not an "
                    f"unsaturated conductivity model. Expected one of: lf (linear "
-                   f"front), vg (van Genuchten), gard (Gardner). A typo here "
-                   f"silently runs the linear-front model instead of the one you "
-                   f"asked for {_AT_MAT}.")
+                   f"front), vg (van Genuchten), gard (Gardner), or blank for lf. "
+                   f"The seepage engine would run it as the linear front, which "
+                   f"may not be the model you asked for {_AT_MAT}.")
 
 
 @rule("mat.option_vocabulary", ERROR, ("lem", "fem"),
-      "The strength model option must be one of mc / cp / pow / hb / elastic.")
+      "The strength model option must be one of mc / cp / ratio / pow / hb / elastic.")
 def _mat_option_vocabulary(ctx):
-    ok = ("mc", "cp", "pow", "hb", "elastic")
+    from .fileio import STRENGTH_OPTIONS
     for i, m in ctx.strength_materials():
         o = m.get("option")
         if o is None or (isinstance(o, str) and not o.strip()):
             continue
-        if str(o).strip().lower() not in ok:
+        if str(o).strip().lower() not in STRENGTH_OPTIONS:
             yield (f"{ctx.mat_label(i)} sets option = {o!r}, which is not a "
-                   f"strength model. Expected one of: mc, cp, pow, hb, elastic "
+                   f"strength model. Expected one of: {', '.join(STRENGTH_OPTIONS)} "
                    f"{_AT_MAT}.")
 
 
-@rule("mat.option_missing", ERROR, ("lem",),
-      "A material a failure surface can cross needs a strength model.")
+@rule("mat.option_missing", ERROR, ("lem", "fem"),
+      "A material a failure surface can cross, or a mesh element takes, needs a "
+      "strength model.")
 def _mat_option_missing(ctx):
-    for i, m in ctx.strength_materials():
+    # Both engines refuse a blank option on a row they read for strength: the LEM
+    # on a material a failure surface can cross, the FEM on one a mesh element
+    # takes (it once ran a blank option as mc, reading c and phi off a row whose
+    # strength columns the sheet leaves live). A row nothing reaches -- a
+    # seepage-only material -- may stay blank.
+    from .fileio import strength_options_text
+    fem = "lem" not in ctx.analyses
+    rows = ctx.seepage_materials() if fem else ctx.strength_materials()
+    for i, m in rows:
         o = m.get("option")
         if o is None or (isinstance(o, str) and not str(o).strip()):
+            where = ("and the finite element mesh gives elements this material, "
+                     "so the engine has no strength law for them" if fem else
+                     "and the material is inside the geometry, so a failure "
+                     "surface can pass through it")
             yield (f"{ctx.mat_label(i)} has no strength model: option is blank, "
-                   f"and the material is inside the geometry, so a failure surface "
-                   f"can pass through it. Choose a strength model (mc, cp, pow, hb "
-                   f"or elastic) {_AT_MAT}.")
+                   f"{where}. Choose a strength model "
+                   f"({strength_options_text()}) {_AT_MAT}.")
 
 
 #: Every field a material row carries when it comes off the mat sheet. A key
@@ -2398,7 +2439,7 @@ def _mat_gamma_sat_without_water(ctx):
     has_water = any(_present(sd.get(k)) for k in
                     ("piezo_line", "piezo_line2", "seep_u", "seep_u2")) or \
         any(str(m.get("u") or "").strip().lower() in ("seep", "piezo")
-            for m in ctx.materials if isinstance(m, dict))
+            for _, m in ctx.pore_pressure_materials() if isinstance(m, dict))
     if has_water:
         return None
     rows = [ctx.mat_label(i) for i, m in enumerate(ctx.materials)
@@ -2452,7 +2493,7 @@ def _mat_gamma_nonpositive(ctx):
     fem = "fem" in ctx.analyses
     for i, m in (ctx.fem_materials() if fem else enumerate(ctx.materials)):
         opt = str(m.get("option") or "").strip().lower()
-        if not fem and opt not in ("mc", "cp", "pow", "hb"):
+        if not fem and opt not in ("mc", "cp", "ratio", "pow", "hb"):
             continue
         if _pos(m.get("gamma")):
             continue
@@ -2537,11 +2578,46 @@ def _mat_cp_zero(ctx):
                    f"everywhere in this material {_AT_MAT}.")
 
 
+@rule("mat.ratio_zero_strength", ERROR, ("lem", "fem"),
+      "option = ratio with both c and c/p zero gives zero undrained strength.",
+      fields=("c", "cp"))
+def _mat_ratio_zero(ctx):
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "ratio":
+            continue
+        c, r = _num(m.get("c")) or 0.0, _num(m.get("cp")) or 0.0
+        if c == 0.0 and r == 0.0:
+            yield (f"{ctx.mat_label(i)} carries no strength: option = ratio but both "
+                   f"c and c/p are zero, so the undrained strength is zero everywhere "
+                   f"in this material. Under option = ratio, c/p is the strength ratio "
+                   f"s_u/sigma'_v and c the minimum strength {_AT_MAT}.")
+
+
+@rule("mat.ratio_above_one", WARNING, ("lem", "fem"),
+      "A strength ratio above 1 is far outside the range soils show.",
+      fields=("cp",))
+def _mat_ratio_above_one(ctx):
+    # Measured ratios run from about 0.05 (liquefied sands; Olson and Stark 2002) to
+    # about 0.3 (normally consolidated clays). Above 1 the likeliest cause is a c/p
+    # entered for option = cp, a strength GAIN per unit depth in stress units, left in
+    # place when the option was switched to ratio.
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "ratio":
+            continue
+        r = _num(m.get("cp"))
+        if r is not None and r > 1.0:
+            yield (f"{ctx.mat_label(i)} has option = ratio with c/p = {r:g}. Under "
+                   f"option = ratio, c/p is the strength ratio s_u/sigma'_v, which runs "
+                   f"from about 0.05 to 0.3 in soils. A value above 1 is usually a c/p "
+                   f"entered for option = cp (a strength gain per unit depth) and left "
+                   f"in place after the option changed {_AT_MAT}.")
+
+
 @rule("mat.ru_zero", ERROR, ("lem",),
       "u = ru with a blank or zero ratio generates no pore pressure.",
       fields=("ru",))
 def _mat_ru_zero(ctx):
-    for i, m in ctx.strength_materials():
+    for i, m in ctx.pore_pressure_materials():
         if str(m.get("u") or "").strip().lower() != "ru":
             continue
         if not _pos(m.get("ru")):
@@ -2570,7 +2646,8 @@ def _mat_hb_method_convergence(ctx):
                f"Hoek-Brown envelope reaches at the low normal stresses on a "
                f"shallow slice near the crest. Run Spencer's Method or the "
                f"Morgenstern-Price Method, which solve for the inclination "
-               f"(Materials table, mat sheet; Run LEM, main D14).")
+               f"(Materials table, mat sheet; Run LEM, main "
+               f"{_main_cell(ctx, 'lem_method')}).")
 
 
 # ---------------------------------------------------------------------------
@@ -2578,20 +2655,20 @@ def _mat_hb_method_convergence(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("main.seismic_missing", ERROR, ("lem",),
-      "Seismic coefficient k (main!D13) must be a number.",
+      "Horizontal seismic coefficient k_h (main!D13) must be a number.",
       remedy="set_seismic_zero",
       fields=("k_seismic",))
 def _seismic_missing(ctx):
     if _finite(ctx.sd.get("k_seismic")):
         return None
-    return (f"Seismic coefficient k is blank or not a number -- enter 0 for a "
+    return (f"Horizontal seismic coefficient k_h is blank or not a number -- enter 0 for a "
             f"static analysis. Left blank it reaches every slice as NaN, and the "
             f"Ordinary Method of Slices then reports success with a factor of safety "
             f"of NaN {_at_global('D13')}.")
 
 
 @rule("main.seismic_magnitude", WARNING, ("lem", "fem"),
-      "A Seismic coefficient k outside the usual 0.05-0.3 range is probably a "
+      "A horizontal seismic coefficient k_h outside the usual 0.05-0.3 range is probably a "
       "percent/fraction slip.",
       fields=("k_seismic",))
 def _seismic_magnitude(ctx):
@@ -2600,29 +2677,46 @@ def _seismic_magnitude(ctx):
         return None
     a = abs(k)
     if a > 1.0:
-        return (f"Seismic coefficient k = {k:g}. k is a fraction of gravity, "
+        return (f"Horizontal seismic coefficient k_h = {k:g}. k_h is a fraction of gravity, "
                 f"typically 0.05-0.3 -- enter 0.15 for 15%g. At this magnitude some "
                 f"methods return a negative factor of safety through the success "
-                f"path and others fail without naming k {_at_global('D13')}.")
+                f"path and others fail without naming k_h {_at_global('D13')}.")
     if a > 0.5:
-        return (INFO, f"Seismic coefficient k = {k:g}, which is high for a "
+        return (INFO, f"Horizontal seismic coefficient k_h = {k:g}, which is high for a "
                       f"pseudo-static analysis (typically 0.05-0.3) "
                       f"{_at_global('D13')}.")
     return None
 
 
-@rule("main.seismic_negative_lem", WARNING, ("lem",),
-      "The LEM takes the magnitude of k and orients it itself; the sign is ignored.",
-      fields=("k_seismic",))
-def _seismic_negative_lem(ctx):
-    k = _num(ctx.sd.get("k_seismic"))
-    if k is None or k >= 0:
+@rule("main.seismic_vertical_invalid", ERROR, ("lem", "fem"),
+      "The vertical seismic coefficient k_v must be a number above -1.")
+def _seismic_vertical_invalid(ctx):
+    raw = ctx.sd.get("k_vertical")
+    if raw is None:
+        return None                # a file older than v28 has none: 0
+    if not _finite(raw):
+        return (f"Vertical seismic coefficient k_v is not a number. Enter 0 for "
+                f"none {_at_global(_main_cell(ctx, 'k_vertical'))}.")
+    kv = float(raw)
+    if kv > -1.0:
         return None
-    return (f"Seismic coefficient k = {k:g} is negative. The limit-equilibrium "
-            f"engine applies the coefficient in the failure-driving direction "
-            f"automatically and ignores the sign, so this run is identical to "
-            f"k = {abs(k):g}. Enter a magnitude -- in the finite element engine the "
-            f"sign does set the direction {_at_global('D13')}.")
+    return (f"Vertical seismic coefficient k_v = {kv:g}. k_v is signed, positive "
+            f"downward, and scales the soil's weight by 1 + k_v: at {kv:g} the "
+            f"weight is {1.0 + kv:g} times itself, so the soil is lifted off the "
+            f"ground. Enter a fraction of gravity, typically half of k_h or less "
+            f"{_at_global(_main_cell(ctx, 'k_vertical'))}.")
+
+
+@rule("main.seismic_vertical_magnitude", WARNING, ("lem", "fem"),
+      "A vertical seismic coefficient k_v above 0.5 in magnitude is probably a "
+      "percent/fraction slip.")
+def _seismic_vertical_magnitude(ctx):
+    kv = _num(ctx.sd.get("k_vertical"))
+    if kv is None or abs(kv) <= 0.5 or kv <= -1.0:
+        return None
+    return (f"Vertical seismic coefficient k_v = {kv:g}. k_v is a fraction of "
+            f"gravity, usually a half or a third of k_h (Eurocode 8) -- enter 0.05 "
+            f"for 5%g {_at_global(_main_cell(ctx, 'k_vertical'))}.")
 
 
 @rule("main.crack_water_deeper_than_crack", ERROR, ("lem",),
@@ -2655,7 +2749,7 @@ def _lem_method_unknown(ctx):
         return None
     return (f"LEM method is {m!r}, which is not a method this package implements. "
             f"Choose one of: {', '.join(LEM_METHOD_OPTIONS)}, or 'all' "
-            f"(Run LEM; main D14).")
+            f"(Run LEM; main {_main_cell(ctx, 'lem_method')}).")
 
 
 # ---------------------------------------------------------------------------
@@ -2933,6 +3027,43 @@ _CIRCLE_RULE = ("A workable circle enters near the crest, runs tangent near the 
                 "base of the zone that governs, and daylights near the toe")
 
 
+def _circle_has_no_size(c):
+    """True when a circles-sheet row states no size: its R or Depth is undefined,
+    because Option is blank or not Depth / Radius / Intercept, or because the cell
+    the Option names is blank."""
+    return isinstance(c, dict) and (_num(c.get("R")) is None
+                                    or _num(c.get("Depth")) is None)
+
+
+@rule("surface.circle_size_missing", ERROR, ("lem",),
+      "A circle's Option names how its size is given, and that cell holds it.")
+def _circle_size_missing(ctx):
+    # The loader keeps such a circle (a file saved mid-edit must reopen) with its
+    # radius and depth undefined; it once refused the whole file over a blank
+    # Option. Every run that reads the circles sheet is refused over it: a
+    # single-surface run analyses circles[0], and a search launches a grid from
+    # every circle on the sheet, which a circle with no size cannot place.
+    if ctx.surface_supplied or ctx.effective_surface_family != "circular":
+        return None
+    for i, c in enumerate(ctx.sd.get("circles") or []):
+        if not _circle_has_no_size(c):
+            continue
+        opt = c.get("Option", "Depth")
+        opt = "" if _num(opt) is None and not isinstance(opt, str) else str(opt).strip()
+        if opt.lower() not in ("depth", "radius", "intercept"):
+            why = ("its Option is blank" if not opt
+                   else f"its Option is {opt!r}, which is not one of the three")
+            yield (f"{ctx.circle_label(i)} states no size: {why}. Option says how "
+                   f"the circle's size is given -- Depth (the elevation of its "
+                   f"lowest point), Radius, or Intercept (a point Xi, Yi it passes "
+                   f"through). Choose one and fill in the cell it names "
+                   f"{_AT_CIRCLES}.")
+        else:
+            yield (f"{ctx.circle_label(i)} states no size: the cell its Option "
+                   f"names (Depth, R, or Xi and Yi) is blank, so its radius is "
+                   f"undefined. Fill it in {_AT_CIRCLES}.")
+
+
 @rule("surface.circle_cannot_be_sliced", WARNING, ("*",),
       summary="The first circle must produce slices; where that circle IS the "
               "run's surface, one that cannot is an error.",
@@ -2973,6 +3104,8 @@ def _circle_cannot_be_sliced(ctx):
     if not circles or not isinstance(circles[0], dict):
         return None
     c = circles[0]
+    if _circle_has_no_size(c):
+        return None            # surface.circle_size_missing names the cell
 
     # Defer where a specific rule already explains THIS circle. Both of those fire
     # on circles[0] under the same conditions this rule would, and each names the
@@ -3283,10 +3416,12 @@ def _mesh_element_type_linear(ctx):
             f"incompressible plastic flow of a Mohr-Coulomb collapse: they resist "
             f"the failure mechanism more than the soil does, so the factor of "
             f"safety comes back too high, in the unconservative direction -- +21% "
-            f"(tri3) and +11% (quad4) against the reference on the Griffiths & Lane "
-            f"Example 1 benchmark. Use tri6, quad8 or quad9 for a finite element or "
+            f"(tri3) and +11% (quad4) on a homogeneous 2:1 slope with φ′ = 20° "
+            f"and c′/γH = 0.05 (Griffiths & Lane 1999), whose factor of safety "
+            f"is about 1.4. Use tri6, quad8 or quad9 for a finite element or "
             f"strength-reduction run; tri3 is for seepage, where the field is scalar "
-            f"and nothing can lock (Build mesh; main D18).")
+            f"and nothing can lock (Build mesh; main "
+            f"{_main_cell(ctx, 'element_type')}).")
 
 
 @rule("mesh.material_id_out_of_range", ERROR, ("seep", "fem"),
@@ -3369,7 +3504,7 @@ def _seep_field_missing(ctx):
     if ctx.mesh is not None and (ctx.sd.get("seep_u") is not None
                                  or ctx.seep_frame is not None):
         return None
-    names = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+    names = [ctx.mat_label(i) for i, m in ctx.pore_pressure_materials()
              if str(m.get("u", "")).strip().lower() == "seep"]
     missing = "mesh" if ctx.mesh is None else "pore-pressure field"
     return (f"{names[0]} takes pore pressure from a seepage solution (u = seep), but "
@@ -3659,6 +3794,70 @@ def _seep_bc_short(ctx):
     return out
 
 
+@rule("seep.bc_value_missing", ERROR, ("lem", "fem", "seep"),
+      "A boundary block with points needs its head or flux value.")
+def _seep_bc_value_missing(ctx):
+    """A seep bc block drawn with points but its Value cell left blank.
+
+    The loader keeps such a block (with the value ``None``) rather than ending the
+    sheet there, which once dropped it and every block after it without a word.
+    It is refused for each run that reads it: a seepage run reads both boundary
+    sets (set 2 is the steady drawn-down state; a transient run reads set 1), and
+    a stability run reads the head boundaries only for the automatic water load --
+    set 1, and set 2 for a rapid drawdown on the two-steady route -- where a block
+    with no level is skipped and the pool it stands for goes missing.
+    """
+    def _blank(v):
+        return v is None or (isinstance(v, float) and math.isnan(v))
+
+    def _touches_ground(b):
+        # The automatic water load measures a pool only from a block with a
+        # vertex on the ground surface (water._bc_pools, same tolerance); a block
+        # on a model side or base would be skipped whatever its value.
+        from shapely.geometry import LineString, Point
+        from .water import _ON_GROUND_FRAC
+        gs = ctx.ground
+        if len(gs) < 2:
+            return False
+        xs = [p[0] for p in gs]
+        tol = max(1e-12, _ON_GROUND_FRAC * (max(xs) - min(xs)))
+        line = LineString(gs)
+        return any(line.distance(Point(float(c[0]), float(c[1]))) <= tol
+                   for c in _coords(b.get("coords")))
+
+    stability = "seep" not in ctx.analyses
+    if "seep" in ctx.analyses:
+        reads = [(1, ("specified_heads", "specified_fluxes"))]
+        if "tseep" not in ctx.analyses:
+            reads.append((2, ("specified_heads", "specified_fluxes")))
+        why = ("A seepage solve cannot hold a boundary at a value it was not given")
+    elif ctx.water_loads_mode == "auto":
+        reads = [(1, ("specified_heads",))]
+        if "rapid" in ctx.analyses and not ctx.staged_drawdown:
+            reads.append((2, ("specified_heads",)))
+        why = ("Water loads is auto, so the run takes the pool from the head "
+               "boundaries, and a block with no level is skipped: the water it "
+               "stands for would be left out of the load without a word")
+    else:
+        return
+    for which, kinds in reads:
+        bc = ctx.sd.get("seepage_bc" if which == 1 else "seepage_bc2") or {}
+        where = _AT_SEEPBC if which == 1 else _AT_SEEPBC2
+        of_set = "" if which == 1 else " of boundary set 2"
+        for kind in kinds:
+            key, noun = (("head", "Specified head") if kind == "specified_heads"
+                         else ("flux", "Specified flux"))
+            for n, b in enumerate(bc.get(kind) or []):
+                if not _blank(b.get(key)):
+                    continue
+                if stability and not _touches_ground(b):
+                    continue
+                enter = (f"Enter the {key}, or the name of a tseep time series"
+                         if which == 1 else f"Enter the {key}")
+                yield (f"{noun} #{n + 1}{of_set} has points but no {key}: its "
+                       f"Value cell is blank. {why}. {enter} {where}.")
+
+
 # ---------------------------------------------------------------------------
 # Family: finite element elastic properties and the tensile cap
 #
@@ -3782,13 +3981,20 @@ def _tension_srf_unset(ctx):
     # would be telling the reader about a control that changes no number.
     capped = [ctx.mat_label(i) for i, m in ctx.fem_materials()
               if has_reducible_tensile_cap(m)]
-    if not capped:
+    # A joints-sheet line's t_cut follows the same setting as a material's.
+    joints = [ctx.joint_label(i) for i, j in enumerate(ctx.joints)
+              if (_num(j.get("t_cut")) or 0.0) > 0.0]
+    if not capped and not joints:
         return None
+    what = " and ".join(
+        part for part in (
+            f"{len(capped)} material(s)" if capped else "",
+            f"{len(joints)} joint line(s)" if joints else "") if part)
     return (f"Tension SRF (FEM) is blank, so the engine default applies: the "
             f"tensile cap is divided by the trial strength-reduction factor "
-            f"alongside c and tan(φ). {len(capped)} material(s) carry a tensile "
+            f"alongside c and tan(φ). {what} carry a tensile "
             f"cutoff above zero. Set it to NO to hold the cap at its entered "
-            f"value instead {_at_global('D17')}.")
+            f"value instead {_at_global(_main_cell(ctx, 'tension_srf'))}.")
 
 
 # ---------------------------------------------------------------------------
@@ -3811,7 +4017,7 @@ def _k0_without_zones(ctx):
             "material-zone geometry for the engine to integrate the overburden "
             "through, so the initial stress state cannot be built. Supply the "
             "profile lines or polygons, or leave K0 blank for the gravity turn-on "
-            "initialization (Global parameters; main D16).")
+            f"initialization (Global parameters; main {_main_cell(ctx, 'k0')}).")
 
 
 @rule("fem.k0_pre_equilibration", INFO, ("fem",),
@@ -3827,7 +4033,7 @@ def _k0_pre_equilibration(ctx):
             f"(relief {h:.4g}). The K0 stress field does not equilibrate itself "
             f"there, so the engine runs one extra full-strength solve first and "
             f"hands the settled state to every trial. The factor of safety moves "
-            f"with K0 without any further notice {_at_global('D16')}.")
+            f"with K0 without any further notice {_at_global(_main_cell(ctx, 'k0'))}.")
 
 
 @rule("ssr.zone_contains_no_elements", ERROR, ("fem",),
@@ -3890,14 +4096,25 @@ def _zone_size_not_finer(ctx):
                        f"not finer than the global target element size ({target:g}). "
                        f"The zone is inert -- a refine polygon's only effect is a "
                        f"SMALLER local element size (Polygons, polygon sheet; Build "
-                       f"mesh, main D19).")
+                       f"mesh, main {_main_cell(ctx, 'target_size')}).")
     for n, p in enumerate(ctx.sd.get("polygons") or []):
         s = _num(p.get("size") if isinstance(p, dict) else None)
         if s is not None and s >= target:
             out.append(f"Polygon #{n + 1} declares Size = {s:g}, which is not "
                        f"finer than the global target element size ({target:g}), so "
                        f"it changes nothing (Polygons, polygon sheet; Build mesh, "
-                       f"main D19).")
+                       f"main {_main_cell(ctx, 'target_size')}).")
+    # A strength-reduction zone's or a joint region's Size reaches the mesher the
+    # same way a refine polygon's does, so the same test applies to it.
+    for kind, label in (("ssr_zones", "SSR zone"), ("joint_zones", "Joint region")):
+        for n, z in enumerate(ctx.sd.get(kind) or []):
+            s = _num(z.get("size") if isinstance(z, dict) else None)
+            if s is not None and s >= target:
+                out.append(f"{label} #{n + 1} declares Size = {s:g}, which is not "
+                           f"finer than the global target element size "
+                           f"({target:g}), so it changes nothing (Polygons, polygon "
+                           f"sheet; Build mesh, main "
+                           f"{_main_cell(ctx, 'target_size')}).")
     return out
 
 
@@ -4119,7 +4336,8 @@ def _thin_zone_unresolved(ctx):
             continue
         out.append(
             f"{label} is about {width:.3g} wide, which is {rows:.1f} element rows at "
-            f"the global target element size ({target:g}, main D19), and the zone "
+            f"the global target element size ({target:g}, main "
+            f"{_main_cell(ctx, 'target_size')}), and the zone "
             f"declares no Size of its own. A zone this thin cannot develop a "
             f"shear band, so the run does not fail on it -- it returns a factor of "
             f"safety that is too high, with nothing in the result to say the mesh "
@@ -4806,7 +5024,7 @@ def _head_line_above_water(ctx):
       "Each pore-pressure option needs its own stage-2 source.")
 def _rapid_stage2_water(ctx):
     out = []
-    piezo_mats = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+    piezo_mats = [ctx.mat_label(i) for i, m in ctx.pore_pressure_materials()
                   if str(m.get("u") or "").strip().lower() == "piezo"]
     if piezo_mats and len(ctx.piezo2) < 2:
         out.append(
@@ -4816,7 +5034,7 @@ def _rapid_stage2_water(ctx):
             f"read zero everywhere -- a drawdown that removed the water AND its "
             f"pressure, and a factor of safety that is too high (Piezometric lines, "
             f"Line 2; piezo sheet).")
-    seep_mats = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+    seep_mats = [ctx.mat_label(i) for i, m in ctx.pore_pressure_materials()
                  if str(m.get("u") or "").strip().lower() == "seep"]
     # Two named instants of a transient march ARE the two staged fields: the run
     # writes the stage_1 and stage_2 frames into seep_u / seep_u2 before the solver
@@ -4921,7 +5139,7 @@ def _rapid_pool_static(ctx):
 @rule("rapid.ru_has_no_stage2", WARNING, ("rapid",),
       "u = ru has no post-drawdown variant: the pore pressure does not change.")
 def _rapid_ru(ctx):
-    named = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+    named = [ctx.mat_label(i) for i, m in ctx.pore_pressure_materials()
              if str(m.get("u") or "").strip().lower() == "ru"]
     if not named:
         return None
@@ -4946,10 +5164,22 @@ def _rapid_dloads2(ctx):
             "dloads (2) sheet).")
 
 
+def _d_psi_materials(ctx):
+    """``(index, material)`` for the rows whose d and psi an engine reads: the
+    option = mc materials a failure surface can cross. The slicer gives every
+    other option d = psi = 0 (an undrained cp or ratio row keeps its own
+    strength, pow and hb are refused), and the template and Studio gray the two
+    cells there, so a value left in them is read by nothing and must not decide
+    a finding the user cannot clear."""
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() == "mc":
+            yield i, m
+
+
 @rule("rapid.d_psi_incomplete", ERROR, ("rapid",),
       "The Kc = 1 envelope needs BOTH d and psi.")
 def _rapid_d_psi(ctx):
-    for i, m in ctx.strength_materials():
+    for i, m in _d_psi_materials(ctx):
         d, psi = _num(m.get("d")), _num(m.get("psi"))
         d = 0.0 if d is None else d
         psi = 0.0 if psi is None else psi
@@ -4957,9 +5187,9 @@ def _rapid_d_psi(ctx):
             continue
         have, missing = ("d", "psi") if d != 0.0 else ("psi", "d")
         yield (f"{ctx.mat_label(i)} carries {have} but not {missing}. The "
-               f"Duncan & Wright Kc = 1 envelope needs both, and a material with "
+               f"Kc = 1 envelope (d, psi) needs both, and a material with "
                f"only one of them is silently treated as free-draining: it keeps "
-               f"its drained c/f through stage 2, which on the reference model was "
+               f"its drained c/f through stage 2, which in one test case was "
                f"worth +12.8% on the factor of safety. Fill both, or clear both to "
                f"declare the material free-draining {_AT_MAT}.")
 
@@ -4967,47 +5197,57 @@ def _rapid_d_psi(ctx):
 @rule("rapid.no_low_k_material", ERROR, ("rapid",),
       "Rapid drawdown needs at least one material with a Kc = 1 envelope.")
 def _rapid_no_low_k(ctx):
-    mats = list(ctx.strength_materials())
-    if not mats:
+    if not list(ctx.strength_materials()):
         return None
     if any((_num(m.get("d")) or 0.0) != 0.0 or (_num(m.get("psi")) or 0.0) != 0.0
-           for _, m in mats):
+           for _, m in _d_psi_materials(ctx)):
         return None
-    return ("No material carries the d / psi pair, so there is no "
-            "low-permeability material for the three-stage procedure to work on and "
-            "the run is refused. Enter d and psi for the materials that do not "
-            "drain during drawdown (Materials table; mat sheet).")
+    return ("No Mohr-Coulomb (option = mc) material carries the d / psi pair, so "
+            "there is no low-permeability material for the three-stage procedure "
+            "to work on and the run is refused. Enter d and psi for the mc "
+            "materials that do not drain during drawdown (Materials table; mat "
+            "sheet).")
 
 
 @rule("rapid.free_draining_materials", WARNING, ("rapid",),
       "A material with no d/psi keeps its drained strength through stage 2.")
 def _rapid_free_draining(ctx):
-    mats = list(ctx.strength_materials())
+    # Counted over the mc rows only, which are the only ones the procedure gives
+    # a stage-2 strength from d and psi: a cp or ratio row is undrained by its
+    # own option and keeps that strength through every stage (rapid_drawdown
+    # finds no d or psi on its slices), so it is neither free-draining nor a
+    # low-permeability row here, whatever its grayed d and psi cells hold.
+    mats = list(_d_psi_materials(ctx))
     if not mats:
         return None
     free = [ctx.mat_label(i) for i, m in mats
             if (_num(m.get("d")) or 0.0) == 0.0 and (_num(m.get("psi")) or 0.0) == 0.0]
     if not free or len(free) == len(mats):
         return None            # none, or all -- the all case is its own ERROR
-    return (f"{len(free)} of {len(mats)} material(s) a failure surface can cross "
-            f"carry no d / psi and are treated as free-draining through the "
-            f"drawdown, keeping their drained strength: {free[0]}"
+    return (f"{len(free)} of {len(mats)} Mohr-Coulomb (option = mc) material(s) a "
+            f"failure surface can cross carry no d / psi and are treated as "
+            f"free-draining through the drawdown, keeping their drained strength: "
+            f"{free[0]}"
             + (f" and {len(free) - 1} other(s)" if len(free) > 1 else "")
             + f" {_AT_MAT}.")
 
 
-@rule("rapid.cp_ignores_d_psi", WARNING, ("rapid",),
+# INFO, not WARNING: d and psi on a cp or ratio row are an input nothing reads
+# (the slicer zeroes them), and the template and Studio gray the two cells there,
+# so a Studio user cannot clear them. A warning nobody can act on is noise.
+@rule("rapid.cp_ignores_d_psi", INFO, ("rapid",),
       "An undrained (option = cp) material cannot also carry a Kc = 1 envelope.")
 def _rapid_cp(ctx):
     for i, m in ctx.strength_materials():
-        if str(m.get("option") or "").strip().lower() != "cp":
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in ("cp", "ratio"):
             continue
         if (_num(m.get("d")) or 0.0) == 0.0 and (_num(m.get("psi")) or 0.0) == 0.0:
             continue
-        yield (f"{ctx.mat_label(i)} uses option = cp, so its d / psi are set to "
-               f"zero for the drawdown: an undrained material can never be "
-               f"low-permeability in the Duncan & Wright sense whatever the "
-               f"materials table says. The stage-2 strength comes from c/p alone "
+        yield (f"{ctx.mat_label(i)} uses option = {opt}, so its d / psi are set to "
+               f"zero for the drawdown: an undrained material does not take its "
+               f"stage-2 strength from d and psi, whatever the materials table "
+               f"says. The stage-2 strength is its option's own "
                f"{_AT_MAT}.")
 
 
@@ -5121,39 +5361,142 @@ def _rapid_stage2_repeat(ctx):
 
 
 # ---------------------------------------------------------------------------
-# Family: seismic direction -- one cell, two meanings
+# Family: two-stage seismic
 #
-# The limit-equilibrium engine takes the MAGNITUDE of k and orients it itself
-# (slice.py:1689, kw = abs(k) * W); the finite element engine reads the SIGN as
-# direction (fem.py:6911, a signed horizontal body force). Both are documented,
-# each on its own engine's page, and neither page mentions the other. These two
-# INFOs state the convention of the engine actually being run, which is also the
-# copy a Run dialog shows.
+# The two-stage pseudostatic analysis (advanced.seismic_two_stage; Duncan, Wright
+# & Brandon 2014, Sec. 10.4.2) inherits every limit-equilibrium rule. Its stage 2
+# gives every slice in a material with d and psi an undrained strength from the
+# stage 1 stresses, so it needs the same Kc = 1 envelope rapid drawdown does and
+# refuses the curved envelopes for the same reason; and it is a pseudostatic
+# analysis, so a model with no seismic coefficient is worth a word.
 # ---------------------------------------------------------------------------
 
-@rule("main.seismic_direction_lem", INFO, ("lem",),
-      "The LEM applies k in the failure-driving direction and ignores its sign.",
-      fields=("k_seismic",))
-def _seismic_direction_lem(ctx):
-    k = _num(ctx.sd.get("k_seismic"))
-    if k is None or k == 0.0:
-        return None
-    return (f"Seismic coefficient k = {k:g} is applied at magnitude {abs(k):g} in "
-            f"the failure-driving direction for each surface: the direction is "
-            f"automatic in the limit-equilibrium engine, so the sign is ignored. "
-            f"Enter a magnitude -- the finite element engine reads the same value as "
-            f"a vector, where +k pushes +x and -k pushes -x {_at_global('D13')}.")
+def _has_d_psi(m):
+    return (_num(m.get("d")) or 0.0) != 0.0 or (_num(m.get("psi")) or 0.0) != 0.0
 
+
+@rule("seismic2.no_low_k_material", ERROR, ("seismic2",),
+      "The two-stage seismic analysis needs at least one material with a Kc = 1 "
+      "envelope.")
+def _seismic2_no_low_k(ctx):
+    # The pair counts on an mc row only (_d_psi_materials): a d or psi left in a
+    # cp or ratio row's grayed cells is read by nothing and gives no slice a
+    # stage 2 strength.
+    mats = list(ctx.strength_materials())
+    if not mats or any(_has_d_psi(m) for _, m in _d_psi_materials(ctx)):
+        return None
+    opts = [str(m.get("option") or "").strip().lower() for _, m in mats]
+    undrained = sorted({o for o in opts if o in ("cp", "ratio")})
+    n_mc = opts.count("mc")
+    if not undrained:
+        return ("No material carries the d / psi pair, so stage 2 has no undrained "
+                "strength to give any slice, and the two-stage analysis would only "
+                "repeat a single-stage pseudostatic analysis with drained strengths. "
+                "Enter d and psi for the materials that do not drain during the "
+                "earthquake, or clear Two-stage seismic to run the single-stage "
+                f"analysis {_AT_MAT}.")
+    # A cp or ratio material is undrained already: advanced.seismic_two_stage gives
+    # it the same strength in both stages (times the stage 2 strength factor), and
+    # its d / psi are never read (seismic2.cp_ignores_d_psi). Only an mc material
+    # takes a stage 2 strength from d and psi.
+    n_und = sum(o in undrained for o in opts)
+    which = " or ".join(undrained)
+    und = (f"The material with option = {which} is undrained already: its option "
+           f"gives it" if n_und == 1 else
+           f"The materials with option = {which} are undrained already: their option "
+           f"gives them")
+    mc = ("" if not n_mc else
+          ", and the material with option = mc keeps its drained strength"
+          if n_mc == 1 else
+          ", and the materials with option = mc keep their drained strength")
+    todo = ("Enter d and psi for the mc materials that do not drain during the "
+            "earthquake, or clear Two-stage seismic to run the single-stage analysis"
+            if n_mc else
+            "Clear Two-stage seismic to run the single-stage analysis")
+    return (f"No Mohr-Coulomb (option = mc) material carries the d / psi pair, so "
+            f"stage 1 gives no slice an undrained strength to carry into stage 2. "
+            f"{und} the same strength in "
+            f"both stages{mc}. The two-stage analysis would therefore be a "
+            f"single-stage pseudostatic analysis with these strengths, the undrained "
+            f"ones multiplied by the stage 2 strength factor when it is below 1. "
+            f"{todo} {_AT_MAT}.")
+
+
+@rule("seismic2.d_psi_incomplete", ERROR, ("seismic2",),
+      "The Kc = 1 envelope needs BOTH d and psi.")
+def _seismic2_d_psi(ctx):
+    for i, m in _d_psi_materials(ctx):
+        d, psi = _num(m.get("d")) or 0.0, _num(m.get("psi")) or 0.0
+        if (d != 0.0) == (psi != 0.0):
+            continue
+        have, missing = ("d", "psi") if d != 0.0 else ("psi", "d")
+        yield (f"{ctx.mat_label(i)} carries {have} but not {missing}. Stage 2 of "
+               f"the two-stage seismic analysis takes its undrained strength from "
+               f"the Kc = 1 envelope, which needs both. Fill both, or clear both to "
+               f"leave the material drained through the earthquake {_AT_MAT}.")
+
+
+# INFO, not WARNING, for the reason given at rapid.cp_ignores_d_psi.
+@rule("seismic2.cp_ignores_d_psi", INFO, ("seismic2",),
+      "An undrained (option = cp) material cannot also carry a Kc = 1 envelope.")
+def _seismic2_cp(ctx):
+    for i, m in ctx.strength_materials():
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in ("cp", "ratio") or not _has_d_psi(m):
+            continue
+        yield (f"{ctx.mat_label(i)} uses option = {opt}, so its d / psi are not read: "
+               f"its strength in both stages is the undrained strength its option "
+               f"gives {_AT_MAT}.")
+
+
+@rule("seismic2.curved_envelope_unsupported", ERROR, ("seismic2",),
+      "option = pow and option = hb are not supported in the two-stage seismic "
+      "analysis.")
+def _seismic2_curved(ctx):
+    for i, m in ctx.strength_materials():
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in ("pow", "hb"):
+            continue
+        name = "power-curve" if opt == "pow" else "Hoek-Brown"
+        yield (f"{ctx.mat_label(i)} uses option = {opt} ({name}), which the "
+               f"two-stage seismic analysis does not support: stage 2 overwrites "
+               f"each slice's c and f, and the curved envelope computes them itself, "
+               f"so the run is refused {_AT_MAT}.")
+
+
+@rule("seismic2.no_seismic_coefficient", WARNING, ("seismic2",),
+      "A two-stage seismic analysis with k_h = 0 is an undrained static analysis.",
+      fields=("k_seismic",))
+def _seismic2_k_zero(ctx):
+    if ctx.selection.get("ky"):
+        return None            # a yield coefficient run sets k itself
+    k = _num(ctx.sd.get("k_seismic"))
+    if k is None or k != 0.0:
+        return None            # a blank k is the global rule's to report
+    return ("The horizontal seismic coefficient k_h is 0, so stage 2 adds no seismic force and "
+            "the result is the static factor of safety with undrained strengths. "
+            f"Enter k_h {_at_global('D13')}.")
+
+
+# ---------------------------------------------------------------------------
+# Family: seismic direction
+#
+# The limit-equilibrium engine takes the MAGNITUDE of k_h and orients it itself
+# (slice.py, kw = abs(k) * W), so the sign never changes its answer and a limit
+# equilibrium run says nothing about it. The finite element engine reads the SIGN
+# as the direction (a signed horizontal body force), and this INFO states it on
+# every finite element run with a seismic force, which is the copy Run FEM shows.
+# ---------------------------------------------------------------------------
 
 @rule("main.seismic_direction_fem", INFO, ("fem",),
-      "In the FEM the sign of k sets the direction of the body force.",
+      "In the FEM the sign of k_h sets the direction of the body force.",
       fields=("k_seismic",))
 def _seismic_direction_fem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k == 0.0:
         return None
     pushes = "+x" if k > 0 else "-x"
-    return (f"Seismic coefficient k = {k:g} pushes in {pushes}. In the finite "
+    return (f"Horizontal seismic coefficient k_h = {k:g} pushes in {pushes}. In the finite "
             f"element engine the sign IS the direction: both faces are analyzed at "
             f"once, so choose the direction that drives the face you are checking -- "
             f"the engine will not choose for you, and a pseudo-static factor of "
@@ -5344,8 +5687,12 @@ def _pile_spacing_invalid(ctx):
       "number you do not have is left blank, never 0.",
       fields=("H", "V_cap", "M_cap"))
 def _pile_capacity_nonpositive(ctx):
+    # H is the limit-equilibrium pile force and only the LEM reads it; Vcap and
+    # Mcap cap the force in both engines.
+    keys = (("H", "H"),) if "lem" in ctx.analyses else ()
+    keys += (("V_cap", "Vcap"), ("M_cap", "Mcap"))
     for i, p in enumerate(ctx.piles):
-        for key, name in (("H", "H"), ("V_cap", "Vcap"), ("M_cap", "Mcap")):
+        for key, name in keys:
             v = _num(p.get(key))
             if v is None or v > 0:
                 continue
@@ -5449,7 +5796,9 @@ def _pile_fem_incomplete(ctx):
                    f"moment of area {_AT_PILES}.")
 
 
-@rule("pile.units_convention", INFO, ("lem", "fem"),
+# Limit equilibrium only: H, the per-unit-width force the note is about, is an
+# LEM input.
+@rule("pile.units_convention", INFO, ("lem",),
       "H is per unit width; D, S, Vcap, Mcap, E, I and Area are per pile.")
 def _pile_units_convention(ctx):
     rows = [i for i, p in enumerate(ctx.piles)
@@ -5518,7 +5867,10 @@ def _vocab(value):
     return text.lower() if text else None
 
 
-@rule("reinforce.dir_vocabulary", ERROR, ("*",),
+# Limit equilibrium only: Dir and Appl are read by the LEM alone, and Type only
+# fills a blank Dir or Appl when the sheet is read. The FEM models every line as a
+# bar along its own axis and a seepage run reads no reinforcement at all.
+@rule("reinforce.dir_vocabulary", ERROR, ("lem",),
       "Type, Dir and Appl each speak a fixed vocabulary.")
 def _reinf_vocabulary(ctx):
     types = ("geosynthetic", "nail", "tieback", "anchor")
@@ -5542,7 +5894,7 @@ def _reinf_vocabulary(ctx):
                    f"{_AT_REINF}.")
 
 
-@rule("reinforce.tmax_nonpositive", ERROR, ("*",),
+@rule("reinforce.tmax_nonpositive", ERROR, ("lem", "fem"),
       "Tmax is the capacity the whole pullout envelope is built from.",
       fields=("t_max",))
 def _reinf_tmax(ctx):
@@ -5598,7 +5950,9 @@ def _reinf_incomplete_cross(ctx):
               f"{_AT_REINF}.")
 
 
-@rule("reinforce.type_blank", WARNING, ("lem", "fem"),
+# Limit equilibrium only: the direction and application a blank Type defaults
+# to are LEM inputs, and the FEM's bar acts along its own axis whatever Type says.
+@rule("reinforce.type_blank", WARNING, ("lem",),
       "A blank Type defaults to tangent/active; a nail or tieback acts axially.")
 def _reinf_type_blank(ctx):
     rows = [i for i, r in enumerate(ctx.reinforcement)
@@ -5612,11 +5966,29 @@ def _reinf_type_blank(ctx):
             f"own axis. Set Type, or set Dir and Appl explicitly {_AT_REINF}.")
 
 
+def _reinf_reads_lp(ctx, r):
+    """True when this run reads line ``r``'s development lengths Lp1/Lp2.
+
+    Neither engine does on a line carrying both Adhesion and Delta: the
+    overburden-dependent law replaces them. Otherwise the LEM always does -- it
+    ignores Joint -- and the FEM does on a bonded line only, since a jointed
+    line's pullout is its interface (``joint.bond_inputs_ignored``).
+    """
+    if _num(r.get("adhesion")) is not None and _num(r.get("delta")) is not None:
+        return False
+    if "lem" in ctx.analyses:
+        return True
+    from .mesh import line_is_jointed
+    return not line_is_jointed(r)
+
+
 @rule("reinforce.pullout_negative", ERROR, ("lem", "fem"),
       "A negative pullout length is read as fully anchored -- the opposite of the intent.",
       fields=("lp1", "lp2", "tend1", "tend2"))
 def _reinf_pullout_negative(ctx):
     for i, r in enumerate(ctx.reinforcement):
+        if not _reinf_reads_lp(ctx, r):
+            continue
         for key, col in (("lp1", "Lp1"), ("lp2", "Lp2")):
             v = _num(r.get(key))
             if v is not None and v < 0:
@@ -6163,6 +6535,99 @@ def _joint_dilation_out_of_range(ctx):
                f"a joint that does not dilate {_AT_JOINTS}.")
 
 
+@rule("joint.strength_out_of_range", ERROR, ("fem",),
+      "A joint's c and t_cut are zero or more, and its phi an angle in [0, 90).",
+      fields=("c", "phi"))
+def _joint_strength_out_of_range(ctx):
+    for i, j in enumerate(ctx.joints):
+        c, phi, tc = _num(j.get("c")), _num(j.get("phi")), _num(j.get("t_cut"))
+        if c is not None and c < 0.0:
+            yield (f"{ctx.joint_label(i)} states c = {c:g}. Cohesion is a "
+                   f"strength, so it is zero or more; a negative one would have "
+                   f"the interface pull its two faces along rather than resist "
+                   f"them. Enter zero for a joint with no cohesion {_AT_JOINTS}.")
+        if phi is not None and not 0.0 <= phi < 90.0:
+            yield (f"{ctx.joint_label(i)} states phi = {phi:g} degrees. The "
+                   f"friction angle is an angle in [0, 90): below zero friction "
+                   f"would drive the slip it should resist, and at 90 tan(phi) is "
+                   f"unbounded. A value entered as a tangent or a percentage "
+                   f"rather than degrees lands here {_AT_JOINTS}.")
+        if tc is not None and tc < 0.0:
+            yield (f"{ctx.joint_label(i)} states t_cut = {tc:g}. The tension "
+                   f"cutoff is the normal tension the joint carries before it "
+                   f"opens, so it is zero or more; leave it blank (or 0) for a "
+                   f"contact that holds no tension {_AT_JOINTS}.")
+
+
+def _yes_no(value):
+    """``'yes'``, ``'no'``, ``None`` for a blank cell, or the entry itself when it
+    is neither word (the Joint and Jred columns, read in any case)."""
+    w = _vocab(value)
+    if w is None or w in ("yes", "no"):
+        return w
+    return value
+
+
+@rule("joint.yes_no_vocabulary", ERROR, ("fem",),
+      "Joint and Jred each read Yes or No.")
+def _joint_yes_no(ctx):
+    # Joint is read by the finite element engine alone (the LEM applies every
+    # line as a force across the slip surface), and Jred by the strength
+    # reduction alone, on a jointed reinforcement line or a joints-sheet row.
+    # The engines test for one word -- a line is a joint only on "yes", a joint
+    # is reduced unless "no" -- so any other entry silently means the other one.
+    from .mesh import line_is_jointed
+    ssrm = "ssrm" in ctx.analyses
+    for i, r in enumerate(ctx.reinforcement):
+        w = _yes_no(r.get("joint"))
+        if w not in (None, "yes", "no"):
+            yield (f"{ctx.reinf_label(i)} sets Joint = {r.get('joint')!r}, which "
+                   f"is neither Yes nor No. A line is a joint only where Joint "
+                   f"reads Yes, so this one would be modeled as a bonded bar "
+                   f"without a word. Enter Yes or No, or leave it blank for No "
+                   f"{_AT_REINF}.")
+        elif ssrm and line_is_jointed(r):
+            w = _yes_no(r.get("jred"))
+            if w not in (None, "yes", "no"):
+                yield (f"{ctx.reinf_label(i)} sets Jred = {r.get('jred')!r}, "
+                       f"which is neither Yes nor No. The strength reduction "
+                       f"reduces a joint's strength unless Jred reads No, so this "
+                       f"one would be reduced. Enter Yes or No, or leave it blank "
+                       f"for Yes {_AT_REINF}.")
+    if not ssrm:
+        return
+    for i, j in enumerate(ctx.joints):
+        w = _yes_no(j.get("jred"))
+        if w not in (None, "yes", "no"):
+            yield (f"{ctx.joint_label(i)} sets Jred = {j.get('jred')!r}, which is "
+                   f"neither Yes nor No. The strength reduction reduces a joint's "
+                   f"strength unless Jred reads No, so this one would be reduced. "
+                   f"Enter Yes or No, or leave it blank for Yes {_AT_JOINTS}.")
+
+
+@rule("joint.stiffness_nonpositive", ERROR, ("fem",),
+      "A joint's kn and ks are greater than zero where they are given.")
+def _joint_stiffness_nonpositive(ctx):
+    # The interface element takes a stated kn or ks only when it is above zero,
+    # and puts the stiffness derived from the adjacent soil in place of any other
+    # (joint.build_joint_data) -- so a 0 or a sign typo would silently become a
+    # different number. Blank is the way to ask for the derived one.
+    from .mesh import line_is_jointed
+    rows = [(ctx.reinf_label(i), r, _AT_REINF)
+            for i, r in enumerate(ctx.reinforcement) if line_is_jointed(r)]
+    rows += [(ctx.joint_label(i), j, _AT_JOINTS) for i, j in enumerate(ctx.joints)]
+    for label, row, where in rows:
+        for key in ("kn", "ks"):
+            v = _num(row.get(key))
+            if v is None or v > 0.0:
+                continue
+            yield (f"{label} has {key} = {v:g}. An interface stiffness is greater "
+                   f"than zero, and the engine would put the stiffness derived "
+                   f"from the adjacent soil in its place without a word. Enter a "
+                   f"positive {key}, or leave it blank to derive it from the "
+                   f"adjacent soil {where}.")
+
+
 @rule("joint.outside_domain", ERROR, ("fem",),
       "A joint line has to lie in the section it splits.")
 def _joint_outside_domain(ctx):
@@ -6580,11 +7045,13 @@ def _joint_bond_inputs(ctx):
 
 # ---- the joint-network regions (polygon sheet, Type 'joints') ---------------
 #
-# A joint region is an authoring input: it says where a generated set exists, and
-# nothing else reads it. So both rules below are about a cell that was filled in
-# expecting it to do something it cannot. A region no set names is NOT one of them
-# -- a region drawn for a set the user has yet to build is an ordinary thing to
-# find in a file, and saying so every run would be noise.
+# A joint region is an authoring input: it says where a generated set exists,
+# and its Size refines the mesh inside it the way a refine polygon's does
+# (mesh.zone_size_not_finer reports one that is not finer than the target). The
+# rule below is about a cell that was filled in expecting it to do something it
+# cannot. A region no set names is NOT one of them -- a region drawn for a set the
+# user has yet to build is an ordinary thing to find in a file, and saying so
+# every run would be noise.
 
 def _joint_region_name(n, zone):
     label = str((zone or {}).get("label") or "").strip()
@@ -6604,20 +7071,6 @@ def _joint_region_material(ctx):
                f"says where a joint set exists. The Mat ID does nothing, and if "
                f"this polygon was meant to BE that soil zone, its Type is the "
                f"cell to change {_AT_POLYGON}.")
-
-
-@rule("joint_region.size_inert", WARNING, ("fem", "seep"),
-      "A joint-network region's Size refines nothing.")
-def _joint_region_size(ctx):
-    for n, z in enumerate(ctx.sd.get("joint_zones") or []):
-        s = _num(z.get("size"))
-        if s is None:
-            continue
-        yield (f"{_joint_region_name(n, z)} declares Size = {s:g}. A joint "
-               f"region is never meshed as a region, so the size is not applied "
-               f"anywhere: the elements inside it come out at the global target "
-               f"like everything else. Draw a second polygon of Type 'refine' "
-               f"over the same ground to refine the mesh there {_AT_POLYGON}.")
 
 
 # ---------------------------------------------------------------------------
@@ -6787,7 +7240,10 @@ def _struct_e_band(ctx):
     return lo, hi, "kPa"
 
 
-@rule("structural.modulus_off_band", WARNING, ("lem", "fem"),
+# Finite element only: the limit equilibrium engine reads no reinforcement or
+# pile modulus (owner ruling 2026-08-14: a FEM-only input is not a defect of the
+# LEM run).
+@rule("structural.modulus_off_band", WARNING, ("fem",),
       "A reinforcement or pile modulus outside the band of any structural material.")
 def _structural_modulus_band(ctx):
     lo, hi, unit = _struct_e_band(ctx)
@@ -6882,7 +7338,7 @@ def _structural_members_cross(ctx):
 
 @rule("mat.strength_negative", ERROR, ("lem", "fem"),
       "A negative cohesion or friction angle is not a strength.",
-      fields=("c", "phi", "cp"))
+      fields=("c", "phi"))
 def _mat_strength_negative(ctx):
     # c/p is deliberately NOT checked. It is a GRADIENT -- the rate at which the
     # undrained strength changes with depth below r_elev -- and a negative one is a
@@ -6892,8 +7348,11 @@ def _mat_strength_negative(ctx):
     # quantities here.
     for i, m in ctx.strength_materials():
         opt = str(m.get("option") or "").strip().lower()
+        # Under option = ratio, c/p is a strength RATIO, not a strength, and its
+        # own rule says what a negative one does (mat.ratio_negative).
         cols = {"mc": (("c", "c"), ("phi", "f")),
-                "cp": (("c", "c"),)}.get(opt, ())
+                "cp": (("c", "c"),),
+                "ratio": (("c", "c"),)}.get(opt, ())
         for key, col in cols:
             v = _num(m.get(key))
             if v is None or v >= 0:
@@ -6904,6 +7363,36 @@ def _mat_strength_negative(ctx):
                    f"stepping c to -500 reports FS = -1.279, and phi to -30 reports "
                    f"FS = -0.493), so nothing downstream can tell the answer is "
                    f"meaningless {_AT_MAT}.")
+
+
+@rule("mat.ratio_negative", ERROR, ("lem", "fem"),
+      "A strength ratio below zero is no soil's, and it never governs the strength.",
+      fields=("cp",))
+def _mat_ratio_negative(ctx):
+    # Under option = ratio the strength is max(c, c/p * sigma'_v), with sigma'_v
+    # floored at zero in the slicer and the finite element engine alike. A negative
+    # ratio makes the second term zero or less, so it never governs: the strength is
+    # c everywhere, the strength the ratio was entered to give is silently dropped,
+    # and with c = 0 the material carries no strength at all -- a case
+    # mat.ratio_zero_strength, which reads c/p = 0, does not see. Nothing goes
+    # negative, so this is not a strength_negative case; it is refused because no
+    # soil has a negative S_u/sigma'_v, and a run would answer for a different
+    # material from the one entered.
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "ratio":
+            continue
+        r = _num(m.get("cp"))
+        if r is None or r >= 0:
+            continue
+        c = _num(m.get("c")) or 0.0
+        then = (f"the strength is c = {c:g} everywhere in this material"
+                if c > 0 else
+                "with c = 0 the material carries no strength at all")
+        yield (f"{ctx.mat_label(i)} has option = ratio with c/p = {r:g}. Under "
+               f"option = ratio, c/p is the strength ratio s_u/sigma'_v, which is "
+               f"never negative in a soil. A negative ratio never governs the "
+               f"strength max(c, c/p * sigma'_v), so {then}, and the ratio entered "
+               f"has no effect. Enter the ratio as a positive number {_AT_MAT}.")
 
 
 @rule("mat.phi_out_of_range", ERROR, ("lem", "fem"),
@@ -7027,7 +7516,8 @@ def _num_slices_few(ctx):
     if n is None or n >= 2:
         return None
     return (f"Number of slices is {_fmt(n)}. Enter at least 2 (30 to 50 is usual), "
-            f"or leave it blank for the default (Run LEM; main D15).")
+            f"or leave it blank for the default (Run LEM; main "
+            f"{_main_cell(ctx, 'num_slices')}).")
 
 
 @rule("fem.k0_nonpositive", ERROR, ("fem",),
@@ -7039,7 +7529,7 @@ def _k0_nonpositive(ctx):
     return (f"K0 initial stress (FEM) is {k0:g}. Enter a positive at-rest "
             f"coefficient (about 1 − sin φ′ for a normally consolidated soil, 1.0 to "
             f"reproduce an RS2 model), or leave it blank for the gravity turn-on "
-            f"initialization {_at_global('D16')}.")
+            f"initialization {_at_global(_main_cell(ctx, 'k0'))}.")
 
 
 def _main_cell(ctx, key):
@@ -7064,11 +7554,11 @@ def _mesh_size_nonpositive(ctx):
     if _bad(sd.get("target_size")):
         yield (f"Target element size is {_fmt(sd.get('target_size'))}. Enter a "
                f"positive size, or leave it blank for the automatic size (Build "
-               f"mesh; main D19).")
+               f"mesh; main {_main_cell(ctx, 'target_size')}).")
     if _bad(sd.get("element_size_1d")):
         yield (f"1D element size is {_fmt(sd.get('element_size_1d'))}. Enter a "
                f"positive size, or leave it blank to follow the target element size "
-               f"(Build mesh; main D20).")
+               f"(Build mesh; main {_main_cell(ctx, 'element_size_1d')}).")
     if sd.get("profile_lines"):
         for k, line in enumerate(sd.get("profile_lines") or []):
             if isinstance(line, dict) and _bad(line.get("size")):
@@ -7132,13 +7622,40 @@ def _search_window_reversed(ctx):
                f"smaller value first (Circles, Search window; circles sheet J8:K17).")
 
 
+@rule("surface.movement_vocabulary", ERROR, ("lem",),
+      "A non-circular point's Movement is Free, Horiz or Fixed, or blank.")
+def _noncirc_movement_vocabulary(ctx):
+    # Only the non-circular search reads Movement; a single-surface run never does.
+    # The three words match in any case. A blank resolves by position (an end
+    # point slides along the ground surface, an interior point stays where it
+    # is), and any other entry is refused by the search itself
+    # (search.noncirc_point_movements) -- it was once read as Fixed, which froze
+    # an interior point typed as lowercase "free".
+    if not ctx.is_search or ctx.effective_surface_family != "noncircular":
+        return None
+    from .fileio import NONCIRC_MOVEMENTS, noncirc_movement
+    for k, p in enumerate(ctx.sd.get("non_circ") or []):
+        raw = p.get("Movement") if isinstance(p, dict) else None
+        word = noncirc_movement(raw)
+        if word is None or word in NONCIRC_MOVEMENTS:
+            continue
+        yield (f"Point {k + 1} of the non-circular surface has Movement "
+               f"{str(raw).strip()!r}, which is not a movement. The search moves a "
+               f"point only as Free (across the surface), Horiz (along x) or Fixed "
+               f"(not at all), and an end point slides along the ground surface "
+               f"unless it is Fixed. Enter one of the three, or leave the cell "
+               f"blank: an end point then slides and an interior point stays "
+               f"where it is {_AT_NONCIRC}.")
+
+
 @rule("reinforce.pullout_length_missing", ERROR, ("lem", "fem"),
       "A line on the development-length law needs Lp1 and Lp2.",
       fields=("lp1", "lp2"))
 def _reinf_lp_missing(ctx):
     for i, r in enumerate(ctx.reinforcement):
-        if _num(r.get("adhesion")) is not None and _num(r.get("delta")) is not None:
-            continue                     # the overburden law does not read Lp
+        if not _reinf_reads_lp(ctx, r):
+            continue                     # the overburden law, or a jointed line's
+                                         # interface on a finite element run
         blank = [col for key, col in (("lp1", "Lp1"), ("lp2", "Lp2"))
                  if _num(r.get(key)) is None]
         if not blank:
@@ -7322,7 +7839,8 @@ def _sens_ru_no_consumer(ctx):
 
 
 @rule("sensitivity.rapid_only_field", ERROR, ("sensitivity",), capability="analysis",
-      summary="d and psi only act in a rapid drawdown analysis, which a sweep cannot run.")
+      summary="d and psi only act in the rapid drawdown and two-stage seismic analyses, "
+              "which a sweep cannot run.")
 def _sens_rapid_only(ctx):
     field = ctx.swept_field
     if field not in ("d", "psi"):
@@ -7331,7 +7849,8 @@ def _sens_rapid_only(ctx):
     where = ctx.mat_label(i) if i is not None else "the materials table"
     label = "d" if field == "d" else "psi"
     return (f"The sweep varies {label} on {where}. That parameter is read only by "
-            f"the rapid drawdown analysis, and a parametric study evaluates the "
+            f"the rapid drawdown analysis and the two-stage seismic analysis, and a "
+            f"parametric study evaluates the "
             f"single-stage model -- probed at d = 0, 10 and 100 (and psi = 0, 10 "
             f"and 40) the factor of safety is identical at every value {_AT_MAT}.")
 
@@ -7401,6 +7920,8 @@ def _rel_no_sigmas(ctx):
         for key in SIGMA_COLUMNS:
             if _pos(m.get(key)):
                 return None
+        if _rel_reads_d_psi(ctx, m) and any(_pos(m.get(k)) for k in D_PSI_SIGMAS):
+            return None
     return no_sigmas_message()
 
 
@@ -7423,7 +7944,7 @@ def _rel_elastic_sigma(ctx):
 def _rel_option_unsupported(ctx):
     for i, m in enumerate(ctx.materials):
         opt = str(m.get("option") or "").strip()
-        if opt.lower() in ("", "mc", "cp", "elastic"):
+        if opt.lower() in ("", "mc", "cp", "ratio", "elastic"):
             continue
         yield unsupported_option_message(m.get("name", f"Material_{i + 1}"), opt)
 
@@ -7432,7 +7953,8 @@ def _rel_option_unsupported(ctx):
       "A standard deviation the material's strength model does not read.")
 def _rel_sigma_ignored(ctx):
     used = {"mc": ("sigma_gamma", "sigma_c", "sigma_phi"),
-            "cp": ("sigma_gamma", "sigma_c", "sigma_cp")}
+            "cp": ("sigma_gamma", "sigma_c", "sigma_cp"),
+            "ratio": ("sigma_gamma", "sigma_c", "sigma_cp")}
     for i, m in enumerate(ctx.materials):
         opt = str(m.get("option") or "").strip().lower()
         if opt not in used:
@@ -7447,26 +7969,58 @@ def _rel_sigma_ignored(ctx):
                    f"index {_AT_MAT}.")
 
 
+#: The two standard deviations of the Kc = 1 envelope, read only by a rapid
+#: drawdown reliability run and only on an mc material (_rel_reads_d_psi).
+D_PSI_SIGMAS = {"sigma_d": "s(d)", "sigma_psi": "s(psi)"}
+
+
+def _rel_reads_d_psi(ctx, m):
+    """True when this reliability run perturbs material ``m``'s d and psi: a rapid
+    drawdown run, on an mc material (reliability._strength_param_mapping). The
+    slicer gives every other option d = psi = 0, and outside a rapid drawdown
+    nothing reads them."""
+    return (bool(ctx.selection.get("rapid"))
+            and str(m.get("option") or "").strip().lower() == "mc")
+
+
 @rule("reliability.dead_sigma_columns", ERROR, ("reliability",),
-      "s(d) and s(psi) are read by no reliability engine.")
+      "s(d) and s(psi) are read only by a rapid drawdown reliability run, on an mc "
+      "material.")
 def _rel_dead_sigmas(ctx):
-    dead = {"sigma_d": "s(d)", "sigma_psi": "s(psi)"}
-    live = any(_pos(m.get(k)) for m in ctx.materials for k in SIGMA_COLUMNS)
+    # A rapid drawdown reliability run perturbs an mc material's d and psi by s(d)
+    # and s(psi), as it does c and phi. Anywhere else the two are unread: on a
+    # cp, ratio or elastic row in a rapid run (a WARNING, the same case as
+    # reliability.sigma_ignored_by_option), and in a run without drawdown (an INFO:
+    # the same model often runs both ways, and the drawdown run reads them). Where
+    # they are the only standard deviations the run carries, it is refused, and
+    # this says why rather than leaving "none were provided" to stand alone.
+    rapid = bool(ctx.selection.get("rapid"))
+    live = any(_pos(m.get(k)) for m in ctx.materials for k in SIGMA_COLUMNS) or any(
+        _rel_reads_d_psi(ctx, m) and any(_pos(m.get(k)) for k in D_PSI_SIGMAS)
+        for m in ctx.materials)
     for i, m in enumerate(ctx.materials):
-        stated = [lbl for key, lbl in dead.items() if _pos(m.get(key))]
-        if not stated:
+        stated = [lbl for key, lbl in D_PSI_SIGMAS.items() if _pos(m.get(key))]
+        if not stated or _rel_reads_d_psi(ctx, m):
             continue
-        text = (f"{ctx.mat_label(i)} carries {' and '.join(stated)}, which no "
-                f"reliability engine reads -- the perturbation set is built from "
-                f"s(g), s(c), s(f) and s(c/p) only.")
-        if live:
-            yield (WARNING, text + " This uncertainty is silently dropped from the "
-                                   f"reliability index {_AT_MAT}.")
+        both = " and ".join(stated)
+        if rapid:
+            opt = str(m.get("option") or "").strip().lower() or "blank"
+            text = (f"{ctx.mat_label(i)} carries {both}, but its strength model is "
+                    f"option = {opt}, which takes no d or psi: rapid drawdown reads "
+                    f"the Kc = 1 envelope on an mc material only.")
         else:
-            yield (text + " They are the only standard deviations in this model, so "
-                          "the run is refused for carrying none at all -- a message "
-                          "that blames the wrong thing. Enter the uncertainty where "
-                          f"an engine reads it {_AT_MAT}.")
+            text = (f"{ctx.mat_label(i)} carries {both}, which only a rapid drawdown "
+                    f"reliability run reads, and this run is not one.")
+        if not live:
+            yield (text + " They are the only standard deviations this run would "
+                          "read, so it is refused for carrying none at all. Enter the "
+                          f"uncertainty where this run reads it {_AT_MAT}.")
+        elif rapid:
+            yield (WARNING, text + " The uncertainty is dropped from the reliability "
+                                   f"index {_AT_MAT}.")
+        else:
+            yield (INFO, text + " It is left out of this reliability index; a "
+                                f"rapid drawdown run of the model reads it {_AT_MAT}.")
 
 
 @rule("reliability.sigma_exceeds_mean", ERROR, ("reliability",),
@@ -7479,11 +8033,15 @@ def _rel_sigma_exceeds_mean(ctx):
         # that the Taylor series must decline is admissible there.
         return None
     used = {"mc": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("phi", "sigma_phi")),
-            "cp": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp"))}
+            "cp": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp")),
+            "ratio": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp"))}
     bad = []
     for i, m in enumerate(ctx.materials):
         opt = str(m.get("option") or "").strip().lower()
-        for param, key in used.get(opt, ()):
+        pairs = used.get(opt, ())
+        if _rel_reads_d_psi(ctx, m):
+            pairs = pairs + (("d", "sigma_d"), ("psi", "sigma_psi"))
+        for param, key in pairs:
             std = _num(m.get(key))
             mlv = _num(m.get(param))
             if std is None or std <= 0 or mlv is None:
@@ -7496,26 +8054,10 @@ def _rel_sigma_exceeds_mean(ctx):
     return None
 
 
-@rule("reliability.rapid_has_no_effect", ERROR, ("reliability",),
-      "Rapid drawdown is dropped silently by two of the reliability modes.")
-def _rel_rapid_noop(ctx):
-    if not ctx.selection.get("rapid"):
-        return None
-    if ctx.reliability_samples_sigmas:
-        name = ("Monte Carlo" if ctx.reliability_engine == "mc"
-                else "response-surface")
-        return (f"This run asks for rapid drawdown, but the {name} engine "
-                "applies it only to the single critical-surface search at the "
-                "most-likely values: every sampled realization is then solved "
-                "WITHOUT drawdown, so the probability of failure describes the "
-                "wrong analysis. Use the Taylor series engine for a rapid drawdown "
-                "reliability, or clear the rapid flag.")
-    if ctx.selection.get("search") is False:
-        return ("This run asks for rapid drawdown with search=False, and the "
-                "fixed-surface evaluation path does not perform the drawdown at "
-                "all -- the run reports 'Rapid drawdown: True' and solves the "
-                "single-stage model. Run with search=True, or clear the rapid flag.")
-    return None
+# (reliability.rapid_has_no_effect is retired: every reliability engine runs a
+# rapid drawdown now -- the Taylor series on each search and on the fixed
+# surface, Monte Carlo and the response surface on every realization of their
+# fixed-surface campaign -- and each varies an mc material's d and psi.)
 
 
 @rule("reliability.mc_samples_too_few", ERROR, ("reliability",),

@@ -49,6 +49,30 @@ is a $\phi = 0$ model: the strength assigned to a slice base depends only on whe
 normal stress acting on it. The rate is normally positive (strength increasing with depth); a negative rate is
 accepted for the consolidated-crust case — see [VP30](../verification/rocscience.md#vp30).
 
+**Undrained strength ratio.** The `ratio` option ties the undrained strength to the vertical effective stress
+itself, the way the ratio is measured:
+{: #undrained-strength-ratio }
+
+> $S_u = \max\left(c,\; r\,\sigma'_v\right)$
+
+where $r$ is the strength ratio $S_u/\sigma'_v$, entered in the **c/p** column, and $c$ is a minimum strength.
+Unlike a drained strength, which follows the normal stress on the slip surface as the soil fails, this strength is
+fixed by the stress the soil has consolidated under, and the soil shears without draining. It suits soft clays that
+have consolidated under the loads now on them and then fail too quickly to drain: a natural slope in normally
+consolidated clay, the soft foundation of an existing embankment, and soft mine tailings. It also gives the residual
+strength of a soil that has liquefied in an earthquake. Typical ratios are about 0.2 to 0.3 for normally consolidated clays, and lower for soils that have liquefied. At
+each slice base, $\sigma'_v$ is the weight of the soil column above it (saturated unit weight below the water
+table), plus the vertical part of the distributed load on the slice top, minus the pore pressure. Ponded water is
+part of that load: under a reservoir the pore pressure includes the water depth, and the water's weight balances it.
+Line loads are not counted. The strength is set from the model as it stands, like `cp`, and does not change with
+the solution.
+
+Under level ground with the water table at the surface, `ratio` and `cp` with $c_p = r\,\gamma'$ give the same
+strength. Under a slope they differ, because $\sigma'_v$ depends on how much soil stands above a point rather than
+on its elevation. One case needs care: under a fill placed so recently that the soil beneath it has not
+consolidated, the ratio credits the soil with strength from a load it does not yet carry. For that case, use `cp`
+for the soil's strength before the fill.
+
 **Nonlinear (power-curve) strength.** In addition to the linear Mohr-Coulomb envelope, a material may use the
 curved power-curve envelope (option `pow` in the input template):
 
@@ -126,57 +150,81 @@ in MPa rather than the model's own stress units.
 
 ### Pore pressures
 
-XSLOPE offers four ways to supply the pore pressure $u$, selected per material through the **u** column of the input
-template.
+Each material takes its pore pressure $u$ from one of four sources, chosen in the **u** column of the `mat` sheet
+(a blank cell means `none`). The materials of one model may use different sources:
 
-**Piezometric line** (`u = piezo`, the piezo sheet's `Type` = *piezo* or blank). The line is a true piezometric
-line — the locus of pressure heads a set of piezometers would read at the slip surface. The pore pressure is the
-full static head:
+| `u` | Pore pressure from | Use it for |
+|---|---|---|
+| `piezo` | a piezometric line on the `piezo` sheet | a quick, conservative model of the water when a seepage analysis isn't practical |
+| `seep` | a finite element seepage solution | the most accurate pore pressures, when the hydraulic conductivities and boundary conditions are known |
+| `ru` | a fixed fraction of the vertical overburden stress | matching published problems that specify $r_u$ |
+| `none` | no pore pressure | dry soil, and undrained (total-stress) strengths |
 
-> $u = \Delta z \cdot \gamma_w$
+Whatever the source, XSLOPE weighs each slice with total unit weights and applies the pore pressure separately. It
+never uses a buoyant unit weight. The [practice note on water pressures](#water-pressures-a-practice-note) explains
+why.
 
-where $\Delta z$ is the vertical distance from the point up to the line and $\gamma_w$ is the unit weight of water
-(upper figure).
+#### Piezometric line (`u = piezo`)
 
-**Phreatic surface** (the piezo sheet's `Type` = *phreatic*). The equation above is only strictly correct when the
-water table is horizontal. When the line is instead a genuine *phreatic surface* — the water table in a slope with
-inclined, roughly surface-parallel steady seepage — the equipotentials are no longer vertical, so the head at depth
-is *less* than the static column and taking the full vertical distance overstates $u$. The static head is reduced
-by $\cos^2\theta$, where $\theta$ is the inclination of the line segment directly above the point (lower figure):
+A line on the `piezo` sheet gives the head of the water. Each line has a `Type` cell, piezo or phreatic, that sets
+how the head at a point below the line is read from the line. The figure shows the two Types at the same point on a
+slip surface:
 
-> $u = \Delta z \cdot \gamma_w \cdot \cos^2\theta$
+![One water line read two ways at a point on a slip surface: piezo takes the vertical distance Δz up to the line; phreatic takes Δz cos²θ, the height a standpipe at the point rises to, where the equipotential through the point meets the line at a right angle](images/piezo_phreatic.png){width=760px}
 
-![piezo.png](images/piezo.png)
+- **Type piezo** (the default; a blank `Type` cell means the same). The head at the point reaches the line
+  directly above it, as it would if the equipotentials, the lines of equal head, were vertical. The pore pressure is
 
-This is the same correction as Slide2's "Hu: Auto" and XSTABL's phreatic-surface option, and it applies in the FEM
-as well as the LEM. It matters most on steep phreatic lines — at $\theta = 20°$ it is already a 12% reduction in
-$u$ — and on a flat line the two types are identical. Choosing between them: if the line came from piezometer
-readings, a flow net, or a seepage analysis, it is a piezometric line; if all you have is the water table position,
-*phreatic* is the appropriate shortcut.
+    > $u = \gamma_w \, \Delta z$
 
-**Where a line applies.** Either type assigns pore pressure only over its own horizontal extent; nothing is
-extrapolated past either end. A line may therefore stop short of the section, which is the right model when the
-water body itself does — an upstream pool with no downstream tailwater, say. What is not allowed is *sampling* one
-from outside it: if a slice base whose material takes `u = piezo` falls beyond either end of the line, XSLOPE stops
-and reports the failure surface, the slice, its x-coordinate and the line's extent, rather than reading zero pore
-pressure and returning an unconservatively high factor of safety. Where a region really is dry, carry the line on
-at an elevation below the section to say so. The finite element solver applies the same rule at every mesh node and
-Gauss point. XSLOPE also stops when a material has `u = piezo` and the file defines no piezometric line at all; a
-dry material takes `u = none`.
+    where $\Delta z$ is the vertical distance from the point up to the line and $\gamma_w$ is the unit weight of
+    water.
 
-**Pore pressure ratio** (`u = ru`). The pore pressure is taken as a fixed fraction of the vertical overburden,
-$u = r_u \sigma_v$, with $r_u$ entered per material. $\sigma_v$ is the *soil-column* stress only — distributed loads
-and tension-crack water are deliberately excluded. This is a coarse idealization, but it is what many published
-benchmarks specify, so it is supported for comparison.
+- **Type phreatic**. The line is the water table in a slope with steady seepage along it. The water flows along the
+  line, so the equipotentials cross it at a right angle. A standpipe at the point rises only to where the
+  equipotential through the point meets the line. That height is $\Delta z \cos^2\theta$, where $\theta$ is the
+  inclination of the line:
 
-**Finite element seepage** (`u = seep`). Pore pressures are interpolated from a 2D finite element seepage solution
-using the [seepage tools](../seep/overview.md), at the point in question, from the nodes of the containing element via
-the element basis functions. This is the most accurate option, and the only one that represents a genuinely
-two-dimensional flow field — including perched water, anisotropy, and internal drains — rather than assuming a head
-distribution up front.
+    > $u = \gamma_w \, \Delta z \cos^2\theta$
 
-With all four options, XSLOPE uses the *explicit* water-force formulation, never buoyant unit weights. Total
-unit weights are used for the slice weights and the pore pressure enters separately through $u$.
+    A real water line curves, so XSLOPE takes $\theta$ from the segment of the line directly above each point.
+
+On a flat line the two Types give the same pore pressure. On a line inclined at 20°, phreatic gives a pore pressure
+12 percent lower than piezo. The phreatic Type is the same correction as Slide2's "Hu: Auto" and XSTABL's
+phreatic-surface option, and it applies in the finite element analysis as well.
+
+**Choosing the Type.** On a flat or gentle line it hardly matters, so leave it at the default, piezo. On a steep line
+with the water moving along it, as in a long natural slope, phreatic is more realistic. Piezo is the more
+conservative choice, because it can only raise the pore pressure. The one exception is a line plotted from
+piezometers with their tips at the slip surface. That line is already the head at that depth, so piezo is exact.
+
+**Where a line applies.** A line gives pore pressures only over its own horizontal extent. Nothing is extended past
+either end. A line may stop short of the section where the water does, such as an upstream pool with no tailwater
+downstream. But every point that reads the line must lie within it. If the base of a slice in a `u = piezo` material
+falls beyond either end of the line, XSLOPE stops with an error that names the surface, the slice, its
+x-coordinate, and the line's extent. It does not read zero pore pressure there, which would give an unconservatively
+high factor of safety. To model dry ground past the end of a line, carry the line on at an elevation below the
+section. The finite element analysis applies the same rule at every mesh node and Gauss point in a `u = piezo`
+material. XSLOPE also stops
+when a material has `u = piezo` and the file has no piezometric line.
+
+#### Finite element seepage (`u = seep`)
+
+The pore pressure at each point is interpolated from a finite element seepage solution, from the nodes of the
+element that contains the point. [Seepage and slope stability](../seep/seep_slope.md) shows how to run the seepage
+analysis and use its solution. This is the most accurate source. It is the only one that represents a
+two-dimensional flow field, including perched water, anisotropy, and internal drains, instead of assuming how the
+head varies.
+
+#### Pore pressure ratio (`u = ru`)
+
+The pore pressure is a fixed fraction of the vertical overburden stress:
+
+> $u = r_u \sigma_v$
+
+$r_u$ is entered for each material, and $\sigma_v$ is the stress from the soil column alone. Distributed loads and
+water in a tension crack are left out of it. The ratio is a coarse model of the water. XSLOPE supports it because
+many published problems specify $r_u$.
 
 ### Matric suction (apparent cohesion above the water table)
 
@@ -195,7 +243,9 @@ With $u_a = 0$, the last term is $s\tan\phi^b$, where $s = \max(0,\,-u_w)$ is th
 apparent cohesion added on top of $c'$. The effective-normal term still uses the ordinary clamped $u$, so the
 base normal forces and interslice forces are computed as before; only the cohesion on the resisting side gains the
 extra term. $\phi^b$ is off unless a material is given a value, and with it off the strength is the ordinary
-Mohr-Coulomb strength.
+Mohr-Coulomb strength. Only an effective-stress material (`mc`, `pow` or `hb`) whose pore pressure comes from
+`piezo` or `seep` takes the credit. A `cp` or `ratio` material states an undrained strength, which has no
+effective-stress term for suction to add to, and `none` and `ru` give no suction to read.
 
 **Setting it up.** The **mat** sheet carries this per material — see
 [phi_b / s_cap](../usage/input_template.md#worksheet-mat) in the input template docs for the columns, the
@@ -388,11 +438,13 @@ unit length, which is then
 converted to a force acting on each slice based on its width and the load intensity (see below). 
 
 **Seismic Loads:** In seismically active regions, the stability of slopes can be significantly affected by seismic 
-forces. These forces are typically represented as horizontal accelerations acting on the mass of each slice. The pseudo-static approach is commonly used, where a horizontal acceleration coefficient $k$ is applied to the weight of each slice to calculate the seismic force.
+forces. These forces are typically represented as horizontal accelerations acting on the mass of each slice. The pseudo-static approach is commonly used, where a horizontal acceleration coefficient $k_h$ is applied to the weight of each slice to calculate the seismic force.
 
 ![seismic.png](images/seismic.png)
 
-The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. That direction follows from the failure surface, so only the magnitude of $k$ is used here; the finite element solver has no failure surface to read it from and uses the signed value instead — see [Seismic forces](../fem/overview.md#seismic-forces).
+The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. That direction follows from the failure surface, so only the magnitude of $k_h$ is used here; the finite element solver has no failure surface to read it from and uses the signed value instead — see [Seismic forces](../fem/overview.md#seismic-forces).
+
+A vertical seismic coefficient $k_v$ adds a vertical force $k_vW$ through the same center of gravity. It is signed: positive acts downward and adds to the slice weight, negative acts upward and takes it away. Every method uses $W(1+k_v)$ wherever it uses the weight, in force and moment equilibrium alike. The effect depends on the soil. On a frictional slope an upward $k_v$ lowers the factor of safety, because it reduces the normal force that friction depends on. On a cohesive slope a downward one does, because it adds driving weight that cohesion does not match. A run applies $k_v$ in the direction entered, so checking both directions takes two runs.
 
 **Reinforcement:** Reinforcement forces are used to represent the effects of geosynthetics, soil nails, or other 
 structural elements that provide additional stability to slopes. These forces can be modeled as tensile forces acting along the base of the slices, providing resistance to sliding and contributing to the overall stability of the slope.
@@ -414,8 +466,8 @@ as follows:
 ![slice_adv.png](images/slice_adv.png)
 
 The distributed load acting on the top of each slice is converted to a resultant force by multiplying the load 
-intensity by the width of the slice and it acts at point $d$. The seismic force $kW$ acts horizontally at the center 
-of gravity of each slice. The reinforcement force $P$ acts at the point where the line crosses the base of the 
+intensity by the width of the slice and it acts at point $d$. The seismic force $k_hW$ acts horizontally at the center 
+of gravity of each slice, and $k_vW$ acts vertically through the same point. The reinforcement force $P$ acts at the point where the line crosses the base of the 
 slice, in a direction that resists sliding — parallel to the base for tangent (flexible) reinforcement, or along 
 the reinforcement axis for axial (rigid) supports. A line load $L$ acts at its point of application on the top of 
 the slice at angle $\delta$. The load corresponding to water in the tension crack is converted to a single resultant 

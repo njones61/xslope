@@ -9,6 +9,7 @@ docs/parametric/ and docs/tutorials/ for test tags of the form:
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.5625, fs_bound=lower, target_size=0.8, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=fem_tilt, k_stand=0.147656, k_fail=0.150391, expected_tilt=8.5, tolerance=0.1, target_size=0.09 -->
+    <!-- test: file=files/foo.xlsx, type=fem_kc, k_stand=0.38, k_fail=0.385, expected_kc=0.3825, kc_tol=0.005, direction=left, target_size=2.0 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
     <!-- test: file=files/foo.xlsx, type=seep_head, points=2:2:4.05;4:2:4.15, tolerance=0.02 -->
@@ -35,6 +36,10 @@ flow, and only then searches or reduces strength (see ``_stage_seep_fields``).
 ``size_divisions`` is the Build Mesh dialog's auto-size spinner: the section width
 over that number, so a page is locked at the mesh it actually built.
 
+``mesh=file`` solves an FEM row on the workbook's own mesh file
+(``{base}_mesh.json``) instead of meshing afresh at ``target_size``: the route of a
+row scored on the vendor's own mesh, so that the mesh cannot be the difference.
+
 The fem_tilt type locks a published TILT ANGLE — the angle a tilt table is
 raised to before a model fails, which is what a tilt-table test reports in place
 of a factor of safety. The model is pushed by a horizontal seismic coefficient k
@@ -44,6 +49,16 @@ model must STAND, and at ``k_fail``, where it must FAIL, each read the way a
 strength-reduction bracket edge is read; the tilt the two bracket, the mean of
 atan(k_stand) and atan(k_fail) in degrees, must lie within ``tolerance`` (in
 DEGREES, absolute) of ``expected_tilt``. See run_fem_tilt_test.
+
+The fem_kc type locks a CRITICAL SEISMIC COEFFICIENT by the finite element
+method: the largest k under which the model stands at full strength
+(``xslope.seismic.fem_yield_coefficient``). It is the same pair of
+full-strength solves as a tilt row, read the same way, at ``k_stand`` (must
+STAND) and ``k_fail`` (must FAIL), in the ``direction`` the tag names ('left'
+for a slope facing -x, the default, or 'right'); the coefficient the two
+bracket, their mean, must lie within ``kc_tol`` (absolute) of
+``expected_kc``. The gate (``--gate``) re-runs the whole bisection instead.
+See run_fem_kc_test.
 
 The pullout_envelope type locks a published PULLOUT TABLE -- the resistance a
 reinforcement layer develops beyond an assumed failure surface, layer by layer.
@@ -487,12 +502,13 @@ def parse_test_tags(md_path):
 
         # Convert numeric fields
         for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'f_stand', 'f_fail', 'beta', 'k0',
-                    'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor',
+                    'expected_kc', 'fs_tol', 'kc_tol', 'refine_factor',
                     'expected_pf', 'pf_tol',
                     'expected_depth', 'depth_x', 'depth_datum',
                     'expected_force', 'target_fs', 'force_elev', 'grid',
                     'refine_grid', 'min_depth',
-                    'expected_tilt', 'k_stand', 'k_fail']:
+                    'expected_tilt', 'k_stand', 'k_fail',
+                    'expected_d', 'ky', 'scale', 'target_pga']:
             if key in params:
                 params[key] = float(params[key])
         for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index',
@@ -695,6 +711,78 @@ def _stage_seep_fields(slope_data, test):
             f"boundary set(s)) or 'transient' (march and stage the frames)")
 
 
+def _apply_material_tag(slope_data, test):
+    """`material=<name>` makes every row of the materials table a copy of the named
+    row, so a one-zone model runs that soil. It exists for Duncan, Wright and
+    Brandon's Table 10.4, which runs eight strength sets (four soils, each as a
+    two-stage d/psi material and as an R envelope) on one geometry: one workbook per
+    water case carries all eight, and the tag picks the row. Then any
+    `mat_<column>=<value>` keys are set on every row, and `mat<k>_<column>=<value>`
+    keys on row k (1-based). Returns an error message, or None (also when the tag
+    sets neither)."""
+    name = str(test.get('material', '')).strip()
+    if name:
+        named = [m for m in slope_data.get('materials', []) if m.get('name') == name]
+        if len(named) != 1:
+            return f"material={name!r} names {len(named)} rows of the materials table, not one"
+        slope_data['materials'] = [dict(named[0]) for _ in slope_data['materials']]
+    # `mat_<column>=<value>` sets that column on every row of the materials table,
+    # for a tutorial whose reader edits a strength between runs of one file (LEM-14
+    # enters the R envelope's c and phi, then c', phi', d, and psi, on one soil).
+    # `mat<k>_<column>=<value>` sets it on row k only (1-based), for a layered model
+    # whose reader edits one soil (LEM-7 turns two of three clays into ratios).
+    for key, raw in test.items():
+        row = re.match(r'mat(\d+)_(.+)$', key)
+        if key.startswith('mat_'):
+            col = key[len('mat_'):]
+        elif row:
+            col = row.group(2)
+        else:
+            continue
+        mats = slope_data.get('materials', [])
+        if row:
+            k = int(row.group(1))
+            if not 1 <= k <= len(mats):
+                return f"{key}: the materials table has no row {k}"
+            mats = [mats[k - 1]]
+        if not mats or any(col not in m for m in mats):
+            return f"{key}: the materials table has no column {col!r}"
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = str(raw).strip()
+        for m in mats:
+            m[col] = value
+    return None
+
+
+def _apply_seismic_tag(slope_data, test):
+    """`k_seismic=` and `k_vertical=` set the model's seismic coefficients for one
+    row, so a closed form can be run at several coefficients on one workbook (DWB
+    Fig. 10.1's wedge with a vertical coefficient). Returns an error message, or
+    None (also when the tag sets neither)."""
+    for key in ('k_seismic', 'k_vertical'):
+        if key in test:
+            try:
+                slope_data[key] = float(test[key])
+            except (TypeError, ValueError):
+                return f"{key}={test[key]!r} is not a number"
+    return None
+
+
+def _tag_seismic2(test):
+    """A tag's two-stage seismic option: `seismic2=interpolated|kc1` names the stage 2
+    strength, and `seismic2_factor=f` adds the stage 2 strength factor (the dict
+    form). Absent -> False (no two-stage analysis)."""
+    strength = str(test.get('seismic2', '')).strip().lower() or False
+    factor = str(test.get('seismic2_factor', '')).strip()
+    if factor:
+        if not strength:
+            raise ValueError("seismic2_factor needs seismic2=interpolated|kc1")
+        return {"strength": strength, "factor": float(factor)}
+    return strength
+
+
 def run_lem_test(test):
     """Run a single LEM test (single_circle, circular_search, or noncircular_search)."""
     from xslope.fileio import load_slope_data
@@ -709,6 +797,9 @@ def run_lem_test(test):
     # `rapid=true` runs the 3-stage rapid-drawdown analysis (needs the seep solution
     # + dloads/seep-bc stage-2 data in the input). Works with any test type.
     rapid = str(test.get('rapid', 'false')).strip().lower() in ('true', '1', 'yes')
+    # `seismic2=interpolated|kc1` runs the two-stage pseudostatic seismic analysis
+    # (advanced.seismic_two_stage) with that stage 2 strength. Absent -> none.
+    seismic2 = _tag_seismic2(test)
     # `composite=true` lets a circle be truncated at the bottom of the model and run
     # along it (slice.CompositeSurface). Only for problems whose base is a real
     # impenetrable boundary; off by default.
@@ -784,6 +875,18 @@ def run_lem_test(test):
         for m in slope_data.get('materials', []):
             m['u'] = u_option
 
+    _mat_err = _apply_material_tag(slope_data, test) or _apply_seismic_tag(slope_data, test)
+    if _mat_err:
+        return None, _mat_err
+
+    # `noncirc_order=reversed` lists the file's non-circular points right to left,
+    # as a user drawing a surface from the crest of a right-facing slope down to its
+    # toe would enter them. The search must find the same surface either way
+    # (search.noncirc_left_to_right); before it did, every move was refused and the
+    # starting surface came back as the answer.
+    if str(test.get('noncirc_order', '')).strip().lower() == 'reversed':
+        slope_data['non_circ'] = list(reversed(slope_data.get('non_circ') or []))
+
     # `tcrack_depth=<ft|m>` and `tcrack_water=<ft|m>` override main!D11/D12, the
     # tension crack depth and the depth of water standing in it. They exist for a
     # tutorial that runs its shipped (uncracked) workbook with a crack added — LEM-1's
@@ -829,11 +932,12 @@ def run_lem_test(test):
             circle = {"Xo": _xo, "Yo": _yo, "Depth": _yo - _r, "R": _r}
             success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
                                               composite=composite, right_facing=right_facing,
-                                              suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+                                              suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                                              rapid=rapid)
             if not success:
                 return None, f"generate_slices failed: {result}"
             slice_df, failure_surface = result
-            solver_result = solve_selected(method, slice_df, rapid=rapid)
+            solver_result = solve_selected(method, slice_df, rapid=rapid, seismic2=seismic2)
             if isinstance(solver_result, str):
                 return None, f"solve failed: {solver_result}"
             return solver_result['FS'], None
@@ -850,11 +954,12 @@ def run_lem_test(test):
         circle = circles[ci]
         success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
                                           composite=composite, right_facing=right_facing,
-                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                                          rapid=rapid)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
-        solver_result = solve_selected(method, slice_df, rapid=rapid)
+        solver_result = solve_selected(method, slice_df, rapid=rapid, seismic2=seismic2)
         if isinstance(solver_result, str):
             return None, f"solve failed: {solver_result}"
         # Regression guard: rapid drawdown must write the winning stage's stresses
@@ -866,7 +971,8 @@ def run_lem_test(test):
 
     elif test_type == 'circular_search':
         fs_cache, converged, search_path, circle_cache = circular_search(
-            slope_data, method, num_slices=num_slices, rapid=rapid, composite=composite,
+            slope_data, method, num_slices=num_slices, rapid=rapid, seismic2=seismic2,
+            composite=composite,
             seed=seed, center_box=center_box, entry_range=entry_range,
             exit_range=exit_range, tangent_depth=tangent_depth
         )
@@ -883,18 +989,19 @@ def run_lem_test(test):
         # the "predefined slip surface" form of the verification problems.
         success, result = generate_slices(slope_data, non_circ=slope_data['non_circ'],
                                           num_slices=num_slices, right_facing=right_facing,
-                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                                          rapid=rapid)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
-        solver_result = solve_selected(method, slice_df, rapid=rapid)
+        solver_result = solve_selected(method, slice_df, rapid=rapid, seismic2=seismic2)
         if isinstance(solver_result, str):
             return None, f"solve failed: {solver_result}"
         return solver_result['FS'], None
 
     elif test_type == 'noncircular_search':
         fs_cache, converged, search_path = noncircular_search(
-            slope_data, method, num_slices=num_slices, rapid=rapid
+            slope_data, method, num_slices=num_slices, rapid=rapid, seismic2=seismic2
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "noncircular_search found no valid surface"
@@ -1299,92 +1406,91 @@ def run_support_force_test(test):
 
 
 def run_critical_kc_test(test):
-    """Find the CRITICAL seismic coefficient k_c — the horizontal pseudo-static
-    coefficient at which the searched minimum factor of safety equals 1.0 — and
-    compare it to the published k_c. This is the verification target for RS2 #68
-    (Loukidis, Bandini & Salgado 2003), which publishes k_c, not an FS.
+    """Find the seismic yield coefficient k_y (the critical seismic coefficient
+    k_c, at which the factor of safety is 1) and compare it to the published one.
+    This is the verification target for RS2 #68 (Loukidis, Bandini & Salgado
+    2003) and Slide2 VP104, which publish k_c rather than a factor of safety.
 
-    Tag keys: file, method, expected_kc, k_min, k_max, num_slices (default 40),
-    fs_tol (confirming-search FS band, default 0.005), kc_tol (the comparison
-    tolerance, via _expected_and_tol), max_outer (default 3).
+    The work is the package's own :func:`xslope.seismic.yield_coefficient`,
+    reached the way Studio's Run LEM reaches it (``run_lem_analysis(ky=True)``),
+    so the tags test the code a user runs. Its bracket is found automatically.
 
-    Algorithm (cheap and honest): FS decreases monotonically as k rises, so k_c is
-    a single crossing. A full circular search at the bracket midpoint fixes a near-
-    critical circle; k is then bisected on that FIXED circle with fast single-circle
-    solves (~0.1 s each) until FS = 1; a confirming FULL search at that k re-checks
-    that the true minimum surface there is also FS ≈ 1. If a more critical surface
-    has emerged (the critical circle migrates with k), it is adopted and the inner
-    bisection repeats — so the result converges to the search-minimised k_c from
-    above, at the cost of ~2 full searches rather than one per bisection step.
-    Returns the k_c (compared to expected_kc within kc_tol by the framework)."""
+    Tag keys: file, method, expected_kc, kc_tol (the comparison tolerance, via
+    _expected_and_tol), num_slices (default 40), surface (``circular`` or
+    ``noncircular``, default circular), search (``false`` for k_y on the file's
+    own surface; default true, the minimum k_y by search), seismic2
+    (``interpolated`` or ``kc1``), material (see :func:`_apply_material_tag`)."""
     from xslope.fileio import load_slope_data
-    from xslope.slice import generate_slices
-    from xslope.solve import solve_selected
-    from xslope.search import circular_search
-
-    method = test['method']
-    num_slices = int(test.get('num_slices', 40))
-    k_min = float(test['k_min'])
-    k_max = float(test['k_max'])
-    fs_tol = float(test.get('fs_tol', 0.005))
-    max_outer = int(test.get('max_outer', 3))
+    from xslope.search import AnalysisError, run_lem_analysis
 
     slope_data = load_slope_data(test['file'])
+    err = _apply_material_tag(slope_data, test) or _apply_seismic_tag(slope_data, test)
+    if err:
+        return None, err
+    search = str(test.get('search', 'true')).strip().lower() not in ('false', '0', 'no')
+    try:
+        bundle = run_lem_analysis(
+            slope_data, test['method'],
+            analysis='auto_search' if search else 'single_surface',
+            surface=str(test.get('surface', 'circular')).strip().lower(),
+            num_slices=int(test.get('num_slices', 40)),
+            seismic2=_tag_seismic2(test),
+            ky=True, announce=False)
+    except AnalysisError as e:
+        return None, str(e)
+    return bundle['yield']['k_y'], None
 
-    def search_min(k):
-        """Full circular search at coefficient k → (min_FS, critical circle)."""
-        slope_data['k_seismic'] = k
-        fs_cache, _conv, _path, _cc = circular_search(
-            slope_data, method, num_slices=num_slices)
-        if not fs_cache or fs_cache[0]['FS'] >= 9999:
-            return None, None
-        b = fs_cache[0]
-        return b['FS'], {'Xo': b['Xo'], 'Yo': b['Yo'], 'Depth': b['Depth'],
-                         'R': b['Yo'] - b['Depth']}
 
-    def fs_on(circle, k):
-        """FS on a FIXED circle at coefficient k (one single_circle solve)."""
-        slope_data['k_seismic'] = k
-        ok, res = generate_slices(slope_data, circle=circle, num_slices=num_slices)
-        if not ok:
-            return None
-        slice_df, _fs = res
-        out = solve_selected(method, slice_df)
-        if isinstance(out, str):
-            return None
-        return out['FS']
+#: An error message that starts with this is a skip with its reason, not an error:
+#: the row needs a file this repository does not carry and this machine lacks.
+SKIP_PREFIX = 'SKIP: '
 
-    _fs_mid, circle = search_min(0.5 * (k_min + k_max))
-    if circle is None:
-        return None, f"circular search found no surface at k={0.5*(k_min+k_max):.4f}"
 
-    kc = 0.5 * (k_min + k_max)
-    for _outer in range(max_outer):
-        lo, hi = k_min, k_max
-        fs_lo, fs_hi = fs_on(circle, lo), fs_on(circle, hi)
-        if fs_lo is None or fs_hi is None:
-            return None, "fixed-circle solve failed at a bracket endpoint"
-        if not (fs_hi <= 1.0 <= fs_lo):
-            return None, (f"k_c is not bracketed on the critical circle: "
-                          f"FS({lo})={fs_lo:.3f}, FS({hi})={fs_hi:.3f} "
-                          f"(need FS(k_min)>=1>=FS(k_max)) — widen k_min/k_max")
-        fs = fs_hi
-        for _inner in range(50):
-            kc = 0.5 * (lo + hi)
-            fs = fs_on(circle, kc)
-            if fs > 1.0:
-                lo = kc            # too stable — raise k
-            else:
-                hi = kc            # unstable — lower k
-            if abs(fs - 1.0) <= 1e-4:
-                break
-        fs_chk, circle_chk = search_min(kc)
-        if circle_chk is None:
-            return None, f"confirming search found no surface at k={kc:.4f}"
-        if abs(fs_chk - 1.0) <= fs_tol:
-            return kc, None        # the true minimum surface at k_c is also FS≈1
-        circle = circle_chk        # critical circle migrated — adopt and re-bisect
-    return kc, None                # best estimate after max_outer iterations
+def run_newmark_test(test):
+    """Integrate an acceleration record as a rigid sliding block and compare the
+    permanent displacement to the published or closed-form one.
+
+    The work is the package's own :func:`xslope.seismic.read_record` and
+    :func:`xslope.seismic.newmark_displacement`, the calls Studio's Newmark
+    dialog makes.
+
+    Tag keys: file (the record), ky (in g), expected_d (in cm, or in inches with
+    ``units=imperial``), tolerance (absolute, default 0.005), scale or
+    target_pga (default: the record as written), direction (``both``, the
+    larger of the two and the default; ``positive`` or ``negative``, the one
+    with that sign of acceleration pushing the block downslope).
+
+    ``vendor=rocscience`` marks a record that lives inside a vendor's own model
+    (``file`` is the model's name), which this repository does not carry: the
+    record is read from the local vendor archive, and the row SKIPS with the
+    reason when the model is not there."""
+    from xslope.seismic import newmark_displacement, read_record, scale_for_pga
+    try:
+        if test.get('vendor'):
+            sys.path.insert(0, str(Path(__file__).parent / 'benchmarks' / 'rocscience'))
+            from newmark_vp104 import MODEL_NAME, MODEL_URL, load_record
+            name = Path(test['file']).name
+            if name != MODEL_NAME:
+                return None, f"vendor={test['vendor']}: no reader for {name}"
+            record = load_record()
+            if record is None:
+                return None, (f"{SKIP_PREFIX}{name} is not in the local vendor "
+                              f"archive (it is in {MODEL_URL})")
+        else:
+            record = read_record(test['file'])
+    except (OSError, ValueError) as e:
+        return None, str(e)
+    scale = test.get('scale', 1.0)
+    if 'target_pga' in test:
+        scale = scale_for_pga(record, test['target_pga'])
+    result = newmark_displacement(record, test['ky'], scale=scale,
+                                  units=str(test.get('units', 'si')).strip().lower())
+    direction = str(test.get('direction', 'both')).strip().lower()
+    if direction == 'both':
+        return result['D'], None
+    if direction not in ('positive', 'negative'):
+        return None, f"direction={direction}: expected both, positive, or negative"
+    return result['directions'][+1 if direction == 'positive' else -1]['D'], None
 
 
 def run_design_test(test):
@@ -1471,7 +1577,14 @@ def _fem_case_model(test):
     # silently zeroes the pore pressures if the node count differs.
     uses_seep = any(str(m.get('u', '')).strip().lower() == 'seep'
                     for m in slope_data.get('materials', []))
-    if uses_seep and slope_data.get('mesh') is not None:
+    # `mesh=file` solves on the workbook's own mesh sidecar ({base}_mesh.json) rather
+    # than meshing afresh: the route of a row scored on the vendor's own mesh, where
+    # the comparison has to hold the discretization fixed (RS2-68's FEM k_c).
+    use_file_mesh = str(test.get('mesh', '')).strip().lower() == 'file'
+    if use_file_mesh and slope_data.get('mesh') is None:
+        raise ValueError("mesh=file, but the workbook has no mesh file "
+                         "({base}_mesh.json) beside it")
+    if (uses_seep or use_file_mesh) and slope_data.get('mesh') is not None:
         mesh = slope_data['mesh']
     else:
         # Default mesh size scales with the domain (like the seepage path) rather
@@ -1936,7 +2049,7 @@ def _row_mode(test):
     checked on its two bracket edges, ``'bracket'`` for one re-proved by the
     bisection, ``'tilt'`` for a tilt lock's two full-strength solves, ``'run'``
     for everything else."""
-    if test.get('type') == 'fem_tilt':
+    if test.get('type') in ('fem_tilt', 'fem_kc'):
         return 'tilt'
     if test.get('type') != 'fem_ssrm':
         return 'run'
@@ -1966,7 +2079,7 @@ def _row_tier(test, timings, threshold=GATE_SECONDS):
       to be expensive the measured rule above holds the row on its own.
     """
     mode = _row_mode(test)
-    if test.get('type') in ('fem_ssrm', 'fem_tilt'):
+    if test.get('type') in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
         recorded = (timings or {}).get(_row_key(test), {}).get(mode)
         if recorded is not None and float(recorded) > threshold:
             return 'gate'
@@ -2207,14 +2320,15 @@ def tilt_of(k):
     return math.degrees(math.atan(abs(float(k))))
 
 
-def solve_fem_tilt(slope_data, mesh, k, test):
+def solve_fem_tilt(slope_data, mesh, k, test, sign=-1.0):
     """One solve at FULL STRENGTH with the model pushed by ``k`` toward the face.
     Returns ``(slope_data_as_solved, fem_data, sol)``.
 
     F = 1 and nothing reduced: what a tilt row asks of a coefficient is whether
     the model stands under it, which is the question a tilt table asks and not the
     one a strength reduction answers. The coefficient is applied as
-    ``k_seismic = -|k|`` (the sign is its direction, toward the face). The
+    ``k_seismic = sign * |k|`` (the sign is its direction, toward the face:
+    -1, the default, for a slope facing -x). The
     reference kernel is forced for the reason every suite path forces it: a lock
     is a property of the reference path, not of whether a machine has the
     compiled kernel built.
@@ -2225,7 +2339,7 @@ def solve_fem_tilt(slope_data, mesh, k, test):
     import xslope.fem as _fem
     from xslope.fem import build_fem_data, solve_fem
 
-    sd = {**slope_data, 'k_seismic': -abs(float(k))}
+    sd = {**slope_data, 'k_seismic': float(sign) * abs(float(k))}
     fem_data = build_fem_data(sd, mesh)
     k0 = test.get('k0')
     with _force_fast_kernel(_fem, False):
@@ -2310,6 +2424,103 @@ def run_fem_tilt_test(test):
     if not fails:
         problems.append(_why(kf, vf, df, itf, 'FAILED', 'failing'))
     return None, '; '.join(problems), ('tilt', text)
+
+
+def _kc_sign(test):
+    """The sign a ``fem_kc`` tag's coefficient is applied with: -1 for
+    ``direction=left`` (the default, a slope facing -x), +1 for ``right``."""
+    d = str(test.get('direction', 'left')).strip().lower()
+    if d not in ('left', 'right'):
+        raise ValueError(f"fem_kc: direction must be left or right, not {d!r}")
+    return -1.0 if d == 'left' else 1.0
+
+
+def run_fem_kc_test(test):
+    """One ``fem_kc`` row. Returns ``(k_c, error_msg, annotation)``.
+
+    The finite element critical seismic coefficient, checked the way a tilt row
+    is: the tag's model and mesh are built once (``_fem_case_model``) and solved
+    at full strength at ``k_stand``, where the model must STAND, and at
+    ``k_fail``, where it must FAIL, each read by the strength-reduction edge
+    rule (``_tilt_reading``). When both hold, the computed value is the mean of
+    the two coefficients, which the summary compares with ``expected_kc``
+    inside ``kc_tol``. Under ``--gate`` (``_force_bracket``) the row re-runs the
+    whole bisection (``xslope.seismic.fem_yield_coefficient``) to ``kc_tol`` from
+    no seismic force, on the reference kernel and at the tag's budget, and the
+    computed value is its k_y.
+
+    ``annotation`` is ``('tilt', text)`` naming both coefficients' verdicts, so
+    the row prints like a tilt row."""
+    try:
+        sign = _kc_sign(test)
+    except ValueError as exc:
+        return None, str(exc), None
+    try:
+        slope_data, mesh = _fem_case_model(test)
+    except ValueError as exc:
+        return None, str(exc), None
+
+    if test.get('_force_bracket'):
+        import xslope.fem as _fem
+        from xslope.fem import build_fem_data
+        from xslope.seismic import fem_yield_coefficient
+        k0 = test.get('k0')
+        fem_data = build_fem_data({**slope_data, 'k_seismic': 0.0}, mesh)
+        t0 = time.time()
+        with _force_fast_kernel(_fem, False):
+            res = fem_yield_coefficient(
+                fem_data, direction='left' if sign < 0 else 'right',
+                tol=float(test.get('kc_tol', 0.005)),
+                k0=float(k0) if k0 not in (None, '') else None,
+                max_iterations=int(float(test.get('max_iter', 250000))),
+                tension_srf=str(test.get('tension_srf', '')).lower()
+                in ('true', '1', 'yes'),
+                fast_kernel=False)
+        text = (f"bisection: stands at {res['k_stand']:.4f}, fails at "
+                f"{res['k_fail']:.4f}, {len(res['trials'])} trials, "
+                f"{time.time() - t0:.0f}s")
+        if res['lower_bound']:
+            return None, ("fem_kc bisection ended on an undecided trial: k_c is "
+                          f"only bounded below by {res['k_stand']:.4f}"), ('tilt', text)
+        return res['k_y'], None, ('tilt', text)
+
+    try:
+        k_stand = abs(float(test['k_stand']))
+        k_fail = abs(float(test['k_fail']))
+    except (KeyError, TypeError, ValueError):
+        return None, "fem_kc needs numeric k_stand and k_fail on the tag", None
+    if not k_stand < k_fail:
+        return None, (f"fem_kc: k_stand={k_stand:g} must be below "
+                      f"k_fail={k_fail:g}"), None
+    ceiling = _trial_ceiling(test)
+    readings = []
+    for k in (k_stand, k_fail):
+        t0 = time.time()
+        _sd, _fd, sol = solve_fem_tilt(slope_data, mesh, k, test, sign=sign)
+        verdict, decided = _tilt_reading(sol, ceiling)
+        readings.append((k, verdict, decided, int(sol.get('iterations') or 0),
+                         time.time() - t0))
+    (ks, vs, ds, its, ws), (kf, vf, df, itf, wf) = readings
+    detail = (f"k={ks:g} {vs}, {its} iterations, {ws:.1f}s; "
+              f"k={kf:g} {vf}, {itf} iterations, {wf:.1f}s")
+    stands = ds and vs in ('CONVERGED', 'JOINT_SETTLED')
+    fails = df and vf == 'FAILED'
+    if stands and fails:
+        return 0.5 * (ks + kf), None, ('tilt', f"stands at k={ks:g}, fails at "
+                                              f"k={kf:g} ({detail})")
+    problems = []
+    for k, verdict, decided, iterations, want, verb, ok in (
+            (ks, vs, ds, its, 'CONVERGED or JOINT_SETTLED', 'standing', stands),
+            (kf, vf, df, itf, 'FAILED', 'failing', fails)):
+        if ok:
+            continue
+        if not decided:
+            problems.append(f"the {verb} coefficient k={k:g} is undecided at the "
+                            f"iteration budget ({verdict}, {iterations} iterations)")
+        else:
+            problems.append(f"the {verb} coefficient k={k:g} now reads "
+                            f"{verdict}, not {want}")
+    return None, '; '.join(problems), ('tilt', detail)
 
 
 def _run_fem_ssrm_bracket(test):
@@ -3425,7 +3636,7 @@ def run_v19_roundtrip_test(test):
 
 
 def run_surface_family_roundtrip_test(test):
-    """Verify the v22 surface-family cell (main D24, D25 from v25) survives save -> load.
+    """Verify the v22 surface-family cell (main D24; D25 from v25, D26 from v28) survives save -> load.
 
     The rare deck defines BOTH a circular and a non-circular surface, and nothing in
     its geometry says which one it means — the circles simply win. The cell is where
@@ -3450,13 +3661,14 @@ def run_surface_family_roundtrip_test(test):
     template = test.get('template', ROUNDTRIP_TEMPLATE)
     problems = []
 
-    # The cell moved down one row at v25, which inserted '1D element size' above it.
-    # Located from the DESTINATION template's own version rather than hardcoded, so
-    # this reads the cell the writer was actually aiming at.
+    # The cell moved down one row at v25 and another at v28, each time a row was
+    # inserted above it. Located from the DESTINATION template's own version through
+    # the loader's lookup, so this reads the cell the writer was actually aiming at.
+    from xslope.fileio import main_sheet_cell
     _twb = openpyxl.load_workbook(template, read_only=True)
     _tv = int(float(_twb['main']['D5'].value))
     _twb.close()
-    SF_CELL = f"D{25 if _tv >= 25 else 24}"
+    SF_CELL = main_sheet_cell('surface_family', _tv)
 
     def _cycle(mutate):
         d1 = load_slope_data(test['file'])
@@ -4065,6 +4277,13 @@ def _editor_norm(key, val):
     return val
 
 
+# The tests below build Studio editors and dialogs, which read and write Studio's
+# machine-wide settings store (editor toggles, recent files); each runs against a
+# scratch store instead (tools/studio_settings.py).
+from tools import studio_settings                                 # noqa: E402
+
+
+@studio_settings.isolated
 def run_editor_roundtrip_test(test):
     """Open each studio CategoryEditor on a fully-populated record, apply with NO
     changes, and assert its managed keys are deep-equal in -> out.
@@ -4228,15 +4447,22 @@ def run_editor_roundtrip_test(test):
     #      mix of blank and 0 (dimmed — no material has a cutoff above zero). The
     #      dimming reads xslope.preflight.has_reducible_tensile_cap, the same
     #      predicate main.tension_srf_unset reads, so this row and the preflight
-    #      row for that rule are the two halves of one guarantee.
+    #      row for that rule are the two halves of one guarantee. A joints-sheet
+    #      line's t_cut follows Tension SRF too, so the fixture's joint lines are
+    #      held at 0 in the four material cases, and a fifth case gives a joint
+    #      line the only cutoff (live).
     _tsd = _editor_fixture()
     for _caps, _live, _why in ((50.0, True, "a positive cutoff"),
                                (0.0, False, "every cutoff 0"),
                                (None, False, "every cutoff blank"),
-                               ("mixed", False, "cutoffs mixing blank and 0")):
+                               ("mixed", False, "cutoffs mixing blank and 0"),
+                               ("joint", True, "only a joint line's cutoff")):
         _m = copy.deepcopy(_tsd)
         for _k, _mat in enumerate(_m["materials"]):
-            _mat["t_cut"] = (None if _k % 2 else 0.0) if _caps == "mixed" else _caps
+            _mat["t_cut"] = ((None if _k % 2 else 0.0) if _caps == "mixed"
+                             else 0.0 if _caps == "joint" else _caps)
+        for _jl in _m.get("joint_lines") or []:
+            _jl["t_cut"] = 5.0 if _caps == "joint" else 0.0
         _fd = RunFemDialog(defaults={"analysis": "ssrm"}, slope_data=_m)
         _got = _fd.tension_srf.isEnabled()
         if _got != _live:
@@ -4691,10 +4917,11 @@ def _run_dialog_preflight_checks(app):
         problems.append("new_slope_data(): a new project does not default to auto "
                         "water loads")
 
-    # (8) Blank preservation, end to end: a cleared cell reaches the model as None
-    #     (not 0.0), the checks can see the difference, and the writer puts a blank
-    #     cell in the sheet rather than inventing a zero on the way out.
-    problems += _blank_preservation_checks(app)
+    # (8) A blank cell, end to end: a cell cleared in the Materials editor reaches
+    #     the model as the value the loader gives the same blank cell in a workbook,
+    #     the runs that crashed on a blank c now slice and solve, the checks still
+    #     see a cleared unit weight, and the writer leaves an unset property blank.
+    problems += _blank_cell_checks(app)
 
     # (9) The surface family the dialog chose survives the session: the write-back
     #     lands in the cell-backed key, a save carries it, and the next dialog opens
@@ -4806,88 +5033,143 @@ def _surface_family_persistence_checks(app):
     return problems
 
 
-def _blank_preservation_checks(app):
-    """A blank material cell must stay blank through the editor and the writer.
+def _blank_cell_checks(app):
+    """A blank cell in the Materials editor is the model a blank workbook cell is.
 
-    The mutation is the point: clear one cell that a plain float field would have
-    stamped 0.0 onto, and require (a) None in the model, (b) a finding that names
-    it, and (c) an empty cell in the saved file. Without all three, the model checks
-    cannot tell a cohesionless material from an unfilled one on any model Studio has
-    touched -- which is every model a Studio user has.
+    The loader is the independent truth. One material row of a real model is saved
+    with every numeric property unset, which the writer turns into blank cells, and
+    loaded back: the value the loader gives each blank column is what the editor must
+    give the same column cleared, in the table view and in the list view. Columns
+    whose blank means "not set" (gsat, t_cut, phi_b, s_cap, Ss, Sy) load as None and
+    stay None; every other column takes the value the loader fills in (0 for c, phi,
+    d, psi, E, nu, ru, k1 and the rest, 0.5 for the Mualem exponent l).
+
+    Then the runs that broke when the editor stored a blank as None instead (Studio
+    walk, 2026-11-22). A ratio or cp material with c cleared reached the slicer as
+    None, and its strength raised a TypeError there; an mc material with c cleared
+    sliced, and then no trial surface solved. Each is sliced and solved on the
+    file's own circle.
     """
     import copy
-    import shutil
     import tempfile
 
-    from studio.editors import CATEGORY_EDITORS
+    import openpyxl
+    from studio.editors import CATEGORY_EDITORS, Field
     from xslope import preflight as pf
-    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    from xslope.fileio import (MAT_NUM_HEADERS, MAT_OPT_NUM_HEADERS,
+                               load_slope_data, save_slope_data_to_xlsx)
+    from xslope.slice import generate_slices
+    from xslope.solve import bishop
 
     problems = []
     editor = CATEGORY_EDITORS["materials"]
-    blank_keys = ("gamma", "c", "phi", "d", "psi", "E", "nu", "ru", "k1")
+    numeric = [f for f in editor.FIELDS if f.kind in Field.NUMERIC_KINDS]
+    model = load_slope_data(_repo('docs/lem/files/xslope_low_clay.xlsx'))
+    row = 2                                   # Lower Soil
 
-    # (a) Opening the editor and applying with NOTHING typed must not stamp zeros
-    #     over a property that was already unset.
-    sd = _editor_fixture()
-    for m in sd["materials"]:
-        m["nu"] = None
-    dlg = editor.build(sd, None)
-    editor.apply(sd, dlg)
-    if any(m.get("nu") is not None for m in sd["materials"]):
-        problems.append("blank(nu): a round-trip through the editor filled in a "
-                        "blank Poisson's ratio")
-    dlg.deleteLater()
-    app.processEvents()
+    def _same(a, b):
+        if a is None or b is None:
+            return a is None and b is None
+        return float(a) == float(b)
 
-    # (b) Clearing a cell in the table gives None, not 0.0 -- for every field whose
-    #     zero is physically meaningful.
-    sd = _editor_fixture()
-    dlg = editor.build(sd, None)
-    dlg.set_view_mode("table")
-    for key in blank_keys:
-        col = next(j for j, f in enumerate(editor.FIELDS) if f.key == key)
-        dlg._table.table.item(0, col).setText("")
-    editor.apply(sd, dlg)
-    got = {k: sd["materials"][0].get(k) for k in blank_keys}
-    bad = {k: v for k, v in got.items() if v is not None}
-    if bad:
-        problems.append(f"blank(clear): cleared cells came back as {bad}, not None")
-    dlg.deleteLater()
-    app.processEvents()
+    # (a) What the loader gives each blank column, from a file whose cells really are
+    #     blank: the writer leaves an unset property's cell empty, never a 0.
+    unset = copy.deepcopy(model)
+    for f in numeric:
+        unset["materials"][row][f.key] = None
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "blank.xlsx")
+        save_slope_data_to_xlsx(unset, out)
+        wb = openpyxl.load_workbook(out)
+        header = _mat_header_columns(wb["mat"])
+        sheet_row = header["_row"] + 1 + row
+        for key, names in MAT_NUM_HEADERS + MAT_OPT_NUM_HEADERS:
+            names = names if isinstance(names, tuple) else (names,)
+            col = next((header[n.lower().replace("_", "")] for n in names
+                        if n.lower().replace("_", "") in header), None)
+            if col is None:
+                problems.append(f"blank(save): no '{names[0]}' column in the saved "
+                                f"mat sheet")
+                continue
+            val = wb["mat"].cell(row=sheet_row, column=col).value
+            if val is not None:
+                problems.append(f"blank(save): an unset {key} was written as {val!r}, "
+                                f"not a blank cell")
+        wb.close()
+        truth = load_slope_data(out)["materials"][row]
 
-    # (c) The checks see the blank -- an unset unit weight is an error naming the row.
-    ids = {f.rule_id for f in pf.preflight(sd, "lem")}
+    # (b) The same columns cleared in each view of the editor.
+    cleared = None
+    for view in ("table", "list"):
+        sd = copy.deepcopy(model)
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode(view)
+        app.processEvents()
+        if view == "table":
+            for j, f in enumerate(editor.FIELDS):
+                item = dlg._table.table.item(row, j)
+                if f.kind in Field.NUMERIC_KINDS and item is not None:
+                    item.setText("")
+        else:
+            lv = dlg._list_view
+            lv.list.setCurrentRow(row)
+            app.processEvents()
+            for f in numeric:
+                if f.key in lv._edits:        # the form carries no Ss / Sy
+                    lv._edits[f.key].setText("")
+        editor.apply(sd, dlg)
+        got = sd["materials"][row]
+        keys = [f.key for f in numeric
+                if view == "table" or f.key in dlg._list_view._edits]
+        bad = {k: (got.get(k), truth.get(k)) for k in keys
+               if not _same(got.get(k), truth.get(k))}
+        if bad:
+            problems.append(f"blank({view} view): cleared cells came back as "
+                            f"(editor, loader) {bad}")
+        if view == "table":
+            cleared = sd
+        dlg.deleteLater()
+        app.processEvents()
+
+    # (c) The checks still see a cleared unit weight, as they see a blank one in a
+    #     workbook: a weightless strength material is an error naming the row.
+    ids = {f.rule_id for f in pf.preflight(cleared, "lem")}
     if "mat.gamma_nonpositive" not in ids:
-        problems.append(f"blank(check): a blank unit weight raised no finding ({ids})")
+        problems.append(f"blank(check): a cleared unit weight raised no finding ({ids})")
 
-    # (d) The writer blanks the cell instead of writing 0.0. Round-tripped through a
-    #     REAL model so the whole save path runs, not just the mat block.
-    src = _repo('docs/inputs/slope/xslope_dam.xlsx')
-    if os.path.exists(src):
-        with tempfile.TemporaryDirectory() as td:
-            model = load_slope_data(src)
-            model["materials"][0]["nu"] = None
-            out = os.path.join(td, "blank.xlsx")
-            try:
-                save_slope_data_to_xlsx(model, out)
-            except Exception as exc:
-                problems.append(f"blank(save): saving a None property raised "
-                                f"{type(exc).__name__}: {exc}")
-            else:
-                import openpyxl
-                wb = openpyxl.load_workbook(out)
-                ws = wb["mat"]
-                header = _mat_header_columns(ws)
-                col = header.get("nu")
-                if col is None:
-                    problems.append("blank(save): no nu column found in the saved sheet")
-                else:
-                    val = ws.cell(row=header["_row"] + 1, column=col).value
-                    if val is not None:
-                        problems.append(f"blank(save): a None Poisson's ratio was "
-                                        f"written as {val!r}, not a blank cell")
-                wb.close()
+    # (d) c cleared in the list view, as the walk entered it, then a run.
+    for option, i, cp in (("ratio", 2, "0.1875"), ("cp", 2, "3.75"), ("mc", 0, None)):
+        sd = copy.deepcopy(model)
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode("list")
+        lv = dlg._list_view
+        lv.list.setCurrentRow(i)
+        app.processEvents()
+        combo = lv._edits["option"]
+        combo.setCurrentIndex(combo.findText(option))
+        app.processEvents()
+        lv._edits["c"].setText("")
+        if cp is not None:
+            lv._edits["cp"].setText(cp)
+        editor.apply(sd, dlg)
+        dlg.deleteLater()
+        app.processEvents()
+        what = f"blank c ({option})"
+        try:
+            ok, out = generate_slices(sd, circle=sd["circles"][0], num_slices=50)
+        except Exception as exc:
+            problems.append(f"{what}: slicing raised {type(exc).__name__}: {exc}")
+            continue
+        if not ok:
+            problems.append(f"{what}: the circle did not slice: {out}")
+            continue
+        try:
+            ok, res = bishop(out[0])
+        except Exception as exc:
+            problems.append(f"{what}: Bishop raised {type(exc).__name__}: {exc}")
+            continue
+        if not ok:
+            problems.append(f"{what}: Bishop did not solve: {res}")
     return problems
 
 
@@ -5092,20 +5374,28 @@ def run_pullout_law_test(test):
     return 0.0, None
 
 
+@studio_settings.isolated
 def run_pullout_switch_test(test):
-    """The reinforcement editor's Pullout switch, driven offscreen on a real model.
+    """The reinforcement editor's Pullout read-out, driven offscreen on a real model.
 
-    The switch is a reading of the line, not a stored field, so the checks are
-    about what it reads and what it leaves behind: a file with no Adhesion/Delta
-    opens on the development lengths; switching to Overburden dims Lp1/Lp2 without
-    touching their values; switching back parks Adhesion/Delta rather than losing
-    them; and the table view grays the same pair the list view dims.
+    Which pullout law a line uses is not a stored field and not a selector: the
+    row's own values say it. A filled Adhesion/Delta pair IS the overburden law;
+    anything else is the development-length law. The list view shows that as a
+    read-only label, and the checks are about what follows from it: the label
+    follows the values as they are typed; Lp1/Lp2 gray (values intact) exactly
+    while both Adhesion and Delta are filled; Adhesion and Delta are never grayed
+    and never cleared, since on a jointed line the finite element interface reads
+    them whatever the law; kn, ks and Jred gray unless Joint is Yes; the table
+    view grays by the same rule; and a new line starts with its development
+    lengths BLANK (a missing length preflight names), never 0, which would be a
+    fully anchored end that passes every check.
     """
+    import math as _math
     import os as _os
     _os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     from PySide6.QtWidgets import QApplication
     from xslope.fileio import load_slope_data
-    from studio.editors import ReinforcementEditor
+    from studio.editors import ReinforcementEditor, _new_reinf
 
     app = QApplication.instance() or QApplication([])
     path = _repo('docs/tutorials/files/xslope_reinforced_slope_start.xlsx')
@@ -5122,55 +5412,103 @@ def run_pullout_switch_test(test):
     lv.list.setCurrentRow(0)
     problems = []
 
-    combo = lv._switch_combo
-    if combo is None:
-        return None, "the reinforcement list view has no Pullout switch"
-    if combo.currentText() != "Development length (Lp1, Lp2)":
-        problems.append(f"a file with no Adhesion/Delta opened on "
-                        f"{combo.currentText()!r}")
+    if getattr(lv, '_switch_combo', None) is not None:
+        problems.append("the list view still carries a Pullout selector; the law is "
+                        "read from the values, not chosen")
+    label = getattr(lv, '_readout_label', None)
+    if label is None:
+        return None, "the reinforcement list view has no Pullout read-out"
+    lp_text = "Development length (Lp1, Lp2)"
+    ob_text = "Overburden (Adhesion, Delta)"
+
+    def _type(key, text):
+        w = lv._edits[key]
+        w.setText(text)
+        w.editingFinished.emit()            # the way a typed value is committed
+
+    # 1. A file with no Adhesion/Delta reads as the development lengths.
+    if label.text() != lp_text:
+        problems.append(f"a line with no Adhesion/Delta reads {label.text()!r}")
     if not lv._cells['lp1'].isEnabled():
-        problems.append("Lp1 is dimmed on a line that uses the development lengths")
-    if lv._cells['adhesion'].isEnabled():
-        problems.append("Adhesion is live on a line that uses the development lengths")
+        problems.append("Lp1 is grayed on a line that uses the development lengths")
+    for key in ('adhesion', 'delta'):
+        if not lv._cells[key].isEnabled():
+            problems.append(f"{key} is grayed on a development-length line, which "
+                            f"leaves no way to fill it")
 
+    # 2. One of the pair filled: still the lengths, and the other stays typable.
     lp1_text = lv._edits['lp1'].text()
-    combo.setCurrentIndex(1)                      # -> Overburden
-    if lv._cells['lp1'].isEnabled():
-        problems.append("Lp1 stayed live after the switch to Overburden")
-    if not lv._cells['adhesion'].isEnabled():
-        problems.append("Adhesion stayed dimmed after the switch to Overburden")
-    if lv._edits['lp1'].text() != lp1_text:
-        problems.append(f"the switch changed Lp1 from {lp1_text!r} to "
-                        f"{lv._edits['lp1'].text()!r} — values must survive it")
+    _type('adhesion', "5")
+    if label.text() != lp_text:
+        problems.append(f"Adhesion alone switched the read-out to {label.text()!r}")
+    if not lv._cells['delta'].isEnabled() or not lv._cells['lp1'].isEnabled():
+        problems.append("filling Adhesion alone grayed Delta or Lp1")
 
-    lv._edits['adhesion'].setText("5")
-    lv._edits['delta'].setText("30")
-    lv._commit()
+    # 3. Both filled: the overburden law; Lp1/Lp2 gray with their values intact.
+    _type('delta', "30")
     row = lv._rows[0]
+    if label.text() != ob_text:
+        problems.append(f"a filled Adhesion/Delta pair reads {label.text()!r}")
     if ReinforcementEditor.pullout_mode(row) != "overburden":
-        problems.append("a filled Adhesion/Delta pair did not read as the "
-                        "overburden law")
-    if ReinforcementEditor.dim_keys(row) != frozenset(("lp1", "lp2")):
-        problems.append(f"the table view grays {sorted(ReinforcementEditor.dim_keys(row))} "
-                        f"on an overburden line, not Lp1/Lp2")
-
-    combo.setCurrentIndex(0)                      # -> back to the lengths
-    row = lv._rows[0]
-    if ReinforcementEditor.pullout_mode(row) != "lp":
-        problems.append("switching back to the development lengths left the "
-                        "overburden law in force")
+        problems.append("the committed row does not read as the overburden law")
+    for key in ('lp1', 'lp2'):
+        if lv._cells[key].isEnabled():
+            problems.append(f"{key} stayed live on an overburden line")
     if lv._edits['lp1'].text() != lp1_text:
-        problems.append("Lp1 did not survive the round trip through Overburden")
-    combo.setCurrentIndex(1)                      # -> Overburden again
-    if (lv._edits['adhesion'].text(), lv._edits['delta'].text()) != ("5", "30"):
-        problems.append(f"the parked Adhesion/Delta came back as "
-                        f"{lv._edits['adhesion'].text()!r}/"
-                        f"{lv._edits['delta'].text()!r}, not '5'/'30'")
+        problems.append(f"the overburden law changed Lp1 from {lp1_text!r} to "
+                        f"{lv._edits['lp1'].text()!r}; values must survive it")
+    dim = ReinforcementEditor.dim_keys(row)
+    if not {'lp1', 'lp2'} <= dim or {'adhesion', 'delta'} & dim:
+        problems.append(f"the table view grays {sorted(dim)} on an overburden line; "
+                        f"it must gray Lp1/Lp2 and never Adhesion/Delta")
 
-    if ReinforcementEditor.dim_keys({'adhesion': float('nan'),
-                                     'delta': float('nan')}):
-        problems.append("the table view grays a pair on a development-length line, "
-                        "which would leave Adhesion untypable there")
+    # 4. Clearing one of the pair goes back to the lengths and clears nothing else.
+    _type('adhesion', "")
+    row = lv._rows[0]
+    if label.text() != lp_text:
+        problems.append(f"clearing Adhesion left the read-out at {label.text()!r}")
+    if not lv._cells['lp1'].isEnabled():
+        problems.append("Lp1 stayed grayed after Adhesion was cleared")
+    if lv._edits['delta'].text() != "30":
+        problems.append(f"Delta was {lv._edits['delta'].text()!r} after Adhesion was "
+                        f"cleared; the editor must never clear it")
+    if lv._edits['lp1'].text() != lp1_text:
+        problems.append("Lp1 did not survive the round trip through the overburden law")
+
+    # 5. Joint: kn, ks and Jred gray unless Joint is Yes; Adhesion/Delta never.
+    def _dim(**kw):
+        return ReinforcementEditor.dim_keys(dict(_new_reinf(), **kw))
+    if not {'kn', 'ks', 'jred'} <= _dim(joint=''):
+        problems.append("kn/ks/Jred are live on a line whose Joint is blank")
+    if {'kn', 'ks', 'jred', 'adhesion', 'delta'} & _dim(joint='yes', adhesion=5.0,
+                                                         delta=30.0):
+        problems.append(f"a jointed overburden line grays "
+                        f"{sorted(_dim(joint='yes', adhesion=5.0, delta=30.0))}; "
+                        f"only Lp1/Lp2 may gray there")
+
+    # 6. A new line starts with blank development lengths, in the editor and in the
+    #    model the dialog hands back.
+    new = _new_reinf()
+    if not all(isinstance(new.get(k), float) and _math.isnan(new[k])
+               for k in ('lp1', 'lp2')):
+        problems.append(f"a new line starts with Lp1/Lp2 = {new.get('lp1')!r}/"
+                        f"{new.get('lp2')!r}; a blank is a length still to enter, "
+                        f"a 0 a fully anchored end")
+    n0 = len(lv._rows)
+    lv._add()
+    if len(lv._rows) != n0 + 1:
+        problems.append("Add did not add a line")
+    elif lv._edits['lp1'].text() or lv._edits['lp2'].text():
+        problems.append(f"the added line shows Lp1/Lp2 "
+                        f"{lv._edits['lp1'].text()!r}/{lv._edits['lp2'].text()!r}, "
+                        f"not blank")
+    else:
+        sd2 = dict(sd)
+        editor.apply(sd2, dlg)
+        added = sd2['reinforcement_lines'][-1]
+        if not all(_math.isnan(float(added.get(k))) for k in ('lp1', 'lp2')):
+            problems.append(f"the added line reached the model with Lp1/Lp2 = "
+                            f"{added.get('lp1')!r}/{added.get('lp2')!r}")
 
     dlg.deleteLater()
     if problems:
@@ -5448,6 +5786,9 @@ PREFLIGHT_BASE_BOTH = _repo('docs/verification/files/rocscience/vp042.xlsx')
 PREFLIGHT_BASE_TSEEP = _repo('docs/seep/files/xslope_earth_dam_tseep.xlsx')
 PREFLIGHT_BASE_RAPID = _repo('docs/verification/files/rocscience/vp096.xlsx')
 PREFLIGHT_BASE_RAPID_MULTI = _repo('docs/verification/files/rocscience/vp099.xlsx')
+#: The two-stage seismic base: DWB Table 10.4's dry slope, k = 0.15, its one zone
+#: in a material with d and psi.
+PREFLIGHT_BASE_SEISMIC2 = _repo('docs/verification/files/published/dwb_t10_4_dry.xlsx')
 #: The one file that can be run as EITHER rapid-drawdown route: the Johnson
 #: Reservoir dam carries boundary set 1 bound to a pool schedule, boundary set 2 as
 #: a constant drawn-down state, and the stage times that couple the drawdown to the
@@ -5816,6 +6157,9 @@ def _pf_joint_on_boundary(sd, on=True):
 #:   mutation  callable(slope_data) breaking exactly that requirement
 #:   control   callable(slope_data) applied instead, to prove the rule is silent
 #:             on a model that satisfies it (default: leave the file alone)
+#:   control_analysis   the analysis the control is checked as, when it is not the
+#:             spec's own: the SAME broken model, run by an analysis that never
+#:             reads the field, must say nothing (a rule scoped to its readers)
 #:   mode      'excel' round-trips the mutated model through the writer and the
 #:             loader, so the rule is exercised on a file a user could actually
 #:             save; 'dict' mutates in memory, which is the honest mode for the
@@ -5855,6 +6199,22 @@ def _pf_overlap(sd):
     p = sd['polygons'][0]
     sd['polygons'].append(dict(p))
     return sd
+
+
+def _pf_movement(sd, **by_point):
+    """Set the Movement of non-circular points by 0-based index:
+    ``_pf_movement(sd, p1='sideways')`` sets point 2's."""
+    for key, word in by_point.items():
+        sd['non_circ'][int(key[1:])]['Movement'] = word
+    return sd
+
+
+def _pf_elastic_u(sd, u, **kw):
+    """Every material dry (u = none) except material 1, which takes ``u`` (and
+    ``kw``): the row a u-reading rule is about. Pass ``option='elastic'`` for the
+    control, where that row is one no engine reads u from."""
+    _pf_mats(sd, u='none')
+    return _pf_mat(sd, 0, u=u, **kw)
 
 
 def _pf_bc2(sd, **head_kw):
@@ -5971,6 +6331,15 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.cp_zero_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, option='cp', c=0.0, cp=0.0),
          expect='undrained strength Su is zero'),
+    dict(rule='mat.ratio_zero_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=0.0, cp=0.0),
+         expect='option = ratio but both c and c/p are zero'),
+    # A c/p rate left behind by a switch from cp: 20 per unit depth read as a ratio.
+    # The control is a real ratio on the same option.
+    dict(rule='mat.ratio_above_one', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=0.0, cp=20.0),
+         control=lambda sd: _pf_mats(sd, option='ratio', c=0.0, cp=0.25),
+         expect='usually a c/p entered for option = cp'),
     dict(rule='mat.ru_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.0),
          expect='selects u = ru'),
@@ -5990,13 +6359,20 @@ PREFLIGHT_RULE_SPECS = [
     # --- main-sheet scalars ------------------------------------------------
     dict(rule='main.seismic_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=float('nan')),
-         expect='Seismic coefficient k is blank'),
+         expect='Horizontal seismic coefficient k_h is blank'),
     dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=15.0),
          expect='fraction of gravity'),
-    dict(rule='main.seismic_negative_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
-         mutation=lambda sd: _pf_set(sd, k_seismic=-0.2),
-         expect='is negative'),
+    # A rule returning one (severity, message) pair is one finding, not two.
+    dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.7),
+         expect='which is high', count=1),
+    dict(rule='main.seismic_vertical_invalid', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.2, k_vertical=-1.5),
+         expect='lifted off the ground'),
+    dict(rule='main.seismic_vertical_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.2, k_vertical=0.8),
+         expect='usually a half or a third of k'),
     dict(rule='main.crack_water_deeper_than_crack', base=PREFLIGHT_BASE_LEM,
          mode='excel',
          mutation=lambda sd: _pf_set(sd, tcrack_water=10.0, tcrack_depth=0.0),
@@ -6592,6 +6968,35 @@ PREFLIGHT_RULE_SPECS = [
          mode='dict', analysis='rapid',
          mutation=lambda sd: _pf_mats(sd, option='pow'),
          expect='rapid drawdown does not support'),
+    # --- two-stage seismic ---------------------------------------------------
+    dict(rule='seismic2.no_low_k_material', base=PREFLIGHT_BASE_SEISMIC2, mode='excel',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, d=0.0, psi=0.0),
+         expect='no undrained strength to give any slice'),
+    # The same refusal on undrained materials (LEM-7 Part C's clays) must not say
+    # the run would use drained strengths: a ratio material keeps its own undrained
+    # strength in both stages.
+    dict(rule='seismic2.no_low_k_material', base=PREFLIGHT_BASE_SEISMIC2, mode='excel',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=10.0, phi=0.0, cp=0.25,
+                                      d=0.0, psi=0.0),
+         expect='undrained already'),
+    dict(rule='seismic2.d_psi_incomplete', base=PREFLIGHT_BASE_SEISMIC2, mode='excel',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, psi=0.0),
+         expect='carries d but not psi'),
+    dict(rule='seismic2.cp_ignores_d_psi', base=PREFLIGHT_BASE_SEISMIC2, mode='dict',
+         analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, option='cp', c=1000.0, cp=0.3),
+         expect='option = cp'),
+    dict(rule='seismic2.curved_envelope_unsupported', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='dict', analysis='seismic2',
+         mutation=lambda sd: _pf_mats(sd, option='pow'),
+         expect='two-stage seismic analysis does not support'),
+    dict(rule='seismic2.no_seismic_coefficient', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='dict', analysis='seismic2',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.0),
+         expect='stage 2 adds no seismic force'),
     dict(rule='rapid.pool_rises', base=PREFLIGHT_BASE_RAPID, mode='dict',
          analysis='rapid',
          mutation=lambda sd: _pf_set(sd, piezo_line2=[
@@ -6609,9 +7014,6 @@ PREFLIGHT_RULE_SPECS = [
          expect='same resultant'),
 
     # --- seismic direction -------------------------------------------------
-    dict(rule='main.seismic_direction_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
-         mutation=lambda sd: _pf_set(sd, k_seismic=0.15),
-         expect='the sign is ignored'),
     dict(rule='main.seismic_direction_fem', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_set(sd, k_seismic=0.15),
@@ -6646,6 +7048,14 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
          expect='has H = 0'),
+    # H is the limit equilibrium pile force; the finite element engine never
+    # reads it.
+    dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
+         control=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
+         control_analysis='ssrm',
+         expect='has H = 0'),
     dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', V_cap=-5.0),
          expect='has Vcap = -5'),
@@ -6675,6 +7085,8 @@ PREFLIGHT_RULE_SPECS = [
          expect='E is blank'),
     dict(rule='pile.units_convention', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=100.0),
+         control=lambda sd: _pf_rows(sd, 'pile_lines', H=100.0),
+         control_analysis='fem',
          expect='different conventions'),
     dict(rule='pile.section_derived', base=PREFLIGHT_BASE_PILES_FEM, mode='dict',
          analysis='ssrm',
@@ -6686,9 +7098,20 @@ PREFLIGHT_RULE_SPECS = [
          expect='crosses any failure surface'),
 
     # --- reinforcement -----------------------------------------------------
+    # Dir, Appl and Type are read by the limit equilibrium engine alone, so the
+    # same broken line is no finding for a strength-reduction run (the FEM's bar
+    # acts along its own axis) or a seepage run (which reads no reinforcement).
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control_analysis='ssrm',
+         expect='is not a direction'),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         control_analysis='seep',
          expect='is not a direction'),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
@@ -6701,7 +7124,7 @@ PREFLIGHT_RULE_SPECS = [
     # engine then applied the line axially. Each of the three vocabulary columns
     # carries the mutation, since they were all read the same way.
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
          expect='is not a direction'),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
@@ -6709,16 +7132,24 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
          load_error="unrecognized Dir"),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', appl=0.0),
          expect='is not an application'),
     dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
+         mode='dict',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=0.0),
          expect='is not a support type'),
     dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
+         expect='has no tensile capacity'),
+    # A seepage run reads no reinforcement, so a line with no capacity cannot
+    # stop one.
+    dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
+         control_analysis='seep',
          expect='has no tensile capacity'),
     dict(rule='reinforce.fem_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
@@ -6733,9 +7164,26 @@ PREFLIGHT_RULE_SPECS = [
          control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
                                      type='geosynthetic'),
          expect='leave Type blank'),
+    # The direction and application a blank Type defaults to are LEM inputs: the
+    # finite element bar acts along its own axis whatever Type says.
+    dict(rule='reinforce.type_blank', base=PREFLIGHT_BASE_REINF_FEM, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=''),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=''),
+         control_analysis='ssrm',
+         expect='leave Type blank'),
     dict(rule='reinforce.pullout_negative', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=-2.0),
+         expect='read as FULLY ANCHORED'),
+    # A jointed line's pullout is its interface in the finite element engine, which
+    # then reads no Lp; the limit equilibrium engine ignores Joint and still does.
+    dict(rule='reinforce.pullout_negative', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                      lp1=-2.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                     lp1=-2.0),
+         control_analysis='ssrm',
          expect='read as FULLY ANCHORED'),
     # A development length a hundred times too long (Lp = 4 entered as 400 on a
     # 20-long line) holds the line to 2.5% of Tmax. The control is the entry the
@@ -6928,9 +7376,10 @@ PREFLIGHT_RULE_SPECS = [
          control=lambda sd: _pf_joint(sd),
          expect='a reinforced wall'),
     # The INFO: which bonded-bar inputs a jointed line stops reading.
-    # The two joint-network REGIONS rules. Both are about a cell filled in expecting
-    # it to do something the region cannot, so each control is the same region with
-    # that cell empty -- which is the ordinary, silent case.
+    # The joint-network REGION rule: a cell filled in expecting it to do something
+    # the region cannot, so the control is the same region with that cell empty --
+    # which is the ordinary, silent case. (A region's Size is no such cell: it
+    # refines the mesh inside the region, mesh.zone_size_not_finer.)
     dict(rule='joint_region.material_assigned', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_set(sd, joint_zones=[
@@ -6940,15 +7389,6 @@ PREFLIGHT_RULE_SPECS = [
              {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
               'label': 'North block', 'size': None, 'mat_id': None}]),
          expect='is not a soil zone'),
-    dict(rule='joint_region.size_inert', base=PREFLIGHT_BASE_REINF_FEM,
-         mode='dict', analysis='ssrm',
-         mutation=lambda sd: _pf_set(sd, joint_zones=[
-             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
-              'label': 'North block', 'size': 0.4, 'mat_id': None}]),
-         control=lambda sd: _pf_set(sd, joint_zones=[
-             {'polygon': [(10.0, 0.0), (30.0, 0.0), (30.0, 10.0), (10.0, 10.0)],
-              'label': 'North block', 'size': None, 'mat_id': None}]),
-         expect='never meshed as a region'),
     # The control keeps the file's Tres (600 on every line): the bar on a
     # jointed line still softens to it, so a filled Tres is no finding.
     dict(rule='joint.bond_inputs_ignored', base=PREFLIGHT_BASE_REINF_FEM,
@@ -6988,9 +7428,12 @@ PREFLIGHT_RULE_SPECS = [
                                          seep_u2=None),
                               _pf_mats(sd, gamma_sat=135.0, u='none'))[-1],
          expect='never applies'),
+    # A finite element input: the limit equilibrium engine reads no member modulus.
     dict(rule='structural.modulus_off_band', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
+         control_analysis='lem',
          expect='outside that range'),
     # The units slip itself: 30 MPa of intact rock typed as the bare 30 into a
     # model whose stress unit is the kPa. The control is the same material with
@@ -7006,6 +7449,14 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.strength_negative', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, c=-500.0),
          expect='A strength cannot be negative'),
+    # A negative strength ratio never governs max(c, c/p * sigma'_v): the walk's
+    # -0.2 under a 15 minimum. The control is the same material with a real ratio,
+    # and strength_negative stays silent on both, since nothing here is negative
+    # strength.
+    dict(rule='mat.ratio_negative', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='ratio', c=15.0, phi=0.0, cp=-0.2),
+         control=lambda sd: _pf_mats(sd, option='ratio', c=15.0, phi=0.0, cp=0.2),
+         expect='never governs the strength'),
     dict(rule='mat.phi_out_of_range', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, phi=95.0),
          expect='no finite value at 90 degrees'),
@@ -7025,13 +7476,19 @@ PREFLIGHT_RULE_SPECS = [
          selection={'param': 'mat:Shell:d'},
          control_selection={'param': 'mat:Shell:gamma'},
          mutation=lambda sd: sd,
-         expect='read only by the rapid drawdown analysis'),
+         expect='read only by the rapid drawdown analysis and the two-stage seismic'),
     dict(rule='sensitivity.range_crosses_zero', base=PREFLIGHT_BASE_LEM,
          mode='dict', analysis='sensitivity',
          selection={'param': 'mat:Shell:gamma', 'values': [-10.0, 0.0, 10.0]},
          control_selection={'param': 'mat:Shell:gamma', 'values': [10.0, 20.0]},
          mutation=lambda sd: sd,
          expect='will be skipped'),
+    dict(rule='sensitivity.range_crosses_zero', base=PREFLIGHT_BASE_LEM,
+         mode='dict', analysis='sensitivity',
+         selection={'param': 'mat:Shell:gamma', 'values': [-10.0, -5.0, 0.0]},
+         control_selection={'param': 'mat:Shell:gamma', 'values': [10.0, 20.0]},
+         mutation=lambda sd: sd,
+         expect='every value in it is zero or negative', count=1),
     dict(rule='sensitivity.seismic_sign_discarded', base=PREFLIGHT_BASE_LEM,
          mode='dict', analysis='sensitivity',
          selection={'param': 'global:k_seismic', 'values': [-0.2, 0.2],
@@ -7047,6 +7504,18 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
                                       sigma_gamma=0.0, sigma_cp=0.0),
          expect='Standard Deviations'),
+    # s(d) on an mc material is a standard deviation a rapid drawdown run reads
+    # (531a), so the same model is not "carrying none" there.
+    dict(rule='reliability.no_standard_deviations', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         control_selection={'rapid': True},
+         mutation=lambda sd: _pf_mat(_pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
+                                              sigma_gamma=0.0, sigma_cp=0.0),
+                                     0, d=500.0, psi=15.0, sigma_d=50.0),
+         control=lambda sd: _pf_mat(_pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
+                                             sigma_gamma=0.0, sigma_cp=0.0),
+                                    0, d=500.0, psi=15.0, sigma_d=50.0),
+         expect='Standard Deviations'),
     dict(rule='reliability.elastic_carries_sigma', base=PREFLIGHT_BASE_RELIABILITY,
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mat(sd, 0, option='elastic'),
@@ -7059,20 +7528,50 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mat(sd, 0, sigma_cp=2.0),
          expect='does not read that parameter'),
+    # s(d) and s(psi) are read by a rapid drawdown reliability run on an mc
+    # material (531a), and by nothing else. Without drawdown, beside other
+    # standard deviations, they are an INFO; as the only ones, the run is refused
+    # and this says why; in a rapid run on a cp row, a WARNING.
     dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
          mode='excel', analysis='reliability',
-         mutation=lambda sd: _pf_mat(sd, 0, sigma_d=1.0),
-         expect='no reliability engine reads'),
+         control_selection={'rapid': True},
+         mutation=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         control=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         expect='only a rapid drawdown reliability run reads'),
+    dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mat(_pf_mats(sd, sigma_c=0.0, sigma_phi=0.0),
+                                     0, d=500.0, psi=15.0, sigma_d=50.0),
+         control=lambda sd: _pf_mats(sd, sigma_d=0.0, sigma_psi=0.0),
+         expect='refused for carrying none at all'),
+    dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         selection={'rapid': True}, control_selection={'rapid': True},
+         mutation=lambda sd: _pf_mat(sd, 0, option='cp', cp=1.0, sigma_cp=0.0,
+                                     sigma_phi=0.0, sigma_d=50.0),
+         control=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         expect='which takes no d or psi'),
     dict(rule='reliability.sigma_exceeds_mean', base=PREFLIGHT_BASE_RELIABILITY,
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mat(sd, 0, sigma_phi=999.0),
          expect='exceeds the mean'),
-    dict(rule='reliability.rapid_has_no_effect', base=PREFLIGHT_BASE_RELIABILITY,
-         mode='dict', analysis='reliability',
-         selection={'engine': 'mc', 'rapid': True},
-         control_selection={'engine': 'taylor', 'rapid': True, 'search': True},
-         mutation=lambda sd: sd,
-         expect='solved WITHOUT drawdown'),
+    # d is a perturbed parameter only in a rapid drawdown run.
+    dict(rule='reliability.sigma_exceeds_mean', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         selection={'rapid': True}, control_selection={},
+         mutation=lambda sd: _pf_mat(sd, 0, d=100.0, psi=15.0, sigma_d=150.0),
+         control=lambda sd: _pf_mat(sd, 0, d=100.0, psi=15.0, sigma_d=150.0),
+         expect='exceeds the mean'),
+    # Monte Carlo and the response surface run a rapid drawdown too (536a), and
+    # vary an mc material's d and psi: s(d) is read there, as in the Taylor
+    # series, and unread (an INFO) without the drawdown.
+    dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         selection={'engine': 'mc'},
+         control_selection={'engine': 'mc', 'rapid': True},
+         mutation=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         control=lambda sd: _pf_mat(sd, 0, d=500.0, psi=15.0, sigma_d=50.0),
+         expect='only a rapid drawdown reliability run reads'),
     dict(rule='reliability.mc_samples_too_few', base=PREFLIGHT_BASE_RELIABILITY,
          mode='dict', analysis='reliability',
          selection={'engine': 'mc', 'n_samples': 1},
@@ -7191,6 +7690,17 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=float('nan')),
          expect='leaves Lp1 blank'),
+    # The same blank Lp on a jointed line: the limit equilibrium engine reads it
+    # (it ignores Joint), the finite element engine does not (the interface
+    # carries the pullout).
+    dict(rule='reinforce.pullout_length_missing', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                      lp1=float('nan')),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='Yes',
+                                     lp1=float('nan')),
+         control_analysis='ssrm',
+         expect='leaves Lp1 blank'),
     dict(rule='reinforce.spacing_nonpositive', base=PREFLIGHT_BASE_REINF,
          mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', spacing=0.0),
@@ -7242,18 +7752,246 @@ PREFLIGHT_RULE_SPECS = [
                   'coords': sd['seepage_bc']['specified_heads'][0]['coords'][:1]}])),
          control=lambda sd: _pf_bc2(sd),
          expect='of boundary set 2 has fewer than two points'),
+
+    # --- the gray-cell audit (Norm, 2026-11): checks scoped to what the engines
+    # read, and the loader fixes that let the vocabulary rules fire at all ------
+    # A seep bc block drawn with its Value cell blank. The loader once ended the
+    # sheet there, dropping that block and every one after it; it now keeps the
+    # block, the writer saves the blank as a blank, and the runs that read it
+    # refuse it. A stability run reads the head boundaries only for the automatic
+    # water load, so the same block on a manual-water model is no finding.
+    dict(rule='seep.bc_value_missing', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc_head(sd, 0, None),
+         expect='has points but no head'),
+    dict(rule='seep.bc_value_missing', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_bc2(sd, head=None),
+         control=lambda sd: _pf_bc2(sd),
+         expect='of boundary set 2 has points but no head'),
+    dict(rule='seep.bc_value_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_bc_head(sd, 0, None),
+         control=lambda sd: _pf_set(_pf_bc_head(sd, 0, None), water_loads='manual'),
+         expect='Water loads is auto'),
+    # A circle that states no size: a blank Option or a word outside Depth /
+    # Radius / Intercept (which once stopped the whole file opening), or the cell
+    # the Option names left blank. The loader keeps it and the writer saves it as
+    # it was; every run that reads the circles sheet refuses it, and a run that
+    # does not (seepage) says nothing.
+    dict(rule='surface.circle_size_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: (sd['circles'][0].update(
+             Option=None, Depth=float('nan'), R=float('nan')) or sd),
+         control=lambda sd: (sd['circles'][0].update(
+             Option=None, Depth=float('nan'), R=float('nan')) or sd),
+         control_analysis='seep',
+         expect='its Option is blank'),
+    dict(rule='surface.circle_size_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: (sd['circles'][-1].update(
+             Option='diameter', Depth=float('nan'), R=float('nan')) or sd),
+         expect="its Option is 'diameter'"),
+    dict(rule='surface.circle_size_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: (sd['circles'][0].update(
+             Depth=float('nan'), R=float('nan')) or sd),
+         expect='the cell its Option names'),
+    # Movement is read by the non-circular search alone. A word outside Free /
+    # Horiz / Fixed is refused; the three match in any case (the control's
+    # lowercase "free" was once read as Fixed on an interior point); and a
+    # single-surface run, which never moves a point, says nothing.
+    dict(rule='surface.movement_vocabulary', base=PREFLIGHT_BASE_NONCIRC,
+         mode='excel', selection={'surface': 'noncircular', 'search': True},
+         mutation=lambda sd: _pf_movement(sd, p1='sideways'),
+         control=lambda sd: _pf_movement(sd, p0='FIXED', p1='free', p2='horiz'),
+         expect="has Movement 'sideways'"),
+    dict(rule='surface.movement_vocabulary', base=PREFLIGHT_BASE_NONCIRC,
+         mode='excel', selection={'surface': 'noncircular', 'search': True},
+         control_selection={'surface': 'noncircular'},
+         mutation=lambda sd: _pf_movement(sd, p1='sideways'),
+         control=lambda sd: _pf_movement(sd, p1='sideways'),
+         expect='which is not a movement'),
+    # Through the writer and the loader: the loader keeps a word outside the three
+    # (it once read every one as lf), so the rule can fire on a saved file, and it
+    # matches the three in any case.
+    dict(rule='mat.unsat_vocabulary', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, unsat='vgn'),
+         control=lambda sd: _pf_mats(sd, unsat='VG', vg_a=0.5, vg_n=1.5),
+         expect='is not an unsaturated conductivity model'),
+    # The finite element engine refuses a blank option on a row the mesh carries
+    # (it once ran it as mc on whatever c and phi the row held).
+    dict(rule='mat.option_missing', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_mats(sd, option=''),
+         expect='finite element mesh gives elements this material'),
+    # u on an elastic row is read by no engine (the LEM never takes a base there,
+    # the FEM keeps elastic elements dry), so it can neither stop a run nor stand
+    # in for a row that does read it. Each control is its mutation with that one
+    # row made elastic.
+    dict(rule='piezo.line_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line=[]), 'piezo'),
+         control=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line=[]), 'piezo',
+                                          option='elastic'),
+         expect='fewer than two points'),
+    dict(rule='mat.ru_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.0),
+         control=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.0, option='elastic'),
+         expect='selects u = ru'),
+    dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_elastic_u(sd, 'seep'),
+         control=lambda sd: _pf_elastic_u(sd, 'seep', option='elastic'),
+         expect='carries no mesh'),
+    dict(rule='piezo.no_consumer', base=PREFLIGHT_BASE_LEM, mode='excel',
+         manual_water=True,
+         mutation=lambda sd: _pf_elastic_u(_pf_mats(sd, gamma_sat=None), 'ru',
+                                           ru=0.3, option='elastic'),
+         control=lambda sd: _pf_elastic_u(_pf_mats(sd, gamma_sat=None), 'ru',
+                                          ru=0.3),
+         expect='no material uses u = piezo'),
+    dict(rule='mat.gamma_sat_without_water', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: (sd.update(piezo_line=[], piezo_line2=[], seep_u=None,
+                                         seep_u2=None),
+                              _pf_elastic_u(_pf_mats(sd, gamma_sat=135.0), 'piezo',
+                                            option='elastic'))[-1],
+         expect='never applies'),
+    dict(rule='rapid.stage2_water_missing', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line2=[]), 'piezo'),
+         control=lambda sd: _pf_elastic_u(_pf_set(sd, piezo_line2=[]), 'piezo',
+                                          option='elastic'),
+         expect='Piezometric Line 2'),
+    dict(rule='rapid.ru_has_no_stage2', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.3),
+         control=lambda sd: _pf_elastic_u(sd, 'ru', ru=0.3, option='elastic'),
+         expect='no staged variant'),
+    # d and psi are read on an mc row only: the slicer gives every other option
+    # zeros, and the template and Studio gray the two cells there, so a value left
+    # in them must not decide a finding. VP99's rockfill (row 1) carries no pair
+    # and its two clays do.
+    dict(rule='rapid.d_psi_incomplete', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_mat(sd, 0, d=100.0, psi=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='cp', c=500.0, cp=0.0,
+                                    d=100.0, psi=0.0),
+         expect='carries d but not psi'),
+    dict(rule='rapid.no_low_k_material', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: _pf_mat(_pf_mats(sd, d=0.0, psi=0.0), 0, option='cp',
+                                     c=500.0, cp=0.0, d=2250.0, psi=20.0),
+         expect='no low-permeability material'),
+    dict(rule='rapid.free_draining_materials', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='excel', analysis='rapid',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_mat(sd, 0, option='cp', c=500.0, cp=0.0),
+         expect='treated as free-draining'),
+    dict(rule='seismic2.no_low_k_material', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='excel', analysis='seismic2',
+         mutation=lambda sd: _pf_mat(sd, 0, option='cp', c=1000.0, cp=0.0),
+         expect='undrained already'),
+    dict(rule='seismic2.d_psi_incomplete', base=PREFLIGHT_BASE_SEISMIC2,
+         mode='excel', analysis='seismic2',
+         mutation=lambda sd: _pf_mat(sd, 0, psi=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='cp', c=1000.0, cp=0.0, psi=0.0),
+         expect='carries d but not psi'),
+    # Joint and Jred read Yes or No in any case (blank: Joint no, Jred yes); any
+    # other word would silently mean the other answer. Joint is a finite element
+    # input and Jred a strength-reduction one.
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='y'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='YES',
+                                     adhesion=5.0, delta=25.0),
+         expect="sets Joint = 'y'"),
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='y'),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines', joint='y'),
+         control_analysis='lem',
+         expect="sets Joint = 'y'"),
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint(sd, jred='maybe'),
+         control=lambda sd: _pf_joint(sd, jred='maybe'),
+         control_analysis='fem',
+         expect="sets Jred = 'maybe'"),
+    dict(rule='joint.yes_no_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, jred='nah'),
+         control=lambda sd: _pf_joint_sheet(sd, jred='NO'),
+         expect="sets Jred = 'nah'"),
+    # A stated kn or ks of zero or less was replaced by the derived stiffness
+    # without a word (joint.build_joint_data); blank is how to ask for that.
+    dict(rule='joint.stiffness_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_joint(sd, kn=0.0),
+         control=lambda sd: _pf_joint(sd, kn=1.0e5),
+         expect='has kn = 0'),
+    dict(rule='joint.stiffness_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='fem',
+         mutation=lambda sd: _pf_joint_sheet(sd, ks=-1.0),
+         control=lambda sd: _pf_joint_sheet(sd, ks=1.0e4),
+         expect='has ks = -1'),
+    dict(rule='joint.strength_out_of_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, c=-1.0),
+         control=lambda sd: _pf_joint_sheet(sd, c=0.0),
+         expect='states c = -1'),
+    dict(rule='joint.strength_out_of_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, phi=95.0),
+         control=lambda sd: _pf_joint_sheet(sd, phi=0.0, c=5.0),
+         expect='states phi = 95 degrees'),
+    dict(rule='joint.strength_out_of_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(sd, t_cut=-2.0),
+         control=lambda sd: _pf_joint_sheet(sd, t_cut=0.0),
+         expect='states t_cut = -2'),
+    # A strength-reduction zone's Size and a joint region's reach the mesher the
+    # way a refine polygon's does, so one at or above the target refines nothing.
+    dict(rule='mesh.zone_size_not_finer', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, target_size=2.0, ssr_zones=[
+             {'kind': 'reduce', 'label': 'SSR reduce', 'size': 4.0,
+              'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)]}]),
+         control=lambda sd: _pf_set(sd, target_size=2.0, ssr_zones=[
+             {'kind': 'reduce', 'label': 'SSR reduce', 'size': 0.5,
+              'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)]}]),
+         expect='SSR zone #1 declares Size = 4'),
+    dict(rule='mesh.zone_size_not_finer', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, target_size=2.0, joint_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'label': 'blocks',
+              'size': 2.0, 'mat_id': None}]),
+         control=lambda sd: _pf_set(sd, target_size=2.0, joint_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'label': 'blocks',
+              'size': 0.5, 'mat_id': None}]),
+         expect='Joint region #1 declares Size = 2'),
+    # A joints-sheet line's t_cut follows Tension SRF the way a material's does.
+    # The base's materials carry t_cut = 0, so only the joint can make it speak.
+    dict(rule='main.tension_srf_unset', base=PREFLIGHT_BASE_REINF_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_joint_sheet(_pf_set(sd, tension_srf=None),
+                                             t_cut=5.0),
+         control=lambda sd: _pf_joint_sheet(_pf_set(sd, tension_srf=None),
+                                            t_cut=0.0),
+         expect='1 joint line(s) carry a tensile'),
 ]
 
 
-def _preflight_eval(sd, spec, selection_key='selection'):
-    """Run preflight for a spec and return the findings from its rule."""
+def _preflight_eval(sd, spec, selection_key='selection', analysis_key='analysis'):
+    """Run preflight for a spec and return the findings from its rule.
+
+    ``analysis_key='control_analysis'`` checks the negative control as a different
+    run (falling back to the spec's own analysis): the same broken model, checked
+    for an analysis that never reads the field, must say nothing.
+    """
     from xslope.preflight import preflight
-    analysis = spec.get('analysis', 'lem')
+    analysis = spec.get(analysis_key) or spec.get('analysis', 'lem')
     sel = spec.get(selection_key)
     if sel is None:
         sel = spec.get('selection')
     if sel is None:
-        sel = {'surface': 'circular'} if analysis in ('lem', 'rapid') else {}
+        sel = {'surface': 'circular'} if analysis in ('lem', 'rapid', 'seismic2') else {}
     report = preflight(sd, analysis, sel,
                        include_availability=spec.get('availability', False))
     return [f for f in report.findings if f.rule_id == spec['rule']]
@@ -7346,7 +8084,8 @@ def run_preflight_rules_test(test):
                 problems.append(f"{rid}: control model failed to round-trip: "
                                 f"{load_err0[:110]}")
                 continue
-            still = _preflight_eval(sd0, spec, selection_key='control_selection')
+            still = _preflight_eval(sd0, spec, selection_key='control_selection',
+                                    analysis_key='control_analysis')
             if still:
                 problems.append(f"{rid}: fired on the control model "
                                 f"({still[0].message[:80]!r})")
@@ -7390,6 +8129,7 @@ PREFLIGHT_TAG_ANALYSIS = {
     # A tilt row is one FEM solve at full strength per coefficient, no strength
     # reduction: the plain FEM analysis, at the sweep budget its tag states.
     'fem_tilt': ('fem', {}),
+    'fem_kc': ('fem', {}),
     'fem_elements': ('fem', {}),
     # A mesh-size lock names no analysis of its own: the file's OTHER tags say
     # what the model is for, and this row only counts what the mesher produced.
@@ -7413,6 +8153,7 @@ def run_preflight_corpus_test(test):
     raising rule to an info so a broken rule can never block a valid model, and
     this is what stops that safety net from hiding the breakage.
     """
+    import copy
     import warnings as _warnings
     from xslope.fileio import load_slope_data
     from xslope.preflight import preflight, ERROR
@@ -7434,6 +8175,16 @@ def run_preflight_corpus_test(test):
         # would have no corpus regression at all.
         if analysis == 'lem' and str(t.get('rapid', '')).strip().lower() == 'true':
             analysis = 'rapid'
+        # Likewise : the two-stage seismic run the tag makes.
+        if analysis == 'lem' and str(t.get('seismic2', '')).strip():
+            analysis = 'seismic2'
+        # A yield coefficient tag states its own surface family and whether it
+        # searches (run_critical_kc_test), so it is checked as that run.
+        if t.get('type') == 'critical_kc':
+            sel = dict(sel, ky=True,
+                       surface=str(t.get('surface', 'circular')).strip().lower(),
+                       search=str(t.get('search', 'true')).strip().lower()
+                       not in ('false', '0', 'no'))
         # A tag that builds its own seepage field at run time (`seep=steady`,
         # `seep=transient`, `march=file`) is checked as the run that follows it:
         # the field the shipped file lacks is exactly what the route produces.
@@ -7442,24 +8193,31 @@ def run_preflight_corpus_test(test):
         # joint.iteration_budget_low is a question about exactly that: a jointed row
         # whose tag allows the budget must not be reported as if it did not. Carried
         # into the selection so the corpus is checked as it is actually run.
-        if t.get('type') in ('fem_ssrm', 'fem_tilt'):
+        if t.get('type') in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
             sel = dict(sel)
             if t.get('max_iter'):
                 sel['max_iterations'] = int(float(t['max_iter']))
             if t.get('max_iter_ceiling'):
                 sel['max_iterations_ceiling'] = int(float(t['max_iter_ceiling']))
-        key = (f, analysis, tuple(sorted(sel.items())))
+        # A tag that edits the model before it runs (`material=`, `mat_<column>=`,
+        # `mat<k>_<column>=`, `k_seismic=`, `k_vertical=`) is checked on the model as
+        # edited: LEM-14's two-stage rows enter d and psi on a file whose fill carries
+        # the R envelope, and LEM-7's ratio rows turn its clays into ratios.
+        mods = tuple(sorted((k, v) for k, v in t.items()
+                            if k.startswith('mat_') or re.match(r'mat\d+_', k)
+                            or k in ('material', 'k_seismic', 'k_vertical')))
+        key = (f, analysis, tuple(sorted(sel.items())), mods)
         if key in cases:
-            cases[key] = (analysis, sel, cases[key][2] or field_at_run)
+            cases[key] = (analysis, sel, cases[key][2] or field_at_run, mods)
         else:
-            cases[key] = (analysis, sel, field_at_run)
+            cases[key] = (analysis, sel, field_at_run, mods)
 
     problems = []
     checked = 0
     loaded = {}
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
-        for (path, _a, _s), (analysis, sel, field_at_run) in sorted(cases.items()):
+        for (path, _a, _s, _m), (analysis, sel, field_at_run, mods) in sorted(cases.items()):
             if not os.path.exists(path):
                 continue
             if path not in loaded:
@@ -7472,6 +8230,13 @@ def run_preflight_corpus_test(test):
                 problems.append(f"{os.path.basename(path)}: load failed "
                                 f"({type(sd).__name__})")
                 continue
+            if mods:
+                sd = copy.deepcopy(sd)
+                err = (_apply_material_tag(sd, dict(mods))
+                       or _apply_seismic_tag(sd, dict(mods)))
+                if err:
+                    problems.append(f"{os.path.basename(path)}: {err}")
+                    continue
             checked += 1
             report = preflight(sd, analysis, sel)
             for f in report.errors:
@@ -7673,7 +8438,7 @@ def run_sweep_gate_test(test):
                                      search=False, num_slices=20)
     if ok3:
         problems.append("a sweep started on a base model preflight refuses")
-    elif 'Seismic coefficient k' not in str(res3):
+    elif 'Horizontal seismic coefficient k_h' not in str(res3):
         problems.append(f"the base-model refusal does not name the field: {res3}")
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
@@ -7825,7 +8590,7 @@ def run_preflight_contract_test(test):
             problems.append("PreflightError is not a ValueError")
         if getattr(exc, 'report', None) is None:
             problems.append("PreflightError carries no report")
-    if 'Seismic coefficient k' not in bad.format():
+    if 'Horizontal seismic coefficient k_h' not in bad.format():
         problems.append("format() lost the finding text")
     if bad.format(min_severity=pf.ERROR).count('WARNING') != 0:
         problems.append("format(min_severity=ERROR) leaked a warning")
@@ -8448,11 +9213,13 @@ def run_auto_water_test(test):
             _remedy_excel(AUTO_WATER_CASES[0][0],
                           lambda sd: dict(sd, water_loads='sometimes'), template)
         except Exception as exc:
-            # The mode cell moved from D23 to D24 at v25, which inserted a row above
-            # it; the refusal names the cell in the destination template's own layout.
+            # The mode cell moved from D23 to D24 at v25 and to D25 at v28, each
+            # time a row was inserted above it; the refusal names the cell in the
+            # destination template's own layout.
             import openpyxl as _opx
+            from xslope.fileio import main_sheet_cell as _msc
             _wbv = _opx.load_workbook(template, read_only=True)
-            _wl_cell = ('D24' if int(float(_wbv['main']['D5'].value)) >= 25 else 'D23')
+            _wl_cell = _msc('water_loads', _wbv['main']['D5'].value)
             _wbv.close()
             if _wl_cell not in str(exc):
                 problems.append(f"an unknown water-load mode was refused without "
@@ -8985,7 +9752,7 @@ def run_fem_elastic_units_test(test):
     from xslope.fileio import load_slope_data
 
     tag_re = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
-    fem_types = {'fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'}
+    fem_types = {'fem_ssrm', 'fem_tilt', 'fem_kc', 'fem_elements', 'fem_reliability'}
     root = Path(__file__).parent
     fem_files = set()
     for md in sorted(root.glob('docs/**/*.md')):
@@ -9341,7 +10108,12 @@ def run_tag_k0_test(test):
                         continue
                     sheet = wb['main']
                     version = sheet['D5'].value
-                    cell = sheet['D16'].value
+                    from xslope.fileio import main_sheet_cell as _msc
+                    try:
+                        _k0_cell = _msc('k0', version) or 'D16'
+                    except (TypeError, ValueError):
+                        _k0_cell = 'D16'
+                    cell = sheet[_k0_cell].value
                 finally:
                     wb.close()
             except Exception:
@@ -9351,7 +10123,7 @@ def run_tag_k0_test(test):
                     continue
             except (TypeError, ValueError):
                 continue
-            problems.append(f"{book.name}: declares K0 = {float(cell):g} in main!D16 "
+            problems.append(f"{book.name}: declares K0 = {float(cell):g} in main!{_k0_cell} "
                             f"that no test tag asks for")
 
     if problems:
@@ -9388,6 +10160,34 @@ def _tilt_pair_problems(t):
     if (a_fail - a_stand) > 2.0 * tol + 1e-12:
         out.append(f"{name}: k pair is {a_fail - a_stand:.4g} deg wide, more than "
                    f"twice the tolerance {tol:g} — not the sweep's final pair")
+    return out
+
+
+def _kc_pair_problems(t):
+    """What is wrong with one ``fem_kc`` tag's coefficient pair (see
+    ``run_lock_edges_test``); empty when nothing is."""
+    name = t.get('benchmark') or Path(str(t.get('file', '?'))).name
+    out = []
+    if any(k in t for k in ('f_stand', 'f_fail', 'check')):
+        out.append(f"{name}: a fem_kc tag carries f_stand/f_fail/check, which "
+                   f"no fem_kc check reads (its pair is k_stand/k_fail)")
+    try:
+        k_stand, k_fail = abs(float(t['k_stand'])), abs(float(t['k_fail']))
+    except (KeyError, TypeError, ValueError):
+        return out + [f"{name}: fem_kc needs numeric k_stand and k_fail"]
+    if not k_stand < k_fail:
+        return out + [f"{name}: k_stand={k_stand:g} is not below k_fail={k_fail:g}"]
+    if t.get('expected_kc') is None:
+        return out + [f"{name}: fem_kc tag with no expected_kc"]
+    expected = float(t['expected_kc'])
+    tol = float(t.get('kc_tol', 0.005))
+    mid = 0.5 * (k_stand + k_fail)
+    if abs(mid - expected) > tol + 1e-12:
+        out.append(f"{name}: k pair brackets {mid:.4f}, more than {tol:g} from "
+                   f"the lock {expected:g}")
+    if (k_fail - k_stand) > 2.0 * tol + 1e-12:
+        out.append(f"{name}: k pair is {k_fail - k_stand:.4g} wide, more than "
+                   f"twice kc_tol {tol:g} — not the bisection's final pair")
     return out
 
 
@@ -9430,6 +10230,9 @@ def run_lock_edges_test(test):
         for t in parse_test_tags(md):
             if t.get('type') == 'fem_tilt':
                 problems.extend(_tilt_pair_problems(t))
+                continue
+            if t.get('type') == 'fem_kc':
+                problems.extend(_kc_pair_problems(t))
                 continue
             if t.get('type') != 'fem_ssrm':
                 continue
@@ -10011,6 +10814,31 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'strength_ratio': (
+        'strength_ratio_check.py',
+        "The strength ratio material, s_u = max(c, c/p x sigma'_v): on a planar "
+        "wedge F = r/(sin a cos a) exactly in every force-equilibrium method and "
+        "each slice's strength is r W/b; under level ground it equals c/p = r "
+        "gamma' slice by slice and element by element; a pond leaves it unchanged "
+        "in both engines; the minimum c holds; stage 2's strength factor reduces it."),
+    'seismic2_factor': (
+        'seismic2_factor_check.py',
+        "The two-stage seismic analysis's stage 2 strength factor: with every slice "
+        "undrained in stage 2, F scales by exactly the factor in every LEM method and "
+        "stage 1 is unchanged; free-draining slices keep their drained strength; the "
+        "yield coefficient carries it; out-of-range factors are refused."),
+    'vertical_seismic': (
+        'vertical_seismic_check.py',
+        "The vertical seismic coefficient: on a dry frictional circle every LEM "
+        "method gives F(k, k_v) = F(k/(1 + k_v), 0) exactly, cohesion breaks that "
+        "identity as it must, and the FEM vertical loads are (1 + k_v) times the "
+        "weight with the horizontal ones unchanged."),
+    'fem_yield_coefficient': (
+        'fem_yield_coefficient_check.py',
+        "The finite element yield coefficient's bisection on k, on a stand-in "
+        "solver: it closes on the answer within its tolerance in the direction "
+        "asked, at full strength from the K0 field, reports an undecided top as "
+        "a lower bound, and refuses a slope that fails with no seismic force."),
     'noncircular_kink': (
         'noncircular_kink_check.py',
         "The non-circular search refuses a trial surface bent back more than 10 "
@@ -10057,6 +10885,14 @@ MODULE_CHECKS = {
         "A surcharge that starts at the crest of a wall stays on the crest: a "
         "slice straddling a face drawn leaning by 0.001 takes its load from the "
         "ground under it, not along the chord up the face."),
+    'newmark_record': (
+        'newmark_record_check.py',
+        "Every way a record file is written (two columns, an NGA-West2 .AT2, an "
+        "older PEER .AT2, run-together fixed-width values) reads to the same "
+        "record and the same Newmark displacement; records in cm/s², with "
+        "backward times, or short of their stated count are refused; reversing "
+        "the record swaps the two directions; D scales with g between unit "
+        "systems."),
     'circle_arc': (
         'circle_arc_check.py',
         "The base of a slice on a circle is as long as the arc it follows: on a "
@@ -11573,6 +12409,73 @@ def run_table_paste_test(test):
     return 0.0, None
 
 
+#: The input-graying audit's standing checks (Norm, 2026-11), one module each in
+#: test/, wired the way table_paste_check is: test type -> (file, the flag group it
+#: rides with). Each module exposes ``run()`` returning a list of failure strings
+#: and runs on its own as a script. A module is enqueued only when its file exists,
+#: so one still being written cannot fail the suite as "missing".
+AUDIT_CHECK_MODULES = {
+    # The loader, preflight and search fixes, and rapid drawdown reliability's d
+    # and psi against a hand combination of deterministic runs.
+    'audit_checks': ('audit_checks_check.py', 'preflight'),
+    # What Studio's editors gray, show and save, held to what the engines read.
+    'audit_studio': ('audit_studio_check.py', 'roundtrip'),
+    # The engine fixes (per-material FEM pore pressure, suction scope, joints in
+    # seepage, SSR and joints Size, the joint tension cutoff, the blank option).
+    'audit_engine': ('audit_engine_check.py', 'fem'),
+    # SLOPE/W's staged rapid drawdown through the GeoStudio importer.
+    'gsz_rapid': ('gsz_rapid_check.py', 'gsz'),
+    # Six GeoStudio import/export gaps: gamma_sat and the unit weight above the
+    # water table, the older tie-back capacity tag, the phreatic switch, partial
+    # factors, and what the skill says an import carries.
+    'gsz_gaps': ('gsz_gaps_check.py', 'gsz'),
+}
+
+
+def _audit_module_path(test_type):
+    return Path(__file__).parent / 'test' / AUDIT_CHECK_MODULES[test_type][0]
+
+
+def run_audit_module_test(test):
+    """One of the input-graying audit's standing check modules (AUDIT_CHECK_MODULES).
+
+    The module owns the story in its own docstring; this runs it exactly as
+    run_table_paste_test runs table_paste_check: offscreen Qt for the Studio
+    checks, then ``run()``, whose failure strings are the result.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = _audit_module_path(test['type'])
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: a Studio module skips itself
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(str(f) for f in failures)
+    return 0.0, None
+
+
+def _audit_module_tests(group):
+    """The AUDIT_CHECK_MODULES rows that ride with flag ``group`` and whose module
+    file exists, as test dicts."""
+    out = []
+    for t, (filename, g) in AUDIT_CHECK_MODULES.items():
+        if g == group and _audit_module_path(t).exists():
+            out.append({'type': t, 'file': f'test/{filename}', 'method': '-',
+                        'source': t})
+    return out
+
+
 def run_project_package_test(test):
     """Project packaging: a project collected into one ``.xslz`` and taken apart
     again.
@@ -11977,7 +12880,7 @@ def run_drawdown_guard_test(test):
             for key in ('c', 'phi', 'd', 'psi'):
                 m[key] = m.get(key, 0) * scale
         ok, payload = generate_slices(data, circle=data['circles'][0],
-                                      num_slices=40, debug=False)
+                                      num_slices=40, debug=False, rapid=True)
         if not ok:
             return None
         return rapid_drawdown(payload[0], 'bishop', debug_level=0)
@@ -12503,6 +13406,20 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/Materials/Material/StressStrain/TensileStrength",
     "/GSIData/Materials/Material/StressStrain/TensileStrength@Missing",
     "/GSIData/Materials/Material/StressStrain/UseTensileStrength",
+    # A ratio material is written as SHANSEP (constant ratio) and a cp one as
+    # S=f(depth); these are the fields SLOPE/W's own SHANSEP and SFnDepth materials use.
+    "/GSIData/Materials/Material/StressStrain/TauSigmaRatio",
+    "/GSIData/Materials/Material/StressStrain/CTopOfLayer",
+    "/GSIData/Materials/Material/StressStrain/CRateOfIncrease",
+    # A rapid drawdown model is written as SLOPE/W's staged rapid drawdown: d and psi
+    # as the R envelope its own examples carry on each soil that does not drain.
+    "/GSIData/Materials/Material/StressStrain/DrawdownCohesion",
+    "/GSIData/Materials/Material/StressStrain/DrawdownPhi",
+    # A unit weight below the water table that differs from the one above it: SLOPE/W's
+    # <UnitWeight> (below) and <DryWeight> under the switch, as its own Unit Weight
+    # Definition example writes them.
+    "/GSIData/Materials/Material/StressStrain/DryWeight",
+    "/GSIData/Materials/Material/StressStrain/SlopeUseUnitWeightAboveWT",
     "/GSIData/Materials@Len",
     # The reinforcement product library, and the loads that hang off the analysis. These
     # branches of the exporter went unchecked for a while because the fixture model has
@@ -12572,6 +13489,10 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/StabilityItems/StabilityItem/Entry/Seismic",
     "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Horizontal",
     "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Vertical",
+    # The analysis switches, and the one the export writes: the staged rapid drawdown.
+    "/GSIData/StabilityItems/StabilityItem/Entry/Control",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Control/IsRapidDrawdown",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Control/IsPiezPhreatic",
     "/GSIData/StabilityItems@Len",
     "/GSIData/WaterItems",
     "/GSIData/WaterItems/WaterItem",
@@ -13864,6 +14785,924 @@ def run_gsz_import_test(test):
     return 0.0, None
 
 
+# Which of SLOPE/W's saved trial surfaces the import may treat as circles. One analysis
+# per case: (name, its <SlipSurface><Option>, its ParentID, the results' CSV style, the
+# SlipOrigSearchMethod on every row). 'old' results are as GeoStudio 11.4 wrote them:
+# the radius column is SlipRadius and there is no SlipOrigSearchMethod, so the
+# analysis's own <Option> must decide. 'old inherit' takes its parent's ('old block').
+_GSZ_TRIAL_CASES = [
+    # name           option            parent  csv    code
+    ("old grid",     "GridAndRadius",  None,   "old", None),
+    ("old block",    "Block",          None,   "old", None),
+    ("old inherit",  "FromOther",      2,      "old", None),
+    ("grid",         "GridAndRadius",  None,   "new", "1"),
+    ("specified",    "FullySpecified", None,   "new", "2"),
+    ("block",        "Block",          None,   "new", "4"),
+]
+
+# Every case scores the same three trials, so a case that imports anything imports the
+# same circle. Both valid ones build on the fixture slope -- which is the trap for a
+# block or a specified surface: its FITTED circle would build and solve just fine.
+_GSZ_TRIAL_ROWS = [(998.0, 25.0, 45.0, 36.4),        # a failed trial: sentinel FOS
+                   (1.42, 28.0, 48.0, 39.0),
+                   (1.31, 25.0, 45.0, 36.4)]         # the critical one
+
+
+def _write_trial_surface_gsz(path):
+    """A one-slope .gsz with one solved analysis per _GSZ_TRIAL_CASES row. Each gets
+    its own result folder, holding a copy of the model XML (as SLOPE/W saves one) and
+    001/slip_surface.csv."""
+    import zipfile
+    n = len(_GSZ_TRIAL_CASES)
+    analyses, contexts, stab = [], [], []
+    for i, (name, option, parent, _kind, _code) in enumerate(_GSZ_TRIAL_CASES, 1):
+        par = f"<ParentID>{parent}</ParentID>" if parent else ""
+        analyses.append(f"<Analysis><ID>{i}</ID><Name>{name}</Name><Kind>SLOPE/W</Kind>"
+                        f"{par}<Method>Spencer</Method><GeometryId>1</GeometryId>"
+                        f"</Analysis>")
+        contexts.append(f"<Context><AnalysisID>{i}</AnalysisID><GeometryUsesMaterials "
+                        f"Len=\"1\"><GeometryUsesMaterial ID=\"Regions-1\" Entry=\"1\" />"
+                        f"</GeometryUsesMaterials></Context>")
+        opt = f"<Option>{option}</Option>" if option else ""
+        stab.append(f"<StabilityItem><AnalysisID>{i}</AnalysisID><Entry><SlipSurface>"
+                    f"{opt}<Grid NumXInc=\"4\" NumYInc=\"4\" /></SlipSurface>"
+                    f"<Seismic Horizontal=\"\" Vertical=\"\" /></Entry></StabilityItem>")
+    xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<GSIData Version="11.11" AppVersion="25.2.1.4">
+  <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
+  <Analyses Len="{n}">{''.join(analyses)}</Analyses>
+  <Geometries Len="1"><Geometry><Name>2D</Name>
+    <Points Len="6">
+      <Point ID="1" X="0" Y="0" /><Point ID="2" X="60" Y="0" />
+      <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
+      <Point ID="5" X="20" Y="10" /><Point ID="6" X="0" Y="10" />
+    </Points>
+    <Regions Len="1"><Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region></Regions>
+  </Geometry></Geometries>
+  <Materials Len="1">
+    <Material><ID>1</ID><Name>fill</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>10</CohesionPrime>
+        <PhiPrime>30</PhiPrime></StressStrain></Material>
+  </Materials>
+  <Contexts Len="{n}">{''.join(contexts)}</Contexts>
+  <StabilityItems Len="{n}">{''.join(stab)}</StabilityItems>
+</GSIData>
+"""
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("fixture.xml", xml)
+        for name, _option, _parent, kind, code in _GSZ_TRIAL_CASES:
+            zf.writestr(f"{name}/fixture.xml", xml)
+            if kind == "old":
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadius,SlipVolume,"
+                         "SlipWeight"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000"
+                          for k, (fs, x, y, r) in enumerate(_GSZ_TRIAL_ROWS, 1)]
+            else:
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadiusX,SlipVolume,"
+                         "SlipWeight,SlipOrigSearchMethod"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000,{code}"
+                          for k, (fs, x, y, r) in enumerate(_GSZ_TRIAL_ROWS, 1)]
+            zf.writestr(f"{name}/001/slip_surface.csv", "\n".join(lines) + "\n")
+
+
+def run_gsz_trial_surfaces_test(test):
+    """Which of SLOPE/W's saved trial surfaces the import takes as its circle.
+
+    A solved .gsz stores every trial surface SLOPE/W scored, each with a center and a
+    radius -- including block and fully-specified surfaces, whose center and radius
+    describe a circle FITTED to them. The import must take the critical circle from a
+    circle search and nothing else:
+      - an older file (radius column SlipRadius, no SlipOrigSearchMethod) is read at all,
+        and its rows are classified by the analysis's own <SlipSurface><Option>:
+        GridAndRadius is a circle, Block is not, and FromOther answers for its parent;
+      - SlipOrigSearchMethod 1 is the grid-and-radius search: a circle;
+      - 2 (fully specified) and 4 (block) are not, though their fitted circle builds.
+    Returns (0.0, None) or (None, message).
+    """
+    import tempfile
+    from xslope.geostudio import read_gsz, gsz_to_slope_data, read_gsz_results
+
+    want_circle = {"old grid": True, "old block": False, "old inherit": False,
+                   "grid": True, "specified": False, "block": False}
+    _fs, xo, yo, r = _GSZ_TRIAL_ROWS[-1]          # the critical trial
+    problems = []
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "trials.gsz")
+        _write_trial_surface_gsz(path)
+        gsz = read_gsz(path)
+        for a in gsz["analyses"]:
+            name, circ = a["name"], want_circle[a["name"]]
+            rows = read_gsz_results(gsz, name)
+            # The sentinel row is dropped; the two scored rows survive either way.
+            if [(t["fs"], t["xo"], t["yo"], t["r"]) for t in rows] != \
+                    [tuple(v) for v in _GSZ_TRIAL_ROWS[1:]]:
+                problems.append(f"'{name}': read {len(rows)} trial rows "
+                                f"{[(t['fs'], t['r']) for t in rows]}, expected the two "
+                                f"scored ones")
+                continue
+            if any(t["circular"] != circ for t in rows):
+                problems.append(f"'{name}': rows read as circular="
+                                f"{[t['circular'] for t in rows]}, expected {circ}")
+            sd, cav = gsz_to_slope_data(gsz, a["id"])
+            got = [(c["Xo"], c["Yo"], c["R"]) for c in sd["circles"]]
+            if circ and got != [(xo, yo, r)]:
+                problems.append(f"'{name}': imported circles {got}, expected SLOPE/W's "
+                                f"critical one ({xo}, {yo}, {r})")
+            if circ and not sd["circular"]:
+                problems.append(f"'{name}': the circle imported but circular is False")
+            if not circ and (got or sd["circular"]):
+                problems.append(f"'{name}': imported {got} as a circle -- the FITTED "
+                                f"circle of a surface that is not one")
+            if not circ and not any("non-circular" in c for c in cav):
+                problems.append(f"'{name}': no caveat says SLOPE/W's surface is "
+                                f"non-circular")
+    if problems:
+        return None, "GeoStudio trial surfaces: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+# The GeoStudio fixtures below share one slope -- the trial-surface fixture's, so its two
+# circles are known to build -- and one writer, which takes a list of analyses. Each is
+# a dict; only 'name' is required:
+#   name       the analysis name; its result folder is escaped as GeoStudio escapes it
+#   kind       'SLOPE/W' (default) or 'SEEP/W'
+#   option     <SlipSurface><Option>; None is the default entry-and-exit search
+#   optimized  <IsOptimizationOn>true</IsOptimizationOn> on the search
+#   parent     ParentID (1-based position in the list)
+#   material   the material ID region 1 takes (1 'fill' by default, 2 'clay')
+#   water      the water <Option> (None: no pore pressure)
+#   entry      extra XML inside the analysis's stability <Entry>
+#   rows       [(fs, xo, yo, r), ...] as SLOPE/W saved them; None for an unsolved one
+#   code       the SlipOrigSearchMethod on every row (None: an older file's columns)
+#   seep       True to save a SEEP/W pore-pressure field (the fixture seep field)
+_GSZ_ROWS = [(998.0, 25.0, 45.0, 36.4),            # a failed trial: sentinel FOS
+             (1.42, 28.0, 48.0, 39.0),
+             (1.31, 25.0, 45.0, 36.4)]             # the critical circle
+
+
+def _gsz_folder(name):
+    """GeoStudio's result folder for an analysis name: '/' -> '&3', ':' -> '&4', and a
+    final '.' -> '&-', as its own files show."""
+    out = name.replace("/", "&3").replace(":", "&4")
+    return out[:-1] + "&-" if out.endswith(".") else out
+
+
+def _write_gsz_cases(path, cases):
+    """A one-slope .gsz with one analysis per case (see the notes above)."""
+    import zipfile
+    analyses, contexts, water, stab = [], [], [], []
+    for i, c in enumerate(cases, 1):
+        par = f"<ParentID>{c['parent']}</ParentID>" if c.get("parent") else ""
+        kind = c.get("kind", "SLOPE/W")
+        method = "SteadyState" if kind == "SEEP/W" else "Spencer"
+        analyses.append(f"<Analysis><ID>{i}</ID><Name>{c['name']}</Name><Kind>{kind}"
+                        f"</Kind>{par}<Method>{method}</Method><GeometryId>1</GeometryId>"
+                        f"</Analysis>")
+        if kind == "SEEP/W":
+            continue
+        contexts.append(f"<Context><AnalysisID>{i}</AnalysisID><GeometryUsesMaterials "
+                        f"Len=\"1\"><GeometryUsesMaterial ID=\"Regions-1\" "
+                        f"Entry=\"{c.get('material', 1)}\" /></GeometryUsesMaterials>"
+                        f"</Context>")
+        opt = (f"<ResultInputInfo><Option>{c['water']}</Option></ResultInputInfo>"
+               if c.get("water") else "")
+        water.append(f"<WaterItem><AnalysisID>{i}</AnalysisID><Entry>{opt}"
+                     f"<UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>")
+        slip = (f"<Option>{c['option']}</Option>" if c.get("option") else "") + \
+            '<Grid NumXInc="4" NumYInc="4" />' + \
+            ("<IsOptimizationOn>true</IsOptimizationOn>" if c.get("optimized") else "")
+        stab.append(f"<StabilityItem><AnalysisID>{i}</AnalysisID><Entry><SlipSurface>"
+                    f"{slip}</SlipSurface><Seismic Horizontal=\"\" Vertical=\"\" />"
+                    f"{c.get('entry', '')}</Entry></StabilityItem>")
+    xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<GSIData Version="11.11" AppVersion="25.2.1.4">
+  <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
+  <Analyses Len="{len(analyses)}">{''.join(analyses)}</Analyses>
+  <Geometries Len="1"><Geometry><Name>2D</Name>
+    <Points Len="6">
+      <Point ID="1" X="0" Y="0" /><Point ID="2" X="60" Y="0" />
+      <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
+      <Point ID="5" X="20" Y="10" /><Point ID="6" X="0" Y="10" />
+    </Points>
+    <Regions Len="1"><Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region></Regions>
+  </Geometry></Geometries>
+  <Materials Len="2">
+    <Material><ID>1</ID><Name>fill</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>10</CohesionPrime>
+        <PhiPrime>30</PhiPrime></StressStrain></Material>
+    <Material><ID>2</ID><Name>clay</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><ResponseType>Undrained</ResponseType><UnitWeight>20</UnitWeight>
+        <CohesionPrime>5</CohesionPrime><PhiPrime>45</PhiPrime>
+        <DrawdownCohesion>60</DrawdownCohesion><DrawdownPhi>23</DrawdownPhi>
+      </StressStrain></Material>
+  </Materials>
+  <Contexts Len="{len(contexts)}">{''.join(contexts)}</Contexts>
+  <WaterItems Len="{len(water)}">{''.join(water)}</WaterItems>
+  <StabilityItems Len="{len(stab)}">{''.join(stab)}</StabilityItems>
+</GSIData>
+"""
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("fixture.xml", xml)
+        for c in cases:
+            folder = _gsz_folder(c["name"])
+            if c.get("seep"):
+                nodes, elements, u = _synthetic_seep_field()
+                zf.writestr(f"{folder}/fixture.xml", xml)
+                zf.writestr(f"{folder}/Mesh.ply", _synthetic_ply(nodes, elements))
+                zf.writestr(f"{folder}/000/node.csv",
+                            "Node,PoreWaterPressure,XTotalStress\n" +
+                            "".join(f"{k + 1},{v}\n" for k, v in enumerate(u)))
+            if c.get("rows") is None:
+                continue
+            zf.writestr(f"{folder}/fixture.xml", xml)
+            if c.get("code") is None:
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadius,SlipVolume,"
+                         "SlipWeight"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000"
+                          for k, (fs, x, y, r) in enumerate(c["rows"], 1)]
+            else:
+                lines = ["SlipNum,SlipFOS,SlipCenterX,SlipCenterY,SlipRadiusX,SlipVolume,"
+                         "SlipWeight,SlipOrigSearchMethod"]
+                lines += [f"{k},{fs},{x},{y},{r},100,2000,{c['code']}"
+                          for k, (fs, x, y, r) in enumerate(c["rows"], 1)]
+            zf.writestr(f"{folder}/001/slip_surface.csv", "\n".join(lines) + "\n")
+
+
+def _gsz_import_cases(cases):
+    """Write ``cases``, read the file back, and import every SLOPE/W analysis.
+    Returns {name: (slope_data, caveats, rows)}."""
+    import tempfile
+    from xslope.geostudio import read_gsz, gsz_to_slope_data, read_gsz_results
+    out = {}
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "cases.gsz")
+        _write_gsz_cases(path, cases)
+        gsz = read_gsz(path)
+        for a in gsz["analyses"]:
+            if a["kind"] != "SLOPE/W":
+                continue
+            sd, cav = gsz_to_slope_data(gsz, a["id"])
+            out[a["name"]] = (sd, cav, read_gsz_results(gsz, a["name"]))
+    return out
+
+
+def _gsz_circles(sd):
+    return [(c["Xo"], c["Yo"], c["R"]) for c in sd["circles"]]
+
+
+def run_gsz_folders_test(test):
+    """An analysis's results are found under the folder name GeoStudio escapes.
+
+    GeoStudio cannot put '/' or ':' in a folder name, or end one in '.', so it writes
+    them as '&3', '&4' and '&-'. Six of SLOPE/W's own verification files name their
+    analysis "SLOPE/W Analysis" and save it as "SLOPE&3W Analysis", and the import --
+    reading the name as the folder -- found no results in any of them. Checked here
+    on every reader that goes to the folder: the trial surfaces (new-style and old,
+    whose search option is read from the XML saved in the same folder) and a SEEP/W
+    pore-pressure field. An unsolved "SLOPE:W Analysis" must NOT pick up
+    "SLOPE/W Analysis"'s folder: a known code is matched exactly.
+    Returns (0.0, None) or (None, message).
+    """
+    rows = _GSZ_ROWS
+    cases = [
+        {"name": "SLOPE/W Analysis", "option": "GridAndRadius", "rows": rows, "code": "1"},
+        {"name": "Case 1: anchor", "option": "GridAndRadius", "rows": rows, "code": "1"},
+        {"name": "Infil. with St.", "option": "GridAndRadius", "rows": rows, "code": "1"},
+        {"name": "Old/style", "option": "GridAndRadius", "rows": rows, "code": None},
+        {"name": "SLOPE:W Analysis", "option": "GridAndRadius", "rows": None},
+        {"name": "seepage", "kind": "SEEP/W"},
+        {"name": "Seep/stability", "parent": 6, "water": "Parent", "seep": True,
+         "rows": None},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    want = (25.0, 45.0, 36.4)
+    for name in ("SLOPE/W Analysis", "Case 1: anchor", "Infil. with St.", "Old/style"):
+        sd, cav, trows = got[name]
+        if len(trows) != 2:
+            problems.append(f"'{name}' (folder '{_gsz_folder(name)}'): read "
+                            f"{len(trows)} trial rows, expected 2")
+        elif _gsz_circles(sd) != [want]:
+            problems.append(f"'{name}': imported circles {_gsz_circles(sd)}, expected "
+                            f"SLOPE/W's critical one {want}")
+    sd, cav, trows = got["SLOPE:W Analysis"]
+    if trows or sd["circles"]:
+        problems.append("the unsolved 'SLOPE:W Analysis' read the results of 'SLOPE/W "
+                        "Analysis' -- '&3' is '/', not ':'")
+    sd, cav, _ = got["Seep/stability"]
+    if sd.get("seep_u") is None or any(m["u"] != "seep" for m in sd["materials"]):
+        problems.append("'Seep/stability' (folder 'Seep&3stability'): the SEEP/W field "
+                        "was not imported")
+    if problems:
+        return None, "GeoStudio result folders: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def _slice_frame(sd, circle=(25.0, 45.0, 36.4), n=20):
+    """The slice table for one circle on an imported model, or an error string."""
+    from xslope.slice import generate_slices
+    xo, yo, r = circle
+    ok, res = generate_slices(sd, circle={"Xo": xo, "Yo": yo, "R": r, "Depth": None,
+                                          "Y": None, "Option": "Depth",
+                                          "Movement": "Left to Right"},
+                              num_slices=n, debug=False, check_inputs=False)
+    return res[0] if ok else f"slices failed: {str(res)[:80]}"
+
+
+def _line_y(line, x):
+    for (x0, y0), (x1, y1) in zip(line, line[1:]):
+        if min(x0, x1) <= x <= max(x0, x1) and x1 != x0:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0), (y1 - y0) / (x1 - x0)
+    return None, None
+
+
+def run_gsz_phreatic_test(test):
+    """The phreatic correction follows the file.
+
+    SLOPE/W applies it only where the analysis sets <Control><IsPiezPhreatic>; on
+    every verification analysis without that switch, SLOPE/W's own per-column pore
+    pressure is the plain head under the line. The import used to make every line
+    'phreatic', which cut the pressure by cos^2 of the line's slope (Zhu & Lee wet:
+    41.7 for SLOPE/W's 52.2) and raised the factor of safety 3-4%. Checked on the
+    slices themselves: plain head where the switch is absent, head x cos^2 where it
+    is set, and a caveat naming the stretch where the line runs along the ground,
+    which SLOPE/W leaves uncorrected and XSLOPE does not.
+    Returns (0.0, None) or (None, message).
+    """
+    line = "<DataPoint Number=\"1\" X=\"0\" Y=\"8\" /><DataPoint Number=\"2\" X=\"60\" Y=\"24\" />"
+    face = ("<DataPoint Number=\"1\" X=\"0\" Y=\"9\" /><DataPoint Number=\"2\" X=\"20\" "
+            "Y=\"10\" /><DataPoint Number=\"3\" X=\"30\" Y=\"20\" /><DataPoint Number=\"4\" "
+            "X=\"60\" Y=\"22\" />")
+
+    def entry(points, n, phreatic):
+        ids = "".join(f"<DataPoint>{k}</DataPoint>" for k in range(1, n + 1))
+        ctl = ("<Control><IsPiezPhreatic>true</IsPiezPhreatic></Control>"
+               if phreatic else "")
+        return (f"<DataPoints Len=\"{n}\">{points}</DataPoints>{ctl}"
+                f"<PiezometricSurfaces Len=\"1\"><PiezometricSurface><ID>1</ID>"
+                f"<DataPoints Len=\"{n}\">{ids}</DataPoints><CapSuction>false</CapSuction>"
+                f"</PiezometricSurface></PiezometricSurfaces>")
+
+    cases = [
+        {"name": "plain", "option": "GridAndRadius", "water": "PiezoSurface",
+         "entry": entry(line, 2, False), "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "corrected", "option": "GridAndRadius", "water": "PiezoSurface",
+         "entry": entry(line, 2, True), "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "on the face", "option": "GridAndRadius", "water": "PiezoSurface",
+         "entry": entry(face, 4, True), "rows": _GSZ_ROWS, "code": "1"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    for name, want in (("plain", False), ("corrected", True), ("on the face", True)):
+        sd, cav, _ = got[name]
+        if bool(sd.get("piezo_phreatic")) != want:
+            problems.append(f"'{name}': piezo_phreatic = {sd.get('piezo_phreatic')}, "
+                            f"expected {want} -- the file "
+                            f"{'sets' if want else 'does not set'} IsPiezPhreatic")
+        if any("'Control'" in c for c in cav):
+            problems.append(f"'{name}': IsPiezPhreatic reported as an unrecognized "
+                            f"'Control'")
+        df = _slice_frame(sd)
+        if isinstance(df, str):
+            problems.append(f"'{name}': {df}")
+            continue
+        worst = 0.0
+        for x, yb, u in zip(df["x_u"], df["y_u"], df["u"]):
+            py, m = _line_y(sd["piezo_line"], float(x))
+            if py is None or py <= yb:
+                continue
+            head = 9.807 * (py - float(yb))
+            expect = head / (1.0 + m * m) if want else head
+            worst = max(worst, abs(float(u) - expect))
+        if worst > 1e-6:
+            problems.append(f"'{name}': slice pore pressure is off "
+                            f"{'head x cos^2' if want else 'the plain head'} by up to "
+                            f"{worst:.3g}")
+    cav = " | ".join(got["corrected"][1])
+    if "phreatic correction" not in cav:
+        problems.append("'corrected': no caveat says SLOPE/W applies its phreatic "
+                        "correction")
+    cav = " | ".join(got["on the face"][1])
+    if "x = 20 to 30" not in cav:
+        problems.append("'on the face': no caveat names x = 20 to 30, where the line "
+                        "runs along the ground and SLOPE/W leaves the head uncorrected")
+    if problems:
+        return None, "GeoStudio phreatic correction: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_ru_test(test):
+    """SLOPE/W's Ru imports as XSLOPE's ru, value for value.
+
+    Under the water option 'Ru', SLOPE/W reads each material's Ru from
+    <MaterialUsesRuParams> and takes u = Ru x the column's weight / width -- exactly,
+    on all three of its verification analyses that use Ru. XSLOPE's u = 'ru' is the
+    same rule, so the value carries over. It used to import as zero with a caveat
+    (Loukidis wet: +77% to +79% on SLOPE/W's own circle). Also checked: an empty Ru
+    is a dry material; a Ru table under a piezometric-surface analysis is ignored, as
+    SLOPE/W ignores it, and is not reported as unrecognized; and a B-bar analysis
+    keeps its piezometric line and says plainly that the B-bar pressure is missing.
+    Returns (0.0, None) or (None, message).
+    """
+    ru = ("<MaterialUsesRuParams Len=\"1\"><MaterialUsesRuParam><ID>1</ID>"
+          "<Entry Function=\"{v}\" /></MaterialUsesRuParam></MaterialUsesRuParams>")
+    piezo = ("<DataPoints Len=\"2\"><DataPoint Number=\"1\" X=\"0\" Y=\"8\" />"
+             "<DataPoint Number=\"2\" X=\"60\" Y=\"24\" /></DataPoints>"
+             "<PiezometricSurfaces Len=\"1\"><PiezometricSurface><ID>1</ID>"
+             "<DataPoints Len=\"2\"><DataPoint>1</DataPoint><DataPoint>2</DataPoint>"
+             "</DataPoints></PiezometricSurface></PiezometricSurfaces>")
+    bbar = ("<MaterialUsesBBarParams Len=\"1\"><MaterialUsesBBarParam><ID>1</ID>"
+            "<Entry Function=\"0.7\" /></MaterialUsesBBarParam></MaterialUsesBBarParams>")
+    cases = [
+        {"name": "ru", "water": "Ru", "entry": ru.format(v="0.3"),
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "ru blank", "water": "Ru", "entry": ru.format(v=""),
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "piezo with an ru table", "water": "PiezoSurface",
+         "entry": piezo + ru.format(v="0.5"), "option": "GridAndRadius",
+         "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "bbar", "water": "PiezoSurfaceBbar", "entry": piezo + bbar,
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+
+    def mat(name):
+        m = got[name][0]["materials"][0]
+        return m["u"], m["ru"]
+
+    if mat("ru") != ("ru", 0.3):
+        problems.append(f"'ru': material imported as u, ru = {mat('ru')}, expected "
+                        f"('ru', 0.3)")
+    else:
+        df = _slice_frame(got["ru"][0])
+        if isinstance(df, str) or not (df["u"] > 0).all():
+            problems.append("'ru': the slices carry no Ru pore pressure")
+    if mat("ru blank") != ("none", 0.0):
+        problems.append(f"'ru blank': imported as {mat('ru blank')}, expected dry")
+    if mat("piezo with an ru table") != ("piezo", 0.0):
+        problems.append(f"'piezo with an ru table': imported as "
+                        f"{mat('piezo with an ru table')}; SLOPE/W reads Ru only under "
+                        f"its Ru option")
+    for name in got:
+        if any("not recognize" in c for c in got[name][1]):
+            problems.append(f"'{name}': a Ru or B-bar table reported as unrecognized")
+    sd, cav, _ = got["bbar"]
+    if mat("bbar")[0] != "piezo" or not sd["piezo_line"]:
+        problems.append("'bbar': the piezometric line under B-bar was not imported")
+    if not any("B-bar" in c and "not imported" in c for c in cav):
+        problems.append("'bbar': no caveat says B-bar's excess pressure was not imported")
+    if problems:
+        return None, "GeoStudio Ru: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_optimized_test(test):
+    """An optimized search's last row is not a circle.
+
+    With <IsOptimizationOn>, SLOPE/W saves its search circles, then one more row --
+    the last -- for the surface the optimization bent out of the critical circle. It
+    is written with the search's own code and a FITTED circle, and has the lowest
+    factor of safety. Importing that circle scored Greco's layered slope 24.6% high;
+    where it did not build (Baker & Leschinsky), the caveat blamed a composite
+    surface. Now the most critical circle of the search is imported, and the caveat
+    gives SLOPE/W's optimized factor of safety. Without the switch the last row is an
+    ordinary circle and is imported as one.
+    Returns (0.0, None) or (None, message).
+    """
+    rows_fit = _GSZ_ROWS + [(1.10, 26.0, 46.0, 37.5)]     # the optimized row; builds
+    rows_out = _GSZ_ROWS + [(1.10, 25.0, 45.0, 50.0)]     # ...and one that does not
+    cases = [
+        {"name": "optimized", "optimized": True, "rows": rows_fit, "code": "5"},
+        {"name": "optimized, will not build", "optimized": True, "rows": rows_out,
+         "code": "5"},
+        {"name": "old optimized", "optimized": True, "rows": rows_fit, "code": None},
+        {"name": "not optimized", "rows": rows_fit, "code": "5"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    for name in ("optimized", "optimized, will not build", "old optimized"):
+        sd, cav, rows = got[name]
+        if _gsz_circles(sd) != [(25.0, 45.0, 36.4)]:
+            problems.append(f"'{name}': imported {_gsz_circles(sd)}, expected the "
+                            f"search's critical circle (25, 45, 36.4) -- not the "
+                            f"optimized row's fitted circle")
+        if [r.get("kind") for r in rows][-1:] != ["optimized"]:
+            problems.append(f"'{name}': the last row read as "
+                            f"{[r.get('kind') for r in rows][-1:]}, expected 'optimized'")
+        joined = " | ".join(cav)
+        if "optimized" not in joined or "1.100" not in joined:
+            problems.append(f"'{name}': no caveat gives SLOPE/W's optimized FS (1.100)")
+        if "COMPOSITE" in joined or "can't build" in joined:
+            problems.append(f"'{name}': a caveat blames a surface xslope cannot build")
+    if _gsz_circles(got["not optimized"][0]) != [(26.0, 46.0, 37.5)]:
+        problems.append(f"'not optimized': imported {_gsz_circles(got['not optimized'][0])}"
+                        f", expected its most critical circle (26, 46, 37.5)")
+    if problems:
+        return None, "GeoStudio optimized search: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_parent_surface_test(test):
+    """A surface taken from a parent (SlipOrigSearchMethod 6) is what the parent's was.
+
+    Tandjiria's reinforced block analyses take the surfaces of a Block parent, coded
+    6, and a 6 was counted as a circle without looking at the parent: their fitted
+    circles were tried, and the caveat blamed a composite surface. The parent's
+    search now decides: a Block or Automatic parent gives no circle; a grid-and-
+    radius parent does; and a child of an OPTIMIZED parent solves both of the
+    parent's critical surfaces without saying which row is which, so none of its
+    rows is taken as a circle.
+    Returns (0.0, None) or (None, message).
+    """
+    cases = [
+        {"name": "block", "option": "Block", "rows": _GSZ_ROWS, "code": "4"},
+        {"name": "block child", "option": "FromOther", "parent": 1,
+         "rows": _GSZ_ROWS, "code": "6"},
+        {"name": "automatic", "option": "Automatic", "rows": _GSZ_ROWS, "code": "7"},
+        {"name": "automatic child", "option": "FromOther", "parent": 3,
+         "rows": _GSZ_ROWS, "code": "6"},
+        {"name": "grid", "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1"},
+        {"name": "grid child", "option": "FromOther", "parent": 5,
+         "rows": _GSZ_ROWS, "code": "6"},
+        {"name": "optimized grid", "option": "GridAndRadius", "optimized": True,
+         "rows": _GSZ_ROWS + [(1.10, 26.0, 46.0, 37.5)], "code": "1"},
+        {"name": "optimized grid child", "option": "FromOther", "parent": 7,
+         "rows": _GSZ_ROWS, "code": "6"},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    for name, words in (("block child", "a block surface"),
+                        ("automatic child", "automatic search"),
+                        ("optimized grid child", "an optimized surface")):
+        sd, cav, _ = got[name]
+        if sd["circles"] or sd["circular"]:
+            problems.append(f"'{name}': imported {_gsz_circles(sd)} -- the fitted "
+                            f"circle of its parent's surface, which is not a circle")
+        joined = " | ".join(cav)
+        if "non-circular" not in joined or words not in joined or "parent" not in joined:
+            problems.append(f"'{name}': no caveat says the surface is {words} taken "
+                            f"from the parent")
+        if "COMPOSITE" in joined:
+            problems.append(f"'{name}': the caveat blames a composite surface")
+    if _gsz_circles(got["grid child"][0]) != [(25.0, 45.0, 36.4)]:
+        problems.append(f"'grid child': imported {_gsz_circles(got['grid child'][0])}, "
+                        f"expected the parent's circle (25, 45, 36.4)")
+    if problems:
+        return None, "GeoStudio parent surfaces: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+def run_gsz_rapid_drawdown_test(test):
+    """A staged rapid drawdown imports as XSLOPE's rapid drawdown, on a built fixture.
+
+    SLOPE/W's staged rapid drawdown (<Control><IsRapidDrawdown>) reads two
+    piezometric surfaces -- the higher before drawdown, the lower after -- and
+    drawdown strengths (c_R, phi_R) for the soils that do not drain. The import takes
+    the higher as piezo line 1, the lower as piezo line 2, and each c_R and phi_R as
+    d and psi through SLOPE/W's own conversion (here Pilarcitos Dam's c_R = 60,
+    phi_R = 23, phi' = 45: d = 64.1, psi = 24.4, Duncan, Wright and Brandon's
+    Eqs. 9.6-9.7). One caveat says what was imported and that the model runs as a
+    rapid drawdown, in place of the generic "2 piezometric surfaces" and the
+    unrecognized 'Control' it once drew. A <Control> switch the import does not
+    handle (here one GeoStudio has never written) is still reported as unrecognized.
+    SLOPE/W's own four examples are
+    checked against their XML and their answers in test/gsz_rapid_check.py.
+    Returns (0.0, None) or (None, message).
+    """
+    pts = ("<DataPoints Len=\"4\"><DataPoint Number=\"1\" X=\"0\" Y=\"25\" />"
+           "<DataPoint Number=\"2\" X=\"60\" Y=\"25\" /><DataPoint Number=\"3\" X=\"0\" "
+           "Y=\"12\" /><DataPoint Number=\"4\" X=\"60\" Y=\"12\" /></DataPoints>")
+    surfaces = ("<PiezometricSurfaces Len=\"2\"><PiezometricSurface><ID>1</ID>"
+                "<DataPoints Len=\"2\"><DataPoint>1</DataPoint><DataPoint>2</DataPoint>"
+                "</DataPoints></PiezometricSurface><PiezometricSurface><ID>2</ID>"
+                "<DataPoints Len=\"2\"><DataPoint>3</DataPoint><DataPoint>4</DataPoint>"
+                "</DataPoints></PiezometricSurface></PiezometricSurfaces>"
+                "<MaterialUsesPiezs Len=\"1\"><MaterialUsesPiez ID=\"2\" UsesID=\"1\" />"
+                "</MaterialUsesPiezs>")
+    rdd = "<Control><IsRapidDrawdown>true</IsRapidDrawdown>{extra}</Control>"
+    cases = [
+        {"name": "drawdown", "material": 2, "water": "PiezoSurface",
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1",
+         "entry": pts + rdd.format(extra="") + surfaces},
+        {"name": "drawdown, unknown switch", "material": 2, "water": "PiezoSurface",
+         "option": "GridAndRadius", "rows": _GSZ_ROWS, "code": "1",
+         "entry": pts + rdd.format(extra="<IsSomeFutureOption>true</IsSomeFutureOption>")
+         + surfaces},
+    ]
+    got = _gsz_import_cases(cases)
+    problems = []
+    sd, cav, _ = got["drawdown"]
+    joined = " | ".join(cav)
+    for want, why in (("staged rapid drawdown", "the analysis is a staged rapid drawdown"),
+                      ("full-pool", "which surface was imported"),
+                      ("(0, 12), (60, 12)", "the lowered surface"),
+                      ("d = 64.1, psi = 24.4", "the converted drawdown strengths")):
+        if want not in joined:
+            problems.append(f"'drawdown': no caveat says {why} ({want!r})")
+    if "2 piezometric surfaces" in joined or "'Control'" in joined:
+        problems.append("'drawdown': the generic two-surface or 'Control' caveat is "
+                        "still given in place of the rapid drawdown one")
+    if sd["piezo_line"] != [(0.0, 25.0), (60.0, 25.0)]:
+        problems.append(f"'drawdown': imported piezo line {sd['piezo_line']}, expected "
+                        f"the full-pool one")
+    if sd["piezo_line2"] != [(0.0, 12.0), (60.0, 12.0)]:
+        problems.append(f"'drawdown': imported piezo line 2 {sd['piezo_line2']}, "
+                        f"expected the lowered one")
+    clay = next((m for m in sd["materials"] if m["name"] == "clay"), None)
+    if clay is None or round(clay["d"], 1) != 64.1 or round(clay["psi"], 1) != 24.4:
+        problems.append(f"'drawdown': clay d, psi = "
+                        f"{(clay or {}).get('d')}, {(clay or {}).get('psi')}, "
+                        f"expected 64.1, 24.4")
+    if not any("'Control'" in c for c in got["drawdown, unknown switch"][1]):
+        problems.append("an unhandled <Control> switch (IsSomeFutureOption) is no "
+                        "longer reported")
+    if problems:
+        return None, "GeoStudio rapid drawdown: " + "; ".join(problems[:4])
+    return 0.0, None
+
+
+# SLOPE/W's undrained strength models, one analysis each, on a 10 m clay layer whose top
+# is level at y = 10 (region 1) under a fill slope (region 2). Analysis 5 puts the clay
+# in both regions, so its top runs from y = 10 up to y = 20. Fields and names are the
+# ones GeoStudio writes (SLOPE/W's own example files; its Slope Stability Modeling book,
+# sections 4.9 and 4.14).
+_GSZ_STRENGTH_MATERIALS = {
+    1: ("fill", "MohrCoulomb",
+        "<UnitWeight>20</UnitWeight><CohesionPrime>5</CohesionPrime>"
+        "<PhiPrime>30</PhiPrime>"),
+    # SHANSEP, constant ratio. CohesionPrime/PhiPrime are left over from another model
+    # and play no part: GeoStudio's own files carry them.
+    2: ("shansep const", "SHANSEP",
+        "<ResponseType>Undrained</ResponseType><UnitWeight>18</UnitWeight>"
+        "<CohesionPrime>5</CohesionPrime><PhiPrime>20</PhiPrime>"
+        "<TauSigmaRatio>0.3</TauSigmaRatio>"),
+    # SHANSEP S x OCR^m with OCR from function 1 (1 to 2).
+    3: ("shansep ocr", "SHANSEP",
+        "<SlopeUndrainedStrengthModel>Custom</SlopeUndrainedStrengthModel>"
+        "<UnitWeight>18</UnitWeight><OCRFnNum>1</OCRFnNum>"
+        "<NCUndrainedStrengthRatio>0.25</NCUndrainedStrengthRatio>"
+        "<SHANSEPExponent>0.8</SHANSEPExponent>"),
+    # SHANSEP strength read off a curve of sigma'_v (function 2).
+    4: ("shansep curve", "SHANSEP",
+        "<SlopeUndrainedStrengthModel>Function</SlopeUndrainedStrengthModel>"
+        "<UnitWeight>18</UnitWeight><ShearVerticalFnNum>2</ShearVerticalFnNum>"
+        "<TauSigmaRatio>0.3</TauSigmaRatio>"),
+    5: ("su depth", "SFnDepth",
+        "<UnitWeight>18</UnitWeight><CTopOfLayer>12</CTopOfLayer>"
+        "<CRateOfIncrease>2</CRateOfIncrease>"),
+    # The same, with SLOPE/W's anisotropy modifier and a field XSLOPE does not know.
+    6: ("su depth aniso", "SFnDepth",
+        "<UnitWeight>18</UnitWeight><CTopOfLayer>12</CTopOfLayer>"
+        "<CRateOfIncrease>2</CRateOfIncrease><ShearAnisoFnNum>1</ShearAnisoFnNum>"
+        "<CMaximumTest>40</CMaximumTest>"),
+}
+# analysis -> (clay material, fill material, water option, entry XML)
+_GSZ_STRENGTH_ANALYSES = [
+    (2, 1, "", ""), (3, 1, "", ""), (4, 1, "", ""), (5, 1, "", ""), (5, 5, "", ""),
+    (6, 1, "", ""),
+    (2, 1, "Bbar", "<MaterialUsesBBarParams Len=\"1\"><MaterialUsesBBarParam><ID>2</ID>"
+                   "<Entry Function=\"1\" /></MaterialUsesBBarParam>"
+                   "</MaterialUsesBBarParams>"),
+]
+
+
+def _write_gsz_strength(path):
+    """The .gsz above: one analysis per _GSZ_STRENGTH_ANALYSES row."""
+    import zipfile
+    mats = "".join(
+        f"<Material><ID>{k}</ID><Name>{n}</Name><SlopeModel>{model}</SlopeModel>"
+        f"<StressStrain>{ss}</StressStrain></Material>"
+        for k, (n, model, ss) in _GSZ_STRENGTH_MATERIALS.items())
+    analyses, contexts, water, stab = [], [], [], []
+    for i, (clay, fill, opt, entry) in enumerate(_GSZ_STRENGTH_ANALYSES, 1):
+        analyses.append(f"<Analysis><ID>{i}</ID><Name>a{i}</Name><Kind>SLOPE/W</Kind>"
+                        f"<Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>")
+        contexts.append(
+            f"<Context><AnalysisID>{i}</AnalysisID><GeometryUsesMaterials Len=\"2\">"
+            f"<GeometryUsesMaterial ID=\"Regions-1\" Entry=\"{clay}\" />"
+            f"<GeometryUsesMaterial ID=\"Regions-2\" Entry=\"{fill}\" />"
+            f"</GeometryUsesMaterials></Context>")
+        o = f"<ResultInputInfo><Option>{opt}</Option></ResultInputInfo>" if opt else ""
+        water.append(f"<WaterItem><AnalysisID>{i}</AnalysisID><Entry>{o}"
+                     f"<UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>")
+        stab.append(f"<StabilityItem><AnalysisID>{i}</AnalysisID><Entry>"
+                    f"<Seismic Horizontal=\"\" Vertical=\"\" />{entry}</Entry>"
+                    f"</StabilityItem>")
+    xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<GSIData Version="11.11" AppVersion="25.2.1.4">
+  <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
+  <Analyses Len="{len(analyses)}">{''.join(analyses)}</Analyses>
+  <Geometries Len="1"><Geometry><Name>2D</Name>
+    <Points Len="7">
+      <Point ID="1" X="0" Y="0" /><Point ID="2" X="60" Y="0" />
+      <Point ID="3" X="60" Y="10" /><Point ID="4" X="20" Y="10" />
+      <Point ID="5" X="0" Y="10" /><Point ID="6" X="60" Y="20" />
+      <Point ID="7" X="40" Y="20" />
+    </Points>
+    <Regions Len="2"><Region><ID>1</ID><PointIDs>1,2,3,4,5</PointIDs></Region>
+      <Region><ID>2</ID><PointIDs>4,3,6,7</PointIDs></Region></Regions>
+  </Geometry></Geometries>
+  <Materials Len="{len(_GSZ_STRENGTH_MATERIALS)}">{mats}</Materials>
+  <Functions><Material><Fn2Ds Len="2">
+    <Fn2D><ID>1</ID><Name>OCR</Name>
+      <Function>Spline(OutputParam=OverconsolidationRatio,InputParam=Y)</Function>
+      <Points Len="2"><Point X="0" Y="1" /><Point X="10" Y="2" /></Points></Fn2D>
+    <Fn2D><ID>2</ID><Name>Su curve</Name>
+      <Function>Spline(OutputParam=UndrainedShearStrength,InputParam=YEffectiveStress)</Function>
+      <Points Len="2"><Point X="10" Y="8" /><Point X="100" Y="30" /></Points></Fn2D>
+  </Fn2Ds></Material></Functions>
+  <Contexts Len="{len(contexts)}">{''.join(contexts)}</Contexts>
+  <WaterItems Len="{len(water)}">{''.join(water)}</WaterItems>
+  <StabilityItems Len="{len(stab)}">{''.join(stab)}</StabilityItems>
+</GSIData>
+"""
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("fixture.xml", xml)
+
+
+def run_gsz_strength_test(test):
+    """SLOPE/W's undrained strength models import as XSLOPE's ratio and cp, and export
+    back, on a .gsz built here.
+
+    Each mapping is checked against SLOPE/W's own definition, and each was a silent
+    wrong strength before: every SHANSEP and S=f(depth) material imported as
+    Mohr-Coulomb with whatever c and phi it carried (a SHANSEP ratio of 0.3 became
+    c = 5, phi = 20; an S=f(depth) clay became c = 0, phi = 0), with a caveat but no
+    strength anything like SLOPE/W's.
+
+      - SHANSEP with a constant ratio -> ratio, c/p = the ratio, no minimum (c = 0);
+        the leftover CohesionPrime is not a minimum.
+      - SHANSEP S x OCR^m with OCR varying -> ratio at the lowest OCR, with a caveat
+        giving the largest shortfall; a strength curve -> no strength, refused.
+      - S=f(depth) on a level top -> cp from that top, exact: slice by slice the base
+        strength is CTopOfLayer + rate x (top - y). On a top that is not level, cp
+        from its highest point, with the largest difference stated.
+      - the anisotropy modifier and unknown fields are named; a ratio material under
+        B-bar is told its strength is too high.
+      - export writes ratio as SHANSEP and cp as S=f(depth), the tags conform to
+        GeoStudio's vocabulary, and the model comes back identical.
+    """
+    import tempfile
+    import zipfile as _zip
+    import xml.etree.ElementTree as _ET
+    from xslope.geostudio import read_gsz, gsz_to_slope_data, export_gsz
+
+    problems = []
+
+    def mat(sd, name):
+        return next((m for m in sd["materials"] if m["name"] == name), None)
+
+    def has(cav, *words):
+        return any(all(w in c for w in words) for c in cav)
+
+    def close(a, b, tol=1e-9):
+        return abs(float(a) - float(b)) <= tol * max(1.0, abs(float(b)))
+
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "strength.gsz")
+        _write_gsz_strength(path)
+        gsz = read_gsz(path)
+        got = {a["id"]: gsz_to_slope_data(gsz, a["id"]) for a in gsz["analyses"]}
+
+        # 1. SHANSEP constant -> ratio 0.3, c = 0.
+        sd, cav = got[1]
+        m = mat(sd, "shansep const")
+        if (m["option"], m["c"], m["phi"], m["cp"]) != ("ratio", 0.0, 0.0, 0.3):
+            problems.append(f"SHANSEP constant came in as option={m['option']} "
+                            f"c={m['c']} phi={m['phi']} c/p={m['cp']}, expected ratio "
+                            f"with c/p 0.3 and c = phi = 0")
+        if has(cav, "shansep const", "NOT the same strength") or \
+                has(cav, "shansep const", "NO STRENGTH"):
+            problems.append("SHANSEP constant still carries the unmapped-model caveat")
+        if not has(cav, "shansep const", "constant ratio", "c/p = 0.3"):
+            problems.append("SHANSEP constant mapping was not reported")
+
+        # 2. S x OCR^m, OCR 1 to 2: the lowest ratio, and the shortfall 2^0.8.
+        sd, cav = got[2]
+        m = mat(sd, "shansep ocr")
+        if m["option"] != "ratio" or not close(m["cp"], 0.25):
+            problems.append(f"SHANSEP OCR came in as {m['option']} c/p={m['cp']}, "
+                            f"expected ratio 0.25 (S at the lowest OCR, 1)")
+        if not has(cav, "shansep ocr", f"{2 ** 0.8:.3g}"):
+            problems.append("SHANSEP OCR caveat does not give the largest shortfall "
+                            f"(a factor of {2 ** 0.8:.3g})")
+
+        # 3. A strength curve is refused: no strength, said plainly.
+        sd, cav = got[3]
+        m = mat(sd, "shansep curve")
+        if (m["option"], m["c"], m["phi"]) != ("mc", 0.0, 0.0) or \
+                not has(cav, "shansep curve", "cannot represent"):
+            problems.append(f"SHANSEP curve was not refused: {m['option']} c={m['c']} "
+                            f"c/p={m['cp']}")
+
+        # 4. S=f(depth) on a level top: cp from y = 10, and the slices agree with
+        # SLOPE/W's definition, base by base.
+        sd, cav = got[4]
+        m = mat(sd, "su depth")
+        if (m["option"], m["c"], m["cp"], m["r_elev"]) != ("cp", 12.0, 2.0, 10.0):
+            problems.append(f"S=f(depth) came in as {m['option']} c={m['c']} "
+                            f"c/p={m['cp']} r_elev={m['r_elev']}, expected cp 12 / 2 / 10")
+        if has(cav, "su depth", "not level"):
+            problems.append("a level layer top was reported as not level")
+        from xslope.slice import generate_slices
+        ok, res = generate_slices(sd, circle={"Xo": 35.0, "Yo": 30.0, "R": 26.0,
+                                              "Depth": None},
+                                  num_slices=30, check_inputs=False)
+        if not ok:
+            problems.append(f"S=f(depth) model did not slice: {res}")
+        else:
+            df = res[0]
+            clay = df[df["mat"] == 1 + sd["materials"].index(m)]
+            if len(clay) < 5:
+                problems.append("the check circle barely enters the clay")
+            else:
+                # SLOPE/W: CTopOfLayer + rate x depth below the top, at the point on
+                # the base where the strength is read.
+                yb = clay["y_u"].to_numpy()
+                diff = abs(clay["c"].to_numpy() - (12.0 + 2.0 * (10.0 - yb))).max()
+                if diff > 1e-9:
+                    problems.append(f"slice strengths differ from SLOPE/W's S=f(depth) "
+                                    f"by up to {diff:.3g}")
+
+        # 5. Clay in both regions: the top runs from 10 to 20.
+        sd, cav = got[5]
+        m = mat(sd, "su depth")
+        if m["r_elev"] != 20.0 or not has(cav, "su depth", "not level", "by up to 20"):
+            problems.append(f"a layer top from y = 10 to 20 gave r_elev={m['r_elev']} "
+                            f"and no caveat with the difference (2 x 10 = 20)")
+
+        # 6. Anisotropy modifier and an unknown field are named.
+        sd, cav = got[6]
+        if not has(cav, "su depth aniso", "anisotropy function 1"):
+            problems.append("the anisotropy modifier was not reported")
+        if not has(cav, "su depth aniso", "CMaximumTest"):
+            problems.append("an unknown field on an S=f(depth) material was not named")
+
+        # 7. A ratio material under B-bar: its strength is too high, said so.
+        sd, cav = got[7]
+        if not has(cav, "shansep const", "B-bar", "higher than SLOPE/W"):
+            problems.append("a ratio material under B-bar was not told its strength "
+                            "is too high")
+
+        # Export: ratio -> SHANSEP, cp -> SFnDepth, conforming tags, identical return.
+        for aid, name, model in ((1, "shansep const", "SHANSEP"),
+                                 (4, "su depth", "SFnDepth")):
+            sd = got[aid][0]
+            out = os.path.join(td, f"rt{aid}.gsz")
+            export_gsz(sd, out, analysis_name="rt")
+            zf = _zip.ZipFile(out)
+            root = _ET.fromstring(zf.read(zf.namelist()[0]))
+            emitted = set()
+
+            def _walk(e, p=""):
+                q = f"{p}/{e.tag}"
+                emitted.add(q)
+                for a in e.attrib:
+                    emitted.add(f"{q}@{a}")
+                for c in e:
+                    _walk(c, q)
+            _walk(root)
+            unknown = sorted(emitted - GSZ_SCHEMA_PATHS)
+            if unknown:
+                problems.append(f"export writes tag(s) GeoStudio does not use: "
+                                f"{', '.join(unknown[:3])}")
+            models = {e.findtext("Name"): e.findtext("SlopeModel")
+                      for e in root.findall("./Materials/Material")}
+            if models.get(name) != model:
+                problems.append(f"'{name}' exported as {models.get(name)}, expected "
+                                f"{model}")
+            back, _ = gsz_to_slope_data(read_gsz(out), 1)
+            for k in ("option", "c", "phi", "cp", "r_elev", "gamma"):
+                if not close(mat(back, name)[k], mat(sd, name)[k]) \
+                        if isinstance(mat(sd, name)[k], float) \
+                        else mat(back, name)[k] != mat(sd, name)[k]:
+                    problems.append(f"'{name}' {k} did not round-trip: "
+                                    f"{mat(sd, name)[k]!r} -> {mat(back, name)[k]!r}")
+
+        # A ratio minimum and a cp held above r_elev are reported, not dropped.
+        sd = got[1][0]
+        mat(sd, "shansep const")["c"] = 4.0
+        cav = export_gsz(sd, os.path.join(td, "min.gsz"), analysis_name="rt")
+        if not has(cav, "shansep const", "minimum strength c = 4"):
+            problems.append("a ratio material's minimum c was dropped on export "
+                            "without a caveat")
+        sd = got[4][0]
+        mat(sd, "su depth")["r_elev"] = 6.0       # c = 12 held from y = 10 down to 6
+        out = os.path.join(td, "band.gsz")
+        cav = export_gsz(sd, out, analysis_name="rt")
+        back, _ = gsz_to_slope_data(read_gsz(out), 1)
+        if not close(mat(back, "su depth")["c"], 12.0 - 2.0 * 4.0) or \
+                not has(cav, "su depth", "above r_elev = 6"):
+            problems.append(f"a cp material held above its r_elev exported with "
+                            f"c_top={mat(back, 'su depth')['c']}, expected 4 (exact "
+                            f"below y = 6), or without a caveat")
+
+    if problems:
+        return None, "GeoStudio strength models: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 # A minimal Slide2 model in the sectioned ASCII grammar Slide2 writes. Authored here
 # rather than shipped because Rocscience's own tutorial files are their copyrighted
 # material and are not in this repository (the same reason the .gsz fixture above is
@@ -14103,6 +15942,107 @@ def run_slide2_import_test(test):
 
     if problems:
         return None, "Slide2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
+def run_slide2_strength_test(test):
+    """Slide2's Undrained material (type 1) imports with its own strength, on .slim
+    files built here from the fixture above.
+
+    Type 1 lines carry no phi and carry a cohesion type ('ctype'): 0 = Constant, 1 =
+    F(Depth from Top of Layer) with 'dc' the rate per unit depth. Before, type 1 was
+    read as Mohr-Coulomb with a tension cutoff: c came across, dc was dropped without a
+    word, and the caveat named a cutoff the material does not have.
+
+      - ctype 1 on a level layer top (y = 6) -> cp from that top; slice by slice the
+        base strength is c + dc x (6 - y), Slide2's definition.
+      - ctype 1 on a top running from y = 6 to 18 -> cp from y = 18, with the largest
+        difference (dc x 12) stated.
+      - ctype 0 -> c with phi = 0, reported as undrained, no tension-cutoff caveat.
+      - a cohesion type XSLOPE does not read, and a key it does not know, are named.
+    """
+    import tempfile
+    import zipfile
+    from xslope.slide2 import read_slim, slide2_to_slope_data
+    from xslope.slice import generate_slices
+
+    base = ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
+            "withru: 0 phib: 15\n"
+            "  soil2 = type: 5 water: 1 wtable: 1 c: 25 phi: 32 uw: 20 hutype: 0 "
+            "withru: 0\n")
+    assert base in _SYNTH_SLI
+    variants = {
+        # soil1 is the slope (top from y = 6 to 18), soil2 the layer below (top y = 6)
+        "depth": ("  soil1 = type: 1 ctype: 1 c: 20 wtable: 0 dc: 2 uw: 19 withru: 0\n"
+                  "  soil2 = type: 1 ctype: 1 c: 15 wtable: 0 dc: 3 uw: 20 withru: 0 "
+                  "cmax_test: 40\n"),
+        "constant": ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
+                     "withru: 0\n"
+                     "  soil2 = type: 1 ctype: 0 c: 25 wtable: 0 uw: 20 withru: 0\n"),
+        "other": ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
+                  "withru: 0\n"
+                  "  soil2 = type: 1 ctype: 2 c: 25 wtable: 0 dc: 1 uw: 20 withru: 0\n"),
+    }
+    problems = []
+    got = {}
+    with tempfile.TemporaryDirectory() as td:
+        for key, lines in variants.items():
+            path = os.path.join(td, f"{key}.slim")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr(f"{key}.sli", _SYNTH_SLI.replace(base, lines))
+            got[key] = slide2_to_slope_data(read_slim(path))
+
+    def has(cav, *words):
+        return any(all(w in c for w in words) for c in cav)
+
+    sd, cav = got["depth"]
+    s1, s2 = sd["materials"]
+    if (s2["option"], s2["c"], s2["phi"], s2["cp"], s2["r_elev"]) != \
+            ("cp", 15.0, 0.0, 3.0, 6.0):
+        problems.append(f"undrained F(depth) on a level top came in as {s2['option']} "
+                        f"c={s2['c']} c/p={s2['cp']} r_elev={s2['r_elev']}, expected cp "
+                        f"15 / 3 from y = 6")
+    if has(cav, "soil2", "not level"):
+        problems.append("a level layer top was reported as not level")
+    if (s1["option"], s1["r_elev"]) != ("cp", 18.0) or \
+            not has(cav, "soil1", "not level", "by up to 24"):
+        problems.append(f"a layer top from y = 6 to 18 gave {s1['option']} r_elev="
+                        f"{s1['r_elev']} and no caveat with the difference (2 x 12 = 24)")
+    if not has(cav, "soil2", "cmax_test"):
+        problems.append("an unknown key on an undrained material was not named")
+    if has(cav, "tension"):
+        problems.append("an undrained material is still reported as a tension cutoff")
+    ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=30,
+                              check_inputs=False)
+    if not ok:
+        problems.append(f"the undrained F(depth) model did not slice: {res}")
+    else:
+        df = res[0]
+        lower = df[df["mat"] == 2]
+        if len(lower) < 3:
+            problems.append("the check circle barely enters the lower layer")
+        else:
+            diff = abs(lower["c"].to_numpy()
+                       - (15.0 + 3.0 * (6.0 - lower["y_u"].to_numpy()))).max()
+            if diff > 1e-9:
+                problems.append(f"slice strengths differ from Slide2's F(Depth from Top "
+                                f"of Layer) by up to {diff:.3g}")
+
+    sd, cav = got["constant"]
+    s2 = sd["materials"][1]
+    if (s2["option"], s2["c"], s2["phi"]) != ("mc", 25.0, 0.0) or \
+            not has(cav, "soil2", "undrained") or has(cav, "tension"):
+        problems.append(f"undrained constant came in as {s2['option']} c={s2['c']} "
+                        f"phi={s2['phi']}, or was reported as a tension cutoff")
+
+    sd, cav = got["other"]
+    s2 = sd["materials"][1]
+    if (s2["option"], s2["c"]) != ("mc", 25.0) or \
+            not has(cav, "soil2", "cohesion type 2"):
+        problems.append("an undrained cohesion type XSLOPE does not read was not named")
+
+    if problems:
+        return None, "Slide2 strength models: " + "; ".join(problems[:5])
     return 0.0, None
 
 
@@ -14978,6 +16918,80 @@ def run_rs2_import_test(test):
 
     if problems:
         return None, "RS2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
+def run_rs2_strength_test(test):
+    """RS2's datum-dependent cohesion imports as cp, on .fez files built here from the
+    fixture above.
+
+    RS2 writes it on the line after a Mohr-Coulomb strength line:
+    ``Ctype: 0 CChange: r Cdatum: y ... CchangeFlag: 1 CcutoffFlag: f Ccutoff: m``, so
+    c = C + r x (y - elevation) below the datum, capped at m. Before, only the strength
+    line was read: the cohesion came in constant, and nothing said so.
+
+      - datum at the zone's top -> cp, c = C, c/p = r, r_elev = the datum; no caveat.
+      - a zone above its datum, a cap the zone reaches, a phi > 0, and a datum type
+        XSLOPE does not read are each reported; a cap it never reaches is not.
+    """
+    import tempfile
+    import zipfile
+    from xslope.rs2 import read_fez, fez_to_slope_data
+
+    line = ("  C: 5 phi: 30 dil: 0 T: 5 Cr: 5 phir: 30 Tr: 5 Apply_SSR: 1 Phi_b: 12 "
+            "Air_Entry: 5 UseUnsaturated: 1\n")
+    assert line in _SYNTH_FEA
+
+    def fea(phi=0, ctype=0, datum=18, cut_on=0, cut=0):
+        return _SYNTH_FEA.replace(line, (
+            f"  C: 20 phi: {phi} dil: 0 T: 0 Cr: 20 phir: {phi} Tr: 0 Apply_SSR: 1 "
+            f"Phi_b: 0 Air_Entry: 0 UseUnsaturated: 0\n"
+            f"  Ctype: {ctype} CChange: 2 Cdatum: {datum} ResCchange: 2 CchangeFlag: 1 "
+            f"CcutoffFlag: {cut_on} Ccutoff: {cut} ResCcutFlag: 0 ResCcutoff: 0\n"))
+
+    # soilA spans y = 4.5 to 18: at its base, 20 + 2 x 13.5 = 47.
+    variants = {"top": fea(), "above": fea(datum=10), "cap": fea(cut_on=1, cut=30),
+                "cap_unreached": fea(cut_on=1, cut=47), "phi": fea(phi=25),
+                "radial": fea(ctype=1)}
+    problems, got = [], {}
+    with tempfile.TemporaryDirectory() as td:
+        for key, text in variants.items():
+            path = os.path.join(td, f"{key}.fez")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr(f"{key}.fea", text)
+            sd, cav = fez_to_slope_data(read_fez(path))
+            got[key] = (next(m for m in sd["materials"] if m["name"] == "soilA"), cav)
+
+    def has(cav, *words):
+        return any(all(w in c for w in words) for c in cav)
+
+    m, cav = got["top"]
+    if (m["option"], m["c"], m["phi"], m["cp"], m["r_elev"]) != \
+            ("cp", 20.0, 0.0, 2.0, 18.0):
+        problems.append(f"datum cohesion came in as {m['option']} c={m['c']} "
+                        f"c/p={m['cp']} r_elev={m['r_elev']}, expected cp 20 / 2 / 18")
+    if has(cav, "soilA", "above its datum") or has(cav, "soilA", "caps"):
+        problems.append("an exact datum cohesion carried a caveat")
+    m, cav = got["above"]
+    if m["r_elev"] != 10.0 or not has(cav, "soilA", "above its datum", "y = 18"):
+        problems.append("a zone above its datum was not reported")
+    m, cav = got["cap"]
+    if not has(cav, "soilA", "caps", "30", "y = 13", "47"):
+        problems.append("a cap the zone reaches was not reported (reached at y = 13, "
+                        "47 at the base)")
+    m, cav = got["cap_unreached"]
+    if m["option"] != "cp" or has(cav, "soilA", "caps"):
+        problems.append("a cap the zone never reaches was reported, or the material "
+                        "did not map")
+    m, cav = got["phi"]
+    if (m["option"], m["phi"]) != ("mc", 25.0) or not has(cav, "soilA", "no friction"):
+        problems.append("a datum cohesion with phi > 0 was not refused with a caveat")
+    m, cav = got["radial"]
+    if m["option"] != "mc" or not has(cav, "soilA", "datum type 1"):
+        problems.append("a datum type XSLOPE does not read was not named")
+
+    if problems:
+        return None, "RS2 strength models: " + "; ".join(problems[:5])
     return 0.0, None
 
 
@@ -16295,6 +18309,8 @@ def run_test(test):
         return _run_fem_ssrm(test)
     if test.get('type', '') == 'fem_tilt':
         return run_fem_tilt_test(test)
+    if test.get('type', '') == 'fem_kc':
+        return run_fem_kc_test(test)
     computed, error_msg = _dispatch_test(test)
     return computed, error_msg, None
 
@@ -16343,18 +18359,38 @@ def _dispatch_test(test):
         return run_dxf_water_test(test)
     if test_type == 'gsz':
         return run_gsz_import_test(test)
+    if test_type == 'gsz_trials':
+        return run_gsz_trial_surfaces_test(test)
+    if test_type == 'gsz_folders':
+        return run_gsz_folders_test(test)
+    if test_type == 'gsz_phreatic':
+        return run_gsz_phreatic_test(test)
+    if test_type == 'gsz_ru':
+        return run_gsz_ru_test(test)
+    if test_type == 'gsz_optimized':
+        return run_gsz_optimized_test(test)
+    if test_type == 'gsz_parent_surface':
+        return run_gsz_parent_surface_test(test)
+    if test_type == 'gsz_rapid_drawdown':
+        return run_gsz_rapid_drawdown_test(test)
     if test_type == 'gsz_water':
         return run_gsz_water_corpus_test(test)
+    if test_type == 'gsz_strength':
+        return run_gsz_strength_test(test)
     if test_type == 'slide2':
         return run_slide2_import_test(test)
     if test_type == 'slide2_water':
         return run_slide2_water_corpus_test(test)
+    if test_type == 'slide2_strength':
+        return run_slide2_strength_test(test)
     if test_type == 'rs2':
         return run_rs2_import_test(test)
     if test_type == 'rs2_water':
         return run_rs2_water_mode_test(test)
     if test_type == 'rs2_loads':
         return run_rs2_load_deck_test(test)
+    if test_type == 'rs2_strength':
+        return run_rs2_strength_test(test)
     if test_type == 'submerged_oracle':
         return run_submerged_oracle_test(test)
     if test_type == 'no_void':
@@ -16453,6 +18489,8 @@ def _dispatch_test(test):
         return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
         return run_table_paste_test(test)
+    if test_type in AUDIT_CHECK_MODULES:
+        return run_audit_module_test(test)
     if test_type == 'project_package':
         return run_project_package_test(test)
     if test_type == 'docs_links':
@@ -16544,6 +18582,9 @@ def _dispatch_test(test):
     if test_type == 'fem_tilt':
         # Unreachable in practice (run_test intercepts it for its annotation).
         return run_fem_tilt_test(test)[:2]
+    if test_type == 'fem_kc':
+        # Unreachable in practice, as fem_tilt above.
+        return run_fem_kc_test(test)[:2]
     if test_type == 'seep_elements':
         return run_seep_elements_test(test)
     if test_type == 'fem_elements':
@@ -16570,6 +18611,8 @@ def _dispatch_test(test):
         return run_design_callable_test(test)
     elif test_type == 'critical_kc':
         return run_critical_kc_test(test)
+    elif test_type == 'newmark':
+        return run_newmark_test(test)
     elif test_type == 'slip_depth':
         return run_slip_depth_test(test)
     elif test_type == 'support_force':
@@ -16593,10 +18636,18 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type == 'critical_kc':
         expected = test.get('expected_kc')
         tol = test.get('kc_tol', 0.01)
+    elif test_type == 'newmark':
+        # ABSOLUTE, in the displacement's own unit (cm, or in for imperial).
+        expected = test.get('expected_d')
+        tol = test.get('tolerance', 0.005)
     elif test_type == 'fem_tilt':
         # ABSOLUTE, in degrees: the tilt the two coefficients bracket.
         expected = test.get('expected_tilt')
         tol = test.get('tolerance', 0.1)
+    elif test_type == 'fem_kc':
+        # ABSOLUTE: the coefficient the two full-strength solves bracket.
+        expected = test.get('expected_kc')
+        tol = test.get('kc_tol', 0.005)
     elif test_type == 'slip_depth':
         # ABSOLUTE, in the model's length units: a depth of zero is a real
         # reading (a surface that grazes the station) and no relative band
@@ -16617,7 +18668,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr', 'kr_average', 'kr_gradient',
+                       'roundtrip', 'v19_roundtrip', 'xlsx_order', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'water_table_profile', 'mesh_interpolation', 'nr_ssrm', 'beam_element', 'elastic_base', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'docs_prose', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'tutorial_restatements', 'corpus_index', 'tag_k0', 'lock_edges', 'dxf', 'dxf_water', 'gsz', 'gsz_trials', 'gsz_folders', 'gsz_phreatic', 'gsz_ru', 'gsz_optimized', 'gsz_parent_surface', 'gsz_rapid_drawdown', 'gsz_water', 'gsz_strength', 'slide2', 'slide2_water', 'slide2_strength', 'rs2', 'rs2_water', 'rs2_loads', 'rs2_strength', 'vg_kr', 'kr_average', 'kr_gradient',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -16630,7 +18681,7 @@ def _expected_and_tol(test, default_tolerance):
                        'noncircular_generator', 'circles_editor', 'studio_results_teardown',
                        'report_problem', 'log_font', 'drop_open',
                        'release_notes',
-                       'seep_bc_series', 'table_paste',
+                       'seep_bc_series', 'table_paste', *AUDIT_CHECK_MODULES,
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'report_template_field', 'report_no_resolve',
@@ -16658,7 +18709,7 @@ def _expected_and_tol(test, default_tolerance):
 
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
-_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_tilt': 4, 'fem_elements': 5,
+_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_tilt': 4, 'fem_kc': 4, 'fem_elements': 5,
               'preflight_corpus': 5, 'preflight_rules': 4, 'corpus_circles': 5,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
               'support_force': 4, 'slip_depth': 2,
@@ -16669,6 +18720,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'force_closure_root': 3,
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'rapid_drained_surface': 3, 'noncircular_kink': 3,
+              'fem_yield_coefficient': 1, 'vertical_seismic': 2, 'seismic2_factor': 2, 'strength_ratio': 2,
               'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
@@ -16842,6 +18894,9 @@ def main():
         # Side-roller assignment on an off-vertical truncation face.
         tests.append({'type': 'side_roller', 'file': 'off-vertical side face (fem)',
                       'method': '-', 'source': 'side_roller'})
+        # The input-graying audit's engine fixes, each against a hand number
+        # (test/audit_engine_check.py, enqueued once the module exists).
+        tests.extend(_audit_module_tests('fem'))
         # The two-trial lock check's tag guard. It belongs to the SSRM locks, so
         # --fem wants it; it is registered with the other tag guards under
         # --roundtrip, and added here only when that scope is not already running.
@@ -16873,7 +18928,7 @@ def main():
     for verification_md in sorted(Path(_repo('docs/verification')).glob('*.md')):
         for t in parse_test_tags(verification_md):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'mesh_elements':
@@ -16977,7 +19032,7 @@ def main():
     if seep_slope.exists():
         for t in parse_test_tags(seep_slope):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_tilt'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'seep':
@@ -16999,7 +19054,7 @@ def main():
                         + sorted(Path(_repo('docs/videos')).glob('*.md'))):
         for t in parse_test_tags(tutorial_md):
             ttype = t.get('type', '')
-            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_elements', 'fem_reliability'):
+            if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
             elif ttype == 'mesh_elements':
@@ -17043,7 +19098,7 @@ def main():
                 if not t.get('file'):
                     continue    # a prose example of the tag syntax, not a fixture
                 ttype = t.get('type', '')
-                if ttype in ('fem_ssrm', 'fem_tilt'):
+                if ttype in ('fem_ssrm', 'fem_tilt', 'fem_kc'):
                     if run_fem:
                         tests.append(t); n_priv += 1
                 elif ttype == 'seep':
@@ -17088,6 +19143,20 @@ def main():
         tests.append({'type': 'noncircular_kink',
                       'file': 'docs/verification/files/rocscience/vp017.xlsx',
                       'method': 'spencer', 'source': 'noncircular_kink'})
+        # The finite element yield coefficient's bisection on a stand-in solver
+        # (under a second).
+        tests.append({'type': 'fem_yield_coefficient', 'file': '(FEM yield coefficient)',
+                      'method': 'fem', 'source': 'fem_yield_coefficient'})
+        # The vertical seismic coefficient in every LEM method and the FEM loads
+        # (a few seconds).
+        tests.append({'type': 'vertical_seismic', 'file': '(vertical seismic coefficient)',
+                      'method': 'all', 'source': 'vertical_seismic'})
+        # The two-stage seismic analysis's stage 2 strength factor (a few seconds).
+        tests.append({'type': 'seismic2_factor', 'file': '(two-stage seismic factor)',
+                      'method': 'all', 'source': 'seismic2_factor'})
+        # The strength ratio material against closed forms, both engines (seconds).
+        tests.append({'type': 'strength_ratio', 'file': '(strength ratio material)',
+                      'method': 'all', 'source': 'strength_ratio'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
         # ponded water into. File-less (builds on xslope_acads_simple).
@@ -17192,6 +19261,11 @@ def main():
         tests.append({'type': 'circle_arc',
                       'file': 'a phi = 0 circle meeting the crest vertically',
                       'method': 'OMS, Bishop, Spencer', 'source': 'circle_arc'})
+        # A record file is read the same way whichever layout it is in, and
+        # the Newmark integration treats both directions alike.
+        tests.append({'type': 'newmark_record',
+                      'file': 'the VP104 record in every layout',
+                      'method': 'Newmark', 'source': 'newmark_record'})
         # Bishop scored against an implementation written from the published
         # equations and nothing else.
         tests.append({'type': 'indep_bishop',
@@ -17251,6 +19325,9 @@ def main():
         # same session and the same check module.
         tests.append({'type': 'steady_seep_save', 'file': '(steady field + save path)',
                       'method': '-', 'source': 'preflight'})
+        # The input-graying audit's loader, preflight and search fixes, and rapid
+        # drawdown reliability's d and psi (test/audit_checks_check.py).
+        tests.extend(_audit_module_tests('preflight'))
         _preflight_sources = ([
             _repo('docs/lem/samples.md'), _repo('docs/lem/design.md'),
             _repo('docs/parametric/sensitivity.md'), _repo('docs/parametric/reliability.md'),
@@ -17600,6 +19677,9 @@ def main():
         # tell the reader to paste rather than retype; this is what keeps that true.
         tests.append({'type': 'table_paste', 'file': 'Studio table copy/paste',
                       'method': '-', 'source': 'table_paste'})
+        # The Studio half of the input-graying audit: what each editor grays, shows
+        # and saves, held to what the engines read (test/audit_studio_check.py).
+        tests.extend(_audit_module_tests('roundtrip'))
         # Guard the Table sub-tab every Parametric result view carries: one row per
         # thing the run produced, the face and stage columns that keep a march's
         # grid saying what its figure says, and a Save CSV… file that is the grid
@@ -17832,13 +19912,35 @@ def main():
     if run_gsz:
         tests.append({'type': 'gsz', 'file': '(synthetic .gsz)',
                       'method': '-', 'source': 'gsz'})
+        # Which saved trial surfaces import as SLOPE/W's circle: old- and new-style
+        # results, circle searches against block and specified ones. Own fixture too.
+        tests.append({'type': 'gsz_trials', 'file': '(synthetic .gsz trial surfaces)',
+                      'method': '-', 'source': 'gsz'})
+        # What the import takes from a solved file, each on its own built fixture:
+        # escaped result folders, the phreatic switch, Ru, an optimized search's last
+        # row, a surface taken from a parent, a staged rapid drawdown's caveat, and
+        # SLOPE/W's undrained strength models (SHANSEP, S=f(depth)) in and out.
+        for _t, _f in (('gsz_folders', 'escaped result folders'),
+                       ('gsz_phreatic', 'phreatic correction'),
+                       ('gsz_ru', 'Ru and B-bar'),
+                       ('gsz_optimized', 'optimized search'),
+                       ('gsz_parent_surface', 'surface from a parent'),
+                       ('gsz_rapid_drawdown', 'staged rapid drawdown'),
+                       ('gsz_strength', 'SHANSEP and S=f(depth)')):
+            tests.append({'type': _t, 'file': f'(synthetic .gsz {_f})',
+                          'method': '-', 'source': 'gsz'})
         # The water-load handover is pinned on Seequent's own models as well as on the
         # fixture: it reads a local, git-ignored copy of the .gsz corpus and skips
         # when absent (the files are Seequent's copyrighted material).
         tests.append({'type': 'gsz_water', 'file': '(GeoStudio corpus)',
                       'method': 'water loads', 'source': 'gsz'})
+        # SLOPE/W's staged rapid drawdown through the importer, and six import/export
+        # gaps (test/gsz_rapid_check.py, test/gsz_gaps_check.py, each enqueued once
+        # the module exists).
+        _gsz_extra = _audit_module_tests('gsz')
+        tests.extend(_gsz_extra)
         if not run_all:
-            print("Including 2 GeoStudio import tests")
+            print(f"Including {10 + len(_gsz_extra)} GeoStudio import tests")
 
     # The Slide2 import test authors its own .slim fixture (Rocscience's own tutorial
     # files are their copyrighted material and are not in this repository), so it needs
@@ -17850,8 +19952,11 @@ def main():
         # Rocscience's own tutorial models from a local copy, skipped when absent.
         tests.append({'type': 'slide2_water', 'file': '(Slide2 tutorial models)',
                       'method': 'water loads', 'source': 'slide2'})
+        # The Undrained material's cohesion types, on fixtures built from the one above.
+        tests.append({'type': 'slide2_strength', 'file': '(synthetic .slim undrained)',
+                      'method': '-', 'source': 'slide2'})
         if not run_all:
-            print("Including 2 Slide2 import tests")
+            print("Including 3 Slide2 import tests")
 
     # The RS2 import test authors its own .fez fixture (Rocscience's own verification
     # files are their copyrighted material and are not in this repository), so it needs
@@ -17868,8 +19973,11 @@ def main():
         # transcription: both are scored against the vendor's own solved files.
         tests.append({'type': 'rs2_loads', 'file': '(RS2 verification models)',
                       'method': 'load deck', 'source': 'rs2'})
+        # Datum-dependent cohesion -> cp, on fixtures built from the synthetic .fez.
+        tests.append({'type': 'rs2_strength', 'file': '(synthetic .fez datum cohesion)',
+                      'method': '-', 'source': 'rs2'})
         if not run_all:
-            print("Including 3 RS2 import tests")
+            print("Including 4 RS2 import tests")
 
     # Interface (joint) elements. The mesh split's fixture rides the round trip;
     # --joints wants it too, and adds it only when that scope is not already
@@ -18008,7 +20116,7 @@ def main():
         tests = kept
     if gate_run:
         for t in tests:
-            if t.get('type') == 'fem_ssrm':
+            if t.get('type') in ('fem_ssrm', 'fem_kc'):
                 t['_force_bracket'] = True
 
     if not tests:
@@ -18080,6 +20188,7 @@ def main():
     passed = 0
     failed = 0
     errors = 0
+    skipped = 0
     total_time = 0
     wall_t0 = time.time()
     # Two-tier fem_ssrm kernel-routing tallies (see _run_fem_ssrm). Reported at the
@@ -18094,6 +20203,12 @@ def main():
     route_edges_bracket = 0   # edges row whose edge flipped, re-solved by the bracket
     # What each row cost, keyed for the timing record the tier rule reads.
     row_times = {}
+    # Every row prints under a file name. A row without one would stop the report
+    # at that row's finish while the workers go on solving, losing every result
+    # after it, so the check runs before any row is solved.
+    _nameless = sorted({t.get('type', '?') for t in tests if 'file' not in t})
+    if _nameless:
+        raise SystemExit(f"rows with no 'file' (the name the report prints): {_nameless}")
 
     def _fmt(v):
         """Expected/computed in a 10-wide column, readable at ANY magnitude.
@@ -18110,7 +20225,7 @@ def main():
         return f"{v:10.3e}" if (av and (av < 1e-3 or av >= 1e6)) else f"{v:10.3f}"
 
     def report(i, test, computed, error_msg, annotation, elapsed):
-        nonlocal passed, failed, errors
+        nonlocal passed, failed, errors, skipped
         nonlocal route_fast, route_fallback, route_direct, route_fail
         nonlocal route_edges, route_edges_bracket
         # Every row's wall-clock, under the mode it ran in. This is the record the
@@ -18123,7 +20238,11 @@ def main():
         test_type = test.get('type', '?')
         method = test.get('method', '-')
         expected, tol = _expected_and_tol(test, args.tolerance)
-        if error_msg:
+        if error_msg and error_msg.startswith(SKIP_PREFIX):
+            status = error_msg
+            skipped += 1
+            comp_str = "    --    "
+        elif error_msg:
             status = f"ERROR: {error_msg}"
             errors += 1
             comp_str = "    --    "
@@ -18209,7 +20328,9 @@ def main():
             report(i, test, computed, error_msg, annotation, elapsed)
 
     print("-" * 120)
-    print(f"\nResults: {passed} passed, {failed} failed, {errors} errors out of {len(tests)} tests")
+    print(f"\nResults: {passed} passed, {failed} failed, {errors} errors"
+          + (f", {skipped} skipped" if skipped else "")
+          + f" out of {len(tests)} tests")
     # FEM SSRM kernel routing: which kernel decided each fem_ssrm row. A run-over-run
     # rise in the fallback count is the visible signal of fast-kernel drift (see
     # _run_fem_ssrm); its companion guard is the kernel_xcheck gate.

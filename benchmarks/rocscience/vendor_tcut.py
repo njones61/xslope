@@ -206,7 +206,7 @@ VENDOR_T_CUT = {
         'Upper embankment (elastic face)': None,
         'Lower embankment (elastic face)': None,
     },
-    # RS2-25 — the Syncrude tailings dyke, vendor model 'slope stability #025.fez',
+    # RS2-25 — the Syncrude tailings dike, vendor model 'slope stability #025.fez',
     #   which states T: 0 on all five materials.
     #   The file-number join missed this one for the same reason VENDOR_E_NU records
     #   above: vp033 is named for its Slide2 problem number (VP33) while its vendor
@@ -628,6 +628,32 @@ VENDOR_T_CUT = {
     'rs2_67f.xlsx': {
         'rock1': 0.0,
     },
+    # RS2-68 (Cases 1-3: '#068_01', '#068_02', '#068_03'; T = c on every material).
+    #   The _fine twins are the same models with a refined band; same caps.
+    'rs2_68a.xlsx': {
+        'rock1': 25.0,
+    },
+    'rs2_68b.xlsx': {
+        'rock1': 25.0,
+    },
+    #   rock3's vendor T = 15 equals its Mohr-Coulomb apex (c / tan 45 = 15), so the cap
+    #   can never bind; it is left blank so the loader does not warn on an inert cap.
+    'rs2_68c.xlsx': {
+        'rock1': 4.0,
+        'rock2': 25.0,
+        'rock3': None,
+    },
+    'rs2_68a_fine.xlsx': {
+        'rock1': 25.0,
+    },
+    'rs2_68b_fine.xlsx': {
+        'rock1': 25.0,
+    },
+    'rs2_68c_fine.xlsx': {
+        'rock1': 4.0,
+        'rock2': 25.0,
+        'rock3': None,
+    },
     # RS2-9
     #   Cubzac-les-Ponts. rock4 is the elastic face skin ("Plasticity Specifications:
     #   None") and carries no cap; tensilestrength_SRF = 0, so the caps below are
@@ -1000,9 +1026,9 @@ VENDOR_E_NU = {
         'Upper embankment (elastic face)': (0.4, 50000.0),
         'Lower embankment (elastic face)': (0.4, 50000.0),
     },
-    # RS2-25 — the Syncrude tailings dyke. Its vendor model is the RS2-NATIVE
+    # RS2-25 — the Syncrude tailings dike. Its vendor model is the RS2-NATIVE
     # 'slope stability #025.fez' (five zones, gamma 20/17/17/17/17, phi
-    # 34/34/34/7.5/7.5 — the dyke, matching this file zone for zone), NOT
+    # 34/34/34/7.5/7.5 — the dike, matching this file zone for zone), NOT
     # '#033.fez', which is a single-material imperial slope (c = 300 psf,
     # phi = 30, gamma = 120 pcf) and a different problem altogether. The corpus
     # file is named for its Slide2 problem number (VP33) while the vendor model
@@ -1438,6 +1464,29 @@ VENDOR_E_NU = {
     # RS2-67f
     'rs2_67f.xlsx': {
         'rock1': (0.3, 100000.0),
+    },
+    # RS2-68 ('#068_01', '#068_02', '#068_03', and the _fine twins)
+    'rs2_68a.xlsx': {
+        'rock1': (0.4, 50000.0),
+    },
+    'rs2_68b.xlsx': {
+        'rock1': (0.4, 50000.0),
+    },
+    'rs2_68c.xlsx': {
+        'rock1': (0.4, 50000.0),
+        'rock2': (0.4, 50000.0),
+        'rock3': (0.4, 50000.0),
+    },
+    'rs2_68a_fine.xlsx': {
+        'rock1': (0.4, 50000.0),
+    },
+    'rs2_68b_fine.xlsx': {
+        'rock1': (0.4, 50000.0),
+    },
+    'rs2_68c_fine.xlsx': {
+        'rock1': (0.4, 50000.0),
+        'rock2': (0.4, 50000.0),
+        'rock3': (0.4, 50000.0),
     },
     # RS2-9
     'rs2_9.xlsx': {

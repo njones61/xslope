@@ -202,8 +202,8 @@ import, and if the picked analysis reads its pore pressures from a solved
 SEEP/W analysis in the same file, that solved field comes along as the model's
 seepage solution (the SEEP/W model itself does not convert). What stays behind:
 SLOPE/W's search definition — a file saved without a solved surface arrives
-with no failure surface — reinforcement sets, an inclined tension crack, and
-the vertical seismic coefficient. Anything XSLOPE does not support comes in as
+with no failure surface — reinforcement sets and an inclined tension crack.
+Anything XSLOPE does not support comes in as
 the nearest fit and is named in the notes, which also say when that would
 change the answer.
 

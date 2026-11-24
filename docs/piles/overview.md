@@ -35,8 +35,8 @@ preview of the section ([Editing Inputs](../studio/editing.md#the-inputs-tree-an
 ![The pile editor in list view](../studio/images/editing_piles_editor.png)
 
 A pile runs from (`x1`, `y1`) to (`x2`, `y2`). The ends can be entered in either order: XSLOPE takes the higher end
-as the head and the lower end as the tip. For a vertical pile, `x1` = `x2`. The template has rows formatted for 20
-piles, and more can be added below them.
+as the head and the lower end as the tip. For a vertical pile, `x1` = `x2`. The template has rows formatted for 10
+piles (rows 3-12), and more can be added below them.
 
 The user picks a unit system, SI or Imperial, on the `main` sheet
 ([Worksheet: main](../usage/input_template.md#worksheet-main)), and enters every value in it: kN and m, or lb and ft.

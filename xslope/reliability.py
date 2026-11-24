@@ -305,14 +305,21 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         if circular:
             ok_, res_ = generate_slices(sd_, circle=sd_['circles'][0],
                                         num_slices=40, composite=composite,
-                                        check_inputs=False)
+                                        check_inputs=False, rapid=rapid)
         else:
             ok_, res_ = generate_slices(sd_, non_circ=sd_['non_circ'], num_slices=40,
-                                        check_inputs=False)
+                                        check_inputs=False, rapid=rapid)
         if not ok_:
             return None
         df_, surf_ = res_
-        ok2, r_ = getattr(_solve, method)(df_)
+        # A rapid drawdown run solves the drawdown on the fixed surface too, the
+        # same three stages the search runs on each trial surface. (This path once
+        # solved the single-stage model, and preflight refused the combination.)
+        if rapid:
+            from .advanced import rapid_drawdown
+            ok2, r_ = rapid_drawdown(df_, method, debug_level=0)
+        else:
+            ok2, r_ = getattr(_solve, method)(df_)
         if not ok2:
             return None
         return [{"FS": r_['FS'], "slices": df_, "failure_surface": surf_,
@@ -358,13 +365,15 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
     # Step 2: Identify parameters with standard deviations
     materials = slope_data['materials']
     
-    # Find parameters that have standard deviations
+    # Find parameters that have standard deviations: the ones each material's
+    # strength model reads in THIS analysis -- d and psi join an mc material's set
+    # in a rapid drawdown run (_strength_param_mapping).
     param_info = []
     
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
 
-        param_mappings = _strength_param_mapping(material, mat_name)
+        param_mappings = _strength_param_mapping(material, mat_name, rapid=rapid)
 
         for param, std_key in param_mappings.items():
             if std_key in material and material[std_key] > 0:
@@ -536,13 +545,19 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
     return True, result
 
 
-def _strength_param_mapping(material, mat_name):
+def _strength_param_mapping(material, mat_name, rapid=False):
     """Map the strength parameters a material's model actually uses to their sigma keys.
 
     Perturbing a field the model does not use (e.g. phi on a cp material) would do
     nothing and silently drop that material's strength uncertainty from COV_F. gamma
     applies to every model. A blank option carries no strength parameters -- legal on
     seep-only material rows; generate_slices raises if one reaches a failure surface.
+
+    ``rapid``: a rapid drawdown analysis also reads an mc material's Kc = 1
+    envelope, d and psi -- stage 2 takes its undrained strength from them -- so
+    their s(d) and s(psi) are perturbed the same way as c and phi. Outside a rapid
+    drawdown nothing reads d or psi, and on any other option the slicer zeroes
+    them, so they stay out of the set there.
 
     An ``elastic`` material is the same kind of legal-but-empty row. It cannot fail and
     a slip surface cannot enter it, so it has NOTHING to perturb -- and a deterministic
@@ -560,7 +575,9 @@ def _strength_param_mapping(material, mat_name):
     mapping = {'gamma': 'sigma_gamma'}
     if option == 'mc':
         mapping.update({'c': 'sigma_c', 'phi': 'sigma_phi'})
-    elif option == 'cp':
+        if rapid:
+            mapping.update({'d': 'sigma_d', 'psi': 'sigma_psi'})
+    elif option in ('cp', 'ratio'):
         mapping.update({'c': 'sigma_c', 'cp': 'sigma_cp'})
     elif option == 'elastic':
         stated = sorted(k for k in ('sigma_gamma', 'sigma_c', 'sigma_phi', 'sigma_cp')
@@ -573,23 +590,38 @@ def _strength_param_mapping(material, mat_name):
     return mapping
 
 
-def _reliability_param_info(materials):
+def _has_sigmas(materials, rapid=False):
+    """True when any material carries a standard deviation this analysis reads:
+    s(g), s(c), s(f) or s(c/p) anywhere, and in a rapid drawdown s(d) or s(psi)
+    on an mc material too."""
+    def _pos(v):
+        try:
+            return float(v or 0) != 0
+        except (TypeError, ValueError):
+            return False
+    keys = ('sigma_gamma', 'sigma_c', 'sigma_phi', 'sigma_cp')
+    for m in materials:
+        if any(_pos(m.get(k)) for k in keys):
+            return True
+        if (rapid and m.get('option') == 'mc'
+                and (_pos(m.get('sigma_d')) or _pos(m.get('sigma_psi')))):
+            return True
+    return False
+
+
+def _reliability_param_info(materials, rapid=False):
     """Build the list of uncertain strength parameters to perturb for TSPM, shared
     by the LEM and FEM reliability paths. Perturbs only the parameters a material's
-    strength model uses — see :func:`_strength_param_mapping`. Returns (param_info,
-    error) — error is a message string if no sigmas are set or a mean-minus-sigma
-    would go negative (non-physical), else None."""
-    has_std = any(
-        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
-        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
-        for m in materials)
-    if not has_std:
+    strength model uses in this analysis — see :func:`_strength_param_mapping`.
+    Returns (param_info, error) — error is a message string if no sigmas are set or
+    a mean-minus-sigma would go negative (non-physical), else None."""
+    if not _has_sigmas(materials, rapid=rapid):
         return None, no_sigmas_message()
 
     param_info = []
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
-        param_mappings = _strength_param_mapping(material, mat_name)
+        param_mappings = _strength_param_mapping(material, mat_name, rapid=rapid)
         for param, std_key in param_mappings.items():
             if std_key in material and material[std_key] > 0:
                 param_info.append({
@@ -825,23 +857,24 @@ MC_DEFAULT_SAMPLES = 10000
 _MC_FLOOR = {'gamma': 1e-6, 'c': 0.0, 'phi': 0.0, 'cp': 0.0}
 
 
-def _mc_param_info(materials):
+def _mc_param_info(materials, rapid=False):
     """Uncertain strength/weight parameters for Monte Carlo, as a list of dicts
     (material_id, param, mlv, std). Same parameter set as the Taylor-series path
     (:func:`_reliability_param_info`) but WITHOUT its mean-minus-sigma>=0 rejection:
     Monte Carlo handles COV>100% by truncating samples at the physical floor, so a
     high-COV parameter that TSPM must decline is admissible here. Returns
-    (param_info, error); error is a message when no sigmas are set."""
-    has_std = any(
-        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
-        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
-        for m in materials)
-    if not has_std:
+    (param_info, error); error is a message when no sigmas are set.
+
+    ``rapid`` adds an mc material's d and psi, as for the Taylor series: a
+    rapid drawdown campaign samples them along with everything else, and every
+    realization is solved as a drawdown (:func:`_fixed_surface_context`)."""
+    if not _has_sigmas(materials, rapid=rapid):
         return None, no_sigmas_message()
     param_info = []
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
-        for param, std_key in _strength_param_mapping(material, mat_name).items():
+        for param, std_key in _strength_param_mapping(material, mat_name,
+                                                      rapid=rapid).items():
             if std_key in material and material[std_key] > 0:
                 param_info.append({'material_id': i + 1, 'material_name': mat_name,
                                    'param': param, 'mlv': material[param],
@@ -934,7 +967,7 @@ def _truncate_samples(col, param):
     against the coordinate that was actually solved.
     """
     col = np.maximum(col, _MC_FLOOR.get(param, 0.0))
-    if param == 'phi':
+    if param in ('phi', 'psi'):
         col = np.minimum(col, 89.0)
     return col
 
@@ -1036,37 +1069,69 @@ def _fixed_surface_context(slope_data, method, label, rapid=False, circular=True
     # fall back to a full rebuild whenever the model declines the shortcut
     # (stress-dependent envelopes, ru pore pressure, suction), and the template
     # is verified against a rebuilt table at the most-likely values before it
-    # is trusted at all.
+    # is trusted at all. A rapid drawdown takes it too: the stage-2 columns (u2,
+    # the stage-2 load) come from the water, not the materials, and the rewrite
+    # carries the d and psi the drawdown reads.
     _template = None
-    if not rapid:
-        try:
-            if circular:
-                okt, rest = generate_slices(slope_data, circle=fixed_circle,
-                                            num_slices=num_slices,
-                                            composite=composite,
-                                            check_inputs=False,
-                                            material_breakdown=True)
-            else:
-                okt, rest = generate_slices(slope_data, non_circ=fixed_noncirc,
-                                            num_slices=num_slices,
-                                            check_inputs=False,
-                                            material_breakdown=True)
-            if okt:
-                cand = rest[0]
-                probe = cand.copy()
-                update_slice_materials(probe, slope_data['materials'])
-                same = all(
-                    np.allclose(probe[col].astype(float),
-                                cand[col].astype(float),
-                                rtol=0, atol=1e-9, equal_nan=True)
-                    for col in ('w', 'kw', 'y_cg', 'c', 'phi', 'c1', 'phi1',
-                                'd', 'psi'))
-                if same:
-                    _template = cand
-        except (ValueError, KeyError):
-            _template = None
+    try:
+        if circular:
+            okt, rest = generate_slices(slope_data, circle=fixed_circle,
+                                        num_slices=num_slices,
+                                        composite=composite,
+                                        check_inputs=False,
+                                        material_breakdown=True, rapid=rapid)
+        else:
+            okt, rest = generate_slices(slope_data, non_circ=fixed_noncirc,
+                                        num_slices=num_slices,
+                                        check_inputs=False,
+                                        material_breakdown=True, rapid=rapid)
+        if okt:
+            cand = rest[0]
+            probe = cand.copy()
+            update_slice_materials(probe, slope_data['materials'])
+            same = all(
+                np.allclose(probe[col].astype(float),
+                            cand[col].astype(float),
+                            rtol=0, atol=1e-9, equal_nan=True)
+                for col in ('w', 'kw', 'y_cg', 'c', 'phi', 'c1', 'phi1',
+                            'd', 'psi'))
+            if same:
+                _template = cand
+    except (ValueError, KeyError):
+        _template = None
 
     _seed_kw = {}
+    # Realizations a rapid drawdown found unstable before the drawdown (see _solve).
+    stage1_failed = [0]
+
+    def _finite(r):
+        fs = r.get('FS') if isinstance(r, dict) else None
+        if fs is None or not np.isfinite(fs):
+            return None
+        return float(fs)
+
+    def _solve(df):
+        """The factor of safety of one realization's slice table, or None.
+
+        A rapid drawdown solves all three stages (advanced.rapid_drawdown), whose
+        procedure presumes a slope stable at full pool and refuses one that is not.
+        A realization that unstable has failed before the water is lowered, so it
+        is counted as a failure at its stage 1 factor of safety (below 1) rather
+        than dropped -- dropping it would leave it out of the probability of
+        failure. The count is reported (``stage1_failed``)."""
+        if not rapid:
+            ok2, r = solver(df, **_seed_kw)
+            return _finite(r) if ok2 else None
+        from .advanced import rapid_drawdown
+        ok2, r = rapid_drawdown(df, method, debug_level=0)
+        if ok2:
+            return _finite(r)
+        ok1, r1 = solver(df)           # stage 1: the method on the full-pool table
+        f1 = _finite(r1) if ok1 else None
+        if f1 is not None and f1 < 1.0:
+            stage1_failed[0] += 1
+            return f1
+        return None
 
     def _eval(sd):
         # check_inputs=False: every realization is a sampled model, so the same
@@ -1077,35 +1142,29 @@ def _fixed_surface_context(slope_data, method, label, rapid=False, circular=True
                 update_slice_materials(df, sd['materials'])
             except ValueError:
                 return _eval_rebuild(sd)
-            ok2, r = solver(df, **_seed_kw)
-            if not ok2:
-                return None
-            fs = r.get('FS')
-            if fs is None or not np.isfinite(fs):
-                return None
-            return float(fs)
+            return _solve(df)
         return _eval_rebuild(sd)
 
     def _eval_rebuild(sd):
         if circular:
             ok, res = generate_slices(sd, circle=fixed_circle, num_slices=num_slices,
-                                      composite=composite, check_inputs=False)
+                                      composite=composite, check_inputs=False,
+                                      rapid=rapid)
         else:
             ok, res = generate_slices(sd, non_circ=fixed_noncirc,
-                                      num_slices=num_slices, check_inputs=False)
+                                      num_slices=num_slices, check_inputs=False,
+                                      rapid=rapid)
         if not ok:
             return None
-        ok2, r = solver(res[0], **_seed_kw)
-        if not ok2:
-            return None
-        fs = r.get('FS')
-        if fs is None or not np.isfinite(fs):
-            return None
-        return float(fs)
+        return _solve(res[0])
 
     F_MLV = _eval(slope_data)
     if F_MLV is None:
         return False, f"{label}: evaluation at the most-likely values failed."
+    if rapid and stage1_failed[0]:
+        return False, (f"{label}: at the most-likely values the slope is unstable "
+                       f"before the drawdown (stage 1 factor of safety "
+                       f"{F_MLV:.4f} < 1), so there is no drawdown to analyze.")
 
     # Seed every realization's iterative solve from the most-likely-values
     # solution: each sampled model's root sits within a few percent of it, so
@@ -1113,7 +1172,9 @@ def _fixed_surface_context(slope_data, method, label, rapid=False, circular=True
     # Methods whose signatures take no seed run exactly as before.
     import inspect as _inspect
     _mlv_theta = None
-    _solver_params = set(_inspect.signature(solver).parameters)
+    # A rapid drawdown takes no seed: its three stages solve tables that differ.
+    _solver_params = (set() if rapid
+                      else set(_inspect.signature(solver).parameters))
     if 'theta_seed' in _solver_params and _template is not None:
         # One extra solve at the most-likely values fetches Spencer's theta for
         # the seed; the F_MLV above stays the seedless, historical evaluation.
@@ -1131,7 +1192,8 @@ def _fixed_surface_context(slope_data, method, label, rapid=False, circular=True
         _seed_kw['theta_seed'] = _mlv_theta
 
     return True, {'evaluate': _eval, 'F_MLV': F_MLV, 'circle': fixed_circle,
-                  'non_circ': fixed_noncirc, 'template': _template}
+                  'non_circ': fixed_noncirc, 'template': _template,
+                  'stage1_failed': stage1_failed}
 
 
 #: The limit-equilibrium solvers a sampling engine will run. Both Monte Carlo and
@@ -1155,6 +1217,13 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     from the standard deviations in the mat sheet (s(g), s(c), s(f),
     s(c/p)), evaluates the factor of safety of each realization on a FIXED failure
     surface, and reports the sample statistics.
+
+    **Rapid drawdown** (``rapid=True``): every realization is solved as a
+    three-stage drawdown, and an mc material's d and psi are sampled from s(d) and
+    s(psi) along with everything else, as in the Taylor series. A realization
+    whose slope is unstable before the drawdown (stage 1 F < 1, which the
+    procedure refuses) has failed at full pool: it is counted as a failure at its
+    stage 1 factor of safety, and the count is reported (``n_stage1_failed``).
 
     **Limit-equilibrium only.** This is deliberately an LEM path: a Monte Carlo
     campaign needs 10^4 factor-of-safety evaluations, which is affordable with a
@@ -1265,7 +1334,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     if gate:
         return False, gate
 
-    param_info, err = _mc_param_info(materials)
+    param_info, err = _mc_param_info(materials, rapid=rapid)
     if err:
         return False, err
 
@@ -1284,6 +1353,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         return False, ctx
     _eval = ctx['evaluate']
     F_MLV = ctx['F_MLV']
+    stage1_failed = ctx['stage1_failed']
 
     if debug_level >= 1:
         print("=== MONTE CARLO RELIABILITY ANALYSIS ===")
@@ -1381,6 +1451,9 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             else:
                 print(f"Convergence target ±{converge_rel*100:.0f}% of P_f not "
                       f"met within the {n_samples}-sample cap.")
+        if rapid and stage1_failed[0]:
+            print(f"{stage1_failed[0]} real solve(s) unstable before the drawdown "
+                  f"(stage 1 F < 1), counted as failures at their stage 1 F.")
         print(f"Mean FS: {mean_FS:.4f}   σ_F: {sigma_F:.4f}   COV_F: {COV_F:.4f}")
         print(f"β (normal): {beta_normal:.4f}   β (lognormal): {beta_ln:.4f}")
         print(f"PF empirical: {pf_empirical*100:.3f}%   "
@@ -1406,6 +1479,9 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         'n_samples': n_samples,
         'n_valid': n_valid,
         'n_invalid': n_invalid,
+        # A rapid drawdown's realizations unstable before the drawdown, counted as
+        # failures at their stage 1 factor of safety (_fixed_surface_context).
+        'n_stage1_failed': int(stage1_failed[0]),
         'rng_seed': rng_seed,
         'distribution': distribution,
         'param_info': param_info,
@@ -1664,7 +1740,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
     if gate_msg:
         return False, gate_msg
 
-    param_info, err = _mc_param_info(materials)
+    param_info, err = _mc_param_info(materials, rapid=rapid)
     if err:
         return False, err
 
@@ -1695,6 +1771,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
         return False, ctx
     _eval = ctx['evaluate']
     F_MLV = ctx['F_MLV']
+    stage1_failed = ctx['stage1_failed']
 
     mlv = np.array([p['mlv'] for p in param_info], dtype=float)
     std = np.array([p['std'] for p in param_info], dtype=float)
@@ -1954,6 +2031,9 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
                   "nothing to check there.")
         print(f"Surrogate: {n_tot:,} realizations | seed {rng_seed} | {distribution} "
               f"| real solves in total: {n_design + int(n_gate) + tail_n + 1}")
+        if rapid and stage1_failed[0]:
+            print(f"{stage1_failed[0]} real solve(s) unstable before the drawdown "
+                  f"(stage 1 F < 1), counted as failures at their stage 1 F.")
         print(f"Mean FS: {mean_FS:.4f}   σ_F: {sigma_F:.4f}   COV_F: {COV_F:.4f}")
         print(f"β (normal): {beta_normal:.4f}   β (lognormal): {beta_ln:.4f}")
         print(f"PF empirical: {pf_empirical * 100:.3f}%   "
@@ -1987,6 +2067,9 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
         'n_gate_valid': n_gate_valid,
         'n_gate_invalid': n_gate_invalid,
         'n_real_solves': n_design + int(n_gate) + tail_n + 1,
+        # Real solves a rapid drawdown found unstable before the drawdown, taken
+        # as failures at their stage 1 factor of safety (_fixed_surface_context).
+        'n_stage1_failed': int(stage1_failed[0]),
         'alpha': float(alpha),
         'gate_rms': gate_rms,
         'gate_max_error': gate_max,

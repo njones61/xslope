@@ -363,6 +363,29 @@ def reliability_table(rel, engine=None):
     return headers, rows, "reliability_taylor"
 
 
+def newmark_table(result):
+    """``(headers, rows, stem)`` for a Newmark result: the record and the block's
+    two histories at every sample, the governing direction's columns first."""
+    unit = result["D_unit"]
+    gov = result["governing"]
+    order = (gov, -gov)
+    word = {+1: "positive", -1: "negative"}
+    headers = ["Time (s)", "Ground acceleration (g)"]
+    for sign in order:
+        tag = f"{word[sign]} pulses push"
+        headers += [f"Velocity, {tag} ({unit}/s)", f"Displacement, {tag} ({unit})"]
+    rows = []
+    t, a = result["time"], result["accel"]
+    hist = [(result["directions"][s]["v"], result["directions"][s]["d"])
+            for s in order]
+    for i in range(len(t)):
+        row = [f"{t[i]:.4f}", f"{a[i]:.6g}"]
+        for v, d in hist:
+            row += [f"{v[i]:.4f}", f"{d[i]:.4f}"]
+        rows.append(row)
+    return headers, rows, "newmark"
+
+
 def parametric_table(bundle, slope_data=None):
     """``(headers, rows, stem)`` for any Parametric result bundle — the one entry
     point the main window and the check both use."""

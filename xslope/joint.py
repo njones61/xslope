@@ -91,7 +91,9 @@ convention. A continuous sheet — the only thing a mesh split represents — ha
 blank Spacing and the division is inert. Its tension cutoff is zero: a
 soil-geotextile interface carries no tension. A ``joints`` sheet line states
 ``c``, ``phi`` and ``t_cut`` in columns of its own, per unit width, with no
-spacing to divide by.
+spacing to divide by. Under strength reduction ``c_j`` and ``tan phi_j`` are
+divided by the trial factor, and ``t_cut`` with them when the Tension SRF setting
+is on (the engine default), as a material's ``t_cut`` is.
 
 **Tips.** The two soil faces rejoin at each end of the line, so the end station
 carries one soil node, not two, and the two joint elements there stand between
@@ -786,6 +788,22 @@ def joint_reduced_strength(jd, F):
     return jd["cj"] / div, jd["tanphi"] / div
 
 
+def joint_reduced_tcut(jd, F, tension_srf=True):
+    """The tension cutoff after the strength reduction, per joint element.
+
+    A joint's tensile strength follows the Tension SRF setting exactly as a
+    material's ``t_cut`` does: divided by the trial factor when ``tension_srf`` is
+    on (the engine default), held at its stated value when it is off. It rides the
+    same per-line switch as ``c_j`` and ``tan phi_j``, so a line that opts out of
+    the reduction keeps its full cutoff either way.
+    """
+    F = float(F)
+    if not tension_srf or F == 1.0:
+        return jd["tcut"].copy()
+    div = np.where(jd["jred"], F, 1.0)
+    return jd["tcut"] / div
+
+
 def joint_reduced_residual_strength(jd, F):
     """``(c_res, tan phi_res)`` after the strength reduction, per joint element.
 
@@ -839,7 +857,7 @@ def _limit_normal(jd, tn):
 
 
 def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
-                slipped=None, res_r=None, dil_p=None, slip_prev=None):
+                slipped=None, res_r=None, dil_p=None, slip_prev=None, tcut_r=None):
     """The joint tractions at displacement ``u``.
 
     ``slip_p`` is the accumulated plastic tangential offset (the viscoplastic
@@ -859,6 +877,9 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
     :data:`JOINT_RESTICK_FRAC` of its limit (the one-sided band). ``None`` is the
     plain test.
 
+    ``tcut_r`` is the trial's tension cutoff per joint element
+    (:func:`joint_reduced_tcut`); ``None`` reads the stated one, ``jd['tcut']``.
+
     Returns a dict with ``dt``, ``dn``, ``tn``, ``ts``, ``tlim``, ``open`` and
     ``slipping``, each (n, 3).
     """
@@ -874,7 +895,8 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
     # Opening: a joint carrying tension past its cutoff parts, and stays parted
     # until the faces come back into contact. A tip pair, where the two soil
     # faces are one node, never opens.
-    opened = tn < -jd["tcut"][:, None]
+    tcut = jd["tcut"] if tcut_r is None else tcut_r
+    opened = tn < -tcut[:, None]
     if open_prev is not None:
         opened = opened | (open_prev & (dn < 0.0))
     opened &= ~jd["tip"]
@@ -909,7 +931,7 @@ def joint_state(jd, u, cj_r, tanphi_r, slip_p=None, open_prev=None,
 def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
                    dt_vp=JOINT_VP_DT, slipped=None, res_r=None, dil_p=None,
                    ks_slip_factor=None, ks_asm=None, kn_asm=None,
-                   loads_relief=None, slip_state=None):
+                   loads_relief=None, slip_state=None, tcut_r=None):
     """One viscoplastic sweep over the joints: update the slip, load the residual.
 
     The global stiffness carries every joint's FULL elastic block, so ``K u``
@@ -951,8 +973,7 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     the current displacement field, so the factor is the relaxation parameter of
     the interface's fixed-point iteration and 1/factor is how far past the
     return it is driven. RS2's own 0.01 is a relaxation of 100 and diverges here
-    (max|u| = 3.8e+50 in 41 sweeps on one corpus row). The measured behavior over
-    milder factors is in r15_joint_convergence.md §3.
+    (max|u| = 3.8e+50 in 41 sweeps on one corpus row).
 
     ``slip_state`` is the (n, 3) record of which pairs were slipping on the last
     sweep, read for the one-sided stick/slip band (see
@@ -964,7 +985,7 @@ def joint_vp_sweep(jd, u, loads, cj_r, tanphi_r, slip_p, open_state,
     """
     st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_state,
                      slipped=slipped, res_r=res_r, dil_p=dil_p,
-                     slip_prev=slip_state)
+                     slip_prev=slip_state, tcut_r=tcut_r)
     np.copyto(open_state, st["open"])
     if slip_state is not None:
         np.copyto(slip_state, st["slipping"])
@@ -1067,7 +1088,7 @@ def tie_vp_sweep(td, u, loads):
 
 def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False,
                          slip_p=None, open_prev=None, slipped=None,
-                         res_r=None, dil_p=None, cross=False):
+                         res_r=None, dil_p=None, cross=False, tcut_r=None):
     """The joints' internal force vector contribution, and optionally the tangent.
 
     The form the Newton driver needs: the shear traction is returned onto the
@@ -1090,15 +1111,15 @@ def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False,
     DOES move with the normal one, through ``t_n = k_n delta_n``, and
     ``d t_s / d delta_n = +- k_n tan phi_j`` is a non-symmetric rank-one term.
     ``cross=True`` supplies it. It is the difference between a tangent whose
-    worst departure from a finite difference is 0.53 and one whose worst is 0.16
-    (r3_surfaces.md §2). The tip-borrowed limit normal (:func:`_limit_normal`)
+    worst departure from a finite difference is 0.53 and one whose worst is 0.16.
+    The tip-borrowed limit normal (:func:`_limit_normal`)
     is treated as fixed in the linearization: it is an average over the pairs of
     one element and it applies to the two pairs at a line's ends only.
 
     Returns ``(f, Ke, state)`` with ``f`` of shape (n, 12).
     """
     st = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p, open_prev=open_prev,
-                     slipped=slipped, res_r=res_r, dil_p=dil_p)
+                     slipped=slipped, res_r=res_r, dil_p=dil_p, tcut_r=tcut_r)
     if (slipped is not None or dil_p is not None) and slip_p is not None:
         # THE HISTORIES THE STEP ITSELF GROWS. The two that are not functions of
         # the current displacement — whether a pair has ever reached its limit
@@ -1127,7 +1148,7 @@ def joint_internal_force(jd, u, cj_r, tanphi_r, want_tangent=False,
                        else dil_p + d_slip * jd["tandil"][:, None])
             st_new = joint_state(jd, u, cj_r, tanphi_r, slip_p=slip_p,
                                  open_prev=open_prev, slipped=slipped_eff,
-                                 res_r=res_r, dil_p=dil_eff)
+                                 res_r=res_r, dil_p=dil_eff, tcut_r=tcut_r)
             if np.array_equal(st_new["slipping"], st["slipping"]) and (
                     dil_p is None or np.allclose(st_new["tn"], st["tn"],
                                                  rtol=1e-12, atol=0.0)):

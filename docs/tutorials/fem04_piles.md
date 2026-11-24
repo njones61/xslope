@@ -451,14 +451,16 @@ plane-strain error is only known where a three-dimensional reference exists. One
 benchmark in XSLOPE's corpus has one. Cai & Ugai (2000) analyzed a
 pile-stabilized slope with a strength reduction finite element model that meshes
 the individual piles, the soil between them, and the slip interface on each
-pile's surface. XSLOPE runs the same slope through both of its engines in
+pile's surface. Their slope is dry, 10 m high, and 1V:1.5H (γ = 20 kN/m³,
+c′ = 10 kPa, φ′ = 20°). A row of 0.8 m steel-tube piles at mid-slope is embedded
+in bedrock, at a center-to-center spacing S of three diameters. XSLOPE runs the same slope through both of its engines in
 [VP106](../verification/rocscience.md#vp106) and
 [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem):
 
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 | --- | :---: | :---: |
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile at D<sub>1</sub>/D = 3, free head | 1.578 | 1.36 (+16.0%) |
+| Pile at S/D = 3, free head | 1.578 | 1.36 (+16.0%) |
 | Pile, head rotation restrained | 1.594 | 1.45 (+9.9%) |
 
 The three strength reduction rows are XSLOPE's runs of

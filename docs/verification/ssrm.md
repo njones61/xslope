@@ -27,8 +27,9 @@ are on the shared [References](references.md) page.
   residual creep their test accepts.
 - **Source precision.** Griffiths & Lane print Examples 1 and 2 on a 0.05 trial grid, read Fig. 7
   "to the nearest 0.05" (p. 394), and print Example 6 to 0.1. Values from Figs. 7, 10 and 15 are
-  read off the plotted points. Torggler's factors are PLAXIS $\Sigma M_{sf}$ values printed to
-  three decimals, beside a SLIDE limit-equilibrium table. Hammah et al. print their SSR factor
+  read off the plotted points. Torggler's factors are PLAXIS $\Sigma M_{sf}$ values (the total strength
+  reduction multiplier at failure, which is PLAXIS's factor of safety) printed to three decimals,
+  beside a SLIDE limit-equilibrium table. Hammah et al. print their SSR factor
   to two decimals and their limit-equilibrium factors to three.
 - **Meshes.** Every row is meshed at its stated size. Parameter series run on a coarse tri6 mesh;
   the stations that carry the argument run again on a refined quad8 mesh, printed beside the
@@ -80,12 +81,13 @@ the firm base at toe level.
 | Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.40$ | **1.4** (0.0%) | their Table 2 and Fig. 2 |
 | SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.37 | 1.4 (−2.1%) | |
 
-Cross-bearings on the same XSLOPE number — context, not the basis of the dot:
+Two other published values for the same slope, for comparison. Neither is Griffiths & Lane's finite
+element answer, so the match dot doesn't rest on them:
 
-| Quantity | XSLOPE | Cross-bearing | Note |
+| Comparison | XSLOPE | Published | Note |
 |---|---|---|---|
-| SSRM FS, against the classical chart | 1.37 | Bishop & Morgenstern (1960) chart 1.380 (−0.7%) | printed on their Fig. 2 |
-| SSRM FS, against their trial table | 1.37 | the highest trial their Table 2 converged, **1.35** (+1.5%) | they fail at 1.40 |
+| SSRM FS, against Bishop & Morgenstern's (1960) stability chart | 1.37 | Bishop & Morgenstern (1960) chart 1.380 (−0.7%) | printed on Griffiths & Lane's Fig. 2 |
+| SSRM FS, against the last trial factor at which Griffiths & Lane's analysis converged | 1.37 | their Table 2, **1.35** (+1.5%) | it fails to converge at 1.40 |
 
 The dot is scored on the first row, XSLOPE's upturn against the displacement-based reading
 Griffiths & Lane themselves report.
@@ -116,7 +118,8 @@ agreeing to within 0.04 of it, so the answer does not turn on which element type
 
 ![griffiths1_results.png](../fem/images/griffiths1_results.png){width=1000}
 
-Maximum displacement against $F$, the paper's Fig. 2 criterion:
+Maximum displacement against $F$. Griffiths & Lane take failure where this curve turns sharply
+upward (their Fig. 2):
 
 ![griffiths1_sweep.png](../fem/images/griffiths1_sweep.png){width=700}
 
@@ -140,12 +143,14 @@ limit-equilibrium search assuming a base circle is misled.
 | SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.35 | FE FOS 1.4 (−3.6%) | within the paper's one-decimal precision: 1.35 rounds to 1.4 |
 | Spencer, unconstrained circular search (toe circle) | 1.37 | the paper's "correct" FOS of **1.4** (−2.1%) | which it obtains only by forcing the circle through the toe (p. 394) |
 
-Cross-bearings on the false base circle — context, not the basis of the dot:
+Griffiths & Lane also show what a limit equilibrium search finds when its circles are forced tangent
+to the base of the foundation, an answer the paper shows is misleading. XSLOPE finds the same answer on
+those circles. These values are for comparison, and the match dot doesn't rest on them:
 
-| Quantity | XSLOPE | Cross-bearing | Note |
+| Comparison | XSLOPE | Published | Note |
 |---|---|---|---|
-| Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | the proprietary slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
-| — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
+| Spencer on circles forced tangent to the foundation base, against the slip-circle program the paper used | 1.70 | the slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
+| The same circles, against Bishop & Morgenstern's (1960) chart for a circle tangent to the base | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
 
 | Property | Value |
 |----------|-------|
@@ -185,8 +190,9 @@ A coarse tri6 run of this model reads 1.39 on its own mesh.
 
 An undrained ($\phi_u = 0$) clay slope at $c_{u1}/\gamma H = 0.25$ with the firm base at $D = 2$,
 cut by a thin layer of weaker clay that runs parallel to the face, horizontal through the
-foundation, and out at 45 degrees beyond the toe (their Fig. 6). The layer follows every dimension
-printed on Fig. 6 and is $0.2H = 10$ ft thick in the foundation reach. Its strength ratio
+foundation, and out at 45 degrees beyond the toe (their Fig. 6). The layer follows the dimensions
+printed on Fig. 6, given as coordinates in the property table below, and is $0.2H = 10$ ft thick
+in the foundation reach. Its strength ratio
 $c_{u2}/c_{u1}$ takes six values to reproduce Fig. 7: lowered far enough, it switches the failure
 from a circular base slide to a slide along the layer, which a circular search misses.
 
@@ -214,6 +220,8 @@ The dot is scored on the bolded row, the same method on the same mechanism.
 | Unit weight, $\gamma$ | 125 pcf |
 | Slope | 2:1, $H = 50$ ft (crest $y = 100$, toe $(200, 50)$, firm base $y = 0$) |
 | Geometry | $2H$ crest platform, 2:1 face, $2H$ runout, $D = 2$ |
+| Weak layer, upper boundary (ft) | (40, 100) to (180, 30), parallel to the face; horizontal to (240, 30); up at 45° to (260, 50) |
+| Weak layer, lower boundary (ft) | (30, 100) to (190, 20), parallel to the face; horizontal to (240, 20); up at 45° to (270, 50) |
 
 The curve keeps the shape of Fig. 7, a plateau down to $c_{u2}/c_{u1} \approx 0.6$ and a roughly
 linear fall below it, but once the failure follows the layer the SSRM reads below the paper's FE
@@ -285,8 +293,9 @@ At $c_{u2}/c_{u1} = 0.2$, a narrow slide along the weak layer, their Fig. 8(c):
 ### 🟢 Griffiths & Lane (1999) Example 4 — Undrained Clay Slope over a Weak Foundation {#verification-griffiths4}
 
 An undrained clay slope at $c_{u1}/\gamma H = 0.25$ on a foundation layer $H$ thick of strength
-$c_{u2}$, with the firm base at $D = 2$ (their Fig. 9). Two cases straddle the change of
-mechanism in Fig. 10: a deep base circle at $c_{u2}/c_{u1} = 1$ and a shallow toe circle at 2.
+$c_{u2}$, with the firm base at $D = 2$ (their Fig. 9). Two cases straddle the strength ratio
+at which Griffiths & Lane's factor of safety changes from a base mechanism to a toe mechanism
+(their Fig. 10): a deep base circle at $c_{u2}/c_{u1} = 1$ and a shallow toe circle at 2.
 
 | Case | XSLOPE | Griffiths & Lane (1999), Fig. 10 |
 |---|---|---|
@@ -594,7 +603,7 @@ target.
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=spencer, num_slices=40, expected_fs=1.121, tolerance=0.01, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=mprice, num_slices=40, expected_fs=1.093, tolerance=0.01, benchmark=SSRM-TORGGLER -->
 
-### 🟢 Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI = 5 {#hoek-brown}
+### 🟢 Hammah et al. (2005b) Example 1 — Hoek-Brown Rock Slope, GSI = 5 {#hoek-brown}
 
 A 10 m high homogeneous rock slope at 45° in a very weak rock mass, from Example 1 of the paper
 that introduced shear-strength reduction for the generalized Hoek-Brown criterion. The row tests
@@ -640,7 +649,7 @@ confinement exceeds about 55°, are well behaved on this weak envelope; see the
 
 **Input file:** [hammah_hb1.xlsx](files/rocscience/hammah_hb1.xlsx).
 
-![Hoek-Brown SSRM (Hammah et al. 2005 example 1): a 10 m, 45° slope in a GSI = 5 rock mass, SSRM 1.166 against the paper's 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band exiting at the toe](images/HB-ssrm.png)
+![Hoek-Brown SSRM (Hammah et al. 2005b example 1): a 10 m, 45° slope in a GSI = 5 rock mass, SSRM 1.166 against the paper's 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band exiting at the toe](images/HB-ssrm.png)
 
 <!-- test: file=files/rocscience/hammah_hb1.xlsx, type=circular_search, num_slices=40, fs_bishop=1.150, fs_spencer=1.152, fs_janbu=1.144, fs_mprice=1.148, benchmark=HB-lem -->
 <!-- test: file=files/rocscience/hammah_hb1.xlsx, type=fem_ssrm, expected_fs=1.166, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, max_iter=16000, k0=1, benchmark=HB-ssrm, f_stand=1.1625, f_fail=1.16875, check=edges, expected_elements=1485, expected_nodes=3112 -->

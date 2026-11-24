@@ -123,6 +123,15 @@ CONTENT_TREE = [
          ("lem_rapid", "Rapid drawdown detail",
           "The three-stage factors of safety, when the run was a rapid "
           "drawdown analysis."),
+         ("lem_seismic2", "Two-stage seismic detail",
+          "The factors of safety of both stages, when the run was a two-stage "
+          "pseudostatic seismic analysis."),
+         ("lem_ky", "Yield coefficient detail",
+          "How the yield coefficient k_y was found, when the run found one: each "
+          "search and its k_y, or the coefficients tried on a single surface."),
+         ("lem_newmark", "Newmark displacement",
+          "The last Newmark run, when there is one: the record and its scaling, "
+          "k_y, the displacement each way, and the three histories."),
      ]),
     ("seep", "Seepage analysis",
      "The seepage analysis: the mesh and conductivities it was solved on, the "

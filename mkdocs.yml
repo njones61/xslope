@@ -15,6 +15,7 @@ extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js
   - js/mathjax-config.js
   - js/nav_collapse.js
+  - js/nav_new.js
 markdown_extensions:
     - attr_list
     - sane_lists
@@ -30,7 +31,7 @@ theme:
 # Change the ?v= date whenever custom.css changes: browsers keep the stylesheet
 # for 4 hours, and a new query string makes them fetch the new one at once.
 extra_css:
-  - css/custom.css?v=2026-10-15
+  - css/custom.css?v=2026-11-22
 plugins:
   - search
   - redirects:
@@ -49,8 +50,10 @@ plugins:
 hooks:
   - hooks/griffe_quiet.py
   - hooks/docs_packages.py
+  - hooks/changelog.py
 nav:
   - Home: index.md
+  - "What's New": whats_new.md
   - Usage Guide:
     - Installation: getting_started/install.md
     - Ways to Use XSLOPE: usage/index.md
@@ -87,6 +90,8 @@ nav:
       - 11. Reliability: tutorials/lem11_reliability.md
       - 12. Piles: tutorials/lem12_piles.md
       - "13. A Rock Slope: Hoek-Brown": tutorials/lem13_rock_slope.md
+      - 14. Pseudostatic Analysis: tutorials/lem14_pseudostatic.md
+      - 15. Yield Coefficient and Newmark Displacement: tutorials/lem15_yield_newmark.md
     - Seepage:
       - 1. Confined Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
       - 2. Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
@@ -138,6 +143,11 @@ nav:
     - Pile and Wall Types: piles/types.md
     - Piles in LEM: piles/lem.md
     - Piles in FEM: piles/fem.md
+  - Seismic Analysis:
+    - Overview: seismic/overview.md
+    - Two-Stage Analysis: seismic/two_stage.md
+    - Yield Coefficient: seismic/yield_coefficient.md
+    - Newmark Displacement: seismic/newmark.md
   - Reliability:
     - Overview: reliability/index.md
     - Taylor Series (TSPM): reliability/taylor.md
@@ -172,6 +182,7 @@ nav:
     - Remedies: api/remedies.md
     - SEEP: api/seep.md
     - Search: api/search.md
+    - Seismic: api/seismic.md
     - Slice: api/slice.md
     - Solve: api/solve.md
   - Coding:

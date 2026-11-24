@@ -166,7 +166,7 @@ choice among the three:
   of extra Gauss points and a center node.
 
 `build_mesh_from_polygons()` defaults to `tri6`, and Studio's *Build mesh* dialog opens
-on it. A blank **Element type** cell (`main!D18`) gives `tri6`.
+on it. A blank **Element type** cell (`main!D19`) gives `tri6`.
 An explicit type on the call or main sheet overrides the default.
 
 For seepage, `tri3` is the lighter choice, with a smaller system that solves faster.
@@ -275,8 +275,9 @@ size grades back to it across the zone boundary:
 A Size only ever refines — a value at or above the global target has no effect, and
 XSLOPE warns rather than silently ignoring it. A polygon whose **Type** is `refine`
 carries nothing *but* a Size: it is not a material, never becomes a mesh region, and only
-makes the mesh finer where it is drawn. Refine polygons reach the mesher through
-`extract_size_regions()`, passed as `size_regions`. Both are described on the
+makes the mesh finer where it is drawn. A Size on an `ssr` or `joints` polygon, which is not
+meshed as a zone either, refines the mesh inside it the same way. These polygons reach the
+mesher through `extract_size_regions()`, passed as `size_regions`. Both are described on the
 [Input Template](../usage/input_template.md#refine-regions) page.
 
 A Size resolves a zone it is entered on, however thin the zone is — the size field
@@ -371,9 +372,10 @@ safety nobody can explain. The two ways to give such a zone the size it needs ar
 **Size** on the zone, which is not capped, and a finer global target. A **Size** declared
 on the zone composes with the derived size by taking the smaller of the two.
 
-On the Griffiths soft-band section
-([xslope_griffiths3_r0p2_thin.xlsx](files/xslope_griffiths3_r0p2_thin.xlsx)) at a 3-unit
-target size, the band carries 1.6 element rows on a triangular mesh with the box clear and
+Take the thin weak layer of Griffiths & Lane's (1999) Example 3
+([verification](../verification/ssrm.md#verification-griffiths3)), at $c_{u2}/c_{u1} = 0.2$
+([xslope_griffiths3_r0p2_thin.xlsx](files/xslope_griffiths3_r0p2_thin.xlsx)). At a 3-unit
+target size, the layer carries 1.6 element rows on a triangular mesh with the box clear and
 1.2 on a quadrilateral one; with the option on both carry 4.0.
 
 From a script, pass `refine_features=['thin_zones']` together with any `refine_factor`

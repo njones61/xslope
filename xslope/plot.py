@@ -73,6 +73,45 @@ def _material_hint(ax, msg, title=""):
     return ax
 
 
+def _fit_title(ax, min_size=8.0):
+    """Keep a property preview's title inside its figure.
+
+    Studio draws these previews into a pane only as wide as the Materials editor
+    leaves it, and a title such as ``Strength ratio   Sᵤ = max(15, 0.1875·σ′v)``
+    runs off the side of a narrow one. A title too wide for the figure goes onto two
+    lines, split where the model's name meets its parameters (the three spaces
+    these titles put between them), as the engine plots set a long title; one still
+    too wide steps its font down, no smaller than ``min_size``. The room allowed is
+    the figure's width less the pad ``tight_layout`` keeps at each side, so a title
+    that fits is left exactly as it was. With no renderer to measure against, the
+    title is left as set.
+    """
+    import matplotlib as _mpl
+    title = ax.title
+    text = title.get_text()
+    if not text:
+        return
+    fig = ax.figure
+    try:
+        renderer = fig.canvas.get_renderer()
+    except AttributeError:
+        return
+    pad = 1.08 * _mpl.rcParams["font.size"] * fig.dpi / 72.0
+    room = fig.bbox.width - 2.0 * pad
+
+    def width():
+        return title.get_window_extent(renderer).width
+
+    if width() <= room:
+        return
+    if "   " in text:
+        title.set_text(text.replace("   ", "\n", 1))
+    size = title.get_fontsize()
+    while width() > room and size > min_size:
+        size = max(min_size, size - 0.5)
+        title.set_fontsize(size)
+
+
 def _tau_sigma_extent(ax, sigma_span, tau0, tau_of=None):
     """``(σ_max, τ_max)`` for a τ–σ envelope drawn at one scale on both axes.
 
@@ -177,6 +216,27 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         ax.set_xlim(left=0)
         ax.grid(True, alpha=0.3)
 
+    elif option == "ratio":
+        c, r = g("c"), g("cp")
+        if c == 0 and r == 0:
+            return _material_hint(ax, "enter c/p (the ratio) and c (the minimum)",
+                                  "Strength ratio")
+        # The same max(c, r·σ′v) the slicer and the FEM apply, over a σ′v range
+        # that shows the floor and the line: past the knee c/r by about as much again.
+        knee = c / r if r > 0 else 0.0
+        s_max = max(2.0 * knee, sigma_max) if r > 0 else sigma_max
+        s = np.linspace(0.0, s_max, n)
+        su = np.maximum(c, r * s)
+        # σ′v grows with depth, so it runs down the side from 0 at the top, as the
+        # c-with-depth plot runs elevation; Sᵤ runs across.
+        ax.plot(su, s, color=_STRENGTH_COLOR, lw=2)
+        ax.set_xlabel("Sᵤ  (undrained strength)")
+        ax.set_ylabel("σ′v  (vertical effective stress)")
+        ax.set_title(f"Strength ratio   Sᵤ = max({c:g}, {r:g}·σ′v)")
+        ax.set_xlim(left=0)
+        ax.set_ylim(s_max, 0)
+        ax.grid(True, alpha=0.3)
+
     elif option == "pow":
         a, b, cp_c, d = g("pow_a"), g("pow_b"), g("pow_c"), g("pow_d")
         if a == 0:
@@ -246,6 +306,7 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
     else:
         return _material_hint(ax, "no strength model\n(blank option)")
 
+    _fit_title(ax)
     return ax
 
 
@@ -431,6 +492,7 @@ def plot_material_kr(ax, material, n=200):
     ax.set_xlabel("matric suction, ψ")
     ax.set_ylabel("relative conductivity, kr")
     ax.set_title(title)
+    _fit_title(ax)
     return ax
 
 
@@ -3734,7 +3796,8 @@ def plot_inputs(
 
     # Seismic coefficient annotation
     k_seismic = slope_data.get('k_seismic', 0.0)
-    if k_seismic and mode in ("lem", "fem"):
+    k_vertical = float(slope_data.get('k_vertical') or 0.0)
+    if (k_seismic or k_vertical) and mode in ("lem", "fem"):
         if mode == "fem":
             # FEM: sign of k directly gives direction (+x → right, -x → left)
             arrow = "\u2192" if k_seismic > 0 else "\u2190"
@@ -3756,7 +3819,11 @@ def plot_inputs(
                     arrow = "\u2190"  # ←  toe on left
             else:
                 arrow = ""
-        k_text = f"k = {abs(k_seismic):g} {arrow}".strip()
+        k_text = f"k = {abs(k_seismic):g} {arrow}".strip() if k_seismic else ""
+        if k_vertical:
+            # Signed, positive downward, in both engines.
+            v_text = f"k_v = {abs(k_vertical):g} {'↓' if k_vertical > 0 else '↑'}"
+            k_text = f"{k_text}, {v_text}" if k_text else v_text
         ax.text(0.98, 0.97, k_text, transform=ax.transAxes,
                 fontsize=10, fontweight='bold', ha='right', va='top',
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',
@@ -4483,7 +4550,9 @@ def plot_reliability_convergence(result, figsize=(9, 5.5), save_png=False,
     Monte Carlo samples the histogram draws.
 
     The line is the cumulative empirical P_f after each realization; the band is
-    its 95% confidence interval, 1.96·sqrt(p(1-p)/n). The plot is readable off
+    its 95% confidence interval, 1.96·sqrt(p(1-p)/n), cut off at 0% and 100%:
+    over the first few realizations that interval runs past both, and a
+    probability cannot. The plot is readable off
     ANY :func:`xslope.reliability.reliability_mc` result — the running estimate
     is recomputed from ``fs_samples`` in order, so a run made without the
     convergence option still shows how (and whether) its answer settled. When
@@ -4507,7 +4576,8 @@ def plot_reliability_convergence(result, figsize=(9, 5.5), save_png=False,
     half = 1.96 * np.sqrt(np.maximum(p * (1 - p), 0.0) / np.maximum(valid, 1))
     ax.plot(n, p * 100, color='tab:blue', lw=1.4,
             label='running $P_f$ (empirical)')
-    ax.fill_between(n, (p - half) * 100, (p + half) * 100, color='tab:blue',
+    ax.fill_between(n, np.clip(p - half, 0.0, 1.0) * 100,
+                    np.clip(p + half, 0.0, 1.0) * 100, color='tab:blue',
                     alpha=0.18, label='95% confidence band')
     p_final = p[-1] if samples.size else float('nan')
     ax.axhline(p_final * 100, color='k', lw=0.8, ls='--',
@@ -5821,4 +5891,84 @@ def plot_mc_rank_correlation(result, figsize=(8, 5), save_png=False, dpi=300,
     fig.tight_layout()
     if save_png:
         fig.savefig('mc_rank_correlation.png', dpi=dpi, bbox_inches='tight')
+    return fig
+
+
+def plot_newmark(result, figsize=(9.0, 7.5), save_png=False, dpi=300, fig=None,
+                 show_title=True, show_legend=True):
+    """The three histories of a Newmark sliding-block analysis
+    (:func:`xslope.seismic.newmark_displacement`), stacked on one time axis the
+    way Duncan, Wright, and Brandon (2014) draw them in Fig. 10.3.
+
+    Top, the ground acceleration (scaled, in g) with the yield acceleration
+    marked on both sides: the block slides one way when the record rises above
+    +k_y and the other way when it falls below −k_y. Middle and bottom, the
+    block's velocity relative to the ground and its accumulated displacement,
+    one curve for each sign of the record, the governing one drawn solid.
+    """
+    from .seismic import direction_phrase
+
+    own_fig = fig is None
+    if own_fig:
+        fig = plt.figure(figsize=figsize)
+    else:
+        fig.clear()
+    ax_a, ax_v, ax_d = fig.subplots(3, 1, sharex=True)
+
+    t = np.asarray(result["time"], dtype=float)
+    a = np.asarray(result["accel"], dtype=float)
+    ky = float(result["ky"])
+    unit = result["D_unit"]
+    gov = result["governing"]
+    colors = {gov: "#1f4e9c", -gov: "#d9822b"}
+
+    ax_a.plot(t, a, color="0.35", linewidth=0.6)
+    for sign in (+1, -1):
+        ax_a.axhline(sign * ky, color=colors[sign], linestyle="--", linewidth=1.1)
+    ax_a.axhline(0.0, color="0.6", linewidth=0.5)
+    ax_a.set_ylabel("Ground\nacceleration (g)")
+    span = max(float(np.max(np.abs(a))), ky) * 1.15
+    ax_a.set_ylim(-span, span)
+    ax_a.text(0.995, 0.97, f"±k$_y$ = {ky:.4f} g", transform=ax_a.transAxes,
+              ha="right", va="top", fontsize=8,
+              bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.8))
+
+    for sign in (-gov, gov):                      # the governing one on top
+        info = result["directions"][sign]
+        style = "-" if sign == gov else (0, (4, 2))
+        width = 1.5 if sign == gov else 1.1
+        label = (f"{direction_phrase(sign)[4:].capitalize()}: "
+                 f"D = {info['D']:.2f} {unit}")
+        ax_v.plot(t, info["v"], color=colors[sign], linestyle=style,
+                  linewidth=width)
+        ax_d.plot(t, info["d"], color=colors[sign], linestyle=style,
+                  linewidth=width, label=label)
+    ax_v.set_ylabel(f"Relative\nvelocity ({unit}/s)")
+    ax_d.set_ylabel(f"Displacement\n({unit})")
+    ax_d.set_xlabel("Time (s)")
+    ax_v.set_ylim(bottom=0.0)
+    ax_d.set_ylim(bottom=0.0)
+    ax_d.set_xlim(float(t[0]), float(t[-1]))
+    for ax in (ax_a, ax_v, ax_d):
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(labelsize=8)
+
+    if show_legend:
+        # The governing direction first; the curves end high, so the lower right
+        # is clear of them.
+        handles, labels = ax_d.get_legend_handles_labels()
+        ax_d.legend(handles[::-1], labels[::-1], loc="lower right", fontsize=8,
+                    framealpha=0.9)
+    if show_title:
+        rec = result.get("record") or {}
+        scale = result.get("scale", 1.0)
+        scaled = "" if abs(scale - 1.0) < 1e-12 else f", scaled ×{scale:.3g}"
+        ax_a.set_title(f"Newmark displacement D = {result['D']:.2f} {unit} at "
+                       f"k$_y$ = {ky:.4f}\n{rec.get('description') or rec.get('name') or ''}"
+                       f" (peak {result['pga']:.3f} g{scaled})", fontsize=11)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig("plot_newmark.png", dpi=dpi, bbox_inches="tight")
+    if own_fig:
+        plt.show()
     return fig

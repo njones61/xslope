@@ -235,7 +235,7 @@ sheet differs in these columns:
 | <code class="rc rc-fem">kn</code>, <code class="rc rc-fem">ks</code> | blank: derived from the softer adjacent material over a notional thickness of one tenth of the element length ([Stiffness](../fem/joints.md#stiffness)) |
 | <code class="rc rc-fem">Jred</code> | blank, so strength reduction weakens the interface along with the soil; `No` holds it at full strength |
 | <code class="rc rc-both">Tend1</code>, <code class="rc rc-both">Tend2</code> | a value above zero ties that end at that capacity; blank or 0 leaves the end free |
-| <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | blank: not read on a jointed line, whose grip on the soil is the interface strength from `Adhesion` and `Delta` |
+| <code class="rc rc-both">Lp1</code>, <code class="rc rc-both">Lp2</code> | blank: the FEM does not read them on a jointed line, whose grip on the soil is the interface strength from `Adhesion` and `Delta`, and the LEM does not read them when `Adhesion` and `Delta` are both filled |
 
 The model checks warn when a bonded sheet looks like a slip surface
 ([Signs that a joint is needed](fem.md#what-says-a-joint-was-needed)).

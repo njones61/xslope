@@ -52,6 +52,10 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+# check_studio builds a real MainWindow, which reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                           # noqa: E402
+
 import matplotlib                                           # noqa: E402
 matplotlib.use("Agg")
 
@@ -409,6 +413,7 @@ def check_run_continuation():
 
 # ===================== 4. Studio (offscreen) =====================
 
+@studio_settings.isolated
 def check_studio():
     print("\n4. Studio: Continue with a higher limit…")
     from PySide6.QtWidgets import QApplication

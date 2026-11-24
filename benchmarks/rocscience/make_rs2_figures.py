@@ -183,7 +183,14 @@ EXTRA_CASES = [
 # This is a claim about the page, not a way to empty the audit, so it is enforced
 # both ways: an entry naming a row that is not registered, or a row that HAS a PNG,
 # is reported as a DEAD exemption and fails the audit exactly like a missing figure.
-EXPECTED_NO_FIGURE = {}
+EXPECTED_NO_FIGURE = {
+    # The geotextile walls' refinement twins (Norm, 573a): each row is scored and
+    # figured on its 1.0 m file, and the twin's 0.7 m factor is printed beside it as
+    # a number, the mesh sensitivity. Whether the finer mesh fails the wall the same
+    # way is the open question of 572a (after 1.1.0); its pictures come with that.
+    'RS2-51-fine': 'refinement twin of RS2-51; its factor is printed, its mechanism not drawn',
+    'RS2-54-fine': 'refinement twin of RS2-54; its factor is printed, its mechanism not drawn',
+}
 
 
 # Sidecar stem overrides. ``make_figure`` writes the exported field next to the case

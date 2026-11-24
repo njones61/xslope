@@ -80,6 +80,10 @@ _REPO = os.path.dirname(_HERE)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
+# The Studio leg reads Studio's machine-wide settings store; it gets a scratch
+# one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 REINF_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_reinf.xlsx")
@@ -1099,6 +1103,7 @@ _STUDIO_ONLY = {test_only_a_report_reaches_word,
                 test_generate_finalizes_then_opens}
 
 
+@studio_settings.isolated
 def run():
     """Every check; returns a list of failure strings (empty = pass)."""
     checks = CHECKS

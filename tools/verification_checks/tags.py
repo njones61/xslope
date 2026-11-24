@@ -153,7 +153,8 @@ def _tag_kv(line):
 #: (run_tests._check_mesh_counts); the page has no reason to print them, where a
 #: mesh_elements tag's counts are the published figure itself.
 GUARD_KEYS = {"fem_ssrm": ("expected_elements", "expected_nodes"),
-              "fem_tilt": ("expected_elements", "expected_nodes")}
+              "fem_tilt": ("expected_elements", "expected_nodes"),
+              "fem_kc": ("expected_elements", "expected_nodes")}
 
 
 def _published(kv, cfg):
@@ -443,7 +444,8 @@ def _section_locks(lines, sec, page_bank, corpus):
         except Exception:
             tol = Decimal("0.01")
         for k, v in kv.items():
-            if not _wanted(k, ("expected_fs*", "fs_*", "expected")):
+            if not _wanted(k, ("expected_fs*", "fs_*", "expected",
+                               "expected_kc", "expected_d")):
                 continue
             slots = _identity(k, kv)
             for part in str(v).split(";"):

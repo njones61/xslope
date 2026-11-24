@@ -132,15 +132,15 @@ On the critical circle at the toe, Spencer's factor of safety is 1.323 with the
 piezometric line and 0.965 with the seepage solution.
 
 The problem is Example 2 in Section 6.13.6 of *Soil Strength and Slope Stability*,
-2nd edition, by Duncan, Wright, and Brandon (2014), pages 121–123. The book gives the
+2nd edition, by Duncan, Wright, and Brandon (2014), pages 121–123. Duncan et al. give the
 elevations, the face slopes, the material properties, and the permeabilities; the
-other dimensions are scaled from its Figures 6.41 and 6.42.
+other dimensions are scaled from their Figures 6.41 and 6.42.
 [Slide2's verification problem 72](../verification/rocscience.md#vp72) is the same
 example, on Slide's own drawing of the section.
 
 ![Earth dam with a clay core](sample_images/earth_dam_problem_sketch.png){width=1000}
 
-The book gives one unit weight per zone, γ, and the downstream analyses use it. Only
+Duncan et al. give one unit weight per zone, γ, and the downstream analyses use it. Only
 the seepage solution uses the permeabilities, k. The saturated unit weights, γ_sat,
 are for the upstream analysis at the end of this section.
 
@@ -151,9 +151,11 @@ are for the upstream analysis at the end of this section.
 |  Clay  |    0     |        24         |   123   |     128     |  1 × 10⁻⁵  |
 |  Sand  |    0     |        32         |   127   |     132     |  1 × 10⁻³  |
 
-The piezometric line is the zero-pressure line of the book's seepage solution (its
-Figure 6.42), traced from the figure. It stays at the reservoir level up to the core,
-drops through the core, and meets the downstream face 1.5 ft above the toe.
+The piezometric line is the phreatic surface of the seepage solution Duncan, Wright, and
+Brandon (2014, Fig. 6.42) give for this dam, traced from their figure. It stays at the
+reservoir level up to the core, drops through the core, and meets the downstream face
+1.5 ft above the toe. The sketch above shows it in blue, and the **piezo** sheet of
+xslope_earth_dam_down.xlsx lists its points.
 
 **Downstream side of the dam**
 
@@ -164,7 +166,7 @@ pressure above that of still water at the same depth, which lowers the effective
 and the strength of the shell and the clay, neither of which has cohesion. A piezometric
 line gives the pressure of still water, so there it gives too little.
 
-As in the book, each set of pore pressures gets two minimum factors of safety, with
+Following Duncan et al., each set of pore pressures gets two minimum factors of safety, with
 each method running its own search:
 
 - the overall minimum, a shallow circle at the toe, from a grid of starting circles,
@@ -266,28 +268,28 @@ more of the piezometric line's value wherever at least 27 ft of fill lies above 
 foundation. Its factor of safety (Spencer) falls by about a tenth, from 1.568 to
 1.404, where the toe circle's falls by more than a quarter.
 
-**Comparison with the book**
+**Comparison with Duncan, Wright, and Brandon (2014)**
 
-Spencer's factors of safety from the tables above, beside the book's Table 6.8. The book
-does not say which method it used.
+Spencer's factors of safety from the tables above, beside the factors of safety they
+report (their Table 6.8). Duncan et al. do not say which method they used.
 
-| Pore pressures | Toe circle, book | Toe circle, XSLOPE | Tangent to El. 197, book | Tangent to El. 197, XSLOPE |
+| Pore pressures | Toe circle, Duncan et al. | Toe circle, XSLOPE | Tangent to El. 197, Duncan et al. | Tangent to El. 197, XSLOPE |
 |:--|:---:|:---:|:---:|:---:|
 | Piezometric line | 1.30 | 1.323 | 1.57 | 1.568 |
 | Seepage solution | 1.11 | 0.965 | 1.37 | 1.404 |
 
-With the piezometric line, both circles agree with the book. With the seepage solution,
-the circle tangent to El. 197 is within 3 percent of the book's, and the toe circle is
+With the piezometric line, both circles agree with Duncan et al. With the seepage solution,
+the circle tangent to El. 197 is within 3 percent of their value, and the toe circle is
 lower. That circle is small, about 11 ft in radius, and sits where the upward flow
 concentrates at the toe, so its factor of safety depends on how finely the mesh resolves
 the toe. It falls as the mesh is refined and settles at about the 3.5 ft element size
-used here. On both circles the seepage solution gives the lower factor of safety, and the book
-concludes that where the flow is not predominantly horizontal, the pore pressures
+used here. On both circles the seepage solution gives the lower factor of safety, and Duncan et al.
+conclude that where the flow is not predominantly horizontal, the pore pressures
 should come from a seepage analysis.
 
 **Upstream side of the dam**
 
-The book analyzes only the downstream slope. The upstream slope is analyzed here under
+Duncan et al. analyze only the downstream slope. The upstream slope is analyzed here under
 the full reservoir, with the same piezometric line and starting circles on the upstream
 side of the dam. Each zone takes its saturated unit weight, γ_sat, 5 pcf above γ, below
 the piezometric line.

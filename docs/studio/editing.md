@@ -16,7 +16,7 @@ open its editor:
 
 | Category | What you edit |
 | --- | --- |
-| **Global parameters** | The project's units and time unit, unit weight of water, tension-crack depth/water, seismic coefficient, and the FEM-only tension SRF and K0 initial stress. |
+| **Global parameters** | The project's units and time unit, unit weight of water, tension-crack depth/water, horizontal and vertical seismic coefficients, and the FEM-only tension SRF and K0 initial stress. |
 | **Materials** | The material table — name, unit weight, strength option and parameters, and (by mode) hydraulic and elastic properties. |
 | **Profile lines** | The profile-line geometry (master/detail); rebuilds the ground surface and material zones. |
 | **Polygons** | Polygon regions (for polygon-based models) — material zones, SSR overlays, mesh refinement regions, and joint-network regions. |
@@ -67,16 +67,29 @@ Seepage — redraw as you type, so a wrong option is easy to see:
 
 ![Materials list view](images/editing_materials_list.png)
 
+A cell that the material's options leave unused is grayed in the table view, as on
+the `mat` sheet, and grayed or hidden in the list view. For example, `d` and `ψ`,
+which define the K<sub>c</sub> = 1 envelope for rapid drawdown and the two-stage
+seismic analysis, are used only by an `mc` material. A blank **u** reads as `none`
+and a blank **unsat** as `lf`, as they do when the file loads, so each grays what
+that choice leaves unread: `r_u`, `phi_b` and `s_cap` for a blank **u**, and the
+van Genuchten `a`, `n` and `l` for a blank **unsat**. A Gardner (`gard`) material
+keeps `h0` live, because a transient seepage run reads it. An `elastic` material
+grays its strength cells, `t_cut`, `d`, `ψ`, `phi_b` and `s_cap`, but keeps **u**
+live: the finite element analysis reads it to decide how the water loads a wall or
+rock, `none` for a sealed one and `seep` or `piezo` for one water passes through
+([Walls and other elastic materials](../fem/overview.md#pore-pressure-options)).
+
 On a Hoek-Brown material the strength envelope also reads out the rock-mass constants
 $m_b$, $s$ and $a$ that σci, GSI, mi and D derive to — the three numbers a published
 Hoek-Brown table quotes, so the four entered inputs can be confirmed against one.
 
-A **blank property stays blank**. Leaving a unit weight, cohesion, friction angle,
-`d`/`ψ`, `E`, `ν`, `r_u` or `k₁` cell empty reads back as unset, not as zero, in both
-views — so a cohesionless material and one nobody has filled in are different models,
-and the [model checks](analysis.md#model-checks-before-a-run) can tell you which one
-you have. Saving writes an unset property as an empty cell rather than inventing a
-zero for it.
+A property left blank reads as the value an empty `mat` sheet cell loads as: 0 for
+γ, c, φ, `d`, `ψ`, `E`, `ν`, `r_u` and `k₁`, and 0.5 for the van Genuchten `l`, in
+both views. A zero is a real value for most of these. Where no material can have
+one — a γ, `E`, `ν` or `k₁` of 0 — the
+[model checks](analysis.md#model-checks-before-a-run) refuse it by name before the
+run that reads it.
 
 The **Display color** swatch under Identity sets the material's color on the
 plots (**Reset** returns it to the default palette); the same swatch is the first
@@ -156,11 +169,18 @@ list) plus a live preview of the feature on the section.
 
 **Failure surfaces** is one editor or the other depending on the family the model
 uses: a circle table, or the **non-circular surface** as a list of vertices ordered
-left→right, each with a **Movement** setting (*Free*, *Horiz*, *Fixed*). Movement
-governs what the search may do with the interior vertices; the entry and exit
-points always slide along the ground surface, whatever their Movement setting.
-Clicking a vertex in the preview selects its row, and vice versa. The circle table
-has seven columns, so its preview sits below the table rather than beside it.
+left→right, each with a **Movement** setting (*Free*, *Horiz*, *Fixed*) that
+governs what the search may do with that vertex. The entry and exit points slide
+along the ground surface under *Free* or *Horiz*, and a *Fixed* one stays where it
+is. A blank Movement shows, in gray, what the search does with the point — *Free* for
+the first and last points, *Fixed* for the points between — and a word that is none
+of the three is shown as typed and drawn as × on the preview, for the model checks to
+name. Neither is rewritten unless you change it. Clicking a vertex in the preview
+selects its row, and vice versa. The circle table has seven columns, so its preview
+sits below the table rather than beside it. Each circle's **Option** grays the size
+cells it does not read, as on the `circles` sheet: Depth reads Depth, Radius reads R,
+and Intercept reads Xi and Yi. **Depth** is the elevation of the circle's lowest
+point, not a depth below the ground.
 
 The circles editor carries a **Generate starting circles…** button — the same
 generator the Run LEM model checks offer as a remedy when a model has no failure
@@ -249,15 +269,21 @@ pullout breakpoints marked:
 
 ![Reinforcement editor (list view)](images/editing_reinforcement_editor.png)
 
-A line develops its pullout capacity one of two ways, and the **Pullout** selector
-at the top of the Anchorage group chooses per line: **Development length (Lp1,
-Lp2)**, or **Overburden (Adhesion, Delta)**, where the resistance follows the
-effective overburden along the line. The pair not in use is grayed rather than
-cleared, in both views — the values stay in their cells, and switching back brings
-them into force again. The selector is set from the line itself: a line arrives
-on **Overburden** when it carries both Adhesion and Delta, and on **Development
-length** otherwise, so a file edited outside Studio opens showing the law it
-actually uses.
+A line develops its pullout capacity one of two ways: over the development lengths
+**Lp1** and **Lp2**, or, when **Adhesion** and **Delta** are both filled, from the
+effective overburden along the line. The values decide which law is in force, so a
+file edited outside Studio opens on the law it actually uses. In the list view, a
+read-only **Pullout** line at the top of the Anchorage group names it:
+*Overburden (Adhesion, Delta)* when both are filled, *Development length (Lp1,
+Lp2)* otherwise. It changes as you fill or clear Adhesion and Delta, which is how a
+line moves from one law to the other; there is no selector. While Adhesion and
+Delta are both filled, Lp1 and Lp2 are grayed in both views, their values kept in
+the cells. Adhesion and Delta themselves are never grayed, and Studio never clears
+them: on a jointed line the finite element interface reads them as its strength
+whatever the pullout law. A new line
+starts with Lp1 and Lp2 blank, so the model checks ask for them before a run instead
+of reading 0, a fully anchored end. **kn**, **ks** and **Jred** are grayed unless
+**Joint** is Yes, the only case in which they are read.
 
 Table view lays every column out at once — the bulk-entry path for the fifteen-plus
 lines of a tiered wall:
@@ -281,8 +307,9 @@ A reinforcement line that is *also* a slip surface stays in the reinforcement
 editor with its **Joint** column set, so that the sheet between the two faces is
 still there; this editor is for the lines that have nothing between them. Blank kn
 and ks are derived from the adjacent soil. Every column is FEM only — the limit
-equilibrium engines do not read the sheet — so this editor carries no engine
-toggle: there is nothing to toggle between. A whole set of joint lines at once —
+equilibrium engines do not read the sheet, and a seepage run lets water flow across
+a joint as if it were not there — so this editor carries no engine toggle: there is
+nothing to toggle between. A whole set of joint lines at once —
 bedding at a spacing, a conjugate pair, a blocky mass — is generated by
 [Build network](#build-network), below.
 
@@ -308,7 +335,11 @@ you need; the table is there for the exceptions:
 drawdown): specified-**head** lines (a head value plus its points),
 specified-**flux** lines (**Add flux**, a **Flux value** plus its points), and
 the **exit face**. The preview draws every boundary in the set over the section
-with the selected one highlighted, and clicking a boundary there selects it:
+with the selected one highlighted, and clicking a boundary there selects it. A new
+head or flux line starts with its value blank, and the list names it *blank* until
+a value is entered; a value cleared from its field stays blank rather than becoming
+0, which is a real head. The model checks name a blank value before any run that
+reads it:
 
 ![Seep BC editor](images/editing_seep_bc_editor.png)
 

@@ -924,6 +924,13 @@ def _comparable_strength(slope_data, ground, material, x, y):
             return None
     sigma_v = _column_stress(slope_data, ground, x, y)
     sigma_n = max(0.0, sigma_v - _pore_pressure(slope_data, material, x, y, sigma_v))
+    if option == "ratio":
+        # the soil column only: a ranking of zones, not the solver's sigma'_v,
+        # which also counts the surface load
+        try:
+            return max(float(material["c"]), float(material["cp"]) * sigma_n)
+        except (KeyError, TypeError, ValueError):
+            return None
     try:
         if option == "hb":
             from .hoekbrown import hb_tangent
@@ -944,7 +951,7 @@ def _comparable_strength(slope_data, ground, material, x, y):
 def _friction_angle(slope_data, ground, material, x, y):
     """The friction angle a wedge ramp through this material should use."""
     option = str((material or {}).get("option") or "mc").strip().lower()
-    if option in ("cp", "elastic", ""):
+    if option in ("cp", "ratio", "elastic", ""):
         return 0.0
     sigma_v = _column_stress(slope_data, ground, x, y)
     sigma_n = max(0.0, sigma_v - _pore_pressure(slope_data, material, x, y, sigma_v))

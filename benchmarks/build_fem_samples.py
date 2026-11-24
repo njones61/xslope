@@ -1,9 +1,9 @@
 """Build the finite element sample workbooks under docs/fem/files that no other
 builder writes.
 
-  xslope_noncircular_fem          docs/fem/samples.md, problem 3 (the thin weak
+  xslope_noncircular_fem          docs/fem/samples.md, problem 1 (the thin weak
                                   clay layer; fem_ssrm row)
-  xslope_simple_mult_layers_fem   docs/fem/samples.md, problem 4 (two-layer c-phi
+  xslope_simple_mult_layers_fem   docs/fem/samples.md, problem 2 (two-layer c-phi
                                   slope; fem_reliability row REL-FEM)
   xslope_piles_fem                the two-pile slope; a fixture of report_check,
                                   nr_ssrm_check, fem_1d_details_check, the
@@ -94,18 +94,22 @@ def _write(sd, name):
 
 
 # =============================================================================
-# docs/fem/samples.md, problem 3: thin weak clay layer
+# docs/fem/samples.md, problem 1: thin weak clay layer
 # =============================================================================
 def build_noncircular_fem():
     """The LEM non-circular sample's section (UTEXASED manual problem) with E and
     nu added: sand fill over sand, a 2 ft soft clay layer, dense sand to y = -10.
-    The water is a horizontal piezometric line at y = -2 read by the sand only."""
+    The water is a horizontal piezometric line at y = -2, read by every sand
+    layer as in the LEM sample (the fill lies wholly above it, so its setting
+    changes nothing); the undrained soft clay (phi = 0) reads none. The fill and
+    the dense sand carried no pore pressure until 2026-11-24, which the FEM's
+    old single pore-pressure option, applied to every layer, hid."""
     sd = _model(
         materials=[
-            _material('Sand Fill', 120.0, 0.0, 37.0, 1.0e6, 0.30),
+            _material('Sand Fill', 120.0, 0.0, 37.0, 1.0e6, 0.30, u='piezo'),
             _material('Sand', 123.0, 0.0, 33.0, 7.0e5, 0.30, u='piezo'),
             _material('Soft Clay', 118.0, 200.0, 0.0, 6.0e4, 0.40),
-            _material('Dense Sand', 131.0, 0.0, 37.0, 1.5e6, 0.28),
+            _material('Dense Sand', 131.0, 0.0, 37.0, 1.5e6, 0.28, u='piezo'),
         ],
         profile_lines=[
             ([(0.0, 0.0), (30.0, 10.0), (50.0, 10.0)], 0),
@@ -120,7 +124,7 @@ def build_noncircular_fem():
 
 
 # =============================================================================
-# docs/fem/samples.md, problem 4: two-layer c-phi slope (reliability)
+# docs/fem/samples.md, problem 2: two-layer c-phi slope (reliability)
 # =============================================================================
 def build_simple_mult_layers_fem():
     """Embankment over a foundation layer, with the standard deviations the

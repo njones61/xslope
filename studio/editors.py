@@ -139,7 +139,20 @@ class Field:
     'bool' is a YES/blank flag, edited through the same combo widget as 'choice' but
     stored as a real Python bool — matching what the loader produces for a YES/blank
     worksheet column. Writing the literal strings back would make the loader reject
-    the saved file, so the conversion happens at BOTH ends here."""
+    the saved file, so the conversion happens at BOTH ends here.
+
+    ``blank`` overrides the value a blank (or unreadable) numeric cell reads back as,
+    for a column whose loader fills a blank with something other than the kind's own
+    blank: the Mualem exponent l, which a blank workbook cell loads as 0.5. It is
+    also the field's ``default`` unless one is given.
+
+    ``as_typed`` (choice kind only) is for a column whose cell the engine reads
+    word by word, blank included, where a cell matching none of the choices must not
+    be shown — or saved — as one of them. A blank cell stays blank: the combo selects
+    nothing and shows ``blank_text`` (a string, or ``(row, n_rows) -> str`` for a
+    blank whose meaning depends on where the row stands) as its grayed placeholder.
+    Any other word is shown as typed, as an extra entry of that cell's own combo.
+    Either one, left alone, saves the value the row came with."""
 
     _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": "",
               "bool": False}
@@ -151,10 +164,16 @@ class Field:
     _BOOL_CHOICES = ["", "YES"]
 
     def __init__(self, key, header, kind="float", choices=None, default=None,
-                 usage=None, applies=None, tooltip=None, unit=None):
+                 usage=None, applies=None, tooltip=None, unit=None, blank=None,
+                 as_typed=False, blank_text=None):
         self.key = key
         self.header = header
         self.kind = kind
+        self.as_typed = bool(as_typed)
+        self.blank_text = blank_text
+        self.blank = self._BLANK.get(kind) if blank is None else blank
+        if default is None and blank is not None:
+            default = blank
         # Optional units-plan (phase 4) tag: the name of a ``xslope.units.labels()``
         # dict key (e.g. "stress", "unit_weight", "k"). When the project declares a
         # unit system the form builder appends the corresponding label to the header
@@ -221,18 +240,13 @@ class Field:
         text = (text or "").strip()
         if self.kind == "bool":
             return text.lower() in ("yes", "true", "1")
-        if self.kind == "float":
-            try:
-                return float(text)
-            except ValueError:
-                return 0.0
-        if self.kind == "optfloat":
+        if self.kind in ("float", "optfloat"):
             if text == "" or text.lower() == "none":
-                return None
+                return self.blank
             try:
                 return float(text)
             except ValueError:
-                return None
+                return self.blank
         if self.kind == "int":
             try:
                 return int(float(text))
@@ -609,6 +623,57 @@ def _sync_action_buttons(pairs):
             button.setEnabled(False)
 
 
+#: Item data marking the extra combo entry an ``as_typed`` cell shows a word
+#: matching none of its choices under (see Field.as_typed).
+_AS_TYPED_ROLE = Qt.UserRole + 7
+
+
+def _is_blank_value(val):
+    """None, NaN, or text that is empty once trimmed: an empty worksheet cell, in
+    any of the forms one reaches the editor in."""
+    if val is None:
+        return True
+    if isinstance(val, float):
+        return val != val
+    return isinstance(val, str) and not val.strip()
+
+
+def _seat_as_typed(combo, field, val):
+    """Show ``val`` in an ``as_typed`` choice cell without changing what it says: a
+    choice matched case-blind is selected; a blank selects nothing, so the cell
+    shows its placeholder; any other word is added to this cell's combo as typed
+    and selected there, marked so that saving it hands back the original value."""
+    if _is_blank_value(val):
+        combo.setCurrentIndex(-1)
+        return
+    text = str(val).strip()
+    hit = next((k for k, c in enumerate(field.choices)
+                if c.lower() == text.lower()), None)
+    if hit is not None:
+        combo.setCurrentIndex(hit)
+        return
+    combo.addItem(str(val))
+    combo.setItemData(combo.count() - 1, True, _AS_TYPED_ROLE)
+    combo.setCurrentIndex(combo.count() - 1)
+
+
+def _as_typed_value(combo, field, original):
+    """What an ``as_typed`` choice cell saves. Untouched, the value the row came
+    with — a blank stays the same blank, an unlisted word the same word, a choice
+    the same spelling. A cell emptied by a paste saves a blank (None), and a
+    different choice picked saves that choice."""
+    k = combo.currentIndex()
+    if k < 0:
+        return original if _is_blank_value(original) else None
+    if combo.itemData(k, _AS_TYPED_ROLE):
+        return original
+    picked = field.from_text(combo.itemText(k))
+    if (not _is_blank_value(original)
+            and str(original).strip().lower() == str(picked).lower()):
+        return original
+    return picked
+
+
 class _EditableTable(QWidget):
     """A table over a list of dict records with Add/Remove rows. Unshown keys are
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
@@ -633,8 +698,9 @@ class _EditableTable(QWidget):
         self._on_select = on_select
         # Optional per-row disable rule: row_dict -> set of field keys to gray out
         # (kept read-only, value retained). The Materials editor uses it to mirror
-        # the mat-sheet conditional formatting for an option=elastic row.
+        # the mat-sheet conditional formatting (the cells a row's choices leave unread).
         self._dim_rule = dim_rule
+        self._pasting = False      # a paste re-grays once, at its end
         # Whether a TYPED cell can change which cells apply. The materials rule is
         # driven by combos, which re-derive on their own; the reinforcement rule is
         # driven by whether Adhesion and Delta carry values, so it has to re-derive
@@ -843,7 +909,9 @@ class _EditableTable(QWidget):
         value is kept the way an untouched cell is), the matching entry for a choice
         column, matched without regard to case. Text that names no choice, and a
         column held read-only by the row's own state, leave their cells as they
-        were and are counted. One change notification for the whole block, so a
+        were and are counted — unless the block also sets one of that row's choices,
+        which defines the row: then every cell lands and the graying follows the
+        block's choices. One change notification for the whole block, so a
         preview redraws for the finished table rather than for every cell of a
         half-filled one."""
         block = _parse_clipboard_block(QApplication.clipboard().text())
@@ -858,6 +926,7 @@ class _EditableTable(QWidget):
 
         prev = self._suppress_notify
         self._suppress_notify = True
+        self._pasting = True
         try:
             grow = start_row + len(block) - self.table.rowCount()
             for _ in range(max(0, grow)):
@@ -867,6 +936,17 @@ class _EditableTable(QWidget):
                 self._bases.append(base)
                 self._set_row(i, base)
             for dr, cells in enumerate(block):
+                # A block that sets one of the row's live choices (a material's
+                # option, u or unsat) defines the row, as a row of the file does: the
+                # graying its OLD choices imposed does not hold its cells back. They
+                # all land, and the row is grayed afresh at the end for what the
+                # block chose.
+                if self._dim_rule is not None and any(
+                        isinstance(w, QComboBox) and w.isEnabled()
+                        for w in (self.table.cellWidget(start_row + dr, cols[start + dc])
+                                  for dc in range(len(cells))
+                                  if start + dc < len(cols))):
+                    self._apply_dim_row(start_row + dr, dim=frozenset())
                 for dc, text in enumerate(cells):
                     if start + dc >= len(cols):
                         skipped["past the last column"] += 1
@@ -876,8 +956,10 @@ class _EditableTable(QWidget):
                     if reason:
                         skipped[reason] += 1
             self._rebuild_swatches()
+            self._pasting = False
             self._apply_dim_all()
         finally:
+            self._pasting = False
             self._suppress_notify = prev
         self._show_paste_summary(len(block), width, skipped)
         self._emit_change()
@@ -906,6 +988,9 @@ class _EditableTable(QWidget):
         if isinstance(w, QComboBox):
             if not w.isEnabled():
                 return "read-only"
+            if f.as_typed and not text:
+                w.setCurrentIndex(-1)        # a pasted blank is a blank (Field.as_typed)
+                return ""
             for k in range(w.count()):
                 if w.itemText(k).strip().lower() == text.lower():
                     w.setCurrentIndex(k)
@@ -995,15 +1080,19 @@ class _EditableTable(QWidget):
             if f.kind in Field.COMBO_KINDS:
                 combo = QComboBox()
                 combo.addItems(f.choices)
-                _txt = f.to_text(val)
-                # The loader lower-cases a free-text option cell ('Yes' reaches
-                # here as 'yes'), so the match is case-blind: a Joint or Jred
-                # that reads yes on the sheet shows Yes in the cell rather than
-                # a blank combo that would write a blank back on save.
-                _hit = next((c for c in f.choices
-                             if c.lower() == str(_txt).lower()), None)
-                if _hit is not None:
-                    combo.setCurrentText(_hit)
+                if f.as_typed:
+                    _seat_as_typed(combo, f, val)
+                else:
+                    _txt = f.to_text(val)
+                    # The loader lower-cases a free-text option cell ('Yes'
+                    # reaches here as 'yes'), so the match is case-blind: a Joint
+                    # or Jred that reads yes on the sheet shows Yes in the cell
+                    # rather than a blank combo that would write a blank back on
+                    # save.
+                    _hit = next((c for c in f.choices
+                                 if c.lower() == str(_txt).lower()), None)
+                    if _hit is not None:
+                        combo.setCurrentText(_hit)
                 # A preset driver fills its dependent columns BEFORE the general
                 # notify, so one edit is one redraw of the finished row. Connected
                 # here (after the initial setCurrentText above) so populating a table
@@ -1098,6 +1187,8 @@ class _EditableTable(QWidget):
         return next((j for j, f in enumerate(self._fields) if f.key == key), None)
 
     def _on_combo_changed(self):
+        if self._pasting:
+            return                 # the paste re-grays and announces once, at its end
         self._apply_dim_all()
         self._emit_change()
 
@@ -1129,7 +1220,23 @@ class _EditableTable(QWidget):
                 self._suppress_notify = prev
         self._emit_change()
 
+    def _refresh_blank_text(self):
+        """Re-word each blank ``as_typed`` cell's placeholder for where its row now
+        stands. Run with the graying, which is re-derived whenever a row is added,
+        removed, pasted or re-chosen — the same moments a row can move to or from
+        the ends of the table."""
+        n = self.table.rowCount()
+        for j, f in enumerate(self._fields):
+            if not (f.as_typed and f.blank_text):
+                continue
+            for i in range(n):
+                w = self.table.cellWidget(i, j)
+                if isinstance(w, QComboBox):
+                    w.setPlaceholderText(f.blank_text(i, n) if callable(f.blank_text)
+                                         else str(f.blank_text))
+
     def _apply_dim_all(self):
+        self._refresh_blank_text()
         if self._dim_rule is None:
             return
         prev = self._suppress_notify
@@ -1140,10 +1247,12 @@ class _EditableTable(QWidget):
         finally:
             self._suppress_notify = prev
 
-    def _apply_dim_row(self, i):
+    def _apply_dim_row(self, i, dim=None):
         """Gray (disable, keep value) the fields the dim rule marks inapplicable for
-        this row; restore the rest to normal editable/enabled state."""
-        dim = self._dim_rule(self._row_values(i))
+        this row; restore the rest to normal editable/enabled state. ``dim`` given
+        overrides the rule (an empty set makes the whole row live)."""
+        if dim is None:
+            dim = self._dim_rule(self._row_values(i))
         for j, f in enumerate(self._fields):
             dimmed = f.key in dim
             w = self.table.cellWidget(i, j)
@@ -1184,7 +1293,9 @@ class _EditableTable(QWidget):
             base = dict(self._bases[i]) if i < len(self._bases) else self._new_row()
             for j, f in enumerate(self._fields):
                 widget = self.table.cellWidget(i, j)
-                if isinstance(widget, QComboBox):
+                if isinstance(widget, QComboBox) and f.as_typed:
+                    base[f.key] = _as_typed_value(widget, f, base.get(f.key))
+                elif isinstance(widget, QComboBox):
                     base[f.key] = f.from_text(widget.currentText())
                 else:
                     item = self.table.item(i, j)
@@ -1516,24 +1627,37 @@ def _draw_polygon_preview(ax, polys, selected, slope_data, style):
     _finish_preview_axes(ax)
 
 
+def _cell_number(v):
+    """A typed cell as a number, NaN when it is blank or not a number."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return float("nan")
+    return v
+
+
 def _circle_radius_depth(c):
     """(Xo, Yo, R, Depth) from a pending circle row, resolving R/Depth from the row's
     Option EXACTLY as CirclesEditor.apply does — so the preview tracks the option live
-    (a Radius/Intercept row previews from R, a Depth row from Depth)."""
+    (a Radius/Intercept row previews from R, a Depth row from Depth). A blank Option,
+    or a word that is none of the three, states no size: R and Depth are NaN, and the
+    circle is not drawn."""
     def f(key):
         try:
             return float(c.get(key, 0) or 0)
         except (TypeError, ValueError):
             return 0.0
     Xo, Yo = f("Xo"), f("Yo")
-    opt = str(c.get("Option", "Depth"))
-    if opt == "Radius":
+    opt = str(c.get("Option", "Depth") or "").strip().lower()
+    if opt == "radius":
         R = f("R"); depth = Yo - R
-    elif opt == "Intercept":
+    elif opt == "intercept":
         R = ((f("Xi") - Xo) ** 2 + (f("Yi") - Yo) ** 2) ** 0.5
         depth = Yo - R
-    else:
+    elif opt == "depth":
         depth = f("Depth"); R = Yo - depth
+    else:
+        R = depth = float("nan")
     return Xo, Yo, R, depth
 
 
@@ -1647,7 +1771,7 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style, window=None)
 
     for i, c in enumerate(circles):
         Xo, Yo, R, depth = _circle_radius_depth(c)
-        if R <= 0:
+        if not R > 0:                  # unsized (NaN) or degenerate: nothing to draw
             continue
         emph = (i == selected)
         arc = _circle_arc(slope_data, Xo, Yo, R, depth)
@@ -1937,13 +2061,32 @@ def _draw_seep_bc_preview(ax, entries, selected, slope_data, style, set_no=1):
 _NCPT_MARKER = {"Fixed": "s", "Horiz": "D", "Free": "o"}   # per movement type
 
 
+def _noncirc_point_movement(value, i, n):
+    """The Movement the non-circular search gives point ``i`` of ``n`` (in table
+    order): Free, Horiz or Fixed matched in any case, and a blank by position — an
+    end point slides along the ground surface (Free), an interior point stays where
+    it is (Fixed). ``None`` for a word that is none of these, which the model checks
+    refuse."""
+    from xslope.fileio import noncirc_movement
+    word = noncirc_movement(value)
+    if word is None:
+        return "Free" if i in (0, n - 1) else "Fixed"
+    return word if word in _NCPT_MARKER else None
+
+
+def _noncirc_blank_text(i, n):
+    """A blank Movement cell's placeholder: what the search does with the point."""
+    return f"{_noncirc_point_movement(None, i, n)} (blank)"
+
+
 def _draw_noncirc_preview(ax, rows, selected, slope_data, style):
     """Preview for the non-circular editor: the base geometry ONLY (profile/polygon
     layers + max-depth base — no piezo or other overlays; Norm's declutter) with the
     pending polyline (all rows) drawn bold, each vertex marked with a per-movement
     glyph — □ Fixed, ◇ Horiz-only, ○ Free — and the selected vertex enlarged and
-    filled. Horiz vertices also carry a small ↔ direction glyph. Points are ordered
-    left→right as entered."""
+    filled. Horiz vertices also carry a small ↔ direction glyph. A blank Movement is
+    drawn as the search reads it (Free at an end, Fixed inside), and a word that is
+    no Movement as ×. Points are ordered left→right as entered."""
     import numpy as np
     from xslope.plot import plot_base_geometry
     from xslope.style import resolve_style
@@ -1953,10 +2096,11 @@ def _draw_noncirc_preview(ax, rows, selected, slope_data, style):
     except Exception:
         pass
     pts = []
-    for r in rows:
+    for k, r in enumerate(rows):
         pt = _xy(r, "X", "Y")
         if pt is not None:
-            pts.append((pt[0], pt[1], str(r.get("Movement", "Free"))))
+            pts.append((pt[0], pt[1],
+                        _noncirc_point_movement(r.get("Movement"), k, len(rows))))
     if len(pts) >= 2:
         ax.plot([p[0] for p in pts], [p[1] for p in pts], color=_PREVIEW_EMPH,
                 linewidth=_PREVIEW_EMPH_LW, zorder=18)
@@ -1970,7 +2114,7 @@ def _draw_noncirc_preview(ax, rows, selected, slope_data, style):
             ax.annotate("", xy=(x + glyph, y), xytext=(x - glyph, y), zorder=19,
                         annotation_clip=False,
                         arrowprops=dict(arrowstyle="<->", color=_PREVIEW_EMPH, lw=1.5))
-        ax.plot([x], [y], marker=_NCPT_MARKER.get(mv, "o"),
+        ax.plot([x], [y], marker=_NCPT_MARKER.get(mv, "X"),
                 markersize=11 if emph else 7, color=_PREVIEW_EMPH,
                 markerfacecolor=_PREVIEW_EMPH if emph else "white",
                 markeredgecolor=_PREVIEW_EMPH, markeredgewidth=1.6, zorder=20)
@@ -2104,7 +2248,7 @@ def _pick_circles(rows, x, y, tol, slope_data):
     best_i, best_d = None, float("inf")
     for i, c in enumerate(rows):
         Xo, Yo, R, depth = _circle_radius_depth(c)
-        if R <= 0:
+        if not R > 0:                  # unsized (NaN) or degenerate: nothing to pick
             continue
         d = pt.distance(_Point(Xo, Yo))                         # center marker
         arc = _circle_arc(slope_data, Xo, Yo, R, depth)
@@ -2488,7 +2632,8 @@ class TableEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
                  usage_toggles=None, preview_draw=None, preview_caption=None,
                  pick_resolve=None, field_help=None, unit_labels=None,
-                 generate=None, preview_below=False, extra_widget=None):
+                 generate=None, preview_below=False, extra_widget=None,
+                 dim_rule=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -2508,9 +2653,12 @@ class TableEditorDialog(QDialog):
             layout.addWidget(_help_label(help_text))
         on_change = self._schedule_preview if preview_draw is not None else None
         on_select = self._schedule_preview if preview_draw is not None else None
+        # ``dim_rule`` (row dict -> keys to gray) grays the cells a row's own
+        # choices leave unread, as the worksheet does (the circles' Option).
         self._editable = _EditableTable(fields, rows, new_row,
                                         on_change=on_change, on_select=on_select,
-                                        unit_labels=self._unit_labels)
+                                        unit_labels=self._unit_labels,
+                                        dim_rule=dim_rule)
         if usage_toggles:
             layout.addLayout(self._build_toggle_bar(usage_toggles, fields))
         else:
@@ -3622,7 +3770,9 @@ class GlobalEditor(CategoryEditor):
         Field("gamma_water", "Unit weight of water", unit="unit_weight"),
         Field("tcrack_depth", "Tension crack depth"),
         Field("tcrack_water", "Water in crack"),
-        Field("k_seismic", "Seismic coefficient k"),
+        Field("k_seismic", "Horizontal seismic coefficient k_h"),
+        # v28: signed, positive downward, in the LEM and the FEM alike.
+        Field("k_vertical", "Vertical seismic coefficient k_v (+ down)"),
         # v19: K0 initial stress. optfloat so a blank stays None — "unspecified",
         # which is the gravity turn-on initialization, NOT K0 = 0.
         Field("k0", "K0 initial stress (FEM)", "optfloat", usage="fem",
@@ -3682,7 +3832,7 @@ _MAT_SIGMA = {"gamma": "sigma_gamma", "c": "sigma_c", "phi": "sigma_phi",
               "cp": "sigma_cp", "d": "sigma_d", "psi": "sigma_psi"}
 # Strength option -> the option-specific fields shown in the list-view form (only
 # the selected option's are visible; blank shows none, per bc0999d).
-_MAT_OPTION_FIELDS = {"mc": ["c", "phi"], "cp": ["c", "cp", "r_elev"],
+_MAT_OPTION_FIELDS = {"mc": ["c", "phi"], "cp": ["c", "cp", "r_elev"], "ratio": ["c", "cp"],
                       "pow": ["pow_a", "pow_b", "pow_c", "pow_d"],
                       "hb": ["hb_sci", "hb_gsi", "hb_mi", "hb_d"],
                       "elastic": [], "": []}
@@ -3690,47 +3840,95 @@ _MAT_ALL_OPTION_FIELDS = ["c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c",
                           "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d"]
 
 # v17: the matric-suction pair phi_b/s_cap (red "LEM & FEM" block, cols Q:R right of
-# ru) is read only for an effective-stress strength option (mc/pow/hb) paired with a
-# signed-u pore-pressure model (piezo or seep). It is inert — and grayed, mirroring
-# the mat-sheet CF on cols Q:R — for cp (total-stress Su already embodies field
-# suction), for elastic (no strength at all), and whenever u delivers no signed
-# pressure (none/ru/blank: ru is a positive ratio by construction, none/blank carry
-# no suction). Both solvers now read it (in the FEM/SSRM the suction term is reduced
-# by F alongside tan φ'); the graying rule is unchanged by that.
+# ru) is read only for an effective-stress strength option (mc/pow/hb, or a blank
+# one) paired with a signed-u pore-pressure model (piezo or seep). Neither solver
+# credits suction to cp, ratio or elastic (cp and ratio state an undrained strength
+# that already embodies it; elastic has no strength), and u = none/ru/blank delivers
+# no signed pressure (ru is a positive ratio by construction; a blank u reads as
+# none). Inert there, so grayed. In the FEM/SSRM the suction term is reduced by F
+# alongside tan φ'.
 _MAT_SUCTION_DIM = frozenset(["phi_b", "s_cap"])
 
 # v16: an option=elastic material cannot fail — the mat sheet grays every strength
-# column, t_cut, the rapid-drawdown pair d/ψ, the matric-suction pair, u/ru and the strength
-# standard deviations for such a row (CF ranges F..N, Q..R, AB..AF on $E="elastic").
-# g/gsat, E/ν, s(γ) and the seepage block stay live. The editor mirrors that: these
-# keys read-only/gray on both views when the row's option is elastic.
+# column, t_cut, the rapid-drawdown pair d/ψ, the matric-suction pair and the strength
+# standard deviations for such a row (CF ranges F..L, Q..R, AA..AF on $E="elastic").
+# s(γ) goes with them: reliability refuses a σ on an elastic row's unit weight.
+# g/gsat, E/ν, u and the seepage block stay live: an elastic material reads its own
+# u (Norm, 533a) — a sealed wall is u = none, so the water presses on its face; a
+# permeable wall or rock is seep or piezo — and its ru when u = ru, so ru grays on
+# an elastic row only as on any other. The editor mirrors that: these keys
+# read-only/gray on both views when the row's option is elastic.
 _MAT_ELASTIC_DIM = frozenset(
-    _MAT_ALL_OPTION_FIELDS + ["d", "psi", "phi_b", "s_cap", "t_cut", "u", "ru",
-                              "sigma_c", "sigma_phi", "sigma_cp",
+    _MAT_ALL_OPTION_FIELDS + ["d", "psi", "phi_b", "s_cap", "t_cut",
+                              "sigma_gamma", "sigma_c", "sigma_phi", "sigma_cp",
                               "sigma_d", "sigma_psi"])
 
 
-def _mat_dim_keys(row):
-    """Field keys to gray for a material row.
+# The fields each strength option leaves unread, as the mat sheet grays them (its
+# conditional formatting on cols F:K and AA:AF). The Kc = 1 pair d/psi is read only
+# for mc: an undrained option (cp, ratio) is the stage-2 strength itself, and pow/hb
+# are refused by rapid drawdown and the two-stage seismic analysis. pow and hb also
+# gray s(γ): reliability refuses a model with either envelope in it.
+_MAT_DPSI_DIM = frozenset(["d", "psi", "sigma_d", "sigma_psi"])
+_MAT_OPTION_DIM = {
+    "mc": frozenset(["cp", "r_elev", "sigma_cp"]),
+    "cp": frozenset(["phi", "sigma_phi"]) | _MAT_DPSI_DIM | _MAT_SUCTION_DIM,
+    "ratio": (frozenset(["phi", "r_elev", "sigma_phi"]) | _MAT_DPSI_DIM
+              | _MAT_SUCTION_DIM),
+    "pow": (frozenset(["c", "phi", "cp", "r_elev", "sigma_gamma", "sigma_c",
+                       "sigma_phi", "sigma_cp"])
+            | _MAT_DPSI_DIM),
+}
+_MAT_OPTION_DIM["hb"] = _MAT_OPTION_DIM["pow"]
+_MAT_POW_FIELDS = frozenset(["pow_a", "pow_b", "pow_c", "pow_d"])
+_MAT_HB_FIELDS = frozenset(["hb_sci", "hb_gsi", "hb_mi", "hb_d"])
 
-    An elastic row grays its whole inert set. Otherwise the only option-coupled
-    graying is the matric-suction pair phi_b/s_cap, which is inert for a total-stress
-    strength option (cp) or a pore-pressure model that delivers no signed u — i.e. u
-    not in {piezo, seep} — mirroring the template's L:M conditional formatting."""
+
+def _mat_dim_keys(row):
+    """Field keys to gray for a material row: the fields its choices leave unread.
+
+    Mirrors the mat sheet's conditional formatting, so the table, the form and the
+    workbook gray the same cells, and the sheet grays what the engines do not read.
+    An elastic row grays its whole inert strength set (``_MAT_ELASTIC_DIM``), the
+    suction pair included, but not u: an elastic material reads its own u. Otherwise:
+    the fields the strength option does not read (``_MAT_OPTION_DIM``) and the other
+    options' curve parameters, and the matric-suction pair unless u delivers a signed
+    pressure (piezo or seep). On every row ru is grayed unless u = ru. A blank u
+    reads as none, as the loader reads it, so it grays ru and the suction pair too.
+    A blank option grays nothing on its own account.
+
+    On every row, elastic included, the unsaturated-model parameters the chosen
+    model does not read are grayed, a blank unsat reading as lf (the loader's
+    reading): lf reads kr0 and h0; vg reads a, n and l; gard reads a and n, and h0
+    as well, which transient seepage takes for its drainage band — so gard grays kr0
+    and l, and vg grays kr0 and h0."""
     opt = str(row.get("option", "") or "").strip().lower()
     if opt == "elastic":
-        return _MAT_ELASTIC_DIM
-    u = str(row.get("u", "") or "").strip().lower()
-    if opt == "cp" or u not in ("piezo", "seep"):
-        return _MAT_SUCTION_DIM
-    return frozenset()
+        dim = set(_MAT_ELASTIC_DIM)
+    else:
+        dim = set(_MAT_OPTION_DIM.get(opt, ()))
+        if opt and opt != "pow":
+            dim |= _MAT_POW_FIELDS
+        if opt and opt != "hb":
+            dim |= _MAT_HB_FIELDS
+    u = str(row.get("u", "") or "").strip().lower() or "none"
+    if u != "ru":
+        dim.add("ru")
+    if u not in ("piezo", "seep"):
+        dim |= _MAT_SUCTION_DIM
+    um = str(row.get("unsat", "") or "").strip().lower() or "lf"
+    if um in _MAT_UNSAT_FIELDS:
+        dim.update(k for k in _MAT_ALL_UNSAT_FIELDS
+                   if k not in _MAT_UNSAT_FIELDS[um])
+    return frozenset(dim)
 
 
-# Unsaturated model -> its curve params. gard reuses vg's a/n columns (fileio.py),
-# but not its Mualem exponent l, which belongs to the van Genuchten conductivity
-# integral alone.
+# Unsaturated model -> the parameters the seepage solvers read for it. gard reuses
+# vg's a/n columns (fileio.py), but not its Mualem exponent l, which belongs to the
+# van Genuchten conductivity integral alone. gard also reads h0: a transient run
+# takes Gardner's drainage band from it.
 _MAT_UNSAT_FIELDS = {"lf": ["kr0", "h0"], "vg": ["vg_a", "vg_n", "vg_l"],
-                     "gard": ["vg_a", "vg_n"]}
+                     "gard": ["h0", "vg_a", "vg_n"]}
 _MAT_ALL_UNSAT_FIELDS = ["kr0", "h0", "vg_a", "vg_n", "vg_l"]
 
 
@@ -4077,14 +4275,14 @@ class _MaterialListView(QWidget):
         self._u_combo = self._make_edit("u")
         self._u_combo.currentIndexChanged.connect(self._on_u_changed)
         uh.addWidget(self._u_combo, 1)
-        self._u_cell = u_cell            # grayed whole for an elastic material
+        self._u_cell = u_cell            # live on every row: elastic reads u too
         gv.addWidget(self._register_cell("u", u_cell))
         gv.addWidget(self._cell("ru", "ru"))
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — LEM & FEM).
         # Placed here to mirror the template, where the pair moved right of ru and is
         # coupled to the pore-pressure model (matric suction = negative pore pressure).
-        # Always shown, grayed when inert (cp/elastic, or u not signed) by
-        # _update_suction_disable.
+        # Always shown, grayed when inert (cp/ratio/elastic, or u not signed) by
+        # _update_dim.
         gv.addWidget(self._pair(self._cell("φ_b", "phi_b", label_w=52),
                                 self._cell("s_cap", "s_cap", label_w=44)))
         self._group_boxes.append((g, ["u", "ru", "phi_b", "s_cap"]))
@@ -4207,8 +4405,7 @@ class _MaterialListView(QWidget):
             self._update_u_visibility()
             self._update_unsat_visibility()
             self._update_sigma_visibility()
-            self._update_elastic_disable()
-            self._update_suction_disable()
+            self._update_dim()
             self._refresh_plots()
         else:
             self._clear_plots()
@@ -4280,33 +4477,26 @@ class _MaterialListView(QWidget):
             self._set_model_hidden(key, key not in shown)
         self._apply_visibility()
 
-    def _update_elastic_disable(self):
-        """Gray the fields inert for an option=elastic material (mirrors the mat-sheet
-        conditional formatting): t_cut, the rapid-drawdown pair d/ψ and the pore-pressure
-        model u/ru go read-only; g/gsat, E/ν and the seepage block stay live. The
-        strength-option cells are already hidden for 'elastic' (empty option set), so
-        only the always-shown cells need graying. Disabling a whole d/ψ cell also
-        grays its s(d)/s(ψ) — matching the template, which grays those too."""
-        elastic = self._opt_combo.currentText().strip().lower() == "elastic"
-        for key in ("t_cut", "d", "psi", "ru"):
-            w = self._cell_widgets.get(key)
-            if w is not None:
-                w.setEnabled(not elastic)
-        self._u_cell.setEnabled(not elastic)
-
-    def _update_suction_disable(self):
-        """Gray the matric-suction pair phi_b/s_cap when it is inert (mirrors the
-        mat-sheet CF on cols Q:R): grayed for cp (total-stress Su already embodies
-        field suction) or elastic (no strength), and whenever u delivers no signed
-        pressure (u not in {piezo, seep}). Reuses the table view's dim rule so the two
-        views stay a single source of truth. Depends on both the option and u combos,
-        so it is re-run whenever either changes as well as on load."""
+    def _update_dim(self):
+        """Gray the cells the row's choices leave unread, by the table view's own
+        rule (``_mat_dim_keys``), so the two views and the mat sheet agree: d/ψ for
+        any option but mc, t_cut for elastic, the suction pair unless u is piezo or
+        seep (and always for cp, ratio and elastic), and so on. A cell the option
+        already hides is grayed as well, which shows only if it comes back.
+        Disabling a cell grays its σ readout with it, as the sheet grays s(d)/s(ψ)
+        with d/ψ; a σ the rule grays on its own (s(γ) for elastic, pow and hb) is
+        grayed by itself, its value cell staying live. Depends on the option, u and
+        unsat combos, so it is re-run whenever one changes as well as on load."""
         dim = _mat_dim_keys({"option": self._opt_combo.currentText(),
-                             "u": self._u_combo.currentText()})
-        for key in ("phi_b", "s_cap"):
-            w = self._cell_widgets.get(key)
-            if w is not None:
+                             "u": self._u_combo.currentText(),
+                             "unsat": self._unsat_combo.currentText()})
+        for key, w in self._cell_widgets.items():
+            if key != "option":
                 w.setEnabled(key not in dim)
+        for base, (slab, sedit) in self._sigma_widgets.items():
+            live = _MAT_SIGMA[base] not in dim
+            slab.setEnabled(live)
+            sedit.setEnabled(live)
 
     def _update_u_visibility(self):
         self._set_model_hidden(
@@ -4314,7 +4504,8 @@ class _MaterialListView(QWidget):
         self._apply_visibility()
 
     def _update_unsat_visibility(self):
-        um = self._unsat_combo.currentText().strip().lower()
+        # Blank reads as lf, as the loader reads it (the combo offers no blank).
+        um = self._unsat_combo.currentText().strip().lower() or "lf"
         shown = set(_MAT_UNSAT_FIELDS.get(um, []))
         for key in _MAT_ALL_UNSAT_FIELDS:
             self._set_model_hidden(key, key not in shown)
@@ -4351,18 +4542,18 @@ class _MaterialListView(QWidget):
     def _on_option_changed(self):
         self._commit()
         self._update_option_visibility()
-        self._update_elastic_disable()
-        self._update_suction_disable()       # option gates the suction pair too
+        self._update_dim()                   # the option gates d/ψ, suction, ...
         self._plot_timer.start()
 
     def _on_u_changed(self):
         self._commit()
         self._update_u_visibility()          # u affects neither plot; no refresh
-        self._update_suction_disable()       # u gates the matric-suction pair
+        self._update_dim()                   # u gates ru and the suction pair
 
     def _on_unsat_changed(self):
         self._commit()
         self._update_unsat_visibility()
+        self._update_dim()
         self._plot_timer.start()             # kr plot depends on the unsat model
 
     def _add(self):
@@ -4426,12 +4617,17 @@ MATERIALS_HELP = {
     "gamma_sat": ("Saturated unit weight (below the water table — the seepage "
                   "surface, else the piezo line; blank = use γ). LEM & FEM."),
     "option": "Strength model — determines which strength columns apply.",
-    "c": "Cohesion intercept (mc: Mohr-Coulomb c; cp: undrained strength at r-elev).",
+    "c": ("Cohesion intercept (mc: Mohr-Coulomb c; cp: undrained strength at r-elev; "
+          "ratio: the minimum undrained strength)."),
     "phi": "Friction angle φ, degrees (mc option).",
-    "cp": "Rate of undrained-strength increase per unit elevation below r-elev (cp option).",
+    "cp": ("cp option: rate of undrained-strength increase per unit elevation below "
+           "r-elev. ratio option: the strength ratio s_u/σ′v (about 0.05 to 0.3)."),
     "r_elev": "Reference elevation; at or above it the strength equals c (cp option).",
-    "d": "Rapid-drawdown R-envelope cohesion intercept (LEM rapid-drawdown only).",
-    "psi": "Rapid-drawdown R-envelope friction angle (LEM rapid-drawdown only).",
+    "d": ("Intercept d of the Kc = 1 envelope (τff against σ′fc), for a material "
+          "that does not drain: LEM rapid drawdown and two-stage seismic only."),
+    "psi": ("Slope ψ of the Kc = 1 envelope (τff against σ′fc), degrees, for a "
+            "material that does not drain: LEM rapid drawdown and two-stage seismic "
+            "only."),
     "phi_b": ("Fredlund unsaturated friction angle φ_b, degrees — credits matric-"
               "suction strength above the water line (mc/pow/hb; LEM & FEM — in the "
               "FEM/SSRM the suction term is reduced by F alongside tan φ'). Blank = no "
@@ -4449,9 +4645,11 @@ MATERIALS_HELP = {
               "at φ=0), enforced but never reduced by F — enough to hold a steep crest cut "
               "shut and inflate SSRM FS. At c=0, blank and 0 are the same. A cap you set IS "
               "reduced with F, like c and tanφ (RS2/Plaxis do the same). 0 = no tension at all."),
-    "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
-    "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
-    "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",
+    "E": "FEM elastic (Young's) modulus — with ν, the only stiffness property read for an elastic material.",
+    "nu": "FEM Poisson's ratio — with E, the only stiffness property read for an elastic material.",
+    "u": ("Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), "
+          "or ru. Read for an elastic material too: none for a sealed wall (the water "
+          "presses on its face), seep or piezo for a permeable one."),
     "ru": "Pore-pressure ratio; u = ru·σv on the soil column only (u = ru option).",
     "pow_a": "Power-curve envelope coefficient a in τ = a·(σ'n + d)^b + c (pow option).",
     "pow_b": "Power-curve exponent b; b = 1 collapses to Mohr-Coulomb (pow option).",
@@ -4462,7 +4660,8 @@ MATERIALS_HELP = {
     "hb_gsi": "GSI — Geological Strength Index, (0, 100] (hb option).",
     "hb_mi": "mi — intact Hoek-Brown constant, a rock-type property (hb option).",
     "hb_d": "D — disturbance factor, 0 (undisturbed) to 1 (blast-damaged) (hb option).",
-    "sigma_gamma": "Reliability: standard deviation of g.",
+    "sigma_gamma": ("Reliability: standard deviation of g. Not read for an elastic, "
+                    "pow or hb material."),
     "sigma_c": "Reliability: standard deviation of c.",
     "sigma_phi": "Reliability: standard deviation of φ.",
     "sigma_cp": "Reliability: standard deviation of cp.",
@@ -4473,7 +4672,8 @@ MATERIALS_HELP = {
     "alpha": "Seepage: orientation angle of the permeability tensor (degrees).",
     "unsat": "Seepage: unsaturated relative-permeability model — lf, vg, or gard.",
     "kr0": "Relative conductivity kr0 at suction head h0 (linear-front, unsat = lf).",
-    "h0": "Suction head at which k = kr0 (linear-front, unsat = lf).",
+    "h0": ("Suction head at which k = kr0 (linear-front, unsat = lf). With gard, a "
+           "transient seepage run takes its storage band from h0."),
     "vg_a": "Curve parameter a (vg: α in 1/length; gard: power-form a).",
     "vg_n": "Curve parameter n (van Genuchten / Gardner, unsat = vg or gard).",
     "vg_l": "Mualem pore-connectivity exponent, 0.5 unless fitted.",
@@ -4775,46 +4975,53 @@ class MaterialsEditor(CategoryEditor):
     # `applies` tags mirror the template's analysis usage (input_template.md):
     # the strength block (g, gsat, option, c, f, c/p, r-elev, the pow_* power-curve
     # and hb_* Hoek-Brown envelope parameters, u, ru, phi_b/s_cap) is shared by LEM+FEM;
-    # d/psi are rapid-drawdown (LEM); s(...) reliability; k1..vg_n seepage; t_cut/E/nu FEM.
+    # d/psi are the Kc = 1 envelope (LEM rapid drawdown and two-stage seismic); s(...)
+    # reliability; k1..vg_n seepage; t_cut/E/nu FEM.
     # gsat is optional (blank -> fall back to g), so it reads back as None when
     # left empty rather than 0.0. The alternate-envelope columns (pow_*/hb_*) are
     # always shown; option-driven show/hide grouping is a later UX pass.
     #
-    # Every property whose ZERO is physically meaningful is an 'optfloat' -- gamma,
-    # c, phi, d, psi, E, nu, ru, k1 -- so a blank cell comes back as None and the
-    # model checks can tell "the user entered 0" from "the user left it blank".
-    # A plain 'float' stamps 0.0 onto every blank cell of every row on OK (the table
-    # rewrites all fields), which made a cohesionless material and an unfilled one
-    # indistinguishable, a blank Poisson's ratio silently 0.0 (-33% on a measured
-    # SSRM factor of safety), and a blank r_u a model with no pore pressure at all.
-    # The writer blanks the cell for a None rather than stamping a 0.0 into the
-    # sheet, so an unfilled property is not invented on the way out either. (The
-    # LOADER still reads a blank numeric cell back as 0.0, unchanged here; what this
-    # buys is that a model edited in Studio carries the distinction while it is being
-    # edited, which is when the checks run and when the user can act on them.)
+    # A blank cell reads back as what the LOADER gives the same blank cell in the
+    # mat sheet (fileio.load_slope_data), so a model edited in Studio is the model
+    # its saved file reopens as. Most columns load a blank as 0 -- gamma, c, phi, d,
+    # psi, E, nu, ru, k1 among them -- and are plain 'float's; the Mualem exponent l
+    # loads as 0.5 (its own `blank`). The columns whose blank means "not set" load as
+    # None and are 'optfloat's: gsat (falls back to g), t_cut (no stated cutoff),
+    # phi_b and s_cap (no suction strength, uncapped), Ss and Sy (required only with
+    # a tseep sheet).
+    #
+    # These columns were once 'optfloat's too, so a cleared cell would stay None and
+    # the model checks could word it as blank. Nothing downstream reads a None there:
+    # a ratio or cp material with c cleared raised a TypeError in the slicer, an mc
+    # one left every trial surface unsolved, and a None d read as a Kc = 1 envelope
+    # (advanced.validate_rapid_drawdown tests d != 0). The checks already refuse the
+    # zeros that matter -- a unit weight or E of 0, a Poisson's ratio of 0 (which
+    # mat.nu_unusable names as what a blank cell reads as), u = ru with r_u = 0 -- so
+    # the loader's value costs them nothing. The writer still blanks the cell for a
+    # None (from a script or the assistant), and the loader reads it back as above.
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
-        Field("gamma", "γ", "optfloat", applies=LF, unit="unit_weight"),
+        Field("gamma", "γ", applies=LF, unit="unit_weight"),
         Field("gamma_sat", "γsat", "optfloat", applies=LF, unit="unit_weight"),
         # A BLANK option is valid for seep-only material rows (the loader keeps ''
         # via _choice; document._blank_material produces it for DXF imports). Offer
         # it as an empty combo entry so the editor round-trips it instead of
         # normalizing blank -> 'mc'. 'elastic' (v16): infinite strength — the row's
         # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
-        Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
-        Field("c", "c", "optfloat", applies=LF, unit="stress"),
-        Field("phi", "φ", "optfloat", applies=LF),
+        Field("option", "option", "choice", choices=["mc", "cp", "ratio", "pow", "hb", "elastic", ""], applies=LF),
+        Field("c", "c", applies=LF, unit="stress"),
+        Field("phi", "φ", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
-        Field("d", "d", "optfloat", usage="lem"),
-        Field("psi", "psi", "optfloat", usage="lem"),
+        Field("d", "d", usage="lem"),
+        Field("psi", "psi", usage="lem"),
         # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
-        Field("E", "E", "optfloat", usage="fem", unit="stress"),
-        Field("nu", "n", "optfloat", usage="fem"),
+        Field("E", "E", usage="fem", unit="stress"),
+        Field("nu", "n", usage="fem"),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
-        Field("ru", "ru", "optfloat", applies=LF),
+        Field("ru", "ru", applies=LF),
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — the red
         # "LEM & FEM" block, mirroring c/φ, since both solvers now read it). optfloat
         # so a blank cell stays None — phi_b None = no suction strength (the default,
@@ -4830,7 +5037,7 @@ class MaterialsEditor(CategoryEditor):
         Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
-        Field("k1", "k1", "optfloat", usage="seep", unit="k"),
+        Field("k1", "k1", usage="seep", unit="k"),
         Field("k2", "k2", usage="seep", unit="k"),
         Field("alpha", "alpha", usage="seep"),
         # Unsaturated model: lf (linear front -> kr0/h0), vg (van Genuchten) or gard
@@ -4840,9 +5047,9 @@ class MaterialsEditor(CategoryEditor):
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep", unit="length"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
         # v26: the Mualem pore-connectivity exponent of the van Genuchten
-        # conductivity curve. optfloat so a blank cell stays None -- which the
-        # loader reads as Mualem's 0.5, the value a 0.0 would NOT mean.
-        Field("vg_l", "l", "optfloat", usage="seep", tooltip=MATERIALS_HELP["vg_l"]),
+        # conductivity curve. A blank cell is Mualem's 0.5, as the loader reads it --
+        # the value a 0.0 would NOT mean.
+        Field("vg_l", "l", usage="seep", tooltip=MATERIALS_HELP["vg_l"], blank=0.5),
         # v18: transient storage (mat sheet seepage block, after the unsat curve
         # pair). optfloat so a blank stays None — the loader never defaults these
         # to 0 (a silent zero would drop the storage term), and preflight demands
@@ -4919,19 +5126,21 @@ class _LineListView(QWidget):
     def __init__(self, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, preview_caption=None, parent=None,
                  unit_labels=None, dynamic_spec=None, preset_spec=None,
-                 switch_spec=None, extra_actions=None):
+                 readout_spec=None, dim_rule=None, extra_actions=None):
         super().__init__(parent)
         # Removals that act on more than the selected row, beside Add / Remove
         # (see _add_action_buttons). Empty for the editors that offer none.
         self._extra_actions_spec = list(extra_actions or [])
         self._field_by_key = {f.key: f for f in fields}
-        # Optional per-line either/or switch inside one group (reinforcement's
-        # Pullout: development length OR overburden). It is a VIEW of the row —
-        # which pair carries values decides where it opens — not a stored field,
-        # so nothing new reaches the file. See _build_switch.
-        self._switch = switch_spec or None
-        self._switch_combo = None
-        self._switch_stash = {}   # row index -> {key: text} parked by a switch
+        # Optional per-line read-out inside one group naming which of two laws the
+        # row's own values put in force (reinforcement's Pullout: development length
+        # OR overburden). It reads the row and sets nothing, so nothing new reaches
+        # the file and no value is ever moved or cleared. See _build_readout.
+        self._readout = readout_spec or None
+        self._readout_label = None
+        # Per-row graying rule (row dict -> keys to gray), the one the table view
+        # grays by, so the two views gray the same cells. None grays nothing.
+        self._dim_rule = dim_rule
         # Same preset rule the table view carries (reinforcement's Type -> Dir/Appl),
         # so the two views fill identically — see _apply_preset.
         self._preset = preset_spec or None
@@ -5090,8 +5299,8 @@ class _LineListView(QWidget):
         for title, group_rows in self._groups:
             g = QGroupBox(title)
             gv = QVBoxLayout(g)
-            if self._switch is not None and title == self._switch.get("group"):
-                gv.addWidget(self._build_switch())
+            if self._readout is not None and title == self._readout.get("group"):
+                gv.addWidget(self._build_readout())
             for keys in group_rows:
                 # A spacing-scaled field carries a long "per element / per unit width"
                 # label, so a pair containing one is broken onto full-width single rows
@@ -5113,85 +5322,62 @@ class _LineListView(QWidget):
             driver.textChanged.connect(lambda *_: self._relabel_dynamic())
         return scroll
 
-    # --- either/or switch -------------------------------------------------
-    def _build_switch(self):
-        """The group's law selector: one combo naming each option and the pair of
-        fields it governs.
+    # --- law read-out and graying ----------------------------------------
+    def _build_readout(self):
+        """The group's law read-out: which option the row's own values put in force.
 
-        Nothing about it is stored. The row itself says which law is in force —
-        for reinforcement, a filled Adhesion/Delta pair IS the overburden law —
-        so the combo opens where ``resolve`` puts it and the fields it does not
-        govern are grayed, values intact.
+        It is a label, not a selector. The row says which law is in force — for
+        reinforcement, a filled Adhesion/Delta pair IS the overburden law — so
+        the read-out follows the values as they are typed, and the way to change
+        the law is to fill or clear those values. A selector would have to clear
+        them to move a line off the overburden law, and on a jointed line the
+        finite element interface reads them whatever the pullout law is.
         """
-        spec = self._switch
+        spec = self._readout
         w = QWidget()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 2, 0, 2)
         h.setSpacing(4)
         lab = QLabel(spec.get("label", "Mode"))
         lab.setMinimumWidth(58)
-        combo = QComboBox()
-        for opt in spec["options"]:
-            combo.addItem(opt[1])
+        val = QLabel("")
+        val.setObjectName("readout")
         tip = spec.get("tooltip")
         if tip:
             lab.setToolTip(tip)
-            combo.setToolTip(tip)
-        combo.currentIndexChanged.connect(self._on_switch_changed)
+            val.setToolTip(tip)
         h.addWidget(lab)
-        h.addWidget(combo, 1)
-        self._switch_combo = combo
+        h.addWidget(val, 1)
+        self._readout_label = val
         return w
 
-    def _switch_index(self, row):
-        want = self._switch["resolve"](row)
-        for j, opt in enumerate(self._switch["options"]):
-            if opt[0] == want:
-                return j
-        return 0
+    def _form_values(self):
+        """The shown row as the form holds it right now, typed text included —
+        what the read-out and the graying rule read, so both follow an edit before
+        it is committed."""
+        vals = {}
+        for key, w in self._edits.items():
+            vals[key] = w.currentText() if isinstance(w, QComboBox) else w.text()
+        return vals
 
-    def _apply_switch_state(self):
-        """Enable the governing pair, gray the rest — labels and edits alike, so a
-        dimmed field reads as inactive rather than merely unfocused."""
-        if self._switch_combo is None:
-            return
-        active = self._switch_combo.currentIndex()
-        for j, opt in enumerate(self._switch["options"]):
-            for key in opt[2]:
-                cell = self._cells.get(key)
-                if cell is not None:
-                    cell.setEnabled(j == active)
-
-    def _on_switch_changed(self, *_):
-        """Move the row onto the law the combo now names.
-
-        Only a SELF-ASSERTING pair is cleared, and it is parked rather than
-        dropped: values left in Adhesion and Delta would keep the overburden law
-        in force whatever the combo said, so leaving that option stashes them and
-        entering it again brings them back. The development lengths assert
-        nothing while the other law runs, so they merely dim — their values stay
-        in the cells, which is what the switch promises.
-        """
-        if self._switch_combo is None or self._cur < 0:
-            return
-        active = self._switch_combo.currentIndex()
-        stash = self._switch_stash.setdefault(self._cur, {})
-        for j, opt in enumerate(self._switch["options"]):
-            keys, asserting = opt[2], opt[3]
-            for key in keys:
-                w = self._edits.get(key)
-                if w is None or isinstance(w, QComboBox):
-                    continue
-                if j == active:
-                    if not w.text().strip() and stash.get(key):
-                        w.setText(stash.pop(key))
-                elif asserting:
-                    if w.text().strip():
-                        stash[key] = w.text()
-                    w.clear()
-        self._apply_switch_state()
-        self._commit()
-        self._preview.schedule()
+    def _sync_row_state(self):
+        """Re-derive what the shown row's values decide: the law read-out's text,
+        and the cells the dim rule grays — labels and edits alike, so a dimmed
+        field reads as inactive rather than merely unfocused. The table view grays
+        by the same rule, so the two views agree cell for cell."""
+        ok = 0 <= self._cur < len(self._rows)
+        vals = self._form_values() if ok else {}
+        if self._readout_label is not None:
+            text = ""
+            if ok:
+                want = self._readout["resolve"](vals)
+                text = next((opt[1] for opt in self._readout["options"]
+                             if opt[0] == want), "")
+            self._readout_label.setText(text)
+        if self._dim_rule is not None:
+            dim = self._dim_rule(vals) if ok else frozenset()
+            for key, cell in self._cells.items():
+                cell.setEnabled(key not in dim)
 
     def apply_usage_filter(self, enabled):
         """Hide the form cells of fields whose usage tag is not enabled — the
@@ -5256,17 +5442,11 @@ class _LineListView(QWidget):
         # Loading blocks the driver's textChanged, so re-word the scaled labels from
         # the freshly-loaded Spacing/S here.
         self._relabel_dynamic()
-        # The either/or switch reads the freshly-loaded row, silently: seeding it
-        # is not the user choosing a law, so it must not move any value.
-        if self._switch_combo is not None:
-            self._switch_combo.blockSignals(True)
-            self._switch_combo.setCurrentIndex(
-                self._switch_index(self._rows[idx]) if ok else 0)
-            self._switch_combo.blockSignals(False)
-            self._apply_switch_state()
         self._form_scroll.setEnabled(ok)
         if ok:
             self._cur = idx
+        # The law read-out and the grayed cells, from the freshly-loaded row.
+        self._sync_row_state()
         self._preview.schedule()
 
     def _commit(self):
@@ -5316,6 +5496,7 @@ class _LineListView(QWidget):
     def _on_edit(self, *_):
         self._commit()
         self._refresh_list_item(self._cur)   # label/type edits update the list line
+        self._sync_row_state()               # a typed value may change the law
         self._preview.schedule()
 
     def _add(self):
@@ -5376,7 +5557,7 @@ class _LineEditorDialog(QDialog):
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
                  field_help=None, unit_labels=None, dynamic_spec=None,
-                 preset_spec=None, dim_rule=None, switch_spec=None,
+                 preset_spec=None, dim_rule=None, readout_spec=None,
                  extra_buttons=None, row_actions=None):
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -5389,12 +5570,11 @@ class _LineEditorDialog(QDialog):
         # Preset rule handed to BOTH views, so a Type picked in either fills the same
         # two columns from the same table (reinforcement; None elsewhere).
         self._preset_spec = preset_spec
-        # Per-row graying rule (row dict -> keys to gray) and the list view's
-        # either/or switch. Both express the SAME fact — which of two mutually
-        # exclusive parameter sets a row is using — so the table's grayed pair and
-        # the list's dimmed pair always agree.
+        # Per-row graying rule (row dict -> keys to gray), handed to BOTH views so
+        # the table's grayed cells and the list's dimmed ones always agree, and the
+        # list view's read-out of which law the row's values put in force.
         self._dim_rule = dim_rule
-        self._switch_spec = switch_spec
+        self._readout_spec = readout_spec
         self._new_row = new_row
         self._groups = groups
         self._item_label = item_label
@@ -5613,7 +5793,7 @@ class _LineEditorDialog(QDialog):
                 self._item_label, self._preview_draw, self._pick_resolve,
                 preview_caption=self._preview_caption, unit_labels=self._unit_labels,
                 dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec,
-                switch_spec=self._switch_spec,
+                readout_spec=self._readout_spec, dim_rule=self._dim_rule,
                 extra_actions=self._bound_row_actions())
             self._list_lay.addWidget(self._list_view)
             # A lazily built list view starts under whatever the toggle bar
@@ -5735,7 +5915,7 @@ CIRCLES_HELP = {
     "Yo": "Y-coordinate of the circle center.",
     "Option": "How the circle's size is defined — Depth, Radius, or Intercept; "
               "only the matching field below is used.",
-    "Depth": "Depth of the circle bottom below the center (R = Yo − Depth). Option = Depth.",
+    "Depth": "Elevation of the circle's lowest point (R = Yo − Depth). Option = Depth.",
     "Xi": "X-coordinate of a point the circle passes through. Option = Intercept.",
     "Yi": "Y-coordinate of a point the circle passes through. Option = Intercept.",
     "R": "Circle radius, specified directly. Option = Radius.",
@@ -5910,9 +6090,48 @@ class CirclesEditor(CategoryEditor):
     # Mirror the 'circles' worksheet: Xo, Yo, Option, Depth, Xi, Yi, R.
     FIELDS = [
         Field("Xo", "Xo"), Field("Yo", "Yo"),
-        Field("Option", "Option", "choice", choices=["Depth", "Radius", "Intercept"]),
+        # A blank Option, or a word that is none of the three, is a circle the loader
+        # keeps with no size (surface.circle_size_missing refuses the runs that read
+        # it). Shown as it is and saved as it was unless an Option is picked
+        # (Field.as_typed); it grays nothing, as the sheet grays nothing for it.
+        Field("Option", "Option", "choice", choices=["Depth", "Radius", "Intercept"],
+              as_typed=True, blank_text="blank"),
         Field("Depth", "Depth"), Field("Xi", "Xi"), Field("Yi", "Yi"), Field("R", "R"),
     ]
+
+    # The size fields each Option leaves unread, as the circles sheet grays them:
+    # Depth reads Depth, Radius reads R, Intercept reads Xi and Yi. The fields it
+    # does not read are derived on OK (apply) or ignored, so they gray, values kept.
+    _OPTION_DIM = {"depth": frozenset(("Xi", "Yi", "R")),
+                   "radius": frozenset(("Depth", "Xi", "Yi")),
+                   "intercept": frozenset(("Depth", "R"))}
+
+    @classmethod
+    def dim_keys(cls, row):
+        """Field keys to gray for a circle row: the size fields its Option does not
+        read. Case-blind; an Option that is none of the three grays nothing."""
+        opt = str(row.get("Option", "") or "").strip().lower()
+        return cls._OPTION_DIM.get(opt, frozenset())
+
+    # The size cells a circle whose Option names no size keeps as entered (the
+    # loader's 'size_cells'), in the table's own columns.
+    _SIZE_CELLS = ("Depth", "Xi", "Yi", "R")
+
+    @classmethod
+    def _shown_row(cls, c):
+        """A model circle as its table row. An unsized circle (its Option blank or
+        unknown, or the cell its Option names blank) carries its typed size cells
+        apart from its undefined R and Depth; the row shows those cells, so what
+        was typed is what the table shows, and a cell nobody typed in shows blank
+        rather than a 0 nobody entered."""
+        cells = c.get("size_cells") if isinstance(c.get("size_cells"), dict) else None
+        opt = str(c.get("Option", "Depth") or "").strip().lower()
+        if cells is None and opt in ("depth", "radius", "intercept"):
+            return c
+        cells = cells or {}
+        row = dict(c)
+        row.update({k: cells.get(k, c.get(k, float("nan"))) for k in cls._SIZE_CELLS})
+        return row
 
     def build(self, slope_data, parent):
         style = _doc_style(parent)
@@ -5924,7 +6143,9 @@ class CirclesEditor(CategoryEditor):
                                   window=window.result_values())
 
         return TableEditorDialog(
-            "Circles", self.FIELDS, slope_data.get("circles", []), _new_circle, parent,
+            "Circles", self.FIELDS,
+            [self._shown_row(c) for c in slope_data.get("circles", [])],
+            _new_circle, parent,
             help_text="Option sets how each circle's size is defined (only the matching "
                       "field is used):\n"
                       "  • Depth — elevation of the circle bottom at the center (R = Yo − Depth)\n"
@@ -5939,6 +6160,7 @@ class CirclesEditor(CategoryEditor):
             pick_resolve=lambda x, y, tol, rows: _pick_circles(rows, x, y, tol, slope_data),
             field_help=CIRCLES_HELP,
             generate=_circles_generate_spec(slope_data),
+            dim_rule=self.dim_keys,
             # Seven columns and a section drawing do not both fit across a dialog:
             # side by side, the table loses R off its right edge. Stacked, the table
             # gets the full width for its columns and the section — wide and short —
@@ -5951,14 +6173,33 @@ class CirclesEditor(CategoryEditor):
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
         for c in rows:
-            opt = str(c.get("Option", "Depth"))
-            if opt == "Radius":
+            # The size cells as typed, before the sizing below writes Depth or R.
+            typed = {k: c.get(k) for k in self._SIZE_CELLS}
+            opt = str(c.get("Option", "Depth") or "").strip().lower()
+            if opt == "radius":
                 c["Depth"] = c["Yo"] - c["R"]
-            elif opt == "Intercept":
+            elif opt == "intercept":
                 c["R"] = ((c["Xi"] - c["Xo"]) ** 2 + (c["Yi"] - c["Yo"]) ** 2) ** 0.5
                 c["Depth"] = c["Yo"] - c["R"]
-            else:  # Depth
+            elif opt == "depth":
                 c["R"] = c["Yo"] - c["Depth"]
+            sized = (opt in ("radius", "intercept", "depth")
+                     and not math.isnan(_cell_number(c.get("R")))
+                     and not math.isnan(_cell_number(c.get("Depth"))))
+            if sized:
+                c.pop("size_cells", None)            # sized now, from the cell named
+            else:
+                # Unsized — a blank or unrecognized Option, or the cell a picked
+                # Option names left blank — as the loader reads it: R and Depth
+                # undefined. The Option stays as it is, and what was typed into the
+                # size cells is kept as entered, under 'size_cells', as the loader
+                # keeps it, so it is saved back and is there when the cell is filled
+                # or an Option picked; the model Studio leaves is the one the saved
+                # file reopens as.
+                c["size_cells"] = {k: _cell_number(typed.get(k)) for k in self._SIZE_CELLS}
+                c.pop("Xi", None)
+                c.pop("Yi", None)
+                c["R"] = c["Depth"] = float("nan")
         slope_data["circles"] = rows
         slope_data["circular"] = len(rows) > 0
         # Only the filled limits are stored, and a window nobody filled in leaves no
@@ -5979,7 +6220,9 @@ NONCIRC_HELP = {
     "X": "X-coordinate of a point on the failure surface, listed left→right.",
     "Y": "Y-coordinate of a point on the failure surface.",
     "Movement": "Movement constraint used by the automated search — Free "
-               "(unrestricted), Horiz (horizontal only), or Fixed (does not move).",
+               "(unrestricted), Horiz (horizontal only), or Fixed (does not move). An "
+               "end point under Free or Horiz slides along the ground surface. Blank: "
+               "Free for an end point, Fixed for an interior one.",
 }
 
 
@@ -6096,8 +6339,13 @@ def _noncirc_generate_spec(slope_data):
 
 class NonCircEditor(CategoryEditor):
     label = "Non-circular surface"
+    # Movement is shown as the search reads it and saved as it was unless changed
+    # (Field.as_typed): a blank stays blank, its placeholder saying what the search
+    # does with that point, and a word that is none of the three stays as typed for
+    # the model checks to name, rather than turning into Free on OK.
     FIELDS = [Field("X", "X"), Field("Y", "Y"),
-              Field("Movement", "Movement", "choice", choices=["Free", "Horiz", "Fixed"])]
+              Field("Movement", "Movement", "choice", choices=["Free", "Horiz", "Fixed"],
+                    as_typed=True, blank_text=_noncirc_blank_text)]
 
     def build(self, slope_data, parent):
         style = _doc_style(parent)
@@ -6107,10 +6355,13 @@ class NonCircEditor(CategoryEditor):
 
         return TableEditorDialog(
             "Non-circular surface", self.FIELDS, slope_data.get("non_circ", []), _new_ncpt, parent,
-            help_text="Points ordered left→right. Entry/exit points use Movement='Free'.",
+            help_text="Points ordered left→right. A blank Movement is Free for the "
+                      "first and last points (they slide along the ground surface) and "
+                      "Fixed for the points between; Fixed pins an end point too.",
             preview_draw=preview,
             preview_caption="Preview shows the non-circular surface on the section "
-                            "(selected vertex enlarged; ○ Free, ◇ Horiz-only, □ Fixed). "
+                            "(selected vertex enlarged; ○ Free, ◇ Horiz-only, □ Fixed, "
+                            "× not a Movement). "
                             "Click a vertex or the surface to select it.",
             pick_resolve=lambda x, y, tol, rows: _pick_noncirc(rows, x, y, tol),
             field_help=NONCIRC_HELP,
@@ -6328,6 +6579,21 @@ class DloadsEditor(CategoryEditor):
 XY_FIELDS = [Field("x", "x"), Field("y", "y")]
 
 
+def _bc_blank(stored):
+    """What a seepage boundary's emptied value field saves: blank. A value that was
+    already blank keeps the form it came in (None from the loader, NaN from a
+    script); anything else becomes None, which the writer saves as an empty cell.
+    Never 0 — a head of 0 is a real head, and a blank one is a value not yet
+    entered, which the model checks name (seep.bc_value_missing)."""
+    return stored if _is_blank_value(stored) else None
+
+
+def _bc_value_label(v):
+    """A boundary's value as its list row names it: the number, a series name, or
+    'blank' for a value not yet entered."""
+    return _display_number(v) if not _is_blank_value(v) else "blank"
+
+
 class _SeepBcSetWidget(QWidget):
     """One seepage BC set as a single master/detail: the left list holds each
     specified-head boundary, each specified-flux boundary, AND the exit face; the
@@ -6507,9 +6773,9 @@ class _SeepBcSetWidget(QWidget):
         self.list.blockSignals(True)
         self.list.clear()
         for i, h in enumerate(self._heads):
-            self.list.addItem(f"Head {i + 1}  (h = {h['head']})")
+            self.list.addItem(f"Head {i + 1}  (h = {_bc_value_label(h['head'])})")
         for i, f in enumerate(self._fluxes):
-            self.list.addItem(f"Flux {i + 1}  (q = {f['flux']})")
+            self.list.addItem(f"Flux {i + 1}  (q = {_bc_value_label(f['flux'])})")
         self.list.addItem("Exit face")
         self.list.blockSignals(False)
 
@@ -6523,8 +6789,10 @@ class _SeepBcSetWidget(QWidget):
             f = self._fluxes[self._flux_idx(self._cur)]
             txt = self.flux_edit.text().strip()
             try:
-                if not _unedited(txt, f.get("flux")):  # untouched keeps the stored value
-                    f["flux"] = float(txt or 0)
+                if not txt:
+                    f["flux"] = _bc_blank(f.get("flux"))
+                elif not _unedited(txt, f.get("flux")):  # untouched keeps the stored value
+                    f["flux"] = float(txt)
             except ValueError:
                 # a non-numeric flux value is a tseep series name (time-varying BC) —
                 # allowed on set 1 only; set 2 is constant, so coerce it to 0.
@@ -6533,8 +6801,11 @@ class _SeepBcSetWidget(QWidget):
         elif self._is_head(self._cur):
             txt = self.head_edit.text().strip()
             try:
-                if not _unedited(txt, self._heads[self._cur].get("head")):
-                    self._heads[self._cur]["head"] = float(txt or 0)
+                if not txt:
+                    self._heads[self._cur]["head"] = _bc_blank(
+                        self._heads[self._cur].get("head"))
+                elif not _unedited(txt, self._heads[self._cur].get("head")):
+                    self._heads[self._cur]["head"] = float(txt)
             except ValueError:
                 # a non-numeric head value is a tseep series name (time-varying BC) —
                 # allowed on set 1 only; set 2 is constant, so coerce it to 0.
@@ -6631,7 +6902,9 @@ class _SeepBcSetWidget(QWidget):
 
     def _add_head(self):
         self._commit()
-        self._heads.append({"head": 0.0, "kind": "head", "coords": []})
+        # Blank, not 0: a head of 0 is a real head, and one nobody entered is what
+        # the model checks (seep.bc_value_missing) ask for before a run.
+        self._heads.append({"head": None, "kind": "head", "coords": []})
         self._cur = -1                     # rows below shifted; avoid a stale commit
         self._refresh()
         self.list.setCurrentRow(len(self._heads) - 1)
@@ -6647,7 +6920,7 @@ class _SeepBcSetWidget(QWidget):
 
     def _add_flux(self):
         self._commit()
-        self._fluxes.append({"flux": 0.0, "coords": []})
+        self._fluxes.append({"flux": None, "coords": []})      # blank, as a new head
         self._cur = -1
         self._refresh()
         self.list.setCurrentRow(len(self._heads) + len(self._fluxes) - 1)
@@ -7750,7 +8023,7 @@ POLYGON_HELP = {
     # beyond).
     "mat_id": ("Material assigned to this closed zone. Grayed out for any Type other than 'material': an overlay is not a soil zone, so it has no material — the same rule the polygon sheet applies when it blanks the material-name echo."),
     "type": ("What kind of region this polygon is. 'material' (the default) is a soil zone. The three SSR types are FEM analysis OVERLAYS — never meshed, never sliced: 'ssr reduce' reduces only inside, 'ssr hold' holds full strength inside, 'ssr elastic' cannot yield inside. 'refine' is a pure meshing region and needs a Size. 'joints' marks where a joint network is built."),
-    "size": ("Optional target finite-element size inside this polygon, used only when a mesh is generated. Blank = the global target size. Independent of Type: a material zone or an SSR overlay may carry one, and a 'refine' polygon is nothing but one. A Size only ever refines — a value at or above the global size cannot coarsen the mesh."),
+    "size": ("Optional target finite-element size inside this polygon, used only when a mesh is generated. Blank = the global target size. Independent of Type: a material zone, an SSR overlay or a joints region may carry one, and a 'refine' polygon is nothing but one. A Size only ever refines — a value at or above the global size cannot coarsen the mesh."),
     "name": ("Name of this joint-network region (Type 'joints' only). The joints editor's Build network dialog offers the region under Within by this name, and the polygon sheet stores it as the block's header. Blank leaves the region named by its number."),
 }
 
@@ -7860,10 +8133,12 @@ def _new_reinf():
     # spacing 1 -> no per-width division); mirrors the pre-v12 default row.
     # Tres blank, not zero: a blank Tres is a line that holds its capacity once it
     # yields, and a zero one ruptures brittly — the loader reads a blank cell the
-    # same way.
+    # same way. Lp1/Lp2 blank, not zero, for the same kind of reason: 0 is a fully
+    # anchored end, which passes every check and overstates the line, while a blank
+    # development length is one the model checks ask for before a run.
     return {"label": "", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0,
             "t_max": 0.0, "t_res": float("nan"),
-            "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0,
+            "lp1": float("nan"), "lp2": float("nan"), "E": 0.0, "area": 0.0,
             "type": "", "dir": "tangent", "appl": "active",
             "tend1": 0.0, "tend2": 0.0, "spacing": 1.0,
             # Blank, not zero: a new line uses the development-length law, and a
@@ -7903,7 +8178,7 @@ def _reinf_item_label(i, row):
 # they are tagged applies=LF and take the sheet's red "LEM & FEM" header color.
 # Lp1/Lp2 and Adhesion/Delta are two ways to state ONE thing, the pullout law: a
 # filled Adhesion/Delta pair takes over and Lp1/Lp2 stop being read, which is what
-# the list view's Pullout switch and the grayed pair in either view say. Type/Dir/
+# the list view's Pullout read-out and the grayed Lp pair in either view say. Type/Dir/
 # Appl are truly LEM only (FEM ignores them); Tres/E/Area are truly FEM only.
 REINFORCE_HELP = {
     "label": "Name used in error messages, summaries, and plots (optional).",
@@ -7940,8 +8215,10 @@ REINFORCE_HELP = {
             "friction only; ÷ Spacing for discrete supports).",
     "tend2": "End anchorage/connection capacity at end 2, per unit width (0 = "
             "friction only; ÷ Spacing for discrete supports).",
-    "lp1": "Pullout bond length at end 1 — tapers the mobilized force toward that end.",
-    "lp2": "Pullout bond length at end 2 — tapers the mobilized force toward that end.",
+    "lp1": ("Pullout bond length at end 1 — tapers the mobilized force toward that end "
+            "(0 = fully anchored). Not read when Adhesion and Delta are both filled."),
+    "lp2": ("Pullout bond length at end 2 — tapers the mobilized force toward that end "
+            "(0 = fully anchored). Not read when Adhesion and Delta are both filled."),
     "adhesion": "Adhesion = soil-reinforcement interface adhesion (blank = use Lp).",
     "delta": "Delta = soil-reinforcement interface friction angle (blank = use Lp).",
     "spacing": "Out-of-plane spacing for discrete supports (nails, tiebacks); leave "
@@ -8063,9 +8340,9 @@ class ReinforcementEditor(CategoryEditor):
     # Which pullout law a line uses is not a stored field — the row says it. A
     # filled Adhesion/Delta pair IS the overburden law, and the development lengths
     # stop being read; anything else is the development-length law, with Adhesion
-    # and Delta blank and free to be typed. One function answers that question for
-    # the table's graying, the list view's switch, and the preflight note, so the
-    # three cannot disagree.
+    # and Delta free to be typed. One function answers that question for the
+    # graying in both views, the list view's read-out, and the preflight note, so
+    # they cannot disagree.
     @staticmethod
     def pullout_mode(row):
         """'overburden' when this row carries both Adhesion and Delta, else 'lp'."""
@@ -8081,30 +8358,41 @@ class ReinforcementEditor(CategoryEditor):
 
     @classmethod
     def dim_keys(cls, row):
-        """Field keys to gray for a reinforcement row.
+        """Field keys to gray for a reinforcement row: the ones no engine reads.
 
-        Only the pair the row is NOT using is grayed, and only when the other pair
-        is actually in force: a line on the development-length law leaves Adhesion
-        and Delta live, because graying an empty cell is graying out the only way
-        to fill it.
+        Lp1 and Lp2 gray exactly when Adhesion and Delta are both filled, whatever
+        the Joint column says: the pair is then the pullout law, and neither engine
+        reads the development lengths. Adhesion and Delta are never grayed. A line
+        on the development-length law leaves them live, because graying an empty
+        cell is graying out the only way to fill it, and one filled alone stays live
+        so the other can be filled beside it. On a jointed line the finite element
+        interface reads them whatever the pullout law.
+
+        kn, ks and Jred gray unless Joint is Yes (a blank Joint is No): they are read
+        only on a jointed line. Case-blind, as the loader and the engines read it.
         """
+        from xslope.mesh import line_is_jointed
+        dim = set()
         if cls.pullout_mode(row) == "overburden":
-            return frozenset(("lp1", "lp2"))
-        return frozenset()
+            dim |= {"lp1", "lp2"}
+        if not line_is_jointed(row):
+            dim |= {"kn", "ks", "jred"}
+        return frozenset(dim)
 
-    SWITCH_SPEC = {
+    # The list view's Pullout read-out: which law the row's own values put in force.
+    # (id, label) per law; ``resolve`` names the id for a row. A read-out, not a
+    # selector: the law is changed by filling or clearing Adhesion and Delta, and
+    # nothing in the editor ever clears them for the user.
+    PULLOUT_READOUT = {
         "group": "Anchorage",
         "label": "Pullout",
-        # (id, label, fields, self-asserting). Adhesion/Delta are self-asserting:
-        # values left in them WOULD keep the overburden law in force, so leaving
-        # that option parks them. Lp1/Lp2 are inert while the other law runs, so
-        # they simply dim -- their values stay on screen and in the file.
-        "options": [("lp", "Development length (Lp1, Lp2)", ("lp1", "lp2"), False),
-                    ("overburden", "Overburden (Adhesion, Delta)",
-                     ("adhesion", "delta"), True)],
+        "options": [("lp", "Development length (Lp1, Lp2)"),
+                    ("overburden", "Overburden (Adhesion, Delta)")],
         "resolve": lambda row: ReinforcementEditor.pullout_mode(row),
-        "tooltip": "Which pullout law this line uses. Development length develops "
-                   "the full capacity over Lp1/Lp2. Overburden develops it at "
+        "tooltip": "The pullout law this line uses, read from its values: "
+                   "Overburden when Adhesion and Delta are both filled, Development "
+                   "length otherwise. Development length develops the full capacity "
+                   "over Lp1/Lp2. Overburden develops it at "
                    "2·(Adhesion + σ′v·tan Delta) per unit "
                    "length, from the effective overburden at each point of the "
                    "line.",
@@ -8135,16 +8423,17 @@ class ReinforcementEditor(CategoryEditor):
                                      "area": "area"}},
             preset_spec=self.PRESET_SPEC,
             dim_rule=self.dim_keys,
-            switch_spec=self.SWITCH_SPEC,
+            readout_spec=self.PULLOUT_READOUT,
             help_text="List view edits one line at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of the many lines of a tiered wall. Both views edit the same rows, "
                       "so switching is lossless. A line develops its pullout capacity one "
-                      "of two ways, chosen per line by the Pullout switch: over the "
-                      "development lengths Lp1/Lp2 (0 = fully anchored), or from the "
-                      "effective overburden through Adhesion and Delta. The pair not in "
-                      "use is grayed, values intact. The LEM tension distribution on the "
-                      "preview is derived from whichever is in force. Picking a Type "
+                      "of two ways: over the development lengths Lp1/Lp2 (0 = fully "
+                      "anchored), or, when Adhesion and Delta are both filled, from the "
+                      "effective overburden through them. Lp1/Lp2 are grayed, values "
+                      "intact, while Adhesion and Delta are both filled; kn, ks and Jred "
+                      "are grayed unless Joint is Yes. The LEM tension distribution on the "
+                      "preview is derived from whichever law is in force. Picking a Type "
                       "fills Dir and Appl "
                       "— change either afterwards to override it — and a blank Type is a "
                       "generic tensile line. Tend1/Tend2 are the "

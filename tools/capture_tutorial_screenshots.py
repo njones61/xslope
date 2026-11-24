@@ -52,6 +52,14 @@ if REPO_ROOT not in sys.path:
 import matplotlib
 matplotlib.use("Agg")
 
+# Studio's machine-wide settings store (recent files, editor toggles, the
+# assistant's provider) is replaced by a scratch ini for every capture that builds
+# a window or opens a file: a screenshot run must never edit the settings of
+# whoever runs it. main() runs the whole sweep inside one redirection, and every
+# function that builds a MainWindow carries its own, so calling one directly is
+# just as safe. See tools/studio_settings.py.
+from tools import studio_settings                     # noqa: E402
+
 try:
     from PySide6.QtWidgets import QApplication, QMessageBox
 except Exception:                       # engine-only install — no studio layer
@@ -390,6 +398,7 @@ SHOTS = {
 
 
 
+@studio_settings.isolated
 def lem01_canvas():
     """The main window at the end of the Studio path's step 3: geometry entered,
     no circles yet. A full-window offscreen grab — the deferred canvas render
@@ -428,6 +437,7 @@ SHOTS["lem01_canvas"] = lem01_canvas
 # --------------------------------------------------------------------------- #
 # Tutorial 0 — Building Models Three Ways
 # --------------------------------------------------------------------------- #
+@studio_settings.isolated
 def t0_studio_window():
     """The whole Studio window, with both of the paths it hosts on screen at once.
 
@@ -458,8 +468,8 @@ def t0_studio_window():
     from studio.ai.config import PROVIDERS
     from studio.main_window import MainWindow
 
-    #: The settings the app itself uses — the real ones, which is why every write
-    #: below is undone in the finally block.
+    #: The settings the app itself uses — a scratch store here (studio_settings),
+    #: and every write below is undone in the finally block all the same.
     settings = QSettings("XSlope", "XSlope Studio")
     pinned = {"ai/provider": "anthropic",
               "ai/model/anthropic": PROVIDERS["anthropic"]["models"][0]}
@@ -1006,7 +1016,7 @@ LEM10_JB = os.path.join(REPO_ROOT, "docs/lem/files/xslope_james_bay.xlsx")
 
 
 def lem10_jb_run_lem():
-    """Part B's first run: the dyke's single seed, Spencer auto search with the
+    """Part B's first run: the dike's single seed, Spencer auto search with the
     surficial filter at the metric 2 m — the state the step dictates."""
     from studio.dialogs import RunLemDialog
 
@@ -1390,6 +1400,14 @@ def lem07_low_materials_const():
                            edit={"option": "mc", "c": 22.5})
 
 
+def lem07_low_materials_ratio():
+    """Part C's edit: the lower layer as option `ratio`, ratio 0.1875 in c/p and a
+    15 kN/m² minimum in c. Under the bench, where the clay carries only its own
+    weight, this is the c/p profile exactly; under the slope it is stronger."""
+    return _lem07_material(LEM07_B, "lem07_studio_low_materials_ratio.png", row=2,
+                           edit={"option": "ratio", "c": 15.0, "cp": 0.1875})
+
+
 def lem07_low_run_lem():
     """Part B's run: Bishop's Simplified, auto search, 50 slices — the slice count
     the step raises from the dialog's default."""
@@ -1408,6 +1426,7 @@ SHOTS.update({
     "lem07_run_lem": lem07_run_lem,
     "lem07_low_materials_cp": lem07_low_materials_cp,
     "lem07_low_materials_const": lem07_low_materials_const,
+    "lem07_low_materials_ratio": lem07_low_materials_ratio,
     "lem07_low_run_lem": lem07_low_run_lem,
 })
 
@@ -3730,6 +3749,208 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
+# LEM-14 — Pseudostatic Analysis (open-and-run on a starter, edited step by step)
+#
+# Every shot is the dialog in the state the page's step leaves it: the starter
+# with k entered, then the two-stage strengths in place of the R envelope, then the
+# water table and u = piezo, then the R envelope back (the completed file).
+# --------------------------------------------------------------------------- #
+LEM14_START = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic_start.xlsx")
+LEM14_DONE = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic.xlsx")
+#: The two-stage strength set (Duncan, Wright, and Brandon 2014, Table 10.3, soil 1).
+LEM14_TWO_STAGE = {"c": 0.0, "phi": 45.0, "d": 64.0, "psi": 24.4}
+
+
+def _lem14(path, k=0.15, **mat):
+    d = _load(path)
+    d["k_seismic"] = k
+    if mat:
+        d["materials"] = [dict(m, **mat) for m in d["materials"]]
+    return d
+
+
+def _lem14_materials(data, name):
+    from studio.editors import MaterialsEditor
+
+    dlg = _lem_only(MaterialsEditor().build(data, None))
+    return _grab(_mat_table(dlg, through="u"), name)
+
+
+def lem14_global():
+    """Global parameters with the seismic coefficient entered on the starter."""
+    from studio.editors import GlobalEditor
+
+    dlg = GlobalEditor().build(_lem14(LEM14_START), None)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_global.png")
+
+
+def lem14_run_lem():
+    """The first run: Spencer, auto search, 40 slices, no seismic option ticked."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_lem14(LEM14_START))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_run_lem.png")
+
+
+def lem14_materials_r_dry():
+    """The fill as the starter carries it: the R envelope as c and phi, d and psi
+    at 0, u = none."""
+    return _lem14_materials(_lem14(LEM14_START), "lem14_studio_materials_r_dry.png")
+
+
+def lem14_materials_two_stage():
+    """The fill with c', phi', d, and psi in place of the R envelope, dry."""
+    return _lem14_materials(_lem14(LEM14_START, **LEM14_TWO_STAGE),
+                            "lem14_studio_materials_two_stage.png")
+
+
+def lem14_run_lem_two_stage():
+    """Two-stage seismic ticked, Stage 2 strength on Kc = 1 envelope."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "seismic2": "kc1"},
+                       slope_data=_lem14(LEM14_START, **LEM14_TWO_STAGE))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_run_lem_two_stage.png")
+
+
+def lem14_piezo():
+    """The piezometric editor holding the water table, on Line 1."""
+    from studio.editors import PiezoEditor
+
+    data = _lem14(LEM14_DONE, **LEM14_TWO_STAGE)
+    dlg = PiezoEditor().build(data, None)
+    _size_preview(dlg, data)
+    return _grab(dlg, "lem14_studio_piezo.png", settle=False)
+
+
+def lem14_materials_piezo():
+    """The two-stage strengths with u = piezo, after the water table goes in."""
+    return _lem14_materials(_lem14(LEM14_DONE, **LEM14_TWO_STAGE),
+                            "lem14_studio_materials_piezo.png")
+
+
+def lem14_materials_r():
+    """The R envelope back in c and phi, d and psi cleared, u = piezo: the
+    completed file."""
+    return _lem14_materials(_lem14(LEM14_DONE), "lem14_studio_materials_r.png")
+
+
+def lem14_build_mesh():
+    """Build Mesh on the size the completed file declares."""
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(LEM14_DONE)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_build_mesh.png")
+
+
+def lem14_run_fem():
+    """Run FEM on the meshed completed file, at the bracket it declares."""
+    from studio.dialogs import RunFemDialog
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    data = _load(LEM14_DONE)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data), data["target_size"], data["element_type"],
+            size_regions=extract_size_regions(data))
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": float(data["ssrm_f_min"]),
+                                 "F_max": float(data["ssrm_f_max"]),
+                                 "tolerance": 0.01,
+                                 "k0": data["k0"]},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem14_studio_run_fem.png")
+
+
+# --------------------------------------------------------------------------- #
+# LEM-15 — Yield Coefficient and Newmark Displacement (LEM-14's dry starter)
+# --------------------------------------------------------------------------- #
+LEM15_RECORD = os.path.join(REPO_ROOT, "docs/tutorials/files/anderson_dam_1989_243.txt")
+
+
+def lem15_run_lem_ky():
+    """Run LEM with Find the yield coefficient k_y ticked, auto search."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "ky": True},
+                       slope_data=_load(LEM14_START))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem15_studio_run_lem_ky.png")
+
+
+def _lem15_newmark(name, factor=None):
+    """Run → Newmark… with the record chosen and k_y from the yield coefficient run,
+    worded as Studio words it (main_window._ky_of_run)."""
+    from studio.dialogs import NewmarkDialog
+    from studio.main_window import _ky_of_run
+    from xslope.search import run_lem_analysis
+
+    data = _load(LEM14_START)
+    with contextlib.redirect_stdout(io.StringIO()):
+        bundle = run_lem_analysis(data, "spencer", analysis="auto_search",
+                                  num_slices=40, ky=True, announce=False)
+    ky, source = _ky_of_run(bundle, "spencer")
+    here = os.getcwd()
+    # Opened from the record's folder, so the Record field shows the file's name.
+    os.chdir(os.path.dirname(LEM15_RECORD))
+    try:
+        dlg = NewmarkDialog(ky=ky, units=data.get("unit_system") or "si",
+                            last_path=os.path.basename(LEM15_RECORD), ky_source=source)
+        if factor is not None:
+            dlg.scale_factor_btn.setChecked(True)
+            dlg.factor.setValue(float(factor))
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, name)
+    finally:
+        os.chdir(here)
+
+
+def lem15_newmark():
+    """The Newmark dialog with the record as recorded."""
+    return _lem15_newmark("lem15_studio_newmark.png")
+
+
+def lem15_newmark_scaled():
+    """The Newmark dialog with the record scaled by 2."""
+    return _lem15_newmark("lem15_studio_newmark_scaled.png", factor=2.0)
+
+
+SHOTS.update({
+    "lem15_run_lem_ky": lem15_run_lem_ky,
+    "lem15_newmark": lem15_newmark,
+    "lem15_newmark_scaled": lem15_newmark_scaled,
+})
+
+
+SHOTS.update({
+    "lem14_global": lem14_global,
+    "lem14_run_lem": lem14_run_lem,
+    "lem14_materials_r_dry": lem14_materials_r_dry,
+    "lem14_materials_two_stage": lem14_materials_two_stage,
+    "lem14_run_lem_two_stage": lem14_run_lem_two_stage,
+    "lem14_piezo": lem14_piezo,
+    "lem14_materials_piezo": lem14_materials_piezo,
+    "lem14_materials_r": lem14_materials_r,
+    "lem14_build_mesh": lem14_build_mesh,
+    "lem14_run_fem": lem14_run_fem,
+})
+
+
+# --------------------------------------------------------------------------- #
 # W-1 — The AI Assistant: the setup shots
 #
 # The two figures the tutorial's "Setting it up" section needs, and the only W-1
@@ -3771,6 +3992,7 @@ def w01_settings():
         return _grab(dlg, "w01_settings.png")
 
 
+@studio_settings.isolated
 def w01_chat_dock():
     """The Assistant dock, empty, on an open project.
 
@@ -3890,6 +4112,7 @@ def _skip(shot, path, source):
     return None
 
 
+@studio_settings.isolated
 def _main_window(model_or_builder, name, width=1500, height=950):
     """The whole Studio window on a model, offscreen.
 
@@ -4358,7 +4581,7 @@ def main(argv=None):
         print("no shot matching %s; known shots: %s\nknown sessions: %s"
               % (argv, ", ".join(sorted(SHOTS)), ", ".join(sorted(SESSIONS))))
         return 1
-    with _app_defaults():
+    with studio_settings.redirected(prefix="capture_tutorial"), _app_defaults():
         for name in names:
             SHOTS[name]()
         for name in sessions:

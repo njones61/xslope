@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-10 — Finding the Global Minimum"
-description: "Two slopes with competing failure mechanisms in XSLOPE: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dyke, where a search from a single reasonable starting circle gives a factor of safety 23% too high — resolved with a minimum slip depth and grid seeding."
+description: "Two slopes with competing failure mechanisms in XSLOPE: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dike, where a search from a single reasonable starting circle gives a factor of safety 23% too high — resolved with a minimum slip depth and grid seeding."
 ---
 
 # Tutorial LEM-10 — Finding the Global Minimum
@@ -9,7 +9,7 @@ Two slopes that each have more than one failure mechanism, and searches that
 return whichever one their starting circles sit nearest. Part A is a 15 ft
 cohesionless embankment on 20 ft of soft clay — a shallow slide in the sand
 face against a deep failure through the foundation. Part B is the same problem
-at full scale on a real section, the James Bay dyke, where a search from a single
+at full scale on a real section, the James Bay dike, where a search from a single
 reasonable starting circle gives a factor of safety 23% too high. The lower of
 two factors of safety is not necessarily the design case.
 
@@ -26,7 +26,7 @@ how the seed circle steers what a search finds, how a minimum slip depth rejects
 surficial slivers, and when grid seeding beats any hand-placed seed.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span><span class="tg-pill">minimum slip depth</span></p>
-<div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) and, for Part B, [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the James Bay dyke of [verification problem VP75](../verification/rocscience.md#vp75), with a single mid-depth starting circle</div>
+<div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) and, for Part B, [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the James Bay dike of [verification problem VP75](../verification/rocscience.md#vp75), with a single mid-depth starting circle</div>
 </div>
 
 ---
@@ -154,11 +154,11 @@ case, and here it is the deep one.
 
 ---
 
-## Part B — The James Bay dyke
+## Part B — The James Bay dike {#part-b-the-james-bay-dike}
 
 Part B applies the same check at full scale, on a real section.
 [Verification problem VP75](../verification/rocscience.md#vp75) is one of the
-planned James Bay dykes, from Duncan & Wright's Fig. 7.16, in metric units: a
+planned James Bay dikes, from Duncan and Wright (2005, Fig. 7.16), in metric units: a
 granular fill embankment — c′ = 0, φ′ = 30° — with a wide berm, resting on
 three soft φ = 0 clays: a 4 m crust at c = 41 kN/m², 8 m of marine clay at
 34.5 kN/m², and 7 m of lacustrine clay at 31.2 kN/m². Two deep mechanisms
@@ -168,13 +168,13 @@ that runs beneath it and daylights beyond.
 ### Opening the model
 
 We download
-[xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the dyke's
+[xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the dike's
 model, with a single starting circle an engineer might reasonably place:
 centered over the slope face, reaching mid-depth into the clays — and open it
 in Studio with **File → Open**. The Inputs plot draws the four profile lines
 in their materials' colors with that one seed:
 
-![The loaded dyke](images/lem10_vp75_inputs.png){width=1000}
+![The loaded dike](images/lem10_vp75_inputs.png){width=1000}
 
 ### Running the analysis
 
@@ -182,7 +182,7 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, with **Ignore surficial (skin) failures** on and
 **Min slip depth** = `2` — the metric counterpart of Part A's 5 ft:
 
-![The Run LEM dialog on the dyke](images/lem10_jb_run_lem.png)
+![The Run LEM dialog on the dike](images/lem10_jb_run_lem.png)
 
 Click **Run**:
 
@@ -212,8 +212,8 @@ Run again:
 
 **FS = 1.420**, on a wider circle that runs under the berm and daylights beyond
 it — 19% below the single seed's answer, against Slide's 1.464 and Duncan &
-Wright's published 1.45. The wrongly seeded search missed by far more than the
-programs and the textbook differ among themselves, and it reported nothing
+Wright's (2005) published 1.45. The wrongly seeded search missed by far more than the
+published values differ among themselves, and it reported nothing
 unusual. The full **Generate starting circles…** set also finds 1.420 with the
 2 m filter on — the deep member of the per-layer family reaches it, as the
 per-layer rule of [LEM-3](lem03_layered_slope.md#guarding-against-local-minima)
@@ -236,7 +236,7 @@ This tutorial covered:
   section with no seed at all.
 - Reading a search by the surface it converged on, since two answers on one
   model can describe entirely different failures.
-- The same problem at full scale on the James Bay dyke, where a search from a
+- The same problem at full scale on the James Bay dike, where a search from a
   single reasonable starting circle converged 23% high.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.

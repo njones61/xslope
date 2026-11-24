@@ -36,6 +36,10 @@ _ROOT = os.path.dirname(_HERE)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 from shapely.geometry import Polygon                          # noqa: E402
 
 from xslope.joints import JointSet, set_name                  # noqa: E402
@@ -353,6 +357,7 @@ def _leg_region_name(failures, results):
                    f"list offers it by name")
 
 
+@studio_settings.isolated
 def run():
     """Returns a list of failure strings (empty = pass)."""
     import time

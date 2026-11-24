@@ -393,7 +393,6 @@ FACE_LOAD = [[{"X": 5.0, "Y": 5.0, "Normal": 750.0},
 LINE_LOAD = [{"x": 30.0, "y": 20.0, "P": 7500.0, "angle": -90.0,
               "label": "footing"}]
 
-LEM02_K = 0.15                     #: the seismic coefficient the page runs
 LEM02_TARGET_FS = 1.5              #: the design target the page solves for
 
 
@@ -490,14 +489,6 @@ def lem02_plots():
                 face[word]["failure_surface"], face[word]["solver_result"],
                 frame="content")
 
-    # A second kind of demand on the same model.
-    sk = copy.deepcopy(sd)
-    sk["k_seismic"] = LEM02_K
-    fs_k, _, _ = _lem02_search(sk)
-    crit_k = fs_k[0]
-    capture("lem02_solution_seismic.png", plot_solution, sk, crit_k["slices"],
-            crit_k["failure_surface"], crit_k["solver_result"], frame="content")
-
     # The design sweep: the cohesion that would hold the target under the load.
     # Drawn from the same run the page quotes, so the crossing on the figure is
     # the number in the sentence beside it — and drawn the way Studio's Design
@@ -520,9 +511,9 @@ def lem02_plots():
     capture("lem02_design.png", _design_figure, res)
 
     print("   surcharge %.4f · line load %.4f · face normal %.4f · face vertical "
-          "%.4f · k=%.2f %.4f · c(FS %.1f) = %.1f"
+          "%.4f · c(FS %.1f) = %.1f"
           % (crit["FS"], crit_ll["FS"], face["normal"]["FS"], face["vertical"]["FS"],
-             LEM02_K, crit_k["FS"], LEM02_TARGET_FS, res["crossing"]))
+             LEM02_TARGET_FS, res["crossing"]))
 
 
 # --------------------------------------------------------------------------- #
@@ -1292,11 +1283,11 @@ def lem10_plots():
     capture("lem10_solution_filter5.png", plot_solution, sd, crit_f["slices"],
             crit_f["failure_surface"], crit_f["solver_result"], frame="content")
 
-    # The second slope: VP75, the James Bay dyke — the corpus's local-minimum
+    # The second slope: VP75, the James Bay dike — the corpus's local-minimum
     # showcase. The generated per-layer seeds settle in the fill; the grid
     # finds the deep circle through all three clays. Both at the Run dialog's
     # default 40 slices, which is the flow the page walks.
-    # Part B runs on the tutorial's own copy of VP75: the same dyke with a
+    # Part B runs on the tutorial's own copy of VP75: the same dike with a
     # single mid-depth seed on the circles sheet — the circle an engineer might
     # place expecting the failure under the crest — so the reader opens and
     # runs without editing anything.
@@ -1354,6 +1345,12 @@ LEM07_B_SLICES = 50
 #: replaced by one number — the average of the layer's 15 kN/m² top and 30 kN/m²
 #: bottom.
 LEM07_B_CONST = 22.5
+#: Part C's edit: each clay as a strength ratio. With gamma = 20 and no water, a
+#: ratio of 3.75 / 20 = 0.1875 with a 15 kN/m² minimum gives the c/p profile (and
+#: the middle clay's constant 15) exactly under the bench at elevation 8, where
+#: the clay carries only its own weight, and more strength under the slope.
+LEM07_C_RATIO = 0.1875
+LEM07_C_MIN = 15.0
 
 
 def _lem07_search(model, method, num_slices, **kwargs):
@@ -1452,6 +1449,15 @@ def lem07_plots():
           % (london["pow"]["FS"], london["mc"]["FS"]))
     print("   B c/p    %s" % _lem07_reading(crit_cp, mat=3))
     print("   B su=%.1f %s" % (LEM07_B_CONST, _lem07_reading(crit_const, mat=3)))
+
+    # ---- Part C: the same section with both clays as strength ratios ----- #
+    as_ratio = {"option": "ratio", "c": LEM07_C_MIN, "cp": LEM07_C_RATIO}
+    middle = dict(b["materials"][1], **as_ratio)
+    lower = dict(b["materials"][2], **as_ratio)
+    b_both = dict(b, materials=[b["materials"][0], middle, lower])
+    crit_both = _lem07_search(b_both, "bishop", LEM07_B_SLICES)
+    _lem07_solution("lem07_low_ratio_both.png", b_both, crit_both)
+    print("   C both   %s" % _lem07_reading(crit_both, mat=3))
 
 
 # --------------------------------------------------------------------------- #
@@ -6387,7 +6393,7 @@ def _combo02_detail(model, crit):
 
     with contextlib.redirect_stdout(io.StringIO()):
         ok, out = generate_slices(model, circle=_combo02_circle(crit),
-                                  num_slices=COMBO02_SLICES)
+                                  num_slices=COMBO02_SLICES, rapid=True)
     if not ok:
         raise RuntimeError(out)
     as_built = out[0]
@@ -7446,6 +7452,185 @@ def capture_only(name):
     return drawn
 
 
+# --------------------------------------------------------------------------- #
+# LEM-14 — Pseudostatic Analysis
+#
+# One fill slope at k = 0.15, run as Studio's Run LEM runs it (Spencer, auto
+# search from the file's circle, 40 slices) in six states: dry and with the water
+# table, each with the R envelope in one stage and with c', phi', d, psi in two
+# stages under both stage 2 strength choices. The dry runs start from the starter
+# file with k entered; the wet runs from the completed file, which carries the
+# water table, k, and the R envelope. Then the strength reduction run on the
+# completed file. Printed: each run's factor of safety, circle, and the two-stage
+# log line; the strength reduction's mesh, trials, and answer.
+# --------------------------------------------------------------------------- #
+LEM14_START = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic_start.xlsx")
+LEM14_DONE = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_pseudostatic.xlsx")
+LEM14_METHOD = "spencer"
+LEM14_SLICES = 40
+LEM14_K = 0.15
+#: The two-stage strength set the page enters in place of the R envelope:
+#: Duncan, Wright, and Brandon (2014), Table 10.3, soil 1.
+LEM14_TWO_STAGE = {"c": 0.0, "phi": 45.0, "d": 64.0, "psi": 24.4}
+#: The strength reduction settings the page leaves on Run FEM.
+LEM14_TOLERANCE = 0.01
+LEM14_MAX_ITERATIONS = 12000
+LEM14_CRITERION = "non_convergence"
+
+
+def _lem14_model(path, two_stage=False):
+    """The model in the state a step leaves it: k entered, and the two-stage
+    strengths in place of the R envelope where the step enters them."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(path)
+    sd["k_seismic"] = LEM14_K
+    if two_stage:
+        sd["materials"] = [dict(m, **LEM14_TWO_STAGE) for m in sd["materials"]]
+    return sd
+
+
+def _lem14_run(label, sd, seismic2=False):
+    """One Run LEM run, the call Studio's dialog makes; prints the reading and the
+    Log's closing lines, and returns the bundle."""
+    from xslope.search import run_lem_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        bundle = run_lem_analysis(copy.deepcopy(sd), LEM14_METHOD,
+                                  analysis="auto_search", num_slices=LEM14_SLICES,
+                                  seismic2=seismic2)
+    crit = bundle["search"]["fs_cache"][0]
+    print("   %-26s FS %.4f  circle (%.2f, %.2f) R %.2f  tangent %.2f"
+          % (label, bundle["results"]["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"], crit["Depth"]))
+    for line in log.getvalue().splitlines():
+        if line.startswith(("Critical FS", "Two-stage seismic stages", "Sliding mass",
+                            "[✓ converged]")):
+            print("        %s" % line.strip())
+    return bundle
+
+
+def _lem14_capture(name, sd, bundle):
+    crit = bundle["search"]["fs_cache"][0]
+    capture(name, plot_solution, sd, crit["slices"], crit["failure_surface"],
+            crit["solver_result"], frame="content")
+
+
+def lem14_plots():
+    """The six limit equilibrium runs and their figures."""
+    capture("lem14_inputs.png", plot_inputs, load_slope_data(LEM14_START),
+            title="Slope Geometry and Inputs")
+    dry_r = _lem14_model(LEM14_START)
+    dry_2 = _lem14_model(LEM14_START, two_stage=True)
+    wet_r = _lem14_model(LEM14_DONE)
+    wet_2 = _lem14_model(LEM14_DONE, two_stage=True)
+
+    b = _lem14_run("dry, one stage, R", dry_r)
+    _lem14_capture("lem14_dry_one_stage.png", dry_r, b)
+    b = _lem14_run("dry, two stages, Kc = 1", dry_2, seismic2="kc1")
+    _lem14_capture("lem14_dry_two_stage.png", dry_2, b)
+    _lem14_run("dry, two stages, interp.", dry_2, seismic2="interpolated")
+    _lem14_run("dry, Kc = 1, factor 0.8", dry_2,
+               seismic2={"strength": "kc1", "factor": 0.8})
+    _lem14_run("wet, two stages, Kc = 1", wet_2, seismic2="kc1")
+    _lem14_run("wet, two stages, interp.", wet_2, seismic2="interpolated")
+    b = _lem14_run("wet, one stage, R", wet_r)
+    _lem14_capture("lem14_wet_one_stage.png", wet_r, b)
+
+
+def lem14_ssrm():
+    """The strength reduction run on the completed file, at the mesh and bracket
+    it declares, and the at-failure shear strain."""
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+    from xslope.plot_fem import plot_fem_results
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        model = load_slope_data(LEM14_DONE)
+        mesh = build_mesh_from_polygons(get_material_polygons(model),
+                                        model["target_size"], model["element_type"],
+                                        size_regions=extract_size_regions(model))
+    print("   mesh        %d nodes · %d elements · %s at target size %g ft"
+          % (len(np.asarray(mesh["nodes"])), len(mesh["elements"]),
+             model["element_type"], model["target_size"]))
+    fem_data = build_fem_data(model, mesh)
+    t0 = time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = solve_ssrm(fem_data, F_min=model["ssrm_f_min"],
+                            F_max=model["ssrm_f_max"], tolerance=LEM14_TOLERANCE,
+                            debug_level=1, failure_criterion=LEM14_CRITERION,
+                            max_iterations=LEM14_MAX_ITERATIONS, k0=model.get("k0"))
+    print("   SSRM        FS %.4f from [%.4f, %.4f] · %.0f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             time.time() - t0))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    capture("lem14_ssrm_shear_strain.png", plot_fem_results, fem_data,
+            result["last_solution"], plot_type="shear_strain", fs=result["FS"],
+            failure_solution=result.get("failure_solution"), field_state="failure")
+
+
+# --------------------------------------------------------------------------- #
+# LEM-15 — Yield Coefficient and Newmark Displacement
+#
+# LEM-14's dry starter file (the fill with its R envelope), run as Studio's Run LEM
+# runs it with "Find the yield coefficient k_y" ticked, then the Anderson Dam record
+# through the Newmark sliding block at that k_y, as recorded and scaled by 2 and 3.
+# Printed: the Log's yield coefficient lines, the k_y circle, and each Newmark run's
+# Log sentence.
+# --------------------------------------------------------------------------- #
+LEM15_MODEL = LEM14_START
+LEM15_RECORD = os.path.join(REPO_ROOT, "docs/tutorials/files/anderson_dam_1989_243.txt")
+LEM15_SCALES = (1.0, 2.0, 3.0)
+#: The scale factors whose Newmark view the page shows.
+LEM15_FIGURES = {1.0: "lem15_newmark_x1.png", 3.0: "lem15_newmark_x3.png"}
+
+
+def lem15_plots():
+    """The yield coefficient run and the Newmark runs."""
+    from xslope.plot import plot_newmark
+    from xslope.search import run_lem_analysis
+    from xslope.seismic import model_at, newmark_displacement, newmark_line, read_record
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        sd = load_slope_data(LEM15_MODEL)
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        bundle = run_lem_analysis(copy.deepcopy(sd), LEM14_METHOD,
+                                  analysis="auto_search", num_slices=LEM14_SLICES,
+                                  ky=True)
+    for line in log.getvalue().splitlines():
+        if "k_y" in line or line.startswith(("Critical FS", "Sliding mass")):
+            print("        %s" % line.strip())
+    info = bundle["yield"]
+    ky = info["k_y"]
+    crit = bundle["search"]["fs_cache"][0]
+    print("   k_y %.4f (static circle %.4f, static F %.3f) on (%.2f, %.2f) R %.2f"
+          % (ky, info["static"]["k_y"], info["static"]["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"]))
+    # The run's own solution, solved at k = k_y (F = 1), as the LEM Solution view
+    # draws it; the search cache's entry is the last trial of the confirming search.
+    capture("lem15_ky_solution.png", plot_solution, model_at(sd, ky),
+            bundle["slice_df"], bundle["failure_surface"], bundle["results"],
+            frame="content")
+
+    record = read_record(LEM15_RECORD)
+    # The Newmark dialog carries k_y to four decimals, and runs on what it shows.
+    ky = round(ky, 4)
+    for scale in LEM15_SCALES:
+        result = newmark_displacement(record, ky, scale=scale,
+                                      units=sd.get("unit_system") or "si")
+        print("   x%g: %s" % (scale, newmark_line(result)))
+        if scale in LEM15_FIGURES:
+            capture(LEM15_FIGURES[scale], plot_newmark, result)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -7474,6 +7659,9 @@ GROUPS = {
     "lem13_plots": lem13_plots,
     "lem13_ssrm": lem13_ssrm,
     "lem13_sweeps": lem13_sweeps,
+    "lem14_plots": lem14_plots,
+    "lem14_ssrm": lem14_ssrm,
+    "lem15_plots": lem15_plots,
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,

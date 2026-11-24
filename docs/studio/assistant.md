@@ -154,6 +154,7 @@ one rather than reassembling the engine by hand:
 | `run_tseep()` | The transient run, on the project's own transient sheet — the same run as [Run Seep](analysis.md) with **Transient** ticked. Its frames are stored where Studio stores them, so the **Seep · Transient** tab plays them and a stability run can read one. It hands back a transient run that is already loaded (a project opened with its `_tseep.csv` sidecar has one) rather than repeating it. |
 | `run_lem(seep_time=t)` | One instant of that transient run as the run's pore pressure; with `rapid=True`, the transient sheet's two drawdown stages. Which instant was used is stated in the log. |
 | `fs_vs_time()` | The factor of safety at every saved instant — the curve the **FS vs Time** tab shows, with its lowest point and the time it falls at. |
+| `newmark('record.AT2')` | Newmark's permanent displacement under an acceleration record, as **Run → Newmark…** computes it, at the yield coefficient of the last `run_lem(ky=True)` unless `ky=` is given. The record is run both ways and the larger displacement governs; the run is stored for the **LEM · Newmark** tab and the report. |
 | `run_fem(analysis='ssrm')` | One finite element run — the SSRM factor of safety, or a single trial. Minutes, not seconds. |
 | `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it — over every engine the session has solved, and stamped with the project file and its SHA-256 where the project has been saved. With no path it is written to the assistant's output folder as `<project>_report.docx`, so it opens from **Files…** with everything else the conversation produced. |
 | `suggest_elastic('Clay')` | Soil-type `E` and `ν` for a material that carries none, classified from its strength. A last resort, never a substitute for a stated value. |
@@ -161,7 +162,7 @@ one rather than reassembling the engine by hand:
 | `corpus_index('rapid drawdown')` | Worked examples from the [verification corpus](../verification/index.md) matching a topic, with their page URLs. |
 
 `run_seep`, `run_tseep` and `run_fem` build the mesh from the file's own declared
-settings (`main!D18`, `main!D19`) when the project has none, so none of them needs a
+settings (`main!D19`, `main!D20`) when the project has none, so none of them needs a
 mesh built first, and all attach their results where Studio attaches them — the
 results tab opens as it would after a Run.
 

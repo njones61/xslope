@@ -721,13 +721,20 @@ def _mixed_fem_data():
     SPIKE.md, "CURVED ENVELOPES"). The two curved materials are fitted to the
     strengths the file's own Mohr-Coulomb materials carry at mid-height
     overburden, so the model is a slope and not a shape.
+
+    The power curve takes the file's water line. The file's Soft Clay carries no
+    pore pressure, which is right for it there (c = 200, phi = 0: an undrained
+    strength water does not change), but a power curve's strength rises with
+    effective stress, and the layer lies 2 to 4 ft below the water line. Left dry
+    it is too strong, and the model stands at MIXED_F_FAILS. The bracket was cut
+    when the FEM put the water line in every layer, whatever the material said.
     """
     import copy
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     sd = load_slope_data(str(MIXED_FILE))
     sd = copy.deepcopy(sd)
     sd['materials'][1].update(option='hb', **MIXED_HB)
-    sd['materials'][2].update(option='pow', **MIXED_POW)
+    sd['materials'][2].update(option='pow', u='piezo', **MIXED_POW)
     mesh = build_mesh_from_polygons(get_material_polygons(sd),
                                     target_size=MIXED_SIZE, element_type='tri6')
     return sd, build_fem_data(sd, mesh)

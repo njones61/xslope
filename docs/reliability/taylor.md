@@ -27,7 +27,7 @@ that compares with the finite-element vendors' own point-estimate options.
 
 To perform reliability analysis using the **xslope** package, we simply need to provide standard deviations for the uncertain parameters in the input data. This is done in the Materials table of the input data file. The main values of the parameters in the table are treated as the most likely values. We can then call the `reliability` function to perform the analysis. The function will automatically calculate the factor of safety based on the most likely values ($F_{MLV}$) of the parameters using an automated search. It will then perturb each parameter by the standard deviation using the Taylor Series Method described above to calculate the coefficient of variation of the factor of safety ($COV_F$). Finally, it will compute the reliability of the slope based on the calculated values.
 
-The strength parameters that are perturbed depend on each material's strength model: for Mohr-Coulomb (`mc`) materials the cohesion $c$ and friction angle $\phi$ are perturbed, while for the depth-varying undrained (`cp`) model the cohesion $c$ and the rate $c_p$ are perturbed. The unit weight $\gamma$ is perturbed in both cases. If a standard deviation exceeds its mean — so that mean $-\sigma$ would be negative — the Taylor-series analysis stops with an error, since a negative strength parameter is non-physical. The Taylor series method cannot handle this case; when a parameter's COV is that large, use the Monte Carlo function instead (`reliability_mc`, described in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope)), which handles the negative draw by truncating it at zero.
+The strength parameters that are perturbed depend on each material's strength model: for Mohr-Coulomb (`mc`) materials the cohesion $c$ and friction angle $\phi$ are perturbed, while for the depth-varying undrained (`cp`) model the cohesion $c$ and the rate $c_p$ are perturbed, and for the strength ratio (`ratio`) the minimum $c$ and the ratio in the c/p column. The unit weight $\gamma$ is perturbed for all three. In a rapid drawdown analysis (`rapid=True`), each factor of safety is the [rapid drawdown](../lem/rapid.md) factor of safety, and an `mc` material's $K_c = 1$ envelope, $d$ and $\psi$, is perturbed too, by σ(d) and σ(ψ), since the drawdown stage takes its undrained strength from it. Without rapid drawdown $d$ and $\psi$ are not read, and neither are σ(d) and σ(ψ). If a standard deviation exceeds its mean — so that mean $-\sigma$ would be negative — the Taylor-series analysis stops with an error, since a negative strength parameter is non-physical. The Taylor series method cannot handle this case; when a parameter's COV is that large, use the Monte Carlo function instead (`reliability_mc`, described in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope)), which handles the negative draw by truncating it at zero.
 
 The Monte Carlo campaign is called the same way through `reliability_mc`, which reads the identical MLV and standard-deviation inputs and adds only the sampling controls (`n_samples`, `distribution`, `rng_seed`). It is a limit-equilibrium path only, for the compute reason discussed in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope).
 
@@ -78,8 +78,8 @@ Rapid drawdown: False
 Circular search: True
 Performing circular search...
   ... (search iterations) ...
-[✅ converged] Iter=9, FS=1.3334 (ΔFS<0.0005) at (x=3.92, y=19.55, depth=4.96), elapsed time=1.73 seconds
-Critical factor of safety (F_MLV): 1.3334
+[✅ converged] Iter=10, FS=1.3336 (ΔFS<0.0005) at (x=4.04, y=19.42, depth=4.97), elapsed time=2.61 seconds
+Critical factor of safety (F_MLV): 1.3336
 Found 3 parameters with standard deviations:
   Material 1: gamma = 18.000 ± σ=0.900
   Material 1: c = 18.000 ± σ=3.600
@@ -87,52 +87,52 @@ Found 3 parameters with standard deviations:
 
 Processing parameter 1/3: Material 1, gamma
   ... (search iterations) ...
-[✅ converged] Iter=13, FS=1.2993 (ΔFS<0.0005) at (x=3.97, y=19.47, depth=4.96), elapsed time=2.15 seconds
+[✅ converged] Iter=10, FS=1.2996 (ΔFS<0.0005) at (x=4.04, y=19.30, depth=4.97), elapsed time=2.35 seconds
   ... (search iterations) ...
-[✅ converged] Iter=9, FS=1.3710 (ΔFS<0.0005) at (x=3.88, y=19.92, depth=4.96), elapsed time=1.78 seconds
-  F+ = 1.2993, F- = 1.3710, ΔF = 0.0717
+[✅ converged] Iter=12, FS=1.3708 (ΔFS<0.0005) at (x=4.16, y=19.42, depth=4.98), elapsed time=2.96 seconds
+  F+ = 1.2996, F- = 1.3708, ΔF = 0.0712
 
 Processing parameter 2/3: Material 1, c
   ... (search iterations) ...
-[✅ converged] Iter=15, FS=1.4752 (ΔFS<0.0005) at (x=3.88, y=20.16, depth=4.96), elapsed time=2.35 seconds
+[✅ converged] Iter=8, FS=1.4735 (ΔFS<0.0005) at (x=4.52, y=19.06, depth=4.99), elapsed time=2.63 seconds
   ... (search iterations) ...
-[✅ converged] Iter=10, FS=1.1886 (ΔFS<0.0005) at (x=3.31, y=19.74, depth=4.90), elapsed time=1.87 seconds
-  F+ = 1.4752, F- = 1.1886, ΔF = 0.2867
+[✅ converged] Iter=8, FS=1.1901 (ΔFS<0.0005) at (x=2.75, y=20.85, depth=4.84), elapsed time=2.17 seconds
+  F+ = 1.4735, F- = 1.1901, ΔF = 0.2834
 
 Processing parameter 3/3: Material 1, phi
   ... (search iterations) ...
-[✅ converged] Iter=16, FS=1.4098 (ΔFS<0.0005) at (x=3.84, y=19.43, depth=4.95), elapsed time=2.66 seconds
+[✅ converged] Iter=12, FS=1.4104 (ΔFS<0.0005) at (x=3.80, y=19.42, depth=4.95), elapsed time=2.76 seconds
   ... (search iterations) ...
-[✅ converged] Iter=10, FS=1.2602 (ΔFS<0.0005) at (x=3.88, y=20.04, depth=4.96), elapsed time=1.74 seconds
-  F+ = 1.4098, F- = 1.2602, ΔF = 0.1496
+[✅ converged] Iter=13, FS=1.2600 (ΔFS<0.0005) at (x=4.04, y=19.72, depth=4.97), elapsed time=2.91 seconds
+  F+ = 1.4104, F- = 1.2600, ΔF = 0.1504
 
-σ_F = 0.1656
-COV_F = 0.1242
-β_ln = 2.2635
-Reliability = 98.82%
-Probability of failure = 1.18%
+σ_F = 0.1643
+COV_F = 0.1232
+β_ln = 2.2838
+Reliability = 98.88%
+Probability of failure = 1.12%
 
 === RELIABILITY ANALYSIS RESULTS ===
 +-------------+-------+-----+---------+---------+-------+-------+-------+
 | Parameter   |  MLV  |  σ  |  MLV+σ  |  MLV-σ  |  F+   |  F-   |  ΔF   |
 +=============+=======+=====+=========+=========+=======+=======+=======+
-| Mat 1 gamma |  18   | 0.9 |  18.9   |  17.1   | 1.299 | 1.371 | 0.072 |
+| Mat 1 gamma |  18   | 0.9 |  18.9   |  17.1   |  1.3  | 1.371 | 0.071 |
 +-------------+-------+-----+---------+---------+-------+-------+-------+
-| Mat 1 c     |  18   | 3.6 |  21.6   |  14.4   | 1.475 | 1.189 | 0.287 |
+| Mat 1 c     |  18   | 3.6 |  21.6   |  14.4   | 1.473 | 1.19  | 0.283 |
 +-------------+-------+-----+---------+---------+-------+-------+-------+
 | Mat 1 phi   |  30   |  3  |   33    |   27    | 1.41  | 1.26  | 0.15  |
 +-------------+-------+-----+---------+---------+-------+-------+-------+
 
 Summary Statistics:
-F_MLV: 1.333
-σ_F: 0.166
-COV_F: 0.124
-β_ln: 2.263
-Reliability: 98.82%
-Probability of failure: 1.18%
+F_MLV: 1.334
+σ_F: 0.164
+COV_F: 0.123
+β_ln: 2.284
+Reliability: 98.88%
+Probability of failure: 1.12%
 
-Reliability analysis completed in 14.29 seconds.
+Reliability analysis completed in 18.45 seconds.
 ```
 
-$F_{MLV}$ = 1.333 and $\beta_{ln}$ = 2.263 match the values quoted for VP36 in the
-[verification corpus](../verification/rocscience.md#vp36).
+$F_{MLV}$ and $\beta_{ln}$ agree with the values the
+[verification corpus](../verification/rocscience.md#vp36) holds for VP36, within its tolerance.

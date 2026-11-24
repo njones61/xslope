@@ -55,15 +55,20 @@ choice changes the model, so XSLOPE asks for it rather than guessing.
 | Region→material assignment (per analysis) | `mat_id` |
 | Mohr-Coulomb materials (c′, φ′) | `option='mc'` with c′, φ′ |
 | **Undrained materials** (φ = 0, strength entered as cohesion) | `option='mc'` with c = Su, φ = 0 |
+| **SHANSEP** with a constant ratio (its older name is S=f(overburden)) | `option='ratio'` with c/p = the ratio and c = 0, see below |
+| **S=f(depth)** (undrained strength rising with depth below the top of its layer) | `option='cp'` measured from that top, see below |
 | **Bedrock** (impenetrable) | `option='elastic'` — an impenetrable material, see below |
 | Material color | The zone color in Studio |
-| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it |
+| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it; Type `phreatic` only where the analysis applies SLOPE/W's phreatic correction |
+| **Ru**, per material | `u = ru`, with the same value |
 | **Water above the ground surface** | **A distributed load** — see below |
 | **A parent SEEP/W analysis's pore-pressure field** | The `seep` option, on SEEP/W's own mesh — see below |
+| **A staged rapid drawdown**: two piezometric surfaces and the drawdown strengths | XSLOPE's rapid drawdown: piezometric lines 1 and 2, and d and ψ — see below |
 | **Surcharges** (a wedge of fill above the ground — the surcharge pressure is its *unit weight*) | `dloads`, varying with the depth of fill |
 | **Reinforcement** — nails, geosynthetics, anchors, tiebacks | `reinforcement_lines` — see below |
 | **Line loads** (magnitude + trend/plunge) | `line_loads` |
 | **Tension crack** (+ percent filled with water) | `tcrack_depth`, `tcrack_water` |
+| **Unit weight above the water table**, where the material switches it on | `gamma` above the water table and `gamma_sat` below — see below |
 | Unit weight of water | `gamma_water` |
 | Horizontal seismic coefficient | `k_seismic` |
 | SLOPE/W's critical circle, if the file was solved and it fits | A single trial circle |
@@ -75,6 +80,64 @@ The ground surface and domain are derived from the zones, as for any polygon-bas
 Mohr-Coulomb materials carry straight over as `option='mc'` with their c′ and φ′.
 GeoStudio's undrained (φ = 0) materials store the undrained strength in the cohesion
 field, and import as `option='mc'` with c = S<sub>u</sub> and φ = 0.
+
+**Strength from the vertical effective stress.** SLOPE/W's SHANSEP model with a
+constant ratio gives S<sub>u</sub> = (τ/σ′<sub>v</sub>) σ′<sub>v</sub>. It imports as the
+[`ratio` option](../lem/overview.md#undrained-strength-ratio), with c/p set to the
+ratio. SHANSEP has no minimum strength, so c is set to 0. A SHANSEP material often still
+carries a cohesion and friction angle from an earlier model; SLOPE/W does not use them,
+and neither does the import. Both programs take σ′<sub>v</sub> as the weight of the soil
+column above the slice base, plus surcharges and ponded water, minus the pore pressure.
+Neither counts point loads. On SLOPE/W's own long-term SHANSEP example, the two
+strengths agree within 0.02 kPa at every column of SLOPE/W's critical surface.
+
+Two other SHANSEP forms have no exact match:
+
+- **A ratio of S × OCR<sup>m</sup>, with OCR varying with elevation.** XSLOPE has one
+  ratio per material, so the import uses the lowest, at the smallest OCR. Its strength
+  is then at or below SLOPE/W's, and the notes give the largest difference.
+- **A strength read from a curve of σ′<sub>v</sub>.** No single ratio is that curve, so
+  the material is imported with no strength, and the notes ask you to set one.
+
+SLOPE/W often pairs SHANSEP with B-bar, to hold σ′<sub>v</sub> at its value before a
+fill is placed. XSLOPE has no B-bar (see below), so it counts the fill's weight in
+σ′<sub>v</sub>, and its strength there is higher than SLOPE/W's. The notes say so.
+
+**Strength rising with depth.** SLOPE/W's S=f(depth) gives
+S<sub>u</sub> = S<sub>top</sub> + r d, where d is the depth below the top of the
+material's own layer, measured at each slice. It imports as the
+[`cp` option](../lem/overview.md), with c = S<sub>top</sub>, c/p = r, and r_elev at the
+top of the layer. Where that top is level, the strength is the same as SLOPE/W's.
+Where it is not, r_elev is its highest point, so XSLOPE's strength is never above
+SLOPE/W's, and the notes give the largest difference. S=f(depth) can also cap the
+strength at a maximum, which XSLOPE does not have. The import names any field on these
+materials that it does not read.
+
+SLOPE/W's S=f(datum), its Spatial Mohr-Coulomb, and every other strength model XSLOPE
+does not have are imported with whatever cohesion and friction angle they carry, and
+the notes say that this is not the same strength.
+
+SLOPE/W can also scale any strength by a function of the slice base's inclination (an
+anisotropy function). XSLOPE has no such scaling, so the import uses the unscaled
+strength and says so.
+
+**Unit weight above the water table.** A SLOPE/W material's unit weight is its
+saturated weight, and it applies everywhere unless the material switches on a
+separate weight above the water table:
+
+| SLOPE/W | XSLOPE |
+|---|---|
+| No switch (a weight above the water table may be stored, and is not used) | γ = the unit weight, throughout |
+| A constant weight above the water table | γ = that weight, γ<sub>sat</sub> = the unit weight |
+| A weight above the water table computed from the volumetric water content | γ = the unit weight, throughout, and the notes say so |
+
+XSLOPE splits the two weights at its water table, the piezometric line or the top of a
+seepage field's positive pressure, where SLOPE/W splits them where the pore pressure turns
+negative; the two are the same water table unless it is perched. On SLOPE/W's own Unit
+Weight Definition example (16 above, 20 below), the split puts the weight of the critical
+slip surface's sliding mass within 0.1% of SLOPE/W's. XSLOPE has no weight that follows
+the water content, so in the third case its slices above the water table are heavier than
+SLOPE/W's.
 
 GeoStudio's **Bedrock** is impenetrable — slip surfaces cannot enter it. XSLOPE's
 **`elastic`** option is the exact analog: an impenetrable zone that cannot fail and that
@@ -99,6 +162,19 @@ shared geometry table, and the import resolves them that way (export writes them
 under the same convention). Resolved against the wrong list, a water table can double
 back on itself or land meters off, and the model still solves, with pore pressures that
 change the factor of safety by several percent.
+
+SLOPE/W's **phreatic correction** is a setting on the analysis. Where it is on, the head
+under the line is reduced by cos² of the line's slope, and the line imports as Type
+`phreatic`, which does the same. Where it is off, which is the default, SLOPE/W uses the
+plain head under the line, and so does the import. One difference remains: SLOPE/W leaves
+the head uncorrected where the line runs along the ground surface, and XSLOPE corrects it
+there too. The caveats name that stretch when a model has one. Export writes a `phreatic`
+line back as SLOPE/W's switch.
+
+**Ru** imports as XSLOPE's `ru` option, with each material's own value. Both programs
+take the pore pressure as ru times the weight of the soil above the slice base. SLOPE/W
+also counts a surcharge in that weight and XSLOPE does not, and the caveats report it
+when a model has both.
 
 Ponded water needs no conversion at all. GeoStudio stores no
 ponded-water object: where the water rises **above** the ground surface, SLOPE/W simply
@@ -170,6 +246,40 @@ unless you replace the field with a water definition the engine can read.
     full list of steps and their factors of safety are all reported, and `step='NNN'`
     takes any other.
 
+### Staged rapid drawdown {#staged-rapid-drawdown}
+
+SLOPE/W's staged rapid drawdown uses the three-stage method of Duncan, Wright, and Wong
+(1990), the same method as XSLOPE's [rapid drawdown](../lem/rapid.md), and it states the
+problem with the same three inputs, so it imports whole:
+
+| SLOPE/W | XSLOPE |
+|---|---|
+| The higher of the analysis's two piezometric surfaces, the water before drawdown | Piezometric line 1 |
+| The lower surface, the water after drawdown | Piezometric line 2 |
+| Drawdown strengths c<sub>R</sub> and φ<sub>R</sub> on a Mohr-Coulomb soil that does not drain | d and ψ, the K<sub>c</sub> = 1 envelope |
+| A soil with no drawdown strengths | A free-draining material, with d and ψ blank |
+
+SLOPE/W's drawdown strengths are an R envelope drawn tangent to the Mohr circles. SLOPE/W
+turns them into the K<sub>c</sub> = 1 envelope with Duncan, Wright, and Brandon's (2014)
+equations, and the import uses the same ones (see
+[When the lab reports an R envelope](../lem/rapid.md#r-envelope)):
+
+>>$d = c_R \dfrac{\cos \phi_R \cos \phi'}{1 - \sin \phi_R} \qquad \psi = \arctan \dfrac{\sin \phi_R \cos \phi'}{1 - \sin \phi_R}$
+
+An XSLOPE input file does not record which analysis to run, so there is no rapid drawdown
+switch to carry. Run the imported model as a rapid drawdown: in Studio, **Run → Run LEM…**
+with Rapid drawdown ticked; in a script, `rapid=True`. Run as an ordinary analysis, it is
+the slope before drawdown. The critical circle imported from a solved file carries
+SLOPE/W's rapid drawdown factor of safety, so the two programs can be compared on it; the
+[verification page](../verification/geostudio.md#gs-2-40) does this for SLOPE/W's four
+rapid drawdown examples.
+
+The notes report anything that is not simply two surfaces, one above the other: a third
+surface, two surfaces that cross, a soil assigned to the lowered surface, drawdown
+strengths on a soil that is not Mohr-Coulomb, and a staged rapid drawdown whose water is
+not two piezometric surfaces. XSLOPE needs both d and ψ, and reads a zero in either as a
+blank, so a soil whose c<sub>R</sub> or φ<sub>R</sub> is zero is named too.
+
 ### Tension cracks
 
 A tension crack imports as `tcrack_depth`, with its percent filled with water as
@@ -186,15 +296,16 @@ an out-of-plane spacing — but **no direction and no dependence on the factor o
 Both are implied by the reinforcement type. XSLOPE stores them explicitly, so the import
 has to supply them, and the mapping was chosen by comparison with *SLOPE/W's own factors
 of safety*: reinforcement acts **along the bar** (`dir='axial'`), as a
-known load (`appl='active'`). On the manual's reinforced-embankment benchmark this
-reproduces SLOPE/W to within 0.3%, where applying the force tangent to the slip surface
-does not converge at all.
+known load (`appl='active'`). On the SLOPE/W verification manual's geosynthetic-reinforced
+embankment ([§2.24](../verification/geostudio.md#gs-2-24)) this reproduces SLOPE/W to within 0.3% for the clay fill and 0.6% for the sand fill.
 
 Everything is converted to XSLOPE's **per unit width** convention by dividing through by
 the spacing, and GeoStudio's pullout resistance per unit length becomes the bond length
 that develops full capacity (`lp = t_max / rate`), which is the same law written the
 other way round. The plate capacity becomes the end capacity at whichever end sits at the
-face.
+face. A file from an earlier GeoStudio 2025 build states the capacity as
+`<TensileCapacity>` and gives no plate capacity; GeoStudio 2025.2 writes the same model
+with both capacities equal to it, so the import reads it that way and says so.
 
 Where a geosynthetic defines its pullout through **interface adhesion and friction**
 rather than a constant resistance, XSLOPE's constant-rate bond length is an approximation
@@ -211,17 +322,28 @@ without telling you. Read the caveats it returns.
   which makes the model complete, and lets you compare the two programs on identical
   geometry. Run a search afterwards to find XSLOPE's own critical surface. If that circle
   will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
-  along a bedrock boundary), no surface is imported and the caveats report this.
+  along a bedrock boundary), XSLOPE takes the most critical of SLOPE/W's circles that
+  does build, or imports no surface if none does, and the caveats report either case. A
+  block, fully specified, or automatic-search surface is not a circle, so no surface is
+  imported from one, or from an analysis that takes its surface from such a parent.
+  An *optimized* search ends on a non-circular surface, which SLOPE/W saves with a
+  circle fitted to it. XSLOPE imports the most critical circle of the search before the
+  optimization instead, and the caveats give SLOPE/W's lower, optimized factor of safety.
 - **Reinforcement *sets*** — GeoStudio's out-of-plane staging groups. The reinforcement
   itself imports; the grouping does not.
+- **Partial factors.** SLOPE/W can solve an analysis with a set of partial factors (a
+  Eurocode 7 design approach), dividing the strengths and multiplying the loads by them.
+  XSLOPE applies none, so the model imports with the strengths and loads the file states,
+  and its factor of safety is not SLOPE/W's factored one. The notes name the set and every
+  factor in it that is not 1.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
-- **Vertical seismic coefficient.** XSLOPE models only the horizontal one.
-- **Pore pressure that is neither a piezometric surface nor a SEEP/W field.** Ru and
-  spatial pore-pressure functions import as zero, and the caveats report this. This is
-  one-way: export *writes* a spatial function (it is how a seepage field crosses), but
-  import does not read one back, so an XSLOPE model exported and re-imported returns
-  dry, with a caveat reporting it.
+- **Spatial pore-pressure functions and B-bar.** A spatial function imports as zero.
+  XSLOPE has no B-bar, so where SLOPE/W adds B-bar's excess pore pressure to a
+  piezometric line, the line imports and the excess pressure does not. The caveats
+  report both. The spatial function is one-way: export *writes* one (it is how a
+  seepage field crosses), but import does not read one back, so an XSLOPE model
+  exported and re-imported returns dry, with a caveat reporting it.
 - **The SEEP/W analysis itself** — its mesh is imported, but its conductivity functions
   and boundary conditions are not, so XSLOPE cannot *re-solve* the seepage problem, only
   read the answer SEEP/W already computed. An **unsolved** SEEP/W-fed file therefore
@@ -260,9 +382,15 @@ omits the attribute, the system is inferred from the unit weight of water: ≈9.
     caveats = export_gsz(slope_data, "my_model.gsz")
     ```
 
-Material zones become regions, materials become Mohr-Coulomb materials with their
-strengths, a piezo line becomes a piezometric surface (its points written under the
-owning analysis, the mirror image of how the import reads them), and **distributed loads
+Material zones become regions, materials become SLOPE/W materials (see
+[Strength options on export](#strength-options-on-export)), a piezo line becomes a
+piezometric surface (its points written under the
+owning analysis, the mirror image of how the import reads them; a `phreatic` line
+switches on SLOPE/W's phreatic correction), a material with a γ<sub>sat</sub> different
+from its γ is written with SLOPE/W's unit weight (γ<sub>sat</sub>) and its separate unit
+weight above the water table (γ), a rapid drawdown model
+becomes SLOPE/W's staged rapid drawdown (see
+[Exporting a rapid drawdown](#exporting-a-rapid-drawdown)), and **distributed loads
 become surcharges** — GeoStudio's surcharge is a wedge of fill, so an XSLOPE pressure
 profile is written as fill whose *depth* reproduces the pressure exactly. A **seepage
 field** is written as SLOPE/W's spatial pore-pressure function, described below. Export
@@ -281,12 +409,53 @@ is rejected rather than approximated.
     its piezometric line goes across, and GeoStudio derives the reservoir from it just
     as XSLOPE's engine does. A `manual` model's water block is recognized and skipped.
 
-A `.gsz` still cannot carry everything XSLOPE models. An **elastic** material *is* written
-— as GeoStudio's impenetrable **Bedrock** — but failure surfaces, piles, other
-non-Mohr-Coulomb strengths (c/φ, power curve, Hoek-Brown), and the material
-properties `t_cut`, `phi_b` and `s_cap` are **not written**: SLOPE/W has no material
-encoding for them, and inventing one would corrupt the file. Each omission is reported as
-a caveat so you know what to re-create on the GeoStudio side.
+A `.gsz` still cannot carry everything XSLOPE models. Failure surfaces, piles, and the
+material properties `t_cut`, `phi_b` and `s_cap` are **not written**: SLOPE/W has no
+material encoding for them, and inventing one would corrupt the file. Each omission is
+reported as a caveat so you know what to re-create on the GeoStudio side.
+
+### Strength options on export
+
+| XSLOPE | GeoStudio |
+|---|---|
+| `mc` | Mohr-Coulomb, with c′ and φ′ |
+| `elastic` | Bedrock (impenetrable) |
+| `ratio` | SHANSEP with a constant ratio, c/p |
+| `cp` | S=f(depth) |
+| `pow`, `hb` | Mohr-Coulomb, with the material's c and φ, which is not the same strength |
+
+SHANSEP has no minimum strength, so a `ratio` material's c is not written. Where
+c/p × σ′<sub>v</sub> is below c, SLOPE/W's strength is lower than XSLOPE's, and the
+caveats say so.
+
+S=f(depth) measures depth from the top of the material's own layer. A `cp` material
+whose top is level and at or below r_elev therefore crosses exactly, with the strength
+at that top and the same rate. A `cp` material that reaches above r_elev, where XSLOPE
+holds the strength at c, is written to match XSLOPE below r_elev. Above it, SLOPE/W's
+strength falls below c. A top that is not level is written from its highest point. Each
+case is reported with the size of the difference.
+
+GeoStudio has a Hoek-Brown model, but the export does not write it yet. GeoStudio has
+no power-curve model as such. Its Shear-Normal function could hold the curve as a
+table of points, which the export does not write.
+
+### Exporting a rapid drawdown
+
+A model with both piezometric lines and a d and ψ on a Mohr-Coulomb material is written
+as SLOPE/W's staged rapid drawdown, the way SLOPE/W's own examples write one: the rapid
+drawdown switch on the analysis, line 1 and line 2 as its two piezometric surfaces, and
+each d and ψ as the drawdown strengths c<sub>R</sub> and φ<sub>R</sub> that SLOPE/W turns
+back into the same d and ψ. The XSLOPE file does not say whether a model is to be run as
+a rapid drawdown, so a model that carries both is always exported as one. To solve it in
+GeoStudio as an ordinary analysis, turn its rapid drawdown off there.
+
+SLOPE/W checks that a soil's c<sub>R</sub> is above its c′ and its φ<sub>R</sub> below its
+φ′. XSLOPE has no such rule, so an envelope that fails the check is written as it is, and
+the notes name the soil. Distributed loads after drawdown (the `dloads (2)` sheet) are not
+written, because SLOPE/W applies one set of surcharges in every stage; the lowered pool
+needs no load of its own, since GeoStudio derives it from the lower surface. A model whose
+water is a seepage field cannot become a staged rapid drawdown, which takes its water as
+two piezometric surfaces, so its d and ψ are left out, and the notes say so.
 
 ### Exporting a seepage field
 
@@ -357,7 +526,8 @@ it straight back out, and diffs XSLOPE's XML against the vendor's.
   analyses. XSLOPE imports the SLOPE/W ones, and reads a SEEP/W analysis's **solved
   pore-pressure field** where a stability analysis depends on it — but it does not import
   a seepage *problem* to re-solve, and writes no analysis but SLOPE/W.
-- Only one piezometric surface is imported; a file defining several uses the first.
+- Only one piezometric surface is imported, except from a staged rapid drawdown, which
+  takes two; any other analysis that defines several uses the first.
 - Import replaces the current project. In Studio you are prompted to discard unsaved
   changes first, exactly as when opening a file; the imported model is then left unsaved
   so you can review it and **Save As**.

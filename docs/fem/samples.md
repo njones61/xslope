@@ -149,7 +149,7 @@ paper's worked examples:
 
 - [Example 1 — homogeneous slope](../verification/ssrm.md#verification-griffiths1)
 - [Example 2 — foundation layer, the false base circle](../verification/ssrm.md#verification-griffiths2)
-- [Example 3 — undrained clay with a thin weak layer](../verification/ssrm.md#verification-griffiths3) — a sweep read from the paper's Fig. 7, and the two competing mechanisms
+- [Example 3 — undrained clay with a thin weak layer](../verification/ssrm.md#verification-griffiths3) — a sweep of the weak layer's strength ratio $c_{u2}/c_{u1}$, compared with Griffiths & Lane's factors of safety, and the two competing mechanisms
 - [Example 4 — undrained clay over a weak foundation](../verification/ssrm.md#verification-griffiths4) — the mechanism changes from a base failure to a toe failure
 - [Example 5 — "slow" drawdown sweep](../verification/ssrm.md#verification-griffiths5) — pore pressure and reservoir load
 - [Example 6 — two-sided earth dam](../verification/ssrm.md#verification-griffiths6)

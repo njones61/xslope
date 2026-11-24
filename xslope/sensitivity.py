@@ -1319,8 +1319,8 @@ def _stage_for_drawdown(slope_data, transient_solution, stage_1, t):
 
 def _run_rapid_point(sd, methods, num_slices, search_opts=None,
                      cancel_check=None):
-    """One instant of a rapid-drawdown curve: a three-stage Duncan-Wright-Brandon
-    drawdown, searched.
+    """One instant of a rapid-drawdown curve: a drawdown by the three-stage method
+    of Duncan, Wright, and Wong (1990), searched.
 
     The surface is ALWAYS searched, on every method, from the model's own starting
     circle -- never the stored circle. A drawdown's critical surface is not the
@@ -1558,9 +1558,9 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
           'stage_1_time'   -- the instant stage 1 was read at (rapid only).
           'mode' / 'output' / 'output_label' / 'runtime'.
 
-    **Rapid drawdown (``rapid=True``).** Each instant becomes a full
-    Duncan-Wright-Brandon three-stage drawdown rather than a single-stage
-    analysis: stage 1 is the march's INITIAL state (the ``tseep`` sheet's
+    **Rapid drawdown (``rapid=True``).** Each instant becomes a full drawdown by
+    the three-stage method of Duncan, Wright, and Wong (1990) rather than a
+    single-stage analysis: stage 1 is the march's INITIAL state (the ``tseep`` sheet's
     ``stage_1``, normally t = 0 at full pool, and the earliest saved frame where
     the sheet names none), stage 2 is the frame at t, and stage 3 re-checks the
     drawn-down section with drained strengths where they are the lower. The
@@ -1597,7 +1597,7 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
                        "slope_data['mesh'] -- build one before running.")
     if rapid and mode != 'lem':
         return False, ("a rapid-drawdown curve is a limit-equilibrium run: the "
-                       "three-stage Duncan-Wright-Brandon procedure has no SSRM "
+                       "three-stage method of Duncan, Wright, and Wong (1990) has no SSRM "
                        "equivalent. Use mode='lem', or turn the drawdown off.")
     output, output_label = _OUTPUT_BY_MODE[mode]
     t0 = time.perf_counter()

@@ -267,7 +267,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 | LEM formulation, slice forces, method comparison | `lem/overview/` |
 | A single method in full | `lem/oms/`, `lem/bishop/`, `lem/janbu/`, `lem/spencer/`, `lem/mprice/`, `lem/force_eq/` |
 | Reinforcement, piles (LEM) | `reinforcement/lem/`, `piles/lem/` |
-| Rapid drawdown (three-stage Duncan-Wright-Brandon) | `lem/rapid/` |
+| Rapid drawdown (the three-stage method of Duncan, Wright, and Wong 1990) | `lem/rapid/` |
 | Automated search for the critical surface | `lem/search/` |
 | Seepage FE formulation, unsaturated models | `seep/overview/` |
 | Transient seepage and storage | `seep/transient/` |
@@ -301,20 +301,20 @@ published comparisons against the source or vendor program, not illustrations.
 
 | Topic | Worked examples |
 |:------|:----------------|
-| Reinforcement & geosynthetics | [VP87–VP94 — Geosynthetic multitiered MSE walls (Leshc…](https://xslope.org/en/latest/verification/rocscience/#vp87) · [2.18 — Borges & Cardoso – Geosynthetic Embankmen…](https://xslope.org/en/latest/verification/geostudio/#gs-2-18) · [Opening the starter file](https://xslope.org/en/latest/tutorials/fem02_reinforcement/#opening-the-starter-file) · [A base geotextile on soft clay](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay) · [A smooth geomembrane liner on a firm foundation](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation) · [FHWA Example E1 — MSE wall with a broken backslope](https://xslope.org/en/latest/verification/published/#fhwa-e1) |
-| Soil nails | [Effect of Dir and Appl](https://xslope.org/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change) · [VP47 — Soil-nailed wall in clay (Amherst test wa…](https://xslope.org/en/latest/verification/rocscience/#vp47) · [VP48 — Soil-nailed wall in sand (Clouterre test…](https://xslope.org/en/latest/verification/rocscience/#vp48) · [RS2 Part IV VP60 — Soil-nailed wall (Pockoski & Duncan slope…](https://xslope.org/en/latest/verification/rs2/#p4-vp60) |
+| Reinforcement & geosynthetics | [VP87–VP94 — Geosynthetic multitiered MSE walls (Leshc…](https://xslope.org/en/latest/verification/rocscience/#vp87) · [2.18 — Borges & Cardoso – Geosynthetic Embankmen…](https://xslope.org/en/latest/verification/geostudio/#gs-2-18) · [Tutorial FEM-2 — Opening the starter file](https://xslope.org/en/latest/tutorials/fem02_reinforcement/#opening-the-starter-file) · [Tutorial FEM-3 — A base geotextile on soft clay](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-base-geotextile-on-soft-clay) · [Tutorial FEM-3 — A smooth geomembrane liner on a firm foundation](https://xslope.org/en/latest/tutorials/fem03_block_wall_joints/#a-smooth-geomembrane-liner-on-a-firm-foundation) · [FHWA Example E1 — MSE wall with a broken backslope](https://xslope.org/en/latest/verification/published/#fhwa-e1) |
+| Soil nails | [Tutorial LEM-8 — Effect of Dir and Appl](https://xslope.org/en/latest/tutorials/lem08_reinforced_slope/#what-dir-and-appl-change) · [VP47 — Soil-nailed wall in clay (Amherst test wa…](https://xslope.org/en/latest/verification/rocscience/#vp47) · [VP48 — Soil-nailed wall in sand (Clouterre test…](https://xslope.org/en/latest/verification/rocscience/#vp48) · [RS2 Part IV VP60 — Soil-nailed wall (Pockoski & Duncan slope…](https://xslope.org/en/latest/verification/rs2/#p4-vp60) |
 | Anchors & tiebacks | [VP49 — Retaining wall, grouted tiebacks, soldier…](https://xslope.org/en/latest/verification/rocscience/#vp49) · [VP58 — Tied-back wall in layered soil](https://xslope.org/en/latest/verification/rocscience/#vp58) · [VP59 — Tieback wall in sand, drawdown water table](https://xslope.org/en/latest/verification/rocscience/#vp59) |
-| Piles & drilled shafts | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Torggler (2016) §3 — Homogeneous slope with a vertical plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3a) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3b) · [Opening the model and reading the pile rows](https://xslope.org/en/latest/tutorials/fem04_piles/#opening-the-model-and-reading-the-pile-rows) · [Opening the model](https://xslope.org/en/latest/tutorials/lem12_piles/#opening-the-model) · [SIGMAW-SRS — Slope stabilization with a sheet pile wall](https://xslope.org/en/latest/verification/geostudio/#sigmaw-wall) |
-| Sheet-pile & cutoff walls | [1. Sea Trench](https://xslope.org/en/latest/seep/samples/#1-sea-trench) · [Check its work](https://xslope.org/en/latest/tutorials/seep01_sheetpile/#check-its-work) · [Partially Penetrating Sheetpile](https://xslope.org/en/latest/verification/seep/#verification-sheetpile) |
-| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.org/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.org/en/latest/verification/rocscience/#vp99) · [6. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.org/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat) · [Conclusion](https://xslope.org/en/latest/tutorials/combo02_rapid_drawdown/#conclusion) · [The dam](https://xslope.org/en/latest/tutorials/combo02_rapid_drawdown/#the-dam) |
-| Transient seepage | [6. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.org/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient) · [Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model) · [Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model_1) · [Conclusion](https://xslope.org/en/latest/tutorials/seep03_reservoir_drawdown/#conclusion) · [Rain that comes and goes](https://xslope.org/en/latest/tutorials/seep04_dam_infiltration/#rain-that-comes-and-goes) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.org/en/latest/verification/geostudio/#seepw-t01) |
+| Piles & drilled shafts | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Torggler (2016) §3 — Homogeneous slope with a vertical plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3a) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3b) · [Tutorial FEM-4 — Opening the model and reading the pile rows](https://xslope.org/en/latest/tutorials/fem04_piles/#opening-the-model-and-reading-the-pile-rows) · [Tutorial LEM-12 — Opening the model](https://xslope.org/en/latest/tutorials/lem12_piles/#opening-the-model) · [SIGMAW-SRS — Slope stabilization with a sheet pile wall](https://xslope.org/en/latest/verification/geostudio/#sigmaw-wall) |
+| Sheet-pile & cutoff walls | [1. Sea Trench](https://xslope.org/en/latest/seep/samples/#1-sea-trench) · [Tutorial SEEP-1 — Check its work](https://xslope.org/en/latest/tutorials/seep01_sheetpile/#check-its-work) · [Partially Penetrating Sheetpile](https://xslope.org/en/latest/verification/seep/#verification-sheetpile) |
+| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.org/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.org/en/latest/verification/rocscience/#vp99) · [2.40 — Rapid Drawdown – Walter Bouldin Dam](https://xslope.org/en/latest/verification/geostudio/#gs-2-40) · [2.42 — Rapid Drawdown – Pumped Storage Dam](https://xslope.org/en/latest/verification/geostudio/#gs-2-42) · [6. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.org/en/latest/lem/samples/#6-saturated-vs-moist-unit-weight-_sat) · [Tutorial COMBO-2 — Conclusion](https://xslope.org/en/latest/tutorials/combo02_rapid_drawdown/#conclusion) |
+| Transient seepage | [6. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.org/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient) · [Tutorial COMBO-3 — Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model) · [Tutorial COMBO-3 — Opening the model](https://xslope.org/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model_1) · [Tutorial SEEP-3 — Conclusion](https://xslope.org/en/latest/tutorials/seep03_reservoir_drawdown/#conclusion) · [Tutorial SEEP-4 — Rain that comes and goes](https://xslope.org/en/latest/tutorials/seep04_dam_infiltration/#rain-that-comes-and-goes) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.org/en/latest/verification/geostudio/#seepw-t01) |
 | Seepage-coupled stability | [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.org/en/latest/verification/rocscience/#vp102) · [VP46 — Baker (1993) three-stage dam — stages 1-2…](https://xslope.org/en/latest/verification/rocscience/#vp46) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.org/en/latest/verification/rs2/#p4-vp102) · [RS2-28 — Excavated slope with FE groundwater and m…](https://xslope.org/en/latest/verification/rs2/#rs2-28) · [4. Earth Dam (Duncan, Wright, and Brandon)](https://xslope.org/en/latest/lem/samples/#4-earth-dam-duncan-wright-and-brandon) · [6. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.org/en/latest/seep/samples/#6-johnson-reservoir-zoned-drawdown-transient) |
-| Probabilistic & reliability | [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.org/en/latest/verification/rs2/#rs2-26) · [2. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.org/en/latest/fem/samples/#2-reliability-analysis-two-layer-c-slope) · [Worked sample](https://xslope.org/en/latest/parametric/sensitivity/#worked-sample) · [Opening the model](https://xslope.org/en/latest/tutorials/lem11_reliability/#opening-the-model) · [The deterministic run](https://xslope.org/en/latest/tutorials/lem11_reliability/#the-deterministic-run) |
-| Tension cracks | [VP53 — Priest (1993) rigid block on a plane](https://xslope.org/en/latest/verification/rocscience/#vp53) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.org/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-29 — Geosynthetic-reinforced embankment on sof…](https://xslope.org/en/latest/verification/rs2/#rs2-29) · [A Simple Embankment from Scratch](https://xslope.org/en/latest/videos/#video-1) · [5. Tension Crack](https://xslope.org/en/latest/lem/samples/#5-tension-crack) |
-| Seismic (pseudo-static) | [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-64 — Slope stability assessment of three homog…](https://xslope.org/en/latest/verification/rs2/#rs2-64) · [FHWA Example E7 — seismic loading on the E4 wall](https://xslope.org/en/latest/verification/published/#fhwa-e7) · [VP104 — Seismic slope with Newmark and multi-moda…](https://xslope.org/en/latest/verification/rocscience/#vp104) · [VP4 — Slope, (3) materials, seismic](https://xslope.org/en/latest/verification/rocscience/#vp4) |
-| Non-circular surfaces | [Griffiths & Lane (1999) Example 3 — Undrained Clay Slope wi…](https://xslope.org/en/latest/verification/ssrm/#verification-griffiths3) · [VP25 — Prandtl bearing mechanism on a 60° slope…](https://xslope.org/en/latest/verification/rocscience/#vp25) · [VP43 — Slope, homogeneous — planar surface (Bake…](https://xslope.org/en/latest/verification/rocscience/#vp43) · [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.org/en/latest/verification/rs2/#rs2-26) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3b) |
-| Layered & zoned dams | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.org/en/latest/verification/rocscience/#vp98) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.org/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [4. Earth Dam (Duncan, Wright, and Brandon)](https://xslope.org/en/latest/lem/samples/#4-earth-dam-duncan-wright-and-brandon) · [4. Earth Dam with Core and Filter](https://xslope.org/en/latest/seep/samples/#4-earth-dam-with-core-and-filter) |
-| Homogeneous benchmarks | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI…](https://xslope.org/en/latest/verification/ssrm/#hoek-brown) · [Griffiths & Lane (1999) Example 1 — Homogeneous Slope](https://xslope.org/en/latest/verification/ssrm/#verification-griffiths1) · [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.org/en/latest/verification/rocscience/#vp102) · [VP21 — Slope, homogeneous, ru pore pressure (Fre…](https://xslope.org/en/latest/verification/rocscience/#vp21) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.org/en/latest/verification/rs2/#p4-vp102) |
+| Probabilistic & reliability | [RS2-25 — Syncrude tailings dike (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.org/en/latest/verification/rs2/#rs2-26) · [2. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.org/en/latest/fem/samples/#2-reliability-analysis-two-layer-c-slope) · [Sensitivity — Worked sample](https://xslope.org/en/latest/parametric/sensitivity/#worked-sample) · [Tutorial LEM-11 — Opening the model](https://xslope.org/en/latest/tutorials/lem11_reliability/#opening-the-model) · [Tutorial LEM-11 — The deterministic run](https://xslope.org/en/latest/tutorials/lem11_reliability/#the-deterministic-run) |
+| Tension cracks | [VP53 — Priest (1993) rigid block on a plane](https://xslope.org/en/latest/verification/rocscience/#vp53) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.org/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-29 — Geosynthetic-reinforced embankment on sof…](https://xslope.org/en/latest/verification/rs2/#rs2-29) · [Videos — A Simple Embankment from Scratch](https://xslope.org/en/latest/videos/#video-1) · [5. Tension Crack](https://xslope.org/en/latest/lem/samples/#5-tension-crack) |
+| Seismic (pseudo-static) | [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-64 — Slope stability assessment of three homog…](https://xslope.org/en/latest/verification/rs2/#rs2-64) · [Tutorial LEM-14 — Part 3 — Strength reduction at the same coefficient](https://xslope.org/en/latest/tutorials/lem14_pseudostatic/#part-3-strength-reduction-at-the-same-coefficient) · [Duncan, Wright & Brandon — single- and two-stage seismic analyses](https://xslope.org/en/latest/verification/published/#dwb-10-4) · [FHWA Example E7 — seismic loading on an MSE wall](https://xslope.org/en/latest/verification/published/#fhwa-e7) · [VP104 — Seismic slope with Newmark and multi-moda…](https://xslope.org/en/latest/verification/rocscience/#vp104) |
+| Non-circular surfaces | [Griffiths & Lane (1999) Example 3 — Undrained Clay Slope wi…](https://xslope.org/en/latest/verification/ssrm/#verification-griffiths3) · [VP25 — Prandtl bearing mechanism on a 60° slope…](https://xslope.org/en/latest/verification/rocscience/#vp25) · [VP43 — Slope, homogeneous — planar surface (Bake…](https://xslope.org/en/latest/verification/rocscience/#vp43) · [RS2-25 — Syncrude tailings dike (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.org/en/latest/verification/rs2/#rs2-26) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.org/en/latest/verification/ssrm/#verification-torggler3b) |
+| Layered & zoned dams | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.org/en/latest/verification/rocscience/#vp98) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.org/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.org/en/latest/verification/rs2/#p4-vp51) · [RS2-25 — Syncrude tailings dike (El-Ramly et al. 2…](https://xslope.org/en/latest/verification/rs2/#rs2-25) · [4. Earth Dam (Duncan, Wright, and Brandon)](https://xslope.org/en/latest/lem/samples/#4-earth-dam-duncan-wright-and-brandon) · [4. Earth Dam with Core and Filter](https://xslope.org/en/latest/seep/samples/#4-earth-dam-with-core-and-filter) |
+| Homogeneous benchmarks | [7. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.org/en/latest/lem/samples/#7-pile-stabilized-slope-hassiotis-et-al-1997) · [Hammah et al. (2005b) Example 1 — Hoek-Brown Rock Slope, GS…](https://xslope.org/en/latest/verification/ssrm/#hoek-brown) · [Griffiths & Lane (1999) Example 1 — Homogeneous Slope](https://xslope.org/en/latest/verification/ssrm/#verification-griffiths1) · [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.org/en/latest/verification/rocscience/#vp102) · [VP21 — Slope, homogeneous, ru pore pressure (Fre…](https://xslope.org/en/latest/verification/rocscience/#vp21) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.org/en/latest/verification/rs2/#p4-vp102) |
 <!-- corpus-index:end -->
 
 ### Tone
@@ -360,9 +360,9 @@ You build the model as an **in-memory `slope_data` dictionary** and write it to 
 template in a single call — you never touch cells or XML directly:
 
 ```python
-from xslope.fileio import save_slope_data_to_xlsx, load_slope_data
+from xslope.fileio import save_slope_data_to_xlsx, load_slope_data, default_template_path
 
-TEMPLATE = "docs/inputs/input_template.xlsx"   # blank master template (copy is made for you)
+TEMPLATE = default_template_path()               # the blank template bundled with xslope (copy is made for you)
 dst = "inputs/problem_name.xlsx"
 
 slope_data = { ... }                            # build the dict (schema below)
@@ -416,33 +416,40 @@ slope_data = {
                                  #   MAGNITUDE and applies it in the failure-driving direction;
                                  #   the FEM reads the SIGN as direction (+k pushes +x). One cell,
                                  #   two conventions — say which engine's you mean when reporting.
+    'k_vertical':   0.0,         # v28, main!D14. vertical seismic coefficient, SIGNED in both
+                                 #   engines: + acts downward (adds k_v*W to the weight), - upward.
+                                 #   Slide2's and SLOPE/W's convention; RS2's is opposite (the
+                                 #   importer flips it). One run applies one direction — check
+                                 #   both with two runs. A yield coefficient search holds
+                                 #   k_v/|k| fixed as it varies k.
 
     # --- Run options: how this model is meant to be analyzed, carried in the file instead of
     #     living in a dialog. All optional; None = unspecified and the solver default stands.
-    'water_loads':    'auto',    # v22, main!D24 (D23 before v25). 'auto' = the engine derives the ponded-water
+    'water_loads':    'auto',    # v22, main!D25 (D24 v25-v27, D23 before v25). 'auto' = the engine derives the ponded-water
                                  #   load from the model's own water definition at EVERY solve,
                                  #   so the dloads sheets carry NON-water loads only; 'manual' =
                                  #   you enter it there yourself. A new file is 'auto'; every
                                  #   pre-v22 file is 'manual'. See guideline 8 (ponded water).
-    'surface_family': None,      # v22, main!D25 (D24 before v25). 'circular' | 'non-circular'. Only bites on a
+    'surface_family': None,      # v22, main!D26 (D25 v25-v27, D24 before v25). 'circular' | 'non-circular'. Only bites on a
                                  #   file defining BOTH families — it picks which one runs (and
                                  #   sets slope_data['circular'] at load). Leave None otherwise.
-    'lem_method':     None,      # v19, main!D14. one of the seven method names, or 'all'
-    'num_slices':     None,      # v19, main!D15
-    'k0':             None,      # v19, main!D16. FEM at-rest coefficient for the INITIAL stress
+    'lem_method':     None,      # v19, main!D15 (D14 before v28). one of the seven method names, or 'all'
+    'num_slices':     None,      # v19, main!D16 (D15 before v28)
+    'k0':             None,      # v19, main!D17 (D16 before v28). FEM at-rest coefficient for the INITIAL stress
                                  #   state, equilibrated at full strength before any reduction.
                                  #   Blank = plain gravity turn-on. Set 1.0 to reproduce an RS2
                                  #   model (RS2 authors an isotropic field stress). Worth a few
                                  #   percent of FS on reinforced/near-cohesionless sections.
-    'tension_srf':    None,      # v19, main!D17. reduce t_cut along with c and tan(phi)?
-    'element_type':   None,      # v19, main!D18. mesh element type (see Meshing below)
-    'target_size':    None,      # v19, main!D19. global target element size
-    'element_size_1d': None,     # v25, main!D20. target element size ALONG the 1D members (piles
+    'tension_srf':    None,      # v19, main!D18 (D17 before v28). reduce t_cut (a material's, and a joints-sheet
+                                 #   line's) along with c and tan(phi)? None = the engine default, True
+    'element_type':   None,      # v19, main!D19 (D18 before v28). mesh element type (see Meshing below)
+    'target_size':    None,      # v19, main!D20 (D19 before v28). global target element size
+    'element_size_1d': None,     # v25, main!D21 (D20 before v28). target element size ALONG the 1D members (piles
                                  #   and reinforcement lines). Blank = the mesher subdivides them
                                  #   on its own, which is what every pre-v25 file does.
-    'ssrm_f_min':     None,      # v19, main!D21/D22 (D20/D21 before v25). the SSRM bracket
+    'ssrm_f_min':     None,      # v19, main!D22/D23 (D21/D22 v25-v27, D20/D21 before v25). the SSRM bracket
     'ssrm_f_max':     None,
-    'side_bc':        None,      # v21, main!D23 (D22 before v25). 'rollers' (the default — a truncation boundary
+    'side_bc':        None,      # v21, main!D24 (D23 v25-v27, D22 before v25). 'rollers' (the default — a truncation boundary
                                  #   is a cut through ground that continues) | 'fixed'. Use
                                  #   'fixed' only to reproduce a program that clamps its sides.
 }
@@ -473,14 +480,20 @@ slope_data['materials'] = [
                                  #   independent of this material's 'u'.
                                  #   So u='none' soil below the water table still weighs gamma_sat,
                                  #   and gamma_sat with no water anywhere is weighed gamma.
-        'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c/p ratio),
+        'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c + c/p per unit
+                                 #   depth below r_elev), 'ratio' (max(c, c/p * sigma'_v): c/p is the
+                                 #   strength ratio, c the minimum; sigma'_v counts surface loads and
+                                 #   ponded water, not line loads),
                                  #   'pow' (power curve), 'hb' (generalized Hoek-Brown), or
                                  #   'elastic' (infinite strength, cannot fail — see below)
         'c':     200.0,          # cohesion
         'phi':   28.0,           # friction angle (degrees)
         'u':     'piezo',        # pore pressure: 'none', 'piezo', 'seep', or 'ru'; set slope_data['piezo_phreatic']=True for the phreatic cos^2 correction (piezo sheet Type)
-        # --- option='cp' only ---
-        'cp':    0.0,            # c/p ratio: rate of Su increase per unit depth below r_elev
+                                 #   Read per material by both the LEM and the FEM, so materials may use different
+                                 #   sources (a dry 'none' fill over a 'piezo' foundation); blank = 'none'.
+        # --- option='cp' (and 'ratio') only ---
+        'cp':    0.0,            # cp: rate of Su increase per unit depth below r_elev;
+                                 #   ratio: the strength ratio Su/sigma'_v (about 0.05-0.3)
         'r_elev':0.0,            # reference elevation for c/p (normally cp>0; negative only
                                  #   for a consolidated crust over softer clay — see VP30)
         # --- option='pow' only: tau = pow_a*(sigma_n + pow_d)^pow_b + pow_c ---
@@ -492,11 +505,15 @@ slope_data['materials'] = [
         'hb_d':   0.0,           # disturbance factor, in [0, 1]
         # --- option='elastic' only (v16): infinite strength, cannot fail. FEM holds it out of
         #     plasticity entirely; LEM treats it as impenetrable (a failure surface may not
-        #     cross it). Uses gamma/gamma_sat/E/nu + seepage columns only — every strength key above
-        #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is ignored (loader warns if
-        #     any is set). Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength",
-        #     SLOPE/W "Bedrock (Impenetrable)".
-        # --- rapid drawdown only (Kc=1 envelope) ---
+        #     cross it). Uses gamma/gamma_sat/E/nu, u, and the seepage columns only — every
+        #     strength key above (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is
+        #     ignored (loader warns if any is set). In the FEM its u sets how the water loads
+        #     it: a sealed wall is u='none' (no pore pressure inside, so the soil water presses
+        #     on its face); a permeable wall or rock is 'seep' or 'piezo' (the same pore
+        #     pressure as its neighbors, so no push at its face). The LEM never reads an
+        #     elastic zone's u. Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite
+        #     Strength", SLOPE/W "Bedrock (Impenetrable)".
+        # --- rapid drawdown and two-stage seismic only (Kc=1 envelope), read on mc rows only ---
         'd':     0.0,            # cohesion intercept
         'psi':   0.0,            # friction angle
         # --- tensile-strength cutoff (v16): Rankine cap on the major principal stress, stress
@@ -524,8 +541,8 @@ slope_data['materials'] = [
         #     converts to apparent cohesion c_suction = min(s, s_cap)*tan(phi_b); None/blank = uncapped.
         #     Dependency: active (read) only for option in {mc, pow, hb} combined with
         #     u in {piezo, seep} — a signed pore-pressure source the suction can be derived
-        #     from. Inert for option='cp' (Su already embodies field suction — do not also set
-        #     phi_b there) and option='elastic' (cannot fail); also inert, by construction, for
+        #     from. Inert for option='cp' and 'ratio' (Su already embodies field suction — do not
+        #     also set phi_b there) and option='elastic' (cannot fail); also inert, by construction, for
         #     u='none' or u='ru' (no signed u to read a suction from). CAUTION: with u='piezo'
         #     the hydrostatic suction above the line is UNBOUNDED with depth, so s_cap is
         #     essential to avoid an unrealistic apparent cohesion; with u='seep' the FE
@@ -546,11 +563,12 @@ slope_data['materials'] = [
         #     leave None for steady-state. Ss = specific storage [1/len], required on
         #     every material; Sy = specific yield [-], required only on UNCONFINED models
         #     (an exit-face BC exists). See "Transient seepage" under Seepage Analysis
-        #     Code for how to build and run one; theory: docs/seep/transient.md.
+        #     Code for how to build and run one; theory: https://xslope.org/en/latest/seep/transient/.
         'Ss': None, 'Sy': None,
         # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,
-        # --- reliability std deviations (only when running reliability) ---
+        # --- reliability std deviations (only when running reliability). sigma_d/sigma_psi are
+        #     read only by a rapid drawdown Taylor-series run, on an mc material ---
         'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0,
         'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0,
     },
@@ -565,8 +583,11 @@ Common strength setups:
 - **Effective stress with a piezometric line:** `option='mc', c=c', phi=phi', u='piezo'`.
 - **Effective stress with a seepage solution:** `option='mc', c=c', phi=phi', u='seep'`.
 - **Rigid / infinite-strength zone (bedrock, a retaining wall):** `option='elastic'` — only
-  gamma/gamma_sat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
-  key is ignored, and the LEM search treats the zone as impenetrable.
+  gamma/gamma_sat/E/nu, `u` (+ seepage columns, if the zone still conducts water) matter; every
+  strength key, `phi_b` and `s_cap` included, is ignored, and the LEM search treats the zone as
+  impenetrable. In the FEM, `u` decides how the water loads it: a sealed wall is `u='none'`, so
+  the soil water presses on its face; a permeable wall or rock that water passes through is
+  `'seep'` or `'piezo'`, with the same pore pressure as its neighbors and no push at its face.
 - **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
   any mc/cp/pow/hb material; leave `t_cut=None` to let the material's own envelope decide (on mc
   the apex c/tan(phi), which the engine enforces; unbounded only at phi = 0).
@@ -575,8 +596,8 @@ Common strength setups:
   SSRM reduces the suction term by F alongside c' and tan(phi')); set `s_cap=<stress value>` too — mandatory in
   practice with `u='piezo'` since the hydrostatic suction above the line grows unbounded with
   height, optional (self-bounding) with `u='seep'`. Leave `phi_b=None` for the pre-v17 default
-  (no suction credit). Do not set `phi_b` on a `cp` material (Su already embodies field
-  suction) or on `elastic` (cannot fail).
+  (no suction credit). Do not set `phi_b` on a `cp` or `ratio` material (Su already embodies
+  field suction; neither engine credits it there) or on `elastic` (cannot fail).
 
 #### Geometry — `profile_lines` OR `polygons` (mutually exclusive)
 
@@ -702,8 +723,9 @@ conforming zones.
 
 An **SSR zone** confines the finite-element strength reduction to part of the model. It is an
 **analysis overlay, not geometry**: it is never meshed, never a material region and never
-slice-generating, so adding one to a finished model leaves the mesh and every other answer
-untouched. Zones live on their own key — never in `polygons` — and on the **polygon** sheet they
+slice-generating, so adding one to a finished model leaves every other answer untouched, and
+the mesh too unless the zone carries a `size`, which refines the mesh inside it as a refine zone
+does. Zones live on their own key — never in `polygons` — and on the **polygon** sheet they
 are rows whose **Type** names the kind. They may overlap each other and cross material
 boundaries; the no-overlap rule above applies to material zones only. A model whose geometry is
 on the profile sheet may still carry zones.
@@ -746,8 +768,8 @@ slope_data['refine_zones'] = [
 #### Joint regions (`joint_zones`) — authoring only
 
 A polygon of Type `joints`: a region a generated joint set is clipped to, for ground no material
-boundary draws. No material, no mesh region, no slices, no effect on the mesh — only
-`xslope.joints` reads it, and only when a set names it.
+boundary draws. No material, no mesh region, no slices. A `size` on it refines the mesh inside it,
+as on a refine zone; otherwise only `xslope.joints` reads it, and only when a set names it.
 
 ```python
 slope_data['joint_zones'] = [
@@ -757,8 +779,8 @@ slope_data['joint_zones'] = [
 ```
 
 `label` is the polygon sheet's block header, and it is how a set names the region
-(`region='poly:North block'`, or `'poly:1'` by position). `size` and `mat_id` do nothing on such
-a polygon and preflight warns about either. A region no set names is fine.
+(`region='poly:North block'`, or `'poly:1'` by position). `mat_id` does nothing on such a polygon
+and preflight warns about it. A region no set names is fine.
 
 A `size` key on a **material** polygon (`slope_data['polygons'][i]['size']`) or on a **profile
 line** (`slope_data['profile_lines'][i]['size']`) does the same thing for that zone. Use those
@@ -858,7 +880,7 @@ and you should decide consciously, not miss it by accident.
 A **FEM-only** or seepage-only model needs no circle: leave the sheet empty. Only a
 limit-equilibrium run needs a surface, and preflight refuses that run when there is none.
 
-**A file that defines both families.** `slope_data['surface_family']` (main!D25) — `'circular'`
+**A file that defines both families.** `slope_data['surface_family']` (main!D26) — `'circular'`
 or `'non-circular'` — decides which one runs, and the loader uses it to set
 `slope_data['circular']`, so the run, the plots and the next session all read the same surface.
 Blank is normal and means "whichever family the model defines"; on a file carrying both, the
@@ -929,8 +951,10 @@ drawing approximately is fine — the optimizer refines them. Non-circular surfa
 the search find the critical path along it.
 
 - **Entry/exit points** (first and last) sit on the **ground surface** with `Movement='Free'` —
-  the search moves them horizontally and snaps Y back to the ground surface, so give each an
-  explicit ground-elevation Y (never leave Y blank).
+  the search steps them along the ground surface itself (`'Horiz'` does the same on an end point;
+  `'Fixed'` pins it), so give each an explicit ground-elevation Y (never leave Y blank). Movement
+  matches in any case; a blank Movement is Free on an end point and Fixed on an interior one, and
+  any other word stops the search.
 - **Interior points** run through the weak layer with `Movement='Horiz'` so the optimizer slides
   them horizontally within it. **Seed them just above the bottom of the weak layer (~0.1 units
   above its base)** — the minimum-FS surface typically rides along the layer bottom.
@@ -998,10 +1022,12 @@ slope_data['reinforcement_lines'] = [
      # v27 interface (joint) option, FEM only. 'Yes' makes the line a slip
      # surface: the mesh splits along it and a pair of interface elements
      # carries the sheet's grip, with 'adhesion'/'delta' as their Mohr-Coulomb
-     # strength (both required). '' / 'No' is the ordinary bonded bar.
+     # strength (both required). '' / 'No' is the ordinary bonded bar. Yes/No
+     # match in any case; any other word is refused by the checks.
      'joint': '',           # '', 'No' (bonded, the default) | 'Yes' (slip surface)
      'kn': float('nan'),    # interface normal stiffness; NaN = derive from the
-     'ks': float('nan'),    # softer adjacent soil over 0.1 x the 1D element size
+     'ks': float('nan'),    # softer adjacent soil over 0.1 x the 1D element size;
+                            # a stated kn/ks must be > 0. Read only when joint='Yes'
      'jred': ''},           # '' / 'Yes' = reduce the interface with the soil in
                             # the SSR (the default); 'No' holds it at full strength
 ]
@@ -1012,9 +1038,12 @@ The two pullout laws share one envelope. With `lp1`/`lp2` the capacity develops 
 `2*(adhesion + sigma'_v*tan(delta))` per unit length, integrated along the line — `sigma'_v`
 being the weight of the soil column above each point (gamma_sat below the water table where a
 material declares one) less the pore pressure that point's material declares. `lp1`/`lp2` are
-then not read. The FHWA form is `adhesion = 0`, `delta = atan(F* * alpha)` for a nominal
-pullout resistance, `atan(F* * alpha / FS_PO)` for an allowable one. Both engines apply
-the same envelope, `xslope.fileio.reinforce_available_tension`. A `slope_data` you assemble in
+then not read. The FHWA form (FHWA-NHI-10-024/025, GEC 11: *Design and Construction of
+Mechanically Stabilized Earth Walls and Reinforced Soil Slopes*, 2009) is `adhesion = 0`,
+`delta = atan(F* * alpha)` for a nominal pullout resistance, `atan(F* * alpha / FS_PO)` for an
+allowable one, where F* is the pullout resistance factor, alpha the scale-effect correction
+factor, and FS_PO the pullout factor of safety (1.5 in granular soil, 2 in cohesive soil).
+Both engines apply the same envelope, `xslope.fileio.reinforce_available_tension`. A `slope_data` you assemble in
 memory resolves the law on the way into either engine, so nothing extra has to be called.
 
 `appl` decides what every capacity on the line is. With `active` the LEM does not divide the
@@ -1032,15 +1061,17 @@ and the report prints; the slice table's `p_active`/`p_passive` columns sum the 
 slice.
 
 Support-type recipes, end 1 at the face or wall (column-by-column entries with typical values
-from the FHWA manuals: `docs/reinforcement/types.md`):
+from the FHWA manuals: https://xslope.org/en/latest/reinforcement/types/):
 - geosynthetics -> `type='geosynthetic'` (tangent, active): `t_max` = long-term strength
   Tal ÷ its factor of safety; `tend1` = the facing connection's allowable strength, 0 where the
   layer ends free at the face; `tend2` = 0.
-- soil nails -> `type='nail'` (axial, active, GEC 7's allowable values): `t_max` = bar area ×
-  yield strength per nail ÷ 1.8; `lp1` = `lp2` = `t_max` ÷ (π × bond strength × drill-hole
+- soil nails -> `type='nail'` (axial, active, allowable values from GEC 7: FHWA Geotechnical
+  Engineering Circular No. 7, *Soil Nail Walls*, FHWA-NHI-14-007, 2015, with its factors of
+  safety from Table 5.1): `t_max` = bar area × yield strength per nail ÷ 1.8 (Grade 60 or 75
+  bar; ÷ 2.0 for Grade 95 or 150); `lp1` = `lp2` = `t_max` ÷ (π × bond strength × drill-hole
   diameter ÷ 2.0); `tend1` = nail-head capacity, the smallest of the facing's flexure and
-  punching-shear resistances ÷ 1.5 and headed-stud resistance ÷ its factor; `tend2` = 0;
-  `adhesion`/`delta` blank. Nominal values instead go with `appl='passive'`.
+  punching-shear resistances ÷ 1.5 and headed-stud resistance ÷ 2.0 (A307 bolt) or 1.7 (A325
+  bolt); `tend2` = 0; `adhesion`/`delta` blank. Nominal values instead go with `appl='passive'`.
 - tiebacks -> `type='tieback'` (axial, active): `t_max` = the smallest of the tendon's design
   load, the allowable capacity of the head's connection to the wall, and the bond capacity
   (allowable load transfer per unit length × bond length); `lp1` = 0; `lp2` = `t_max` ÷ the
@@ -1060,12 +1091,13 @@ the material: does the slip surface CUT the reinforcement or run ALONG it? A bon
 where the surface crosses the layers (a circle through a geogrid slope, a nail wall, a pile
 row) — it corresponds to the LEM treatment. A joint is right where the surface can run along
 the layer: a base geotextile under an embankment on soft clay, a wrapped-face or block-faced
-wall whose fill slides on its sheets, a smooth liner. On a jointed line `lp1`/`lp2` are not
-read (the grip is the interface traction); the bar still yields at `t_max` and softens to `t_res`
+wall whose fill slides on its sheets, a smooth liner. On a jointed line the FEM does not read
+`lp1`/`lp2` (the grip is the interface traction; the LEM, which ignores `joint`, reads them unless
+`adhesion` and `delta` are both set); the bar still yields at `t_max` and softens to `t_res`
 where one is given. A blank `tend1`/`tend2` leaves that end free to pull out, and a filled one
 ties it at that capacity. LEM ignores `joint` entirely. Preflight
 reports the geometry that indicates a bonded line should have been a joint. See
-`docs/reinforcement/fem.md`, "Choosing a Bonded Bar or a Joint".
+https://xslope.org/en/latest/reinforcement/fem/#bonded-bar-or-joint.
 
 ### Joint lines (v27 `joints` sheet, FEM only)
 
@@ -1079,17 +1111,18 @@ coincident nodes and one interface element instead of three and two.
 slope_data['joint_lines'] = [
     {'label': 'Block base',
      'x1': 6.0, 'y1': 6.0, 'x2': 6.3, 'y2': 6.0,
-     'c': 0.0,              # joint cohesion; blank/0 is a purely frictional contact
-     'phi': 34.0,           # friction angle, degrees. REQUIRED — preflight refuses a blank
+     'c': 0.0,              # joint cohesion, >= 0; blank/0 is a purely frictional contact
+     'phi': 34.0,           # friction angle, degrees, in [0, 90). REQUIRED — preflight refuses a blank
      'c_res': float('nan'),  # NaN = no residual branch: the joint keeps its peak strength.
      'phi_res': float('nan'),#   A stated pair is what it drops to the first time it slips,
                              #   permanently; neither may exceed the peak.
      'dil': float('nan'),   # NaN/0 = no dilation. An angle makes a unit of slip open the
                             #   joint by tan(dil), which builds normal stress under confinement
-     't_cut': 0.0,          # tension cutoff: the joint opens past it and closes on contact
+     't_cut': 0.0,          # tension cutoff, >= 0: the joint opens past it and closes on
+                            #   contact. Reduced with c and tan(phi) unless tension_srf is False
      'kn': float('nan'),    # NaN = derive from the softer adjacent soil over
-     'ks': float('nan'),    # 0.1 x the 1D element size, as the reinforce sheet's pair does
-     'jred': ''},           # '' / 'Yes' = reduce with the soil in the SSR; 'No' holds it
+     'ks': float('nan'),    # 0.1 x the 1D element size, as the reinforce sheet's pair does; > 0 if stated
+     'jred': ''},           # '' / 'Yes' = reduce with the soil in the SSR; 'No' holds it (any case)
 ]
 ```
 
@@ -1105,8 +1138,9 @@ jointed too (`joint='Yes'`) or stop short of it, and a pile must stop short: the
 node, and a bonded member there has no side to attach to (preflight
 `joint.crosses_constraint_line` refuses it). A thin zone crossed by many joint lines needs a per-polygon `size`
 (the polygon sheet's Size column) — a 0.3 m facing column crossed every 0.6 m does not mesh at a
-1 m target size. LEM ignores the sheet entirely. See `docs/reinforcement/fem.md`, "Joints without
-reinforcement".
+1 m target size. LEM ignores the sheet entirely, and seepage ignores every joint (both sheets):
+water flows across a joint line as if the mesh were not split there. See
+https://xslope.org/en/latest/reinforcement/fem/#joints-without-reinforcement.
 
 #### Joint networks (`xslope.joints`)
 
@@ -1306,11 +1340,17 @@ for c in caveats:
 
 - **Always read the returned caveat list back to the user.** A clean return does not mean a
   complete model — it means nothing crashed.
-- **No import ever carries a failure surface.** Add one after importing (the generators are the
-  fastest route). An RS2 SSR model has none by construction.
+- **Check for a failure surface after importing.** A solved `.gsz` brings SLOPE/W's critical
+  circle as one trial circle (SLOPE/W's answer on it, not a search; the caveats give its factor
+  of safety). A Slide2 file brings its specified circle or non-circular surface, and a DXF the
+  circles on a layer mapped to them. An unsolved `.gsz`, a search-only Slide2 file and an RS2
+  SSR model bring none. If `circles` and `non_circ` are both empty, add one (the generators are
+  the fastest route), and run a search before reporting a critical factor of safety.
 - `import_gsz(..., analysis_id=None, step=None)` selects the analysis; a probabilistic SLOPE/W
   analysis imports its standard deviations onto the materials (`sigma_gamma`/`sigma_c`/
-  `sigma_phi`), so a reliability run is ready. A parent SEEP/W pore-pressure field does not fit
+  `sigma_phi`), so a reliability run is ready. A staged rapid drawdown imports both water lines
+  and each undrained soil's d and psi: run it with `rapid=True`. Partial factors (Eurocode 7) are
+  not applied; the caveats name them. A parent SEEP/W pore-pressure field does not fit
   in a spreadsheet and is written beside the .xlsx as `{base}_mesh.json` + `{base}_seep.csv` —
   **keep all three files together or the model silently reverts to dry.**
 - `import_slmd(..., scenario=None)` picks the scenario. `import_dxf(..., material_map=...)`
@@ -1321,7 +1361,10 @@ for c in caveats:
   by a SEEP/W field and RS2 arrive `manual` (the reservoir is an explicit load object there, or
   recovered from a field nothing downstream can re-derive). Do not "tidy" an imported model by
   moving its water between the two — that is how a reservoir gets counted twice or lost.
-- The GeoStudio path also goes outward: `export_gsz(slope_data, "out.gsz")`.
+- The GeoStudio path also goes outward: `export_gsz(slope_data, "out.gsz")`. It writes `gamma`
+  and `gamma_sat` as SLOPE/W's unit weights above and below the water table, a phreatic line as
+  SLOPE/W's phreatic switch, and a model with both piezo lines and d and psi as a staged rapid
+  drawdown. Read the returned caveats for what it could not write.
 
 Import, then load, plot, and run the input checks (next section) before analyzing.
 
@@ -1417,8 +1460,9 @@ nodes with; pass `slope_data.get('element_size_1d')` through so a stated cell is
 **Never use linear elements for a FEM or SSRM run.** `tri3` and `quad4` lock volumetrically:
 Mohr-Coulomb plastic flow is nearly incompressible, a linear element cannot shear at constant
 volume, so it resists the mechanism and needs a larger reduction to collapse — FS comes back
-**too high, in the unconservative direction**. On Griffiths & Lane Example 1 (reference ≈ 1.40)
-`tri3` returns 1.70 (+21%) and `quad4` 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return
+**too high, in the unconservative direction**. On a homogeneous 2:1 slope with φ′ = 20° and
+c′/γH = 0.05 (Griffiths & Lane 1999), whose factor of safety is about 1.4, `tri3` returns 1.70
+(+21%) and `quad4` 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return
 1.41. Use `tri6` (conforms best to irregular/zoned geometry — the default choice) or `quad8`/
 `quad9` (more regular layout on block-like sections). The model checks warn before an SSRM on a
 linear mesh; it is a warning rather than an error, but a linear mesh is still wrong for an SSRM.
@@ -2152,17 +2196,17 @@ slope height below the toe (or ask).
 
 ---
 
-## Rapid Drawdown (three-stage Duncan-Wright-Brandon)
+## Rapid Drawdown (three-stage method of Duncan, Wright, and Wong 1990)
 
 Rapid drawdown uses TWO states of everything water-related. The template carries the second
 state on dedicated sheets whose layouts mirror the first set:
 
 | Second-state data | Sheet / location | Layout |
 |---|---|---|
-| Drawn-down piezometric line | **piezo** sheet, columns D-E (Piezo Line 2) | data from row 4 |
+| Drawn-down piezometric line | **piezo** sheet, columns D-E (Piezo Line 2) | data from row 5; read only by a rapid drawdown run |
 | Drawn-down reservoir load | **dloads (2)** sheet | same block layout as dloads |
 | Drawn-down seepage BCs | **seep bc (2)** sheet | same layout as seep bc |
-| Undrained (Kc=1) envelope | **mat** sheet columns J (d) and K (psi) | per material |
+| Undrained (Kc=1) envelope | **mat** sheet columns J (d) and K (psi) | per material, read on `mc` rows only |
 
 Rules:
 - Materials with `d`/`psi` BLANK are treated as **free-draining** (drained strength in all
@@ -2194,6 +2238,60 @@ if slope_data.get("has_seepage_bc2"):
     export_seep_solution(seep_data2, sol2, f"{stem}_seep2.csv")
 slope_data = load_slope_data(input_file)   # re-load so mesh + both solutions attach
 results = solve_selected("spencer", slice_df, rapid=True)
+```
+
+---
+
+## Seismic Analysis (pseudostatic, two-stage, yield coefficient, Newmark)
+
+The pages under https://xslope.org/en/latest/seismic/overview/ are the reference. Rules:
+
+- **Pseudostatic F:** enter `k_seismic` (main!D13) and, only if a code asks for it, `k_vertical`
+  (main!D14, signed, + down). Every LEM method applies k_hW (and k_vW) at each slice's center of
+  gravity; one run is one k_v direction.
+- **Which strength** (Duncan, Wright & Brandon 2014, Sec. 10.4): UU strengths in total stress for an
+  earthquake right after construction or on an existing slope; CU strengths for a new slope after it
+  consolidates — d/psi on the mat sheet with `seismic2=`, or the R envelope's c_R, phi_R entered as c,
+  phi in ONE stage with the pore pressures from BEFORE the earthquake (steady seepage). The R envelope
+  is the Corps of Engineers' total-stress envelope from consolidated-undrained triaxial tests,
+  drawn on Mohr circles that each start at the sample's effective consolidation pressure
+  sigma'_3c (https://xslope.org/en/latest/lem/rapid/#r-envelope). Free-draining
+  gravels keep c', phi' (leave d/psi blank). A screening strength reduction (usually 0.8, sometimes
+  0.85) belongs to one screening method and is used only with that method's k and minimum F (table at
+  https://xslope.org/en/latest/seismic/overview/#choosing-k). In one stage enter the reduced strengths;
+  in two stages pass
+  `seismic2={"strength": ..., "factor": 0.8}`, which scales only the stage 2 undrained strengths,
+  d/psi, cp, and ratio materials alike (reducing the inputs would also change stage 1).
+- **Two-stage** (`seismic2="interpolated"` default: the stage 2 strength is interpolated between the
+  K_c = 1 envelope (d, psi) and the drained envelope by each slice's consolidation stress ratio, as in
+  rapid drawdown; or `"kc1"`: the K_c = 1 envelope alone at the stage 1 stresses, tau_ff = d +
+  sigma'_fc tan psi, which is how Duncan, Wright & Brandon (2014) computed their published two-stage
+  factors of safety (four soils on one slope at k = 0.15)): stage 1
+  static and drained, stage 2 undrained from stage-1 stresses plus the seismic force; no stage 3.
+  Refused with `rapid=True`, without any d/psi material, with d or psi alone, on pow/hb materials
+  carrying d/psi, and when stage 1 F < 1.
+- **Yield coefficient** `xslope.seismic.yield_coefficient(slope_data, method, analysis=...)`:
+  `"single_surface"` on the entered surface, `"auto_search"` for the minimum k_y (it reports k_y on
+  the static critical surface too, in `bundle["yield"]["static"]`). The minimum-k_y surface can run to
+  the model's base and ends on a cohesive slope; say so, and report both candidates. With k_v, the
+  ratio k_v/|k| is held; k_v with k = 0 is refused.
+- **Newmark** `newmark_displacement(read_record(path), ky, scale=..., units=...)`: records are PEER
+  .AT2 or two columns (t s, a g). It always runs both directions and reports the larger; quote both.
+  The method assumes no significant strength loss; do not offer it for liquefiable soils.
+- **After the earthquake:** an ordinary static run (k = 0) with the reduced (residual or partly
+  reduced) strengths entered; a liquefying zone is its own material.
+
+```python
+from xslope.search import run_lem_analysis
+from xslope.seismic import newmark_displacement, read_record, yield_coefficient
+
+two = run_lem_analysis(slope_data, "spencer", seismic2="interpolated")
+print(two["results"]["seismic_stage1_FS"], two["results"]["seismic_stage2_FS"])
+
+ky_run = yield_coefficient(slope_data, "spencer", analysis="auto_search")
+ky = ky_run["yield"]["k_y"]
+nm = newmark_displacement(read_record("record.AT2"), ky, units="si")   # D in cm (in for imperial)
+print(nm["D"], {s: d["D"] for s, d in nm["directions"].items()})
 ```
 
 ---

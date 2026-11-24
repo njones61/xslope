@@ -1244,7 +1244,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -3069,6 +3069,18 @@
       },
       "model": "docs/lem/files/xslope_low_clay.xlsx",
       "references": [
+        {
+          "anchor": "entering-both-clays-as-ratios",
+          "checks": [
+            "LEM-7-ratio-both"
+          ],
+          "level": 3,
+          "page": "tutorials/lem07_strength_envelopes/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem07_strength_envelopes.md",
+          "title": "Entering both clays as ratios",
+          "url": "https://xslope.org/en/latest/tutorials/lem07_strength_envelopes/#entering-both-clays-as-ratios"
+        },
         {
           "anchor": "opening-the-model_1",
           "checks": [
@@ -6815,6 +6827,159 @@
       "features": {
         "circular": true,
         "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.15,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_pseudostatic.xlsx",
+      "references": [
+        {
+          "anchor": "part-3-strength-reduction-at-the-same-coefficient",
+          "checks": [
+            "LEM-14-ssrm",
+            "LEM-14-wet-one-stage",
+            "LEM-14-wet-two-stage-interpolated",
+            "LEM-14-wet-two-stage-kc1"
+          ],
+          "level": 2,
+          "page": "tutorials/lem14_pseudostatic/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem14_pseudostatic.md",
+          "title": "Part 3 — Strength reduction at the same coefficient",
+          "url": "https://xslope.org/en/latest/tutorials/lem14_pseudostatic/#part-3-strength-reduction-at-the-same-coefficient"
+        }
+      ],
+      "topics": [
+        "seismic",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_pseudostatic_start.xlsx",
+      "references": [
+        {
+          "anchor": "opening-the-model",
+          "checks": [
+            "LEM-14-dry-one-stage",
+            "LEM-14-dry-two-stage-interpolated",
+            "LEM-14-dry-two-stage-kc1",
+            "LEM-14-dry-two-stage-kc1-factor"
+          ],
+          "level": 2,
+          "page": "tutorials/lem14_pseudostatic/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem14_pseudostatic.md",
+          "title": "Opening the model",
+          "url": "https://xslope.org/en/latest/tutorials/lem14_pseudostatic/#opening-the-model"
+        },
+        {
+          "anchor": "opening-the-model",
+          "checks": [
+            "LEM-15-ky"
+          ],
+          "level": 2,
+          "page": "tutorials/lem15_yield_newmark/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem15_yield_newmark.md",
+          "title": "Opening the model",
+          "url": "https://xslope.org/en/latest/tutorials/lem15_yield_newmark/#opening-the-model"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
         "dloads": 1,
         "element_type": "tri6",
         "hoek_brown": false,
@@ -7648,6 +7813,279 @@
       "features": {
         "circular": true,
         "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 5,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_40.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-40",
+          "checks": [
+            "GS-2.40"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.40 — Rapid Drawdown – Walter Bouldin Dam",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-40"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_41.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-41",
+          "checks": [
+            "GS-2.41"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.41 — Rapid Drawdown – USACE Benchmark",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-41"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_42.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-42",
+          "checks": [
+            "GS-2.42"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.42 — Rapid Drawdown – Pumped Storage Dam",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-42"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_43.xlsx",
+      "references": [
+        {
+          "anchor": "gs-2-43",
+          "checks": [
+            "GS-2.43"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "2.43 — Rapid Drawdown – Pilarcitos Dam",
+          "url": "https://xslope.org/en/latest/verification/geostudio/#gs-2-43"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
         "dloads": 1,
         "element_type": null,
         "hoek_brown": false,
@@ -8414,6 +8852,244 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/dwb_fig10_1_wedge.xlsx",
+      "references": [
+        {
+          "anchor": "dwb-10-1",
+          "checks": [
+            "DWB-10.1-wedge-cphi-corps",
+            "DWB-10.1-wedge-cphi-kv-down",
+            "DWB-10.1-wedge-cphi-kv-none",
+            "DWB-10.1-wedge-cphi-kv-up",
+            "DWB-10.1-wedge-cphi-lowe",
+            "DWB-10.1-wedge-cphi-spencer",
+            "DWB-10.1-wedge-frictional-corps",
+            "DWB-10.1-wedge-frictional-kv-down",
+            "DWB-10.1-wedge-frictional-kv-down-ky-corps",
+            "DWB-10.1-wedge-frictional-kv-down-ky-lowe",
+            "DWB-10.1-wedge-frictional-kv-none",
+            "DWB-10.1-wedge-frictional-kv-up",
+            "DWB-10.1-wedge-frictional-kv-up-ky-corps",
+            "DWB-10.1-wedge-frictional-kv-up-ky-lowe",
+            "DWB-10.1-wedge-frictional-lowe"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "Duncan, Wright & Brandon — yield coefficient of a rigid wedge",
+          "url": "https://xslope.org/en/latest/verification/published/#dwb-10-1"
+        }
+      ],
+      "topics": [
+        "non-circular"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 8,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.15,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/dwb_t10_4_dry.xlsx",
+      "references": [
+        {
+          "anchor": "dwb-10-4",
+          "checks": [
+            "DWB-10.4-dry-1-interpolated",
+            "DWB-10.4-dry-1-kc1",
+            "DWB-10.4-dry-1-single",
+            "DWB-10.4-dry-2-interpolated",
+            "DWB-10.4-dry-2-kc1",
+            "DWB-10.4-dry-2-single",
+            "DWB-10.4-dry-3-interpolated",
+            "DWB-10.4-dry-3-kc1",
+            "DWB-10.4-dry-3-single",
+            "DWB-10.4-dry-4-interpolated",
+            "DWB-10.4-dry-4-kc1",
+            "DWB-10.4-dry-4-single"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "Duncan, Wright & Brandon — single- and two-stage seismic analyses",
+          "url": "https://xslope.org/en/latest/verification/published/#dwb-10-4"
+        }
+      ],
+      "topics": [
+        "seismic"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 8,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.15,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 27,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
+      "references": [
+        {
+          "anchor": "dwb-10-4",
+          "checks": [
+            "DWB-10.4-submerged-1-interpolated",
+            "DWB-10.4-submerged-1-kc1",
+            "DWB-10.4-submerged-1-single",
+            "DWB-10.4-submerged-2-interpolated",
+            "DWB-10.4-submerged-2-kc1",
+            "DWB-10.4-submerged-2-single",
+            "DWB-10.4-submerged-3-interpolated",
+            "DWB-10.4-submerged-3-kc1",
+            "DWB-10.4-submerged-3-single",
+            "DWB-10.4-submerged-4-interpolated",
+            "DWB-10.4-submerged-4-kc1",
+            "DWB-10.4-submerged-4-single"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "Duncan, Wright & Brandon — single- and two-stage seismic analyses",
+          "url": "https://xslope.org/en/latest/verification/published/#dwb-10-4"
+        }
+      ],
+      "topics": [
+        "seismic",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 1,
@@ -8768,7 +9444,7 @@
           "page": "verification/published/",
           "resolution": "input-link",
           "source_md": "docs/verification/published.md",
-          "title": "FHWA Example E6 — traffic barrier impact on the E4 wall",
+          "title": "FHWA Example E6 — traffic barrier impact on an MSE wall",
           "url": "https://xslope.org/en/latest/verification/published/#fhwa-e6"
         }
       ],
@@ -8840,7 +9516,7 @@
           "page": "verification/published/",
           "resolution": "input-link",
           "source_md": "docs/verification/published.md",
-          "title": "FHWA Example E7 — seismic loading on the E4 wall",
+          "title": "FHWA Example E7 — seismic loading on an MSE wall",
           "url": "https://xslope.org/en/latest/verification/published/#fhwa-e7"
         }
       ],
@@ -8908,7 +9584,7 @@
           "page": "verification/ssrm/",
           "resolution": "input-link",
           "source_md": "docs/verification/ssrm.md",
-          "title": "Hammah et al. (2005) Example 1 — Hoek-Brown Rock Slope, GSI = 5",
+          "title": "Hammah et al. (2005b) Example 1 — Hoek-Brown Rock Slope, GSI = 5",
           "url": "https://xslope.org/en/latest/verification/ssrm/#hoek-brown"
         }
       ],
@@ -10248,7 +10924,7 @@
           "page": "verification/rs2_joints/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2_joints.md",
-          "title": "RJ-14: Alejano et al. plowing sliding slab, example 5 (rj014)",
+          "title": "RJ-14: Alejano et al. plowing toppling slab, example 5 (rj014)",
           "url": "https://xslope.org/en/latest/verification/rs2_joints/#rj-14"
         }
       ],
@@ -10694,7 +11370,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -10715,7 +11391,7 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)",
+          "title": "RS2-25: Syncrude tailings dike (El-Ramly et al. 2003)",
           "url": "https://xslope.org/en/latest/verification/rs2/#rs2-25"
         }
       ],
@@ -13620,13 +14296,13 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": true,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": false,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -13650,8 +14326,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -13663,20 +14339,23 @@
       "model": "docs/verification/files/rocscience/rs2_68a.xlsx",
       "references": [
         {
-          "anchor": "rs2-68",
+          "anchor": "rs2-68-fem",
           "checks": [
             "RS2-68a-bishop",
-            "RS2-68a-spencer"
+            "RS2-68a-fem-kc",
+            "RS2-68a-spencer",
+            "RS2-68a-spencer-noncirc"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003)",
-          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68"
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
         }
       ],
       "topics": [
+        "non-circular",
         "homogeneous"
       ]
     },
@@ -13688,13 +14367,81 @@
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": true,
-        "k0": null,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
         ],
         "n_materials": 1,
-        "non_circular": false,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": true,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_68a_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-68-fem",
+          "checks": [
+            "RS2-68a-fem-kc-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -13718,8 +14465,8 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -13731,20 +14478,23 @@
       "model": "docs/verification/files/rocscience/rs2_68b.xlsx",
       "references": [
         {
-          "anchor": "rs2-68",
+          "anchor": "rs2-68-fem",
           "checks": [
             "RS2-68b-bishop",
-            "RS2-68b-spencer"
+            "RS2-68b-fem-kc",
+            "RS2-68b-spencer",
+            "RS2-68b-spencer-noncirc"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003)",
-          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68"
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
         }
       ],
       "topics": [
+        "non-circular",
         "homogeneous"
       ]
     },
@@ -13755,14 +14505,14 @@
         "dloads": 0,
         "element_type": null,
         "hoek_brown": false,
-        "homogeneous": false,
-        "k0": null,
+        "homogeneous": true,
+        "k0": 1.0,
         "line_loads": 0,
         "material_options": [
           "mc"
         ],
-        "n_materials": 3,
-        "non_circular": false,
+        "n_materials": 1,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -13786,8 +14536,76 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_68b_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-68-fem",
+          "checks": [
+            "RS2-68b-fem-kc-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
+        }
+      ],
+      "topics": [
+        "non-circular",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -13799,22 +14617,93 @@
       "model": "docs/verification/files/rocscience/rs2_68c.xlsx",
       "references": [
         {
-          "anchor": "rs2-68",
+          "anchor": "rs2-68-fem",
           "checks": [
             "RS2-68-mesh-coarse",
             "RS2-68-mesh-fine",
             "RS2-68c-bishop",
-            "RS2-68c-spencer"
+            "RS2-68c-fem-kc",
+            "RS2-68c-spencer",
+            "RS2-68c-spencer-noncirc"
           ],
-          "level": 3,
+          "level": 4,
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003)",
-          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68"
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
         }
       ],
-      "topics": []
+      "topics": [
+        "non-circular"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/rs2_68c_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-68-fem",
+          "checks": [
+            "RS2-68c-fem-kc-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "Finite element k꜀",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-68-fem"
+        }
+      ],
+      "topics": [
+        "non-circular"
+      ]
     },
     {
       "features": {
@@ -13921,7 +14810,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": true,
         "tension_crack_water": true,
@@ -14003,7 +14892,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14080,7 +14969,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14159,7 +15048,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14238,7 +15127,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14315,7 +15204,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14382,7 +15271,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14461,7 +15350,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14541,7 +15430,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14618,7 +15507,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14697,7 +15586,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14777,7 +15666,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14860,7 +15749,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -14939,7 +15828,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15022,7 +15911,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15101,7 +15990,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15180,7 +16069,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15247,7 +16136,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15325,7 +16214,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15403,7 +16292,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15469,7 +16358,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15546,7 +16435,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15626,7 +16515,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15706,7 +16595,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15771,7 +16660,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15840,7 +16729,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15912,7 +16801,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -15984,7 +16873,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16056,7 +16945,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16128,7 +17017,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16204,7 +17093,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -16279,7 +17168,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -16353,7 +17242,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16426,7 +17315,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16501,7 +17390,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16574,7 +17463,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16647,7 +17536,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16717,7 +17606,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16753,7 +17642,7 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)",
+          "title": "RS2-25: Syncrude tailings dike (El-Ramly et al. 2003)",
           "url": "https://xslope.org/en/latest/verification/rs2/#rs2-25"
         }
       ],
@@ -16803,7 +17692,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16887,7 +17776,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -16959,7 +17848,7 @@
         ],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17042,7 +17931,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17314,7 +18203,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": true,
@@ -17387,7 +18276,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": true,
@@ -17455,7 +18344,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -17540,7 +18429,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -17608,7 +18497,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17678,7 +18567,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17757,7 +18646,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -17827,7 +18716,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17895,7 +18784,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -17974,7 +18863,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18053,7 +18942,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18199,7 +19088,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18278,7 +19167,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18357,7 +19246,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18496,7 +19385,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18571,7 +19460,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18648,7 +19537,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18735,7 +19624,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -18803,7 +19692,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -18872,9 +19761,9 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
-        "tension_crack": false,
+        "tension_crack": true,
         "tension_crack_water": false,
         "transient_seepage": false,
         "unit_system": "si",
@@ -18897,7 +19786,9 @@
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp52"
         }
       ],
-      "topics": []
+      "topics": [
+        "tension-cracks"
+      ]
     },
     {
       "features": {
@@ -18937,9 +19828,9 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
-        "tension_crack": false,
+        "tension_crack": true,
         "tension_crack_water": false,
         "transient_seepage": false,
         "unit_system": "si",
@@ -18963,6 +19854,7 @@
         }
       ],
       "topics": [
+        "tension-cracks",
         "zoned-dams"
       ]
     },
@@ -19004,7 +19896,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": true,
@@ -19073,7 +19965,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19142,7 +20034,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19210,7 +20102,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19278,7 +20170,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -19359,7 +20251,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -19447,7 +20339,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19521,7 +20413,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19596,7 +20488,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -19677,7 +20569,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19756,7 +20648,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19835,7 +20727,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19903,7 +20795,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -19971,7 +20863,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20039,7 +20931,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -20119,7 +21011,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20186,7 +21078,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20265,7 +21157,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20342,7 +21234,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20407,7 +21299,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20488,7 +21380,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20568,7 +21460,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20647,7 +21539,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20714,7 +21606,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20794,7 +21686,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20873,7 +21765,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20941,7 +21833,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21009,7 +21901,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": true,
         "tension_crack_water": false,
@@ -21076,7 +21968,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21153,7 +22045,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21175,7 +22067,7 @@
           "page": "verification/rocscience/",
           "resolution": "input-link",
           "source_md": "docs/verification/rocscience.md",
-          "title": "VP75: The James Bay dyke (D&W Fig. 7.16)",
+          "title": "VP75: The James Bay dike (D&W Fig. 7.16)",
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp75"
         },
         {
@@ -21187,7 +22079,7 @@
           "page": "verification/rs2/",
           "resolution": "input-link",
           "source_md": "docs/verification/rs2.md",
-          "title": "RS2-42: James dike",
+          "title": "RS2-42: James Bay dike",
           "url": "https://xslope.org/en/latest/verification/rs2/#rs2-42"
         }
       ],
@@ -21231,7 +22123,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21299,7 +22191,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21366,7 +22258,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21447,7 +22339,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21532,7 +22424,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21611,7 +22503,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21678,7 +22570,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21745,7 +22637,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21822,7 +22714,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21887,7 +22779,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -21952,7 +22844,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22029,7 +22921,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22107,7 +22999,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22184,7 +23076,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22262,7 +23154,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22340,7 +23232,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22418,7 +23310,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22496,7 +23388,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22579,7 +23471,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22653,7 +23545,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22727,7 +23619,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22801,7 +23693,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22875,7 +23767,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -22948,7 +23840,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23022,7 +23914,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23095,7 +23987,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23169,7 +24061,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23242,7 +24134,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23265,6 +24157,154 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp090_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-51-wall",
+          "checks": [
+            "RS2-51-wall"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-51: Geotextile wall, dual reinforcement type (vp090_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-51-wall"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp090_fem_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-51-wall",
+          "checks": [
+            "RS2-51-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-51: Geotextile wall, dual reinforcement type (vp090_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-51-wall"
         }
       ],
       "topics": [
@@ -23315,7 +24355,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23389,7 +24429,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23462,7 +24502,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23485,6 +24525,81 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp092_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-53",
+          "checks": [
+            "RS2-53"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-53: Geotextile wall, water (vp092_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-53"
         }
       ],
       "topics": [
@@ -23536,7 +24651,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23559,6 +24674,154 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp87"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp093_fem.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-54",
+          "checks": [
+            "RS2-54"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-54: Geotextile wall, crest surcharge (vp093_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-54"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "passive"
+          ],
+          "count": 15,
+          "dirs": [
+            "axial"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 28,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp093_fem_fine.xlsx",
+      "references": [
+        {
+          "anchor": "rs2-54",
+          "checks": [
+            "RS2-54-fine"
+          ],
+          "level": 4,
+          "page": "verification/rs2/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rs2.md",
+          "title": "RS2-54: Geotextile wall, crest surcharge (vp093_fem)",
+          "url": "https://xslope.org/en/latest/verification/rs2/#rs2-54"
         }
       ],
       "topics": [
@@ -23609,7 +24872,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23683,7 +24946,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23750,7 +25013,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23818,7 +25081,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23886,7 +25149,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -23954,7 +25217,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24022,7 +25285,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24089,7 +25352,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24156,7 +25419,7 @@
         "sigmas": [],
         "ssr_zones": 1,
         "suction_strength": false,
-        "template_version": 25,
+        "template_version": 28,
         "tensile_cutoff": true,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24235,7 +25498,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24682,7 +25945,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24699,6 +25962,7 @@
           "checks": [
             "VP103a-deep",
             "VP103a-deep-circ",
+            "VP103a-deep-reversed",
             "VP103a-shallow-circ"
           ],
           "level": 2,
@@ -24751,7 +26015,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24820,7 +26084,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24889,7 +26153,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24932,7 +26196,7 @@
           "mc"
         ],
         "n_materials": 3,
-        "non_circular": false,
+        "non_circular": true,
         "piezo_line": false,
         "pile_fixities": [],
         "piles": 0,
@@ -24956,7 +26220,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -24972,6 +26236,7 @@
           "anchor": "vp104",
           "checks": [
             "VP104-kc",
+            "VP104-kc-noncirc",
             "VP104-noseismic"
           ],
           "level": 2,
@@ -24982,7 +26247,9 @@
           "url": "https://xslope.org/en/latest/verification/rocscience/#vp104"
         }
       ],
-      "topics": []
+      "topics": [
+        "non-circular"
+      ]
     },
     {
       "features": {
@@ -25022,7 +26289,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25089,7 +26356,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25230,7 +26497,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25301,7 +26568,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25522,7 +26789,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25593,7 +26860,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25662,7 +26929,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25735,7 +27002,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25803,7 +27070,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25874,7 +27141,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 27,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -25941,7 +27208,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 28,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -28385,7 +29652,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 402,
+    "models": 419,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -28413,6 +29680,8 @@
       "tutorials/lem11_reliability/",
       "tutorials/lem12_piles/",
       "tutorials/lem13_rock_slope/",
+      "tutorials/lem14_pseudostatic/",
+      "tutorials/lem15_yield_newmark/",
       "tutorials/seep01_sheetpile/",
       "tutorials/seep02_johnson_dam/",
       "tutorials/seep03_reservoir_drawdown/",
@@ -28430,22 +29699,22 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 673,
+    "tags": 742,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 192,
-      "non-circular": 33,
+      "homogeneous": 198,
+      "non-circular": 41,
       "piles": 15,
       "probabilistic": 16,
-      "rapid-drawdown": 8,
-      "reinforcement": 35,
+      "rapid-drawdown": 12,
+      "reinforcement": 40,
       "seepage-coupled": 76,
-      "seismic": 11,
+      "seismic": 14,
       "soil-nails": 5,
-      "tension-cracks": 21,
+      "tension-cracks": 23,
       "transient-seepage": 25,
-      "zoned-dams": 50
+      "zoned-dams": 54
     },
     "unloadable": 0
   },
@@ -28514,6 +29783,8 @@
       "docs/tutorials/files/xslope_dam_infiltration_storm.xlsx",
       "docs/tutorials/files/xslope_pile_wall.xlsx",
       "docs/tutorials/files/xslope_pile_wall_start.xlsx",
+      "docs/tutorials/files/xslope_pseudostatic.xlsx",
+      "docs/tutorials/files/xslope_pseudostatic_start.xlsx",
       "docs/tutorials/files/xslope_rock_joints.xlsx",
       "docs/tutorials/files/xslope_rock_slope.xlsx",
       "docs/tutorials/files/xslope_rock_toppling.xlsx",
@@ -28522,6 +29793,8 @@
       "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/geostudio/gs2_41.xlsx",
+      "docs/verification/files/geostudio/gs2_43.xlsx",
       "docs/verification/files/geostudio/gs2_45.xlsx",
       "docs/verification/files/geostudio/gs2_46.xlsx",
       "docs/verification/files/geostudio/gs2_cons.xlsx",
@@ -28580,7 +29853,9 @@
       "docs/verification/files/rocscience/rs2_67e.xlsx",
       "docs/verification/files/rocscience/rs2_67f.xlsx",
       "docs/verification/files/rocscience/rs2_68a.xlsx",
+      "docs/verification/files/rocscience/rs2_68a_fine.xlsx",
       "docs/verification/files/rocscience/rs2_68b.xlsx",
+      "docs/verification/files/rocscience/rs2_68b_fine.xlsx",
       "docs/verification/files/rocscience/vp010.xlsx",
       "docs/verification/files/rocscience/vp016.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",
@@ -28679,9 +29954,16 @@
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
+      "docs/verification/files/published/dwb_fig10_1_wedge.xlsx",
       "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
       "docs/verification/files/rocscience/rs2_30.xlsx",
       "docs/verification/files/rocscience/rs2_30_split.xlsx",
+      "docs/verification/files/rocscience/rs2_68a.xlsx",
+      "docs/verification/files/rocscience/rs2_68a_fine.xlsx",
+      "docs/verification/files/rocscience/rs2_68b.xlsx",
+      "docs/verification/files/rocscience/rs2_68b_fine.xlsx",
+      "docs/verification/files/rocscience/rs2_68c.xlsx",
+      "docs/verification/files/rocscience/rs2_68c_fine.xlsx",
       "docs/verification/files/rocscience/vp008.xlsx",
       "docs/verification/files/rocscience/vp009.xlsx",
       "docs/verification/files/rocscience/vp017.xlsx",
@@ -28705,7 +29987,8 @@
       "docs/verification/files/rocscience/vp103a.xlsx",
       "docs/verification/files/rocscience/vp103b.xlsx",
       "docs/verification/files/rocscience/vp103c.xlsx",
-      "docs/verification/files/rocscience/vp103d.xlsx"
+      "docs/verification/files/rocscience/vp103d.xlsx",
+      "docs/verification/files/rocscience/vp104a.xlsx"
     ],
     "piles": [
       "docs/fem/files/xslope_torggler_3a_plate.xlsx",
@@ -28747,6 +30030,10 @@
       "docs/lem/files/xslope_johnson_rapid_KEY.xlsx",
       "docs/tutorials/files/xslope_johnson_rapid.xlsx",
       "docs/tutorials/files/xslope_johnson_rapid_start.xlsx",
+      "docs/verification/files/geostudio/gs2_40.xlsx",
+      "docs/verification/files/geostudio/gs2_41.xlsx",
+      "docs/verification/files/geostudio/gs2_42.xlsx",
+      "docs/verification/files/geostudio/gs2_43.xlsx",
       "docs/verification/files/rocscience/vp096.xlsx",
       "docs/verification/files/rocscience/vp097.xlsx",
       "docs/verification/files/rocscience/vp098.xlsx",
@@ -28780,10 +30067,15 @@
       "docs/verification/files/rocscience/vp089.xlsx",
       "docs/verification/files/rocscience/vp089_fem.xlsx",
       "docs/verification/files/rocscience/vp090.xlsx",
+      "docs/verification/files/rocscience/vp090_fem.xlsx",
+      "docs/verification/files/rocscience/vp090_fem_fine.xlsx",
       "docs/verification/files/rocscience/vp091.xlsx",
       "docs/verification/files/rocscience/vp091_fem.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",
+      "docs/verification/files/rocscience/vp092_fem.xlsx",
       "docs/verification/files/rocscience/vp093.xlsx",
+      "docs/verification/files/rocscience/vp093_fem.xlsx",
+      "docs/verification/files/rocscience/vp093_fem_fine.xlsx",
       "docs/verification/files/rocscience/vp094.xlsx",
       "docs/verification/files/rocscience/vp094_fem.xlsx",
       "docs/verification/files/rocscience/vp107b.xlsx",
@@ -28868,6 +30160,9 @@
       "docs/videos/files/xslope_video11_seep_to_lem.xlsx"
     ],
     "seismic": [
+      "docs/tutorials/files/xslope_pseudostatic.xlsx",
+      "docs/verification/files/published/dwb_t10_4_dry.xlsx",
+      "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
       "docs/verification/files/published/fhwa_e7.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64g.xlsx",
@@ -28901,6 +30196,8 @@
       "docs/verification/files/rocscience/vp039d.xlsx",
       "docs/verification/files/rocscience/vp042.xlsx",
       "docs/verification/files/rocscience/vp051.xlsx",
+      "docs/verification/files/rocscience/vp052a.xlsx",
+      "docs/verification/files/rocscience/vp052b.xlsx",
       "docs/verification/files/rocscience/vp053.xlsx",
       "docs/verification/files/rocscience/vp056.xlsx",
       "docs/verification/files/rocscience/vp057.xlsx",
@@ -28961,8 +30258,11 @@
       "docs/tutorials/files/xslope_johnson_rapid_start.xlsx",
       "docs/tutorials/files/xslope_johnson_res.xlsx",
       "docs/tutorials/files/xslope_johnson_res_solved.xlsx",
+      "docs/verification/files/geostudio/gs2_40.xlsx",
+      "docs/verification/files/geostudio/gs2_42.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/geostudio/gs2_wall_none.xlsx",
+      "docs/verification/files/published/dwb_t10_4_submerged.xlsx",
       "docs/verification/files/rocscience/rs2_25_noncirc.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64l_split.xlsx",
@@ -28982,6 +30282,7 @@
       "docs/verification/files/rocscience/vp072a.xlsx",
       "docs/verification/files/rocscience/vp072b.xlsx",
       "docs/verification/files/rocscience/vp092.xlsx",
+      "docs/verification/files/rocscience/vp092_fem.xlsx",
       "docs/verification/files/rocscience/vp098.xlsx",
       "docs/verification/files/rocscience/vp099.xlsx",
       "docs/verification/files/rocscience/vp107a.xlsx",

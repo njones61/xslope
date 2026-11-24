@@ -8,12 +8,169 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ### New
 
+- Seismic analysis, following Duncan, Wright, and Brandon (2014), Chapter 10. A
+  new Seismic Analysis section of the documentation explains each part, and
+  Tutorials LEM-14 and LEM-15 walk through them. The Analysis Report and the AI
+  assistant cover all of them.
+  - A vertical seismic coefficient, k_v, beside the horizontal one, k_h. It is
+    signed, positive downward, and makes each slice weigh W(1 + k_v) in every
+    limit equilibrium method; the finite element method applies it to the weight
+    of the soil. Enter it in Studio's Global parameters, or in cell D14 of the
+    template's main sheet.
+  - A two-stage pseudostatic analysis, for a slope that has consolidated under
+    its own weight (Run LEM, Two-stage seismic). Stage 1 finds the stresses on
+    each slice base before the earthquake. Stage 2 takes each slice's undrained
+    strength from those stresses, by the K<sub>c</sub> = 1 envelope or by
+    interpolating between it and the drained envelope as in rapid drawdown, with
+    an optional strength factor, and solves with the seismic force. XSLOPE
+    reproduces the factors of safety Duncan, Wright, and Brandon publish for four
+    soils, dry and submerged, within 1.3%.
+  - The yield coefficient, k_y: the seismic coefficient at which the factor of
+    safety is 1 (Run LEM, Find the yield coefficient k_y). XSLOPE finds it on one
+    slip surface, or by search, which reports k_y on the static critical surface
+    and the lowest k_y of any surface. In Python,
+    `xslope.seismic.fem_yield_coefficient` finds it with the finite element
+    method.
+  - Newmark's sliding-block displacement (Run, Newmark…): the permanent
+    displacement of the sliding mass under an acceleration record, a text file of
+    time and acceleration or a PEER .AT2 file, used as recorded, scaled by a
+    factor, or scaled to a target peak acceleration. It matches Newmark's (1965)
+    closed-form result for a rectangular pulse.
+- A strength ratio material (option `ratio`): the undrained strength is the ratio
+  r = S<sub>u</sub>/σ′<sub>v</sub>, entered in the c/p column, times the vertical
+  effective stress, with c as a minimum. Limit equilibrium applies it at each slice
+  base and the finite element method at each integration point. Part C of Tutorial
+  LEM-7 uses it for two clays.
 - Studio's Piezometric lines editor now sets each line's Type, piezo or
   phreatic, in a box above the line's table. Until now the Type could be set
   only in the workbook's piezo sheet.
+- GeoStudio import and export carry SLOPE/W's staged rapid drawdown. The
+  import takes SLOPE/W's water surfaces before and after drawdown as
+  Piezometric Lines 1 and 2, and converts each soil's R envelope (c_R, φ_R) to
+  XSLOPE's d and ψ; the export writes them back. On SLOPE/W's own critical
+  circles, its four rapid drawdown examples read within 0.3%, 1.8%, 0.8%, and
+  0.0% of SLOPE/W, and are on the GeoStudio verification page.
 
 ### Fixed
 
+- The finite element method takes each material's pore pressure from that
+  material's own u, as limit equilibrium does. It used to apply one source to
+  the whole model: a single piezo row gave every material the line's pressure,
+  including materials set to none, and one ru row applied every row's r_u.
+  Materials may now use different sources in one model. The Analysis Report
+  names each material's source.
+- Suction strength (φ_b, s_cap) is no longer added to cp or ratio materials, in
+  either engine, as the documentation says. These are undrained strengths, which
+  already include it.
+- Studio's seepage analysis lets water flow across joints. Studio's mesh is
+  split along each joint for the finite element method, and seepage on that
+  mesh treated the joint as a sealed wall: one joint cut an earth dam's flow
+  from 42.23 to 36.73. A Python script, which builds no split, gave a different
+  answer from Studio.
+- A mesh Size on an ssr reduce, ssr hold, ssr elastic, or joints polygon refines
+  the mesh inside it, as it does on material and refine polygons. It was
+  ignored.
+- A joint's tensile cutoff is reduced with the strength reduction factor when
+  Tension SRF is on, as a material's is; it was never reduced. Studio's Tension
+  SRF box is live when only a joint has a cutoff.
+- Reliability analysis runs rapid drawdown with every engine, and varies d and ψ
+  by s(d) and s(ψ). These were never read, so the uncertainty in the drawdown
+  strength was left out: on Slide2's verification problem 96, the Taylor series'
+  β falls from 5.37 to 3.79. A Taylor series run on a fixed surface used to
+  solve the slope before drawdown, and Monte Carlo and the response surface
+  refused a rapid drawdown. A Monte Carlo sample that is unstable before the
+  water is lowered counts as a failure, and the run says how many there were.
+  Studio's Reliability dialog checks the engine and the drawdown you chose.
+- The finite element method refuses a blank strength option, as limit
+  equilibrium does. It used to run it as Mohr-Coulomb.
+- A limit equilibrium run that isn't a rapid drawdown no longer reads
+  Piezometric Line 2. A short line 2 could stop the run.
+- A seepage boundary block with a blank value no longer drops every block after
+  it. The block is kept, and the model checks report the missing value. Studio
+  keeps a blank boundary value blank instead of saving it as 0.
+- An unsaturated-model word other than lf, vg, or gard is refused; it used to
+  run as lf. A non-circular point's Movement other than Free, Horiz, or Fixed is
+  refused; any other word used to fix an interior point. Both, and the circles
+  sheet's Option, are matched whatever their case, and a circle with a blank
+  Option opens and is reported when a run reads circles.
+- The model checks no longer stop runs that don't read the field they check,
+  such as reinforcement checks on a seepage run, and they check what joints
+  read: Joint and Jred words, kn and ks above zero, and the joints sheet's c, φ,
+  and t_cut. d and ψ are checked only on mc rows, the only rows that read them.
+- Studio's editors gray only what nothing reads: a Gardner material keeps h0,
+  which transient seepage reads; a blank u or unsat grays what it leaves
+  unread; Adhesion and Delta stay live on a jointed reinforcement line, whose
+  interface reads them, and are no longer cleared; Lp1 and Lp2 gray when
+  Adhesion and Delta are both filled; the circles table grays by Option. New
+  reinforcement lines start with Lp blank instead of 0, which passed every
+  check as fully anchored. Studio rebuilds the mesh when a line's Joint or
+  Tend changes, and shows a blank or unrecognized Movement as it is instead of
+  saving it as Free.
+- A material property left blank in Studio's Materials editor now reads as the
+  value a blank workbook cell loads as: 0 for c, φ, γ, d, ψ, E, ν, r_u, and k1,
+  and 0.5 for l. A cp or ratio material with a blank c failed with "Solve
+  failed", and an mc material with a blank c left every trial surface unsolved.
+  The model checks still refuse a zero γ, E, ν, or k1 by name.
+- Importing a solved GeoStudio file brings in SLOPE/W's critical circle when
+  SLOPE/W searched with a grid and radius, and when an older GeoStudio (version
+  11.4) saved the file. The import took circles only from entry-and-exit searches
+  and couldn't read the trial surfaces older versions save, so 31 analyses in 10
+  of SLOPE/W's 43 verification files arrived with no failure surface.
+- A GeoStudio file finds its solved results when an analysis name holds a slash
+  or a colon, or ends in a period. GeoStudio saves "SLOPE/W Analysis" in a folder
+  named "SLOPE&3W Analysis", so six of SLOPE/W's verification files imported no
+  failure surface at all.
+- A GeoStudio import applies the phreatic correction to a piezometric line only
+  when the SLOPE/W analysis turns it on. Every line used to import with the
+  correction, which put Zhu and Lee's wet slope 3.7% and 3.0% above SLOPE/W on
+  SLOPE/W's own circles; the two are now within 0.6% and 0.3%.
+- A GeoStudio analysis that takes its pore pressure from Ru imports it as
+  XSLOPE's r_u, material by material. It used to import dry: on Loukidis's wet
+  slope XSLOPE read 77% above SLOPE/W on SLOPE/W's own circle, and now reads
+  within 0.06%.
+- An optimized SLOPE/W search imports its most critical searched circle, and the
+  import's notes give the lower factor of safety of SLOPE/W's optimized surface.
+  It used to import a circle fitted to the optimized surface, which read 24.6%
+  above SLOPE/W on Greco's layered slope; the searched circle reads 0.1% below.
+- A GeoStudio analysis that takes its slip surface from another analysis imports
+  a circle only when that analysis searched circles. One used to import a circle
+  fitted to an automatic search's surface, 14.9% above SLOPE/W.
+- A GeoStudio import brings in a SLOPE/W SHANSEP material with a constant ratio
+  as XSLOPE's strength ratio material, and an S=f(depth) material as `cp`, measured
+  from the top of its layer. Both used to import as Mohr-Coulomb with whatever
+  cohesion and friction angle the file held. On SLOPE/W's own circles, its SHANSEP
+  example read 34% above SLOPE/W and now reads within 0.1%; Borges and Cardoso's
+  embankment read 53% below and now reads within 0.2%. A SHANSEP ratio that grows
+  with overconsolidation imports at its lowest value, and a strength read from a
+  curve imports with none; the import's notes say so.
+- Exporting to GeoStudio writes a `ratio` material as SLOPE/W's SHANSEP and a `cp`
+  material as S=f(depth). Both used to be written as Mohr-Coulomb.
+- Exporting to GeoStudio writes a material's saturated unit weight, and a
+  phreatic piezometric line as phreatic. Every material used to go out with one
+  weight, and a phreatic line came back as an ordinary piezometric line.
+- A GeoStudio import reads SLOPE/W's separate unit weight above the water table
+  when the analysis uses it, as γ above the water table and γ_sat below. On
+  SLOPE/W's Unit Weight Definition example, the sliding mass now weighs within
+  0.07% of SLOPE/W's own slices; it was 18% to 25% off.
+- Tie-back anchors in a GeoStudio 2025 file import with their capacity. An
+  earlier 2025 build writes it under another name, and those anchors imported
+  with none.
+- A GeoStudio file with Eurocode partial factors says, on import, which factors
+  it holds and that XSLOPE doesn't apply them.
+- A Slide2 Undrained material imports with its own strength, constant or rising
+  with depth below the top of its layer (`cp`). The import read it as Mohr-Coulomb
+  with a tension cutoff and dropped the rise with depth without saying so.
+- An RS2 material whose cohesion changes with depth below a datum imports as
+  `cp`. The import kept only the cohesion at the datum: Slide2's verification
+  problems 83 and 84, imported from RS2's files, read 16% to 34% below Slide2 and
+  now read within 0.7%.
+- A B-bar analysis imports from GeoStudio with its piezometric line, and the
+  notes say the excess pore pressure from B-bar is not included; it used to
+  import dry.
+- A non-circular search now runs when the surface's points were entered from
+  right to left. Every move was refused, and the search returned the starting
+  surface as its answer: 1.313 on one model where the search, run from the same
+  points entered left to right, finds 1.221.
 - The non-circular search no longer settles on a notched surface that gives a
   false, far-too-low factor of safety. With the surface's points free to move,
   the search could bend the surface back down into the sliding mass until
@@ -66,9 +223,25 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   critical surface. When the critical or analyzed circle is one of them, the
   Log, the Analysis Report, and Studio's LEM Solution tab say so, and the status
   bar notes it when the run finishes.
+- The Monte Carlo convergence plot keeps its 95% confidence band between 0% and
+  100%. Over the first few realizations the band ran below zero, to about −15%
+  on the documentation's example.
+- The finite element non-circular sample and Video 14's completed model give the
+  dense sand below the clay layer the water table's pore pressure, as the limit
+  equilibrium sample does. Their factors of safety, 1.609 and 1.621, are
+  unchanged.
 
 ### Changed
 
+- The input template is version 28. It adds k_v to the main sheet (D14) and the
+  ratio option to the mat sheet. Its gray cells follow what the analysis reads:
+  ru, φ_b, and s_cap gray when u is blank; a, n, and l when unsat is blank; l
+  and kr0 for a Gardner material, which reads h0; s(γ) for hb, pow, and
+  elastic; and Lp1 and Lp2 when Adhesion and Delta are both filled. Workbooks
+  made on earlier versions still load.
+- The horizontal seismic coefficient is called k_h everywhere: in Studio, the
+  model checks, the documentation, and the Analysis Report, which writes the
+  seismic force as k_hW and the slice weight as W(1 + k_v).
 - The Analysis Report's Rapid Drawdown section now gives one row per stage: the
   water the stage reads (Piezometric Line 1 or 2, a seepage boundary set's
   solution, or the transient solution at the stage time), the strengths it

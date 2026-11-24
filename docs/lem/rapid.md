@@ -182,6 +182,8 @@ The two envelopes usually cross. To the right of the crossing, at higher stress,
 
 For a rapid drawdown analysis in **xslope**, enter $d$ and $\psi$ in the material properties for each soil that does not drain during the drawdown. The free-draining soils keep their drained strengths, $c'$ and $\phi'$, in every stage, and their $d$ and $\psi$ are left blank.
 
+A soil given an undrained strength directly, with the `cp` or [`ratio`](overview.md#undrained-strength-ratio) option, takes no $d$ and $\psi$ (any left in its row are not read) and keeps that strength in all three stages. A `ratio` material's strength comes from the vertical effective stress under the water before drawdown, the Stage 1 water, so lowering the pool does not change it.
+
 ### When the lab reports an R envelope {#r-envelope}
 
 $\overline{CU}$ test results are often reported as an R envelope instead of the $K_c = 1$ envelope. R is the U.S. Army Corps of Engineers' name for the consolidated-undrained test, between its Q (unconsolidated-undrained) and S (drained) tests, and the R envelope is also called the total stress envelope. It is drawn on a Mohr diagram with one circle for each test. Each circle starts at the sample's effective consolidation pressure, $\sigma'_{3c}$, and its diameter is the principal stress difference at failure, $\sigma_{1f} - \sigma_{3f}$. The envelope's intercept and slope are $c_R$ and $\phi_R$.
@@ -321,9 +323,9 @@ A rapid drawdown analysis needs these inputs beyond an ordinary one:
 
 | Input | Where | Notes |
 |-------|-------|-------|
-| The $K_c = 1$ envelope, $d$ and $\psi$ | the `mat` sheet, columns J and K; Studio: Materials, with LEM parameters shown | For each material that does not drain during the drawdown. Blank or zero means free-draining: the material keeps $c'$ and $\phi'$ in all three stages. A material needs both or neither. If the lab reports an R envelope ($c_R$, $\phi_R$) instead, convert it first, as described under [When the lab reports an R envelope](#r-envelope). |
+| The $K_c = 1$ envelope, $d$ and $\psi$ | the `mat` sheet, columns J and K; Studio: Materials, with LEM parameters shown | For each `mc` material that does not drain during the drawdown; the pair is read on `mc` materials only. Blank or zero means free-draining: the material keeps $c'$ and $\phi'$ in all three stages. A material needs both or neither. A `cp` or `ratio` material keeps its own undrained strength, and a $d$ or $\psi$ left on it is not read; the model checks note it as information. A `pow` or `hb` material a slip surface can reach stops the run, because the drawdown stages replace each slice's $c$ and $\phi$, which a curved envelope computes itself. If the lab reports an R envelope ($c_R$, $\phi_R$) instead, convert it first, as described under [When the lab reports an R envelope](#r-envelope). |
 | The water before and after drawdown | one of three sources, below | The water before drawdown feeds Stage 1; the water after drawdown feeds Stages 2 and 3. |
-| The water load on the face | Water loads in the `main` sheet (cell D24) or Studio's Global parameters | **auto**, the default and the recommended setting, derives the full-pool load for Stage 1 and the lowered-pool load for Stages 2 and 3 from whichever water source the model uses. With **manual**, enter both: the `dloads` and `dloads (2)` sheets, or the Set 1 and Set 2 (rapid drawdown) tabs of Studio's Distributed loads. |
+| The water load on the face | Water loads in the `main` sheet (cell D25) or Studio's Global parameters | **auto**, the default and the recommended setting, derives the full-pool load for Stage 1 and the lowered-pool load for Stages 2 and 3 from whichever water source the model uses. With **manual**, enter both: the `dloads` and `dloads (2)` sheets, or the Set 1 and Set 2 (rapid drawdown) tabs of Studio's Distributed loads. |
 
 The two water states can come from three sources:
 

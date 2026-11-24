@@ -26,6 +26,12 @@ from .hoekbrown import hb_tangent
 
 _ito_matsui_warned = False  # module-level flag: warn once about large H
 
+#: The strength options that take matric-suction strength (phi_b, s_cap): the
+#: effective-stress envelopes. cp and ratio are undrained strengths, with no
+#: effective-stress term for suction to add to; the finite element engine keeps
+#: the same list (fem.SUCTION_OPTIONS).
+SUCTION_OPTIONS = ("mc", "pow", "hb")
+
 
 def _support_choice(row, key, vocabulary, default, index, what):
     """One structural-row vocabulary field (Dir, Appl), or a loud refusal.
@@ -585,6 +591,7 @@ def update_slice_materials(slice_df, materials):
         sghy += gs * HYs[:, p] + g * HYm[:, p]
     slice_df['w'] = w
     slice_df['kw'] = abs(mb['k_seismic']) * w
+    slice_df['kvw'] = float(mb.get('k_vertical') or 0.0) * w
     with np.errstate(invalid='ignore', divide='ignore'):
         slice_df['y_cg'] = np.where(sgh > 0, sghy / np.maximum(sgh, 1e-300), np.nan)
 
@@ -594,6 +601,7 @@ def update_slice_materials(slice_df, materials):
     c = np.empty(n); phi = np.empty(n)
     c1 = np.zeros(n); phi1 = np.zeros(n)
     dcol = np.zeros(n); psi = np.zeros(n)
+    cp_flag = np.zeros(n, dtype=bool)
     for bi in np.unique(base):
         mask = base == bi
         m = materials[bi]
@@ -604,7 +612,13 @@ def update_slice_materials(slice_df, materials):
         else:  # cp
             c[mask] = m['c'] + np.maximum(0.0, m['r_elev'] - y_cb[mask]) * m['cp']
             phi[mask] = 0.0
+            cp_flag[mask] = True
     slice_df['c'] = c; slice_df['phi'] = phi
+    if 'cp_flag' in slice_df.columns:
+        slice_df['cp_flag'] = cp_flag
+    if 'ratio_flag' in slice_df.columns:
+        # a ratio base refuses this path above (its strength follows the weight)
+        slice_df['ratio_flag'] = False
     slice_df['c1'] = c1; slice_df['phi1'] = phi1
     slice_df['d'] = dcol; slice_df['psi'] = psi
     return slice_df
@@ -1187,7 +1201,7 @@ def pile_force_angle(x1, y1, x2, y2, right_facing=None):
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
                     composite=False, right_facing=None,
                     suction_phi_b=None, suction_cap=None, check_inputs=True,
-                    material_breakdown=False):
+                    material_breakdown=False, rapid=False):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -1211,7 +1225,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             (Fredlund extended Mohr-Coulomb), LEM only. Maps ``{material name:
             phi_b degrees}``. Default None auto-wires from the materials' template
             (v17) ``phi_b`` values; an explicit dict overrides the file, and an empty
-            dict forces suction off. For a slice whose base material is named in the dict,
+            dict forces suction off. For a slice whose base material is named in the
+            dict and has an effective-stress envelope (mc, pow or hb; cp and ratio
+            take no suction credit),
             the base matric suction ``s = max(0, -u)`` (from the UNCLAMPED pore
             pressure: a piezometric line's hydrostatic negative head above the
             line, or an unsaturated seepage solution's negative u) contributes an
@@ -1235,6 +1251,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             the searches do this after gating once at their own entry (the model
             does not change between trial surfaces), and the sweep engines do it
             because a deliberately perturbed value is not a user mistake.
+        rapid (bool, optional): True when the slices are for a rapid drawdown
+            analysis (:func:`xslope.advanced.rapid_drawdown`), the only analysis
+            that reads the second piezometric line. Then, as for the first line,
+            the slices break where a surface crosses Line 2, and a slice whose
+            base takes u = piezo and falls outside Line 2's x-extent is refused.
+            Default False: Line 2 shapes nothing and refuses nothing, so a
+            single-stage run (and the two-stage seismic analysis, which reads the
+            stage 1 water in both stages) is the same with or without it. The
+            stage-2 column ``u2`` is still filled from Line 2 where it is defined
+            and is NaN where a drawn Line 2 does not reach, so a drawdown solved
+            on slices made without ``rapid=True`` cannot read zero there.
 
     Returns:
         tuple:
@@ -1284,6 +1311,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     tcrack_depth = slope_data["tcrack_depth"]
     tcrack_water = slope_data["tcrack_water"]
     k_seismic = slope_data['k_seismic']
+    # Vertical seismic coefficient (v28): signed, positive acting downward, applied
+    # as given -- unlike k, whose magnitude the slicer orients itself.
+    k_vertical = float(slope_data.get('k_vertical') or 0.0)
     # === WATER LOADS (v22 main!D23) ===
     # In automatic mode the weight of standing water is not something the user
     # typed: it is derived here from the model's own water definition -- the
@@ -1652,7 +1682,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Find intersections with piezometric lines. A single point is not a line: it
     # cannot become a LineString and it cannot be interpolated, so it is treated as
     # no line here and reported by the u='piezo' guard below.
-    for pl in (piezo_line, piezo_line2):
+    # The second line only where the analysis reads it (rapid drawdown): in any
+    # other run it must not move the slice boundaries, or a line nobody's run uses
+    # would change the factor of safety.
+    for pl in ((piezo_line, piezo_line2) if rapid else (piezo_line,)):
         if pl and len(pl) >= 2:
             fixed_xs.update(_crossing_xs(LineString(pl)))
 
@@ -2211,8 +2244,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             dload2, d_x2, d_y2, beta_d2, qL2, qR2 = _combine(dload2_interp_funcs,
                                                              dload2_vert_funcs)
 
-        # Seismic force
+        # Seismic forces: horizontal, oriented by the surface, and vertical, signed,
+        # positive downward. Both act through the slice's center of gravity.
         kw = abs(k_seismic) * soil_weight
+        kvw = k_vertical * soil_weight
 
         # === BEGIN : "Tension crack water force" ===
 
@@ -2558,7 +2593,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 raise _piezo_extent_error(
                     i, x_u, materials[base_material_idx]['name'], _pz_ext,
                     "piezometric line")
-            if _pz2_ext is not None and np.isnan(piezo_y2):
+            # The second line is read only by rapid drawdown, so only a rapid
+            # run is refused for a slice outside it. Any other run leaves u2
+            # undefined (NaN) there rather than zero: nothing reads it, and a
+            # drawdown that did would fail rather than lose the water.
+            _u2_undefined = _pz2_ext is not None and np.isnan(piezo_y2)
+            if rapid and _u2_undefined:
                 raise _piezo_extent_error(
                     i, x_u, materials[base_material_idx]['name'], _pz2_ext,
                     "second piezometric line")
@@ -2567,7 +2607,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if not np.isnan(piezo_y2) and piezo_y2 > y_u:
                 hw2 = piezo_y2 - y_u
             u = hw * gamma_w if not np.isnan(piezo_y) else 0
-            u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
+            u2 = (np.nan if _u2_undefined
+                  else (hw2 * gamma_w if not np.isnan(piezo_y2) else 0))
             # Signed head to the piezometric line: negative above the line, where
             # its magnitude is the hydrostatic matric suction. No phreatic cos^2
             # correction (that models steady parallel seepage below the line).
@@ -2742,10 +2783,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             psi = 0     # not used in rapid drawdown, but must be defined
             pow_flag = False
             hb_flag = False
+            cp_flag = False
+            ratio_flag = False
         else:
             pow_flag = False
             hb_flag = False
             mat_option = materials[base_material_idx]['option']
+            # An undrained strength from c/p or from a strength ratio: the two-stage
+            # seismic analysis's stage 2 strength factor reduces both
+            # (advanced.seismic_two_stage).
+            cp_flag = mat_option == 'cp'
+            ratio_flag = mat_option == 'ratio'
             if mat_option == 'hb':
                 # Generalized Hoek-Brown. Like 'pow' this is a curved envelope, so
                 # the strength depends on the base normal stress, which depends on
@@ -2786,13 +2834,36 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     f"Failure surface runs along elastic (impenetrable) material "
                     f"'{materials[base_material_idx]['name']}' with no material "
                     f"beneath it.")
+            elif mat_option == 'ratio':
+                # Undrained strength ratio (template v28, Norm 472a): s_u = c/p times
+                # the vertical effective stress at the pore-pressure point, never
+                # below c. The vertical stress is the soil column above that point
+                # (the column the 'ru' option multiplies, gamma_sat below the water
+                # table) plus the vertical part of the distributed load on the slice
+                # top, ponded water included (468a): under a pond the pore pressure
+                # carries the water depth, so leaving its weight out would understate
+                # sigma'_v. A line load is a point force, not an overburden, and is
+                # not counted. Fixed for the run, like c/p: the strength the soil
+                # consolidated to, not one that follows the solution.
+                mat = materials[base_material_idx]
+                sigma_v_soil = (_column_stress_at_u(i, water_table_y_u_all[i])
+                                if on_arc_all[i] else sum_gam_h)
+                sigma_v_load = (dload * cos(radians(beta_d)) / dx) if dx > 0 else 0.0
+                sigma_v_eff = max(0.0, sigma_v_soil + sigma_v_load - u)
+                c = max(mat['c'], mat['cp'] * sigma_v_eff)
+                phi = 0
+                c1 = 0      # not used in rapid drawdown, but must be defined
+                phi1 = 0    # not used in rapid drawdown, but must be defined
+                d = 0       # not used in rapid drawdown, but must be defined
+                psi = 0     # not used in rapid drawdown, but must be defined
             elif mat_option not in ('mc', 'cp'):
                 # Was silently treated as 'cp'. A blank option is legal on seep-only
                 # material rows, but not on one a failure surface passes through.
+                from .fileio import STRENGTH_OPTIONS
                 raise ValueError(
                     f"Material '{materials[base_material_idx]['name']}' lies on the failure "
                     f"surface but has no valid strength option (option='{mat_option}'). "
-                    "Expected one of: mc, cp."
+                    f"Expected one of: {', '.join(STRENGTH_OPTIONS)}."
                 )
             elif mat_option == 'mc':
                 c = materials[base_material_idx]['c']
@@ -2821,8 +2892,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         # solvers add this to c in the resisting term c*dl; the effective-normal
         # term keeps the clamped u, so this is exactly the (u_a - u_w) tan(phi_b)
         # term with u_a = 0. Default (suction_phi_b None) => 0.0, bit-identical.
+        # Only an effective-stress envelope takes the credit (mc, pow, hb): the
+        # (u_a - u_w) tan(phi_b) term adds to c' + sigma' tan(phi'), and an
+        # undrained strength (cp, ratio) has no effective-stress term to add it to.
+        # The finite element engine follows the same rule (fem.SUCTION_OPTIONS).
         c_suction = 0.0
-        if suction_phi_b and base_material_idx is not None:
+        if (suction_phi_b and base_material_idx is not None
+                and materials[base_material_idx].get('option') in SUCTION_OPTIONS):
             _bm_name = materials[base_material_idx]['name']
             phi_b_deg = suction_phi_b.get(_bm_name)
             if phi_b_deg:
@@ -2874,6 +2950,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'beta': beta_d,
             'beta2': beta_d2,  # ditto for the stage-2 load (see advanced.rapid_drawdown)
             'kw': kw,   # seismic force
+            'kvw': kvw,  # vertical seismic force, positive downward
             't': t_force,  # tension crack water force
             'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action
             'p': p_sum,   # sum of reinforcement line T values that intersect base of slice (tangent, active).
@@ -2911,6 +2988,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'c_suction': c_suction,  # apparent cohesion from matric suction (0.0 unless suction_phi_b opt-in)
             'phi': phi,
             'pow_flag': pow_flag,  # power-curve strength: iterate tangent (c,phi) on sigma'_n
+            'cp_flag': cp_flag,    # undrained strength from the c/p option
+            'ratio_flag': ratio_flag,  # undrained strength from the strength ratio option
             'pow_a': (materials[base_material_idx]['pow_a'] if pow_flag else 0.0),
             'pow_b': (materials[base_material_idx]['pow_b'] if pow_flag else 0.0),
             'pow_c': (materials[base_material_idx]['pow_c'] if pow_flag else 0.0),
@@ -2985,6 +3064,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'y_u': np.asarray(mb_y_u, dtype=float),   # where cp strength is read
             'mat_of_poly': _mats_of_poly,
             'k_seismic': k_seismic,
+            'k_vertical': k_vertical,
             'suction': bool(suction_phi_b),
         }
     if facing_note and debug:

@@ -2,8 +2,8 @@
 
 Full bibliographic details for the author-year citations used throughout the
 verification corpus pages ([Slide2](rocscience.md), [Slide2
-groundwater](rocscience_groundwater.md), [RS2](rs2.md),
-[SLOPE/W](geostudio.md), [FE
+groundwater](rocscience_groundwater.md), [RS2](rs2.md), [RS2
+joints](rs2_joints.md), [SLOPE/W](geostudio.md), [FE
 seepage](seep.md), [SSRM](ssrm.md) and [published
 problems](published.md)). The corpus pages cite works in
 author-year form in their prose and **Sources:** lines; this page collects the
@@ -22,6 +22,16 @@ Engineers).
 
 ---
 
+- Alejano, L.R. & Alonso, E. (2005). Application of the 'shear and tensile strength
+  reduction technique' to obtain factors of safety of toppling and footwall rock slopes. In
+  *Eurock 2005: Impact of Human Activity on the Geological Environment*. *(Cited as in the RS2
+  Joint Verification Manual, §2. The source of the block-toppling slope built as
+  [RJ-2](rs2_joints.md#rj-2).)*
+- Alejano, L.R., Ferrero, A.M., Ramírez-Oyanguren, P. & Álvarez Fernández, M.I. (2011).
+  Comparison of limit-equilibrium, numerical and physical models of wall slope stability.
+  *International Journal of Rock Mechanics & Mining Sciences* 48, 16–26.
+  [doi:10.1016/j.ijrmms.2010.06.013](https://doi.org/10.1016/j.ijrmms.2010.06.013). *(The
+  bilinear, plowing, and footwall slabs of [RJ-9 to RJ-15](rs2_joints.md#rj-9).)*
 - Arai, K. & Tagyo, K. (1985). Determination of noncircular slip surface giving
   the minimum factor of safety in slope stability analysis. *Soils and
   Foundations* 25(1), 43–51. [doi:10.3208/sandf1972.25.43](https://doi.org/10.3208/sandf1972.25.43)
@@ -45,6 +55,10 @@ Engineers).
   strength option; cited in the docs as "Balmer's (1952) transformation". Not fully
   verified — page range unconfirmed, and ASTM Proceedings is not indexed by
   Crossref.)*
+- Barla, G., Borri-Brunetto, M., Devin, P. & Zaninetti, A. (1995). Validation of a distinct
+  element model for toppling rock slopes. In *Proc. 8th International Congress on Rock
+  Mechanics* (ISRM), Tokyo, 417–421. *(The tilt-table toppling test of
+  [RJ-16](rs2_joints.md#rj-16).)*
 - Bear, J. (1972). *Dynamics of Fluids in Porous Media*. American Elsevier, New
   York.
 - Berg, R.R., Christopher, B.R. & Samtani, N.C. (2009). *Design and
@@ -60,9 +74,9 @@ Engineers).
 - Borges, J.L. & Cardoso, A.S. (2002). Overall stability of
   geosynthetic-reinforced embankments on soft soils. *Geotextiles and
   Geomembranes* 20(6), 395–421. [doi:10.1016/S0266-1144(02)00014-6](https://doi.org/10.1016/S0266-1144(02)00014-6)
-- Bowles, J.E. (1996). *Foundation Analysis and Design*, 5th ed. McGraw-Hill,
-  New York. *(Source of the "Bowles' homogeneous dam" flow-net example
-  re-solved in the groundwater corpus.)*
+- Bowles, J.E. (1984). *Physical and Geotechnical Properties of Soils*, 2nd ed.
+  McGraw-Hill, New York. *(Source of the "Bowles' homogeneous dam" flow-net example
+  re-solved in the groundwater corpus, Example 9-2, p. 248.)*
 - Cai, F. & Ugai, K. (2000). Numerical analysis of the stability of a slope
   reinforced with piles. *Soils and Foundations* 40(1), 73–84.
   [doi:10.3208/sandf.40.73](https://doi.org/10.3208/sandf.40.73)
@@ -82,8 +96,7 @@ Engineers).
 - Chapuis, R.P., Chenaf, D., Bussière, B., Aubertin, M. & Crespo, R. (2001). A
   user's approach to assess numerical codes for saturated and unsaturated
   seepage conditions. *Canadian Geotechnical Journal* 38(5), 1113–1126.
-  [doi:10.1139/t01-055](https://doi.org/10.1139/t01-055). *(Cited in the groundwater corpus as "Chapuis, Chenaf &
-  Bowles" / "Chapuis et al. (2001)".)*
+  [doi:10.1139/t01-055](https://doi.org/10.1139/t01-055)
 - Charles, J.A. & Soares, M.M. (1984). The stability of slopes in soils with
   nonlinear failure envelopes. *Canadian Geotechnical Journal* 21(3), 397–406.
   [doi:10.1139/t84-044](https://doi.org/10.1139/t84-044)
@@ -140,6 +153,10 @@ Engineers).
 - Giam, P.S.K. & Donald, I.B. (1992). Determination of critical slip surfaces
   for slopes via stress-strain calculations. In *Proc. 6th Australia–New Zealand
   Conf. on Geomechanics*, Christchurch, 461–465. *(Pages not fully verified.)*
+- Goodman, R.E. & Bray, J.W. (1976). Toppling of rock slopes. In *Proc. Specialty Conference
+  on Rock Engineering for Foundations and Slopes*, ASCE, Boulder, Colorado, Vol. 2, 201–234.
+  *(The column analysis that referees the toppling problems [RJ-1](rs2_joints.md#rj-1a) and
+  [RJ-2](rs2_joints.md#rj-2).)*
 - Görög, P. & Török, Á. (2007). Slope stability assessment of a three-layered
   slope (Budapest) with a weak "waste" band. *(Best match: Natural Hazards and
   Earth System Sciences 7, 417–422; exact match to the RS2 manual citation not
@@ -227,6 +244,8 @@ Engineers).
   using shear strength reduction finite element method. In *Landslides and
   Engineered Slopes* (Proc. 10th Int. Symp. on Landslides), Taylor & Francis,
   p. 851. [doi:10.1201/9780203885284-c107](https://doi.org/10.1201/9780203885284-c107). *(End page not fully verified.)*
+- Newmark, N.M. (1965). Effects of earthquakes on dams and embankments.
+  *Géotechnique* 15(2), 139–160. [doi:10.1680/geot.1965.15.2.139](https://doi.org/10.1680/geot.1965.15.2.139)
 - Ng, C.W.W. & Shi, Q. (1998). A numerical investigation of the stability of
   unsaturated soil slopes subjected to transient seepage. *Computers and
   Geotechnics* 22(1), 1–28. [doi:10.1016/S0266-352X(97)00036-0](https://doi.org/10.1016/S0266-352X(97)00036-0).

@@ -4,9 +4,10 @@ RS2 #68 critical-seismic-coefficient rows on docs/verification/rs2.md.
 RS2 #68 is the one LEM problem on the RS2 page whose lock is a critical seismic
 coefficient k꜀ (FS = 1), not a factor of safety, so it is not covered by the
 `fem_ssrm` 4-panel renderer (make_rs2_figures.py). Each figure sets the seismic
-coefficient to the locked k꜀ from the problem's `critical_kc` tag — the same value
-the regression uses — re-runs the circular search, and shows the critical seismic
-surface (with the pseudo-static arrow) beside the inputs.
+coefficient to the scored k꜀ — the lowest Spencer `critical_kc` tag on the file, the
+circle on a tie, since the page scores the lower of the circular and non-circular
+searches — re-runs that tag's search, and shows the critical seismic surface (with
+the pseudo-static arrow) beside the inputs.
 
 Run from the repo root:
     python benchmarks/rocscience/make_rs2_kc_figures.py            # all
@@ -29,7 +30,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from xslope.fileio import load_slope_data
-from xslope.search import circular_search
+from xslope.search import run_lem_analysis
 from xslope.plot import plot_inputs, plot_solution
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
@@ -40,8 +41,10 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 
 
 def parse_kc_tags(path=RS2_MD):
-    """One entry per input file: the Spencer `critical_kc` tag (the rigorous
-    method), carrying the locked k꜀ and the search settings."""
+    """One entry per input file: the scored Spencer `critical_kc` tag (the
+    rigorous method), carrying the locked k꜀ and the search settings. A file with
+    a circular and a non-circular Spencer tag is scored on the lower k꜀; on a tie
+    the first tag on the page (the circle) stands."""
     by_file = {}
     with open(path) as fh:
         for line in fh:
@@ -56,8 +59,12 @@ def parse_kc_tags(path=RS2_MD):
             if kv.get('type') != 'critical_kc':
                 continue
             stem = os.path.basename(kv['file']).split('.')[0]
-            # prefer Spencer; fall back to whatever method appears first
-            if stem not in by_file or kv.get('method') == 'spencer':
+            # prefer Spencer, the lowest k꜀ among its tags; fall back to
+            # whatever method appears first
+            old = by_file.get(stem)
+            if (old is None or kv.get('method') == 'spencer' and (
+                    old.get('method') != 'spencer'
+                    or float(kv['expected_kc']) < float(old['expected_kc']))):
                 by_file[stem] = kv
     return by_file
 
@@ -70,9 +77,11 @@ def make_figure(stem, tag, panel_size=(8.0, 5.0), dpi=150):
     ns = int(tag.get('num_slices', 40))
 
     with contextlib.redirect_stdout(io.StringIO()):
-        cache, _conv, _path, _cc = circular_search(sd, method, num_slices=ns)
-    best = cache[0]
-    df, surface, results = best['slices'], best['failure_surface'], best['solver_result']
+        bundle = run_lem_analysis(sd, method, analysis='auto_search',
+                                  surface=tag.get('surface', 'circular'),
+                                  num_slices=ns)
+    df, surface, results = (bundle['slice_df'], bundle['failure_surface'],
+                            bundle['results'])
 
     paths = []
     for which in ('inputs', 'solution'):
@@ -99,7 +108,7 @@ def make_figure(stem, tag, panel_size=(8.0, 5.0), dpi=150):
     combo.save(out)
     for p in paths:
         os.remove(p)
-    return out, best['FS']
+    return out, results['FS']
 
 
 if __name__ == '__main__':

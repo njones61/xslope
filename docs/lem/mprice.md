@@ -11,7 +11,7 @@ limit-equilibrium methods in XSLOPE, and Spencer's method is a special case of i
 Every slice has the same free body as in Spencer's method — refer to the
 [Spencer slice geometry](spencer.md#slice-geometry-and-forces) for the definition of
 every symbol ($W$, $N$, $S$, the interslice resultant $Z$ and its inclination
-$\theta$, the external loads $kW$, $P/D$, $T$, $R$, $V$, $H$, and the angles
+$\theta$, the external loads $k_hW$, $k_vW$, $P/D$, $T$, $R$, $V$, $H$, and the angles
 $\alpha$, $\beta$, $\theta_p$):
 
 ![spencer3_forces.png](images/spencer3_forces.png)
@@ -131,11 +131,11 @@ Summing the per-slice contributions:
 
 | Force | Components $(F_x, F_y)$ | Acts at | Moment about origin |
 |---|---|---|---|
-| Weight $W$ | $(0,\ -W)$ | $(x_c,\ y_{cg})$ | $-W\,x_c$ |
+| Weight and vertical seismic $W(1 + k_v)$ | $(0,\ -W(1 + k_v))$ | $(x_c,\ y_{cg})$ | $-W(1 + k_v)\,x_c$ |
 | Base normal $N$ (total) | $(-N\sin\alpha,\ N\cos\alpha)$ | $(x_c,\ y_{cb})$ | $N\,(x_c\cos\alpha + y_{cb}\sin\alpha)$ |
 | Base shear $S$ | $(S\cos\alpha,\ S\sin\alpha)$ | $(x_c,\ y_{cb})$ | $S\,(x_c\sin\alpha - y_{cb}\cos\alpha)$ |
 | Surface load $D$ | $(D\sin\beta,\ -D\cos\beta)$ | $(d_x,\ d_y)$ | $-D\,(d_x\cos\beta + d_y\sin\beta)$ |
-| Seismic $kW$ | $(-kW,\ 0)$ | $(x_c,\ y_{cg})$ | $kW\,y_{cg}$ |
+| Horizontal seismic $k_hW$ | $(-k_hW,\ 0)$ | $(x_c,\ y_{cg})$ | $k_hW\,y_{cg}$ |
 | Tension-crack water $V$ | $(-V,\ 0)$ | $(x_v,\ y_t)$ | $V\,y_t$ |
 | Reinforcement $R$ | $(R\cos\psi,\ R\sin\psi)$ | $(x_r,\ y_r)$ | $R\,(x_r\sin\psi - y_r\cos\psi)$ |
 | Pile $H$ | $(H\cos\theta_p,\ H\sin\theta_p)$ | $(x_h,\ y_h)$ | $H\,(x_h\sin\theta_p - y_h\cos\theta_p)$ |
@@ -149,8 +149,8 @@ so the normal moment term is $(N' + u\,\Delta\ell)(x_c\cos\alpha + y_{cb}\sin\al
 Assembling the rows over the $n$ slices gives the moment residual XSLOPE evaluates:
 
 >>$\begin{aligned}
-R_m = \sum_{i=1}^{n} \Big[ &- W x_c + (N' + u \Delta \ell)(x_c \cos \alpha + y_{cb} \sin \alpha) + S (x_c \sin \alpha - y_{cb} \cos \alpha) \\
-&- D (d_x \cos \beta + d_y \sin \beta) + kW y_{cg} + V y_t \\
+R_m = \sum_{i=1}^{n} \Big[ &- W(1 + k_v) x_c + (N' + u \Delta \ell)(x_c \cos \alpha + y_{cb} \sin \alpha) + S (x_c \sin \alpha - y_{cb} \cos \alpha) \\
+&- D (d_x \cos \beta + d_y \sin \beta) + k_hW y_{cg} + V y_t \\
 &+ R (x_r \sin \psi - y_r \cos \psi) + H (x_h \sin \theta_p - y_h \cos \theta_p) \\
 &+ L (x_f \sin \delta - y_f \cos \delta) \Big]
 \end{aligned}   \qquad (10)$

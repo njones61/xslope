@@ -1446,7 +1446,28 @@ def rs2_51():
     return 'rs2_51.xlsx'
 
 
-def rs2_68a():
+def _rs2_68_fine(sd, name):
+    """Write the refined-mesh twin of an RS2 #68 case as ``name``.
+
+    The twin is the same model with one mesh refinement zone: a band 5 m either
+    side of the file's own non-circular starting surface (the critical surface at
+    k_c on Cases 1 and 2, the path along the base of the weak layer on Case 3),
+    clipped to the model, at 1.0 m. The plain file's FEM k_c rows solve on RS2's
+    own mesh (its rs2_68*_mesh.json, written by rs2_68_vendor_mesh.py); the twin
+    gives the refined value printed beside them. Every case, plain or twin, pins
+    its side boundaries the way RS2's models do."""
+    from shapely.geometry import LineString
+    from shapely.ops import unary_union
+    domain = unary_union([p['polygon'] for p in sd['polygons']])
+    path = LineString([(p['X'], p['Y']) for p in sd['non_circ']])
+    band = path.buffer(5.0).intersection(domain).simplify(0.25)
+    ring = [(round(x, 3), round(y, 3)) for x, y in list(band.exterior.coords)[:-1]]
+    sd['refine_zones'] = [{'polygon': ring, 'size': 1.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, name))
+    return name
+
+
+def rs2_68a(fine=False):
     """RS2 #68 Case 1 (Ru = 0.5, homogeneous) -- Stability of Seismically Loaded
     Slopes, after Loukidis, Bandini & Salgado (2003), Geotechnique 53(5), 463-479.
 
@@ -1466,20 +1487,35 @@ def rs2_68a():
     Published k_c (Slide2 LEM columns are the XSLOPE targets): Slide2 Bishop 0.118,
     Spencer 0.132; RS2 SSR 0.125; reference FEM 0.132 / Bishop 0.127 / Spencer 0.131
     / log-spiral 0.132; limit-analysis UB 0.145 / LB 0.126. Geometry transcribed
-    from the RS2 vendor model 'slope stability #068_01.fez'."""
+    from the RS2 vendor model 'slope stability #068_01.fez'.
+
+    Loukidis ran Spencer's method on irregular (non-circular) trial surfaces, and
+    Slide2's VP62 ran a non-circular path search through the toe, so the file
+    carries a non-circular starting surface for the Spencer k_c: the critical
+    circle at k_c sampled at sixteen points, toe to crest, which the search then
+    reshapes. The scored Spencer k_c is the lower of the circular and non-circular
+    searches. Bishop's simplified method stays on the circles, as Loukidis ran it."""
     poly = [(0.0, 0.0), (0.0, 25.0), (35.0, 25.0), (110.0, 50.0), (300.0, 50.0),
             (300.0, 0.0)]
     sd = _poly_slope_data(
         polygons=[(0, poly)],
         materials=[dict(name='rock1', c=25.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
-                        E=1.0e5, nu=0.3, u='ru', ru=0.5)],
+                        E=5.0e4, nu=0.4, u='ru', ru=0.5)],
         circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
         max_depth=0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((34.9, 25.0), (40.6, 23.8), (46.4, 23.0), (52.1, 22.6),
+                       (57.8, 22.5), (63.6, 22.8), (69.3, 23.5), (75.0, 24.5),
+                       (80.8, 26.0), (86.5, 27.8), (92.2, 30.1), (98.0, 32.8),
+                       (103.7, 36.1), (109.4, 40.0), (115.2, 44.6), (120.9, 50.0))]
+    sd['side_bc'] = 'fixed'   # RS2's '#068' models pin every edge
+    if fine:
+        return _rs2_68_fine(sd, 'rs2_68a_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68a.xlsx'))
     return 'rs2_68a.xlsx'
 
 
-def rs2_68b():
+def rs2_68b(fine=False):
     """RS2 #68 Case 2 (Ru = 0, homogeneous) -- same 25 m, 1V:3H, c = 25 / phi = 30
     / gamma = 20 slope as Case 1 (rs2_68a) but dry (u = none). Critical seismic
     coefficient k_c is the verification target (see rs2_68a).
@@ -1487,20 +1523,31 @@ def rs2_68b():
     Published k_c: Slide2 Bishop 0.425, Spencer 0.431; RS2 SSR 0.413; reference FEM
     0.433 / Bishop 0.426 / Spencer 0.431 / log-spiral 0.432; UB 0.454 / LB 0.423.
     Geometry from 'slope stability #068_02.fez' (200 m wide domain vs Case 1's
-    300 m; the critical mechanism is near the slope, so the extra width is inert)."""
+    300 m; the critical mechanism is near the slope, so the extra width is inert).
+
+    The non-circular starting surface is this case's critical circle at k_c,
+    sampled the same way (see rs2_68a)."""
     poly = [(0.0, 0.0), (0.0, 25.0), (35.0, 25.0), (110.0, 50.0), (200.0, 50.0),
             (200.0, 0.0)]
     sd = _poly_slope_data(
         polygons=[(0, poly)],
         materials=[dict(name='rock1', c=25.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
-                        E=1.0e5, nu=0.3, u='none')],
+                        E=5.0e4, nu=0.4, u='none')],
         circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
         max_depth=0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((34.6, 25.0), (40.6, 24.4), (46.6, 24.1), (52.5, 24.0),
+                       (58.5, 24.3), (64.5, 24.9), (70.5, 25.8), (76.4, 27.0),
+                       (82.4, 28.5), (88.4, 30.4), (94.3, 32.6), (100.3, 35.2),
+                       (106.3, 38.2), (112.3, 41.6), (118.2, 45.5), (124.2, 50.0))]
+    sd['side_bc'] = 'fixed'   # RS2's '#068' models pin every edge
+    if fine:
+        return _rs2_68_fine(sd, 'rs2_68b_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68b.xlsx'))
     return 'rs2_68b.xlsx'
 
 
-def rs2_68c():
+def rs2_68c(fine=False):
     """RS2 #68 Case 3 (Ru = 0, non-homogeneous 3-layer) -- a benched slope in three
     dipping rock bands, dry. Critical seismic coefficient k_c is the target (see
     rs2_68a). Materials (mat_id 0/1/2): rock1 c = 4 / phi = 30 / gamma = 17 (upper
@@ -1510,7 +1557,13 @@ def rs2_68c():
 
     Published k_c: Slide2 Bishop 0.155, Spencer 0.151; RS2 SSR 0.161; reference FEM
     0.161 / Bishop 0.155 / UB 0.172 / LB 0.148. Zone polygons transcribed from the
-    RS2 vendor model 'slope stability #068_03.fez' via the .fez zone polygonizer."""
+    RS2 vendor model 'slope stability #068_03.fez' via the .fez zone polygonizer.
+
+    The file also carries a non-circular starting surface for the yield coefficient
+    search on that family: from the upper crest down through rock1 into the weak
+    band, along the band just above its base, and out on the face where the
+    critical circle at k_c exits. Neither the manual nor the paper gives one; it is
+    a starting point the search moves, placed on the mechanism the circles find."""
     zones = [
         (0, [(74.693, 41.077), (109.5, 55.0), (150.0, 55.0), (150.0, 44.5),
              (74.693, 41.077)]),                                        # rock1 (upper)
@@ -1523,16 +1576,39 @@ def rs2_68c():
         polygons=zones,
         materials=[
             dict(name='rock1', c=4.0, phi=30.0, gamma=17.0, gamma_sat=17.0,
-                 E=1.0e5, nu=0.3, u='none'),
+                 E=5.0e4, nu=0.4, u='none'),
             dict(name='rock2', c=25.0, phi=15.0, gamma=19.0, gamma_sat=19.0,
-                 E=1.0e5, nu=0.3, u='none'),
+                 E=5.0e4, nu=0.4, u='none'),
             dict(name='rock3', c=15.0, phi=45.0, gamma=19.0, gamma_sat=19.0,
-                 E=1.0e5, nu=0.3, u='none'),
+                 E=5.0e4, nu=0.4, u='none'),
         ],
         circle={'Xo': 78.0, 'Yo': 82.0, 'Depth': 27.0, 'R': 55.0},
         max_depth=0.0)
+    # Left to right: the non-circular search moves each point only between its
+    # neighbors' x, so points listed right to left can never move.
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((39.0, 29.5), (50.0, 29.3), (70.0, 30.2), (95.0, 31.5),
+                       (108.0, 38.0), (123.0, 55.0))]
+    sd['side_bc'] = 'fixed'   # RS2's '#068' models pin every edge
+    if fine:
+        return _rs2_68_fine(sd, 'rs2_68c_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68c.xlsx'))
     return 'rs2_68c.xlsx'
+
+
+def rs2_68a_fine():
+    """RS2 #68 Case 1's refined-mesh twin (see _rs2_68_fine)."""
+    return rs2_68a(fine=True)
+
+
+def rs2_68b_fine():
+    """RS2 #68 Case 2's refined-mesh twin (see _rs2_68_fine)."""
+    return rs2_68b(fine=True)
+
+
+def rs2_68c_fine():
+    """RS2 #68 Case 3's refined-mesh twin (see _rs2_68_fine)."""
+    return rs2_68c(fine=True)
 
 
 # ======================================================================================
@@ -2224,7 +2300,7 @@ if __name__ == '__main__':
                rs2_30, rs2_30_split,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
                rs2_67a, rs2_67b, rs2_67c, rs2_67d, rs2_67e, rs2_67f,
-               rs2_68a, rs2_68b, rs2_68c,
+               rs2_68a, rs2_68b, rs2_68c, rs2_68a_fine, rs2_68b_fine, rs2_68c_fine,
                vp102_transient,
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
                rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,

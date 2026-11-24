@@ -22,17 +22,24 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMessageBox, QPushButton, QRadioButton, QSpinBox, QStackedWidget,
+    QMessageBox, QPushButton, QRadioButton, QSpinBox, QStackedWidget, QStyle,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .preflight_panel import (
-    PreflightPanel, SEISMIC_NOTE_FEM, SEISMIC_NOTE_LEM, apply_capabilities,
+    PreflightPanel, SEISMIC_NOTE_FEM, apply_capabilities,
     two_pane,
 )
 # The thin-zone toggle's default is declared beside the code that acts on it, so
 # the checkbox and the mesh build can never disagree about what "off" means.
 from .runners import REFINE_THIN_ZONES_DEFAULT, TRANSIENT_IC_MAX_ITER_DEFAULT
+
+#: The two-stage seismic analysis's stage 2 strength choices, in
+#: :data:`xslope.advanced.SEISMIC2_STRENGTHS`'s keys.
+SEISMIC2_STRENGTH_CHOICES = [
+    ("interpolated", "Interpolated (as in rapid drawdown)"),
+    ("kc1", "Kc = 1 envelope"),
+]
 
 LEM_METHODS = [
     ("oms", "Ordinary Method of Slices (OMS)"),
@@ -691,14 +698,15 @@ class RunFemDialog(QDialog):
                            "(sigma_h = K0·sigma_v).")
         form.addRow("K0", self.k0)
 
-        # Tension SRF (v19). A no-op wherever no material declares a cutoff above
-        # zero — see _has_reducible_tensile_cap, which is what dims it.
+        # Tension SRF (v19). A no-op wherever no material and no joints-sheet line
+        # declares a cutoff above zero — see _has_reducible_tensile_cap, which is
+        # what dims it.
         self.tension_srf = QCheckBox("Reduce the tensile cap with F (Tension SRF)")
         self.tension_srf.setChecked(bool(defaults.get("tension_srf", True)))
         self._tension_srf_tip = (
-            "Divide each material's tensile-strength cap by the trial F alongside c "
-            "and tan(phi), so the factor of safety is the factor on the WHOLE "
-            "strength envelope — shear and tensile.\n\n"
+            "Divide each material's and each joint line's tensile-strength cap by "
+            "the trial F alongside c and tan(phi), so the factor of safety is the "
+            "factor on the WHOLE strength envelope — shear and tensile.\n\n"
             "This is RS2's tensilestrength_SRF = 1 (the setting behind its published "
             "verification set) and what Plaxis does. Off holds each cap at its "
             "authored value through the bisection.")
@@ -911,18 +919,31 @@ class RunFemDialog(QDialog):
         return "hybrid" if jointed else "non_convergence"
 
     def _has_reducible_tensile_cap(self):
-        """Whether some material declares a tensile cutoff above zero.
+        """Whether some material or some joints-sheet line declares a tensile
+        cutoff above zero.
 
-        The rule lives in :func:`xslope.preflight.has_reducible_tensile_cap`, so
-        the control this dims and the ``main.tension_srf_unset`` note beside it in
-        the checks column read the same model the same way. A blank cutoff is no
-        cap at all and a cutoff of 0 divides to 0 at every trial factor; a model
-        whose materials are each blank or 0, in any mix, leaves the trial factor
-        nothing to reduce.
+        A material asks :func:`xslope.preflight.has_reducible_tensile_cap`, so the
+        control this dims and the ``main.tension_srf_unset`` note beside it in the
+        checks column read the same model the same way. A joints-sheet line's
+        t_cut follows the same setting (``xslope.joint.joint_reduced_tcut``), and
+        the note counts a line whose t_cut is above zero; so does this. A blank
+        cutoff is no cap at all and a cutoff of 0 divides to 0 at every trial
+        factor; a model whose materials and joint lines are each blank or 0, in any
+        mix, leaves the trial factor nothing to reduce.
         """
         from xslope.preflight import has_reducible_tensile_cap
-        mats = (self._sd or {}).get("materials") or []
-        return any(has_reducible_tensile_cap(m) for m in mats)
+        sd = self._sd or {}
+        if any(has_reducible_tensile_cap(m) for m in (sd.get("materials") or [])):
+            return True
+
+        def positive(v):
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                return False
+            return v == v and v > 0.0
+        return any(positive(j.get("t_cut")) for j in (sd.get("joint_lines") or [])
+                   if isinstance(j, dict))
 
     def _sync_enabled(self):
         a = self.analysis.currentData()
@@ -936,17 +957,17 @@ class RunFemDialog(QDialog):
         # K0 initialization applies to both a single trial and the SSRM.
         self.k0.setEnabled(self.k0_on.isChecked())
         # The tensile cap is only reduced during a strength reduction, and only
-        # where some material declares a cutoff ABOVE ZERO: a blank t_cut is no
-        # cap at all, and a cutoff of 0 divides to 0 at every trial factor. In
-        # both cases the box changes no number, so it is dimmed rather than
-        # offered, with the reason in its tooltip.
+        # where some material or joints-sheet line declares a cutoff ABOVE ZERO:
+        # a blank t_cut is no cap at all, and a cutoff of 0 divides to 0 at every
+        # trial factor. In both cases the box changes no number, so it is dimmed
+        # rather than offered, with the reason in its tooltip.
         reducible = self._has_reducible_tensile_cap()
         self.tension_srf.setEnabled((not single) and reducible)
         self.tension_srf.setToolTip(self._tension_srf_tip + ("" if reducible else
-            "\n\nDimmed: no material on this model declares a tensile cutoff above "
-            "zero. Each is either blank (no cap at all) or 0 (a soil that carries "
-            "no tension, and 0 divided by the trial factor is still 0), so there "
-            "is nothing here to reduce."))
+            "\n\nDimmed: no material and no joint line on this model declares a "
+            "tensile cutoff above zero. Each is either blank (no cap at all) or 0 "
+            "(no tension carried, and 0 divided by the trial factor is still 0), so "
+            "there is nothing here to reduce."))
         # Surficial-failure filter applies to the SSRM criterion only.
         self.min_slip_on.setEnabled(a == "ssrm")
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())
@@ -1399,6 +1420,27 @@ class BuildMeshDialog(QDialog):
         }
 
 
+class _WrappedNote(QLabel):
+    """A word-wrapped label that reserves the height its text needs at the width
+    it is given.
+
+    A form budgets a wrapped label's height from its size hint, before the label
+    knows how wide it will be, and a note that wraps to two lines gets one: its
+    second line is drawn under the next row. Each time the width changes this
+    reserves the wrapped height as the label's minimum, the way the editors and
+    the canvas caption reserve theirs."""
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setWordWrap(True)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        wanted = self.heightForWidth(event.size().width())
+        if wanted > 0 and wanted != self.minimumHeight():
+            self.setMinimumHeight(wanted)
+
+
 class RunLemDialog(QDialog):
     """Options for an LEM solve (single surface or auto-search; circular or not).
 
@@ -1432,10 +1474,9 @@ class RunLemDialog(QDialog):
         self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
         form.addRow("Analysis", self.analysis)
 
-        note = QLabel("Single surface analyzes the first circle / the non-circular "
-                      "surface as entered. Auto-search refines from there to the "
-                      "critical surface.")
-        note.setWordWrap(True)
+        note = _WrappedNote("Single surface analyzes the first circle / the "
+                            "non-circular surface as entered. Auto-search refines "
+                            "from there to the critical surface.")
         form.addRow(note)
 
         # The surface-family selector appears when the deck carries BOTH families —
@@ -1464,6 +1505,104 @@ class RunLemDialog(QDialog):
         self.rapid = QCheckBox("Rapid drawdown")
         self.rapid.setChecked(bool(defaults.get("rapid", False)))
         form.addRow("", self.rapid)
+
+        # The two-stage pseudostatic seismic analysis (Duncan, Wright & Brandon 2014,
+        # Sec. 10.4.2). A run is a rapid drawdown or a two-stage seismic analysis,
+        # never both, so ticking one clears the other.
+        _s2 = defaults.get("seismic2")
+        self.seismic2 = QCheckBox("Two-stage seismic")
+        self.seismic2.setChecked(bool(_s2) and not self.rapid.isChecked())
+        self.seismic2.setToolTip(
+            "The two-stage pseudostatic analysis for a slope that has consolidated "
+            "under its own weight (Duncan, Wright & Brandon 2014, Sec. 10.4.2).\n\n"
+            "Stage 1 solves the slope with no seismic force and drained strengths, "
+            "which gives each slice its consolidation stresses. Stage 2 gives every "
+            "slice in a material with d and ψ an undrained strength from those "
+            "stresses and adds the seismic force kW; its factor of safety is the "
+            "answer. Materials without d and ψ stay drained.")
+        from xslope.advanced import seismic2_factor, seismic2_strength
+        try:
+            _s2_strength = seismic2_strength(_s2) if _s2 else None
+            _s2_factor = seismic2_factor(_s2)
+        except ValueError:
+            _s2_strength, _s2_factor = None, 1.0
+        self.seismic2_strength = self._combo(
+            SEISMIC2_STRENGTH_CHOICES, _s2_strength or "interpolated")
+        self.seismic2_strength.setToolTip(
+            "How stage 2 takes the undrained strength.\n\n"
+            "Interpolated: between the Kc = 1 envelope (d, ψ) and the drained "
+            "envelope (c′, φ′) by each slice's consolidation stress ratio, as in "
+            "rapid drawdown. This is the procedure Duncan, Wright, and Brandon (2014) "
+            "describe.\n\n"
+            "Kc = 1 envelope: τff = d + σ′fc tan ψ at the stage 1 stresses, with no "
+            "interpolation. Duncan, Wright, and Brandon computed their published "
+            "two-stage factors of safety this way.")
+        self.seismic2_strength_label = QLabel("Stage 2 strength")
+        self.seismic2_strength_label.setToolTip(self.seismic2_strength.toolTip())
+        # The screening methods' strength reduction (Duncan, Wright & Brandon 2014,
+        # Table 10.1), on the stage 2 undrained strengths only: it can't be applied
+        # to the inputs, which also set stage 1.
+        self.seismic2_factor = QDoubleSpinBox()
+        self.seismic2_factor.setRange(0.05, 1.0)
+        self.seismic2_factor.setSingleStep(0.05)
+        self.seismic2_factor.setDecimals(2)
+        self.seismic2_factor.setValue(_s2_factor)
+        self.seismic2_factor.setToolTip(
+            "Multiplies each stage 2 undrained strength: materials with d and ψ, "
+            "and cp and ratio materials. Free-draining materials keep their drained "
+            "strength.\n\n"
+            "1 uses the strength as computed. A screening analysis reduces it as its "
+            "method directs: 0.85 in Seed (1979), 0.8 in Hynes-Griffin and Franklin "
+            "(1984) and most later methods, each used with that method's own seismic "
+            "coefficient and minimum factor of safety.")
+        self.seismic2_factor_label = QLabel("Strength factor")
+        self.seismic2_factor_label.setToolTip(self.seismic2_factor.toolTip())
+
+        # The seismic yield coefficient (Duncan, Wright & Brandon 2014, Sec. 10.1.3):
+        # the run finds k instead of using the model's. Not with a rapid drawdown,
+        # which is not a pseudostatic analysis, so ticking one clears the other.
+        self.ky = QCheckBox("Find the yield coefficient k_y")
+        self.ky.setChecked(bool(defaults.get("ky")) and not self.rapid.isChecked())
+        self.ky.setToolTip(
+            "Find the seismic coefficient at which the factor of safety is 1, the "
+            "yield coefficient k_y (Duncan, Wright & Brandon 2014, Sec. 10.1.3). "
+            "The model's own k is not used.\n\n"
+            "Single surface: k_y on the first circle or the non-circular surface.\n\n"
+            "Auto-search: the surface with the lowest k_y. The run searches with no "
+            "seismic force, finds k_y on that critical surface, and searches again "
+            "at that k until no surface falls below F = 1. The Log reports k_y on "
+            "both surfaces.\n\n"
+            "Works with Two-stage seismic. The result is solved at k = k_y, so its "
+            "factor of safety is 1.")
+
+        # The seismic options, in the same column as every other run option and
+        # under one row label. The yield coefficient comes first: it is a choice of
+        # its own, with or without the two-stage analysis. The stage 2 strength
+        # belongs to the two-stage analysis and sits under it, indented so its label
+        # starts where the checkbox's text does (the style's indicator width plus
+        # its label spacing).
+        form.addRow("Seismic", self.ky)
+        form.addRow("", self.seismic2)
+        strength_row = QWidget()
+        sr = QHBoxLayout(strength_row)
+        sr.setContentsMargins(0, 0, 0, 0)
+        style = self.seismic2.style()
+        sr.addSpacing(style.pixelMetric(QStyle.PM_IndicatorWidth, None, self.seismic2)
+                      + style.pixelMetric(QStyle.PM_CheckBoxLabelSpacing, None,
+                                          self.seismic2))
+        sr.addWidget(self.seismic2_strength_label)
+        sr.addWidget(self.seismic2_strength, 1)
+        form.addRow("", strength_row)
+        factor_row = QWidget()
+        fr = QHBoxLayout(factor_row)
+        fr.setContentsMargins(0, 0, 0, 0)
+        fr.addSpacing(style.pixelMetric(QStyle.PM_IndicatorWidth, None, self.seismic2)
+                      + style.pixelMetric(QStyle.PM_CheckBoxLabelSpacing, None,
+                                          self.seismic2))
+        fr.addWidget(self.seismic2_factor_label)
+        fr.addWidget(self.seismic2_factor)
+        fr.addStretch(1)
+        form.addRow("", factor_row)
 
         # Composite surfaces: let a circle be truncated at the bottom of the model
         # and run along it. Off by default — the floor of a profile-line model is
@@ -1584,9 +1723,10 @@ class RunLemDialog(QDialog):
         # The model checks, beside the controls: warnings inform the decision instead
         # of annotating the regret, and an error refuses before anything is started.
         self.preflight = PreflightPanel(
-            analysis=lambda: "rapid" if self.rapid.isChecked() else "lem",
+            analysis=lambda: ("rapid" if self.rapid.isChecked() else
+                              "seismic2" if self.seismic2.isChecked() else "lem"),
             slope_data=slope_data, document=document,
-            selection_fn=self._selection, notes=(SEISMIC_NOTE_LEM,), parent=self)
+            selection_fn=self._selection, notes=(), parent=self)
 
         self.analysis.currentIndexChanged.connect(self._sync_tols)
         if self.surface is not None:
@@ -1594,8 +1734,15 @@ class RunLemDialog(QDialog):
             self.surface.currentIndexChanged.connect(self._sync_tols)
         self.min_slip_on.toggled.connect(self._sync_tols)
         self.method.currentIndexChanged.connect(self._recheck)
+        self.rapid.toggled.connect(self._exclusive_from_rapid)
+        self.seismic2.toggled.connect(self._exclusive_from_seismic2)
+        self.ky.toggled.connect(self._exclusive_from_ky)
+        self.ky.toggled.connect(self._recheck)
         self.rapid.toggled.connect(self._recheck)
         self.rapid.toggled.connect(self._sync_seep_time)
+        self.seismic2.toggled.connect(self._sync_seismic2)
+        self.seismic2.toggled.connect(self._recheck)
+        self._sync_seismic2()
         # The seepage time is part of what the checks are told (it names the frame
         # that will be staged), so a change to it re-evaluates them as well as the
         # button — otherwise the panel would go on naming the previous instant.
@@ -1691,6 +1838,7 @@ class RunLemDialog(QDialog):
                 # checks are handed the whole run description, seeding included.
                 "grid_seed": (self.grid_seed.isChecked()
                               if hasattr(self, "grid_seed") else False),
+                "ky": self.ky.isChecked() if hasattr(self, "ky") else False,
                 "seep_frame": self._seep_frame()}
 
     def _seep_frame(self):
@@ -1734,6 +1882,39 @@ class RunLemDialog(QDialog):
 
     def _recheck(self):
         self.preflight.refresh()
+
+    def _exclusive_from_rapid(self, on):
+        """Rapid drawdown ticked: the run cannot also be two-stage seismic, or
+        find a yield coefficient."""
+        if on and self.seismic2.isChecked():
+            self.seismic2.setChecked(False)
+        if on and self.ky.isChecked():
+            self.ky.setChecked(False)
+
+    def _exclusive_from_ky(self, on):
+        """Yield coefficient ticked: the run cannot also be a rapid drawdown."""
+        if on and self.rapid.isChecked():
+            self.rapid.setChecked(False)
+
+    def _exclusive_from_seismic2(self, on):
+        """Two-stage seismic ticked: the run cannot also be a rapid drawdown."""
+        if on and self.rapid.isChecked():
+            self.rapid.setChecked(False)
+
+    def _seismic2_option(self):
+        """The run's ``seismic2`` option (see :func:`xslope.advanced.seismic2_strength`)."""
+        if not self.seismic2.isChecked():
+            return False
+        strength = self.seismic2_strength.currentData()
+        factor = round(self.seismic2_factor.value(), 2)
+        return strength if factor == 1.0 else {"strength": strength, "factor": factor}
+
+    def _sync_seismic2(self, *_):
+        """The stage 2 strength choice means something only for a two-stage run."""
+        on = self.seismic2.isChecked()
+        for w in (self.seismic2_strength, self.seismic2_strength_label,
+                  self.seismic2_factor, self.seismic2_factor_label):
+            w.setEnabled(on)
 
     def _sync_seep_time(self):
         """A rapid drawdown reads its two stage times, not a single instant, so the
@@ -1791,6 +1972,10 @@ class RunLemDialog(QDialog):
             "surface": self._surface_value(),
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
+            # False, the stage 2 strength choice ("interpolated" / "kc1"), or, with
+            # a strength factor below 1, {"strength": ..., "factor": ...}.
+            "seismic2": self._seismic2_option(),
+            "ky": self.ky.isChecked(),
             "composite": self.composite.isChecked(),
             "grid_seed": self.grid_seed.isChecked(),
             "diagnostic": self.diagnostic.isChecked(),
@@ -1981,7 +2166,7 @@ class SensitivityDialog(QDialog):
         self.preflight = PreflightPanel(
             analysis="sensitivity", slope_data=slope_data, document=document,
             selection_fn=self._selection,
-            notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
+            notes=(() if self.app_mode == "lem" else (SEISMIC_NOTE_FEM,)),
             parent=self)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -2275,8 +2460,9 @@ class SensitivityDialog(QDialog):
         unit_txt = f" {self._time_unit}" if self._time_unit else ""
         self.rapid = QCheckBox("Rapid drawdown at each time")
         self.rapid.setToolTip(self._rapid_time_reason or (
-            f"On: every ticked instant is a three-stage Duncan-Wright-Brandon "
-            f"rapid drawdown — stage 1 the transient run's initial state at "
+            f"On: every ticked instant is a rapid drawdown by the three-stage "
+            f"method of Duncan, Wright, and Wong (1990) — stage 1 the transient "
+            f"run's initial state at "
             f"t = {_fmt_time(self._stage_1)}{unit_txt} (full pool), stage 2 that "
             f"instant's drawn-down state, stage 3 the same section re-checked with "
             f"drained strengths. The curve reports the drawdown's own factor of "
@@ -3010,11 +3196,8 @@ class ReliabilityDialog(QDialog):
         # before learning that a conductivity or a Poisson's ratio was blank.
         self.preflight = PreflightPanel(
             analysis="reliability", slope_data=slope_data, document=document,
-            selection_fn=lambda: {"base": self.app_mode,
-                                  "method": self.method.currentData(),
-                                  "surface": self._surface_value(),
-                                  "search": self.search.isChecked()},
-            notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
+            selection_fn=lambda: self._selection(),
+            notes=(() if self.app_mode == "lem" else (SEISMIC_NOTE_FEM,)),
             parent=self)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -3030,6 +3213,14 @@ class ReliabilityDialog(QDialog):
         self.method.currentIndexChanged.connect(self.preflight.refresh)
         if self.surface is not None:
             self.surface.currentIndexChanged.connect(self.preflight.refresh)
+        # Every control whose value is in _selection re-checks the model: the
+        # engine (the Taylor series and the sampling engines have different
+        # preconditions), rapid drawdown (it decides whether s(d)/s(psi) are read),
+        # the search, and the sample count.
+        self.engine.currentIndexChanged.connect(self.preflight.refresh)
+        self.rapid.toggled.connect(self.preflight.refresh)
+        self.search.toggled.connect(self.preflight.refresh)
+        self.n_samples.editingFinished.connect(self.preflight.refresh)
         self.preflight.changed.connect(self._sync_run)
         self._sync_enabled()
         self._sync_run()
@@ -3039,10 +3230,7 @@ class ReliabilityDialog(QDialog):
         if self.app_mode == "lem":
             from xslope.preflight import capabilities
             apply_capabilities(self.method,
-                               capabilities(self.preflight.model,
-                                            {"method": self.method.currentData(),
-                                             "surface": self._surface_value(),
-                                             "search": self.search.isChecked()}
+                               capabilities(self.preflight.model, self._selection()
                                             ).get("lem_method", {}))
         blocked = self.preflight.blocked
         self._ok.setEnabled(self._has_sigma and not blocked)
@@ -3063,6 +3251,21 @@ class ReliabilityDialog(QDialog):
 
     def _engine_value(self):
         return self.engine.currentData()
+
+    def _selection(self):
+        """The run as the model checks judge it — every selection key a
+        reliability rule reads, valued as the run will be (see options()): the
+        engine (the Taylor series and the sampling engines have different
+        preconditions), whether it is a rapid drawdown (which decides whether
+        s(d) and s(psi) are read), and the Monte Carlo sample count. A finite
+        element reliability runs no drawdown, so it is never judged as one."""
+        return {"base": self.app_mode,
+                "method": self.method.currentData(),
+                "surface": self._surface_value(),
+                "search": self.search.isChecked(),
+                "engine": self._engine_value(),
+                "rapid": self.app_mode == "lem" and self.rapid.isChecked(),
+                "n_samples": self.n_samples.value()}
 
     def _surface_value(self):
         return self._fixed_surface or (self.surface.currentData()
@@ -3456,3 +3659,159 @@ class UnpackPackageDialog(QDialog):
     def chosen(self):
         """``(destination folder, "extract" | "existing")``."""
         return self.dest.text(), self._mode
+
+
+class NewmarkDialog(QDialog):
+    """Run → Newmark…: the permanent displacement of the sliding mass under an
+    acceleration record (:func:`xslope.seismic.newmark_displacement`).
+
+    The record is a file the dialog reads when it is picked (a PEER ``.AT2``, or
+    two columns of time in s and acceleration in g), and its header line, length,
+    time step and peak are shown before anything runs. It may be used as recorded,
+    scaled by a factor, or scaled to a target peak acceleration. k_y comes from
+    the last yield coefficient run when there is one, and can be typed over.
+
+    :meth:`options` returns the record dict, the scale factor, k_y, and a phrase
+    saying where k_y came from, for the Log and the report.
+    """
+
+    def __init__(self, parent=None, ky=None, ky_source=None, units="si",
+                 last_path=""):
+        super().__init__(parent)
+        from xslope.seismic import DISPLACEMENT_UNIT
+        self.setWindowTitle("Newmark displacement")
+        self._record = None
+        self._ky_run = ky
+        self._ky_source = ky_source
+        unit = DISPLACEMENT_UNIT.get(units, ("cm", 100.0))[0]
+        # Spelled out: "reported in in" reads as a typo.
+        unit_word = {"cm": "centimeters", "in": "inches"}.get(unit, unit)
+
+        layout = QVBoxLayout(self)
+        note = QLabel(
+            "The sliding mass is taken as a rigid block that slides whenever the "
+            "ground acceleration exceeds k_y·g. The record is run both ways, with "
+            "its positive and with its negative accelerations pushing the block "
+            "downslope, and the larger displacement is reported, in "
+            f"{unit_word} for this model.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        form = QFormLayout()
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        self.path = QLineEdit(last_path or "")
+        self.path.setReadOnly(True)
+        self.path.setPlaceholderText("No record chosen")
+        self.path.setMinimumWidth(self.path.fontMetrics().horizontalAdvance("n" * 40))
+        browse = QPushButton("Browse…")
+        browse.clicked.connect(self._browse)
+        row.addWidget(self.path, 1)
+        row.addWidget(browse)
+        holder = QWidget()
+        holder.setLayout(row)
+        form.addRow("Record", holder)
+        self.info = QLabel("")
+        self.info.setWordWrap(True)
+        form.addRow("", self.info)
+
+        self.scale_as_is = QRadioButton("As recorded")
+        self.scale_factor_btn = QRadioButton("Scale factor")
+        self.scale_pga_btn = QRadioButton("Target peak acceleration (g)")
+        self.scale_group = QButtonGroup(self)
+        for b in (self.scale_as_is, self.scale_factor_btn, self.scale_pga_btn):
+            self.scale_group.addButton(b)
+        self.scale_as_is.setChecked(True)
+        self.factor = QDoubleSpinBox()
+        self.factor.setDecimals(3)
+        self.factor.setRange(0.001, 100.0)
+        self.factor.setValue(1.0)
+        self.target = QDoubleSpinBox()
+        self.target.setDecimals(3)
+        self.target.setRange(0.001, 10.0)
+        self.target.setSingleStep(0.05)
+        self.target.setValue(0.3)
+        for label, button, field in (("Scaling", self.scale_as_is, None),
+                                     ("", self.scale_factor_btn, self.factor),
+                                     ("", self.scale_pga_btn, self.target)):
+            r = QHBoxLayout()
+            r.setContentsMargins(0, 0, 0, 0)
+            r.addWidget(button)
+            if field is not None:
+                r.addWidget(field)
+            r.addStretch(1)
+            w = QWidget()
+            w.setLayout(r)
+            form.addRow(label, w)
+        self.scale_group.buttonToggled.connect(self._sync)
+
+        self.ky = QDoubleSpinBox()
+        self.ky.setDecimals(4)
+        self.ky.setRange(0.0001, 2.0)
+        self.ky.setSingleStep(0.005)
+        self.ky.setValue(ky if ky else 0.1)
+        form.addRow("Yield coefficient k_y", self.ky)
+        self.ky_note = QLabel(
+            f"From the last k_y run ({ky_source})." if ky
+            else "No k_y run in this session: type the yield coefficient, or run "
+                 "LEM with “Find the yield coefficient k_y” first.")
+        self.ky_note.setWordWrap(True)
+        form.addRow("", self.ky_note)
+        layout.addLayout(form)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.button(QDialogButtonBox.Ok).setText("Run")
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+        if last_path and os.path.exists(last_path):
+            self._load(last_path)
+        self._sync()
+
+    def _browse(self):
+        start = os.path.dirname(self.path.text()) if self.path.text() else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose an acceleration record", start,
+            "Acceleration records (*.AT2 *.at2 *.txt *.csv *.dat);;All files (*)")
+        if path:
+            self._load(path)
+            self._sync()
+
+    def _load(self, path):
+        from xslope.seismic import read_record
+        self.path.setText(path)
+        try:
+            self._record = read_record(path)
+        except (OSError, ValueError) as e:
+            self._record = None
+            self.info.setText(f"<span style='color:#b00020'>{e}</span>")
+            return
+        r = self._record
+        step = (f"dt = {r['dt']:g} s" if r["dt"] is not None
+                else "uneven time steps")
+        self.info.setText(f"{r['description']}<br>{r['npts']:,} points, {step}, "
+                          f"{r['duration']:.2f} s, peak {r['pga']:.3f} g")
+        self.target.setValue(round(r["pga"], 3))
+
+    def _sync(self, *args):
+        self.factor.setEnabled(self.scale_factor_btn.isChecked())
+        self.target.setEnabled(self.scale_pga_btn.isChecked())
+        self.buttons.button(QDialogButtonBox.Ok).setEnabled(self._record is not None)
+
+    def scale(self):
+        from xslope.seismic import scale_for_pga
+        if self.scale_factor_btn.isChecked():
+            return float(self.factor.value())
+        if self.scale_pga_btn.isChecked() and self._record is not None:
+            return scale_for_pga(self._record, self.target.value())
+        return 1.0
+
+    def options(self):
+        ky = float(self.ky.value())
+        typed = not (self._ky_run and abs(ky - round(self._ky_run, 4)) < 5e-5)
+        source = "typed in" if typed else self._ky_source
+        # The run uses the k_y the field shows, so a k_y left as filled and the same
+        # value typed in give the same displacement.
+        return {"record": self._record, "path": self.path.text(),
+                "scale": self.scale(), "ky": ky, "ky_source": source}

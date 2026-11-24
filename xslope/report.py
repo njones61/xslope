@@ -64,6 +64,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import io
+import math
 import os
 import re
 import shutil
@@ -298,7 +299,7 @@ FORCE_DIAGRAM_BLOCK_IN = 0.90
 #: report reads no pixels at build time. A check re-measures every image and
 #: fails a drawing whose block has moved.
 FORCE_DIAGRAM_BLOCK_PX = {
-    "oms_complete.png": (211, 417),
+    "oms_complete.png": (210, 417),
     "bishop_complete.png": (189, 389),
     "slice_fe_complete.png": (210, 467),
     "spencer3_forces.png": (168, 627),
@@ -829,6 +830,9 @@ DEFAULT_OPTIONS = {
     "lem_slice_key": True,
     "lem_calculations": True,
     "lem_rapid": True,
+    "lem_seismic2": True,
+    "lem_ky": True,
+    "lem_newmark": True,              # the last Newmark run, when there is one
     "seep": True,
     "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
@@ -1305,6 +1309,11 @@ def analysis_options(slope_data, solutions):
            "surface": surface,
            "num_slices": int(slices),
            "rapid": "stage1_FS" in results,
+           "seismic2": (results.get("seismic_strength", False)
+                        if results.get("seismic_factor", 1.0) == 1.0 else
+                        {"strength": results.get("seismic_strength", "interpolated"),
+                         "factor": results["seismic_factor"]}),
+           "ky": bool(ref.get("yield")),
            "composite": False,
            "grid_seed": False}
     for key in out:
@@ -1779,7 +1788,8 @@ def report_analyses(solutions, opts):
         bundle = select_bundle(solutions, opts.get("method"))
         if bundle is not None:
             results = bundle.get("results") or {}
-            out.append("rapid" if "stage1_FS" in results else "lem")
+            out.append("rapid" if "stage1_FS" in results else
+                       "seismic2" if "seismic_stage1_FS" in results else "lem")
     if opts.get("seep") and seepage_documented(solutions):
         out.append("seep")
     for bundle in (fem_bundles(solutions) if opts.get("fem") else []):
@@ -1947,7 +1957,7 @@ def _traceability_section(slope_data, solutions, opts):
     return sec
 
 
-def _property_table(slope_data, fields, caption, counter):
+def _property_table(slope_data, fields, caption, counter, view=None):
     """One row per referenced material, one column per property that is real.
 
     ``fields`` is ``(key, header, formatter, when-shown)``. A column marked
@@ -1957,10 +1967,15 @@ def _property_table(slope_data, fields, caption, counter):
     printed only where some material populates it with a nonzero one, so a table
     never rules off a column of blanks. Each engine's table is this function with
     its own field list.
+
+    ``view`` maps each material to the values the table reads, both to format
+    them and to decide which columns are real (:func:`_strength_as_read`).
     """
     rows_src = referenced_materials(slope_data)
     if not rows_src:
         return None
+    if view is not None:
+        rows_src = [(i, view(m)) for i, m in rows_src]
     mats = [m for _i, m in rows_src]
     keep = _keep_columns(mats, fields)
     headers = [f[1] for f in keep]
@@ -1987,30 +2002,115 @@ def _fmt(value, spec="{:.2f}"):
     return "" if n is None else spec.format(n)
 
 
+#: Significant digits an entered property is read to, the same six Studio's
+#: editors show it at: enough for anything typed, and short of the noise in a
+#: value Studio computed.
+_ENTERED_DIGITS = 6
+
+
+def _fmt_entered(value, decimals, thousands=False):
+    """An entered property, with at least ``decimals`` decimal places and as many
+    more as the value carries.
+
+    A column's fixed decimals line its numbers up, and a value entered with more
+    digits than the column shows keeps them: a strength ratio of 0.1875 prints as
+    0.1875 in a c/p column of three decimals, not as 0.188, and a cohesion of
+    11.64 as 11.64, not 11.6. A value with no more digits than the column shows
+    prints as it always has (20.0, 0.250).
+    """
+    n = _num(value)
+    if n is None:
+        return ""
+    need = 0
+    if n != 0:
+        mag = math.floor(math.log10(abs(n)))
+        text = f"{n:.{max(0, _ENTERED_DIGITS - 1 - mag)}f}"
+        if "." in text:
+            need = len(text.rstrip("0").split(".")[1])
+    places = max(decimals, need)
+    return f"{n:,.{places}f}" if thousands else f"{n:.{places}f}"
+
+
+#: The strength properties each option reads, of those the materials tables
+#: print. A row's cell for any other one is left blank, and a column no row's
+#: option reads is not printed: a c/p or r elev. left behind by an earlier option
+#: is in the file, but it is not a property of the analysis. d and ψ are the
+#: Kc = 1 envelope, which only an mc material carries into rapid drawdown or a
+#: two-stage seismic analysis. An elastic material reads none of them.
+_STRENGTH_READS = {
+    "mc": frozenset({"c", "phi", "d", "psi", "t_cut"}),
+    "cp": frozenset({"c", "phi", "cp", "r_elev", "t_cut"}),
+    "ratio": frozenset({"c", "phi", "cp", "t_cut"}),
+    "pow": frozenset({"t_cut"}),
+    "hb": frozenset({"t_cut"}),
+}
+_STRENGTH_KEYS = ("c", "phi", "cp", "r_elev", "d", "psi", "t_cut")
+
+
+def _strength_as_read(m):
+    """``m`` with each strength property as the analysis reads it: blank where the
+    material's option does not read it, φ = 0 on an undrained (cp or ratio)
+    material, which is the friction angle those options analyze with whatever the
+    φ cell holds, and r_u blank unless the pore pressure is taken from it."""
+    opt = str(m.get("option") or "").strip().lower()
+    reads = _STRENGTH_READS.get(opt, frozenset())
+    out = dict(m)
+    for key in _STRENGTH_KEYS:
+        if key not in reads:
+            out[key] = None
+    if opt in ("cp", "ratio"):
+        out["phi"] = 0.0
+    if str(m.get("u") or "").strip().lower() != "ru":
+        out["ru"] = None
+    return out
+
+
+def _strength_option_notes(slope_data):
+    """What c and c/p mean on an undrained material, for each such option the
+    referenced materials use, or ``""``. The table prints the option's code and the
+    two numbers under the same headers as a Mohr-Coulomb material's, and c/p in
+    particular means a different thing under each option."""
+    opts = {str(m.get("option") or "").strip().lower()
+            for _i, m in referenced_materials(slope_data)}
+    notes = []
+    if "cp" in opts:
+        notes.append("Under the CP option, c is the undrained strength at the "
+                     "reference elevation r elev., and c/p is the rate the "
+                     "strength increases per unit of depth below that elevation.")
+    if "ratio" in opts:
+        notes.append("Under the RATIO option, c/p is the strength ratio "
+                     "S_u/σ_v′, and c is a minimum strength: the undrained "
+                     "strength is the larger of c and c/p times the vertical "
+                     "effective stress σ_v′.")
+    return " ".join(notes)
+
+
 def _materials_table(slope_data, counter):
     """The materials table: referenced rows, populated columns."""
     unit = _unit_suffix(slope_data)
 
-    # (key, header, formatter, always-shown)
+    # (key, header, formatter, always-shown). Each cell is the value the analysis
+    # reads (_strength_as_read), printed without losing an entered digit.
     fields = [
         ("__index", "#", lambda m: "", True),
         ("name", "Material", lambda m: str(m.get("name") or ""), True),
-        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt(m.get("gamma"), "{:.1f}"), True),
-        ("gamma_sat", f"γ_sat{unit('unit_weight')}", lambda m: _fmt(m.get("gamma_sat"), "{:.1f}"), False),
+        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt_entered(m.get("gamma"), 1), True),
+        ("gamma_sat", f"γ_sat{unit('unit_weight')}", lambda m: _fmt_entered(m.get("gamma_sat"), 1), False),
         ("option", "Strength", lambda m: str(m.get("option") or "").upper(), True),
-        ("c", f"c{unit('stress')}", lambda m: _fmt(m.get("c"), "{:.1f}"), True),
-        ("phi", "φ (deg)", lambda m: _fmt(m.get("phi"), "{:.1f}"), True),
-        ("cp", "c/p", lambda m: _fmt(m.get("cp"), "{:.3f}"), False),
-        ("r_elev", f"r elev.{unit('length')}", lambda m: _fmt(m.get("r_elev"), "{:.1f}"), False),
-        ("d", f"d{unit('stress')}", lambda m: _fmt(m.get("d"), "{:.1f}"), False),
-        ("psi", "ψ (deg)", lambda m: _fmt(m.get("psi"), "{:.1f}"), False),
+        ("c", f"c{unit('stress')}", lambda m: _fmt_entered(m.get("c"), 1), True),
+        ("phi", "φ (deg)", lambda m: _fmt_entered(m.get("phi"), 1), True),
+        ("cp", "c/p", lambda m: _fmt_entered(m.get("cp"), 3), False),
+        ("r_elev", f"r elev.{unit('length')}", lambda m: _fmt_entered(m.get("r_elev"), 1), False),
+        ("d", f"d{unit('stress')}", lambda m: _fmt_entered(m.get("d"), 1), False),
+        ("psi", "ψ (deg)", lambda m: _fmt_entered(m.get("psi"), 1), False),
         # A DECLARED cutoff prints even where every material's is 0: that is a
         # no-tension soil, and the analysis was run under it.
-        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), DECLARED),
-        ("ru", "r_u", lambda m: _fmt(m.get("ru"), "{:.3f}"), False),
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt_entered(m.get("t_cut"), 1), DECLARED),
+        ("ru", "r_u", lambda m: _fmt_entered(m.get("ru"), 3), False),
         ("u", "Pore pressure", lambda m: str(m.get("u") or "none"), True),
     ]
-    return _property_table(slope_data, fields, "Material properties", counter)
+    return _property_table(slope_data, fields, "Material properties", counter,
+                           view=_strength_as_read)
 
 
 def _seep_materials_table(slope_data, counter, unsaturated=True):
@@ -2069,19 +2169,24 @@ def _fem_materials_table(slope_data, counter):
     stiffness columns are what separate it from the limit equilibrium table: a
     limit equilibrium analysis never reads E or ν, and this one does."""
     unit = _unit_suffix(slope_data)
+    # The strength option and the c/p and r elev. it may read, as on the limit
+    # equilibrium table: a ratio or cp material's strength is not its c alone.
     fields = [
         ("__index", "#", lambda m: "", True),
         ("name", "Material", lambda m: str(m.get("name") or ""), True),
-        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt(m.get("gamma"), "{:.1f}"), True),
-        ("c", f"c{unit('stress')}", lambda m: _fmt(m.get("c"), "{:.1f}"), True),
-        ("phi", "φ (deg)", lambda m: _fmt(m.get("phi"), "{:.1f}"), True),
-        ("E", f"E{unit('stress')}", lambda m: _fmt(m.get("E"), "{:,.0f}"), True),
-        ("nu", "ν", lambda m: _fmt(m.get("nu"), "{:.2f}"), True),
+        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt_entered(m.get("gamma"), 1), True),
+        ("option", "Strength", lambda m: str(m.get("option") or "").upper(), True),
+        ("c", f"c{unit('stress')}", lambda m: _fmt_entered(m.get("c"), 1), True),
+        ("phi", "φ (deg)", lambda m: _fmt_entered(m.get("phi"), 1), True),
+        ("cp", "c/p", lambda m: _fmt_entered(m.get("cp"), 3), False),
+        ("r_elev", f"r elev.{unit('length')}", lambda m: _fmt_entered(m.get("r_elev"), 1), False),
+        ("E", f"E{unit('stress')}", lambda m: _fmt_entered(m.get("E"), 0, thousands=True), True),
+        ("nu", "ν", lambda m: _fmt_entered(m.get("nu"), 2), True),
         # As on the strength table: a stated 0 is a no-tension material and prints.
-        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), DECLARED),
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt_entered(m.get("t_cut"), 1), DECLARED),
     ]
     return _property_table(slope_data, fields, "Finite element material properties",
-                           counter)
+                           counter, view=_strength_as_read)
 
 
 #: What each pore-pressure option on the materials sheet MEANS, in the words the
@@ -2432,7 +2537,7 @@ FEM_ANCHOR = "fem"
 
 
 def _loads_section(slope_data, feats, counter, seismic=True, already=0,
-                   water_stated=False, source_stated=False):
+                   water_stated=False, source_stated=False, ky=False):
     """The loads an engine applies, as a section of that engine's own inputs.
 
     A distributed load is not a property of the section: it is something an
@@ -2443,7 +2548,8 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     general table that belongs to neither.
 
     ``seismic`` prints the pseudo-static coefficient, which only the limit
-    equilibrium analysis applies. ``already`` is the number of a loads table an
+    equilibrium analysis applies; ``ky`` says the analysis found the coefficient
+    (the yield coefficient) rather than reading it from the model. ``already`` is the number of a loads table an
     earlier section has printed: the blocks are identical — same points, same
     pressures — so the second engine points at the first table rather than
     setting the same numbers twice, where two copies could disagree. That
@@ -2516,10 +2622,28 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     else:
         sub.blocks.append(Prose("The model carries no distributed loads."))
     k = _num(slope_data.get("k_seismic"))
-    if seismic and k:
-        sub.blocks.append(Prose(
-            f"A pseudo-static seismic coefficient of k = {k:g} is applied, "
-            f"acting horizontally toward the toe on every slice."))
+    kv = _num(slope_data.get("k_vertical")) or 0.0
+    kv_dir = "downward" if kv > 0 else "upward"
+    if seismic and ky:
+        text = ("A pseudo-static seismic force k_hW acts horizontally toward the toe on "
+                "every slice, at the seismic coefficient the analysis finds: the yield "
+                "coefficient k_y, at which the factor of safety is 1.")
+        if kv and k:
+            text += (f" A vertical seismic force k_v·W acts {kv_dir} with it, held at "
+                     f"the model's ratio k_v/k = {abs(kv) / abs(k):.3g}, so "
+                     f"k_v = {abs(kv) / abs(k):.3g}·k_y.")
+        elif k:
+            text += f" The model's own coefficient, k = {k:g}, is not used."
+        sub.blocks.append(Prose(text))
+    elif seismic and (k or kv):
+        parts = []
+        if k:
+            parts.append(f"A pseudo-static seismic coefficient of k = {k:g} is "
+                         f"applied, acting horizontally toward the toe on every slice.")
+        if kv:
+            parts.append(f"A vertical seismic coefficient of k_v = {abs(kv):g} is "
+                         f"applied, acting {kv_dir} on every slice.")
+        sub.blocks.append(Prose(" ".join(parts)))
     return sub
 
 
@@ -3182,6 +3306,14 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
         items.append(("Trial surfaces evaluated", f"{len(fs_cache):,}"))
     if path_pts:
         items.append(("Refinement stages", str(len(path_pts))))
+    # A search made while finding the yield coefficient ran at a coefficient of
+    # its own (xslope.seismic.yield_coefficient), and its factors of safety are
+    # at that coefficient.
+    k_search = _num(search.get("k_seismic"))
+    if k_search is not None:
+        items.append(("Seismic coefficient of this search", f"{k_search:.4f}"))
+        from .seismic import model_at
+        slope_data = model_at(slope_data, k_search)
     valid = [c for c in fs_cache if _num(c.get("FS")) is not None
              and _num(c.get("FS")) < 9000]
     if valid:
@@ -3509,6 +3641,271 @@ def _rapid_section(results, counter, slope_data=None, slice_df=None,
     return sub
 
 
+#: The documentation page the two-stage seismic section points a reader to.
+SEISMIC2_DOC_PAGE = "seismic/two_stage.md"
+
+#: The documentation page the yield coefficient section points a reader to.
+KY_DOC_PAGE = "seismic/yield_coefficient.md"
+
+
+#: The documentation page the Newmark section points a reader to.
+NEWMARK_DOC_PAGE = "seismic/newmark.md"
+
+
+def newmark_bundles(solutions):
+    """The Newmark runs, as a list. A bundle is what
+    :func:`xslope.seismic.newmark_displacement` returns, with ``ky_source``
+    added: where the yield coefficient came from."""
+    return engine_bundles(solutions, "newmark")
+
+
+def _newmark_section(solutions, opts, counter, figure_dir, progress=None):
+    """The permanent displacement of the last Newmark run: the record, its
+    scaling, the yield coefficient, the displacement each way, and the three
+    histories."""
+    runs = newmark_bundles(solutions)
+    if not runs:
+        return None
+    from .seismic import direction_phrase
+    r = runs[-1]
+    rec = r.get("record") or {}
+    unit = r["D_unit"]
+    gov = r["governing"]
+    sec = Section("Newmark Displacement")
+    term = "sliding-block method"
+    url = docs_url(NEWMARK_DOC_PAGE)
+    g_text = (f"g = {r['g']:g} m/s²" if r["units"] == "si"
+              else f"g = {r['g']:g} ft/s²")
+    sec.blocks.append(Prose(
+        f"The permanent displacement of the sliding mass during the earthquake "
+        f"was estimated by Newmark's (1965) {term}. The mass above the failure "
+        f"surface is treated as a rigid block that slides downslope whenever the "
+        f"ground acceleration exceeds the yield acceleration k_y·g and keeps "
+        f"sliding until its velocity relative to the ground returns to zero "
+        f"(Duncan, Wright, and Brandon 2014). The yield coefficient k_y is held "
+        f"constant, so the method does not apply to a slope that loses "
+        f"significant strength during shaking. The sign of a recorded "
+        f"acceleration follows the recording instrument's axis and not the "
+        f"slope, so the record was run twice, once with its positive and once "
+        f"with its negative accelerations pushing the block downslope, and the "
+        f"larger displacement governs. The record is taken as linear between "
+        f"samples, with {g_text}.", links=[(term, url)]))
+    step = (f"{rec['dt']:g} s" if rec.get("dt") else "uneven")
+    scale = r.get("scale", 1.0)
+    items = [("Record file", rec.get("name") or ""),
+             ("Record", rec.get("description") or ""),
+             ("Samples and time step", f"{rec.get('npts', 0):,}, {step}"),
+             ("Duration", f"{rec.get('duration', 0.0):.2f} s"),
+             ("Peak acceleration as recorded", f"{rec.get('pga', 0.0):.3f} g")]
+    if abs(scale - 1.0) > 1e-12:
+        items += [("Scale factor", f"{scale:.4g}"),
+                  ("Peak acceleration as analyzed", f"{r['pga']:.3f} g")]
+    items.append(("Yield coefficient k_y", f"{r['ky']:.4f}"
+                  + (f" ({r['ky_source']})" if r.get("ky_source") else "")))
+    for sign in (gov, -gov):
+        info = r["directions"][sign]
+        word = "positive" if sign > 0 else "negative"
+        items.append((f"Displacement, {word} accelerations pushing downslope",
+                      f"{info['D']:.2f} {unit} ({info['episodes']} slip episodes)"))
+    sec.blocks.append(KeyValues(items))
+    sec.blocks.append(Prose(
+        f"The permanent displacement is D = {r['D']:.2f} {unit}, with "
+        f"{direction_phrase(gov)}.", bold=[f"D = {r['D']:.2f} {unit}"]))
+    path = os.path.join(figure_dir, "newmark.png")
+
+    def draw(fig):
+        from .plot import plot_newmark
+        plot_newmark(r, fig=fig, show_title=False)
+
+    if progress:
+        progress("the Newmark histories")
+    if _render(draw, path, opts, figsize=(7.5, 7.0)):
+        number = counter.next_figure()
+        where, links = cite("Figure", number)
+        sec.blocks.append(Prose(
+            f"{where} shows the ground acceleration with ±k_y, and the "
+            f"block's velocity relative to the ground and its displacement "
+            f"for each direction.", links=links))
+        sec.blocks.append(Figure(path, "Newmark sliding-block histories",
+                                 number, source="newmark"))
+    return sec
+
+
+def _ky_section(info, results, counter, noun="surface"):
+    """How the yield coefficient was found, when the run found one.
+
+    On a search, one row per search: the coefficient it was made at, the
+    critical factor of safety it found there, and k_y on that surface. The first
+    is the search with no seismic force, whose critical surface is the first of
+    the candidate surfaces Duncan, Wright, and Brandon (2014) name; the lowest
+    k_y is the second. On a specified surface, the coefficients the root search
+    tried and the factor of safety at each.
+    """
+    if not info:
+        return None
+    from .seismic import CONFIRM_TOL, zero_k_phrase
+    sub = Section("Yield Coefficient")
+    k_y = info["k_y"]
+    zero = zero_k_phrase(info)
+    table_number = counter.next_table()
+    where, links = cite("Table", table_number)
+    url = docs_url(KY_DOC_PAGE)
+    term = "seismic yield coefficient"
+    links = [(term, url)] + links
+    if info.get("search"):
+        static = info.get("static") or {}
+        sub.blocks.append(Prose(
+            f"The {term} k_y is the seismic coefficient at which the factor of "
+            f"safety is 1 (Duncan, Wright, and Brandon 2014). The critical {noun} "
+            f"{zero} was found first and k_y was found on it. The "
+            f"search was then repeated at that coefficient: a {noun} with a factor "
+            f"of safety below 1 there has a lower k_y, which was found in turn, and "
+            f"the searches stopped when none fell more than "
+            f"{info.get('confirm_tol', CONFIRM_TOL):g} below 1. {where} lists each "
+            f"search.", links=links))
+        rows = [["1", "0 (no seismic force)", f"{static.get('FS', float('nan')):.3f}",
+                 f"{static.get('k_y', float('nan')):.4f}"]]
+        best = 0
+        for i, r in enumerate(info.get("rounds") or []):
+            rows.append([str(i + 2), f"{r['k']:.4f}", f"{r['FS']:.4f}",
+                         "—" if r.get("k_y") is None else f"{r['k_y']:.4f}"])
+            if r.get("k_y") is not None and abs(r["k_y"] - k_y) < 1e-12:
+                best = i + 1
+        sub.blocks.append(Table(
+            ["Search", "Made at k", "Critical F", f"k_y on that {noun}"], rows,
+            "The searches that located the minimum yield coefficient",
+            table_number, bold_rows=[best]))
+        items = [("Yield coefficient k_y", f"{k_y:.4f}"),
+                 (f"F on that {noun} {zero}", f"{info['FS_k0']:.3f}"),
+                 (f"k_y on the critical {noun} {zero}",
+                  f"{static.get('k_y', float('nan')):.4f}")]
+        sub.blocks.append(KeyValues(items))
+        if not info.get("converged"):
+            sub.blocks.append(Prose(
+                f"The searches did not settle in {len(info.get('rounds') or [])} "
+                f"rounds, so k_y is the lowest they found and may not be the "
+                f"minimum."))
+    else:
+        sub.blocks.append(Prose(
+            f"The {term} k_y is the seismic coefficient at which the factor of "
+            f"safety is 1 (Duncan, Wright, and Brandon 2014). It was found on the "
+            f"{noun} specified in the input by solving it at a sequence of "
+            f"coefficients until the factor of safety reached 1. {where} lists "
+            f"them.", links=links))
+        trace = [(k, f) for k, f in (info.get("trace") or [])]
+        rows = [[f"{k:.4f}", "no solution" if f is None else f"{f:.4f}"]
+                for k, f in trace]
+        sub.blocks.append(Table(
+            ["k", "F"], rows,
+            "Factor of safety at each seismic coefficient tried",
+            table_number, bold_rows=[len(rows) - 1] if rows else []))
+        sub.blocks.append(KeyValues([
+            ("Yield coefficient k_y", f"{k_y:.4f}"),
+            (f"F on the {noun} {zero}", f"{info['FS_k0']:.3f}")]))
+    return sub
+
+
+def _seismic2_section(results, counter, slope_data=None, slice_df=None,
+                      surface="surface"):
+    """The two-stage pseudostatic seismic detail, when the run was one.
+
+    One row per stage — the seismic force it carries, the strengths it uses and
+    its factor of safety — then the factor of safety reported, which is stage
+    2's. ``surface`` names the surface analyzed, for the sentence that says when
+    it crosses no material with d and ψ.
+    """
+    if not results or "seismic_stage1_FS" not in results:
+        return None
+    from .advanced import SEISMIC2_STRENGTHS
+    sub = Section("Two-Stage Seismic Analysis")
+    s1, s2 = results["seismic_stage1_FS"], results["seismic_stage2_FS"]
+    strength = results.get("seismic_strength", "interpolated")
+    factor = results.get("seismic_factor", 1.0)
+    low_k = _rapid_flags(results, slice_df, "seismic_low_k")
+    if low_k is None and slice_df is not None and {"d", "psi"} <= set(slice_df.columns):
+        low_k = [bool(d > 0 or p > 0) for d, p in zip(slice_df["d"], slice_df["psi"])]
+    fallback = _rapid_flags(results, slice_df, "seismic_fallback")
+    n_low = sum(low_k) if low_k is not None else None
+    k = _num((slope_data or {}).get("k_seismic"))
+    k_txt = f"k = {abs(k):g}" if k is not None else "the model's seismic coefficient"
+
+    table_number = counter.next_table()
+    where, links = cite("Table", table_number)
+    url = docs_url(SEISMIC2_DOC_PAGE)
+    procedure = "two-stage procedure of Duncan, Wright, and Brandon (2014)"
+    links = [(procedure, url)] + links
+    if strength == "kc1":
+        how = ("from the K_c = 1 envelope at its stage 1 stresses, "
+               "τ_ff = d + σ′_fc tan ψ")
+    else:
+        how = ("interpolated from its stage 1 stresses between the K_c = 1 "
+               "envelope (d, ψ) and the K_c = K_f envelope (c′, φ′), as in rapid "
+               "drawdown")
+    sub.blocks.append(Prose(
+        f"The surface was analyzed for the earthquake by the {procedure}. Stage 1 "
+        f"solves the section with no seismic force and the drained strength "
+        f"(c′, φ′) in every material, and gives the effective normal and shear "
+        f"stress on each slice base before the earthquake. Stage 2 gives each "
+        f"slice whose base is in a material with a nonzero d or ψ an undrained "
+        f"strength τ_ff, {how}"
+        + (f", multiplied by the stage 2 strength factor, {factor:.2f}, the strength "
+           f"reduction of a screening method" if factor != 1.0 else "")
+        + (f"; cp and ratio materials keep their undrained strength, times the same "
+           f"factor in stage 2" if factor != 1.0 and slice_df is not None and any(
+               f in slice_df.columns and bool(slice_df[f].any())
+               for f in ("cp_flag", "ratio_flag")) else "")
+        + f"; free-draining materials keep c′, φ′. Stage 2 "
+        f"adds the seismic force k_hW with {k_txt}, and its factor of safety is the "
+        f"one reported. {where} gives the strengths and F for each stage.",
+        links=links))
+
+    if (slope_data and low_k is not None and slice_df is not None
+            and "mat" in slice_df.columns):
+        mats = _slice_materials(slope_data, slice_df, keep=low_k)
+    else:
+        mats = [(i, m) for i, m in referenced_materials(slope_data or {})
+                if (_num(m.get("d")) or 0) > 0 or (_num(m.get("psi")) or 0) > 0]
+    names = [str(m.get("name") or "") for _i, m in mats]
+    if n_low == 0:
+        strengths2 = "c′, φ′ in all materials"
+    else:
+        undrained = ("undrained (τ_ff from d, ψ" if strength == "kc1"
+                     else "undrained (τ_ff from d, ψ and c′, φ′")
+        undrained += f", × {factor:.2f})" if factor != 1.0 else ")"
+        strengths2 = (f"{undrained} in {_join(names)}" if names else
+                      f"{undrained} in the low-permeability materials")
+        if low_k is None or n_low < len(low_k):
+            strengths2 += "; c′, φ′ elsewhere"
+    rows = [["1", "none", "c′, φ′ in all materials", f"{s1:.3f}"],
+            ["2", k_txt, strengths2, f"{s2:.3f}"]]
+    sub.blocks.append(Table(
+        ["Stage", "Seismic force", "Strengths", "F"], rows,
+        "Factor of safety at each stage of the two-stage seismic analysis",
+        table_number, bold_rows=[1], align=["c", "l", "l", "c"]))
+    sub.blocks.append(KeyValues([("Pseudostatic factor of safety — stage 2",
+                                  f"{results['FS']:.3f}")]))
+
+    if n_low == 0:
+        sub.blocks.append(Prose(
+            f"The {surface} crosses no material with d and ψ, so both stages used "
+            f"drained strengths, and stage 2 is a single-stage pseudostatic "
+            f"analysis."))
+
+    if fallback is not None and low_k is not None:
+        n_fallback = sum(f for f, kk in zip(fallback, low_k) if kk)
+        if n_fallback:
+            rule = "the lower of the two envelopes"
+            sub.blocks.append(Prose(
+                f"On {_slice_share(n_fallback, n_low)}, the minor principal "
+                f"effective stress at the end of consolidation computes as zero "
+                f"or negative on one of the two envelopes, which leaves the "
+                f"interpolation for τ_ff undefined; stage 2 used {rule}, "
+                f"K_c = 1 (d, ψ) or K_c = K_f (c′, φ′), on "
+                f"{'that slice' if n_fallback == 1 else 'those slices'}.",
+                links=[(rule, docs_url(RAPID_DOC_PAGE) + RAPID_NEGATIVE_STRESS_ANCHOR)]))
+    return sub
+
+
 def _surface_family(slice_df, slope_data):
     """``"circular"`` or ``"noncircular"`` for the surface a slice table describes.
 
@@ -3588,6 +3985,7 @@ def _fs_table(slope_data, solutions, opts, counter):
             solved[name] = b
 
     rows = []
+    ky = False
     for name in methods:
         bundle = solved.get(name) or {}
         # Every row is a method that RAN — for this analysis or for this report,
@@ -3597,12 +3995,23 @@ def _fs_table(slope_data, solutions, opts, counter):
         res = bundle.get("results")
         res = res if isinstance(res, dict) else {}
         fs = _num(res.get("FS"))
+        info = bundle.get("yield")
+        if info:
+            ky = True
+            rows.append([method_label(name), f"{info['k_y']:.4f}",
+                         _solution_parameters(res)])
+            continue
         rows.append([method_label(name),
                      "did not converge" if fs is None else f"{fs:.3f}",
                      "" if fs is None else _solution_parameters(res)])
 
     if not rows:
         return None
+    if ky:
+        # A yield coefficient run has F = 1 on every row by construction; the
+        # answer each method gives is its k_y.
+        return Table(["Method", "Yield coefficient k_y", "Solution parameters at k_y"],
+                     rows, "Computed yield coefficients", counter.next_table())
     return Table(["Method", "Factor of safety", "Solution parameters"],
                  rows, "Computed factors of safety", counter.next_table())
 
@@ -3833,6 +4242,12 @@ _ACTIVE_FORM = NotApplicable(
     "mobilizes with the soil and enters divided by F")
 
 
+def _wv(C):
+    """The slice weight with the vertical seismic force through the same center
+    of gravity: W(1 + k_v) = W + k_vW, per slice."""
+    return C.A["W"] + C.A["kvW"]
+
+
 def _unexercised(C):
     """A published term no model carries: zero on every slice, every time.
 
@@ -3938,29 +4353,33 @@ FORCE_TERMS = (
     ForceTerm(
         key="W",
         columns=("w",),
-        arrays=(("W", "w", False),),
+        # The vertical seismic force k_v·W acts through the same center of
+        # gravity, so every equation carries the two together as W(1 + k_v),
+        # as the documentation writes them: its column is read here, not
+        # registered as a force of its own.
+        arrays=(("W", "w", False), ("kvW", "kvw", False)),
         symbols=(Symbol("x_r", "arm",
                         "horizontal moment arm of the slice weight about the "
                         "center of rotation"),),
         feature="", passive=False,
         moment_res=NotApplicable("the weight drives"),
         # Equation (8a) opens with the weight, ahead of the base terms.
-        moment_drv=(Term(+1, "W·x_r", lambda C: C.A["W"] * C.arms["x_r"],
+        moment_drv=(Term(+1, "W(1 + k_v)·x_r", lambda C: _wv(C) * C.arms["x_r"],
                          rank=-1),),
         force_res=_NO_HORIZONTAL_COMPONENT,
         force_drv=_NO_HORIZONTAL_COMPONENT,
         spencer_h=_NO_HORIZONTAL_COMPONENT,
-        spencer_v=(Term(-1, "W", lambda C: C.A["W"]),),
+        spencer_v=(Term(-1, "W(1 + k_v)", _wv),),
         march_x=_NO_HORIZONTAL_COMPONENT,
-        march_y=(Term(+1, "W", lambda C: C.A["W"], rank=5),),
-        normal=(Term(+1, "W", lambda C: C.A["W"], always=True),),
+        march_y=(Term(+1, "W(1 + k_v)", _wv, rank=5),),
+        normal=(Term(+1, "W(1 + k_v)", _wv, always=True),),
         # The weight opens all three: equation (4) resolves it perpendicular to
         # the base, equation (10) vertically, and the driving side takes its
         # moment as W·sin α with the radius factored out.
-        oms_num=(Term(+1, "W cos α", lambda C: C.A["W"] * C.A["cos_a"],
+        oms_num=(Term(+1, "W(1 + k_v) cos α", lambda C: _wv(C) * C.A["cos_a"],
                       rank=-1, always=True),),
-        bishop_num=(Term(+1, "W", lambda C: C.A["W"], rank=-1, always=True),),
-        page_drv=(Term(+1, "W·sin α", lambda C: C.A["W"] * C.A["sin_a"],
+        bishop_num=(Term(+1, "W(1 + k_v)", _wv, rank=-1, always=True),),
+        page_drv=(Term(+1, "W(1 + k_v)·sin α", lambda C: _wv(C) * C.A["sin_a"],
                        rank=-1, always=True),),
     ),
     ForceTerm(
@@ -4023,22 +4442,22 @@ FORCE_TERMS = (
                         "moment arm of the seismic force, taken at the slice "
                         "center of gravity"),
                  # Spencer's section transcribes the published equations before
-                 # reducing them, so kW is printed on a model with no seismic
+                 # reducing them, so k_hW is printed on a model with no seismic
                  # load, where the column it would be read from is not.
-                 Symbol("kW", "letter",
+                 Symbol("k_hW", "letter",
                         "horizontal seismic force on the slice, per unit "
-                        "thickness — column kW of the slice table")),
+                        "thickness — column k_hW of the slice table")),
         feature="seismic load", passive=False,
         moment_res=NotApplicable("the seismic force drives"),
-        moment_drv=(Term(+1, "kW·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
+        moment_drv=(Term(+1, "k_hW·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
         force_res=NotApplicable("the seismic force drives"),
-        force_drv=(Term(+1, "kW", lambda C: C.A["kW"]),),
-        spencer_h=(Term(-1, "kW", lambda C: C.A["kW"]),),
+        force_drv=(Term(+1, "k_hW", lambda C: C.A["kW"]),),
+        spencer_h=(Term(-1, "k_hW", lambda C: C.A["kW"]),),
         spencer_v=_NO_VERTICAL_COMPONENT,
-        march_x=(Term(+1, "kW", lambda C: C.A["kW"], rank=7),),
+        march_x=(Term(+1, "k_hW", lambda C: C.A["kW"], rank=7),),
         march_y=_NO_VERTICAL_COMPONENT,
         normal=_NO_VERTICAL_COMPONENT,
-        oms_num=(Term(-1, "kW sin α", lambda C: C.A["kW"] * C.A["sin_a"],
+        oms_num=(Term(-1, "k_hW sin α", lambda C: C.A["kW"] * C.A["sin_a"],
                       rank=4),),
         bishop_num=_NO_VERTICAL_COMPONENT,
         page_drv=(Term(+1, "W·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
@@ -4369,6 +4788,10 @@ EQUATION_SYMBOLS = {
            "the soil and so stands on the mobilized side",
     "k": "seismic coefficient, the fraction of the slice weight applied "
          "horizontally",
+    "k_h": "horizontal seismic coefficient, the fraction of the slice weight "
+           "applied horizontally",
+    "k_v": "vertical seismic coefficient, the fraction of the slice weight "
+           "applied vertically, positive downward",
     "α": "inclination of the slice base from horizontal",
     **_group_symbols("angle"),
     "θ": "inclination of the interslice forces from horizontal",
@@ -5180,7 +5603,7 @@ def _quotient_full(res_consumer, drv_consumer):
 _DRIVING_PARTS = (
     ("D_W", "W", +1, "", True),
     ("D_D", "D", +1, "frac{1}{R}·", True),
-    ("D_k", "kW", +1, "frac{k}{R}·", True),
+    ("D_k", "kW", +1, "frac{k_h}{R}·", True),
     ("D_T", "T", +1, "frac{1}{R}·", False),
     ("D_P", "P", -1, "frac{1}{R}·", True),
     ("D_H", "H", -1, "frac{1}{R}·", True),
@@ -6711,6 +7134,11 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
     results = bundle.get("results") or {}
     slice_df = bundle.get("slice_df")
+    # A yield coefficient run was solved at k = k_y, and its figures say so.
+    ky_info = bundle.get("yield")
+    from .seismic import model_at
+    sd_run = (model_at(slope_data, ky_info["k_y"]) if ky_info
+              else slope_data)
 
     # --- the search that found THIS method's surface ---
     if opts["lem_search"] and bundle.get("search"):
@@ -6736,7 +7164,7 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
         def draw(fig):
             from .plot import plot_solution
-            plot_solution(slope_data, slice_df, bundle.get("failure_surface"),
+            plot_solution(sd_run, slice_df, bundle.get("failure_surface"),
                           results, fig=fig, show_title=False,
                           style=opts.get("style"))
 
@@ -6753,7 +7181,18 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     where, links = cite("Figure", figure.number if figure is not None else 0)
 
     fs = _num(results.get("FS"))
-    if fs is not None:
+    if fs is not None and ky_info:
+        surface = f"the {named} of {where}" if where else f"the {named}"
+        k_y = f"{ky_info['k_y']:.4f}"
+        text = (f"{label} gives a seismic yield coefficient of k_y = {k_y} on "
+                f"{surface}, where the factor of safety is {fs:.3f} at k = k_y.")
+        if not searched:
+            text += (" No search was performed: this yield coefficient is for the "
+                     "surface entered in the input and is not a minimum over any "
+                     "family of surfaces.")
+        res.blocks.append(Prose(
+            text + (f" {note}" if note else ""), bold=[k_y], links=links))
+    elif fs is not None:
         surface = f"the {named} of {where}" if where else f"the {named}"
         text = f"{label} gives a factor of safety of {fs:.3f} on {surface}."
         if not searched:
@@ -6798,6 +7237,25 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
                      f"{'circle' if family == 'circular' else 'surface'}"))
         if rapid is not None:
             sec.children.append(rapid)
+
+    # --- two-stage seismic ---
+    if opts["lem_seismic2"]:
+        family = _surface_family(slice_df, slope_data)
+        seismic2 = _seismic2_section(
+            results, counter, sd_run, slice_df,
+            surface=(f"{'critical' if searched else 'specified'} "
+                     f"{'circle' if family == 'circular' else 'surface'}"))
+        if seismic2 is not None:
+            sec.children.append(seismic2)
+
+    # --- the yield coefficient ---
+    if opts["lem_ky"] and ky_info:
+        family = _surface_family(slice_df, slope_data)
+        ky_sec = _ky_section(
+            ky_info, results, counter,
+            noun="circle" if family == "circular" else "surface")
+        if ky_sec is not None:
+            sec.children.append(ky_sec)
 
     # --- slice table and calculations ---
     # The calculation is worked out first: it adds the per-slice terms of the
@@ -6906,6 +7364,10 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     methods = featured_methods(solutions, opts)
 
     sec = Section("Limit Equilibrium Analysis", anchor=section_anchor(LEM_ANCHOR))
+    # A yield coefficient run finds k instead of reading it, and its factor of
+    # safety is 1 by construction: the inputs, the loads, and the comparison
+    # table all say so.
+    ky = bool(bundle.get("yield"))
     # The definition is the ratio the LEM overview publishes — F = s/τ, the
     # available strength over the shear the surface has to carry to stand. A
     # factor the strength is DIVIDED by until the mass fails is the strength
@@ -6954,7 +7416,20 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     k = _num(slope_data.get("k_seismic"))
     items.append(("Surface", "located by search" if any_search
                   else "specified in the input; no search was performed"))
-    items.append(("Seismic coefficient", f"{k:g}" if k else "none"))
+    kv = _num(slope_data.get("k_vertical")) or 0.0
+    if ky:
+        items.append(("Seismic coefficient",
+                      "found by the analysis (the yield coefficient k_y)"
+                      + (f"; the model's k = {k:g} is not used" if k and not kv else "")))
+        if kv and k:
+            items.append(("Vertical seismic coefficient",
+                          f"{abs(kv) / abs(k):.3g}·k_y, "
+                          f"{'downward' if kv > 0 else 'upward'}"))
+    else:
+        items.append(("Seismic coefficient", f"{k:g}" if k else "none"))
+        if kv:
+            items.append(("Vertical seismic coefficient",
+                          f"{abs(kv):g}, {'downward' if kv > 0 else 'upward'}"))
     tc = _num(slope_data.get("tcrack_depth"))
     if tc:
         items.append(("Tension crack depth", f"{tc:g}"))
@@ -7036,6 +7511,9 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                 f"analysis are shown in {where}, including the strength option "
                 f"each material is analyzed under, the properties that option "
                 f"uses, and how its pore pressure is taken.", links=links))
+            notes = _strength_option_notes(slope_data)
+            if notes:
+                sub.blocks.append(Prose(notes))
             sub.blocks.append(table)
         else:
             sub.blocks.append(Prose("The model defines no materials."))
@@ -7086,7 +7564,7 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     if opts["lem_loads"]:
         loads = _loads_section(
             slope_data, feats, counter,
-            source_stated=bool(opts.get("_water_source_stated")))
+            source_stated=bool(opts.get("_water_source_stated")), ky=ky)
         sec.children.append(loads)
         printed = [b.number for b in loads.blocks if b.kind == "table"]
         if printed:
@@ -7109,14 +7587,24 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # surfaces; each method's block carries its own search.
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
-        sub_fs = Section("Factors of Safety")
+        sub_fs = Section("Yield Coefficients" if ky else "Factors of Safety")
         searched = [m for m in methods if method_searched(solutions, m)]
         where, links = cite("Table", table.number)
         # Three provenances, and exactly one of them is true of any one table.
         # Saying that every method finds its own surface AND that no search was
         # performed said both at once, on a report where the second was the true
         # one.
-        if searched and len(searched) == len(methods):
+        if ky:
+            text = (f"The seismic yield coefficient k_y found by each method, the "
+                    f"coefficient at which its factor of safety is 1, is listed in "
+                    f"{where}.")
+            if searched and len(searched) == len(methods):
+                text += (" Each method searched for the surface with its own "
+                         "lowest k_y.")
+            elif not searched:
+                text += (" Each was found on the surface specified in the input, "
+                         "which is not a minimum over any family.")
+        elif searched and len(searched) == len(methods):
             # Separate searches usually settle on different surfaces, but not
             # always: on some models two methods land on the same circle, and the
             # sentence has to say which happened.
@@ -9826,13 +10314,33 @@ def _ssrm_scope(recorded):
 
 
 #: Where the finite element analysis takes pore pressure from, in the same words
-#: the limit equilibrium section uses for the same sources. Keyed by
-#: ``fem_data['pp_option']``, which is what build_fem_data resolved off the
-#: materials and what the assembly reads — so the sentence names the field the
-#: elements were actually solved with. The consolidation ratio the limit
-#: equilibrium slicer reads is not here: the finite element assembly has no
+#: the limit equilibrium section uses for the same sources. Keyed by each
+#: material's source as build_fem_data recorded it (``fem_data['pp_option_by_mat']``),
+#: which is what the assembly reads, element by element — so the sentence names
+#: the field the elements were actually solved with. The consolidation ratio the
+#: limit equilibrium slicer reads is not here: the finite element assembly has no
 #: branch for it.
 FEM_PORE_SOURCES = {key: PORE_SOURCES[key] for key in ("piezo", "seep", "ru")}
+
+
+def _fem_pore_groups(fem_data):
+    """``{source: [material names]}`` over the materials the mesh uses, in
+    materials order, or ``None`` for a fem_data that records only one source for
+    the whole model (one built before each material took its own)."""
+    by_mat = fem_data.get("pp_option_by_mat")
+    if by_mat is None:
+        return None
+    names = list(fem_data.get("material_names") or [])
+    em = fem_data.get("element_materials")
+    used = (sorted({int(v) for v in em}) if em is not None
+            else range(1, len(by_mat) + 1))
+    groups = {}
+    for k in used:
+        if 1 <= k <= len(by_mat):
+            src = str(by_mat[k - 1] or "none").strip().lower()
+            name = names[k - 1] if k - 1 < len(names) else f"Material {k}"
+            groups.setdefault(src, []).append(str(name))
+    return groups
 
 
 def _fem_pore_basis(fem_data, solutions, opts):
@@ -9843,19 +10351,40 @@ def _fem_pore_basis(fem_data, solutions, opts):
     which one it was. A model whose materials take no pore pressure says nothing
     — there is nothing to state — and one whose option the assembly has no
     branch for is not credited with a source it never read.
+
+    Each material takes pore pressure from its own source. Where every material
+    in the mesh shares one, the sentence says so for the whole section; where
+    they differ, or some carry none, it names each source with its materials,
+    since "every node" would put water where there is none.
     """
-    said = FEM_PORE_SOURCES.get(str(fem_data.get("pp_option") or "").lower())
-    if not said:
+    groups = _fem_pore_groups(fem_data)
+    if groups is None:
+        src = str(fem_data.get("pp_option") or "").lower()
+        groups = {src: []}
+    credited = [s for s in groups if s in FEM_PORE_SOURCES]
+    if not credited:
         return None
-    text = f"Pore pressure at every node is taken from {said}."
+    if len(groups) == 1:
+        text = f"Pore pressure at every node is taken from {FEM_PORE_SOURCES[credited[0]]}."
+    else:
+        clauses = [f"in {_join(groups[s])} "
+                   f"{'is taken ' if n == 0 else ''}from {FEM_PORE_SOURCES[s]}"
+                   for n, s in enumerate(credited)]
+        text = f"Pore pressure {_join(clauses)}"
+        dry = groups.get("none") or []
+        if dry:
+            text += f"; {_join(dry)} {'carries' if len(dry) == 1 else 'carry'} none"
+        text += "."
     links = []
     # The field is an outcome of the flow analysis, and where this report
     # documents that analysis the reader is sent to it rather than told twice
     # what it computed.
-    if (said == PORE_SOURCES["seep"] and opts["seep"]
-            and seepage_documented(solutions)):
+    if "seep" in credited and opts["seep"] and seepage_documented(solutions):
         there, links = cite_section(SEEPAGE_ANCHOR)
-        text += f" That is the field the seepage analysis of {there} reports."
+        text += (f" That is the field the seepage analysis of {there} reports."
+                 if len(groups) == 1 else
+                 f" The seepage field is the one the seepage analysis of {there} "
+                 f"reports.")
     return Prose(text, links=links)
 
 
@@ -10079,10 +10608,14 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             sub_inputs.blocks.append(Prose(
                 f"The material properties associated with "
                 f"{'SSRM ' if ssrm else ''}finite element analysis are shown in "
-                f"{where}, including the unit weight, the Mohr-Coulomb strength "
-                f"that sets when an element yields, and the Young's modulus and "
-                f"Poisson's ratio that set how it deforms before yielding.",
+                f"{where}, including the unit weight, the strength option and the "
+                f"properties it uses, which set when an element yields, and the "
+                f"Young's modulus and Poisson's ratio that set how it deforms "
+                f"before yielding.",
                 links=links))
+            notes = _strength_option_notes(slope_data)
+            if notes:
+                sub_inputs.blocks.append(Prose(notes))
             sub_inputs.blocks.append(table)
     pore = _fem_pore_basis(fem_data, solutions, opts)
     if pore is not None:
@@ -10264,6 +10797,8 @@ def planned_figures(slope_data, solutions, opts):
                 n += 1
             if _diagram_is_printed(slope_data, solutions, name, opts):
                 n += 1
+    if opts["lem"] and opts["lem_newmark"] and newmark_bundles(solutions):
+        n += 1
     return n
 
 
@@ -10354,6 +10889,9 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
             ``{"fem_data", "solution", "FS", "analysis", "failure_solution"}``,
             where ``analysis`` is ``"ssrm"`` for a strength reduction run and
             ``"single"`` for one trial at a stated factor.
+        ``"newmark"``
+            What :func:`xslope.seismic.newmark_displacement` returns, plus
+            ``ky_source``. The last one is documented.
 
         An engine that is absent gets no section.
     options : dict, optional
@@ -10426,6 +10964,10 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
                            progress)
         if lem is not None:
             report.sections.append(lem)
+    if opts["lem"] and opts["lem_newmark"]:
+        newmark = _newmark_section(solutions, opts, counter, figure_dir, progress)
+        if newmark is not None:
+            report.sections.append(newmark)
     if opts["fem"]:
         fem = _fem_section(slope_data, solutions, opts, counter, figure_dir,
                            progress)

@@ -76,12 +76,13 @@ reinforcement, and boundary conditions to scale.
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks the template format for compatibility. The current version is **27**. xslope rejects a file whose version is newer than the installed version supports, so an older install cannot misread a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
+- **Template version**: Tracks the template format for compatibility. The current version is **28**. xslope rejects a file whose version is newer than the installed version supports, so an older install cannot misread a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial).
 - **Time** (`sec`, `min`, `hr`, `day`, or `yr`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type takes precedence (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
 - **Tension crack parameters**: Depth **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface
-- **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
+- **Horizontal seismic coefficient** (kh) — **[–]**: the horizontal seismic acceleration, as a fraction of gravity, for a pseudo-static analysis. The limit-equilibrium engine takes its magnitude and applies it toward the toe of each failure surface. The finite element engine reads its sign as the direction: positive pushes toward +x, negative toward −x.
+- **Vertical seismic coefficient** (kv) — **[–]**: the vertical seismic acceleration, as a fraction of gravity. It is signed in both engines: positive acts downward and adds k<sub>v</sub>·W to the weight, negative acts upward and takes it away. Each run applies it in the direction entered, so checking both directions, as Eurocode 8 asks, takes two runs. Its effect depends on the soil: on a frictional slope an upward k<sub>v</sub> lowers the factor of safety, and on a cohesive one a downward k<sub>v</sub> does. Blank or 0 means none. A yield coefficient search holds k<sub>v</sub> at the ratio k<sub>v</sub>/k<sub>h</sub> of the two values entered here.
 
 **Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
 brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
@@ -95,7 +96,7 @@ psf, pcf, ft/day.
 
 ### Run options
 
-The cells below the seismic coefficient record **how this model is meant to be
+The cells below the seismic coefficients record **how this model is meant to be
 analyzed**, so the analysis travels with the file instead of living only in a dialog.
 Every one of them is optional, and **blank always means unspecified** — the solver or
 the Studio dialog uses its own default. A choice you make in a Studio dialog always takes
@@ -104,7 +105,7 @@ precedence over the value in the file.
 - **LEM method** (`oms`, `janbu`, `bishop`, `corps`, `lowe`, `spencer`, `mprice`, or `all`) — **[–]**: the limit-equilibrium method this model is built for. `all` means "run every method" and is used by the batch drivers; the Studio run dialog, which solves one method at a time, leaves its own default in place for it. An unrecognized value is an error at load time, never a silent fallback to some other method.
 - **Number of slices** — **[–]**: the slice count for limit-equilibrium runs. Minimum 2; blank uses the solver default.
 - **K0 initial stress (FEM)** — **[–]**: at-rest lateral earth pressure coefficient for the FEM's **initial stress state**. Blank starts from zero stress and switches gravity on in one step, so the initial lateral stress is whatever elasticity produces — σ<sub>h</sub> = ν/(1−ν)·σ<sub>v</sub>, about 0.43·σ<sub>v</sub> at ν = 0.3, a number set by the stiffness rather than by the soil. Enter a value and the initial stress is built from the overburden instead, σ<sub>h</sub> = K0·σ<sub>v</sub> both in-plane and out-of-plane, and then iterated to equilibrium — in an SSRM run as a separate full-strength step, so that establishing the in-situ state is not charged to the strength reduction. Normally consolidated sand sits near Jaky's 1 − sin φ′; compacted fills and overconsolidated clays run at 1.0 and above. Set **1.0** to reproduce an RS2 result, whose models are authored with an isotropic K = 1 field stress. The effect is small on a cohesive slope and worth several percent on a reinforced or near-cohesionless one, always in the direction of a higher factor of safety. A value here must be positive; leave the cell blank for the gravity turn-on. See [K0 initial stress](../fem/overview.md#k0-initial-stress) for the formulation, how to choose a value, and the measured sensitivity.
-- **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. The setting changes nothing unless some material declares a cutoff **above zero**: a blank `t_cut` leaves the material its envelope's own apex, which strength reduction never moves, and a cutoff of `0` — a soil that carries no tension — is still `0` however it is divided. Studio's Run FEM dialog dims the matching checkbox on both kinds of model.
+- **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. The setting changes nothing unless some material, or some line on the [joints](#worksheet-joints) sheet, declares a cutoff **above zero**: a blank `t_cut` leaves the material its envelope's own apex, which strength reduction never moves, and a cutoff of `0` — a soil that carries no tension — is still `0` however it is divided. Studio's Run FEM dialog dims the matching checkbox on both kinds of model.
 - **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Use quadratic elements (`tri6`, `quad8`, `quad9`) for every stress analysis; linear elements are for seepage only, because in plasticity they lock volumetrically and overestimate the factor of safety.
 - **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, because a size in the file is taken as the intended size.
 - **1D element size** — **[L]**: the target element size along the model's 1D members — the pile and reinforcement lines — where it should differ from the mesh target size above. Blank means the members follow the mesh target size; a value here must be positive.
@@ -114,7 +115,7 @@ precedence over the value in the file.
 - **Side BC** (`rollers` or `fixed`) — **[–]**: how the FEM restrains the left and right truncation boundaries of the model. `rollers` (the default, and what every file that leaves this blank gets) fixes horizontal movement and leaves the face free to settle vertically. `fixed` clamps both directions. Rollers are the usual choice: a truncation boundary is an artificial cut through ground that continues, and the ground on the other side of it does not hold the face up. `fixed` adds shear restraint that ground does not have, and stiffens a domain truncated close to the slope; use it to reproduce a program that fixes its side boundaries. The bottom boundary is fully fixed either way.
 
 These global parameters are accessed throughout the analysis. For example, the unit weight of water is used in 
-computing pore pressures from piezometric lines, and the seismic coefficient is used to add horizontal inertial 
+computing pore pressures from piezometric lines, and the seismic coefficients add horizontal and vertical inertial 
 forces to each slice in limit equilibrium calculations. The tension crack parameters allow the simulation of a tension
 crack at the top of the slope for cohesive soils to reduce the likelihood that negative normal forces develop along the 
 face, which are unconservative in the limit equilibrium method. Filling the crack with water adds an extra level of 
@@ -149,13 +150,13 @@ material's options don't use are grayed out.
 | --- | --- | --- |
 | **γ** | F/L³ | Unit weight above the water table |
 | **γsat** | F/L³ | Unit weight below the water table. Blank uses γ everywhere |
-| **option** | | Strength model: `mc`, `cp`, `pow`, `hb`, or `elastic` (table below) |
+| **option** | | Strength model: `mc`, `cp`, `ratio`, `pow`, `hb`, or `elastic` (table below) |
 | **c**, **φ** | F/L², deg | Cohesion and friction angle |
-| **c/p**, **r-elev** | F/L²/L, L | Strength gain per unit depth, and the elevation it starts from (`cp`) |
-| **d**, **psi** | F/L², deg | Kc = 1 envelope for [rapid drawdown](../lem/rapid.md) |
+| **c/p**, **r-elev** | F/L²/L, L | Strength gain per unit depth, and the elevation it starts from (`cp`); with `ratio`, c/p is the strength ratio S<sub>u</sub>/σ′<sub>v</sub> (–) and r-elev is not read |
+| **d**, **psi** | F/L², deg | Kc = 1 envelope for [rapid drawdown](../lem/rapid.md) and the [two-stage seismic analysis](../seismic/two_stage.md), read on `mc` materials only |
 | **t_cut** | F/L² | Tensile strength cap (FEM only) |
 | **E**, **nu** | F/L², – | Young's modulus and Poisson's ratio (FEM only) |
-| **u** | | Pore pressure source: `piezo`, `seep`, `ru`, or `none` |
+| **u** | | Pore pressure source: `piezo`, `seep`, `ru`, or `none` (blank means `none`) |
 | **ru** | – | Pore pressure ratio, read when **u** = `ru` |
 | **phi_b**, **s_cap** | deg, F/L² | Strength from suction above the water table, and its cap |
 | **pow_a** … **pow_d** | | Power-curve envelope (`pow`) |
@@ -173,6 +174,7 @@ whatever its **u** option.
 | --- | --- | --- |
 | `mc` | Mohr-Coulomb: τ = c + σ′ tan φ | c, φ |
 | `cp` | Undrained strength increasing below an elevation: S<sub>u</sub> = c + c/p × (r-elev − y) | c, c/p, r-elev |
+| `ratio` | Undrained strength ratio: S<sub>u</sub> = max(c, c/p × σ′<sub>v</sub>), with c the minimum ([details](../lem/overview.md#undrained-strength-ratio)) | c, c/p |
 | `pow` | Power curve: τ = pow_a (σ′ + pow_d)<sup>pow_b</sup> + pow_c | pow_a, pow_b, pow_c, pow_d |
 | `hb` | Generalized Hoek-Brown, for rock | hb_sci, hb_gsi, hb_mi, hb_d |
 | `elastic` | Can't fail. Search surfaces may run along it but not through it | none |
@@ -182,13 +184,29 @@ model's stress units, not MPa (30 MPa is 30,000 kPa). The
 [LEM overview](../lem/overview.md) explains each envelope, including
 [Hoek-Brown](../lem/overview.md#hoek-brown-strength).
 
-**Pore pressure (u).**
+**Pore pressure (u).** Each material takes its pore pressure from its own **u**, in
+the limit equilibrium and the finite element analysis alike:
 
 - `piezo`: from the line on the **piezo** sheet.
 - `seep`: from a seepage solution; see
   [Seepage and slope stability](../seep/seep_slope.md).
-- `ru`: u = ru × the vertical stress of the soil column.
-- `none`: no pore pressure. Use it with undrained (total-stress) strengths.
+- `ru`: u = ru × the vertical stress of the soil column. The **ru** column is read
+  only on a row whose **u** is `ru`.
+- `none`, or a blank cell: no pore pressure. Use it with undrained (total-stress)
+  strengths.
+
+The materials of one model may use different sources: a dry fill (`none`) over a
+foundation that reads the piezometric line (`piezo`), for example. A row that no
+zone of the section uses is not read. Where a material with pore pressure meets one
+without, the water presses on the face of the dry material; the
+[FEM overview](../fem/overview.md#pore-pressure-options) explains how.
+
+An `elastic` material, such as a wall, a sheet pile or bedrock, reads its own **u** in the
+finite element analysis too. It cannot fail, so **u** sets how the water loads it, not its
+strength. Use `none` for a sealed wall: it carries no pore pressure, and the water in the soil
+beside it presses on its face. Use `seep` or `piezo` for a permeable wall or rock: it carries the
+same pore pressure as its neighbors, with no push at its face. Its **phi_b** and **s_cap** are
+not read.
 
 Any other entry is rejected when the file loads. A model imported from RS2 gets
 its **u** values from RS2's water settings; a pore-pressure grid or a groundwater
@@ -204,12 +222,13 @@ always when matching an RS2 or Plaxis model. See
 [Tensile strength in the SSRM](../fem/solver.md#tensile-strength-in-ssrm).
 
 **Suction (phi_b, s_cap).** A positive **phi_b** adds strength s × tan φ<sup>b</sup>
-from the suction s above the water table. It is read only for `mc`, `pow`, and
-`hb` materials with **u** = `piezo` or `seep`. With `piezo`, the suction grows
+from the suction s above the water table. Both engines read it, and only for `mc`,
+`pow`, and `hb` materials with **u** = `piezo` or `seep`; a `cp` or `ratio`
+material states an undrained strength and takes no suction credit. With `piezo`, the suction grows
 without limit above the line, so **always set s_cap**. See
 [Matric suction](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table).
 
-**Stiffness.** The FEM needs E > 0 and 0 ≤ ν < 0.5 for every material.
+**Stiffness.** The FEM needs E > 0 and 0 < ν < 0.5 for every material.
 
 ### Standard deviations
 
@@ -217,6 +236,10 @@ without limit above the line, so **always set s_cap**. See
 
 **σ(γ)**, **σ(c)**, **σ(φ)**, **σ(c/p)**, **σ(d)**, and **σ(ψ)** are the standard
 deviations used by the reliability analysis, each in the units of its property.
+**σ(d)** and **σ(ψ)** are read only in a rapid drawdown analysis, where the
+[Taylor series](../reliability/taylor.md) varies an `mc` material's d and ψ by them
+along with its c and φ. Without rapid drawdown, d and ψ are not read, and neither
+are their standard deviations.
 
 ### Seepage
 
@@ -226,8 +249,8 @@ deviations used by the reliability analysis, each in the units of its property.
 | --- | --- | --- |
 | **k1**, **k2** | L/t | Major and minor hydraulic conductivity. Equal values are isotropic |
 | **alpha** | deg | Angle of the k1 direction from horizontal, usually 0 |
-| **unsat** | | Unsaturated model: `lf` (default), `vg`, or `gard` |
-| **kr0**, **h0** | –, L | Linear-front parameters (`lf`) |
+| **unsat** | | Unsaturated model: `lf`, `vg`, or `gard`, in any case. Blank means `lf`; any other word stops a seepage run |
+| **kr0**, **h0** | –, L | Linear-front parameters (`lf`). A transient run also reads h0 for `gard` |
 | **a**, **n** | | van Genuchten α and n (`vg`), or the Gardner parameters (`gard`) |
 | **l** | – | van Genuchten pore-connectivity exponent. Blank is 0.5 |
 | **Ss** | 1/L | Specific storage (transient only) |
@@ -337,9 +360,10 @@ sheet.
 
 ### Local mesh sizes and refine regions {#refine-regions}
 
-A **Size** on a polygon or a [profile line](#worksheet-profile) makes the mesh finer inside it,
-growing back to the global size outside. A `refine` polygon does only that: it has no material and
-no effect on any solver. Use it for something the geometry doesn't outline, such as the ground
+A **Size** on a polygon of any Type, or on a [profile line](#worksheet-profile), makes the mesh
+finer inside it, growing back to the global size outside. An `ssr` or `joints` polygon with a Size
+refines the mesh the same way. A `refine` polygon does only that: it has no material and no effect
+on any solver. Use it for something the geometry doesn't outline, such as the ground
 under a footing or the tip of a cutoff wall. A `refine` polygon needs a Size.
 
 A Size only refines; a value at or above the global size has no effect, and XSLOPE warns about it.
@@ -349,12 +373,12 @@ affect it.
 ### Joint regions {#joint-regions}
 
 A `joints` polygon marks where a [generated joint set](#joint-sets) exists, for ground that isn't a
-material zone, such as one block of an outcrop. It isn't meshed and does nothing unless a joint set
-names it. A set names it by the block header (`poly:North block`, after typing over the
+material zone, such as one block of an outcrop. It isn't meshed as a zone, and apart from a Size,
+which refines the mesh inside it, it does nothing unless a joint set names it. A set names it by the block header (`poly:North block`, after typing over the
 `Polygon #3` header) or by its number among the joint regions (`poly:1`). A set confined to one
 material can name the material instead and needs no polygon.
 
-Leave its Mat ID and Size blank; the [model checks](preflight.md) flag either one.
+Leave its Mat ID blank; the [model checks](preflight.md) flag one.
 
 ---
 
@@ -362,47 +386,46 @@ Leave its Mat ID and Size blank; the [model checks](preflight.md) flag either on
 
 ![sheet_piezo.png](images/sheet_piezo.png)
 
-The **piezo** worksheet defines up to two water lines used to compute pore water pressures in limit equilibrium
-analysis. A line is used by every material on the **mat** sheet whose pore pressure option is set to "piezo", so it
-applies to soils analyzed with effective-stress (drained) strengths. Below the line, pore pressures are positive;
+The **piezo** worksheet defines up to two water lines used to compute pore water pressures. A line is used by every
+material on the **mat** sheet whose pore pressure option is set to "piezo", in the limit equilibrium and the finite
+element analysis alike, so it applies to soils analyzed with effective-stress (drained) strengths. Below the line, pore pressures are positive;
 above it, they are zero.
 
-Each line has a **Type** cell that states what the line represents, which determines how the pressure head is
-computed:
+Each line has a **Type** cell that says how the head at a point below the line is read from the line. There are
+two types, piezo and phreatic. The figure shows both at the same point on a slip surface:
 
-- **piezo** (the default — a blank cell means the same): the line is a true *piezometric line*, i.e., the locus of
-  pressure heads measured by piezometers at the slip surface. The pore pressure at a slice base is the full static
-  head, u = γw · Δz, where Δz is the vertical distance from the slice base up to the line (upper figure below).
+![One water line read two ways at a point on a slip surface: piezo takes the vertical distance Δz up to the line; phreatic takes Δz cos²θ, the height a standpipe at the point rises to, where the equipotential through the point meets the line at a right angle](../lem/images/piezo_phreatic.png){width=760px}
 
-- **phreatic**: the line is the *phreatic surface* (the water table) in a slope with inclined, roughly
-  surface-parallel steady seepage. In that flow regime the equipotentials are not vertical, so the head at depth is
-  less than the static column and the static head is reduced by cos²θ, where θ is the inclination of the line
-  segment directly above the slice base (lower figure below). This is the same correction as Slide2's "Hu: Auto"
-  and the phreatic-surface option in XSTABL, and it matters most on steep phreatic lines — on a flat line the two
-  types are identical.
+- **Type piezo** (the default; a blank cell means the same): the head reaches the line directly above the point. The pore
+  pressure is u = γ<sub>w</sub> Δz, where Δz is the vertical distance from the point up to the line.
+
+- **Type phreatic**: the line is the water table in a slope with steady seepage along it. The equipotentials cross the
+  line at a right angle, so a standpipe at the point rises only to Δz cos²θ, where θ is the inclination of the line
+  segment directly above the point. The pore pressure is u = γ<sub>w</sub> Δz cos²θ. This is the same correction as
+  Slide2's "Hu: Auto" and the phreatic-surface option in XSTABL.
 
 In XSLOPE Studio, the **Piezometric lines** editor sets each line's Type in the box above its table.
 
-![piezo.png](images/piezo.png)
-
-Choosing between them: if the line came from piezometer readings, a flow net, or a seepage analysis, it is a
-piezometric line — use **piezo**. If all you have is the water table position, **phreatic** is the appropriate
-shortcut. For full rigor on complex problems, run a finite element seepage analysis and set the material pore
-pressure option to "seep" instead; the pore pressures then come from the seepage solution directly and neither line
-type is needed.
+On a flat or gentle line the Type hardly matters, so leave it at piezo. On a steep line with the water moving along
+it, phreatic is more realistic, and piezo is the more conservative choice. A line plotted from piezometers with
+their tips at the slip surface is exact as piezo. For the most accurate pore pressures, run a finite element seepage
+analysis and set the material's pore pressure option to "seep"; no line is then needed. The
+[LEM overview](../lem/overview.md#pore-pressures) explains the two types in more detail.
 
 A line applies only over its own horizontal extent — its pressures are not extended past either end. That makes a
 line that stops short of the section a legitimate model, for a water body that stops there too (a reservoir on one
 side of a dam and no tailwater on the other). It does mean the line must reach everywhere it is *read*: if a slice
 base, mesh node, or Gauss point in a material set to "piezo" falls beyond the end of the line, the analysis stops
-with an error rather than treating that point as having no pore pressure. To model dry ground past the end of a
+with an error rather than treating that point as having no pore pressure. A material that reads no pore pressure
+from the line does not need it to reach. To model dry ground past the end of a
 line, carry the line on at an elevation below the section. For the same reason, a material set to "piezo" in a file
 whose piezo worksheet is empty is an error too; a material with no water takes **none**.
 
 The worksheet provides space for two lines, which supports rapid drawdown analysis:
 
 - **Piezometric Line 1 (columns A–B)**: steady-state or initial condition
-- **Piezometric Line 2 (columns D–E)**: post-drawdown condition (only required for rapid drawdown)
+- **Piezometric Line 2 (columns D–E)**: post-drawdown condition. Only a rapid drawdown analysis reads it; every
+  other analysis ignores it, wherever it is drawn
 
 Each line has its own Type cell and requires at least two XY coordinate pairs **[L]**, ordered from left to right. The table
 is formatted for 20 rows, but coordinates can be entered beyond the bottom of the table as needed.
@@ -417,7 +440,8 @@ A file with no Type cell treats its lines as **piezo**.
 
 The **circles** worksheet defines circular failure surfaces for limit equilibrium analysis. Circular surfaces are 
 the most common assumption in slope stability analysis and are required for methods like Bishop's Simplified Method 
-and Spencer's Method. XSLOPE supports up to 10 circular failure surfaces, each of which can be analyzed 
+and Spencer's Method. The sheet is formatted for 10 circular failure surfaces (rows 3-12), and more can be added
+below. Each one can be analyzed 
 individually or used as starting points when searching for a critical failure surface with a minimum factor of 
 safety using an automated search algorithm. A seepage or finite element model can leave this sheet empty: only a limit equilibrium run needs a surface, here or on the **non-circ** sheet.
 
@@ -427,11 +451,16 @@ Each row in the circles table specifies one circular failure surface with the fo
 parameters:
 
 - **Xo, Yo** — **[L]**: Coordinates of the circle center
-- **Option**: Method for defining circle size - "Depth", "Radius", or "Intercept"
->>- **Depth**: Specify depth below ground surface at center location
+- **Option**: Method for defining circle size - "Depth", "Radius", or "Intercept", in any case
+>>- **Depth**: The elevation of the circle's lowest point, so the radius is R = Yo − Depth (not a depth below the ground)
 >>- **Radius**: Directly specify circle radius
 >>- **Intercept**: Specify a point (Xi, Yi) where circle should pass through
-- **Depth, R, Xi, Yi** — **[L]**: Associated values depending on option selected
+- **Depth, R, Xi, Yi** — **[L]**: Associated values depending on option selected. The cells an Option does not
+  read are grayed
+
+A circle whose Option is blank or not one of the three, or whose Option names a cell left blank, has no size. The file still opens, and the
+[model checks](preflight.md) refuse every limit equilibrium run that reads the circles sheet until the size is
+entered.
 
 During a limit equilibrium (LEM) analysis, XSLOPE performs the following steps:
 
@@ -488,8 +517,8 @@ file loads.
 The **non-circ** worksheet allows definition of arbitrary non-circular failure surfaces. Some slopes include thin 
 layers with especially weak soils. In such cases, a failure surface where much of the surface is confined to the 
 weak layer can be more critical than a circular failure surface. A non-circular failure surface is defined by a set 
-of XY points, listed from left to right. The table is formatted for 20 rows, but extra rows can be added below the table if needed. Generally, the leftmost point is the entry point and the rightmost point is 
-the exit point and both should correspond to the ground suface. 
+of XY points, listed from left to right. The table is formatted for 21 rows (rows 3-23), but extra rows can be added below the table if needed. Generally, the leftmost point is the entry point and the rightmost point is 
+the exit point and both should correspond to the ground surface. 
 
 ![noncircular.png](images/noncircular.png)
 
@@ -509,12 +538,18 @@ supported in XSLOPE, the following table defines which methods support non-circu
 | Force Equilibrium - Corps of Engineer's Method |             Yes              |
 | Force Equilibrium - Lowe & Karafiath Method    |             Yes              |
 | Spencer's Method                               |             Yes              |
+| Morgenstern–Price Method                       |             Yes              |
 
-For the movement option, the following values are supported:
+The Movement column reads three words, in any case:
 
-- **Free**: End points move along the ground surface. Interior points move perpendicular to the failure surface.
-- **Horiz**: Point moves in the horizontal direction only
-- **Fixed**: Fixed movement constraint at each point
+- **Free**: An end point slides along the ground surface. An interior point moves perpendicular to the line
+  joining its two neighbors.
+- **Horiz**: An end point slides along the ground surface, as with Free. An interior point moves horizontally only.
+- **Fixed**: The point does not move. A Fixed end point stays where it was entered.
+
+A blank cell means Free for the first and last points and Fixed for the points between them. Any other word stops
+the search with an error naming the point. The column is read only by the automated search; a single-surface run
+analyzes the points as entered.
 
 These moves are described in more detail in the [Automated Search Algorithms](../lem/search.md) section.
 
@@ -530,7 +565,7 @@ to represent the force of the water on the slope. During limit equilibrium analy
 
 ![sheet_dloads2.png](images/sheet_dloads2.png)
 
-Each worksheet is formatted for 4 distributed loads, but additional loads can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, but additional rows can be added below the end of table if necessary.
+Each worksheet is formatted for 6 distributed loads, but additional loads can be added by copying and pasting more tables to the right. Each table is formatted for up to 19 points (rows 7-25), but additional rows can be added below the end of table if necessary.
 
 Each distributed load is defined by a **Direction** and a series of points with:
 
@@ -603,8 +638,9 @@ one side is a separate body from the material on the other and the two can slide
 reinforce sheet's `Joint` column does the same thing to a line that *does* carry a sheet; this worksheet is for the
 lines that do not.
 
-The template is formatted for up to 30 joint lines (rows 3-32), but additional rows can be added as needed. Every
-column on this sheet is **FEM only** — the limit equilibrium engines do not read it.
+The template is formatted for up to 50 joint lines (rows 3-52), but additional rows can be added as needed. Every
+column on this sheet is **FEM only** — the limit equilibrium engines do not read it, and a seepage analysis ignores
+joints: water flows across a joint line as if it were not there.
 
 Each joint line is defined by:
 
@@ -614,10 +650,10 @@ set](#joint-sets) names its rows `bed-01`, `bed-02`, … after the set they came
 >>x1, y1 **[L]**: Start point coordinates<br>
 >>x2, y2 **[L]**: End point coordinates<br>
 - **Strength**:<br>
->>c **[F/L²]**: Joint cohesion. Blank is 0, which with a stated `phi` is the purely frictional contact a dry joint
-usually is.<br>
->>phi **[degrees]**: Joint friction angle. **Required** — `c` alone defaults to zero, so a blank `phi` would be a
-frictionless surface the two sides slide along under any load at all.<br>
+>>c **[F/L²]**: Joint cohesion, zero or more. Blank is 0, which with a stated `phi` is the purely frictional contact
+a dry joint usually is.<br>
+>>phi **[degrees]**: Joint friction angle, at least 0 and less than 90. **Required** — `c` alone defaults to zero,
+so a blank `phi` would be a frictionless surface the two sides slide along under any load at all.<br>
 >>c_res **[F/L²]**, phi_res **[degrees]**: Residual cohesion and friction angle — what the joint keeps once it has
 slipped. A rough surface shears through its asperities the first time it reaches its limit and does not rebuild
 them, so the drop is instantaneous and permanent: the pair stays on the residual branch for the rest of the run
@@ -627,16 +663,18 @@ Neither may exceed its peak.<br>
 it by $\tan$`dil`. Where the material around it holds it closed that opening builds normal traction against `kn`,
 and with it shear strength; where the sliding block is free to lift, it lifts. Blank is 0, a joint that slides
 without opening.<br>
->>t_cut **[F/L²]**: Tension cutoff. The joint **opens** when the normal traction passes it — carrying neither shear
-nor normal traction — and closes again when the two faces come back into contact. Blank is 0, which is a contact
-that holds no tension at all.<br>
+>>t_cut **[F/L²]**: Tension cutoff, zero or more. The joint **opens** when the normal traction passes it — carrying
+neither shear nor normal traction — and closes again when the two faces come back into contact. Blank is 0, which is
+a contact that holds no tension at all.<br>
 - **Stiffness**:<br>
 >>kn **[F/L³]**: Normal stiffness of the interface. Leave blank to derive it from the softer adjacent soil,
-$E_{adj}$ over a virtual thickness of 0.1 × the 1D element size.<br>
->>ks **[F/L³]**: Shear stiffness of the interface. Leave blank to derive it the same way, from $G_{adj}$.<br>
+$E_{adj}$ over a virtual thickness of 0.1 × the 1D element size. A stated value must be greater than zero.<br>
+>>ks **[F/L³]**: Shear stiffness of the interface. Leave blank to derive it the same way, from $G_{adj}$. A stated
+value must be greater than zero.<br>
 >>Jred: **No** holds the joint at full strength through a strength reduction — for a construction detail rather
 than the design question. Blank or **Yes** reduces `c` and $\tan$`phi` by the trial factor along with the soil's,
-which is the usual choice.<br>
+which is the usual choice, and `t_cut` with them unless **Tension SRF** on the [main](#worksheet-main) sheet is
+`NO`. Yes and No are read in any case; any other word stops a strength reduction run.<br>
 
 Joint lines may **meet** — at a T, at a crossing, at a corner, end to end — and where they do the split copies the
 shared node once per wedge of material around it, so each element keeps the material on its own side of every line
@@ -676,7 +714,7 @@ end is the head. The [Piles and Walls Overview](../piles/overview.md#the-columns
 
 ![Pile Example](images/pile_example.png){width=800px}
 
-The template is formatted for up to 20 piles, but additional rows can be added to the table as needed.
+The template is formatted for up to 10 piles (rows 3-12), but additional rows can be added to the table as needed.
 
 ---
 
@@ -731,6 +769,10 @@ directly to its right is interpreted:
 | `head` | specified head — a **plain Dirichlet** total head held at every node of the polyline, at all times (may be a suction/negative-pressure head) | **[L]** |
 | `reservoir` | a reservoir/tailwater **level**: nodes at or below the level are held at it; a node the water has covered and then uncovered by falling becomes a seepage (exit) face; a node the water has not reached is no-flow | **[L]** |
 | `flux` | specified flux — the **normal Darcy velocity**, **positive into the domain** | **[L/t]** |
+
+A block with points and a blank value cell opens as it was saved, and the blocks after it are read as usual. The
+[model checks](preflight.md) refuse it for any run that reads it: a seepage run, and a stability run whose **Water
+loads** is `auto`, which measures the pool from the head boundaries.
 
 Both `head` and `reservoir` are total heads (height of water above the datum) and, for a
 line drawn at or below the applied value, behave identically. They differ only in what happens

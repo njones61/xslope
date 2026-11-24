@@ -36,10 +36,6 @@ CONFIG = PageConfig(
         # VP51 is an LEM row; the vendor catalog's RS2 SSRM value is quoted, not scored.
         ('1.22', 'the RS2 SSRM value of 1.22 in the catalog'),
         ('1.19', 'The 1.19 published for this problem'),
-        # the geotextile wall rows that print the factor their search found
-        # without confirming it (RS2-49, 51, 52, 53, 54)
-        ('1.018', 'unconfirmed'),
-        ('1.037', 'unconfirmed'),
         # Source papers' own numbers quoted in prose, each named as the paper's:
         # El-Ramly et al.'s deterministic Bishop on measured band pressures
         # (RS2-25, shown, not scored); Cheng et al.'s Fig. 13c value for the
@@ -88,19 +84,19 @@ CONFIG = PageConfig(
 
     locked_value_re=r"(?:SSRM|Spencer|Bishop|k꜀|FS)\s+\**(\d+\.\d{3})",
 
-    # Two section headings are named by summary rows carrying different dots.
-    # In both cases the heading covers more than one row of the manual, so the
+    # Three section headings are named by summary rows carrying different dots.
+    # In each case the heading covers more than one row of the manual, so the
     # dot it opens with is the one the section's own locked comparisons set.
     heading_dot_multi=[
+        # "RS2-68" is Parts I-III problem 68 (row 68) and Part IV's VP62 and VP63
+        # (rows 62 and 63), which share its build.  The Part IV rows score the
+        # limit-equilibrium k꜀ only, 🟢; row 68 also scores the finite element
+        # k꜀ against RS2's, and Case 3's −5.6% makes the section 🟡.
+        ('rs2-68', '🟡'),
         # "RS2-39/41/43" builds problems 41 and 43, both 🟢; problem 39 (and its
         # Part IV twin, row 76) is deferred with no lock of its own, which is
         # what its ⊘ says.  The section's locked comparisons are the 🟢 pair.
         ('rs2-39', '🟢'),
-        # "RS2-68" carries the three seismic cases together.  Parts I-III score
-        # the problem 🔴 on case 3, and Part IV's rows split the same section:
-        # case 1 (row 62) 🟢 and case 3 (row 63) 🔴.  The worst locked case sets
-        # the dot, here and in the summary table.
-        ('rs2-68', '🔴'),
         # "RS2 Part IV VP65 / VP66" carries the two upstream-pool dams of one
         # family in a single section, because what separates them is one
         # argument about how each is watered.  VP66 (row 66) is the section's

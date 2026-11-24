@@ -24,7 +24,8 @@ runs.
 **Sampling model.** Each uncertain parameter is drawn independently from a
 distribution whose **mean is the material's base value** (the MLV in the mat sheet)
 and whose **standard deviation is the matching σ(·) column** — σ(γ) for $\gamma$,
-σ(c) for $c$, σ(φ) for $\phi$, σ(c/p) for $c_p$. The default distribution is
+σ(c) for $c$, σ(φ) for $\phi$, σ(c/p) for $c_p$, and, in a rapid drawdown, σ(d) and
+σ(ψ) for an `mc` material's $d$ and $\psi$. The default distribution is
 **normal**, the same interpretation the Taylor series places on those columns; a
 `distribution='lognormal'` option draws lognormal samples matched to the same mean
 and standard deviation. Every draw is truncated at its physical floor — a strength
@@ -81,6 +82,16 @@ limit-equilibrium solve but not with the finite-element SSRM, so FEM reliability
 stays on the Taylor series (1 + 2N solves — see
 [Reliability Analysis (FEM)](fem.md)).
 
+**Rapid drawdown.** With `rapid=True` (the **Rapid drawdown** box in Studio), every
+realization is solved as a [rapid drawdown](../lem/rapid.md), all three stages on
+the fixed surface, and an `mc` material's $K_c = 1$ envelope is sampled along with
+everything else: $d$ from σ(d) and $\psi$ from σ(ψ), as the Taylor series perturbs
+them. The drawdown procedure presumes a slope that is stable before the water is
+lowered, and refuses one that is not. A realization whose sampled parameters leave
+the slope unstable at full pool has failed before any drawdown, so it is counted as
+a failure at its stage 1 factor of safety rather than dropped, and the run reports
+how many there were (`n_stage1_failed`).
+
 **Stopping on statistical convergence.** The number of realizations a campaign
 needs depends on the result rather than on the input: the 95% confidence half-width on an
 empirical probability of failure is $1.96\sqrt{p(1-p)/n}$. The optional
@@ -135,8 +146,9 @@ The distribution is strongly right-skewed, as is typical of a large-COV input pa
 through a nonlinear factor-of-safety response: mean FS = 2.532, $\sigma_F$ = 0.801,
 and an empirical probability of failure of 1.49% (9,880 of the 10,000 draws
 converged to a valid Spencer solution; the rest are excluded rather than counted as
-failures). This is inside the 0.36%–6.2% band spanned by the three published
-estimates for this problem, a case for which the Taylor series gives no result (see
+failures). This lies between the two published estimates for this problem, Slide's
+Monte Carlo 0.355% and Wolff and Harr's point estimate 4.55%, a case for which the
+Taylor series gives no result (see
 [VP34](../verification/rocscience.md#vp34) for the full comparison). This is the same
 plot XSLOPE Studio renders on the **Reliability · MC** result tab — see
 [Reliability analysis](../studio/analysis.md#reliability-analysis).
@@ -154,7 +166,8 @@ formula that stands in for the solver — to a
 few dozen real solves and samples that surrogate ten million times, which moves the
 error budget from sampling noise, which no longer registers, to the fit, which is
 measured and reported. Everything else is the campaign above: the same fixed
-surface, the same uncertain parameters, and the same draws — both engines generate
+surface, the same uncertain parameters (in a rapid drawdown, $d$ and $\psi$ among
+them, with every real solve a drawdown), and the same draws — both engines generate
 their realizations through one routine, so the distributions, the physical floors
 and the $\phi \le 89°$ cap are identical by construction.
 
@@ -214,6 +227,16 @@ analyzable solution at all, so its $P_f$ would be a count of realizations the mo
 cannot solve. Monte Carlo reports that model, excluding those draws and counting
 them separately.
 
+A rapid drawdown is often a case for Monte Carlo. Its factor of safety is not a
+smooth function of the strength parameters: each low-permeability slice takes the
+lower of two strengths in stage 3, and the governing stage can change from one
+realization to the next, so the response has bends a quadratic cannot follow. On
+the [VP96](../verification/rocscience.md#vp96) embankment, given standard deviations
+of 2° on $\phi$ and $\psi$ and 200 psf on $d$, the surrogate fits the bulk of the
+distribution, but the solver puts 13% of the realizations it counts as failures
+back above $F = 1$. With those deviations multiplied by 2.5 it misses by up to 0.18
+in $F$. Both runs stop with the message, and Monte Carlo answers instead.
+
 **The submerged slope, both engines, Spencer's method:**
 
 | | Monte Carlo | Response surface |
@@ -254,10 +277,13 @@ therefore **never randomized**. Two treatments are meaningful:
   *same* surface: the prescribed surface when `search=False`, or the
   most-likely-values critical surface when `search=True` (found once, then held
   fixed). This is the analogue of Slide2's **Global Minimum** probabilistic method,
-  and it is what every published probabilistic benchmark did — Duncan's estimated
-  LASH surface (VP29), Chowdhury & Xu's printed circles (VP28), Wolff & Harr's
-  prescribed noncircular surface (VP34) — so it is the correct like-for-like basis
-  for comparison. A fixed-surface $P_f$ *understates* the
+  and it is what every published probabilistic benchmark did, so it is the correct
+  like-for-like basis for comparison. Those benchmarks use the slip surface Duncan (2000)
+  estimated for the underwater trench failure at the Port of San Francisco LASH terminal
+  ([VP29](../verification/rocscience.md#vp29)), the critical circles of Chowdhury & Xu's
+  (1995) Congress Street Cut and embankment ([VP28](../verification/rocscience.md#vp28)),
+  and the noncircular surface Wolff & Harr (1987) prescribed for the Clarence Cannon Dam
+  ([VP34](../verification/rocscience.md#vp34)). A fixed-surface $P_f$ *understates* the
   slope-system probability of failure, because for some sampled parameter sets the
   true critical surface lies elsewhere.
 - **Per-realization minimum (not available).** The system-level analogue of

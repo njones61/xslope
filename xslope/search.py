@@ -20,13 +20,16 @@ import numpy as np
 from shapely.geometry import LineString, Point
 
 from . import solve
-from .advanced import no_low_k_sentence, rapid_drawdown, validate_rapid_drawdown
+from .advanced import (no_low_k_sentence, rapid_drawdown, seismic2_strength, seismic2_tag,
+                       seismic_stages_line,
+                       seismic_two_stage, validate_rapid_drawdown)
 # Re-exported beside the search it feeds: a starting set for a model that carries
 # no circles is a search input, and a caller reaching for one is already here.
 # The implementation lives in generators.py, which stays free of search's imports
 # so the preflight remedy can build a starting set without pulling in the solvers.
 from .generators import (generate_noncircular_surface, generate_starting_circles,
                          rank_weak_zones, slope_geometry)
+from .fileio import NONCIRC_MOVEMENTS, noncirc_movement
 from .preflight import preflight
 from .slice import crossings_above_center, generate_slices
 
@@ -437,9 +440,22 @@ def _check_cancel(cancel_check):
         raise AnalysisCancelled()
 
 
+def _refuse_two_staged(rapid, seismic2):
+    """A run is a rapid drawdown or a two-stage seismic analysis, never both: each
+    is its own pair of stages on the same slices. Also refuses a ``seismic2`` that
+    names no stage 2 strength (see :func:`xslope.advanced.seismic2_strength`)
+    before any trial is cut."""
+    seismic2_strength(seismic2)
+    if rapid and seismic2:
+        raise ValueError("Rapid drawdown and the two-stage seismic analysis each "
+                         "run their own stages on the same slices, so a run takes "
+                         "one or the other.")
+
+
 def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                        rapid=False, composite=False, nx=10, ny=5, n_tangents=6,
                        keep=4, diagnostic=False, cancel_check=None, circle_cache=None,
+                       seismic2=False,
                        min_slip_depth=None, center_box=None, entry_range=None,
                        exit_range=None, tangent_depth=None, tally=None):
     """Coarse grid-and-tangent sweep that SEEDS the adaptive circular search.
@@ -524,7 +540,7 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                 success, result = generate_slices(slope_data, circle=circle,
                                                   num_slices=sweep_slices,
                                                   composite=composite,
-                                                  check_inputs=False)
+                                                  check_inputs=False, rapid=rapid)
                 if not success:
                     continue
                 df_slices, failure_surface = result
@@ -534,6 +550,8 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                     continue
                 if rapid:
                     ok, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
+                elif seismic2:
+                    ok, solver_result = seismic_two_stage(df_slices, method_name, debug_level=0, strength=seismic2)
                 else:
                     ok, solver_result = solver(df_slices)
                 if tally is not None:
@@ -579,6 +597,50 @@ SEARCH_WINDOW_KEYS = ('entry_x_min', 'entry_x_max', 'exit_x_min', 'exit_x_max',
                       'center_box_x_min', 'center_box_y_min',
                       'center_box_x_max', 'center_box_y_max',
                       'max_tangent_depth', 'min_slip_depth')
+
+
+def noncirc_point_movements(non_circ):
+    """How the non-circular search moves each point: ``'Free'``, ``'Horiz'`` or
+    ``'Fixed'``, one per point of ``non_circ`` in its own order.
+
+    The Movement column matches in any case. A blank cell keeps its standing
+    meaning: an END point slides along the ground surface (as ``Free`` or
+    ``Horiz`` would -- that is an end point's only admissible direction) and an
+    INTERIOR point is held where it is (``Fixed``). Any other entry raises
+    ValueError rather than being read as ``Fixed``, which once froze a point
+    typed as lowercase "free" without a word.
+    """
+    pts = list(non_circ or [])
+    out = []
+    for i, p in enumerate(pts):
+        raw = p.get('Movement') if isinstance(p, dict) else None
+        word = noncirc_movement(raw)
+        if word is None:
+            word = 'Free' if i in (0, len(pts) - 1) else 'Fixed'
+        elif word not in NONCIRC_MOVEMENTS:
+            raise ValueError(
+                f"Point {i + 1} of the non-circular surface has Movement "
+                f"{str(raw).strip()!r}, which is not a movement. Enter Free, Horiz "
+                f"or Fixed, or leave it blank (an end point then slides along the "
+                f"ground surface and an interior point stays where it is) "
+                f"(Non-circular surface; non-circ sheet).")
+        out.append(word)
+    return out
+
+
+def noncirc_left_to_right(non_circ):
+    """The non-circular surface's points in order of increasing x, each with its
+    own Movement flag.
+
+    The order the points are entered in says nothing about the surface: a
+    surface drawn from the crest down to the toe of a right-facing slope is the
+    same surface listed the other way. The search needs them left to right,
+    because it moves each point only between its neighbors' x.
+    """
+    pts = list(non_circ or [])
+    if len(pts) >= 2 and float(pts[0]['X']) > float(pts[-1]['X']):
+        pts.reverse()
+    return pts
 
 
 def file_search_window(slope_data, already=()):
@@ -657,7 +719,7 @@ def noncircular_search_opts(search_opts):
             if k in NONCIRCULAR_WINDOW_KEYS}
 
 
-def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
+def circular_search(slope_data, method_name, rapid=False, seismic2=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03,
                     diagnostic=False, num_slices=40, cancel_check=None, composite=False,
                     seed='circles', min_slip_depth=None, center_box=None, entry_range=None,
@@ -756,9 +818,10 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     # limit-equilibrium rule and adds the stage-2 water, load and strength
     # requirements, which is exactly what validate_rapid_drawdown below only
     # PRINTS -- and only on this path.
-    preflight(slope_data, 'rapid' if rapid else 'lem',
+    _refuse_two_staged(rapid, seismic2)
+    preflight(slope_data, 'rapid' if rapid else ('seismic2' if seismic2 else 'lem'),
               {'surface': 'circular', 'search': True,
-               'method': method_name}).raise_for_errors()
+               'method': method_name, 'seismic2': seismic2}).raise_for_errors()
 
     if rapid:
         validate_rapid_drawdown(slope_data)
@@ -817,7 +880,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         _check_cancel(cancel_check)
         circles = _grid_seed_circles(
             slope_data, method_name, num_slices=num_slices, fs_fail=fs_fail,
-            rapid=rapid, composite=composite, diagnostic=diagnostic,
+            rapid=rapid, seismic2=seismic2, composite=composite, diagnostic=diagnostic,
             cancel_check=cancel_check, circle_cache=circle_cache,
             min_slip_depth=min_slip_depth, center_box=center_box,
             entry_range=entry_range, exit_range=exit_range, tangent_depth=tangent_depth,
@@ -853,7 +916,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             seed_ok, _seed_res = generate_slices(
                 slope_data,
                 circle={'Xo': x, 'Yo': y, 'Depth': depth_guess, 'R': y - depth_guess},
-                num_slices=num_slices, composite=composite, check_inputs=False)
+                num_slices=num_slices, composite=composite, check_inputs=False,
+                rapid=rapid)
             if seed_ok:
                 floor = depth_guess
         best_depth = max(depth_guess, floor)
@@ -879,7 +943,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d, 'R': y - d}
                 success, result = generate_slices(slope_data, circle=test_circle,
                                                   num_slices=num_slices, composite=composite,
-                                                  check_inputs=False)
+                                                  check_inputs=False, rapid=rapid)
                 if not success:
                     FS = fs_fail
                     df_slices = None
@@ -898,6 +962,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                     else:
                         if rapid:
                             solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
+                        elif seismic2:
+                            solver_success, solver_result = seismic_two_stage(df_slices, method_name, debug_level=0, strength=seismic2)
                         else:
                             solver_success, solver_result = solver(df_slices)
                         # The two ways a trial scores fs_fail are different facts,
@@ -1028,7 +1094,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         try:
             seed_ok, seed_msg = generate_slices(
                 slope_data, circle={'Xo': x0, 'Yo': y0, 'Depth': depth_guess, 'R': r0},
-                num_slices=num_slices, composite=composite, check_inputs=False)
+                num_slices=num_slices, composite=composite, check_inputs=False,
+                rapid=rapid)
         except Exception:
             seed_ok, seed_msg = True, ''
         if not seed_ok:
@@ -1133,7 +1200,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     _report_unsolved()
     return sorted_fs_cache, converged, search_path, circle_cache
 
-def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, max_kink_back=MAX_KINK_BACK, cancel_check=None, min_slip_depth=None):
+def noncircular_search(slope_data, method_name, rapid=False, seismic2=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, max_kink_back=MAX_KINK_BACK, cancel_check=None, min_slip_depth=None):
     """
     Non-circular search using the specified solver.
 
@@ -1201,9 +1268,10 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     # Gate once at the entry, not per trial -- see circular_search. This is also
     # what turns "the starting surface is not viable" into the real reason when the
     # method cannot use a non-circular surface at all.
-    preflight(slope_data, 'rapid' if rapid else 'lem',
+    _refuse_two_staged(rapid, seismic2)
+    preflight(slope_data, 'rapid' if rapid else ('seismic2' if seismic2 else 'lem'),
               {'surface': 'noncircular', 'search': True,
-               'method': method_name}).raise_for_errors()
+               'method': method_name, 'seismic2': seismic2}).raise_for_errors()
 
     if rapid:
         validate_rapid_drawdown(slope_data)
@@ -1282,7 +1350,8 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
 
         # Generate slices and compute FS
         success, result = generate_slices(slope_data, non_circ=non_circ,
-                                          num_slices=num_slices, check_inputs=False)
+                                          num_slices=num_slices, check_inputs=False,
+                                          rapid=rapid)
         if not success:
             return float('inf'), None, None, None, fs_cache
             
@@ -1305,6 +1374,8 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
 
         if rapid:
             solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
+        elif seismic2:
+            solver_success, solver_result = seismic_two_stage(df_slices, method_name, debug_level=0, strength=seismic2)
         else:
             solver_success, solver_result = solver(df_slices)
         FS = solver_result['FS'] if solver_success else float('inf')
@@ -1325,10 +1396,14 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         
         return FS, df_slices, failure_surface, solver_result, fs_cache
 
-    # Get initial surface from non_circ data
-    non_circ = slope_data['non_circ']
+    # Get initial surface from non_circ data, left to right: each point moves only
+    # between its neighbors' x, so points listed right to left could never move.
+    non_circ = noncirc_left_to_right(slope_data['non_circ'])
     points = np.array([[p['X'], p['Y']] for p in non_circ])
-    movements = [p['Movement'] for p in non_circ]
+    # Free / Horiz / Fixed in any case; a blank resolves by position (an end point
+    # slides, an interior point stays); any other word is refused here as well as
+    # by preflight's surface.movement_vocabulary above.
+    movements = noncirc_point_movements(non_circ)
     ground_surface = slope_data['ground_surface']
     # Each vertex may bend back as far as the guard allows or as far as it was
     # entered, whichever is more: the search may not make a bend, or deepen one.
@@ -1693,6 +1768,7 @@ def analyzed_surface_noun(searched, circular):
 
 def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circular",
                      num_slices=40, rapid=False, composite=False, grid_seed=False,
+                     seismic2=False, ky=False,
                      diagnostic=False, cancel_check=None, fs_tol=None, tol=None,
                      max_iter=None, min_slip_depth=None, announce=True):
     """Run ONE method on this model and return the bundle every consumer reads.
@@ -1711,6 +1787,16 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         Which family to run over, for a model that defines both.
     num_slices, rapid, composite, grid_seed, diagnostic
         The run options, under the names Studio's Run LEM dialog gives them.
+    seismic2 : bool, str, or dict
+        The two-stage pseudostatic analysis (:func:`xslope.advanced.seismic_two_stage`):
+        False, or the stage 2 strength (True or ``"interpolated"``, ``"kc1"``), or
+        ``{"strength": ..., "factor": f}`` to multiply the stage 2 undrained
+        strengths by f (:func:`xslope.advanced.seismic2_factor`).
+    ky : bool
+        Find the seismic yield coefficient instead of the factor of safety at the
+        model's k (:func:`xslope.seismic.yield_coefficient`): on the specified
+        surface, or the minimum over the search. The bundle is solved at k = k_y
+        and carries the answer under ``"yield"``. Not with ``rapid``.
     cancel_check : callable, optional
         Polled at iteration boundaries; raises :class:`AnalysisCancelled`.
     fs_tol, tol, max_iter, min_slip_depth
@@ -1756,13 +1842,25 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             f"'single_surface'.")
     method = str(method or "").lower()
     circular = surface != "noncircular"
-    tag = " (rapid drawdown)" if rapid else ""
+    _refuse_two_staged(rapid, seismic2)
+    if ky:
+        if rapid:
+            raise ValueError("A rapid drawdown analysis has no yield coefficient: "
+                             "k_y is found for a pseudostatic analysis.")
+        from .seismic import yield_coefficient
+        return yield_coefficient(
+            slope_data, method, analysis=analysis, surface=surface,
+            num_slices=num_slices, seismic2=seismic2, composite=composite,
+            grid_seed=grid_seed, diagnostic=diagnostic, cancel_check=cancel_check,
+            fs_tol=fs_tol, tol=tol, max_iter=max_iter,
+            min_slip_depth=min_slip_depth, announce=announce)
+    tag = " (rapid drawdown)" if rapid else seismic2_tag(seismic2)
     # Recorded before anything is solved, so what comes back says how it was made
     # whichever branch made it.
     made_under = {"analysis": analysis,
                   "surface": "circular" if circular else "noncircular",
-                  "num_slices": num_slices, "rapid": rapid,
-                  "composite": composite, "grid_seed": grid_seed,
+                  "num_slices": num_slices, "rapid": rapid, "seismic2": seismic2,
+                  "ky": False, "composite": composite, "grid_seed": grid_seed,
                   "diagnostic": diagnostic, "fs_tol": fs_tol, "tol": tol,
                   "max_iter": max_iter, "min_slip_depth": min_slip_depth}
     if analysis == "auto_search":
@@ -1781,7 +1879,7 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                       f"{method.upper()}{tag}…")
             unsolved = {}
             fs_cache, converged, search_path, circle_cache = circular_search(
-                slope_data, method, rapid=rapid, num_slices=num_slices,
+                slope_data, method, rapid=rapid, seismic2=seismic2, num_slices=num_slices,
                 diagnostic=diagnostic, cancel_check=cancel_check,
                 composite=composite, seed=seed, unsolved_out=unsolved, **kw)
             search = {"kind": "circular", "fs_cache": fs_cache,
@@ -1795,7 +1893,7 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                 print(f"Searching for the critical non-circular surface with "
                       f"{method.upper()}{tag}…")
             fs_cache, converged, search_path = noncircular_search(
-                slope_data, method, rapid=rapid, num_slices=num_slices,
+                slope_data, method, rapid=rapid, seismic2=seismic2, num_slices=num_slices,
                 diagnostic=diagnostic, cancel_check=cancel_check, **kw)
             # The unsolved-trial disclosure is the circular search's; the
             # non-circular branch scores a solver failure the same way it scores
@@ -1830,6 +1928,9 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                     results, analyzed_surface_noun(True, circular))
                 if drained:
                     print(drained)
+            if "seismic_stage1_FS" in results:
+                print(seismic_stages_line(
+                    results, "the " + analyzed_surface_noun(True, circular)))
             mass = _sliding_mass_line(critical.get("slices"), slope_data)
             if mass:
                 print(mass)
@@ -1864,7 +1965,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                   f"{num_slices} slices{tag}…")
 
     ok, out = generate_slices(slope_data, circle=circle, non_circ=non_circ,
-                              num_slices=num_slices, composite=composite)
+                              num_slices=num_slices, composite=composite,
+                              rapid=rapid)
     if not ok:
         raise AnalysisError(str(out))
     slice_df, failure_surface = out
@@ -1876,7 +1978,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     held = io.StringIO()
     try:
         with contextlib.redirect_stdout(held):
-            results = solve.solve_selected(method, slice_df, rapid=rapid)
+            results = solve.solve_selected(method, slice_df, rapid=rapid,
+                                           seismic2=seismic2)
     except BaseException:
         print(held.getvalue(), end="")   # nothing the solver printed is lost
         raise
@@ -1897,6 +2000,9 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
                                     analyzed_surface_noun(False, circular))
         if drained:
             print(drained)
+        if "seismic_stage1_FS" in bundle["results"]:
+            print(seismic_stages_line(
+                bundle["results"], "the " + analyzed_surface_noun(False, circular)))
         mass = _sliding_mass_line(slice_df, slope_data)
         if mass:
             print(mass)

@@ -48,7 +48,7 @@ The three build paths, the template's worksheets, what **Save As** writes, and `
 
 ## Limit equilibrium
 
-<span class="tut-band-sub">13 tutorials</span>
+<span class="tut-band-sub">15 tutorials</span>
 
 </div>
 
@@ -79,9 +79,9 @@ The smallest complete model — one material, one profile line, a rigid base —
 
 ### [Loads on the Crest](lem02_loads_on_the_crest.md)
 
-A surcharge added to LEM-1's embankment — spread over the crest, gathered onto a point, pushed normal to the ground or straight down, and shaken — then a sweep for the cohesion that would carry it at a target factor of safety.
+A surcharge added to LEM-1's embankment — spread over the crest, gathered onto a point, pushed normal to the ground or straight down — then a sweep for the cohesion that would carry it at a target factor of safety.
 
-<p class="tut-tags"><span class="tut-tag">distributed loads</span><span class="tut-tag">line loads</span><span class="tut-tag">load direction</span><span class="tut-tag">seismic coefficient</span><span class="tut-tag">design mode</span></p>
+<p class="tut-tags"><span class="tut-tag">distributed loads</span><span class="tut-tag">line loads</span><span class="tut-tag">load direction</span><span class="tut-tag">design mode</span></p>
 
 </div>
 </div>
@@ -160,13 +160,13 @@ An embankment on bedrock that dips across the section, entered as closed materia
 <span class="tut-num">7</span>
 </div>
 <div class="tut-body" markdown>
-<p class="tut-kicker">LEM-7 · Limit equilibrium · 30–40 min</p>
+<p class="tut-kicker">LEM-7 · Limit equilibrium · 40–50 min</p>
 
 ### [Strength Options Beyond Mohr-Coulomb](lem07_strength_envelopes.md)
 
-Two slopes whose strength is not a pair of numbers — a compacted clay fitted once as a curved power envelope and once as the straight Mohr-Coulomb line through the same triaxial data, and a layered clay whose undrained strength grows with depth, flattened to a constant to see how the search responds when strength no longer increases with depth.
+Two slopes whose strength is not a pair of numbers — a compacted clay fitted once as a curved power envelope and once as the straight Mohr-Coulomb line through the same triaxial data, and a layered clay whose undrained strength grows with depth, flattened to a constant to see how the search responds when strength no longer increases with depth, and then entered as strength ratios, as the clays become once they consolidate under the slope.
 
-<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">three materials</span><span class="tut-tag">power-curve envelope</span><span class="tut-tag">Mohr-Coulomb</span><span class="tut-tag">strength with depth</span><span class="tut-tag">undrained strength</span><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span></p>
+<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">three materials</span><span class="tut-tag">power-curve envelope</span><span class="tut-tag">Mohr-Coulomb</span><span class="tut-tag">strength with depth</span><span class="tut-tag">strength ratio</span><span class="tut-tag">undrained strength</span><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span></p>
 
 </div>
 </div>
@@ -215,9 +215,9 @@ A 30 ft soldier-pile wall held by two rows of grouted tiebacks — discrete anch
 
 ### [Finding the Global Minimum](lem10_global_minimum.md)
 
-Two slopes with competing failure mechanisms: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dyke, where a single credible seed reads 23% high — resolved with a minimum slip depth and grid seeding.
+Two slopes with competing failure mechanisms: an embankment on soft clay where moving the starting circle moves the answer, and the James Bay dike, where a single credible seed reads 23% high — resolved with a minimum slip depth and grid seeding.
 
-<p class="tut-tags"><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span><span class="tut-tag">grid seeding</span><span class="tut-tag">minimum slip depth</span><span class="tut-tag">James Bay dyke</span></p>
+<p class="tut-tags"><span class="tut-tag">starting circles</span><span class="tut-tag">circular search</span><span class="tut-tag">grid seeding</span><span class="tut-tag">minimum slip depth</span><span class="tut-tag">James Bay dike</span></p>
 
 </div>
 </div>
@@ -269,6 +269,40 @@ A 20 ft clay slope stabilized by two rows of drilled shafts whose force column i
 A 10 m rock cut whose strength is described by four field observations rather than a cohesion and a friction angle — the intact strength, the Geological Strength Index, the intact constant and the blast disturbance — solved by Spencer's method and then by strength reduction on the same file, read once more with its intact strength typed in the megapascals the literature quotes, and then swept across the Geological Strength Index and the blast-disturbance factor to find which of the four field inputs controls the answer.
 
 <p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">Hoek-Brown</span><span class="tut-tag">GSI</span><span class="tut-tag">disturbance factor</span><span class="tut-tag">instantaneous tangent</span><span class="tut-tag">circular search</span><span class="tut-tag">strength reduction</span><span class="tut-tag">quadratic triangles</span><span class="tut-tag">parametric study</span><span class="tut-tag">design sweep</span><span class="tut-tag">model checks</span></p>
+
+</div>
+</div>
+
+<div class="tut-row" markdown>
+<div class="tut-thumb" markdown>
+[![](images/lem14_dry_two_stage.png)](lem14_pseudostatic.md)
+<span class="tut-num">14</span>
+</div>
+<div class="tut-body" markdown>
+<p class="tut-kicker">LEM-14 · Limit equilibrium, finite element (strength reduction) · ~45 min</p>
+
+### [Pseudostatic Analysis](lem14_pseudostatic.md)
+
+A 15 ft fill slope at a seismic coefficient of 0.15, with undrained strengths from consolidated-undrained tests: run in one stage with the R envelope and in two stages with each choice of stage 2 strength and with a strength reduction, dry and with a water table, and then by strength reduction at the same coefficient.
+
+<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">seismic coefficient</span><span class="tut-tag">R envelope</span><span class="tut-tag">two-stage seismic</span><span class="tut-tag">Kc = 1 envelope</span><span class="tut-tag">strength factor</span><span class="tut-tag">d and ψ</span><span class="tut-tag">piezometric line</span><span class="tut-tag">Spencer</span><span class="tut-tag">circular search</span><span class="tut-tag">strength reduction</span><span class="tut-tag">quadratic triangles</span></p>
+
+</div>
+</div>
+
+<div class="tut-row" markdown>
+<div class="tut-thumb" markdown>
+[![](images/lem15_newmark_x3.png)](lem15_yield_newmark.md)
+<span class="tut-num">15</span>
+</div>
+<div class="tut-body" markdown>
+<p class="tut-kicker">LEM-15 · Limit equilibrium · ~30 min</p>
+
+### [Yield Coefficient and Newmark Displacement](lem15_yield_newmark.md)
+
+The yield coefficient of LEM-14's fill slope, found on the static critical circle and by search, and the permanent displacement a recorded earthquake causes it in a Newmark sliding-block analysis, in both directions, as recorded and scaled by 2 and 3.
+
+<p class="tut-tags"><span class="tut-tag">one material</span><span class="tut-tag">R envelope</span><span class="tut-tag">yield coefficient</span><span class="tut-tag">Spencer</span><span class="tut-tag">circular search</span><span class="tut-tag">Newmark displacement</span><span class="tut-tag">acceleration record</span><span class="tut-tag">scale factor</span></p>
 
 </div>
 </div>

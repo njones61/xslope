@@ -29,6 +29,10 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+# Every Studio window, editor or dialog this builds reads and writes Studio's
+# machine-wide settings store; it gets a scratch one (tools/studio_settings.py).
+from tools import studio_settings                      # noqa: E402
+
 import matplotlib
 matplotlib.use("Agg")
 
@@ -273,6 +277,7 @@ SHOTS = {
 }
 
 
+@studio_settings.isolated
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     sweep = "--all" in argv

@@ -169,7 +169,8 @@ def compute_fs(params):
             with contextlib.redirect_stdout(io.StringIO()):
                 if test_type == "single_circle":
                     circle = slope_data["circles"][0]
-                    ok, res = generate_slices(slope_data, circle=circle, num_slices=num_slices)
+                    ok, res = generate_slices(slope_data, circle=circle, num_slices=num_slices,
+                                               rapid=rapid)
                     if not ok:
                         results[short] = None
                         continue

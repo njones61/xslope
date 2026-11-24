@@ -2,7 +2,9 @@
 
 The [Rocscience Slide2 verification manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
 publishes 111 slope stability problems drawn from the literature, each with Slide2's own factor of
-safety and, in most cases, the original authors'. XSLOPE reproduces them problem by problem; the
+safety and, in most cases, the original authors'. Problems 1 to 10 come from the Association for
+Computer Aided Design's (ACADS) 1989 review of slope stability programs (Donald & Giam 1989).
+XSLOPE reproduces them problem by problem; the
 summary table gives each problem's headline comparison and a
 [match dot](index.md#how-the-match-dots-are-scored), and links to the section that builds it.
 
@@ -92,8 +94,8 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp060.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.009, fs_janbu=1.073, benchmark=VP60 -->
 <!-- test: file=files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
 <!-- test: file=files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.202, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
-<!-- test: file=files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.797, fs_bishop=1.796, benchmark=VP52-dry -->
-<!-- test: file=files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.189, fs_bishop=1.176, benchmark=VP52-wet -->
+<!-- test: file=files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.794, fs_bishop=1.793, benchmark=VP52-dry -->
+<!-- test: file=files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.180, fs_bishop=1.167, benchmark=VP52-wet -->
 <!-- test: file=files/rocscience/vp053.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.048, fs_spencer=1.048, fs_mprice=1.048, fs_lowe=1.048, benchmark=VP53 -->
 <!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
@@ -154,6 +156,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.452, fs_spencer=2.451, benchmark=VP102-dry -->
 <!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.723, fs_spencer=1.731, benchmark=VP102-steady -->
 <!-- test: file=files/rocscience/vp103a.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.221, benchmark=VP103a-deep -->
+<!-- test: file=files/rocscience/vp103a.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.221, noncirc_order=reversed, benchmark=VP103a-deep-reversed -->
 <!-- test: file=files/rocscience/vp103b.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.298, benchmark=VP103b-deep -->
 <!-- test: file=files/rocscience/vp103c.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.374, benchmark=VP103c-deep -->
 <!-- test: file=files/rocscience/vp103d.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.322, benchmark=VP103d-shallow -->
@@ -165,7 +168,13 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp103c.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=18;30, fs_spencer=1.348, benchmark=VP103c-shallow-circ -->
 <!-- test: file=files/rocscience/vp104a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.372, benchmark=VP104-noseismic -->
 <!-- test: file=files/rocscience/vp104b.xlsx, type=circular_search, num_slices=40, fs_spencer=0.989, benchmark=VP104-k015 -->
-<!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.144, k_min=0.08, k_max=0.22, kc_tol=0.01, num_slices=40, benchmark=VP104-kc -->
+<!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.1445, kc_tol=0.001, num_slices=40, benchmark=VP104-kc -->
+<!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, surface=noncircular, expected_kc=0.1433, kc_tol=0.001, num_slices=40, benchmark=VP104-kc-noncirc -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.139, expected_d=5.036, tolerance=0.005, benchmark=VP104-newmark -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.139, direction=positive, expected_d=4.007, tolerance=0.005, benchmark=VP104-newmark-positive -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.140, expected_d=4.928, tolerance=0.005, benchmark=VP104-newmark-uni -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.1433, expected_d=4.589, tolerance=0.005, benchmark=VP104-newmark-xslope-ky -->
+<!-- test: file=Tutorial 28 Seismic.slmd, vendor=rocscience, type=newmark, ky=0.1445, expected_d=4.473, tolerance=0.005, benchmark=VP104-newmark-xslope-ky-circles -->
 <!-- test: file=files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.532, benchmark=VP82 -->
 <!-- test: file=files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
@@ -249,7 +258,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [49](#vp49) | 🟢 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | Janbu(corr) 1.469 vs Slide 1.479 (−0.7%) · Janbu(corr) 1.469 vs SNAILZ 1.52 (−3.4%) |  |
 | [50](#vp50) | 🟢 | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | Janbu(corr) 1.448 vs SNAILZ 1.46 (−0.8%) · Janbu(corr) 1.448 vs Slide 1.417 (+2.2%) |  |
 | [51](#vp51) | 🟢 | Slope, (4) materials, water table, tension crack, seismic | Spencer 1.294 vs Slide 1.293 (+0.1%) · Spencer 1.294 vs Zhu 1.293 (+0.1%) | phreatic line calibrated to the agreeing published Bishop/Spencer values |
-| [52](#vp52) | 🟢 | Slope, (4) materials, water table, tension crack | dry: Spencer 1.797 vs Slide 1.804 (−0.4%) · wet: Spencer 1.189 vs Slide 1.189 (0.0%) | the shallow/noncircular surfaces need constrained searches not yet exposed |
+| [52](#vp52) | 🟢 | Slope, (4) materials, water table, tension crack | dry: Spencer 1.794 vs Slide 1.804 (−0.6%) · wet: Spencer 1.180 vs Slide 1.189 (−0.8%) | the shallow/noncircular surfaces need constrained searches not yet exposed |
 | [53](#vp53) | 🟢 | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | all methods 1.048 vs Slide / RocPlane / Priest 1.049 (−0.1%) | on a single plane every method coincides |
 | [54](#vp54) | 🟢 | Slope, homogenous, micro piles | no pile: Bishop 1.100 vs Slide 1.102 (−0.2%) · with pile: Bishop 1.185 vs Slide 1.193 (−0.7%) |  |
 | [55](#vp55) | 🟢 | Slope, homogenous, water table | Spencer 1.297 vs Slide 1.300 (−0.2%) · Bishop 1.290 vs Slide 1.293 (−0.2%) |  |
@@ -272,7 +281,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [72](#vp72) | 🟢 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | FE seepage, tangent 197: Spencer 1.341 vs Slide 1.312 (+2.2%) · piezometric line: Spencer 1.563 vs Slide 1.557 (+0.4%) |  |
 | [73](#vp73) | 🟢 | Excavated slope, (4) materials, tension crack | Spencer 1.766 vs Slide 1.758 (+0.5%) · Spencer 1.766 vs D&W 1.76 (+0.3%) |  |
 | [74](#vp74) | 🟢 | Embankment, (2) materials | Spencer 1.194 vs Slide 1.201 (−0.6%) · Spencer 1.194 vs D&W 1.19 (+0.3%) |  |
-| [75](#vp75) | 🟢 | Dyke, (4) materials | free search: Bishop 1.424 vs D&W 1.45 (−1.8%) | D&W report Bishop, so Bishop governs like-for-like |
+| [75](#vp75) | 🟢 | Dike, (4) materials | free search: Bishop 1.424 vs D&W 1.45 (−1.8%) | D&W report Bishop, so Bishop governs like-for-like |
 | [76](#vp76) | 🟢 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.073 vs Slide 1.075 (−0.2%) · piezometric line: Spencer 1.078 vs Slide 1.100 (−2.0%) | a shallow toe surface hypersensitive to the piezometric-line elevation; the line carries Slide2's own vertices |
 | [77](#vp77) | 🟢 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.724 vs Slide 1.724 (0.0%) · piezometric line: Spencer 1.659 vs Slide 1.648 (+0.7%) |  |
 | [78](#vp78) | 🟢 | Slope, homogenous | Spencer 1.135 vs Slide 1.139 (−0.4%) · Bishop 1.134 vs D&W 1.124 (+0.9%) |  |
@@ -301,9 +310,9 @@ Full bibliographic details for the author-year citations on this page are on the
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
 | [102](#vp102) | 🟢 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.731 vs Slide 1.745 (−0.8%) · drawdown at 100 h: Spencer 1.817 vs Slide 1.867 (−2.7%) | the 100 h frame is the widest of the 60–1500 h transient series, which runs from −2.7% to +0.2% against the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause of the early-frame shortfall and is worth a small fraction of it. |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | 4 files, both mechanisms; the deep→shallow switch lands in Slide2's own interval |
-| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | 3 of 4 scenarios; the Newmark displacement is reproduced by a benchmark diagnostic (−0.5% at Slide2's K<sub>y</sub>), not an XSLOPE mode |
+| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.1433 vs Slide2 uni-modal 0.140 (+2.4%) · Newmark D 5.036 cm vs Slide2 MMO 5.042 cm (−0.1%) | all 4 scenarios; the Newmark displacement is run at Slide2's own K<sub>y</sub> 0.139 |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
-| [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · D1/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · D1/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · D1/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · D1/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | 5 cases; the Ito & Matsui limit pressure is auto-computed. The paper's three-dimensional finite-element results are compared separately, as a [diagnostic of the 2D pile idealization](#vp106-fem) that carries no dot |
+| [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · S/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · S/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · S/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · S/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | 5 cases; the Ito & Matsui limit pressure is auto-computed. The paper's three-dimensional finite-element results are compared separately, as a [diagnostic of the 2D pile idealization](#vp106-fem) that carries no dot |
 | [107](#vp107) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Spencer 1.397 vs Slide 1.386 (+0.8%) · mesh supports: Spencer 1.397 vs Slide 1.392 (+0.4%) |  |
 | [108](#vp108) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Bishop 1.790 vs Slide 1.787 (+0.2%) · mesh: Bishop 1.830 vs Slide 1.835 (−0.3%) | Spencer within 0.3% on both |
 | [109](#vp109) | 🟢 | Retaining walls, gabion walls, weak layers | Spencer 1.797 vs Slide's joint block search 1.803 (−0.3%) · Bishop 1.790 vs Slide 1.799 (−0.5%) | the joints do not govern overall stability |
@@ -311,6 +320,10 @@ Full bibliographic details for the author-year citations on this page are on the
 | [111](#vp111) | <span class="nodata">⊘</span> | Helical anchor | Slide's problem 111 verifies its helical-anchor capacity envelope, not a slope — there is no slope and no factor of safety to compare. Helically anchored slopes are analyzed in XSLOPE by entering the governing capacity as a standard anchor force — see the [worked note](#vp111). | *not supported* — XSLOPE takes an anchor's capacity as an input rather than computing a helical plate's |
 
 </div>
+
+Abbreviations in the table: A&T, Arai & Tagyo (1985); Y&U, Yamagami & Ueta (1988); F&K, Fredlund &
+Krahn (1977); H&W, Hassan & Wolff (1999); D&W, Duncan & Wright (2005); L&H, Leshchinsky & Han
+(2004); DWW, Duncan, Wright & Wong (1990); LLA, local linear approximation.
 
 ---
 
@@ -938,17 +951,19 @@ trace of the drawn surface, and `reliability(search=False)` evaluates it directl
 | F, most likely values | 1.145 | 1.17 (−2.1%) | 1.157 (−1.0%), mean 1.166 |
 | β_ln → PF | 0.936 → **17.5%** | ≈0.9 → **18%** | 1.088 → 13.96% (Monte Carlo — cross-estimator) |
 
-*Both published sources are reproduced. The deterministic factor of safety brackets between
-them on Duncan's surface, represented as a smooth least-squares arc (RMS 1.1 ft against the
+*Both published sources are reproduced. The deterministic factor of safety sits just below
+both on Duncan's surface, represented as a smooth least-squares arc (RMS 1.1 ft against the
 pixel trace), and the probability of failure reproduces Duncan's own 18% almost exactly.
 Slide's Table 29.2 renders Duncan's whole-envelope ±σ as a rate-only σ (±1.2 psf/ft), the
 only form a c/cp parameterization can express, which is why Slide's Monte Carlo PF (14%)
 sits below Duncan's 18%.*
 
 *The same slope carries three published probabilities of failure — 14% (Slide MC),
-18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, on a wider 2σ-rule envelope). Two TSPM
-analyses by the same author differ by more than TSPM differs from Monte Carlo, so the
-σ-input choice, not the estimator, dominates probabilistic comparisons.*
+18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, on a wider 2σ-rule envelope). The last
+does not follow from the book's own Table 13.8, whose entries give σ_F = 0.242 and a COV of
+20.7%. Worked through, those put the probability of failure at about 24–25%. Two TSPM analyses
+by the same author differ by more than TSPM differs from Monte Carlo, so the σ-input choice,
+not the estimator, dominates probabilistic comparisons.*
 
 ![vp029: inputs and representative solution](images/vp029.png)
 
@@ -1039,7 +1054,7 @@ which print every vertex, the clay layer boundaries, and the three published cir
 **Input files:** [vp033.xlsx](files/rocscience/vp033.xlsx)
 
 El-Ramly, Morgenstern & Cruden (2003)'s simplified probabilistic model of a Syncrude tailings
-dyke: a cohesionless section (tailing sand over glacio-fluvial sands and tills, all φ = 34°) on a
+dike: a cohesionless section (tailing sand over glacio-fluvial sands and tills, all φ = 34°) on a
 presheared disturbed clay-shale with φ = 7.5° ± 2.1°. The critical mechanism rides the clay-shale,
 and Slide's drawn circle (center (327.5, 394), R = 124) is tangent about nineteen meters below the
 model base, so the surface is **composite** — truncated at the base and running flat inside the
@@ -1099,8 +1114,8 @@ evaluation would use a negative friction angle and `reliability()` declines the 
 published probabilities themselves differ by 13× — W&H's point estimate 4.55×10⁻² against Slide's
 Monte-Carlo 3.55×10⁻³ — so at a COV of 124% the sampling treatment of the φ ≥ 0 bound dwarfs the
 estimator choice. `reliability_mc` carries the case past that boundary, truncating the negative φ
-draws at zero as the published samplers do, and lands inside the band the three published
-estimates span. It carries no match because the two published probabilities are 13× apart, so
+draws at zero as the published samplers do, and lands between the two published
+probabilities. It carries no match because they are 13× apart, so
 there is no single target to hold a sampled probability to; the row's dot scores the
 deterministic factor of safety.*
 
@@ -1285,7 +1300,7 @@ the uncorrected one.
 
 ## 🟢 VP41: Slope, homogenous, ru pore pressure {#vp41}
 
-Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curve strength tau = 1.4*(sigma')^0.8 and ru = 0.3 — exercises the v12 pow option and ru together.
+Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curve strength tau = 1.4*(sigma')^0.8 and ru = 0.3 — exercises the pow option and ru together.
 
 **Input files:** [vp041.xlsx](files/rocscience/vp041.xlsx)
 
@@ -1338,7 +1353,7 @@ Every method that applies to a non-circular surface reads 1.352 on the plane, ag
 
 ## 🟢 VP44: Slope, homogeneous — linear vs non-linear envelope (Baker ex. 1) {#vp44}
 
-Slide #44 / Baker (2003) example problem 1: a straight 43° slope, H = 6 m, γ = 18 kN/m³, in compacted Israeli clays, analyzed with three strength models fitted to the same triaxial data — the power curve τ = 1.107·σ′^0.86, the experimentally fitted Mohr-Coulomb envelope c′ = 11.64 kPa / φ′ = 24.7° (Baker's Table I, iteration 0, which resolves the property-table ambiguity in the Slide manual), and Baker's converged local-linear-approximation parameters c′ = 0.39 kPa / φ′ = 38.6°. The example is about extrapolating a linear envelope into the low-stress range: the Mohr-Coulomb fit says the slope is safe, the non-linear law says it is failing.
+Slide #44 / Baker (2003) example problem 1: a straight 43° slope, H = 6 m, γ = 18 kN/m³, in compacted Israeli clays, analyzed with three strength models fitted to the same triaxial data — the power curve τ = 1.107·σ′^0.86, the experimentally fitted Mohr-Coulomb envelope c′ = 11.64 kPa / φ′ = 24.7° (Baker's Table I, iteration 0, which resolves the property-table ambiguity in the Slide manual), and Baker's converged local-linear-approximation (LLA) parameters c′ = 0.39 kPa / φ′ = 38.6°. The example is about extrapolating a linear envelope into the low-stress range: the Mohr-Coulomb fit says the slope is safe, the non-linear law says it is failing.
 
 **Input files:** [vp044a.xlsx](files/rocscience/vp044a.xlsx), [vp044b.xlsx](files/rocscience/vp044b.xlsx), [vp044c.xlsx](files/rocscience/vp044c.xlsx)
 
@@ -1519,27 +1534,33 @@ Also [SLOPE/W §2.31](geostudio.md) — the same problem in the GeoStudio corpus
 
 ## 🟢 VP52: Slope, (4) materials, water table, tension crack {#vp52}
 
-Slide #52, dry and wet (Table 52.2 water table). An unconstrained circular search lands in the
-deep (surface 3) family, where Slide runs a grid search and Zhu a specified deep circle, and the
-published values spread widely.
+Slide #52 is Zhu & Lee's (2002) heterogeneous slope: a 15 m high slope at 2H:1V cut through four
+horizontal soil layers, with a dry tension crack 1.015 m deep at the crest, analyzed dry and with the
+water table of the manual's Table 52.2. The crack depth is the one both vendors use: the critical
+circle in Slide's Fig. 52.4 ends at y = 13.985, 1.015 m below the crest at y = 15, and SLOPE/W's
+model draws its crack line at that elevation. The water table follows the ground surface to (10.568, 5.284)
+on the face, then the table's arc through (25.314, 9.002) to (39.149, 10.269), then runs level; the
+model draws the arc as 40 short chords that stay within 1 mm of it. An
+unconstrained circular search lands in the deep-circle family (Zhu & Lee's surface 3), where Slide runs a grid
+search and Zhu a specified deep circle, and the published values spread widely.
 
 **Input files:** [vp052a.xlsx](files/rocscience/vp052a.xlsx), [vp052b.xlsx](files/rocscience/vp052b.xlsx)
 
-*Dry — governing deep (surface 3) family*
+*Dry — governing deep-circle family*
 
 | Method | XSLOPE | Slide | Zhu |
 |---|---|---|---|
-| Bishop | 1.796 | 1.804 (−0.4%) | 1.429 (+25.7%) |
-| Spencer | 1.797 | 1.804 (−0.4%) | 1.836 (−2.1%) |
+| Bishop | 1.793 | 1.804 (−0.6%) | 1.429 (+25.5%) |
+| Spencer | 1.794 | 1.804 (−0.6%) | 1.836 (−2.3%) |
 
-*Wet — governing deep (surface 3) family*
+*Wet — governing deep-circle family*
 
 | Method | XSLOPE | Slide | Zhu |
 |---|---|---|---|
-| Bishop | 1.176 | 1.176 (0.0%) | 1.079 (+9.0%) |
-| Spencer | 1.189 | 1.189 (0.0%) | 1.211 (−1.8%) |
+| Bishop | 1.167 | 1.176 (−0.8%) | 1.079 (+8.2%) |
+| Spencer | 1.180 | 1.189 (−0.8%) | 1.211 (−2.6%) |
 
-*Wet Spencer and Bishop match Slide exactly; the manual itself shows a wide Slide–Zhu spread on this family.*
+*The searched critical circles end at the crack bottom, 1.015 m below the crest, as the circle in Slide's Fig. 52.4 does. The manual itself shows a wide Slide–Zhu spread on this family.*
 
 ![vp052a: inputs and representative solution](images/vp052a.png)
 
@@ -1727,8 +1748,8 @@ Slide #61 / Baker (2003) example problem 3: the same 43°, H = 6 m slope as [#44
 
 ## 🟢 VP62: Slope, homogenous, ru pore pressure, seismic {#vp62}
 
-Slide #62, dry at kc = 0.432 and at ru = 0.5 with kc = 0.132. Slide solves both with a circular
-search, Loukidis with a log-spiral mechanism.
+Slide #62, dry at kc = 0.432 and at ru = 0.5 with kc = 0.132. Slide solves both with circular
+and noncircular surfaces through the toe; the two coefficients are Loukidis's log-spiral values.
 
 **Input files:** [vp062a.xlsx](files/rocscience/vp062a.xlsx), [vp062b.xlsx](files/rocscience/vp062b.xlsx)
 
@@ -1759,13 +1780,15 @@ Also [SLOPE/W §2.38](geostudio.md) — the same problem in the GeoStudio corpus
 Loukidis, Bandini & Salgado (2003)'s second example: a three-layer dry slope (a weak φ = 15°
 middle layer between a light c = 4 kPa cap and a strong φ = 45° base) loaded pseudo-statically at
 the paper's critical seismic coefficient kc = 0.155, at which the factor of safety is exactly 1.
-Loukidis analyzed a log-spiral mechanism and Slide a path search with Monte-Carlo optimization;
-XSLOPE runs its noncircular search from a seed through the layer-2/3 daylight point the manual
-identifies as a point on the critical surface.
+Loukidis found that coefficient with Spencer's method on irregular trial surfaces (their Table
+3, which has no log-spiral value for this example, though the Slide manual describes one), and
+Slide ran a path search with Monte-Carlo optimization; XSLOPE runs its noncircular search from a
+seed through the layer-2/3 daylight point the manual identifies as a point on the critical
+surface.
 
 |  | XSLOPE | Slide | Loukidis et al. |
 |---|---|---|---|
-| Spencer, noncircular search | 1.001 | 0.991 (+1.0%) | 1.000 (log-spiral, by definition of kc) |
+| Spencer, noncircular search | 1.001 | 0.991 (+1.0%) | 1.000 (Spencer, by definition of kc) |
 
 The critical surface enters at the daylight point (35.8, 27.9) and exits on the crest at
 x ≈ 121. The mechanism is genuinely noncircular: a circular search on the same model reads
@@ -1903,9 +1926,9 @@ Slide #72 / Duncan & Wright (2005) Figs. 6.39–6.40: a symmetric embankment dam
 
 Pore pressures are modeled both ways, as in the manual: FE seepage from XSLOPE's own solver, and
 Slide's piezometric line vertex-extracted from Figure 72.2. This dam is also
-[LEM sample problem 4](../lem/samples.md#4-earth-dam-duncan-wright-and-brandon), built independently from the book; the
-corpus file follows Slide's slightly different crest and core-top dimensions rather than the
-book's, since Slide's published numbers are the benchmark here.
+[LEM sample problem 4](../lem/samples.md#4-earth-dam-duncan-wright-and-brandon), built independently from Duncan & Wright's example; the
+corpus file follows Slide's slightly different crest and core-top dimensions rather than
+Duncan & Wright's, since Slide's published numbers are the benchmark here.
 
 **Input files:** [vp072a.xlsx](files/rocscience/vp072a.xlsx) (FE seepage), [vp072b.xlsx](files/rocscience/vp072b.xlsx) (piezometric line)
 
@@ -1956,9 +1979,9 @@ Slide #74 / Duncan & Wright (2005) Fig. 7.12: a 100-ft cohesionless embankment (
 
 ![vp074: inputs and representative solution](images/vp074.png)
 
-## 🟢 VP75: The James Bay dyke (D&W Fig. 7.16) {#vp75}
+## 🟢 VP75: The James Bay dike (D&W Fig. 7.16) {#vp75}
 
-Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dykes — a granular fill embankment with a wide berm (ground (−17,31)–(40,31)–(58,25)–(114,25)–(132,19)–(168,19), metric) resting on three soft clay units: a 4 m crust (c = 41 kN/m²), 8 m of marine clay (34.5) and 7 m of lacustrine clay (31.2), all φ = 0. Fill c' = 0, φ' = 30°. Free circular search.
+Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dikes — a granular fill embankment with a wide berm (ground (−17,31)–(40,31)–(58,25)–(114,25)–(132,19)–(168,19), metric) resting on three soft clay units: a 4 m crust (c = 41 kN/m²), 8 m of marine clay (34.5) and 7 m of lacustrine clay (31.2), all φ = 0. Fill c' = 0, φ' = 30°. Free circular search.
 
 **Input files:** [vp075.xlsx](files/rocscience/vp075.xlsx)
 
@@ -2118,7 +2141,11 @@ Slide #84 / Duncan & Wright (2005) Fig. 15.9: an embankment (c' = 0, φ' = 35°,
 
 ## 🟢 VP85: Reinforced slope, homogenous, grouted tieback {#vp85}
 
-Slide #85 case 1 applies the tieback as active support, case 2 as passive; each is
+Slide #85 is a 20 ft cut in saturated clay (γ = 98 pcf, c = 350 psf, φ = 0), held by one
+horizontal tieback carrying 9,000 lb/ft at mid-height, from Duncan & Wright (2005, Fig. 6.34).
+Case 1 applies the tieback as active support, a working load that is not divided by the factor
+of safety; case 2 applies it as passive support, divided by the factor of safety along with the
+soil strength (see [force application](../reinforcement/lem.md#force-application-appl)). Each case is
 evaluated on the circle Slide prints for it.
 
 **Input files:** [vp085a.xlsx](files/rocscience/vp085a.xlsx), [vp085b.xlsx](files/rocscience/vp085b.xlsx)
@@ -2145,8 +2172,6 @@ methods scatter so widely here and why the per-circle comparison is the meaningf
 ![vp085a: inputs and representative solution](images/vp085a.png)
 
 ![vp085b: inputs and representative solution](images/vp085b.png)
-
-The problem is Duncan & Wright (2005) Fig. 6.34; the tieback carries 9,000 lb/ft, applied horizontally at mid-height of the slope.
 
 ## 🟢 VP86: Reinforced slope, homogenous, grouted tieback {#vp86}
 
@@ -2187,7 +2212,7 @@ exits exactly tangent to the crest and needs a hair of extra radius to intersect
 | 93 | Surcharge q=20 (Ta=10) | Bishop | 0.961 | 0.958 (+0.3%) | 1.02 | 1.00 |
 | 94 | Five 1.8-m tiers (Ta=10.1) | Bishop | 1.020 | 1.040 (−1.9%) | — | 1.00 |
 
-*VP92 models the paper's hw as pore pressure in the foundation soil only (a drained MSE fill), plus the 3-m pond standing against the lower tier; treating the fill as saturated instead reconciles with neither program. XSLOPE's free circular search finds slightly more critical circles than Slide's grid on several of these.*
+*The paper puts the water 3 m above the toe on both sides of the wall, inside the fill as well, but Slide2's answer is reproduced only with the fill dry, so VP92 follows Slide2's model, with pore pressure in the foundation only and the 3-m pond standing against the lower tier. RS2's version of this wall wets the fill; see [RS2-53](rs2.md#rs2-53). XSLOPE's free circular search finds slightly more critical circles than Slide's grid on several of these.*
 
 ![vp087: inputs and representative solution](images/vp087.png)
 
@@ -2212,6 +2237,11 @@ In VP90 the upper 8 geotextile layers carry Ta = 7.5 and the lower 7 carry Ta = 
 Slide #95 runs the USACE EM 1110-2-1902 (1970) Appendix G example — the same dam that
 [VP96](#vp96) builds — through the **Corps of Engineers 2-stage** rapid-drawdown
 procedure and its R-envelope.
+
+The R envelope is the Corps' consolidated-undrained strength envelope
+([R envelope](../lem/rapid.md#r-envelope)). The three-stage problems below use the
+K<sub>c</sub> = 1 envelope instead, with intercept d and slope ψ
+([two envelopes](../lem/rapid.md#two-envelopes)).
 
 | Method | XSLOPE | Slide | USACE |
 |---|---|---|---|
@@ -2292,7 +2322,12 @@ The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW pr
 
 ## 🟢 VP100: Embankment dam, homogenous, rapid drawdown, water table {#vp100}
 
-Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore pressure is hydrostatic below the slope surface, i.e. piezo = ground, no external pond.
+Slide #100 is a slope from Morgenstern's (1963) rapid drawdown charts, 100 ft high at 3H:1V, with
+c′ = 312 psf, φ′ = 30°, and γ = 124.8 pcf. The pool drops from the crest, el. 100, all the way
+to the toe, el. 0. Slide runs it with its B-bar method at B̄ = 1, which means the pore pressure
+falls by the full change in total stress when the water is removed. The pore pressure left after drawdown is then
+hydrostatic below the slope surface, so the piezometric line follows the ground and no pond
+remains.
 
 **Input files:** [vp100.xlsx](files/rocscience/vp100.xlsx)
 
@@ -2307,7 +2342,9 @@ Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore pressure 
 
 ## 🟢 VP101: Embankment dam, homogenous, rapid drawdown, water table {#vp101}
 
-Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground where the face is above the pool and stays at 50 below it, with the remaining pond loading the submerged face.
+Slide #101 is the same Morgenstern (1963) slope drawn down halfway, from el. 100 to el. 50,
+again with B̄ = 1. The piezometric line follows the ground where the face is above the pool and
+stays at el. 50 below it, and the remaining pond loads the submerged face.
 
 **Input files:** [vp101.xlsx](files/rocscience/vp101.xlsx)
 
@@ -2425,10 +2462,14 @@ Slide #104 is built on Slide2's own *Tutorial 28 — Seismic Analysis with the N
 the verification manual prints no geometry of its own. The model is a 10 m, 2:1 slope in three
 layers over a horizontal base (soil 1: c = 0, φ = 38°; soil 2: c = 5.3 kPa, φ = 23°; soil 3:
 c = 7.2 kPa, φ = 20°; all γ = 19.5 kN/m³), dry, with no external loads. The manual runs four
-scenarios twice, once with multi-modal Particle Swarm plus Surface Altering optimization and once
-with the ordinary uni-modal search, and prints both columns in Table 104.1. The two published
+scenarios twice: once with the ordinary uni-modal search, which converges on a single critical
+surface, and once with multi-modal optimization (Particle Swarm plus Surface Altering), which looks
+for several separate local minima in one run. Table 104.1 prints both columns. The two published
 columns agree to about 0.1%, and the uni-modal column is what an ordinary circular search targets,
-so three of the four scenarios reproduce directly.
+so the first two scenarios reproduce directly. For the critical acceleration the file also carries a
+non-circular starting surface, eight points on the critical circle, and XSLOPE's K<sub>y</sub> is
+the lower of its circular and non-circular searches. The fourth scenario is run at Slide2's own
+K<sub>y</sub> (below).
 
 **Input files:** [vp104a.xlsx](files/rocscience/vp104a.xlsx) (no seismic) ·
 [vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15)
@@ -2437,45 +2478,44 @@ so three of the four scenarios reproduce directly.
 |---|---|---|---|
 | No seismic | 1.372 | 1.360 (+0.9%) | 1.359 (+1.0%) |
 | Seismic coefficient k = 0.15 | 0.989 | 0.980 (+0.9%) | 0.978 (+1.1%) |
-| Critical acceleration | K<sub>y</sub> = 0.144 | K<sub>y</sub> = 0.140 (+2.9%) | K<sub>y</sub> = 0.139 (+3.6%) |
-| Newmark displacement | — *diagnostic, below* | 5.081 cm | 5.042 cm |
+| Critical acceleration | K<sub>y</sub> = 0.1433 (non-circular; circles 0.1445) | K<sub>y</sub> = 0.140 (+2.4%) | K<sub>y</sub> = 0.139 (+3.1%) |
+| Newmark displacement | *below* | 5.081 cm | 5.042 cm |
 
-*All three built scenarios run about +0.9% high, in the same direction and by the same amount:
+*The two factors of safety run +0.9% high, in the same direction and by the same amount:
 Slide2's Surface Altering optimization refines the surface away from a circle and so finds a
-slightly lower minimum than a circular search can, and the critical acceleration follows from
-that. The critical-acceleration row compares a yield acceleration, not a factor of safety.*
+slightly lower minimum than a circular search can. XSLOPE's non-circular search brings its
+K<sub>y</sub> down from 0.1445 on circles to 0.1433, +2.4% above Slide2's uni-modal value. The
+critical-acceleration row compares a yield acceleration, not a factor of safety.*
 
-**The fourth scenario — permanent Newmark displacement — is reproduced as a diagnostic.**
-The seismic record it needs is not printed in the verification manual but ships with the product:
-the tutorial model the problem is built on (`Tutorial 28 Seismic.slmd`) stores the whole time
-history inside its *Newmark Displacement* scenario — 5862 samples at dt = 0.005 s spanning 0 to
-29.305 s, labeled *Mammoth Lakes-1 1980: CVK-090*. `benchmarks/rocscience/newmark_vp104.py`
-carries that record and integrates it with the textbook rigid-block scheme: while the driving
-acceleration exceeds the yield acceleration K<sub>y</sub> the block accelerates relative to the
-ground at (a − K<sub>y</sub>)·g, one-way, and the relative velocity is integrated to a permanent
-displacement.
+**The fourth scenario: permanent Newmark displacement.** The acceleration record it needs is
+not printed in the verification manual, but it ships with the product: the tutorial model the
+problem is built on (`Tutorial 28 Seismic.slmd`) stores the whole history in its *Newmark
+Displacement* scenario, 5862 samples at dt = 0.005 s spanning 0 to 29.305 s, labeled *Mammoth
+Lakes-1 1980: CVK-090*. The model is in Rocscience's
+[deprecated Slide2 tutorials](https://static.rocscience.cloud/assets/model-files/Slide2/Slide2-Deprecated-Tutorials-v9027.zip)
+download, and the checks read the record from it. XSLOPE's Newmark analysis treats the sliding mass as a rigid block that slides whenever the
+ground acceleration exceeds K<sub>y</sub>·g, runs the record once with each sign pushing the
+block downslope, and reports the larger displacement.
 
-| K<sub>y</sub> | Rigid-block integration | Slide2 published |
+| K<sub>y</sub> | XSLOPE | Slide2 published |
 |---|---|---|
-| 0.139 — Slide2 MMO | 5.015 cm | 5.042 cm (−0.5%) |
-| 0.140 — Slide2 uni-modal | 4.906 cm | 5.081 cm (−3.4%) |
-| 0.144 — XSLOPE `critical_kc` | 4.496 cm | — |
+| 0.139 — Slide2 MMO | 5.036 cm | 5.042 cm (−0.1%) |
+| 0.140 — Slide2 uni-modal | 4.928 cm | 5.081 cm (−3.0%) |
+| 0.1433 — XSLOPE's own K<sub>y</sub> (non-circular) | 4.589 cm | — |
+| 0.1445 — XSLOPE's circles | 4.473 cm | — |
 
-The published pair is **non-monotone in K<sub>y</sub>** — the larger yield acceleration is printed
-with the larger displacement — which no single integration of one record can produce, since
+The record's negative accelerations govern. With its positive ones pushing the block, K<sub>y</sub>
+= 0.139 gives 4.007 cm.
+
+The published pair is **non-monotone in K<sub>y</sub>**: the larger yield acceleration is printed
+with the larger displacement, which no integration of one record can produce, since the
 displacement falls as K<sub>y</sub> rises. The two columns are two different critical surfaces whose
-K<sub>y</sub> is printed rounded to three decimals, and inverting each published displacement back
-through the integration shows that only the multi-modal row's value is consistent with its printed
-K<sub>y</sub>, and it agrees to −0.5%. Displacement is also far more sensitive to the yield
-acceleration than the factor of safety is: XSLOPE's K<sub>y</sub> runs +2.9% high because a circular
-search cannot follow Slide2's surface-altering optimization, and carried through the same
-integration that 2.9% removes about 11% of the displacement. That amplification is why the yield
-acceleration, not the displacement, is the compared quantity.
-
-**Scope.** XSLOPE's seismic modeling is pseudo-static: a seismic coefficient in the
-limit-equilibrium solve, plus the `critical_kc` search for the k at which the searched minimum
-factor of safety reaches 1. Displacement integration is not an analysis mode — the script above
-takes a yield acceleration as an input and reads no XSLOPE model — so that row is a diagnostic and carries no match.
+K<sub>y</sub> is printed to three decimals, and inverting each published displacement through the
+integration shows that only the multi-modal row's is consistent with its printed K<sub>y</sub>.
+The displacement is also far more sensitive to the yield acceleration than the factor of safety
+is: carried through the same record, XSLOPE's K<sub>y</sub> gives 4.589 cm against 4.928 cm at
+Slide2's uni-modal K<sub>y</sub> (−6.9%). The displacement is therefore scored at Slide2's own
+K<sub>y</sub>, and XSLOPE's K<sub>y</sub> is scored in the table above.
 
 ![vp104a: no-seismic inputs and Spencer critical surface](images/vp104a.png)
 
@@ -2499,11 +2539,12 @@ ordinary circular search. The same gap blocks [GeoStudio §2.47](geostudio.md).
 **Input files:** [vp106a.xlsx](files/rocscience/vp106a.xlsx) (no pile) ·
 [vp106b](files/rocscience/vp106b.xlsx) / [c](files/rocscience/vp106c.xlsx) /
 [d](files/rocscience/vp106d.xlsx) / [e](files/rocscience/vp106e.xlsx)
-(D1/D = 2, 3, 4, 6)
+(S/D = 2, 3, 4, 6)
 
 Cai & Ugai (2000)'s pile-reinforced slope: a 10-m, 1V:1.5H dry cohesive-frictional slope
 (γ = 20, c′ = 10, φ′ = 20) with a row of 0.8-m steel-tube piles at mid-slope, embedded to
-bedrock, at center-to-center spacings of 2–6 diameters. The pile's stabilizing force is
+bedrock, at center-to-center spacings S of 2–6 pile diameters D (S/D = 2–6; Cai & Ugai write
+D1 for S). The pile's stabilizing force is
 the Ito & Matsui (1975) theoretical limit pressure, which XSLOPE computes automatically
 from the pile diameter and spacing (the per-pile force is divided by the spacing to give
 the per-meter-width value). The reaction is applied in the passive sense — added to the
@@ -2512,16 +2553,16 @@ resisting moment and divided by the factor of safety — which is how Slide appl
 | Case | XSLOPE (Bishop search) | Slide | Cai & Ugai |
 |---|---|---|---|
 | No pile | 1.143 | 1.14 (+0.3%) | 1.13 (+1.2%) |
-| D1/D = 2 | 1.540 | 1.54 (0.0%) | 1.54 (0.0%) |
-| D1/D = 3 | 1.451 | 1.43 (+1.5%) | 1.37 (+5.9%) |
-| D1/D = 4 | 1.341 | 1.33 (+0.8%) | 1.31 (+2.4%) |
-| D1/D = 6 | 1.260 | 1.25 (+0.8%) | 1.25 (+0.8%) |
+| S/D = 2 | 1.540 | 1.54 (0.0%) | 1.54 (0.0%) |
+| S/D = 3 | 1.451 | 1.43 (+1.5%) | 1.37 (+5.9%) |
+| S/D = 4 | 1.341 | 1.33 (+0.8%) | 1.31 (+2.4%) |
+| S/D = 6 | 1.260 | 1.25 (+0.8%) | 1.25 (+0.8%) |
 
-At the closest spacing (D1/D = 2) all three programs report the same factor, but not on
+At the closest spacing (S/D = 2) all three programs report the same factor, but not on
 the same surface. XSLOPE's critical circle passes through the pile head, so it develops no
 pile force at all: the reinforcement is strong enough that the cheapest mechanism is one
 that misses it. Cai & Ugai's surface at that spacing crosses the pile and carries a
-reaction, so the agreement at 1.54 is between two different mechanisms. At D1/D = 3 the published
+reaction, so the agreement at 1.54 is between two different mechanisms. At S/D = 3 the published
 values themselves spread — Slide sits 4.4% above the paper, a search-method difference the
 manual acknowledges — and XSLOPE lands 1.5% above Slide but 5.9% above Cai & Ugai's own
 value, the widest gap among this section's references. Every other case agrees with
@@ -2534,14 +2575,14 @@ the pile station x = 17.5 m.
 
 | Case | XSLOPE depth at the pile (m) | Cai & Ugai (Bishop, m) |
 |---|---|---|
-| D1/D = 2 | 0.000 | 2.84 |
-| D1/D = 3 | 3.094 | 3.18 (−2.7%) |
-| D1/D = 4 | 3.261 | 3.34 (−2.4%) |
-| D1/D = 6 | 3.488 | 3.50 (−0.3%) |
+| S/D = 2 | 0.000 | 2.84 |
+| S/D = 3 | 3.094 | 3.18 (−2.7%) |
+| S/D = 4 | 3.261 | 3.34 (−2.4%) |
+| S/D = 6 | 3.488 | 3.50 (−0.3%) |
 
 Three of the four spacings match, and the trend the paper reports — a shallower surface as
 the piles close up — comes out a little steeper: 3.488 m at six diameters to 3.094 m at
-three, against 3.50 m to 3.18 m. At D1/D = 2 the two readings are two different mechanisms
+three, against 3.50 m to 3.18 m. At S/D = 2 the two readings are two different mechanisms
 rather than a pairing, so no difference is given. The row's match dot is set by the factors
 of safety; the depths say which surface each factor belongs to.
 
@@ -2554,13 +2595,13 @@ of safety; the depths say which surface each factor belongs to.
 ## VP106 — finite-element variant: the 2D pile idealization measured {#vp106-fem}
 
 **Input files:** [vp106a_fem.xlsx](files/rocscience/vp106a_fem.xlsx) (no pile) ·
-[vp106c_fem.xlsx](files/rocscience/vp106c_fem.xlsx) (D1/D = 3, free head) ·
-[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (D1/D = 3, unrotated head — rotation held, translation free)
+[vp106c_fem.xlsx](files/rocscience/vp106c_fem.xlsx) (S/D = 3, free head) ·
+[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (S/D = 3, unrotated head — rotation held, translation free)
 
 Cai & Ugai analyzed this slope twice; the limit-equilibrium side is [VP106](#vp106) above, and the
 other is a **three-dimensional** shear-strength-reduction finite-element model that meshes the
 individual piles and the soil between them, with interfaces that can slip. These three files run
-that side through XSLOPE's SSRM at the paper's default D1/D = 3, on the same section and soil, with
+that side through XSLOPE's SSRM at the paper's default S/D = 3, on the same section and soil, with
 the pile as a plane-strain beam: E = 6×10⁷ kPa on the 0.8 m section, so I = 0.0201 m⁴ and
 A = 0.5027 m², both divided by the 2.4 m spacing; soil E = 2×10⁵ kPa, ν = 0.25. The Ito & Matsui
 limit pressure the limit-equilibrium files carry is deliberately absent: in a finite-element

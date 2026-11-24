@@ -1863,7 +1863,7 @@ def _vp033_slope_data():
 
 def vp033():
     """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
-    tailings dyke (simplified probabilistic case). Cohesionless section over a
+    tailings dike (simplified probabilistic case). Cohesionless section over a
     presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
     surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
     is tangent to el 270, ~19 m below the model base (~289), so it truncates at
@@ -2483,10 +2483,41 @@ def vp101():
     return 'vp101.xlsx'
 
 
+def _arc_through(p1, p2, p3, n_seg):
+    """Vertices of the circular arc from p1 through p2 to p3, in n_seg chords
+    of equal angle (p1 and p3 exact, interior vertices rounded to 1e-4)."""
+    (x1, y1), (x2, y2), (x3, y3) = p1, p2, p3
+    d = 2.0 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
+    s1, s2, s3 = x1 * x1 + y1 * y1, x2 * x2 + y2 * y2, x3 * x3 + y3 * y3
+    xc = (s1 * (y2 - y3) + s2 * (y3 - y1) + s3 * (y1 - y2)) / d
+    yc = (s1 * (x3 - x2) + s2 * (x1 - x3) + s3 * (x2 - x1)) / d
+    r = math.hypot(x1 - xc, y1 - yc)
+    a1 = math.atan2(y1 - yc, x1 - xc)
+    a3 = math.atan2(y3 - yc, x3 - xc)
+    pts = [tuple(p1)]
+    for i in range(1, n_seg):
+        a = a1 + (a3 - a1) * i / n_seg
+        pts.append((round(xc + r * math.cos(a), 4), round(yc + r * math.sin(a), 4)))
+    pts.append(tuple(p3))
+    return pts
+
+
 def _zhu_lee_slope_data(wet):
-    """Zhu & Lee (2002) heterogeneous slope (Slide #52): benched 4-layer
-    profile, layers daylighting at (6,3) and (18,9); dry tension crack at the
-    crest. Wet case adds the manual's Table 52.2 water table."""
+    """Zhu & Lee (2002) heterogeneous slope (Slide #52, SLOPE/W §2.32):
+    benched 4-layer profile, layers daylighting at (6,3) and (18,9).
+
+    Both vendors cut a dry tension crack 1.015 m deep at the crest: Slide's
+    Fig. 52.4 ends the surface-3 circle at (41.663, 13.985) under the 15.0
+    crest, and SLOPE/W's .gsz draws the crack line at y = 13.985 with no water
+    in it. Built as tcrack_depth = 1.015, tcrack_water = 0.
+
+    Wet case: the manual's Table 52.2 water table, (-20,0), (0,0), (6,3), an
+    arc through (10.568,5.284), (25.314,9.002) and (39.149,10.269), then
+    (50,10.269). The arc is the circle through those three points (center
+    (40.741, -83.285), R 93.567; SLOPE/W's .gsz draws it as 20 chords of the
+    same circle), built here as 40 equal-angle chords, within 1 mm of the arc.
+    (6,3) and (10.568,5.284) both lie on the 2H:1V face, so the line follows
+    the ground down to the toe."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     props = [('Layer 1 (top)', 20.0, 18.0, 18.8), ('Layer 2', 40.0, 22.0, 18.5),
@@ -2505,9 +2536,11 @@ def _zhu_lee_slope_data(wet):
         {'mat_id': 3, 'coords': [(-20.0, -6.0), (50.0, -6.0)]},
     ]
     sd['max_depth'] = -9.0
+    sd['tcrack_depth'] = 1.015
+    sd['tcrack_water'] = 0.0
     if wet:
-        sd['piezo_line'] = [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0), (10.568, 5.284),
-                            (25.314, 9.002), (39.149, 10.269), (50.0, 10.269)]
+        arc = _arc_through((10.568, 5.284), (25.314, 9.002), (39.149, 10.269), 40)
+        sd['piezo_line'] = [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0)] + arc + [(50.0, 10.269)]
     sd['circles'] = [{'Xo': 20.0, 'Yo': 25.0, 'Depth': -5.0, 'R': 30.0}]
     return sd
 
@@ -2808,17 +2841,32 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
     sd = load_slope_data(LEVEE_POLY)
     base = dict(sd['materials'][0])
     mats = []
-    # the paper's hw is the water level above the FOUNDATION soil: the MSE
-    # fill and blocks drain (u=0); only the foundation carries pore pressure.
-    # (This follows L&H (2004) and Slide2's VP92 model, which this file is
-    # locked against. The RS2 vendor .fez #053 instead applies the piezo-line
-    # pore pressure mesh-wide, wetting the granular fill below the pond as well;
-    # adopting that drops the Slide2 Bishop lock from 1.010 to 0.885 vs Slide's
-    # published 1.037, so it is not used here -- documented in the wall section.)
+    # Where the water is (water=True, the hw = 3 m case).
+    #
+    # The strength-reduction build (joint=True) puts it in EVERY material. That
+    # is the water both of its references ran. Leshchinsky & Han: "the water
+    # table is 3 m high above the toe in either side of the wall" and "the
+    # horizontal phreatic surface on both sides of the wall" (p. 1232, and
+    # conclusion 8, p. 1235);
+    # their Table 2 defines hw as the "height of water table above the
+    # foundation soil", a level, not a wet layer. RS2's own model of the case,
+    # vendor `slope stability #053.fez`, assigns piezometric line 1 (y = 9) to
+    # all its materials, and its nodal pore pressures are 9.81 (9 - y) at every
+    # node below the line: 696 nodes of the reinforced fill between y = 6 and 9
+    # and every node of the lowest facing column, as well as the foundation.
+    #
+    # The limit-equilibrium build (joint=False) keeps the fill and blocks dry
+    # and wets the foundation only. It is scored against Slide2's printed VP92
+    # circle, and only the dry fill reproduces it: on that circle at the
+    # baseline's Ta = 10 (the value Slide2's results were computed with, see
+    # the Slide2 page), Bishop reads 1.039 dry against Slide's 1.037, and 0.936
+    # with the fill wet, 0.915 with fill and blocks wet. At the case's 9.25 the
+    # dry file locks at 1.010 (0.907 / 0.885 wet).
     for name, (c, phi) in (('Reinforced and retained fill', fill),
                            ('Foundation soil', fnd), ('Blocks', (2.5, 34.0))):
         m = dict(base)
-        uopt = 'piezo' if (water and name == 'Foundation soil') else 'none'
+        uopt = ('piezo' if (water and (joint or name == 'Foundation soil'))
+                else 'none')
         m.update(name=name, c=c, phi=phi, gamma=18.0, option='mc', u=uopt)
         # The dry-stack facing is concrete: it does not yield, and the strength
         # reduction leaves it alone (ssr_exclude on the tag). The paper's 2.5 kPa
@@ -3074,7 +3122,23 @@ def vp089_fem():
     return 'vp089_fem.xlsx'
 
 
-def vp090_fem():
+def _wall_fine(sd, name):
+    """Write a wall's refinement-step twin as ``name``.
+
+    The same model with the 1D elements along the sheets and joints at 0.5 m
+    (main D20) and every polygon's mesh Size cut by 0.7 (the facing columns'
+    0.15 m to 0.105 m), meshed at 0.7 m where the plain file is meshed at 1.0 m.
+    The plain file's row is the one scored; the twin's factor is printed beside
+    it as the row's mesh sensitivity (Norm, 573a)."""
+    sd['element_size_1d'] = 0.5
+    for p in sd['polygons']:
+        if p.get('size') is not None:
+            p['size'] = round(p['size'] * 0.7, 6)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, name))
+    return name
+
+
+def vp090_fem(fine=False):
     """RS2-51 — two geotextile grades, jointed dry stack.
 
     Vendor `#051` gives the lower seven sheets Ks = 10 000 against the upper
@@ -3085,8 +3149,15 @@ def vp090_fem():
                              ks_of=lambda i, n: 1.0e4 if i < 7 else 1.0e5)
     sd['circles'] = []
     sd['non_circ'] = []
+    if fine:
+        return _wall_fine(sd, 'vp090_fem_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp090_fem.xlsx'))
     return 'vp090_fem.xlsx'
+
+
+def vp090_fem_fine():
+    """RS2-51's refinement-step twin (see :func:`_wall_fine`)."""
+    return vp090_fem(fine=True)
 
 
 def vp091_fem():
@@ -3107,7 +3178,12 @@ def vp091_fem():
 
 
 def vp092_fem():
-    """RS2-53 — water (piezo at y = 9 with a 3 m pond, Ta = 9.25), jointed dry stack."""
+    """RS2-53 — water (piezo at y = 9 with a 3 m pond, Ta = 9.25), jointed dry stack.
+
+    Every material reads the piezometric line, the fill and the facing as well as
+    the foundation, as in Leshchinsky & Han and RS2's #053; the limit-equilibrium
+    sibling vp092 wets the foundation only. See :func:`_lh_wall_slope_data`.
+    """
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 9.25, water=True, joint=True)
     sd['circles'] = []
     sd['non_circ'] = []
@@ -3115,7 +3191,7 @@ def vp092_fem():
     return 'vp092_fem.xlsx'
 
 
-def vp093_fem():
+def vp093_fem(fine=False):
     """RS2-54 — 20 kPa crest surcharge (Ta = 11.6), jointed dry stack.
 
     The tensile strength is the paper's, not the vendor .fez's. Leshchinsky &
@@ -3135,8 +3211,15 @@ def vp093_fem():
     sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.6, surcharge=20.0, joint=True)
     sd['circles'] = []
     sd['non_circ'] = []
+    if fine:
+        return _wall_fine(sd, 'vp093_fem_fine.xlsx')
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093_fem.xlsx'))
     return 'vp093_fem.xlsx'
+
+
+def vp093_fem_fine():
+    """RS2-54's refinement-step twin (see :func:`_wall_fine`)."""
+    return vp093_fem(fine=True)
 
 
 def vp094_fem():
@@ -5159,7 +5242,7 @@ def vp073():
 
 
 def vp075():
-    """Slide #75 / Duncan & Wright (2005) Fig. 7.16: the James Bay dyke -- a
+    """Slide #75 / Duncan & Wright (2005) Fig. 7.16: the James Bay dike -- a
     granular fill embankment with a berm, on a three-layer soft clay foundation.
     Fully labeled figure (metric): ground (-17,31)-(40,31)-(58,25)-(114,25)-
     (132,19)-(168,19); clay crust el 19-15, marine clay 15-7, lacustrine clay
@@ -5273,10 +5356,10 @@ def vp076b():
 # Table 104.1 publishes BOTH the multi-modal (MMO) and the ordinary uni-modal
 # search columns, and they agree to ~0.1%. XSLOPE has no multi-modal search, but
 # it does not need one to verify this problem: the uni-modal column is exactly
-# what an ordinary circular search targets. The fourth scenario in the table,
-# Newmark seismic DISPLACEMENT, has no XSLOPE equivalent (the seismic capability
-# is the yield-acceleration search, not displacement integration) and is not
-# built.
+# what an ordinary circular search targets. The fourth scenario, the Newmark
+# displacement, needs no model: it integrates the tutorial's acceleration record,
+# read from the vendor's tutorial model in the local vendor archive, at a yield
+# acceleration (benchmarks/rocscience/newmark_vp104.py).
 # ---------------------------------------------------------------------------
 
 _VP104_ZONES = [                      # (mat_id, polygon vertices)
@@ -5318,8 +5401,18 @@ def _vp104_slope_data(k_seismic=0.0):
 def vp104a():
     """Slide2 #104 scenario 1 (no seismic). Table 104.1: MMO FS = 1.359,
     uni-modal FS = 1.360. Also the base file for the critical-acceleration
-    scenario, whose runner sets k itself (Table 104.1: Ky 0.139 / 0.140)."""
+    scenario, whose runner sets k itself (Table 104.1: Ky 0.139 / 0.140).
+
+    Slide2's multi-modal search reshapes its surfaces away from a circle, so the
+    file carries a non-circular starting surface for XSLOPE's own K_y: the
+    critical circle with no seismic force sampled at eight points, toe to crest,
+    which the search then reshapes. XSLOPE's K_y is the lower of the circular and
+    non-circular searches, as on RS2-68."""
     sd = _vp104_slope_data(k_seismic=0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in
+                      ((29.802, 25.0), (32.811, 24.468), (35.819, 24.445),
+                       (38.827, 24.935), (41.836, 25.98), (44.844, 27.7),
+                       (47.853, 30.38), (50.861, 35.0))]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp104a.xlsx'))
     return 'vp104a.xlsx'
 
@@ -5467,7 +5560,8 @@ BUILDERS = [
     vp072b, vp073, vp074, vp075, vp076a, vp076b, vp077a, vp077b, vp078, vp078b, vp078c,
     vp079, vp080a, vp080b, vp081, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d,
     vp085a, vp085b, vp086, vp087, vp087_fem, vp088, vp088_fem, vp089, vp089_fem,
-    vp090, vp090_fem, vp091, vp091_fem, vp092, vp092_fem, vp093, vp093_fem,
+    vp090, vp090_fem, vp090_fem_fine, vp091, vp091_fem, vp092, vp092_fem, vp093,
+    vp093_fem, vp093_fem_fine,
     vp094, vp094_fem, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
     vp103d, vp104a, vp104b, vp106a, vp106b, vp106c, vp106d, vp106e, vp107a, vp107b, vp108a,
     vp108b, vp109,

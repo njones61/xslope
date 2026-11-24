@@ -214,13 +214,15 @@ Without the piles, the two agree to about 1%. The LEM credits the pile rows with
 1.20.
 
 Neither is a three-dimensional answer. Cai & Ugai (2000) solved a pile-stabilized slope by three-dimensional
-strength reduction, meshing each pile, the soil between the piles and a slip interface on each pile's surface. XSLOPE
+strength reduction, meshing each pile, the soil between the piles and a slip interface on each pile's surface. Their
+slope is dry, 10 m high, and 1V:1.5H (γ = 20 kN/m³, c′ = 10 kPa, $\phi'$ = 20°). A row of 0.8 m steel-tube piles
+at mid-slope is embedded in bedrock, at a center-to-center spacing $S$ of three diameters. XSLOPE
 solves the same slope with both engines. The FEM gives:
 
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile at $D_1/D$ = 3, free head | 1.578 | 1.36 (+16.0%) |
+| Pile at $S/D$ = 3, free head | 1.578 | 1.36 (+16.0%) |
 | Pile, head rotation restrained | 1.594 | 1.45 (+9.9%) |
 
 Without the pile, the two agree to 0.4%, so the other two rows' differences come from the pile. The FEM credits the
@@ -237,3 +239,5 @@ Ito, T., & Matsui, T. (1975). Methods to estimate lateral force acting on stabil
 Poulos, H.G. (1995). Design of reinforcing piles to increase slope stability. *Canadian Geotechnical Journal*, 32(5), 808-818.
 
 Hassiotis, S., Chameau, J.L., & Gunaratne, M. (1997). Design method for stabilization of slopes with piles. *Journal of Geotechnical and Geoenvironmental Engineering*, 123(4), 314-323.
+
+Cai, F., & Ugai, K. (2000). Numerical analysis of the stability of a slope reinforced with piles. *Soils and Foundations*, 40(1), 73-84. [doi:10.3208/sandf.40.73](https://doi.org/10.3208/sandf.40.73)

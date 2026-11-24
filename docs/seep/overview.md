@@ -371,6 +371,10 @@ the usual choice for a stand-alone seepage analysis. Quadratic elements (`tri6`,
 [FEM stability analysis](seep_slope.md#element-type-considerations-for-fem), where linear
 elements lock volumetrically and overestimate the factor of safety.
 
+A mesh built for a model with [joints](../fem/joints.md) is split along each joint line, so that
+the two faces can slide in a stability analysis. Seepage ignores the split: water flows across a
+joint as if it were not there, and both faces of the joint carry the same head and pore pressure.
+
 ### Confined and unconfined problems
 
 `run_seepage_analysis` picks the solution path from the boundary conditions: a problem with
@@ -526,8 +530,8 @@ properties used for stability:
 | `k1` | Major principal conductivity — the direction of maximum permeability, typically horizontal or bedding-parallel |
 | `k2` | Minor principal conductivity. Equal to `k1` for an isotropic material |
 | `alpha` | Rotation of the principal directions from the x-axis, in degrees |
-| `unsat` | Relative-conductivity model: `lf` (linear front, the default), `vg` (van Genuchten), `gard` (Gardner) |
-| `kr0`, `h0` | Linear-front parameters: the relative conductivity `kr0` (> 0) at the reference suction head `h0` (< 0) |
+| `unsat` | Relative-conductivity model: `lf` (linear front), `vg` (van Genuchten), `gard` (Gardner), in any case. A blank cell is `lf`; any other word stops a seepage run |
+| `kr0`, `h0` | Linear-front parameters: the relative conductivity `kr0` (> 0) at the reference suction head `h0` (< 0). A transient run also reads `h0` on a Gardner material, for the width of its [draining band](transient.md#storage) |
 | `a`, `n` | van Genuchten α and n (n > 1), or Gardner a and n (both > 0) — read according to `unsat` |
 | `l` | van Genuchten only: the Mualem pore-connectivity exponent. Blank is Mualem's 0.5 |
 | `Ss`, `Sy` | Specific storage and specific yield, used only by a [transient](transient.md#storage) run |
@@ -541,8 +545,10 @@ The **seep bc** sheet carries the boundary geometry: up to five head or flux blo
 a type cell (`head`, `reservoir` or `flux`), a value, and a coordinate sequence; plus one
 exit-face polyline. A second sheet, **seep bc (2)**, carries the drawn-down
 boundary set for a [rapid drawdown](seep_slope.md#workflow) analysis. Values on
-either sheet may name a [tseep series](transient.md#time-series) instead of a number, which is
-what makes the run transient.
+the first sheet may name a [tseep series](transient.md#time-series) instead of a number, which is
+what makes the run transient; the second is a steady state and takes numbers only. A block drawn
+with points and a blank value is kept when the file opens, and the
+[model checks](../usage/preflight.md) refuse it for any run that reads it.
 
 !!! note "The boundary conditions also place the water load"
     With **Water loads** set to `auto`, the engine derives the weight

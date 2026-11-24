@@ -19145,17 +19145,17 @@ def main():
                       'method': 'spencer', 'source': 'noncircular_kink'})
         # The finite element yield coefficient's bisection on a stand-in solver
         # (under a second).
-        tests.append({'type': 'fem_yield_coefficient',
+        tests.append({'type': 'fem_yield_coefficient', 'file': '(FEM yield coefficient)',
                       'method': 'fem', 'source': 'fem_yield_coefficient'})
         # The vertical seismic coefficient in every LEM method and the FEM loads
         # (a few seconds).
-        tests.append({'type': 'vertical_seismic',
+        tests.append({'type': 'vertical_seismic', 'file': '(vertical seismic coefficient)',
                       'method': 'all', 'source': 'vertical_seismic'})
         # The two-stage seismic analysis's stage 2 strength factor (a few seconds).
-        tests.append({'type': 'seismic2_factor',
+        tests.append({'type': 'seismic2_factor', 'file': '(two-stage seismic factor)',
                       'method': 'all', 'source': 'seismic2_factor'})
         # The strength ratio material against closed forms, both engines (seconds).
-        tests.append({'type': 'strength_ratio',
+        tests.append({'type': 'strength_ratio', 'file': '(strength ratio material)',
                       'method': 'all', 'source': 'strength_ratio'})
         # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
         # validates the perpendicular-dload water convention the vendor importers convert
@@ -20203,6 +20203,12 @@ def main():
     route_edges_bracket = 0   # edges row whose edge flipped, re-solved by the bracket
     # What each row cost, keyed for the timing record the tier rule reads.
     row_times = {}
+    # Every row prints under a file name. A row without one would stop the report
+    # at that row's finish while the workers go on solving, losing every result
+    # after it, so the check runs before any row is solved.
+    _nameless = sorted({t.get('type', '?') for t in tests if 'file' not in t})
+    if _nameless:
+        raise SystemExit(f"rows with no 'file' (the name the report prints): {_nameless}")
 
     def _fmt(v):
         """Expected/computed in a 10-wide column, readable at ANY magnitude.

@@ -35,7 +35,7 @@ and the field must then pass the ordinary gate on one ordinary sweep.
 
 THE CLASS C ESCAPE HAS NO FIXTURE NOW EITHER. Its last one, vp077a on the quad8 mesh
 Studio builds at 100 divisions, ended its 400 iterations unconverged and closed on a
-pinned element. Newton steps converge it in 126 iterations, and the escape fired on
+pinned element. Newton steps converge it on their own, and the escape fired on
 none of the 130 Studio-mesh solves made when they went in (ten models as tri3, tri6,
 quad4, quad8 and quad9 at 100, 150 and 250 divisions), nor on any solve this file
 makes. The leg below locks the fixture as a solve that converges on its own.
@@ -107,8 +107,10 @@ WHAT THIS CHECK LOCKS
    2.8x rain and 21% at 4x.
 5. The class C escape's three former fixtures converge on their own and are locked as
    that, with no pinned element and their flow rates: vp077a on the quad8 mesh Studio
-   builds at 100 divisions, under Studio's settings, in 126 iterations, and the
-   drawdown section's two meshes (15 and 14 divisions) in 20 and 19.
+   builds at 100 divisions, under Studio's settings, and the drawdown section's two
+   meshes (15 and 14 divisions) in 20 and 19 iterations. vp077a's count is not held:
+   the 126 recorded when it went in could not be reproduced later at the same commit
+   (163, to the same flow rate).
 
 WHY THE GATES ARE WHERE THEY ARE (each mutable in one line if a reader wants to see the
 other side of it). THE NUMBERS IN THIS SECTION WERE MEASURED UNDER EARLIER kr RULES
@@ -279,13 +281,15 @@ PIN_ROWS = [
 #: The pinned-element escape's last fixture: vp077a on the quad8 mesh Studio's Build
 #: Mesh makes at 100 divisions (3100 nodes), under Studio's settings. It used to end
 #: its budget unconverged and close on a pinned element at sweep 401. It converges on
-#: its own in 126 iterations, on the flow rate the pinned element reached, and the row
-#: locks that: no pinned element, the count (held to SWEEP_RTOL like the others) and
-#: the flow rate.
+#: its own, on the flow rate the pinned element reached, and the row locks that: no
+#: pinned element, convergence inside the budget, and the flow rate. Its iteration
+#: count is NOT held, unlike the drawdown rows': the 126 recorded when it went in
+#: could not be reproduced later at the same commit (163, to the same flow rate), and
+#: what the fixture guards is that it converges on its own, not how fast.
 PIN_STUDIO_MODEL = "docs/verification/files/rocscience/vp077a.xlsx"
 PIN_STUDIO_DIVISIONS, PIN_STUDIO_ELEMENT = 100, "quad8"
 PIN_STUDIO_SETTINGS = dict(tol=1e-4, max_iter=400)
-PIN_STUDIO_Q, PIN_STUDIO_SWEEPS = 8.2072266e-06, 126
+PIN_STUDIO_Q = 8.2072266e-06
 
 
 def _solve(stem_rel, bc, settings):
@@ -664,8 +668,6 @@ def leg_pinned():
         fails.append(f"{tag}: does not converge")
     if _fired(log, _PIN_LINE) is not None or _fired(log, _CYCLE_LINE) is not None:
         fails.append(f"{tag}: an escape fired on a solve that converges without one")
-    if not _sweeps_close(_sweeps(log), PIN_STUDIO_SWEEPS):
-        fails.append(f"{tag}: converged on sweep {_sweeps(log)} for {PIN_STUDIO_SWEEPS}")
     if not _close(float(sol["flowrate"]), PIN_STUDIO_Q):
         fails.append(f"{tag}: flow rate {sol['flowrate']:.7e} for {PIN_STUDIO_Q:.7e}")
     print(f"  {tag}: no escape, converged {sol['converged']} on sweep "

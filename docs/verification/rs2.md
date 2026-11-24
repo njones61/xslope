@@ -125,10 +125,10 @@ tension crack.
 | [48](#rs2-48) | 🟡 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 1.037 vs Leshchinsky &amp; Han FDM referee 0.99 (+4.7%) | Modeled as the paper's dry stack — elastic blocks on friction joints, sheets on their own interfaces — at the paper's reinforcement stiffness J = 1000 kN/m. RS2's own SSR 1.05 comes from a facing meshed as one body and is shown beside it, not scored against. |
 | [49](#rs2-49) | 🔴 | Geotextile wall, fill-quality variant | SSRM 1.096 vs L&amp;H FDM referee 0.99 (+10.7%) | RS2 SSR 1.08 beside; both codes sit above the paper, whose wall fails through a facing neither program lets fail that way — see [RS2-48](#rs2-48). |
 | [50](#rs2-50) | 🟢 | Geotextile wall, 4.2 m reinforcement variant | SSRM 0.998 vs L&amp;H FDM referee 0.98 (+1.8%) | RS2 SSR 0.93 shown beside — see [RS2-48](#rs2-48). |
-| [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type |  | *unconfirmed* — the search closed at 1.018, but a finer mesh moves the factor by twice the search tolerance of 0.02. |
+| [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type |  | *unconfirmed* — the search closed at 1.018, but a finer mesh lowers the factor by twice the search tolerance of 0.02. |
 | [52](#rs2-52) | 🔴 | Geotextile wall, weak-foundation variant | SSRM 0.783 vs L&amp;H FDM referee 0.86 (−9.0%) | RS2 SSR 0.84 beside; the two codes fail this wall in different ways — see [RS2-52](#rs2-52). |
 | [53](#rs2-53) | 🟢 | Geotextile wall, water variant | SSRM 1.037 vs L&amp;H FDM referee 1.01 (+2.7%) | RS2 SSR 1.03 shown beside — see [RS2-48](#rs2-48). |
-| [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant |  | *unconfirmed* — the search closed at 1.037, but a finer mesh moves the factor by twice the search tolerance of 0.02; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10. |
+| [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant |  | *unconfirmed* — the search closed at 1.037, but a finer mesh lowers the factor by three times the search tolerance of 0.02; modeled at the paper's 11.6 kN/m sheet strength, where the vendor's file carries 10. |
 | [55](#rs2-55) | 🟢 | Geotextile wall, tier-count variant | SSRM 1.018 vs L&amp;H FDM referee 1.00 (+1.8%) | RS2 SSR 1.04 shown beside — see [RS2-48](#rs2-48). |
 | [56](#rs2-56) | 🟢 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | The weakest and strongest cases are scored; case 5 is the wider of them and sets the dot. |
 | [57](#rs2-57) | 🟢 | Pruska H = 10.5 m, 6 cases | Case 1 (weakest): SSRM 0.439 vs RS2 SSRM 0.44 (−0.2%) · Case 6 (strongest): SSRM 1.401 vs RS2 SSRM 1.42 (−1.3%) | The weakest and strongest cases are scored; case 6 is the wider of them and sets the dot. |
@@ -1461,7 +1461,8 @@ crossing the lower sheets and passing behind the ends of the upper ones, which n
 
 Two grades of sheet in one wall: the lower seven at 11.0 kN/m, the upper eight at 7.5, with the
 vendor's shear stiffness of 10,000 on the lower seven against 100,000 above. *Unconfirmed*: every
-trial came to rest, but the 0.7 m mesh moves the factor by twice the search tolerance.
+trial on both meshes came to rest, but the 0.7 m mesh lowers the factor by twice the search
+tolerance.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|
@@ -1514,8 +1515,8 @@ wall", and the water RS2's model applies. The sheets are at the paper's 9.25 kN/
 #### ⊘ RS2-54: Geotextile wall, crest surcharge (vp093_fem) {#rs2-54}
 
 A uniform 20 kPa surcharge on the top tier, from the back of the top facing column to the far
-boundary, as the vendor's model applies it. *Unconfirmed*: every trial came to rest, but the
-0.7 m mesh moves the factor by twice the search tolerance.
+boundary, as the vendor's model applies it. *Unconfirmed*: every trial on both meshes came to
+rest, but the 0.7 m mesh lowers the factor by three times the search tolerance.
 
 | XSLOPE SSRM | L&H FDM referee | RS2 SSR |
 |---|---|---|

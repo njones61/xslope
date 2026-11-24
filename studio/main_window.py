@@ -2182,6 +2182,13 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()
                 self.doc.rollback_edit()
                 return
+            if self.doc.edit_changed_nothing():
+                # OK on an editor that changed nothing: no undo step, no dirty
+                # flag, and every result stays. Dropping them here used to take a
+                # loaded transient seepage solution with them, and a Save after
+                # that deleted its files beside the workbook.
+                self.doc.drop_noop_edit()
+                return
             self.doc.commit_edit()        # -> re-render + mark dirty
             self._populate_inputs_tree()
             # inputs changed -> solution is stale; if the geometry changed, the

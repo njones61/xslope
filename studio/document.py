@@ -71,6 +71,70 @@ def _blank_material(name):
     }
 
 
+
+#: Keys a record may leave out, with the value everything that reads the record
+#: takes for them (``c.get("Option", "Depth")``). The loader leaves a Depth circle's
+#: Option and intercept point out; the Circles editor writes them back explicitly.
+_RECORD_DEFAULTS = {"circles": {"Option": "Depth", "Xi": 0.0, "Yi": 0.0}}
+
+
+def _as_read(key, value):
+    """A top-level model value in the form it is read in, so two spellings of one
+    model compare equal: in a list of records, a key holding None is the same as a
+    key left out (``rec.get(k)`` is None either way: the Profile lines editor drops
+    an empty Size the loader wrote), and a key with a documented default is the
+    same as that default (``_RECORD_DEFAULTS``)."""
+    if not isinstance(value, list) or not all(isinstance(r, dict) for r in value):
+        return value
+    defaults = _RECORD_DEFAULTS.get(key, {})
+    out = []
+    for rec in value:
+        r = {k: v for k, v in rec.items() if v is not None}
+        for k, v in defaults.items():
+            r.setdefault(k, v)
+        out.append(r)
+    return out
+
+
+def _same_value(a, b):
+    """Exact equality of two model values as an editor writes them back: dicts by
+    key, lists and tuples item by item, arrays and frames by their own equality
+    (NaN equal to NaN), floats with NaN equal to NaN. A pair it cannot compare is
+    unequal, which errs toward treating an edit as a change."""
+    import math
+    if a is b:
+        return True
+    try:
+        import numpy as np
+        import pandas as pd
+    except ImportError:                      # pragma: no cover - Studio needs both
+        np = pd = None
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_same_value(a[k], b[k]) for k in a)
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return (type(a) is type(b) and len(a) == len(b)
+                and all(_same_value(x, y) for x, y in zip(a, b)))
+    if pd is not None and isinstance(a, (pd.DataFrame, pd.Series)):
+        return type(a) is type(b) and a.equals(b)
+    if np is not None and (isinstance(a, np.ndarray) or isinstance(b, np.ndarray)):
+        if not (isinstance(a, np.ndarray) and isinstance(b, np.ndarray)):
+            return False
+        if a.shape != b.shape or a.dtype != b.dtype:
+            return False
+        try:
+            return bool(np.array_equal(a, b, equal_nan=a.dtype.kind in "fc"))
+        except Exception:
+            return all(_same_value(x, y) for x, y in zip(a.ravel(), b.ravel()))
+    if isinstance(a, float) and isinstance(b, float) and math.isnan(a) and math.isnan(b):
+        return True
+    if type(a) is not type(b) and not (isinstance(a, (int, float)) and isinstance(b, (int, float))
+                                       and not isinstance(a, bool) and not isinstance(b, bool)):
+        return False
+    try:
+        return bool(a == b)
+    except Exception:
+        return False
+
 class ProjectDocument(QObject):
     loaded = Signal()             # a project was loaded/created (full reset)
     changed = Signal()            # slope_data mutated (re-render)
@@ -88,6 +152,7 @@ class ProjectDocument(QObject):
         # surfaced in the toolbar history dropdown (plan §Phase 2 undo hardening).
         self._undo = []
         self._redo = []
+        self._pre_edit = None          # what the last begin_edit cleared
         # Saved-state marker: the undo position (== len(self._undo)) the document
         # was last saved at, so undo/redo back to that point clears the dirty flag
         # (Office-style). None = the saved state is unreachable (never saved, or its
@@ -522,18 +587,57 @@ class ProjectDocument(QObject):
         is a short tag describing the edit, shown in the history dropdown."""
         if self.slope_data is None:
             return
+        # What this begin takes away, so drop_noop_edit can give it back.
+        self._pre_edit = (self._clean_index, list(self._redo), None)
         # A new edit discards the redo branch. If the saved (clean) state lived on
         # that branch, it's now unreachable -> mark it lost so we stay dirty.
         if self._clean_index is not None and self._clean_index > len(self._undo):
             self._clean_index = None
         self._undo.append((label, self._snapshot()))
         if len(self._undo) > self.MAX_HISTORY:
-            self._undo.pop(0)             # drop oldest; positions shift down by 1
+            oldest = self._undo.pop(0)    # drop oldest; positions shift down by 1
+            self._pre_edit = self._pre_edit[:2] + (oldest,)
             if self._clean_index is not None:
                 self._clean_index -= 1
                 if self._clean_index < 0:
                     self._clean_index = None   # saved state scrolled off the stack
         self._redo.clear()
+
+    def edit_changed_nothing(self):
+        """True when the mutation since ``begin_edit`` left ``slope_data`` exactly
+        as the snapshot holds it: an editor closed with OK and nothing changed.
+
+        Equal means equal in every value, read the way the snapshot was taken (the
+        mesh is shared, so it must be the same object; the saved water table is not
+        in the snapshot). Anything this cannot compare counts as a change, which
+        keeps the old behavior for it."""
+        if not self._undo or self.slope_data is None:
+            return False
+        snap = self._undo[-1][1]
+        cur = {k: v for k, v in self.slope_data.items()
+               if k != "_water_table_profile"}
+        if cur.get("mesh") is not snap.get("mesh"):
+            return False
+        cur = {k: _as_read(k, v) for k, v in cur.items() if k != "mesh"}
+        old = {k: _as_read(k, v) for k, v in snap.items() if k != "mesh"}
+        return _same_value(cur, old)
+
+    def drop_noop_edit(self):
+        """Take back a ``begin_edit`` whose edit changed nothing: drop its snapshot
+        and restore the redo branch and saved marker it cleared, so OK on an editor
+        that changed nothing leaves the history, and the dirty flag, as they were."""
+        if not self._undo:
+            return
+        self._undo.pop()
+        pre = getattr(self, "_pre_edit", None)
+        if pre is not None:
+            clean, redo, oldest = pre
+            if oldest is not None:
+                self._undo.insert(0, oldest)
+            self._clean_index = clean
+            self._redo[:] = redo
+            self._pre_edit = None
+        self._refresh_dirty()
 
     def commit_edit(self):
         """Signal that an in-place mutation of slope_data is complete."""

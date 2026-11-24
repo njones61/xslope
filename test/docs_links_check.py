@@ -3079,16 +3079,16 @@ def test_lem12_pile_console_block():
     text = open(page, encoding="utf-8").read()
     df = pd.DataFrame()
     df.attrs["pile_report"] = [
-        {"label": "lower row", "x": 5.0, "y": -5.070439, "computed": True,
-         "S": 6.0, "appl": "active", "H_width": 2540.651083,
-         "F_soil": 44178.182854, "F_used": 15243.906495,
-         "governed": "bending (Mcap/Lm)", "L_m": 3.935999,
-         "depth": 10.070439},
-        {"label": "upper row", "x": 10.0, "y": -4.478998, "computed": True,
-         "S": 6.0, "appl": "active", "H_width": 1826.978303,
-         "F_soil": 81729.176651, "F_used": 10961.869817,
-         "governed": "bending (Mcap/Lm)", "L_m": 5.473519,
-         "depth": 14.478998},
+        {"label": "lower row", "x": 5.0, "y": -5.024185, "computed": True,
+         "S": 6.0, "appl": "active", "H_width": 2551.241415,
+         "F_soil": 43842.994253, "F_used": 15307.448493,
+         "governed": "bending (Mcap/Lm)", "L_m": 3.91966,
+         "depth": 10.024185},
+        {"label": "upper row", "x": 10.0, "y": -4.442207, "computed": True,
+         "S": 6.0, "appl": "active", "H_width": 1831.229137,
+         "F_soil": 81369.907855, "F_used": 10987.374823,
+         "governed": "bending (Mcap/Lm)", "L_m": 5.460813,
+         "depth": 14.442207},
     ]
     lines = _pile_report_lines(df, {"unit_system": "imperial"})
     fails = []

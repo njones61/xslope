@@ -79,13 +79,20 @@ SEEP_ONLY = SEEPAGE_TYPES
 #: Recognises the model files a page links, so the page inherits their locks.
 MODEL_FILE = re.compile(r"[\w./-]+\.xlsx")
 
+#: A recorded session is a source too. W-1 quotes the factors of safety its
+#: assistant conversations printed when they were recorded, which can differ from
+#: today's run in the third decimal (the page's own note says so, and its "Check
+#: its work" lists give today's values); a header or sentence that says the
+#: number is as recorded hands it to the recording, not to a lock.
+RECORDED = r"\brecord(?:ed|ing)\b"
+
 #: A table column header, or a row label, that names an authority rather than
 #: this program: the cells under it are the source's numbers, not a run's.
-AUTH = re.compile(AUTH_HDR_BASE, re.I)
+AUTH = re.compile(AUTH_HDR_BASE + "|" + RECORDED, re.I)
 
 #: A source-side attributor in prose.  What follows belongs to the source until
 #: the sentence ends.
-SOURCE = re.compile(SOURCE_EXTRA + "|" + AUTH_HDR_BASE, re.I)
+SOURCE = re.compile(SOURCE_EXTRA + "|" + AUTH_HDR_BASE + "|" + RECORDED, re.I)
 
 Lock = namedtuple("Lock", "value tol slots origin benchmark key type file series")
 

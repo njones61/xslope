@@ -502,7 +502,7 @@ foundation as **Medium Clay** at E = 668,300 psf with ν = 0.40 — and the
 assistant entered both, calling them generic textbook values rather than site
 data since the model states no stiffnesses.
 
-The second turn ran the limit equilibrium search at **FS = 1.244** — Spencer,
+As recorded, the second turn ran the limit equilibrium search at **FS = 1.244** — Spencer,
 the method a run takes when the model names none — then built the mesh and ran
 the strength reduction to **1.270**, 2.0% higher. That number comes out of a
 bisection on the factor the strengths are divided by: nine trials, each of them
@@ -562,7 +562,7 @@ Both soils are undrained. What should the pore-pressure option be, and what woul
 **It corrected the premise.** One snippet ran five of the methods, each with its
 own search, and the answer says first that not quite all of them match.
 
-| Method | Equilibrium satisfied | FS (searched) |
+| Method | Equilibrium satisfied | FS (searched, as recorded) |
 | :--- | :--- | :---: |
 | Ordinary Method of Slices (OMS) | moment only | 1.244 |
 | Bishop | moment, and vertical force | 1.244 |

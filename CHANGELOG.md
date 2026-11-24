@@ -223,6 +223,13 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   critical surface. When the critical or analyzed circle is one of them, the
   Log, the Analysis Report, and Studio's LEM Solution tab say so, and the status
   bar notes it when the run finishes.
+- The Monte Carlo convergence plot keeps its 95% confidence band between 0% and
+  100%. Over the first few realizations the band ran below zero, to about −15%
+  on the documentation's example.
+- The finite element non-circular sample and Video 14's completed model give the
+  dense sand below the clay layer the water table's pore pressure, as the limit
+  equilibrium sample does. Their factors of safety, 1.609 and 1.621, are
+  unchanged.
 
 ### Changed
 

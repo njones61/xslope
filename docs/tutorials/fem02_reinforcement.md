@@ -125,15 +125,15 @@ finite element run solves. Click **Run**.
 
 ![Spencer's critical circle through the reinforced block](images/fem02_lem_solution.png){width=1000}
 
-**Spencer's method gives FS = 1.587**, on a circle centered at (−5.13, 46.98)
-with a radius of 47.26 ft. The surface daylights at the toe, cuts up through the
-reinforced block and comes out on the crest at **x = 36.2**, behind the last
+**Spencer's method gives FS = 1.589**, on a circle centered at (−6.00, 49.48)
+with a radius of 49.83 ft. The surface daylights at the toe, cuts up through the
+reinforced block and comes out on the crest at **x = 36.8**, behind the last
 geogrid. It crosses five of the six layers and takes 800 lb/ft from each of
 them, for 4,000 lb/ft of tension in total.
 That crossing-by-crossing is worked through in
 [LEM-8](lem08_reinforced_slope.md#where-the-surface-meets-the-lines).
 
-<!-- test: file=files/xslope_reinforced_slope_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.587, tolerance=0.005 -->
+<!-- test: file=files/xslope_reinforced_slope_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.589, tolerance=0.005 -->
 
 ---
 
@@ -257,7 +257,7 @@ by ticking the box or by shrinking the whole mesh, and the model begins to find
 a second, real mechanism: shallow sloughing of the sand face, the same one a
 tiny starting circle on the face would find in the limit equilibrium search.
 The reported factor of safety then drifts down toward the sloughing answer
-(from 1.54 at this page's mesh to 1.47 with the box ticked and 1.44 at 1 ft
+(from 1.54 at this page's mesh to 1.47 with the box ticked and 1.50 at 1 ft
 elements, on the run with a residual) — a different failure, not a better
 estimate of this one. We are after
 the general mechanism through the reinforced block, the one Spencer's circle
@@ -337,7 +337,7 @@ The toggle hides `Type`, `Dir` and `Appl`, which only the limit equilibrium run
 reads. The capacity columns stay in view, because the finite element run reads
 them too, and the six lines are complete on every one of them: 800 lb/ft in
 `Tmax`, a 4 ft pullout length in `Lp1` and `Lp2`, and 0 in `Tend1` and `Tend2`,
-which is no end anchorage. `Adhesion` and `Delta` are blank, so the run reads the
+which is no end anchorage. `Adhesion (psf)` and `Delta` are blank, so the run reads the
 pullout lengths. `Spacing` reads 1, because geogrid properties are
 already per unit width. Of the seven blue columns, `Tres`, `E (psf)` and `Area`
 are empty. The other four, `Joint`, `kn`, `ks` and `Jred`, are for a line the
@@ -388,7 +388,7 @@ a bracket of 1.00 to 2.00, a tolerance of 0.0100, **Rollers** on the sides, and
 which cannot reach equilibrium has failed. In FEM-1 we compare it against the
 three other criteria the list offers. Click **Run**.
 
-**FS = 1.566**, **1.3% below** Spencer's 1.587. The two engines solve the
+**FS = 1.566**, **1.4% below** Spencer's 1.589. The two engines solve the
 problem in completely different ways, so agreement within a couple of percent
 is a good check on both.
 
@@ -401,8 +401,8 @@ captures by re-solving once at 1.15 times the factor of safety so the collapse
 develops far enough to draw. The contours are viscoplastic shear strain — the
 shearing left after the elastic response is subtracted — and the band they draw
 runs from the toe, up behind the reinforced block, and out onto the crest near
-**x = 49**. Spencer's circle came out at x = 36.2. The two mechanisms start in
-the same place and end about 13 ft apart: the finite element band passes
+**x = 49**. Spencer's circle came out at x = 36.8. The two mechanisms start in
+the same place and end about 12 ft apart: the finite element band passes
 *behind* the reinforced block, while Spencer's circle cuts through the back of
 it. The two engines treat the layers differently — the limit equilibrium run
 applies each layer's full capacity at the crossing, the finite element run lets
@@ -480,8 +480,8 @@ the 0.3 to 0.7 usually quoted for geosynthetics. Click **OK**, then
 **Run → Run FEM…** and **Run**, with nothing else on the dialog touched.
 
 **FS = 1.535**. Post-peak behavior cost
-**0.031** of factor of safety, 2.0% — half again the 0.021 between
-Spencer's 1.587 and the elastic-perfectly-plastic 1.566.
+**0.031** of factor of safety, 2.0% — about a third more than the 0.023
+between Spencer's 1.589 and the elastic-perfectly-plastic 1.566.
 
 <!-- test: file=files/xslope_reinforced_slope.xlsx, type=fem_ssrm, expected_fs=1.535, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-2-ssrm, f_stand=1.53125, f_fail=1.5390625, check=edges, expected_elements=2113, expected_nodes=4388 -->
 
@@ -611,7 +611,7 @@ Its resistance rate, 2 *F*\* α σ′<sub>v</sub>, is the law above with
 
 Open **Reinforcement** once more. Clear the `Tres` column, so the layers are
 elastic-perfectly-plastic again and the only change from the first run is the
-pullout law, and enter `0` under `Adhesion` and `22` under `Delta` on all six
+pullout law, and enter `0` under `Adhesion (psf)` and `22` under `Delta` on all six
 rows. Once those two are filled, `Lp1` and `Lp2` are no longer read. Click
 **OK**, then **Run → Run FEM…** and **Run**.
 
@@ -659,13 +659,13 @@ little cover the law allows almost nothing there, where the stated ramp allowed
 that the weak end moved from the tail to the face.
 
 Both answers move, and by comparable amounts: the finite element one by 2.5%,
-and the limit equilibrium one by 1.8%, to **1.559** when the search is run again
+and the limit equilibrium one by 1.9%, to **1.559** when the search is run again
 with the law entered. Spencer's move is not a loss of capacity. On the critical circle from the
-stated-length search, every one of the five crossings sits 8.4 ft or more from
+stated-length search, every one of the five crossings sits 8.2 ft or more from
 the nearer end, out where both laws allow the full 800 lb/ft, so on that surface
 the two laws give the same forces.
 Instead, the critical circle shifts slightly — it now daylights
-8.4 ft beyond the toe rather than at it, and clips line 1 two feet from the
+6.5 ft beyond the toe rather than at it, and clips line 1 two feet from the
 face, where the law offers 168 lb/ft against the stated ramp's 400. The red dots on the
 solution plot are where each line's available tension first reaches the full
 800 lb/ft from either end — the ends of its development lengths. Under the
@@ -693,13 +693,13 @@ The three results for the same slope, from the same file, are:
 
 | Reading | FS |
 | --- | :---: |
-| Spencer's method, searched on this page | 1.587 |
+| Spencer's method, searched on this page | 1.589 |
 | Strength reduction, layers elastic-perfectly-plastic | 1.566 |
 | Strength reduction, layers with a 600 lb/ft residual | 1.535 |
 
-The gap between Spencer and the peak-residual run is 0.052, and the section
+The gap between Spencer and the peak-residual run is 0.054, and the section
 above measured what post-peak behavior costs: **0.031 of it**. The other
-0.021 separates Spencer from the elastic-perfectly-plastic run, which is the
+0.023 separates Spencer from the elastic-perfectly-plastic run, which is the
 same physical assumption about the layers — hold capacity once yielded — applied
 two different ways.
 
@@ -712,11 +712,11 @@ at its most-worked point against the 800 the envelope allows, all six lines are
 held at their bond limits once the residual is in play, and the
 force in every layer tapers away from the shear band instead of standing at its
 envelope value everywhere. Prescribing the maximum available force at one point
-gives a factor of safety 1.3% higher than the elastic–perfectly plastic FEM result on this slope.
+gives a factor of safety 1.5% higher than the elastic–perfectly plastic FEM result on this slope.
 
 The mechanisms differ in the same direction. Spencer's circle had to be a
 circle, and the most critical circle available cuts out through the crest at
-x = 36.2. The finite element band, free to take any shape, goes around the back
+x = 36.8. The finite element band, free to take any shape, goes around the back
 of the reinforced block and reaches the crest near x = 49 — a path no circular
 search can follow.
 
@@ -738,15 +738,12 @@ layers' modulus scaled separately:
 | :---: | :---: | :---: |
 | ×0.1 | ×1 | 1.5273 |
 | ×1 (the file) | ×1 | 1.5352 |
-| ×10 | ×1 | at least 1.34 |
+| ×10 | ×1 | 1.3633 |
 | ×10 | ×10 | 1.5352 |
 
 The result does not carry over. With ten times the soil's modulus and the
-geogrid left as it is, the run reports a lower bound rather than a single number.
-Its closing summary in the Log opens with "No failure was found up to F = 1.3516"
-and ends with "The factor of safety is at least 1.34". At 1.3516 the run could not
-tell whether the slope would stand. The trials at 1.3594 and above failed, so the
-answer lies between 1.34 and 1.36, well below the file's 1.5352. A stiffer soil strains less
+geogrid left as it is, the factor of safety falls to 1.363, about 0.17 below the
+file's 1.5352. A stiffer soil strains less
 under the same load, so the layers are stretched less and give less of their
 tension. One tenth of the modulus costs one bisection cell, next to
 nothing, because at that stiffness the layers are already carrying close to

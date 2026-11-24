@@ -41,7 +41,7 @@ Download [xslope_pseudostatic_start.xlsx](files/xslope_pseudostatic_start.xlsx) 
 Open**. It is the starter file of LEM-14, a 15 ft slope at 2:1 in one soil, dry, with one starting circle through the
 toe. Open **Materials** and set the **Show parameters for:** toggles to **LEM** alone:
 
-| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ (deg) | c/p | r-elev | d (psf) | ψ (deg) | u |
+| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ | c/p | r-elev | d | psi | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | fill | 135 | | mc | 60 | 23 | 0 | 0 | 0 | 0 | none |
 

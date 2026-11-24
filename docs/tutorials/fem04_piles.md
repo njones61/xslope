@@ -209,15 +209,15 @@ Click **Run**.
 
 ![Spencer's critical circle, with the two pile crossings marked](images/fem04_lem_solution_piles.png){width=1000}
 
-**FS = 1.842**, on a deep circle that leaves the ground 13.5 ft beyond the toe
+**FS = 1.845**, on a deep circle that leaves the ground 13.5 ft beyond the toe
 and exits on the crest at x = 35. The two red dots are where it crosses the pile
-rows. The rows deliver **4,367.6 lb/ft** to the slices there — 15,244 lb from
-each shaft of the lower row and 10,962 lb from each of the upper, both of them
+rows. The rows deliver **4,382.5 lb/ft** to the slices there — 15,307 lb from
+each shaft of the lower row and 10,987 lb from each of the upper, both of them
 limited by the shafts' moment capacity rather than by what the soil could
 supply. That calculation is worked through in
 [LEM-12](lem12_piles.md#how-the-force-is-computed).
 
-<!-- Spencer's 1.842 on this same file at 40 slices is locked by the seven-method tag on docs/tutorials/lem12_piles.md (fs_spencer=1.842); not duplicated here. -->
+<!-- Spencer's 1.845 on this same file at 40 slices is locked by the seven-method tag on docs/tutorials/lem12_piles.md (fs_spencer=1.845); not duplicated here. -->
 
 ### The finite element answer
 
@@ -262,7 +262,7 @@ to 1.730 on the wall of the second half, so every one of them uses the same 1.0
 to 2.0 and the answers stay comparable.
 Leave everything else as it is and click **Run**.
 
-**FS = 1.363**. Spencer's method gave 1.842 on the same file.
+**FS = 1.363**. Spencer's method gave 1.845 on the same file.
 
 <!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.363, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-4-piles-ssrm, f_stand=1.359375, f_fail=1.3671875, check=edges, expected_elements=1521, expected_nodes=3180 -->
 
@@ -392,7 +392,7 @@ is its own Spencer search, because spacing changes which surface governs.
 
 ![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem04_spacing_sweep.png){width=800}
 
-The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
+The limit equilibrium answer falls from 2.195 to 1.410 over that range, 36%.
 With the tips pinned the strength reduction answer barely moves: 1.363 at 3 ft
 and again at 6 ft, and 1.324 at 12 ft.
 
@@ -409,8 +409,8 @@ with it. Each row below is read at that spacing's captured mechanism:
 
 | S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per shaft (lb·ft) | Fraction of M<sub>cap</sub> |
 | :---: | :---: | :---: | :---: | :---: |
-| 3 | 1.357 × 10<sup>8</sup> | 4,752 | 14,257 | 24% |
-| 6 | 6.786 × 10<sup>7</sup> | 4,752 | 28,514 | 48% |
+| 3 | 1.357 × 10<sup>8</sup> | 4,752 | 14,256 | 24% |
+| 6 | 6.786 × 10<sup>7</sup> | 4,752 | 28,512 | 48% |
 | 12 | 3.393 × 10<sup>7</sup> | 5,093 | 61,116 | 102% |
 
 At 3 and 6 ft the moment *per unit width of slope* does not move at all, which
@@ -434,7 +434,7 @@ can turn on its toe develops 48% of it and the run answers 1.363; socketing the
 toe puts both rows on their capacity and the run answers 1.410. So the choice
 between 1.36 and 1.41 is a question about the shaft — bearing on the rock, or
 socketed into it — and it is one cell in the file. Both answers stay well under
-Spencer's 1.842.
+Spencer's 1.845.
 
 The two engines respond differently to spacing. The limit equilibrium
 answer falls with spacing because its force is a capacity divided by a widening
@@ -535,7 +535,7 @@ use.
 ![The wall row: S = 1, no diameter, section constants entered directly](images/fem04_studio_wall_row.png)
 
 Enter the geometry — `x1` 10, `y1` 10, `x2` 10, `y2` −10 — then `E`
-`4176000000`, which the cell redisplays as `4.176e+09`, `I` `0.00888` and `Area`
+`4176000000`, which the table shows as `4.176e+09` the next time it opens, `I` `0.00888` and `Area`
 `0.0551` from the table above, `Mcap` `152000`, and `S` `1`. Leave `D` and
 `Vcap` empty.
 

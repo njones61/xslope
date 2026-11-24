@@ -130,19 +130,21 @@ Click **OK**, then run the same Spencer auto search again:
 
 ![Spencer on the Mohr-Coulomb envelope](images/lem07_baker_mc.png){width=1000}
 
-**FS = 1.518** — Slide reports 1.536 and Baker 1.50 — on a circle centered at
+**FS = 1.519** — Slide reports 1.536 and Baker 1.50 — on a circle centered at
 (−0.23, 9.22), tangent to elevation 0.00 and 10.96 m long, carrying
-306.7 kN/m of soil. That is three times the mass of the surface the power curve
+306.6 kN/m of soil. That is three times the mass of the surface the power curve
 found, and it explains why the two answers differ so much: the straight
 envelope's cohesion gives the shallow, low-stress surface enough strength that
 the critical surface moves to a deeper one, where friction contributes more of
 the strength.
 
-Same slope, same soil, same triaxial data — 0.958 against 1.518. The two
+<!-- test: file=../lem/files/xslope_baker_clay.xlsx, type=circular_search, method=spencer, num_slices=40, mat1_option=mc, mat1_c=11.64, mat1_phi=24.7, expected_fs=1.519, tolerance=0.005 -->
+
+Same slope, same soil, same triaxial data — 0.958 against 1.519. The two
 envelopes cross at σ′ = 89.4 kPa and give the same strength there, so the fits
 agree at the high stresses where the clay was tested. But 6 m of this clay generates at most
 γH = 18 × 6 = 108 kPa of vertical stress, and the surfaces the search actually
-chooses run far below that: 8.3 kPa on average along the power curve's, 24.2
+chooses run far below that: 8.3 kPa on average along the power curve's, 24.1
 along the Mohr-Coulomb one. At 10 kPa the curve gives 8.02 kPa of shear
 strength where the line gives 16.24, and most of the line's value is the
 11.64 kPa of cohesion, which it keeps unchanged down to zero stress. The
@@ -177,7 +179,7 @@ model, the fitted Mohr-Coulomb envelope:
 
 **FS = 1.367**, against Slide's 1.366 and Baker's 1.35. The curve gives a
 factor of safety 7% above the line's here, where on the compacted clay the
-line's was 58% above the curve's, and the two critical surfaces are nearly the
+line's was 59% above the curve's, and the two critical surfaces are nearly the
 same shape and depth. Where the tests cover the stresses on the critical
 surface, the choice between a curve and a line makes little difference; where
 they do not, it can change the result substantially.
@@ -287,6 +289,8 @@ flat on the rigid base, the deepest surface the model allows. It is 41.89 m
 long against 39.30 m, and 23.13 m of it runs through the lowest clay. With a
 constant strength a shallower surface has no advantage, so the search takes the
 largest circle the geometry permits.
+
+<!-- test: file=../lem/files/xslope_low_clay.xlsx, type=circular_search, method=bishop, num_slices=50, mat3_option=mc, mat3_c=22.5, expected_fs=1.084, tolerance=0.005 -->
 
 The 5% drop is not only because the constant is too low. To separate the two
 effects, we run the same edit at four different constants:

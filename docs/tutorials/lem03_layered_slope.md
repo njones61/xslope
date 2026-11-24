@@ -17,7 +17,7 @@ needs a starting circle at the base of each layer so the search tries both.
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>~30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model a layered slope: how to carve a section into
@@ -222,9 +222,10 @@ Click **Profile lines**, and set **Max depth (bottom boundary elevation):** to
 `-10` — an elevation, which puts the rigid base 10 ft below the toe.
 
 1. Press **Add line**, set **Material:** to `1: embankment`, and **Add row**
-   three times for `0, 0` / `40, 20` / `90, 20`.
+   twice for `0, 0` / `40, 20` / `90, 20`. A new line starts with one vertex
+   row, so two more make the three.
 2. Press **Add line** again, set **Material:** to `2: foundation`, and **Add
-   row** twice for `-30, 0` and `90, 0`.
+   row** once for `-30, 0` and `90, 0`.
 
 The second line is the contact: by the [top-of-a-layer rule](#the-problem),
 everything below it down to the maximum depth is foundation. With it selected,
@@ -301,12 +302,12 @@ run's slices:
 
 | Circle | Depth | Factor of safety | Weight of the sliding mass (lb/ft) |
 | --- | :---: | :---: | :---: |
-| Base of the embankment | 0 | **1.247** | 61,224 |
-| Through the toe | −4.72 | 1.646 | 100,872 |
-| Base of the foundation | −10 | 1.656 | 157,486 |
+| Base of the embankment | 0 | **1.248** | 61,222 |
+| Through the toe | −4.72 | 1.647 | 100,867 |
+| Base of the foundation | −10 | 1.658 | 157,476 |
 
-<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, method=spencer, num_slices=40, circle_index=0, expected_fs=1.247, tolerance=0.005 -->
-<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, method=spencer, num_slices=40, circle_index=1, expected_fs=1.656, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, method=spencer, num_slices=40, circle_index=0, expected_fs=1.248, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=single_circle, method=spencer, num_slices=40, circle_index=1, expected_fs=1.658, tolerance=0.005 -->
 
 The deep circles carry up to 2.57 times the weight of the shallow one and are
 still a third safer, because everything they add is in the foundation:
@@ -322,26 +323,26 @@ the critical one in red:
 
 The gray circles show both families being tried — the shallow set clustered on
 the contact, the deep set running down to the rock. The green arrows trace the
-center's path from the two circles' shared start at (20, 40) to (18.5, 43.75):
+center's path from the two circles' shared start at (20, 40) to (18.5, 43.0):
 both seeds are refined together, and both end on the same surface.
 
 ![Spencer's critical surface](images/lem03_solution.png){width=1000}
 
-**FS = 1.244**, on a circle centered at (18.5, 43.75) with a radius of 43.75. Its
+**FS = 1.245**, on a circle centered at (18.5, 43.0) with a radius of 43.0. Its
 lowest point is at elevation 0.000: the critical surface is tangent to the
 contact, running along the top of the foundation without entering it. Every one
 of the 40 slice bases carries c = 400 psf, the fill's strength.
 
 The solution has three admissibility warnings — interslice tension (a most
-tensile −1436 lb/ft against a largest compression of 7382), a line of thrust
-outside the slice on 15% of the boundaries, and tension on the base of 2 slices
+tensile −1454 lb/ft against a largest compression of 7360), a line of thrust
+outside the slice on 18% of the boundaries, and tension on the base of 2 slices
 near the crest. This is the crest tension of a φ = 0
 slope, which is diagnosed and fixed with a tension crack in
 [Tutorial LEM-1](lem01_simple_embankment.md); adding one here at z<sub>c</sub> = 2c/γ = 6.15 ft gives a clean solution at
 **FS = 1.175**, on a circle still tangent to the contact. It changes nothing
 about which surface is critical, and unlike in the uncracked embankment of LEM-1
 the tension never prevented a surface from being solved: Spencer answered on all
-529 trial surfaces the search tried.
+511 trial surfaces the search tried.
 
 ### Guarding against local minima
 
@@ -351,17 +352,19 @@ To guard against a local minimum, try several starting circle locations and
 confirm they agree; the circles at the base of each layer serve that purpose. We
 run the search from the shallow
 circle, the deep circle and the generator's toe circle: every one returns the same
-surface here — tangent to the contact, FS = 1.244.
+surface here — tangent to the contact, FS = 1.245.
 
 The check passes here even from starting circles far from the answer. Started
-from an arc far out of scale with the section — a center 220 ft above the slope,
-R = 269 ft — the search moves back down to the same contact-tangent circle and
-reports the same **1.244**, because of the two soils: in a uniform φ = 0 fill the
+from a circle far out of scale with the section — a center 220 ft above the slope,
+R = 269 ft, an arc that never reaches the ground surface inside the section, so
+the Log notes that it cannot be built and the search starts from the grid of
+centers around it — the search moves back down to the same contact-tangent circle
+and reports the same **1.245**, because of the two soils: in a uniform φ = 0 fill the
 deepest surface available is the critical one, so the search drives down through
 the embankment, and everything below the contact is twice as strong, so a trial
 surface that dips into the foundation gains more strength than the weight it
 adds and is pushed back up. The minimum sits on the contact and is reached
-downhill from either side. Because every start agrees, 1.244 is the minimum for
+downhill from either side. Because every start agrees, 1.245 is the minimum for
 the model and not only for one neighborhood.
 
 Other sections have two competing mechanisms, and layering is the usual cause:
@@ -381,20 +384,20 @@ c = 300 psf — below the fill's 400 — with everything else unchanged:
 
 ![Spencer on the same section with a weak foundation](images/lem03_solution_weak.png){width=1000}
 
-**FS = 0.792**, and it is a different mechanism entirely. The critical circle is
+**FS = 0.793**, and it is a different mechanism entirely. The critical circle is
 now tangent to the rock at elevation −10; it exits 9 ft beyond the toe, on the
 flat ground the section provides for it, and reaches back to x = 63 in the crest.
-It weighs 149,933 lb/ft against the 61,393 of the answer above, and its base runs
+It weighs 150,635 lb/ft against the 60,693 of the answer above, and its base runs
 through both soils. The deeper surface now has the lower factor of safety: a
 circle tangent to the contact lies wholly in the fill, where nothing has changed,
-so solved alone it returns the same 1.247 it did before — against the 0.792 at
+so solved alone it returns the same 1.248 it did before — against the 0.793 at
 the rock.
 
 A layered model has one candidate mechanism per layer, and a starting circle at
 the base of each layer gives the search each of them: the circle that looked
 unnecessary on the original section is the critical one with the weak
 foundation. The factor of safety alone does not show which mechanism the search
-found. 1.244 and 0.792 come from the same geometry, the same three build paths
+found. 1.245 and 0.793 come from the same geometry, the same three build paths
 and the same run settings, and only the depth of the reported surface and the
 soils it passes through tell them apart.
 
@@ -404,17 +407,17 @@ The search finds each method its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
+| 1.245 | 1.245 | 1.314 | 1.327 | 1.286 | 1.245 | 1.245 |
 
-<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.245, fs_bishop=1.245, fs_janbu=1.314, fs_corps=1.327, fs_lowe=1.286, fs_spencer=1.245, fs_mprice=1.245 -->
 
 The four methods that satisfy moment equilibrium — the Ordinary Method of
 Slices (OMS), Bishop, Spencer and
-Morgenstern-Price — land on the same circle and the same 1.244. With φ = 0 they
+Morgenstern-Price — land on the same circle and the same 1.245. With φ = 0 they
 give the same factor of safety on any circle, and here each of them could solve
 the critical one. The three force-equilibrium procedures each settle on a flatter,
-larger-radius circle of their own (Janbu R = 45.6, Lowe 47.7, Corps 52.9, against
-Spencer's 43.75) and come out 3–7% higher. Spencer satisfies both force and
+larger-radius circle of their own (Janbu R = 46.0, Lowe 48.2, Corps 53.3, against
+Spencer's 43.0) and come out 3–7% higher. Spencer satisfies both force and
 moment equilibrium and is the one to report.
 
 ---

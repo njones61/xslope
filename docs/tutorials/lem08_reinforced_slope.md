@@ -171,7 +171,7 @@ lengths out and fill `Adhesion` and `Delta` instead, which makes the resistance
 follow the overburden along the line rather than a fixed length. On this slope
 neither one moves the answer: the critical circle crosses every layer more than
 8 ft from the nearer tip, well outside any of these development lengths, and
-Spencer returns 1.587 on that circle with 4 ft at both ends, with 2 ft at the
+Spencer returns 1.589 on that circle with 4 ft at both ends, with 2 ft at the
 buried end, and under the overburden law alike.
 
 **Starting circles** — two, with centers 40 ft up, one above the toe and one
@@ -403,7 +403,7 @@ in gray and the critical circle in red:
 
 ![The circular search](images/lem08_search.png){width=1000}
 
-**FS = 1.587**, on a circle centered at (−5.13, 46.98) with a radius of 47.26.
+**FS = 1.589**, on a circle centered at (−6.00, 49.48) with a radius of 49.83.
 The solution plot draws that circle with the base stresses, the reinforcement
 lines it crosses (gray bars, with a red dot 4 ft in from each end where the
 line's capacity first reaches the full 800 lb/ft — the stretch between the dots
@@ -413,7 +413,7 @@ thrust:
 ![Spencer on the critical circle](images/lem08_solution.png){width=1000}
 
 The surface daylights at the toe, cuts up through the reinforced block and
-comes out on the crest at x ≈ 36, behind the last geogrid. It weighs 29,706
+comes out on the crest at x ≈ 37, behind the last geogrid. It weighs 30,283
 lb/ft, and the reinforcement it crosses contributes 4,000 lb/ft of tension —
 five lines at the full 800.
 
@@ -431,22 +431,36 @@ the sliding mass, and what limits the tension
 Every crossing lands more than 8 ft from the nearer end of its line, twice the
 4 ft it takes to develop the full capacity. Pullout limits nothing here, so the
 last column reads `Tmax` and all five deliver 800 lb/ft. Line 2, for example,
-runs from x = 5 to 25 and is crossed at x = 14.51, 9.51 ft from end 1.
+runs from x = 5 to 25 and is crossed at x = 14.36, 9.36 ft from end 1.
 
 To see the pullout lengths at work, we solve this same circle as a **Single
 surface** run — no search, so changing `Lp1` and `Lp2` is the only thing that
-moves — at two other values. At `Lp1` = `Lp2` = 0, fully anchored, the answer
-stays **1.587**: anchorage had nothing to add. At 10 ft, a longer development
-length than this fill would give, the five crossings fall inside their
-development zones, mobilize 3,553 lb/ft between them rather than 4,000, and
-the factor of safety drops to **1.539**. The table's last column then names the
-end each line is limited by: end 1, at the face, for Lines 2 and 6, and end 2,
-behind the surface, for Lines 3 to 5.
+moves — at two other values. A single-surface run solves the first circle on the
+circles sheet, so the critical circle has to be entered there first. Open
+**Circles**, click the first `Xo` cell, and paste the critical circle over the
+first row:
+
+| Xo | Yo | Option | Depth |
+| :---: | :---: | --- | :---: |
+| -6 | 49.4764 | Depth | -0.3516 |
+
+Click **OK**. In **Run LEM…**, set **Analysis** to `Single surface` and run it
+once as it stands: it returns the search's 1.589. At `Lp1` = `Lp2` = 0, fully
+anchored, the answer stays **1.589**: anchorage had nothing to add. At 10 ft, a
+longer development length than this fill would give, the five crossings fall
+inside their development zones, mobilize 3,535 lb/ft between them rather than
+4,000, and the factor of safety drops to **1.540**. The table's last column then
+names the end each line is limited by: end 1, at the face, for Lines 2 and 6,
+and end 2, behind the surface, for Lines 3 to 5.
 
 Line 1 gives nothing at all. It runs from the toe at elevation 0, and the
 surface daylights at the toe and climbs away from it, so the whole line lies in
 the soil below the sliding mass. A layer the critical surface never crosses is
 not in the analysis, and the note above the table lists Line 1 as not crossed.
+
+Before going on, set `Lp1` and `Lp2` back to 4 on all six lines, put the first
+circle back to `0`, `40`, `Depth`, `0`, and set **Analysis** back to
+`Auto search`. The searches below start from the file's two circles.
 
 ### Factor of safety by method {#what-the-other-methods-say}
 
@@ -454,24 +468,23 @@ Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.480 | 1.594 | 1.524 | 1.608 | 1.598 | 1.587 | 1.587 |
+| 1.481 | 1.595 | 1.524 | 1.609 | 1.598 | 1.589 | 1.590 |
 
-<!-- test: file=../lem/files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.594, fs_janbu=1.524, fs_corps=1.608, fs_lowe=1.598, fs_spencer=1.587, fs_mprice=1.587 -->
+<!-- test: file=../lem/files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.481, fs_bishop=1.595, fs_janbu=1.524, fs_corps=1.609, fs_lowe=1.598, fs_spencer=1.589, fs_mprice=1.590, tolerance=0.005 -->
 
-Spencer and Morgenstern-Price agree to four figures on the same circle and are
+Spencer and Morgenstern-Price land on the same circle, 1.589 and 1.590, and are
 the ones to report. Below them sit the two procedures that leave an equilibrium
 condition out: OMS neglects the interslice forces altogether and comes out 7%
 low, and Janbu's corrected method, which satisfies force equilibrium but not
 moment equilibrium, 4%. Bishop, Lowe & Karafiath and the Corps of Engineers land
-0.4 to 1.3% above Spencer, each on a shallow circle of its own that daylights at
-the toe and cuts the same reinforced block.
+0.3 to 1.2% above Spencer, all three on Spencer's own critical circle.
 
 ### The UTEXASED solution
 
 UTEXASED's Example 5 reports FS = 1.646 by Spencer's method, on a critical circle
 centered at (3.2, 42.0) with a radius of 43.4. Solved as a single surface on that
 circle, XSLOPE's Spencer method gives the same 1.646. The search on this page
-finds a shallower circle, centered at (−5.13, 46.98), at 1.587, which is 3.6%
+finds a shallower circle, centered at (−6.00, 49.48), at 1.589, which is 3.4%
 lower.
 
 <!-- test: file=../lem/files/xslope_reinforce.xlsx, type=single_circle, circle_xo=3.2, circle_yo=42.0, circle_r=43.4, method=spencer, num_slices=40, expected_fs=1.646, tolerance=0.005 -->
@@ -484,15 +497,17 @@ circle:
 
 ![Spencer on the unreinforced section](images/lem08_solution_bare.png){width=1000}
 
-**FS = 1.167** against 1.587: the six layers raise the factor of safety by 36%.
+**FS = 1.168** against 1.589: the six layers raise the factor of safety by 36%.
 The mechanism changes with them. Without the lines the critical surface is a thin
-sliver behind the face, 17,376 lb/ft of soil; with them, the critical mechanism
+sliver behind the face, 17,107 lb/ft of soil; with them, the critical mechanism
 is the deeper, heavier one above, which cuts through the reinforced block.
 
-Solved on the reinforced model's own critical circle instead — one surface, no
-search — the unreinforced section returns 1.247. The gap between that and the
-searched 1.167 is the part of the loss that comes from the slope having a worse
-mechanism available, not from the missing tension.
+Next we solve the unreinforced section on the reinforced model's own critical
+circle — one surface, no search. Paste that circle over the first row of
+**Circles** again, as above, and run a `Single surface`: the unreinforced
+section returns 1.252. Then put the first row back to `0`, `40`, `Depth`, `0`.
+The gap between that and the searched 1.168 is the part of the loss that comes
+from the slope having a worse mechanism available, not from the missing tension.
 
 ### Effect of the reinforcement length {#how-long-the-lines-have-to-be}
 
@@ -502,23 +517,23 @@ Every length gets its own search and its own critical circle:
 
 | Line length (ft) | FS | Tension mobilized (lb/ft) | Lines crossed |
 | :---: | :---: | :---: | :---: |
-| 10 | 1.270 | 532 | 2 of 6 |
-| 15 | 1.426 | 1,466 | 4 of 6 |
-| 20 | 1.587 | 4,000 | 5 of 6 |
-| 25 | 1.587 | 4,000 | 5 of 6 |
-| 30 | 1.587 | 4,000 | 5 of 6 |
-| 40 | 1.587 | 4,000 | 5 of 6 |
+| 10 | 1.270 | 427 | 2 of 6 |
+| 15 | 1.425 | 1,528 | 4 of 6 |
+| 20 | 1.589 | 4,000 | 5 of 6 |
+| 25 | 1.589 | 4,000 | 5 of 6 |
+| 30 | 1.589 | 4,000 | 5 of 6 |
+| 40 | 1.589 | 4,000 | 5 of 6 |
 
 At 40 ft — double the design length — the search returns the same circle and
-the same 1.587, with the lines reaching far past every crossing: the extra
+the same 1.589, with the lines reaching far past every crossing: the extra
 length adds nothing.
 
 ![Spencer with 40 ft geogrids](images/lem08_solution_long.png){width=1000}
 
 Beyond 20 ft the answer does not change, and the four searches that produced it
-show why: each settles on the same circle — center (−5.13, 46.98), the same five
+show why: each settles on the same circle — center (−6.00, 49.48), the same five
 crossings at the same x — and every one of those crossings already lies at least
-8.4 ft from the nearer end of its line, twice the 4 ft it takes to develop Tmax.
+8.2 ft from the nearer end of its line, twice the 4 ft it takes to develop Tmax.
 All five deliver the full 800 lb/ft before anything is lengthened. Adding length
 moves the back end further from crossings the back end never governed. On this
 section the reinforcement force is limited by the tensile capacity `Tmax`, which
@@ -530,10 +545,10 @@ back ends of most of the layers:
 ![Spencer on the same section with 10 ft geogrids](images/lem08_solution_short.png){width=1000}
 
 The gray bars stop well short of the surface in the middle of the face: only two
-of the six lines are crossed at all, and both crossings are caught within 1.7 ft
-of a tip, inside the pullout ramp, where they mobilize 193 and 340 lb/ft instead
-of 800. At 1.270 that section is barely better than the 1.167 of no reinforcement at
-all. Between the two regimes — 15 ft, four crossings, 1,466 lb/ft — added length
+of the six lines are crossed at all, and both crossings are caught within 1.6 ft
+of a tip, inside the pullout ramp, where they mobilize 115 and 311 lb/ft instead
+of 800. At 1.270 that section is barely better than the 1.168 of no reinforcement at
+all. Between the two regimes — 15 ft, four crossings, 1,528 lb/ft — added length
 both reaches more crossings and anchors them better, and it is the only part of
 the range where
 lengthening a geogrid changes the answer.
@@ -547,11 +562,11 @@ than along the slip surface, which gives less force along the slice bases but
 more normal force on them, and on a φ = 37° sand the added friction slightly
 outweighs the loss. Switching instead to `Passive`, so the same 800 lb/ft is treated
 as a nominal capacity divided by the factor of safety, the search returns
-**1.453**. Neither is a correction to the other; they are two published
+**1.454**. Neither is a correction to the other; they are two published
 conventions, which is why the type presets set them together and the reference
 page states which setting suits each support.
 
-<!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.485, fs_lowe=1.477, fs_mprice=1.471 -->
+<!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.476, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.486, fs_lowe=1.478, fs_mprice=1.471 -->
 <!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=mp_spencer -->
 <!-- test: file=../lem/files/xslope_reinforce_rface.xlsx, type=roundtrip -->
 

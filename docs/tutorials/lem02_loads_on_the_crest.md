@@ -16,7 +16,7 @@ unchanged — the load is the only new input.
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>20–25 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>35–45 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to apply loads to a slope model: how to enter
@@ -184,14 +184,14 @@ stresses under it and the surcharge standing on the crest:
 
 ![Spencer on the loaded model](images/lem02_solution_load.png){width=1000}
 
-**FS = 0.918.** The unloaded slope stood at 1.282; 750 psf over 10 ft of crest
+**FS = 0.919.** The unloaded slope stood at 1.282; 750 psf over 10 ft of crest
 takes 28% off it and puts the embankment below 1. The drop is large for a
 small-looking load because the critical surface moved to the loaded strip, as the
 figure and the table below show.
 
 | | unloaded | with the surcharge |
 | --- | :---: | :---: |
-| Factor of safety (Spencer) | 1.282 | 0.918 |
+| Factor of safety (Spencer) | 1.282 | 0.919 |
 | Circle radius (ft) | 40.0 | 33.8 |
 | Surface exits the crest at x = | 44.6 | 35.0 |
 | Length of the surface (ft) | 50.9 | 42.8 |
@@ -211,20 +211,15 @@ The uncracked embankment in LEM-1 could not be solved cleanly: Spencer and Bisho
 disagreed (1.282 against 1.215) because the crest slices were being asked to
 carry tension, and 49 of Spencer's 173 trial circles admitted no solution at
 all. Now we run the loaded model with Bishop, the Ordinary Method of Slices (OMS)
-and Morgenstern-Price: all three return **0.918 on the same
-circle** as Spencer, and no trial circle below the minimum goes unsolved.
+and Morgenstern-Price: all three return **0.919 on the same
+circle** as Spencer.
 
-The surcharge presses down on the crest, against the tension that left those
-circles unsolved, and the change shows up between the slices rather than under
-them. On the critical surface in LEM-1 Spencer's most tensile
-interslice force was −3258 lb/ft against a largest compression of 5568 — 58% of
-it. Under the surcharge it is −822 lb/ft against 6234, or 13%, and Spencer's
-line-of-thrust warning clears. The base itself barely moves: the most tensile
-base stress goes from −666 psf to −561 psf. The interslice tension warning
-therefore remains, smaller: the crest of a φ = 0 slope is prone to tension, and
-Morgenstern-Price still puts its line of thrust outside the slice on 15% of the
-boundaries. But the tension no longer leaves any circle unsolved, so it no longer
-limits which surface the search can report.
+The surcharge presses down on the crest, against that tension, and the change
+shows up in the forces between the slices. On the critical surface in LEM-1
+Spencer's most tensile interslice force was −3266 lb/ft against a largest
+compression of 5671 — 58% of it. Under the surcharge it is −836 lb/ft against
+6222, or 13%. The interslice tension warning therefore remains, smaller: the
+crest of a φ = 0 slope is prone to tension.
 
 ### The same force as a line load
 
@@ -238,8 +233,9 @@ worksheet and Studio's line-loads editor share:
 | --- | :---: | :---: | :---: | :---: |
 | footing | 30 | 20 | 7500 | -90 |
 
-- **Studio** — click **Line loads** in the **Inputs** tree, **Add row**, and
-  enter the row above.
+- **Studio** — click **Distributed loads** in the **Inputs** tree, select the
+  load in the list, press **Remove**, and click **OK**. Then click **Line loads**,
+  **Add row**, and enter the row above.
 - **Excel** — on the **lloads** worksheet, paste the row into `B3:F3`. Delete
   the distributed load from `dloads`.
 - **Assistant** — say: *"Replace the distributed load with a line load of 7500
@@ -253,12 +249,12 @@ magnitude and must be positive; the direction lives entirely in the angle.
 
 ![Spencer with the line load](images/lem02_solution_lload.png){width=1000}
 
-**FS = 0.852**, against 0.918 for the same total force spread over the strip. The
+**FS = 0.855**, against 0.919 for the same total force spread over the strip. The
 concentrated form is the more severe of the two, and the reason is the same one
 as before: the critical surface stops where the load stops. It exits the crest at
-x = 30.0 — the load point — where the spread version had to run out to x = 35 to
-collect the last of the strip. That is 3.8 ft less arc, and with φ = 0 the
-resistance is c times the arc length: 19,523 lb/ft against 21,411. The two loads
+x = 30.1 — just past the load point — where the spread version had to run out to
+x = 35 to collect the last of the strip. That is 3.7 ft less arc, and with φ = 0
+the resistance is c times the arc length: 19,564 lb/ft against 21,419. The two loads
 have the same resultant, and the concentrated one lets the slope fail on a
 shorter surface.
 
@@ -286,10 +282,10 @@ pushing the slope horizontally into the hill. The answer comes out *above* the u
 
 ![750 psf on the face, read as vertical](images/lem02_face_vertical.png){width=1000}
 
-**FS = 1.279** with **Direction** = `vertical`. The same stockpile, the same
-total force, pointed the way gravity points: essentially the unloaded answer,
-which is what a weight added to the middle of a face does — it drives and resists
-in almost equal measure.
+**FS = 1.282** with **Direction** = `vertical`. The same stockpile, the same
+total force, pointed the way gravity points: the unloaded answer to three
+decimals, on the unloaded critical circle, which is what a weight added to the
+middle of a face does — it drives and resists in almost equal measure.
 
 The two settings differ by 28% here, and `normal` is wrong for a stockpile: a
 pile of gravel does not push horizontally into a hillside. Choose `normal` for a
@@ -307,7 +303,7 @@ displacement.
 
 ### Finding the cohesion for a target factor of safety {#what-strength-would-carry-it}
 
-The model as it stands is not supportable: its factor of safety, 0.918, is
+The model as it stands is not supportable: its factor of safety, 0.919, is
 below 1. The next question is what strength would raise the factor of safety
 to the value required, and a parametric sweep answers it.
 
@@ -334,7 +330,7 @@ In Studio, click **Run → Parametric…**:
 
 ![The design sweep](images/lem02_design.png){width=1000}
 
-**c = 817 psf.** The soil would have to be 63% stronger than the 500 psf it has
+**c = 816.5 psf.** The soil would have to be 63% stronger than the 500 psf it has
 to carry this stockpile at a factor of safety of 1.5.
 
 In the design sweep plot:
@@ -345,7 +341,7 @@ In the design sweep plot:
   factor of safety is exactly proportional to cohesion. A sweep on a φ > 0 soil,
   or one whose critical surface moves, bends.
 - **The target is bracketed.** The sweep crossed 1.5 inside the range it was
-  given, so 817 psf is interpolated between two solved points rather than
+  given, so 816.5 psf is interpolated between two solved points rather than
   extrapolated past the last one. A target that never crosses is reported as
   such, with the direction to widen the range — a design sweep does not report a
   value outside the range it solved.
@@ -387,12 +383,12 @@ The table gives each method's own search on the model with the crest surcharge:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 0.918 | 0.918 | 0.950 | 0.953 | 0.939 | 0.918 | 0.918 |
+| 0.919 | 0.919 | 0.951 | 0.954 | 0.940 | 0.919 | 0.919 |
 
-<!-- test: file=../lem/files/xslope_crest_surcharge.xlsx, type=circular_search, num_slices=40, fs_oms=0.918, fs_bishop=0.918, fs_janbu=0.950, fs_corps=0.953, fs_lowe=0.939, fs_spencer=0.918, fs_mprice=0.918 -->
-<!-- test: file=../lem/files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.986, fs_bishop=0.986, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.986 -->
+<!-- test: file=../lem/files/xslope_crest_surcharge.xlsx, type=circular_search, num_slices=40, fs_oms=0.919, fs_bishop=0.919, fs_janbu=0.951, fs_corps=0.954, fs_lowe=0.940, fs_spencer=0.919, fs_mprice=0.919 -->
+<!-- test: file=../lem/files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.986, fs_bishop=0.986, fs_janbu=0.969, fs_corps=1.051, fs_lowe=1.040, fs_spencer=0.986, fs_mprice=0.986 -->
 
 The Ordinary Method of Slices (OMS), Bishop, Spencer and Morgenstern-Price all
-give 0.918. The three force-equilibrium procedures come out 2.3 to 3.8% higher:
-Lowe & Karafiath at 0.939, Janbu at 0.950 and the Corps of Engineers at 0.953.
+give 0.919. The three force-equilibrium procedures come out 2.3 to 3.9% higher:
+Lowe & Karafiath at 0.940, Janbu at 0.951 and the Corps of Engineers at 0.954.
 All seven put the loaded slope below 1.

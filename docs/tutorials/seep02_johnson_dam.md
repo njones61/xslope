@@ -882,8 +882,12 @@ the Newton steps to finish the run. Set **Max iterations** back to its default o
 shipped model takes 20.
 
 Check `converged` before quoting a flowrate. A run that hits the limit still
-returns one, 1.9288 here, 2.4% from the converged answer, with nothing about the
-number to say so. Prefer a gentler relative-conductivity curve when nothing about
+returns one, 1.9288 here, 2.4% from the converged answer, and the number itself
+looks like any other. Studio flags the run in two places: the status bar reads
+*Seepage (BC set 1) did not converge: the field shown is the solve's last iterate
+(the log has the sweeps)*, and the plot title reads **Seepage Solution (did not
+converge)**. A script that calls the solver directly gets only the `converged`
+flag and the log's warning. Prefer a gentler relative-conductivity curve when nothing about
 the result depends on its shape, which on a stability model is the usual case.
 
 ---

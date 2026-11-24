@@ -15,7 +15,7 @@ friction angle — a **total-stress undrained** strength.
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>25–30 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>35–40 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to build and run a slope stability model: how to
@@ -166,8 +166,8 @@ Most of this sheet is already right:
    `main!D10` **Unit weight of water** with that system's value, `62.4` pcf here.
    XSLOPE never converts between systems — the declaration states what the numbers
    you type already mean, and drives the unit labels on the plots.
-2. Leave **Tension crack depth**, **Depth of water in crack** and **Seismic
-   coefficient** at `0`.
+2. Leave **Tension crack depth**, **Depth of water in crack** and the two seismic
+   coefficients, **kh** and **kv**, at `0`.
 3. Leave `main!D25` **Water loads** at `auto`, which derives the weight of standing
    water from the water table rather than from a load you type. There is no water
    here, so it changes nothing — but it is the setting to leave alone.
@@ -291,8 +291,9 @@ on the material you just created, closed from below by the rigid base. Click
 1. Set **Max depth (bottom boundary elevation):** to `0`. This is an *elevation*,
    not a thickness: it places a horizontal rigid base at the toe of the slope.
 2. Set **Material:** to `1: soil`.
-3. **Add row** three times and enter `0, 0` / `20, 20` / `60, 20` — the toe, the
-   crest break at the top of the 1:1 face, and the back of the crest.
+3. The new line starts with one vertex row. **Add row** twice, for three rows, and
+   enter `0, 0` / `20, 20` / `60, 20` — the toe, the crest break at the top of the
+   1:1 face, and the back of the crest.
 
 ![The profile lines editor](images/lem01_studio_profile.png)
 
@@ -364,7 +365,10 @@ Click **Run LEM…**. Choose:
 ### The search result and its warnings {#the-search-result-and-the-warnings-that-come-with-it}
 
 When the search completes, the search-results plot shows every circle it tried in
-gray, the path its center followed in green, and the critical circle it settled on:
+gray and the critical circle it settled on in red. A green arrow traces the path
+the circle's center followed; on this model the center never leaves (10, 40), so
+the starting circle is Spencer's critical circle and the arrow is only a green tip
+at that point:
 
 ![The circular search](images/lem01_search.png){width=660}
 
@@ -398,11 +402,12 @@ computed normal stress on the base is negative. The solution needs the top of th
 slope to hold itself together in tension.
 
 Because φ = 0 here, Spencer would also give 1.215 on Bishop's circle. It reports
-1.282 because it could not solve that circle. The run output shows this:
+1.282 because it could not solve that circle. The last lines of the Spencer run in
+Studio's **Log** pane show this:
 
 ```text
-[⚠️ unsolved trials] Spencer could not solve 49 of 173 trial surfaces (on 49, no interslice force inclination satisfies both force and moment equilibrium)
-[⚠️ crest tension] Tension on the base of 4 slices near the crest. Consider adding a tension crack.
+[! unsolved trials] Spencer could not solve 49 of 173 trial surfaces (on 49, no interslice force inclination satisfies both force and moment equilibrium)
+[! crest tension] Tension on the base of 4 slices near the crest. Consider adding a tension crack.
 Critical FS = 1.282
 Sliding mass = 60,984.2 lb/ft over 50.94 ft of failure surface
 ```
@@ -442,7 +447,8 @@ We run the Spencer search again:
 ![Spencer on the cracked model](images/lem01_solution_cracked.png){width=1000}
 
 **FS = 1.084**, and this time the solution is clean: no amber strip, no red bars,
-and the line of thrust (the dashed red curve) stays inside the sliding mass. Run
+and the line of thrust (the dashed red curve) stays inside the sliding mass. The
+Log still reports 2 of the 398 trial circles unsolved, against 49 of 173 before. Run
 Bishop or Morgenstern-Price on the cracked model and they land on the *same* circle
 and the *same* factor of safety: with no tension in the model, the methods agree.
 
@@ -482,7 +488,7 @@ above the bottom of the crack.
 **FS = 1.013**, 6.5% below the dry-crack 1.084. The blue triangle at the crack is the
 water pressure, with its arrows pointing into the sliding mass. Bishop and
 Morgenstern-Price land on the same circle and the same 1.013. One base-stress bar is
-red: the slice against the crack, where Spencer's solution puts about −340 psf of
+red: the slice against the crack, where Spencer's solution puts about −645 psf of
 tension on the base. With φ = 0 the strength along the base does not depend on the
 normal stress, so the tension on that one slice does not change the factor of
 safety. The line of thrust stays inside the sliding mass.
@@ -502,13 +508,13 @@ deeper removes strength the soil actually has.
 
 We can find that depth with the search itself: re-run it at a few trial depths and
 watch for the shallowest clean solution. The tension decreases gradually as the
-crack deepens. On this slope 15% of the interior boundaries are in tension at a 4 ft
-crack, 8% at 6 ft and 3% at 7 ft, and the last of it goes at about **7¼ ft**, a
-little short of the theoretical 8. The factor of safety there is **1.084**, which
-is the 8-ft answer to three decimals.
+crack deepens. On this slope 23% of the interior boundaries are in tension at a 4 ft
+crack, 10% at 6 ft, 5% at 7 ft and still 3% at 7.4 ft, and the last of it goes at
+about **7½ ft**, a little short of the theoretical 8. The factor of safety at 7½ ft
+is **1.084**, which is the 8-ft answer to three decimals.
 
 Which to use is a matter of judgment, and on this slope the impact is minor — the
-two depths are 0.06% apart in factor of safety. The 7¼ ft depth is the closer
+two depths are 0.01% apart in factor of safety. The 7½ ft depth is the closer
 model of the soil; the theoretical 8 ft depth is the more conservative choice.
 The uncracked model is not a reasonable choice: both cracked answers are well
 below its 1.282.
@@ -547,13 +553,13 @@ tension crack is added:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.282 | 1.226 |
+| 1.215 | 1.215 | 1.336 | 1.320 | 1.264 | 1.282 | 1.228 |
 
-<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.282, fs_mprice=1.226 -->
+<!-- test: file=../lem/files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.336, fs_corps=1.320, fs_lowe=1.264, fs_spencer=1.282, fs_mprice=1.228 -->
 
 The Ordinary Method of Slices (OMS) lands on Bishop's 1.215: with φ = 0 the
 strength on a slice base does not depend on the normal force, so the two compute
 the same factor of safety on any circle. Morgenstern-Price also satisfies moment
-equilibrium, so its 1.226, 0.9% above Bishop, means its search settled on a
+equilibrium, so its 1.228, 1.0% above Bishop, means its search settled on a
 different circle. The three force-equilibrium procedures come out higher still:
 Lowe & Karafiath 4.0% above Bishop, the Corps of Engineers 8.6% and Janbu 9.9%.

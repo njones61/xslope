@@ -70,9 +70,9 @@ The section is drawn on six layers:
 
 This drawing uses the layer names XSLOPE itself writes, so the wizard fills
 the whole mapping in. Any other drawing works the same way: the wizard lists
-its layers, suggests **material zone** for a layer that draws closed shapes and
-**ignore** otherwise, and each suggestion can be changed with the **Import as**
-selector shown below.
+its layers, suggests **material zone** for a layer that draws closed shapes or
+loose line segments and **ignore** otherwise, and each suggestion can be changed
+with the **Import as** selector shown below.
 
 With the drawing downloaded, we start the import from the File menu. Click
 **File → Import DXF…** and choose `w02_section.dxf`.
@@ -122,10 +122,10 @@ of its points. That model is available as
 
 With the properties in, the model is complete. Click **Run LEM**, choose
 **Spencer** and **Auto search**, leave **Number of slices** at 40, and click
-**Run**. The search returns **FS = 1.184** on a circle tangent to the top of the
+**Run**. The search returns **FS = 1.185** on a circle tangent to the top of the
 dense sand — through the foundation clay rather than the fill.
 
-<!-- test: file=files/w02_section_imported.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.184, tolerance=0.005, benchmark=W-2-dxf -->
+<!-- test: file=files/w02_section_imported.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.185, tolerance=0.005, benchmark=W-2-dxf -->
 
 ### Check its work
 
@@ -273,7 +273,7 @@ circle and reaches lower than a circular search can.
 This tutorial covered:
 
 - A DXF drawing imported layer by layer, then given the properties no CAD file
-  holds: Spencer 1.184.
+  holds: Spencer 1.185.
 - A GeoStudio model imported whole, its solved circle putting both programs on one
   surface: 1.939 against 1.934.
 - A Slide2 scenario arriving with no failure surface, because Slide2 stores a

@@ -98,9 +98,10 @@ shows. Set the toggles to **LEM** and **Reliability**. **Reliability** puts a
 ![The clay with its standard deviations](images/lem11_studio_materials.png)
 
 The clay reads **γ** = `120` **± σ** `8` and **c** = `400` **± σ** `100`. Those
-are the mat sheet's σ(γ) and σ(c) columns, which the table view shows as two
-columns in a **Standard Deviations** block at the right of the sheet and which
-the list view puts next to the values they belong to. A blank or zero σ means the
+are the mat sheet's σ(γ) and σ(c) columns, the first two of the six columns in
+its **Standard Deviations** block at the right of the sheet — σ(γ), σ(c), σ(φ),
+σ(c/p), σ(d), and σ(ψ). The table view shows the same six columns, and the list
+view puts each σ next to the value it belongs to. A blank or zero σ means the
 parameter is treated as known exactly and is not varied.
 
 A standard deviation is easier to judge as a fraction of its own value — the
@@ -191,10 +192,10 @@ most-likely values and then once more at ±σ for each uncertain parameter — 1
 solves, five of them here — and combines the swings into a variance. The
 per-parameter table is written to the Log pane:
 
-| Parameter | MLV | σ | F⁺ | F⁻ | ΔF |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| soil γ | 120 | 8 | 1.193 | 1.578 | 0.385 |
-| soil c | 400 | 100 | 1.699 | 1.019 | 0.680 |
+| Parameter | MLV | σ | MLV+σ | MLV−σ | F⁺ | F⁻ | ΔF |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Mat 1 gamma | 120 | 8 | 128 | 112 | 1.193 | 1.578 | 0.385 |
+| Mat 1 c | 400 | 100 | 500 | 300 | 1.699 | 1.019 | 0.680 |
 
 Each row is one of those ±σ pairs: **F⁺** is the factor of safety solved with
 that parameter raised to MLV + σ, **F⁻** with it lowered to MLV − σ (the
@@ -411,7 +412,7 @@ Click **Run**. The engine solves the real model 9 times to fit the formula —
 the mean values, plus the one- and two-standard-deviation combinations of
 the two parameters — and then 700 more times to check the fit: 500 solves
 spread across the whole range of the inputs, and 200 concentrated where the
-formula predicts failure. About four seconds later the result view shows the
+formula predicts failure. A few seconds later the result view shows the
 same histogram Monte Carlo produced, now built from ten million realizations
 of the formula:
 
@@ -421,10 +422,10 @@ of the formula:
 Carlo's 16.13% and 1.001. The checks are reported with the answer: across the 500 checking solves the formula reproduced the
 real factor of safety with a typical error of 0.018 (R² = 0.998), and none
 of the 500 landed on the other side of FS = 1 from where the formula put
-it. In a fuller test run for this page, thirty thousand of the draws were
-re-solved with the real model: the formula's P<sub>f</sub> came out 0.08
-percentage points low. The sampling error is removed, and the small fit error
-remains. The
+it. In a fuller test run for this page, the formula and the real model were
+both evaluated on the same thirty thousand draws: the formula's P<sub>f</sub>
+came out 0.03 percentage points low. The sampling error is removed, and the
+small fit error remains. The
 [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
 of the documentation draws the fitted formula over the design points and the
 F = 1 boundary, and lists the checks that make the engine refuse a model it
@@ -542,7 +543,7 @@ leave the cohesion itself at 400 psf, and compare.
 
 Open **Materials**, select the clay, and change the **± σ** beside **c** from
 `100` to `50`. In the table view — and on the mat sheet — this is the second cell
-of the two-column **Standard Deviations** block:
+of the six-column **Standard Deviations** block; the first two cells then read:
 
 | σ(γ) | σ(c) |
 | :---: | :---: |

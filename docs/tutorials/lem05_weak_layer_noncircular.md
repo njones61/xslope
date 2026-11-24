@@ -518,7 +518,7 @@ a box titled **LEM run failed**:
 
 and the Log pane shows the reason:
 
-> [❌ noncircular_search] the starting surface is not viable (slice generation or
+> [✗ noncircular_search] the starting surface is not viable (slice generation or
 > the solver failed on it) — adjust the non_circ starting points.
 
 Nothing was searched at all. The search rejects any trial surface with a base
@@ -586,7 +586,7 @@ same method, so that each result comes from its own search:
 
 ![Spencer's critical circle on the same section](images/lem05_solution_circle.png){width=1000}
 
-**FS = 1.769**, on a circle centered at (11.59, 18.66) with a radius of 24.66,
+**FS = 1.770**, on a circle centered at (11.47, 18.54) with a radius of 24.54,
 whose lowest point is at elevation **−6.000** — tangent to the base of the clay.
 The generated set is six circles: one through the toe, one tangent to the base of
 each layer and to the maximum depth (elevations 0, −4, −6 and −10), and one

@@ -127,7 +127,9 @@ file arrives with those fields solved, so the first thing to do with it is look
 at what it contains. With the mode strip on **Seepage**, click the
 **Seep · Transient** tab. The play bar steps through **nineteen** instants —
 t = 0, 2, 5, 10, 15, 20, 25, 30, 35, 40, 47, 55, 65, 80, 100, 130, 180, 240 and
-300 — and every run below reads one of them.
+300 — and every run below reads one of them. The frames open as line contours at
+20 levels with no arrows; the figure below has **Velocity vectors** ticked and
+**Contour levels** set to `12` in the tab's Display panel.
 
 ![The Seep · Transient tab, its play bar parked on day 35](images/combo03_studio_playbar.png)
 
@@ -182,7 +184,10 @@ gets its pore pressure, and `seep` takes it from a solved seepage field;
 its four values. With a transient solution loaded, `seep` means one frame of it,
 chosen at the run rather than here.
 
-Click **OK**.
+Click **OK**. An editor's **OK** clears the results Studio holds for the model,
+so the seepage solution the file loaded is gone from the session
+and the **Seep · Transient** tab has closed. We solve it again once the circles
+are checked.
 
 ### Starting circles
 
@@ -230,7 +235,8 @@ instant.
 
 ![Two starting circles and the one search limit the file sets](images/combo03_studio_circles.png)
 
-Click **OK** on the Circles editor. The Inputs plot draws the model:
+Nothing on the Circles editor needs to change, so close it with **Cancel**. The
+Inputs plot draws the model:
 
 ![The stability model: two zones, the reservoir load, and the two starting circles](images/combo03_inputs.png){width=1000}
 
@@ -242,6 +248,22 @@ ground into a distributed load, re-derived at every instant from the pool as it
 stood then. The
 two red dashed arcs are the starting circles, both centers sitting above the
 frame.
+
+### Solving the seepage again
+
+Typing the strengths in cleared the seepage solution, so solve it again before
+the stability runs read it. Switch the mode strip to **Seepage** (`Ctrl+2`) and
+click **Run → Run Seep…**. **Run type** already reads **Transient
+(time-dependent)**, because the file has a schedule; leave it and the other
+settings at their defaults and click **Run**. The run repeats the one behind the
+shipped solution, on the same mesh and schedule: it takes about 600 steps and
+about ten seconds, saves the same nineteen frames, and reopens the
+**Seep · Transient** tab. Step counts like this one can differ by a few between
+computers; the frames do not. Switch the mode strip back to **LEM** (`Ctrl+1`).
+
+If the **Seep · Transient** tab is still open (you opened the completed file and
+closed each editor with **Cancel**), its solution is still loaded, and you can go
+on to the next section.
 
 ### Stability at one time step
 
@@ -367,6 +389,7 @@ instant giving the factor of safety and the circle it was found on:
 
 ```text
 Factor of safety vs time (lem): 19 instant(s) of the transient solution, spencer, re-searching at each…
+…
 Factor of safety versus time
 t (day)      FS      Xo     Yo      R
       0  1.5315  103.00  56.86  56.86
@@ -547,7 +570,10 @@ loaded. Studio opens this file with the mode strip on **FEM**; switch it to
 ### What the file contains {#what-the-file-carries}
 
 Nothing on this dam has to be built, so before running anything we go through
-what came with it. Five things in the file determine what the sweep can do.
+what came with it. Five things in the file determine what the sweep can do. Close
+each editor you open here with **Cancel**: clicking **OK** clears the results
+Studio holds for the model, the loaded seepage solution among them, even when
+nothing was changed, and the sweep needs that solution.
 
 **The undrained envelope.** Click **Materials** and set the **Show parameters
 for:** toggles to **LEM** alone. Only the core has a $K_c = 1$ envelope —
@@ -576,14 +602,14 @@ a single one, center (275, 235) with a radius of 160 ft, tangent at elevation 75
 Every search below starts from it. One circle is enough here because which face
 governs is not in question — lowering the pool takes the water off the upstream
 slope and leaves it inside the embankment — where Part 1's dam needed a circle on
-each face. Click **OK**.
+each face. Click **Cancel**.
 
 **The schedule and the stage times.** Switch the mode strip to **Seepage**
 (`Ctrl+2`) and click **Transient** in the Inputs dock. The `pool` series holds at
 elevation 160 for five days and falls to 110 over the following 45, the run lasts
 500 days, and the save times are listed outright, a frame every five days to the
 end of the fall and widening steps after. **Stage 1 time** is `0` and **Stage 2
-time** is `50`. Click **OK**.
+time** is `50`. Click **Cancel**.
 
 That schedule is this file's own; the [COMBO-2](combo02_rapid_drawdown.md)
 workbook keeps a coarser one and a 1,000-day run. Its instants are packed where
@@ -638,6 +664,7 @@ table appears when the last search finishes:
 
 ```text
 Rapid drawdown vs time (lem): 20 instant(s) of the transient solution, spencer, re-searching at each…
+…
 Rapid drawdown versus time (stage 1 at t = 0)
 t (day)  stage 1  stage 2       stage 3      FS  governs      Xo      Yo       R
       5   1.5242   1.4697  not required  1.4697        2  242.70  257.12  167.06
@@ -758,12 +785,12 @@ We can run the same twenty-one frames at drained strengths. Open
 other field, and click **Run**; **Re-search the critical surface at each step**
 becomes active again and stays ticked.
 
-Each point now solves the section once rather than three times, and takes about
-half as long for it — 8 seconds an instant against 17 on the machine these runs
-were timed on:
+Each point now solves the section once rather than three times, so the sweep
+takes a fraction of the time:
 
 ```text
 Factor of safety vs time (lem): 21 instant(s) of the transient solution, spencer, re-searching at each…
+…
 Factor of safety versus time
 t (day)      FS      Xo      Yo       R
       0  1.5221  240.00  259.76  168.93

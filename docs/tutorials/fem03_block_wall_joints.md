@@ -198,7 +198,7 @@ carries a local **Size** of **0.3 m** in its own row of the polygons worksheet.
 That is the right way to refine a thin zone: dropping the global size to 0.3 m
 would refine the whole 24 m section and cost several times the nodes for nothing.
 
-The dialog reports **1,980 nodes, 903 elements, and 36 joint elements on 7
+The Log pane reports **1,980 nodes, 903 elements, and 36 joint elements on 7
 jointed lines**.
 
 ![The mesh, refined through the block column and coarse across the rest of the section](images/fem03_mesh.png){width=1000}
@@ -234,17 +234,15 @@ says the factor of safety depends on the iteration limit, or reports it as
 **Accelerate convergence — leave it ticked.** It is on for any model that
 has a joint. Once the joints have settled into their states the solver
 takes longer steps, which brings a jointed trial to rest in a fraction of the
-iterations, and the closing summary reports when it was on.
+iterations. The Log's opening lines for the run report whether it was on:
+`Max iterations per trial: 100,000; convergence acceleration on`.
 
 **Failure criterion — leave it on Hybrid.** The dialog opens on Hybrid for any
 model that has a joint, because a near-critical trial on a jointed model
 often neither settles nor runs away: the joints go on slipping by a fixed
 amount each pass while the wall itself stops moving, which is a wall standing
 still behind contacts that never quite balance. Hybrid reads the slip and the
-movement together and reports that as standing. The other criteria read only
-whether the solver reached equilibrium, and on this wall they report every
-near-critical trial as a failure — the search then moves its lower bound down to
-the floor and gives no factor of safety at all.
+movement together and reports that as standing.
 
 Press **Run**. The search takes about **seven minutes** on an ordinary desktop —
 nearer twelve on an install that does not include the
@@ -271,7 +269,8 @@ The slip on the joint faces puts numbers on that, read at the last converged
 state, the wall still standing. **1D Details…** on the results
 toolbar opens one contact at a time and draws its normal stress, its shear
 stress against the Coulomb limit with the slipping stations marked, and its
-slip along the line. Here is the back face's:
+slip along the line. It opens on **At failure**: set **Field state** to **Last
+converged** and select the back face. Here it is:
 
 ![1D details of the back face at the critical factor: the normal stress along the contact, the shear stress sitting on the Coulomb limit with 28 of 30 stations marked slipping and both ends open, and the slip growing from the base to 70 mm near the top](images/fem03_1d_details_back_face.png){width=1000}
 
@@ -435,17 +434,18 @@ failure criterion on Hybrid. Press **Run**. It takes about twice as long as Part
 because the search climbs higher, and reports
 
 <!-- test: file=files/xslope_block_wall_grid.xlsx, type=fem_ssrm, expected_fs=1.515625, fs_bound=lower, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=hybrid, max_iter=100000, benchmark=FEM-3-grid-ssrm, expected_elements=927, expected_nodes=2139 -->
+<!-- The prose below prints the default solver path's run (fast_kernel='auto', what a reader's Studio does): FS ≥ 1.50, the trial at F = 1.5156 still creeping at the 100,000-iteration limit. This tag keeps the reference-path lock (fast_kernel=False), FS ≥ 1.51 at 1.515625, which is how the suite decides it. The bound sits on the iteration limit, so the two paths land one bisection cell apart. -->
 
->>**FS ≥ 1.51**
+>>**FS ≥ 1.50**
 
 This time the result is a bound rather than a number, and the Log gives the
 reason:
 
-> No failure was found up to F = 1.5234. The slope came to rest at every
-> strength tried up to F = 1.5156, moving further each time; at that strength
-> it had moved 0.0654 m. At F = 1.5234 it was still creeping, more slowly all
+> No failure was found up to F = 1.5156. The slope came to rest at every
+> strength tried up to F = 1.5078, moving further each time; at that strength
+> it had moved 0.0636 m. At F = 1.5156 it was still creeping, more slowly all
 > the time, when the 100,000-iteration limit came, so the run could not tell
-> whether it would stop. The factor of safety is at least 1.51. To go further,
+> whether it would stop. The factor of safety is at least 1.50. To go further,
 > raise Max iterations per trial.
 
 The wall came to rest at every strength the search confirmed, and at the next
@@ -454,7 +454,7 @@ run cannot determine whether that trial would have come to rest, it reports the
 last strength at which the wall was confirmed to stand.
 
 You can tell in Studio that a run ended this way. The results view is titled
-with the bound, **FS ≥ 1.51**, instead of a number, the Log shows the
+with the bound, **FS ≥ 1.50**, instead of a number, the Log shows the
 paragraph above, and the results toolbar shows a button that is not there after
 an ordinary run, **Continue with a higher limit…**, beside **1D Details…**.
 Leave it alone for now. If you stop here you have a complete set of results,
@@ -464,20 +464,20 @@ and the next section reads them. The section after that presses the button.
 
 Here is the Displacement vs F plot from this run:
 
-![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5156, and every trial above that was still moving when the limit came](images/fem03_ssrm_curve_grid.png){width=800}
+![Displacement against strength reduction factor with the geogrid in place: the wall comes to rest at 1.0, 1.5 and 1.5078, and every trial above that was still moving when the limit came](images/fem03_ssrm_curve_grid.png){width=800}
 
 None of the points shows the wall giving way. Every filled point is a strength at which
 the wall came to rest, and the movement grows with each one: 1.7 cm at 1.0,
-6.2 cm at 1.5 and 6.5 cm at 1.5156. The open points above 1.5156 are trials
+6.2 cm at 1.5 and 6.4 cm at 1.5078. The open points above 1.5078 are trials
 that were still moving when the limit came. The panels show what the wall is
-doing at the last trial, the undecided one at 1.5234.
+doing at the last trial, the undecided one at 1.5156.
 
 ![The deformed blocks with the geogrid in place](images/fem03_fem_blocks_grid_failure.png){width=855}
 
 This panel has no element grid: the blocks panel drops it once a model has
 more than eight jointed lines (the wall alone had seven; the sheets make ten),
 and **Element edges** in the display panel puts it back. Otherwise it is drawn
-as in Part 1: the block column 13 times deformed, the undeformed outline dashed
+as in Part 1: the block column 14 times deformed, the undeformed outline dashed
 behind it, and every contact a line, gray where closed and not slipping, green
 where slipping, shaded by how far. The three geogrid sheets are the
 near-horizontal lines running back from the facing, each drawn as the two faces
@@ -486,7 +486,7 @@ lengths where it has slid, at the facing on all three and near the far end of
 the top sheet.
 
 The joint slip shows the effect of the layers. With the soil at 66% of its
-strength (F = 1.5156), the back face has slid **36 mm** and the base **9 mm**,
+strength (F = 1.5078), the back face has slid **35 mm** and the base **9 mm**,
 and the wall is at rest. Without the layers, the wall had slid 70 mm and 13 mm
 with the soil still at 88% of its strength (F = 1.133), and the next step down
 in strength brought it down. The layers have turned a wall that slides down its
@@ -498,16 +498,17 @@ half as far.
 The shear strain panel shows the same for the soil. Part 1's band ran up
 from the heel of the wall through the reinforced fill with strains near 0.05;
 here the band is in the same place but faint, under 0.02. The largest strains
-are in small spots: 0.075 in the fill against the back face where the top sheet
-leaves the blocks, 0.06 where the middle one does, and 0.05 in the foundation at
+are in small spots: 0.074 in the fill against the back face where the top sheet
+leaves the blocks, 0.055 where the middle one does, and 0.050 in the foundation at
 the toe.
 The three layers have not moved the surface along which the fill tends to fail.
 They have held the mass behind the facing together so that less of it is
 straining. The bars themselves show blue, the low end of the reinforcement force scale: they
 carry little tension, as the next panel shows in detail.
 
-**1D Details…** draws what one layer is doing along its length. Here is the
-middle one:
+**1D Details…** draws what one layer is doing along its length. Set **Field
+state** to **Last converged** as in Part 1 and select `grid-02` under
+**Joints**, the middle layer:
 
 ![The middle layer's 1D details: the bar's tension peaking at 27% of its capacity about 2 m from the facing, and the interface at its Mohr-Coulomb limit only at the facing end](images/fem03_1d_details.png){width=1000}
 
@@ -539,7 +540,7 @@ is about models where jointing the sheet changes the answer from the start.
 
 ### Results with a higher iteration limit {#if-you-let-it-run}
 
-The default run reported FS ≥ 1.51 because its trials ran out of iterations. To go further,
+The default run reported FS ≥ 1.50 because its trials ran out of iterations. To go further,
 press **Continue with a higher limit…** on the results toolbar and enter
 1,000,000. The search picks up where its trials stopped, keeps every trial it
 has already decided, and runs until the wall gives way. You can also start
@@ -611,7 +612,7 @@ quarter of a meter.
 ![Viscoplastic shear strain at the failed state: a band from just in front of the toe of the block column, where the foundation is punched, up through the reinforced fill to the crest; the bottom layer at its capacity on the reinforcement force scale](images/fem03_fem_shear_grid_long_failure.png){width=1000}
 
 The shear strain is on a different scale from the default run's: it tops out
-near 1.9 where the default run's topped out near 0.075. The band runs from just
+near 1.9 where the default run's topped out near 0.074. The band runs from just
 in front of the toe of the block column, where the wall is punching into the foundation, up
 through the reinforced fill and out to the crest. The bars are drawn on the
 reinforcement force scale, and at this state the bottom layer is at its
@@ -637,8 +638,8 @@ crossing lies between 1.0 and 1.5; at 2%, 7 cm, between 1.5 and 1.75.
 For this wall the allowable movement governs the answer.
 
 When modeling a wall like this, you may wish to report the movement along with
-the factor of safety. The default run found a wall standing at F = 1.5156 with
-6.5 cm of movement and the geogrid at under a third of capacity, and that says more
+the factor of safety. The default run found a wall standing at F = 1.5078 with
+6.4 cm of movement and the geogrid at under a third of capacity, and that says more
 than the factor of safety alone.
 Read the closing summary on every reinforced wall: when it says *No failure
 was found* or gives the factor of safety as *at least*, you have this kind of
@@ -817,6 +818,12 @@ of 10° is less than 0.6 of the 32° friction angle of the soil around it, which
 makes it a smooth interface rather than a soil-geosynthetic contact. All three
 warnings point to the same thing: this is a plane the fill can slide on, and a
 bonded bar cannot model that. Set `Joint` to Yes and the warnings go away.
+
+The bonded base geotextile of the first version raises the first two of these
+warnings too, because it also lies flat on a material boundary under the whole
+fill. The checks cannot tell which way the failure will run; there it crosses
+the sheet, and the bonded and jointed runs agree at 1.566. A warning of this
+kind says to check, and running the model both ways is the check.
 
 ### Why the wall's own sheets could not be run both ways
 

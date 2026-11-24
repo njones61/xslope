@@ -1571,7 +1571,7 @@ SHOTS.update({
 LEM12 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
 #: The page's two edits, each applied before its editor is built so the shot
 #: carries the state its own step ends in.
-LEM12_H = (2540.7, 1827.0)
+LEM12_H = (2551.2, 1831.2)
 LEM12_S = 12.0
 
 

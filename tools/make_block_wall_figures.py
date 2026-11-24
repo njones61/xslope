@@ -155,16 +155,19 @@ def _mesh(model, target_size):
             joint_lines=extract_joint_options(model))
 
 
-def _solve(model, mesh, max_iterations=FEM03_MAX_ITERATIONS):
-    """One strength reduction at the page's settings, on the reference kernel.
+def _solve(model, mesh, max_iterations=FEM03_MAX_ITERATIONS, reference=False):
+    """One strength reduction at the page's settings, on Studio's default path.
 
-    ``fast_kernel=False`` is pinned the way every producer of a committed number
-    pins it: the compiled Mohr-Coulomb kernel is built on some machines and not
-    others, and on this wall the two paths do not agree — so the figure has to
-    carry the answer the reference path gives.  Returns
-    ``(fem_data, result, seconds)``.  ``max_iterations`` is the page's 100,000
-    for every figure; only the long run behind the page's iteration-limit
-    sentence passes another.
+    On this wall the compiled Mohr-Coulomb kernel and the reference path do not
+    always agree (Part 2: FS >= 1.50 against 1.51), and the page prints what a
+    reader's Studio shows, which is the compiled kernel the installers build in
+    (owner, 584a). So the kernel is required here: a machine without it stops
+    rather than drawing the reference answer under the page's numbers. The page's
+    test tags keep the reference locks, which the suite decides on.
+    ``reference=True`` pins the reference path instead, for the long run behind
+    the page's iteration-limit sentence, which quotes a reference run. Returns
+    ``(fem_data, result, seconds)``. ``max_iterations`` is the page's 100,000
+    for every figure; only that long run passes another.
     """
     import time
 
@@ -172,9 +175,14 @@ def _solve(model, mesh, max_iterations=FEM03_MAX_ITERATIONS):
     import xslope.fem as _fem
     from xslope.fem import build_fem_data, solve_ssrm
 
+    if not reference and not RT._fast_kernel_available():
+        raise SystemExit("make_block_wall_figures: the compiled kernel is not "
+                         "importable here; build it (python setup_kernel.py "
+                         "build_ext --inplace) so the figures show Studio's "
+                         "default path")
     fem_data = build_fem_data(model, mesh)
     t0 = time.time()
-    with RT._force_fast_kernel(_fem, False):
+    with RT._force_fast_kernel(_fem, not reference):
         with contextlib.redirect_stdout(io.StringIO()):
             result = solve_ssrm(fem_data, F_min=FEM03_F_MIN, F_max=FEM03_F_MAX,
                                 tolerance=FEM03_TOLERANCE, debug_level=0,
@@ -574,7 +582,8 @@ def fem03_grid_long():
     grid = load_slope_data(FEM03_GRID)
     mesh = _mesh(grid, FEM03_TARGET_SIZE)
     fem_data, result, seconds = _solve(grid, mesh,
-                                       max_iterations=FEM03_LONG_MAX_ITERATIONS)
+                                       max_iterations=FEM03_LONG_MAX_ITERATIONS,
+                                       reference=True)
     _counts("wall + grid", grid, mesh, fem_data)
     _report("grid 500k", result, seconds, declared_unit_labels(grid)["length"])
     _layer_loads(grid, fem_data, result)

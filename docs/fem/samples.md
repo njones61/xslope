@@ -82,28 +82,35 @@ whose probability of failure is not negligible:
 | Foundation | 140 |    20° |      135 | 500,000 | 0.35  |  35 (25%)        |  2 (10%)            |  6.75 (5%)            |
 
 
-Running the analysis (`reliability_fem`, or **Studio → Run FEM → Reliability**)
-on a **tri6 mesh** (50 divisions across the width, target_size ≈ 2.4, ~2080 nodes)
-gives:
+The analysis runs on the **tri6 mesh** that ships with the workbook
+(`xslope_simple_mult_layers_fem_mesh.json`, 985 elements and 2,080 nodes). Studio
+and `load_slope_data` attach this mesh when they open the workbook, and
+`reliability_fem` runs on an attached mesh. In Studio, run **Reliability…** from the
+**Run** menu in FEM mode without building a new mesh. **Build Mesh** at 50 divisions
+makes a different mesh, with 1,122 elements whether or not **Refine thin zones** is
+ticked. The run gives:
 
-| $F_{MLV}$ | $\sigma_F$ | $COV_F$ | $\beta_{LN}$ | Reliability $R$ | $P_f$ |
-|:----------:|:-----------:|:--------:|:-------------:|:----------------:|:------:|
-| 1.143     | 0.122      | 0.107   | 1.196        | **88.4%**       | 11.6% |
+| $F_{MLV}$ | $\sigma_F$ | $COV_F$ | $\beta_{LN}$ | Reliability $R$ | $P_f$ (lognormal) | $\beta_N$ | $P_f$ (normal) |
+|:----------:|:-----------:|:--------:|:-------------:|:----------------:|:------:|:------:|:------:|
+| 1.147     | 0.124      | 0.108   | 1.225        | **89.0%**       | 11.0% | 1.191 | 11.7% |
 
-The most-likely factor of safety is 1.14, and with the moderate parameter scatter
-in the table above the probability of failure is **≈11.6%**. A factor of safety
-above 1.0 does not by itself mean a low probability of failure.
+The most-likely factor of safety is 1.15, and with the moderate parameter scatter
+in the table above the probability of failure is **11.0%**. A factor of safety
+above 1.0 does not by itself mean a low probability of failure. Treating the factor
+of safety as normally rather than lognormally distributed gives a slightly lower
+reliability index and a slightly higher probability of failure (see the
+[Reliability Equation](../reliability/index.md#reliability-equation)).
 
 The per-parameter ΔF table shows how much each parameter changes the factor of safety:
 
 | Parameter        | MLV | σ    | $F^+$ | $F^-$ | ΔF    |
 |------------------|:----:|:-----:|:------:|:------:|:------:|
-| Embankment $\phi$ |  20 | 2    | 1.235 | 1.052 | 0.182 |
-| Embankment $c$    |  70 | 18   | 1.220 | 1.059 | 0.160 |
-| Embankment $\gamma$ | 130 | 6.5 | 1.127 | 1.159 | 0.031 |
-| Foundation $\phi$ |  20 | 2    | 1.143 | 1.143 | 0.000 |
-| Foundation $c$    | 140 | 35   | 1.143 | 1.143 | 0.000 |
-| Foundation $\gamma$ | 135 | 6.75 | 1.143 | 1.143 | 0.000 |
+| Embankment $\phi$ |  20 | 2    | 1.236 | 1.058 | 0.178 |
+| Embankment $c$    |  70 | 18   | 1.228 | 1.059 | 0.169 |
+| Embankment $\gamma$ | 130 | 6.5 | 1.131 | 1.164 | 0.033 |
+| Foundation $\phi$ |  20 | 2    | 1.147 | 1.147 | 0.000 |
+| Foundation $c$    | 140 | 35   | 1.147 | 1.147 | 0.000 |
+| Foundation $\gamma$ | 135 | 6.75 | 1.147 | 1.147 | 0.000 |
 
 The foundation's properties have ΔF = 0. The critical failure mechanism stays
 within the weaker embankment and does not reach the stronger foundation, so the
@@ -129,10 +136,12 @@ method gives each parameter's contribution directly as its ΔF.
     percent in the factor of safety changes the reliability index, and the
     probability of failure with it, by ten times as much.
 
-<!-- FEM reliability regression (marginally-stable two-layer slope). 13 SSRM solves, so it runs
-     on a deliberately coarse 253-element mesh (target_size=5): at 2.4 this one test WAS the suite's
-     wall clock (~510s; 5.0 runs in ~110s). beta is mesh-dependent but bit-reproducible for a fixed
-     mesh, and the test guards the TSPM-over-SSRM pipeline, not mesh convergence. -->
+<!-- FEM reliability regression (marginally-stable two-layer slope). 13 SSRM solves. REL-FEM-page
+     locks every number the example prints, on the shipped mesh the page describes (mesh=file); it
+     takes 8-17 minutes, so it is pinned to the gate tier. REL-FEM runs the same pipeline on a
+     deliberately coarse 253-element mesh (target_size=5, ~110-290s) as the standard-tier check.
+     beta is mesh-dependent but bit-reproducible for a fixed mesh. -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, mesh=file, element_type=tri6, expected_elements=985, expected_nodes=2080, f_min=0.7, f_max=1.6, ssrm_tol=0.001, expected_beta=1.225, tolerance=0.01, expected_fmlv=1.147, expected_sigma=0.124, expected_cov=0.108, expected_r=0.890, expected_pf=0.110, expected_beta_n=1.191, expected_pf_n=0.117, params=1.phi;1.c;1.gamma;2.phi;2.c;2.gamma, f_plus=1.236;1.228;1.131;1.147;1.147;1.147, f_minus=1.058;1.059;1.164;1.147;1.147;1.147, delta_f=0.178;0.169;0.033;0.000;0.000;0.000, tier=gate, benchmark=REL-FEM-page -->
 <!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.345, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
 

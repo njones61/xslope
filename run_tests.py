@@ -3451,12 +3451,88 @@ def run_reliability_rs_test(test):
     return result['beta_ln'], None
 
 
+#: The summary numbers a fem_reliability tag may lock beside expected_beta: the tag
+#: key and the reliability_fem result key it is compared with. Probabilities are
+#: written as fractions (a page's 88.4% is expected_r=0.884, the same precision).
+_FEM_REL_SUMMARY = (('expected_fmlv', 'F_MLV'), ('expected_sigma', 'sigma_F'),
+                    ('expected_cov', 'COV_F'), ('expected_r', 'reliability'),
+                    ('expected_pf', 'prob_failure'),
+                    ('expected_beta_n', 'beta_normal'), ('expected_pf_n', 'pf_normal'))
+
+#: The per-parameter table's columns a fem_reliability tag may lock: the tag key
+#: (a semicolon list, one value per ``params`` entry) and the param_info key.
+_FEM_REL_TABLE = (('f_plus', 'F_plus'), ('f_minus', 'F_minus'), ('delta_f', 'delta_F'))
+
+
+def _fem_reliability_misses(test, result):
+    """Every number a fem_reliability tag locks besides expected_beta that this run
+    no longer gives: inside ``tolerance`` and, on a page under docs/, at the
+    precision the tag writes it (``_as_written_miss``). The per-parameter table is
+    keyed by ``params=<material number>.<parameter>;...`` (``1.phi;1.c;...``), and
+    a run that perturbs a parameter the list leaves out is a miss too, so the
+    page's table cannot silently lose a row."""
+    tol = float(test.get('tolerance', 0.02))
+    written = test.get('_as_written') or {}
+    misses = []
+
+    def one(key, got, want, text=None):
+        if got is None:
+            misses.append(f"{key}: the result has no value for it")
+            return
+        if abs(float(got) - float(want)) > tol:
+            misses.append(f"{key}: this run gives {float(got):.5f}, the tag "
+                          f"{float(want)} (tol {tol:g})")
+            return
+        miss = _as_written_miss(test, key, got, written=text)
+        if miss:
+            misses.append(miss)
+
+    for key, rkey in _FEM_REL_SUMMARY:
+        if key in test:
+            one(key, result.get(rkey), test[key])
+
+    names = [s.strip() for s in str(test.get('params', '')).split(';') if s.strip()]
+    if names:
+        by_name = {f"{p['material_id']}.{p['param']}": p
+                   for p in (result.get('param_info') or [])}
+        for extra in sorted(set(by_name) - set(names)):
+            misses.append(f"params: the run perturbs {extra}, which the tag's "
+                          f"table leaves out")
+        for key, pkey in _FEM_REL_TABLE:
+            if key not in test:
+                continue
+            texts = [s.strip() for s in str(written.get(key, test[key])).split(';')]
+            if len(texts) != len(names):
+                misses.append(f"{key}: {len(texts)} values for {len(names)} params")
+                continue
+            for name, text in zip(names, texts):
+                p = by_name.get(name)
+                if p is None:
+                    misses.append(f"params: {name} is not a parameter the run "
+                                  f"perturbs")
+                    continue
+                one(f"{key} ({name})", p.get(pkey), float(text), text)
+    return misses
+
+
 def run_fem_reliability_test(test):
     """FEM reliability regression: run reliability_fem on a mesh and return the
     lognormal reliability index beta_ln (compared to expected_beta). Guards the
     whole TSPM-over-SSRM pipeline — F_MLV, the F+/F- perturbation solves, and the
-    beta combination — on a coarse mesh so it stays affordable. ssrm_tol sets the
-    bisection precision; the tag's `tolerance` is the beta comparison tolerance."""
+    beta combination. ssrm_tol sets the bisection precision; the tag's `tolerance`
+    is the comparison tolerance.
+
+    The mesh is built at the tag's ``target_size`` (or ``size_divisions``; neither
+    given, the width over 100), or, with ``mesh=file``, is the workbook's own mesh
+    sidecar ({base}_mesh.json): the mesh Studio and ``load_slope_data`` attach when
+    the model is opened, so a page that prints a run on it is locked on the mesh its
+    reader gets. ``expected_elements`` / ``expected_nodes`` hold the lock to its mesh.
+
+    A tag that prints more than the index locks the rest too (see
+    ``_fem_reliability_misses``): expected_fmlv, expected_sigma, expected_cov,
+    expected_r and expected_pf (the lognormal reliability and probability of
+    failure), expected_beta_n and expected_pf_n (the normal ones), and the
+    per-parameter table as params / f_plus / f_minus / delta_f lists."""
     import io
     import contextlib
     from xslope.fileio import load_slope_data
@@ -3465,17 +3541,24 @@ def run_fem_reliability_test(test):
     from xslope.advanced import reliability_fem
 
     slope_data = load_slope_data(test['file'])
-    element_type = test.get('element_type', 'tri6')
-    target_size = test.get('target_size')
-    if target_size is None:
-        x_coords = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(x_coords) - min(x_coords)) / 100
-    constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
-    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
-    mesh = build_mesh_from_polygons(polygons, target_size=target_size,
-                                    element_type=element_type, lines=constraint_lines,
-                                    element_size_1d=slope_data.get('element_size_1d'),
-                                    size_regions=extract_size_regions(slope_data))
+    if str(test.get('mesh', '')).strip().lower() == 'file':
+        mesh = slope_data.get('mesh')
+        if mesh is None:
+            return None, ("mesh=file, but the workbook has no mesh file "
+                          "({base}_mesh.json) beside it")
+    else:
+        element_type = test.get('element_type', 'tri6')
+        target_size = _tag_target_size(test, slope_data, default_divisions=100)
+        constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+        polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+        mesh = build_mesh_from_polygons(polygons, target_size=target_size,
+                                        element_type=element_type, lines=constraint_lines,
+                                        element_size_1d=slope_data.get('element_size_1d'),
+                                        size_regions=extract_size_regions(slope_data))
+    try:
+        _check_mesh_counts(test, mesh)
+    except ValueError as exc:
+        return None, str(exc)
     with contextlib.redirect_stdout(io.StringIO()):
         success, result = reliability_fem(
             slope_data, mesh=mesh, F_min=test.get('f_min', 0.5),
@@ -3483,6 +3566,9 @@ def run_fem_reliability_test(test):
             failure_criterion=test.get('criterion', 'non_convergence'))
     if not success:
         return None, f"reliability_fem failed: {result}"
+    misses = _fem_reliability_misses(test, result)
+    if misses:
+        return None, (f"beta_ln {result['beta_ln']:.4f}; " + "; ".join(misses))
     return result['beta_ln'], None
 
 

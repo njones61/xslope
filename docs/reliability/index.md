@@ -1,103 +1,85 @@
 ---
 title: "Slope stability reliability analysis — XSLOPE"
-description: "Reliability analysis in XSLOPE: probability of failure and reliability index by the Taylor series method or Monte Carlo simulation, for both limit equilibrium and finite element strength reduction."
+description: "Reliability analysis in XSLOPE: why a factor of safety is not enough, standard deviations and the 3σ and Nσ rules, the reliability index and probability of failure, acceptable values, the choice of slip surface, and the Taylor series, Monte Carlo, and response-surface methods for limit equilibrium and finite element analyses."
 ---
 
 # Reliability Analysis
 
-The foundation of the limit equilibrium method is the factor of safety (FoS), which is defined as the ratio of the resisting forces to the driving forces. This is a simple and useful metric, but it does not provide a complete picture of the reliability of the system. For example, if a structure has a factor of safety = 1.5, we have an intuitive sense of the stability, but ultimately, how safe is the structure? How likely is it to fail? An alternative approach to slope stability analysis is to calculate the reliability of a slope, which is defined as the probability that the slope will not fail. It is related to the probability of failure ($P_f$) as follows:
+XSLOPE computes the **probability of failure**, $P_f$, and the **reliability index**, $\beta$, of a
+slope from the uncertainty in its material properties. You enter a standard deviation beside each
+uncertain value. XSLOPE varies those values, finds how much the factor of safety varies with them, and
+reports $\beta$ and $P_f$.
 
->>$R = 1 - P_f$
+Three methods do this with limit equilibrium: the [Taylor series](taylor.md),
+[Monte Carlo simulation](monte_carlo.md), and a
+[response surface](monte_carlo.md#sampling-a-fitted-response-surface). The Taylor series also runs on
+the finite element method's strength reduction ([Reliability Analysis (FEM)](fem.md)). This page
+covers what the methods share: what the numbers mean, where the standard deviations come from, what
+probability is acceptable, and which slip surface to analyze.
 
-where:
+## Why the Factor of Safety Is Not Enough
 
->>$R$ = the reliability of the slope<br>
-> $P_f$ = the probability of failure
+Every input to a stability analysis is uncertain, the shear strength most of all. A factor of safety
+computed from the most likely value of each input, $F_{MLV}$, says how stable the slope is if those
+values are right. It does not say how well they are known.
 
-In reliability analysis, we consider the uncertainties in the parameters that affect the stability of the slope. These uncertainties can arise from various sources, such as variations in soil properties, loading conditions, and environmental factors. By incorporating these uncertainties into our analysis, we can obtain a more comprehensive understanding of the slope's stability. The **xslope** package provides a function to calculate the reliability of a slope using the limit equilibrium method. This function takes into account the uncertainties in the soil properties ($\gamma$, $c$, $\phi$, etc.) and provides a probability of failure (Pf) and reliability (R) for the slope. It can be used with any of the limit equilibrium methods implemented in the package, such as Bishop's method, Janbu's method, or Spencer's method. It can also be combined with a rapid drawdown analysis.
+![Two slopes at F = 1.5 with very different probabilities of failure](images/same_f.png){width=700}
 
-In XSLOPE Studio this lives behind the **Reliability…** button, beside
-**Parametric…** on the Run menu and toolbar: pick the Taylor series, Monte Carlo or
-response-surface engine, review the standard deviations pulled from the mat sheet, and
-view the results in a dedicated tab — the perturbation-surface plot for the Taylor
-series, the FS histogram for the two sampling engines. See
-[Studio → Running Analyses](../studio/analysis.md#reliability-analysis).
+The two slopes in the figure both have $F_{MLV} = 1.5$. The curves show how likely each value of the
+factor of safety is, and the orange area below $F = 1$ is the probability of failure. Slope A's inputs
+are well known: its factor of safety is $1.5 \pm 0.15$ (one standard deviation), and its probability
+of failure is about 3 in 100,000. Slope B's inputs are poorly known: $1.5 \pm 0.45$, and its
+probability of failure is 11%, about one in nine. The factor of safety is the same, and the odds of
+failure differ by a factor of about 3,600. (Both curves are lognormal, one of the two shapes described
+under [Reliability Equation](#reliability-equation).)
 
-## The reliability family
+## Reliability and Probability of Failure
 
-All of the methods described in this section are reached through a single entry point:
+The **reliability**, $R$, of a slope is the probability that it remains stable under stated design
+conditions: the end of construction, long-term steady seepage, rapid drawdown, or an earthquake of a
+given size (after Harr 1987 and Duncan, Wright, and Brandon 2014). The probability of failure is the
+rest:
 
->>`reliability(slope_data, method, engine='taylor')`
+$$R = 1 - P_f$$
 
-The `engine` argument selects the analysis engine. `engine='taylor'` (the default)
-runs the Taylor Series Probability Method; `engine='mc'` runs a Monte Carlo campaign;
-`engine='rs'` runs the same campaign against a fitted response surface.
-Because the default is the Taylor series, a call such as
-`reliability(slope_data, 'bishop')` runs the Taylor series. Every engine is also
-public directly under its own name, so a script can call whichever it wants:
+![R = 1 − P_f on a distribution of the factor of safety](images/r_pf.png){width=460}
 
-| Function | Method | Solver | Cost | Page |
-|----------|--------|--------|------|------|
-| `reliability_taylor` | Taylor Series Probability Method | limit equilibrium | 1 + 2N searches | [Taylor Series (TSPM)](taylor.md) |
-| `reliability_mc`     | Monte Carlo                      | limit equilibrium | N (≈ 10⁴) evaluations | [Monte Carlo](monte_carlo.md) |
-| `reliability_rs`     | Response surface                 | limit equilibrium | ~10² solves, then 10⁷ surrogate evaluations | [Monte Carlo](monte_carlo.md#sampling-a-fitted-response-surface) |
-| `reliability_fem`    | Taylor Series Probability Method | finite-element SSRM | 1 + 2N solves | [Reliability Analysis (FEM)](fem.md) |
-
-`reliability_fem` is the finite-element counterpart of the Taylor series — each factor
-of safety comes from a strength-reduction (SSRM) solve rather than a limit-equilibrium
-search (see [Reliability Analysis (FEM)](fem.md)). The two sampling engines are
-limit-equilibrium paths only, for the compute reason discussed under
-[Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope). All four engines read the *same*
-inputs — the material most-likely values and the standard-deviation columns of the mat
-sheet — so choosing an engine never changes the data you enter.
+The factor of safety and the probability of failure complement each other, and knowing both is more
+useful than knowing either one. One chance in ten against one chance in a hundred is often a clearer
+basis for a decision than a factor of safety of 1.3 against 1.5. A probability of failure is never
+zero.
 
 ## Parameter Uncertainty
 
-In order to perform reliability analysis, we need to consider the uncertainties in the parameters that affect the stability of the slope. These parameters can include soil properties such as unit weight ($\gamma$), cohesion ($c$), and angle of internal friction ($\phi$). The uncertainties in these parameters can be represented using probability distributions, such as normal or lognormal distributions. Uncertainty is typically represented by a standard deviation or a coefficient of variation (COV), which is the ratio of the standard deviation to the mean. The standard deviation provides a measure of the spread of the parameter values, while the COV provides a measure of the relative variability of the parameter. The standard deviation is defined as:
+### Standard Deviation and Coefficient of Variation
 
->>$\sigma = \sqrt{\frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2}$
+When a soil property is measured several times, the results scatter. The **standard deviation**, σ,
+measures the scatter. It has the units of the property:
 
-where:
+$$\sigma = \sqrt{\frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2}$$
 
->>$\sigma$ = standard deviation<br>
-> $x_i$ = individual parameter value<br>
-> $\bar{x}$ = mean of the parameter values<br>
-> $n$ = number of parameter values
+where $x_i$ are the $n$ measured values and $\bar{x}$ is their average. For a normally distributed
+property, about 68% of the values fall within one standard deviation of the average:
 
+![One standard deviation on a normal distribution](images/sigma_normal.png){width=460}
 
-The COV is a dimensionless quantity that is defined as:
+The **coefficient of variation**, COV, is the standard deviation as a fraction of the average:
 
->>$COV = \dfrac{\sigma}{\bar{x}}$
+$$COV = \frac{\sigma}{\bar{x}}$$
 
-where:
+It has no units, so it compares the scatter of different properties. If every value doubled, σ would
+double and the COV would not change.
 
->>$COV$ = coefficient of variation<br>
-> $\sigma$ = standard deviation<br>
-> $\bar{x}$ = mean of the parameter values
+The inputs that need a standard deviation are the shear strengths and the unit weights. The shear
+strength is usually the largest uncertainty.
 
-To calculate a proper standard deviation or COV for a parameter, we need to have a set of representative values for that parameter. This can be done by performing laboratory tests on soil samples, conducting field investigations, or using empirical correlations based on previous studies. In practice, we often do not have a large number of values for a parameter, so we may need to use expert judgment or statistical methods to estimate the standard deviation or COV. For example, if we have a limited number of soil samples, we can use the range of the values to estimate the standard deviation. Alternatively, we can use a default value based on previous studies or guidelines. To use a range of values, we can use the $3\sigma$ rule, which states that approximately 99.7% of the values in a normal distribution lie within three standard deviations of the mean. Therefore, we can estimate the standard deviation as:
+### Published Values
 
->>$\sigma = \dfrac{(x_{max} - x_{min})}{6}$
+Often there are too few tests to compute a standard deviation: a property comes from a correlation, or
+from a few tests and judgment. Published coefficients of variation give a first estimate. These are
+the ranges compiled by Duncan, Wright, and Brandon (2014) for the properties XSLOPE varies:
 
-where:
-
->>$\sigma$ = standard deviation<br>
-> $x_{max}$ = maximum value of the parameter<br>
-> $x_{min}$ = minimum value of the parameter
-
-Studies have shown that even experts often under-estimate max and min values (estimated range is typically too small). Thus, it is conservative to estimate the standard deviation as:
-
->>$\sigma = \dfrac{(x_{max} - x_{min})}{4}$
-
-where:
-
->>$\sigma$ = standard deviation<br>
-> $x_{max}$ = maximum value of the parameter<br>
-> $x_{min}$ = minimum value of the parameter
-
-We can also look at the literature to find typical values for the standard deviation or COV of a parameter. Duncan, Wright, and Brandon (2014, Table 13.4) collect published values for the soil properties XSLOPE varies:
-
-| Property | Typical COV | Sources cited |
+| Property | Typical COV | Sources |
 |---|---|---|
 | Unit weight ($\gamma$) | 3–7% | Harr (1987), Kulhawy (1992) |
 | Buoyant unit weight ($\gamma_b$) | 0–10% | Lacasse and Nadim (1997), Duncan (2000) |
@@ -105,113 +87,258 @@ We can also look at the literature to find typical values for the standard devia
 | Undrained shear strength ($S_u$) | 13–40% | Kulhawy (1992), Harr (1987), Lacasse and Nadim (1997) |
 | Undrained strength ratio ($S_u/\sigma'_v$) | 5–15% | Lacasse and Nadim (1997), Duncan (2000) |
 
-The table gives no range for an effective stress cohesion $c'$; estimate its standard deviation from a high and a
-low value with one of the rules above.
+The ranges are wide. No range is given for an effective stress cohesion $c'$. The two rules below
+make a better estimate from what you know about your own site.
+
+### The 3σ and Nσ Rules
+
+Estimate the **highest conceivable value** (HCV) and the **lowest conceivable value** (LCV) of the
+property. In a normal distribution, 99.73% of the values lie within three standard deviations of the
+average, so the HCV and LCV are about $\pm 3\sigma$ from it. That is the **3σ rule**:
+
+$$\sigma = \frac{HCV - LCV}{6}$$
+
+People, experienced engineers included, tend to guess ranges that are too narrow, and a range that is
+too narrow gives a standard deviation that is too small. The **Nσ rule** (Foye, Salgado, and Scott
+2006) corrects for it by dividing by a smaller number:
+
+$$\sigma = \frac{HCV - LCV}{N_\sigma}, \qquad N_\sigma = 4$$
+
+The reason for 4: our highest and lowest conceivable values come from experience of perhaps 20 or 30
+cases, and in a sample of 20 to 30 values from a normal distribution, the highest and lowest sit about
+four standard deviations apart (3.7σ for 20 values, 4.1σ for 30). So the HCV and LCV are taken at
+$\pm 2\sigma$, and about one value in twenty falls outside them.
+
+[Tutorial LEM-11](../tutorials/lem11_reliability.md)'s clay has a most likely cohesion of 400 psf.
+Suppose its highest conceivable value is 600 psf and its lowest 200 psf. The 3σ rule gives
+σ = 67 psf; the Nσ rule gives σ = 100 psf, a COV of 25%, which is the value the tutorial uses.
+
+![The 3σ and Nσ rules on a cohesion of 400 psf](images/sigma_rules.png){width=540}
+
+The same steps apply to a property that varies with depth: draw the most likely line through the data,
+then the highest and lowest conceivable lines, and put the average $\pm \sigma$ lines halfway between
+(for $N_\sigma = 4$). Analyzing the slope with each $\pm \sigma$ line gives the two factors of safety
+the [Taylor series](taylor.md) needs for that strength.
+
+### Standard Deviations in XSLOPE {#standard-deviations-in-xslope}
+
+The values a material is given are its most likely values. The standard deviations go beside them, in
+the **Standard Deviations** block at the right of the mat sheet: σ(γ), σ(c), σ(φ), σ(c/p), σ(d), and
+σ(ψ). In Studio, open **Materials** and tick **Reliability** under **Show parameters for:**; a
+**± σ** box appears beside each value that can have one. A blank or zero standard deviation means the
+value is known exactly and is not varied.
+
+Which values are varied depends on the material's strength model:
+
+| Strength model | Values varied |
+|---|---|
+| Mohr-Coulomb (`mc`) | $c$, $\phi$, and $\gamma$; in a [rapid drawdown](../lem/rapid.md) analysis also the $K_c = 1$ envelope, $d$ and $\psi$ |
+| Depth-varying undrained (`cp`) | $c$, the rate $c_p$ (the c/p column), and $\gamma$ |
+| Strength ratio (`ratio`) | the minimum $c$, the ratio (the c/p column), and $\gamma$ |
+
+σ(d) and σ(ψ) are read only in a rapid drawdown analysis. All three methods, and the finite element
+Taylor series, read the same columns, so changing the method never changes the data you enter.
+
+## From the Inputs to the Factor of Safety
+
+Uncertain inputs make the factor of safety uncertain: every combination of strengths and unit weights
+gives its own factor of safety, and together they make a distribution of $F$. Two numbers describe it
+well enough for most purposes: $F_{MLV}$, and the standard deviation of the factor of safety,
+$\sigma_F$, or its coefficient of variation, $COV_F = \sigma_F / F_{MLV}$. XSLOPE computes them three
+ways:
+
+| Method | How | Real solves | Page |
+|---|---|---|---|
+| Taylor series | Moves each input up and down one standard deviation and measures how far $F$ swings | $1 + 2N$ for $N$ uncertain inputs | [Taylor Series](taylor.md) |
+| Monte Carlo | Solves thousands of versions of the slope drawn from the input distributions and counts the failures | thousands | [Monte Carlo](monte_carlo.md) |
+| Response surface | Fits a formula for $F$ to a few real solves, checks it, and counts on the formula | a few hundred | [Response surface](monte_carlo.md#sampling-a-fitted-response-surface) |
 
 ## Reliability Equation
 
-Overall reliability can be determined once we know the following values:
+The **reliability index**, $\beta$, is the number of standard deviations between $F_{MLV}$ and failure,
+$F = 1$. On a normal distribution of $F$, the distance from 1 to $F_{MLV}$ is $\beta \sigma_F$:
 
->>$F_{MLV}$ = The factor of safety based on the most likely values of the parameters
+![β on a normal distribution of the factor of safety](images/beta_on_f.png){width=480}
 
->>$COV_{F}$ = The coefficient of variation of the factor of safety, which is a measure of the uncertainty in the factor of safety due to the uncertainties in the parameters
+Treating $F$ as **normally distributed**:
 
-These values can be used to compute the lognormal reliability index ($\beta$) using the following equation:
+$$\beta_N = \frac{F_{MLV} - 1}{\sigma_F}$$
 
->>$\beta_{LN} = \dfrac{\ln \left( \dfrac{F_{MLV}}{\sqrt{1 + COV_F^2}} \right)}{\sqrt{\ln (1 + COV_F^2)}}$
+Treating $F$ as **lognormally distributed**, which is skewed as the factor of safety usually is and never
+goes below zero:
 
-We can then calculate the reliability ($R$) using a normal distribution function. In Excel, we can use the `NORMSDIST` function to calculate the reliability:
+$$\beta_{LN} = \frac{\ln\left(F_{MLV} \big/ \sqrt{1 + COV_F^2}\right)}{\sqrt{\ln\left(1 + COV_F^2\right)}}$$
 
-```excel
-= NORMSDIST(beta_LN)
-```
-In Python, this can be done using the `scipy.stats.norm` module:
+For either shape, the probability of failure and the reliability follow from the standard normal
+distribution, $\Phi$:
+
+$$P_f = \Phi(-\beta), \qquad R = \Phi(\beta)$$
+
+In a spreadsheet, $P_f$ is `NORM.S.DIST(-beta, TRUE)`; in Python, `scipy.stats.norm.cdf(-beta)`.
+
+![The probability of failure against the reliability index](images/beta_pf.png){width=580}
+
+A β of 1 is a probability of failure of 16%, 2 is 2.3%, and 3 is 0.13%. Each step in β cuts the
+probability by a factor of ten or more, so for a safe slope, two analyses that barely disagree about β
+can look far apart in $P_f$.
+
+Which shape is right? Duncan, Wright, and Brandon (2014) find some justification for either and no
+way to tell which is better in a particular case, so they suggest computing both and treating the
+difference as a measure of the uncertainty in $P_f$. Every XSLOPE reliability analysis reports both:
+
+- The **Taylor series** (limit equilibrium and finite element) reports $\beta_{LN}$ with its reliability
+  and probability of failure, and $\beta_N$ with its probability of failure.
+- **Monte Carlo** and the **response surface** count the probability of failure directly, and report
+  both indices for comparison, computed from the mean and standard deviation of their realizations.
+
+## Acceptable Probability of Failure
+
+There is no universally acceptable probability of failure. Slopes designed by conventional practice
+often have a probability of failure near 1%, which is a β of about 2.3 (Duncan, Wright, and Brandon
+2014). Like the required factor of safety, the right value depends on the consequences of failure.
+
+"Failure" need not be a catastrophe. Shallow sloughing on a slope that is easy to repair is a
+maintenance issue; a slide that threatens lives or delays an important project is another matter. The
+U.S. Army Corps of Engineers speaks of the probability of **unsatisfactory performance**, a reminder
+to judge the event by its real consequences. Its target reliability indices (U.S. Army Corps of
+Engineers 1995):
+
+| Expected performance | β | Probability of unsatisfactory performance |
+|---|:---:|:---:|
+| High | 5.0 | 0.0000003 |
+| Good | 4.0 | 0.00003 |
+| Above average | 3.0 | 0.001 |
+| Below average | 2.5 | 0.006 |
+| Poor | 2.0 | 0.023 |
+| Unsatisfactory | 1.5 | 0.07 |
+| Hazardous | 1.0 | 0.16 |
+
+A probability of failure can also be weighed against cost. The expected cost of failure is $P_f$ times
+the cost of a failure, and a flatter, more expensive slope can cost less in all once that is added.
+
+A small probability of failure is expensive to find by Monte Carlo, which counts failed realizations:
+knowing a $P_f$ near 1% to within ±10% of itself takes about 38,000 realizations, and near 0.1% about
+380,000 ([How Many Realizations](monte_carlo.md#how-many-realizations)). The
+[response surface](monte_carlo.md#sampling-a-fitted-response-surface) makes that affordable.
+
+## Choosing the Slip Surface
+
+The slip surface is not one of the inputs a reliability analysis varies, and **the surface with the
+lowest factor of safety need not have the lowest reliability index.** Hassan and Wolff (1999) showed
+it on Cannon Dam, XSLOPE's verification problem [VP35](../verification/rocscience.md#vp35):
+
+![Cannon Dam: the circle of lowest F and the circle of lowest β](images/vp035_surfaces.png){width=800}
+
+Both circles are analyzed by the Taylor series with Bishop's method, each held fixed. The blue circle is
+the critical circle of a search at the most likely values: $F = 2.53$, $\beta_{LN} = 6.79$. The orange
+circle has a higher factor of safety, 2.97, but a reliability index of only 3.35, less than half. It
+stays in the two clay fills, which carry all the strength uncertainty. The blue circle runs through the
+foundation sand for much of its length, and the sand's strength is taken as known. Two other analyses
+find the same, with their own numbers: Slide2's lowest-β circle has β = 4.351 against 10.953 for its
+lowest-F circle, and Hassan and Wolff's 3.987 against 10.356 (Rocscience, Slide2 verification manual,
+problem 35). A design screened on the factor of safety alone can examine the wrong surface.
+
+<!-- test: file=../verification/files/rocscience/vp035.xlsx, type=circular_search, num_slices=50, fs_bishop=2.53, benchmark=REL-VP35-fs -->
+<!-- test: file=../verification/files/rocscience/vp035.xlsx, type=single_circle, circle_index=0, num_slices=40, fs_bishop=2.97, benchmark=REL-VP35-B -->
+<!-- test: file=../verification/files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.35, tolerance=0.03, benchmark=REL-VP35-beta -->
+
+XSLOPE does not search for the surface of lowest β. The search checkbox in the Reliability dialog decides
+which surface each solve uses:
+
+| Method | Search ticked | Search unticked |
+|---|---|---|
+| Taylor series | A search for the critical surface at each of the $1 + 2N$ solves | Every solve on the file's own surface |
+| Monte Carlo, response surface | One search, at the most likely values; every realization on that surface | Every realization on the file's own surface |
+
+The file's own surface is the first circle on the circles sheet, or the non-circular surface. Untick
+the search for a prescribed surface: a published benchmark's circle, an observed failure surface, a
+bedding plane, or a candidate surface whose β you want to check. Monte Carlo holds one surface because
+a search for every realization would cost hundreds of solves each. For some realizations the critical
+surface lies elsewhere, so a fixed surface understates the probability of failure of the slope as a
+whole a little.
+
+## Choosing a Method {#when-to-use-monte-carlo-versus-the-taylor-series}
+
+All three methods read the same standard deviations, and on ordinary problems they agree closely: on
+LEM-11's slope their probabilities of failure are within about a percentage point of each other
+([Monte Carlo: the three methods compared](monte_carlo.md#the-three-methods-compared)).
+
+| Method | Assumes | Use it for |
+|---|---|---|
+| Taylor series | $F$ changes in a straight line over $\pm\sigma$, and $F$'s distribution has a known shape | The quick first look: $1 + 2N$ solves, and its table ranks the inputs by how much each contributes |
+| Monte Carlo | Nothing about $F$: only the input distributions | The reference answer; and the cases the Taylor series cannot handle, below |
+| Response surface | $F$ follows a quadratic formula, which it checks | A probability of failure too small for Monte Carlo to find affordably |
+
+Use Monte Carlo when the Taylor series' straight line cannot hold:
+
+- **A standard deviation larger than its value.** The Taylor series cannot evaluate a strength at
+  $MLV - \sigma$ when that is negative, and stops without a result. Monte Carlo cuts its draws off at
+  zero. [VP34](../verification/rocscience.md#vp34)'s fill has $\phi = 6.34° \pm 7.87°$, a COV of
+  124%: the Taylor series cannot run, and Monte Carlo can
+  ([the VP34 example](monte_carlo.md#vp34-a-standard-deviation-larger-than-its-value)).
+- **A factor of safety that curves strongly with an input.** Then a straight line through the values
+  at $\pm\sigma$ is a poor summary of it.
+
+The standard deviations themselves often move the probability of failure more than the choice of
+method does. Where a standard deviation is uncertain, run the analysis again with a second plausible
+value and see whether the conclusion holds
+([LEM-11 halves σ(c)](../tutorials/lem11_reliability.md#halving-c)).
+
+## Reliability in Other Programs
+
+The commercial limit-equilibrium programs compute reliability by Monte Carlo: Rocscience **Slide2**
+and GeoStudio **SLOPE/W** sample the inputs, solve each realization, and count the realizations with
+$F < 1$, on a fixed surface as XSLOPE's Monte Carlo does. Both offer Latin hypercube sampling, and
+Slide2 adds a response surface and a spatially variable (random-field) mode
+([Slide2 Probabilistic Analysis](https://www.rocscience.com/help/slide2/documentation/slide-model/project-settings/statistics/probabilistic-analysis)).
+Finite element programs do not rely on mass sampling, because thousands of finite element solves are
+impractical. Rocscience **RS2** offers the Rosenblueth point-estimate method (two points per variable at
+$\pm\sigma$), a response surface, and Monte Carlo on that surface
+([RS2 Probabilistic Analysis](https://www.rocscience.com/help/rs2/documentation/rs2-model/project-settings/statistics/probabilistic-analysis)).
+XSLOPE's finite element reliability belongs to the point-estimate family: its $1 + 2N$ Taylor series
+evaluates each variable at the same two points.
+
+## Running a Reliability Analysis
+
+In **XSLOPE Studio**, click **Reliability…** on the **Run** menu or the toolbar, beside
+**Parametric…**. Choose the method, then the limit equilibrium method and slice count (or, in FEM mode,
+the strength reduction bracket). **Standard deviations in this file**, at the bottom of the dialog, lists
+what the run will vary. The results open in their own tab, and the per-parameter table goes to the Log
+pane. [Studio: Reliability analysis](../studio/analysis.md#reliability-analysis) describes the dialog
+and the result views.
+
+From **Python**, one entry point runs every method:
 
 ```python
-from scipy.stats import norm
-def calculate_reliability(F_MLV, COV_F):
-    beta_LN = (np.log(F_MLV / np.sqrt(1 + COV_F**2)) /
-               np.sqrt(np.log(1 + COV_F**2)))
-    R = norm.cdf(beta_LN)
-    return R
+from xslope.fileio import load_slope_data
+from xslope.reliability import reliability
+
+slope_data = load_slope_data("xslope_reliability.xlsx")
+success, result = reliability(slope_data, "spencer", engine="taylor")   # or "mc", "rs"
+if success:
+    print(result["beta_ln"], result["prob_failure"], result["beta_normal"], result["pf_normal"])
 ```
 
-The lognormal index treats the factor of safety as lognormally distributed. If the
-factor of safety is treated as normally distributed instead, the reliability index is:
+Each method is also public under its own name:
 
->>$\beta_N = \dfrac{F_{MLV} - 1}{\sigma_F}$
-
-where $\sigma_F = COV_F \times F_{MLV}$ is the standard deviation of the factor of
-safety. The probability of failure is then $P_f = \Phi(-\beta_N)$, where $\Phi$ is the
-standard normal distribution function (`NORMSDIST(-beta_N)` in Excel,
-`norm.cdf(-beta_N)` in Python). Duncan, Wright, and Brandon (2014) find some
-justification for either distribution and suggest computing both. Every XSLOPE
-reliability analysis reports both: the lognormal $\beta_{LN}$ with its reliability and
-probability of failure, and the normal $\beta_N$ with its probability of failure. The
-two can differ by a wide margin. At a large factor of safety the lognormal index is
-the larger of the two, and its probability of failure is the smaller.
-
-But first, we have to calculate the factor of safety based on the most likely values of the parameters ($F_{MLV}$) and the coefficient of variation of the factor of safety ($COV_F$). Calculating the $F_{MLV}$ is straightforward, as it is simply the factor of safety calculated using the most likely values of the parameters. This can be done using any of the limit equilibrium methods implemented in the **xslope** package, such as Bishop's method, Janbu's method, or Spencer's method.
-
-To calculate the $COV_F$, there are two common approaches to calculate these values: the [Monte Carlo method](monte_carlo.md) and the [Taylor Series Probability Method (TSPM)](taylor.md).
-
-## When to use Monte Carlo versus the Taylor series
-
-For ordinary parameter scatter the two methods agree, and the [Taylor series](taylor.md) is far
-cheaper (1 + 2N solves versus $10^4$), so it is the default. Use [Monte Carlo](monte_carlo.md)
-when the Taylor series' straight-line (first-order) treatment of the
-factor of safety breaks down:
-
-- **Large coefficients of variation.** When a standard deviation approaches or
-  exceeds its mean, the Taylor series cannot evaluate $F(\text{MLV} - \sigma)$
-  without a negative parameter and stops without a result. Monte Carlo handles it by
-  truncating the draw at zero. The worked example is **VP34** (Clarence Cannon Dam),
-  whose Phase I fill has a friction-angle COV of 124%: the Taylor series cannot run,
-  while Monte Carlo returns a probability of failure inside the range the published
-  studies span.
-- **A strongly curved or skewed response.** When the factor of safety does not
-  change in a straight line with a parameter, a slope measured at ±σ is a poor
-  summary of it.
-- **Counted probabilities.** When $P_f$ should come from counting failed
-  realizations rather than from a fitted lognormal shape.
-
-## How commercial software does it
-
-xslope's two-engine split mirrors what the established geotechnical packages do, and
-the split falls along the solver, not the software. The commercial **limit-equilibrium**
-codes do reliability by direct **Monte Carlo**: Rocscience **Slide2** and GeoStudio
-**SLOPE/W** both sample the strength and pore-pressure inputs from user-specified
-distributions, evaluate the factor of safety of each realization, and report the
-probability of failure as the fraction of realizations with FoS < 1 — the same
-fixed-surface campaign as xslope's `reliability_mc`. Both offer **Latin Hypercube**
-sampling as a more efficient alternative to plain Monte Carlo — the same sampling
-`reliability_mc` uses by default (SLOPE/W added it in
-GeoStudio 2024.1), and Slide2 adds a machine-learning **response surface** to
-accelerate the sampling and a **spatial-variability** (random-field) mode
-([Slide2 Probabilistic Analysis](https://www.rocscience.com/help/slide2/documentation/slide-model/project-settings/statistics/probabilistic-analysis);
-[Advancing Slope Stability Analysis with Probabilistic Methods in Slide2 and Slide3](https://www.rocscience.com/learning/advancing-slope-stability-analysis-with-probabilistic-methods-in-slide2-and-slide3);
-[Stability Modeling with SLOPE/W (Seequent)](https://files.seequent.com/PDFs/Geostudio-Stability%20Modeling-Oct2022.pdf)).
-On the **finite-element** side the economics change — 10⁴ full FE solves is
-impractical — so the FE codes do *not* rely on brute-force sampling. Rocscience **RS2**
-offers the Rosenblueth **point-estimate method** (two point estimates per variable, at
-±1σ, explicitly recommended for problems with only a few random variables, ≈ 2–6), a
-**response-surface** method, and Monte Carlo / Latin Hypercube over that surface
-([RS2 Probabilistic Analysis](https://www.rocscience.com/help/rs2/documentation/rs2-model/project-settings/statistics/probabilistic-analysis)).
-**PLAXIS**'s reliability module likewise provides Monte Carlo, Latin Hypercube and an
-(alternative) point-estimate method with sensitivity analysis
-([New Developments in PLAXIS: Material Point Method and Reliability Analysis, TU Delft](https://research.tudelft.nl/en/publications/new-developments-in-plaxis-material-point-method-and-reliability-)).
-xslope's `reliability_fem` belongs to this point-estimate family: its 1 + 2N
-Taylor-series perturbation is a two-point-per-variable estimate of the factor-of-safety
-variance — the same economical strategy the FE vendors adopt in place of mass sampling.
-
-On the limit-equilibrium side xslope provides the response-surface part of that
-vendor strategy as `reliability_rs`
-([Sampling a fitted response surface](monte_carlo.md#sampling-a-fitted-response-surface));
-on the finite-element side it uses the Taylor series only.
+| Function | Method | Solver | Page |
+|---|---|---|---|
+| `reliability_taylor` | Taylor series | limit equilibrium | [Taylor Series](taylor.md) |
+| `reliability_mc` | Monte Carlo | limit equilibrium | [Monte Carlo](monte_carlo.md) |
+| `reliability_rs` | Response surface | limit equilibrium | [Response surface](monte_carlo.md#sampling-a-fitted-response-surface) |
+| `reliability_fem` | Taylor series | finite element (SSRM) | [Reliability Analysis (FEM)](fem.md) |
 
 ## References
 
-- Duncan, J.M. (2000). "Factors of safety and reliability in geotechnical engineering." *Journal of Geotechnical and
-  Geoenvironmental Engineering*, 126(4), 307–316.
-- Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014). *Soil Strength and Slope Stability*, 2nd ed. Wiley, Hoboken,
-  NJ. Chapter 13.
+- Duncan, J.M. (2000). "Factors of safety and reliability in geotechnical engineering." *Journal of
+  Geotechnical and Geoenvironmental Engineering*, 126(4), 307–316.
+- Duncan, J.M., Wright, S.G., and Brandon, T.L. (2014). *Soil Strength and Slope Stability*, 2nd ed.
+  Wiley, Hoboken, NJ. Chapter 13.
+- Foye, K.C., Salgado, R., and Scott, B. (2006). "Assessment of variable uncertainties for
+  reliability-based design of foundations." *Journal of Geotechnical and Geoenvironmental Engineering*,
+  132(9), 1197–1207.
+- Harr, M.E. (1987). *Reliability-Based Design in Civil Engineering*. McGraw-Hill, New York.
+- Hassan, A.M., and Wolff, T.F. (1999). "Search algorithm for minimum reliability index of earth
+  slopes." *Journal of Geotechnical and Geoenvironmental Engineering*, 125(4), 301–308.
+- U.S. Army Corps of Engineers (1995). *Introduction to Probability and Reliability Methods for Use in
+  Geotechnical Engineering*. Engineer Technical Letter 1110-2-547, Washington, DC.

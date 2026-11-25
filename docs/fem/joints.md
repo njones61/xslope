@@ -69,6 +69,16 @@ along its neighbor's side. Where two joint lines are meant to meet but the coord
 hair, the end is moved onto the other line before the mesh is built, so nothing has to be entered
 to more decimals than the drawing gives.
 
+The same holds where a joint is meant to reach the surface of the section. Where a line on the
+**joints** worksheet, carried on past an end that no other joint line shares, would reach the
+section's outer boundary within one twentieth of the target element size, that end is extended
+along the line to the boundary before the mesh is built, and a message in the Log pane reports the
+move. Left where it was entered, the joint would stop just inside the rock, and a sliver of rock too
+thin for any element would hold the block it bounds. A point where two or more joint lines meet
+stays where it was entered, and so does the end of a joint that runs alongside the boundary without
+heading into it. A reinforcement sheet flagged as a joint is meshed with its ends where they are
+entered.
+
 A joint line may not do two things, and the model checks reject both, naming the line: run along
 another joint line for part of its length, and run along the outer boundary of the section, where there is
 rock on one side only.

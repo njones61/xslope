@@ -54,7 +54,19 @@ boundary, and the Log says so.
      ending 0.03 inside the outer boundary is moved onto it; one ending 0.1
      inside is not (beyond a twentieth of an element); one ending 0.03 inside
      near a corner is left for the corner snap; one ending 0.03 short of an
-     interior material boundary is not moved (that is a joint stopping in rock).
+     interior material boundary is not moved (that is a joint stopping in rock);
+     and two lines MEETING 0.03 inside the outer boundary are not moved either:
+     only an end that belongs to one jointed line moves, and a junction of the
+     network stays where it was typed. A line at 2 degrees to the boundary whose
+     far end stands 0.03 off it is not moved (carried on past that end it runs
+     away from the boundary; pulled sideways it would lie along it), and a
+     reinforcement line flagged as a joint is meshed where it is entered;
+  E. **the Voronoi mass is meshed as typed.** Tutorial FEM-5's Voronoi model has
+     two block walls meeting 0.06 m inside the slope face (a twentieth of its
+     1.5 m element is 0.075 m). That corner is a junction, so it stays: the model
+     meshes to the 1,303 nodes, 531 elements and 82 joint elements its tag locks,
+     and the mesher prints no move. Moving it carried a block corner out to the
+     face and dropped the factor of safety from 1.090 to 0.804.
 
 Run directly:  PYTHONPATH=. python3 test/joint_end_snap_check.py
 """
@@ -68,6 +80,9 @@ ROOT = Path(__file__).resolve().parent.parent
 FILES = ROOT / 'docs' / 'tutorials' / 'files'
 START = FILES / 'xslope_rock_joints_start.xlsx'
 DONE = FILES / 'xslope_rock_toppling.xlsx'
+VORONOI = FILES / 'xslope_rock_voronoi.xlsx'
+#: What FEM-5's Voronoi tag locks for its mesh (tri6 at 1.5 m).
+VORONOI_COUNTS = (1303, 531, 82)
 
 #: Tutorial FEM-5 Part 2 at three decimals: the region and base plane as a reader
 #: types the page's 9.000 / 6.887 / 20.928 / 0.000, and the column set's
@@ -232,23 +247,57 @@ def check_which_ends_move(fails):
         [(7.0, 3.0), (9.9, 3.0)],      # 0.1 short: a joint stopping in rock
         [(7.0, 9.0), (9.98, 9.97)],    # 0.03 short, beside the corner (10, 10)
         [(1.0, 5.0), (4.97, 5.0)],     # 0.03 short of the zone boundary x = 5
+        [(7.0, 6.0), (9.97, 7.0)],     # two lines meeting 0.03 short of the
+        [(7.0, 8.0), (9.97, 7.0)],     #   right side: a junction, as typed
+        [(10.0, 3.6), (9.97, 4.46)],   # 2 degrees to the side, its far end 0.03
+                                       #   off it and pointing away: runs near
+        [(7.0, 1.0), (9.97, 1.0)],     # a reinforcement line (a bar): as entered
     ]
     want = {0: (10.0, 5.0)}
-    with contextlib.redirect_stdout(io.StringIO()):
-        moved = _move_joint_ends_onto_boundary(
-            lines, {0: {}, 1: {}, 2: {}, 3: {}}, [left, right], 1.0)
+    opts = {k: {'bar': False} for k in range(len(lines))}
+    opts[7] = {}                       # no 'bar' key: a line that has one
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        moved = _move_joint_ends_onto_boundary(lines, opts, [left, right], 1.0)
     got = {li: tuple(round(c, 9) for c in q) for li, _p, q in moved}
     if got != want:
         fails.append(f"D: the ends moved are {got}, not {want}")
-    for li, end in ((1, (9.9, 3.0)), (2, (9.98, 9.97)), (3, (4.97, 5.0))):
+    for li, end in ((1, (9.9, 3.0)), (2, (9.98, 9.97)), (3, (4.97, 5.0)),
+                    (4, (9.97, 7.0)), (5, (9.97, 7.0)), (6, (9.97, 4.46)),
+                    (7, (9.97, 1.0))):
         if tuple(lines[li][-1]) != end:
             fails.append(f"D: line {li + 1}'s end moved to {lines[li][-1]}")
+    said = [ln for ln in out.getvalue().splitlines() if "moved onto" in ln]
+    if len(said) != 1 or not said[0].startswith("Jointed line 1 "):
+        fails.append(f"D: the mesher said {said}, not one move of line 1")
+
+
+def check_the_voronoi_mass(fails):
+    """E: a junction near the face stays; the Voronoi model meshes as locked."""
+    from xslope.fileio import load_slope_data
+    _LOG.seek(0)
+    _LOG.truncate()
+    try:
+        mesh, _lines = _mesh(load_slope_data(str(VORONOI)))
+    except Exception as exc:
+        fails.append(f"E: the Voronoi model does not mesh: "
+                     f"{type(exc).__name__}: {exc}")
+        return
+    got = (len(mesh['nodes']), len(mesh['elements']),
+           len(mesh.get('elements_joint', [])))
+    if got != VORONOI_COUNTS:
+        fails.append(f"E: the Voronoi model meshes to {got} (nodes, elements, "
+                     f"joint elements), not the {VORONOI_COUNTS} its tag locks")
+    said = [ln for ln in _LOG.getvalue().splitlines() if "moved onto" in ln]
+    if said:
+        fails.append(f"E: the mesher moved a Voronoi junction: {said}")
 
 
 def run():
     fails = []
     for check in (check_the_reader_model_meshes, check_the_completed_file_meshes,
-                  check_a_split_refusal_is_a_message, check_which_ends_move):
+                  check_a_split_refusal_is_a_message, check_which_ends_move,
+                  check_the_voronoi_mass):
         try:
             check(fails)
         except Exception as exc:                             # pragma: no cover

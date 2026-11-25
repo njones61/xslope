@@ -408,6 +408,9 @@ domain boundary — on the base at `max_depth`, or along the ground surface — 
 cannot be embedded; it is rejected before meshing starts, with a message naming the line, rather than producing a
 mesh the line is silently missing from. A line end within one twentieth of the target size of a polygon vertex is
 moved onto that vertex, unless it stands partway along another line, and a line no longer than that is refused.
+Where a line on the **joints** worksheet, carried on past an end that no other joint line shares, would reach the
+section's outer boundary within one twentieth of the target size, that end is extended along the line to the boundary,
+and a message in the Log pane reports the move.
 
 Node spacing along a line comes from the size field like everything else.
 `element_size_1d` (the main sheet's **1D element size**, edited in Studio's *Build mesh*

@@ -3494,14 +3494,33 @@ def _move_joint_ends_onto_boundary(lines, opts, polygon_coords, target_size):
     a cut the block can slide out along (FEM-5's toppling slope: 1.152 against
     the completed file's 1.105).
 
-    So an end within the mesher's end-snap distance of the outer boundary -- a
-    twentieth of an element, the distance within which it already moves a line
-    end onto a zone corner (``_BOUNDARY_END_MERGE_FRAC``) -- is moved onto it, at
-    the foot of the perpendicular on the nearest boundary edge. An end with a zone
-    corner within that distance is left to the end snap in
-    ``build_mesh_from_polygons``, which puts it on the corner; an end already on
-    the boundary, or outside the section, is left alone. Only the OUTER boundary:
-    an end near an interior material boundary is a joint stopping inside rock.
+    So an end that the line, carried on past it in its own direction, would bring
+    to the outer boundary within the mesher's end-snap distance -- a twentieth of
+    an element, the distance within which it already moves a line end onto a
+    zone corner (``_BOUNDARY_END_MERGE_FRAC``) -- is moved to that point: the line
+    is lengthened along itself, never turned. A line that merely runs NEAR the
+    boundary is not moved: a joint at 2 degrees to the face, whose far end stands
+    0.03 m off it, points away from the face past that end, and pulling the end
+    sideways onto the face would lay the joint along the boundary, where there is
+    rock on one side only and the split refuses it. An end with a zone corner
+    within that distance is left to the end snap in ``build_mesh_from_polygons``,
+    which puts it on the corner; an end already on the boundary, or outside the
+    section, is left alone. Only the OUTER boundary: an end near an interior
+    material boundary is a joint stopping inside rock.
+
+    Only a joint line with no bar in it (a line of the ``joints`` sheet, a rock
+    joint) moves. A reinforcement line flagged as a joint is a member whose ends
+    are part of its layout -- vp088's fifteen wall sheets start 0.05 m behind the
+    face, as the problem states them -- and are meshed where they are entered.
+
+    Only a FREE end moves: one that belongs to this line alone. An end another
+    jointed line shares -- two Voronoi walls meeting at a block corner, a release
+    joint ending on a bedding plane -- is a junction of the network, and moving it
+    would carry the whole corner of a block out to the face, which is a change to
+    the network, not to the precision it was typed to (FEM-5's Voronoi mass: a
+    corner 0.06 m inside the face, moved out, drops the factor of safety from
+    1.090 to 0.804). A junction stays where it was typed, and nothing is printed
+    about it.
 
     Runs after the junction points are placed (``_insert_joint_junction_points``),
     so the lines that end on a moved line keep the vertex they meet it at; the
@@ -3515,7 +3534,7 @@ def _move_joint_ends_onto_boundary(lines, opts, polygon_coords, target_size):
     if not idx or not polygon_coords or not (target_size and target_size > 0):
         return []
     from shapely.geometry import Polygon as _Poly, Point as _Pt
-    from shapely.ops import nearest_points as _nearest, unary_union as _union
+    from shapely.ops import unary_union as _union
 
     reach = _BOUNDARY_END_MERGE_FRAC * float(target_size)
     tol = _joint_line_tol(lines, polygon_coords)
@@ -3530,11 +3549,22 @@ def _move_joint_ends_onto_boundary(lines, opts, polygon_coords, target_size):
     dom = _union(rings)
     outer = _union([g.exterior for g in getattr(dom, 'geoms', [dom])])
 
+    from shapely.geometry import LineString as _LS
+    curves = {li: _LS([tuple(map(float, v[:2])) for v in lines[li]])
+              for li in idx if lines[li] and len(lines[li]) >= 2}
+
+    def _shared(li, p):
+        """Does another jointed line pass through, or end at, point ``p``?"""
+        return any(lj != li and c.distance(_Pt(p)) <= tol
+                   for lj, c in curves.items())
+
     moved = []
     for li in idx:
         line = lines[li]
         if not line or len(line) < 2:
             continue
+        if (opts.get(li) or {}).get('bar', True):
+            continue                         # a member: its ends are its layout
         pts = [tuple(map(float, v[:2])) for v in line]
         for e in (0, len(pts) - 1):
             p = pts[e]
@@ -3543,8 +3573,24 @@ def _move_joint_ends_onto_boundary(lines, opts, polygon_coords, target_size):
                 continue
             if any(math.hypot(p[0] - c[0], p[1] - c[1]) <= reach for c in corners):
                 continue                     # the end snap puts it on the corner
-            foot = _nearest(outer, _Pt(p))[0]
-            q = (float(foot.x), float(foot.y))
+            if _shared(li, p):
+                continue                     # a junction of the network: as typed
+            # Carried on past the end along the line's own direction: where it
+            # meets the boundary, if it does within the reach.
+            prev = pts[1] if e == 0 else pts[-2]
+            ux, uy = p[0] - prev[0], p[1] - prev[1]
+            ul = math.hypot(ux, uy)
+            if ul <= 0.0:
+                continue
+            ray = _LS([p, (p[0] + ux / ul * reach, p[1] + uy / ul * reach)])
+            hit = ray.intersection(outer)
+            if hit.is_empty:
+                continue                     # runs near the boundary, not to it
+            cand = [g for g in getattr(hit, 'geoms', [hit])]
+            pts_hit = []
+            for g in cand:
+                pts_hit.extend(tuple(map(float, c[:2])) for c in g.coords)
+            q = min(pts_hit, key=lambda c: math.hypot(c[0] - p[0], c[1] - p[1]))
             pts[e] = q
             moved.append((li, p, q))
             print(f"Jointed line {li + 1} ends {gap:.3g} inside the section's outer "

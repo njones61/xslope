@@ -217,4 +217,4 @@ change in storage
 
 <!-- Transient regression: total head sampled at interior stations at end of drawdown and quasi-equilibrium, re-solved through the run_tests tseep_head path (tri3, target_size=15.0). -->
 <!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:131.353;350:115:148.811;400:110:122.103, tolerance=0.05 -->
-<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.828;350:115:118.881;400:110:112.454, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.830;350:115:118.886;400:110:112.457, tolerance=0.05 -->

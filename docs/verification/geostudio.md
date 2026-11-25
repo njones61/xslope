@@ -52,8 +52,8 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.16](#gs-2-16) | 🟢 | Prandtl Bearing Capacity | Lowe & Karafiath 1.017 vs the closed-form 1.0 (+1.7%) · Spencer 1.043 vs the closed-form 1.0 (+4.3%) | *covered* — [Slide2 VP26](rocscience.md#vp26); XSLOPE's methods bracket the closed form (0.98–1.10) and the best of them sets the dot. The same file's SSRM solution returns ≈ 1.0, and SLOPE/W's own fully-specified M-P brackets the closed form from below |
 | [2.17](rocscience.md#vp28) | 🟢 | [Chowdhury & Xu (1995)](https://doi.org/10.1016/0951-8320(94)00063-T), 5 examples | XSLOPE reproduces the ten cases on SLOPE/W's own imported circles, with Taylor σ_F within ≈ 1% of SLOPE/W's Monte Carlo | *covered* (3 of 10 cases built, with their reliability checked) |
 | [2.18](#gs-2-18) | 🟢 | Borges & Cardoso Geosynthetic Emb. #2 | On SLOPE/W's own critical circle M-P 1.155 vs 1.171 (−1.4%) · vs Borges & Cardoso 1.15 (+0.4%) | |
-| [2.19](rocscience.md#vp32) | 🟢 | Borges & Cardoso Geosynthetic Emb. #3 | Two fill stages on SLOPE/W's own solves: 1.218 vs 1.229 (−0.9%) · 0.982 vs 0.972 (+1.0%) | *covered*; identical materials and geometry (verified to <1 cm), and the vendor reinforcement-friction difference (39.6° vs 31.0°) is immaterial — the fully-embedded bar develops its full 200 kN/m either way; also [RS2 #24](rs2.md#rs2-24) |
-| [2.20](rocscience.md#vp33) | 🟢 | Probabilistic – Syncrude Dike | Bishop 1.320 on Slide's circle vs Slide 1.305 (+1.1%) · vs El-Ramly et al. 1.31 (+0.8%) | *covered* (deterministic) |
+| [2.19](rocscience.md#vp32) | 🟢 | Borges & Cardoso Geosynthetic Emb. #3 | Two fill stages on SLOPE/W's own solves: 1.220 vs 1.229 (−0.7%) · 0.982 vs 0.972 (+1.0%) | *covered*; identical materials and geometry (verified to <1 cm), and the vendor reinforcement-friction difference (39.6° vs 31.0°) is immaterial — the fully-embedded bar develops its full 200 kN/m either way; also [RS2 #24](rs2.md#rs2-24) |
+| [2.20](rocscience.md#vp33) | 🟢 | Probabilistic – Syncrude Dike | Bishop 1.321 on Slide's circle vs Slide 1.305 (+1.2%) · vs El-Ramly et al. 1.31 (+0.8%) | *covered* (deterministic) |
 | [2.21](rocscience.md#vp34) | 🟢 | Cannon Dam | M-P 2.384 vs Wolff & Harr 2.36 (+1.0%) · Spencer 2.423 vs Slide 2.383 (+1.7%) | *covered* |
 | [2.22](#gs-2-22) | 🟢 | Cannon Dam #2 | All nine Hassan & Wolff fixed circles: Morgenstern-Price within 0.18% of SLOPE/W's own M-P · Bishop within 0.5% of Slide2 Table 35.2 on eight of nine · slice weight within 0.17% | nine fixed surfaces; the reliability side is *covered* under [Slide2 VP35](rocscience.md#vp35) |
 | [2.23](#gs-2-23) | 🟢 | Li & Lumb – Reliability Index | Bishop 1.334 vs Hassan & Wolff 1.334 (0.0%) · β_ln 2.284 vs Hassan & Wolff 2.336 (−2.2%) | SLOPE/W instead searches for the minimum β across surfaces, so its β and FS are not on this surface |
@@ -82,8 +82,8 @@ Full bibliographic details for the author-year citations on this page are on the
 | [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | M-P free search 1.073 vs SLOPE/W's composite minimum 1.091 (−1.6%) · Bishop free search 1.075 vs Bishop 1.07 in *Smith's Elements of Soil Mechanics* (+0.5%) | DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage |
 | [2.47](#gs-2-47) | <span class="nodata">⊘</span> | Compound Strength vs Anisotropic Function | | *blocked* — needs a dip-relative strength model |
 | [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Center excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
-| [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46,800 s (0.4% of the 8 m suction step) | unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
-| [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.10–0.20 m through the 30-day drawdown (1.3–2.5% of the 8 m drawdown); the published factor-of-safety-vs-time curve is reproduced at every saved step of both drawdown rates | both drawdown rates; the reference columns are the vendor's own solved `node.csv` field, sampled with the same probe used on XSLOPE's, and its solved minimum factor of safety per step |
+| [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.02 m of SEEP/W head at t = 46,800 s (0.3% of the 8 m suction step) | unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.01 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
+| [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.20 m through the 30-day drawdown (1.1–2.5% of the 8 m drawdown); the published factor-of-safety-vs-time curve is reproduced at every saved step of both drawdown rates | both drawdown rates; the reference columns are the vendor's own solved `node.csv` field, sampled with the same probe used on XSLOPE's, and its solved minimum factor of safety per step |
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within 0.003 m of SEEP/W at the initial frame and 0.07 m at the high-rate near-steady, over the checked stations | specified-flux (Neumann) top boundary on a gravity-drained unsaturated column, the van Genuchten pair fitted to the vendor's conductivity table over the suctions the column reaches |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | The 14-layer infiltration leg needs a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
@@ -972,9 +972,9 @@ off the analytical curve while XSLOPE's open circles lie on it.
 **Sources:** GeoStudio SEEP/W example "Simulating Consolidation with SEEP/W"; Terzaghi
 (1943), *Theoretical Soil Mechanics*, Eq. 17.3.
 
-<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=150, max_head_change_frac=0.02, points=0.005:0.0125:100.9073;0.005:0.025:101.0165;0.005:0.0375:100.9073, tolerance=0.02, benchmark=SEEPW-CONS-t150 -->
-<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=604, max_head_change_frac=0.02, points=0.005:0.0125:100.5683;0.005:0.025:100.7928;0.005:0.0375:100.5683, tolerance=0.02, benchmark=SEEPW-CONS-t604 -->
-<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=1460, max_head_change_frac=0.02, points=0.005:0.0125:100.2834;0.005:0.025:100.4008;0.005:0.0375:100.2834, tolerance=0.02, benchmark=SEEPW-CONS-t1460 -->
+<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=150, max_head_change_frac=0.02, points=0.005:0.0125:100.9073;0.005:0.025:101.0165;0.005:0.0375:100.9073, tolerance=0.02, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=SEEPW-CONS-t150 -->
+<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=604, max_head_change_frac=0.02, points=0.005:0.0125:100.5683;0.005:0.025:100.7928;0.005:0.0375:100.5683, tolerance=0.02, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=SEEPW-CONS-t604 -->
+<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=1460, max_head_change_frac=0.02, points=0.005:0.0125:100.2834;0.005:0.025:100.4008;0.005:0.0375:100.2834, tolerance=0.02, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=SEEPW-CONS-t1460 -->
 
 ### 🟢 SEEPW-T02 — Verification: infiltration into dry soil {#seepw-t02}
 
@@ -992,17 +992,17 @@ returns the dry column directly.
 The comparison is against SEEP/W's own `node.csv` pressure field at the final time; the
 published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x)
 semi-analytical profile. XSLOPE reproduces the **wetted zone** behind the front to within
-0.028 m of head:
+0.020 m of head:
 
 | y (m) | XSLOPE ψ | SEEP/W ψ (Δ = XSLOPE − SEEP/W) |
 |:---:|:---:|:---:|
-| 0.6 | −0.194 m | −0.166 m (−0.028 m) |
-| 0.7 | −0.074 m | −0.064 m (−0.010 m) |
+| 0.6 | −0.186 m | −0.166 m (−0.020 m) |
+| 0.7 | −0.072 m | −0.064 m (−0.008 m) |
 | 0.8 | −0.021 m | −0.020 m (−0.001 m) |
 | 0.9 | −0.002 m | −0.003 m (+0.001 m) |
 
 Below the front the two agree to 0.002 m. At the front itself the mid-front (ψ = −4 m)
-crossing lands at y = 0.397 in XSLOPE against y = 0.380 in SEEP/W, the expected
+crossing lands at y = 0.393 in XSLOPE against y = 0.380 in SEEP/W, the expected
 **lumped-mass vs consistent-mass** difference: XSLOPE's lumped mass matrix damps the front
 oscillations SEEP/W's own write-up warns about, at the cost of a slightly smeared front. The
 four wetted-zone points are checked at a 0.08 m tolerance, wide enough to carry that offset.
@@ -1010,7 +1010,7 @@ four wetted-zone points are checked at a 0.08 m tolerance, wide enough to carry 
 **Sources:** GeoStudio SEEP/W example "Verification – Infiltration into Dry Soil";
 Warrick, Lomen & Yates (1985), *Soil Sci. Soc. Am. J.* 49.
 
-<!-- test: file=files/geostudio/gs2_infil.xlsx, type=tseep_head, target_size=0.01, time=46800, max_head_change_frac=0.01, points=0.025:0.6:0.4057;0.025:0.7:0.6262;0.025:0.8:0.7786;0.025:0.9:0.8978, tolerance=0.08, benchmark=SEEPW-INF -->
+<!-- test: file=files/geostudio/gs2_infil.xlsx, type=tseep_head, target_size=0.01, time=46800, max_head_change_frac=0.01, points=0.025:0.6:0.4136;0.025:0.7:0.6285;0.025:0.8:0.7789;0.025:0.9:0.8977, tolerance=0.08, benchmark=SEEPW-INF -->
 
 ### 🟢 SEEPW-T03 — Rapid drawdown {#seepw-t03}
 
@@ -1037,12 +1037,12 @@ vendor's own solved `node.csv` field, read with the same probe as XSLOPE's:
 | (20, 5) | IC (full reservoir) | 7.147 m | 7.280 m (−0.13 m) |
 | (25, 5) | IC (full reservoir) | 6.056 m | 6.258 m (−0.20 m) |
 | (30, 3) | IC (full reservoir) | 4.826 m | 5.008 m (−0.18 m) |
-| (20, 5) | slow, t = 1.2 d | 6.409 m | 6.509 m (−0.10 m) |
-| (30, 3) | slow, t = 1.2 d | 4.761 m | 4.914 m (−0.15 m) |
-| (20, 5) | instantaneous, t = 30 d | 3.685 m | 3.808 m (−0.12 m) |
-| (35, 2) | instantaneous, t = 30 d | 2.215 m | 2.331 m (−0.12 m) |
+| (20, 5) | slow, t = 1.2 d | 6.403 m | 6.509 m (−0.11 m) |
+| (30, 3) | slow, t = 1.2 d | 4.760 m | 4.914 m (−0.15 m) |
+| (20, 5) | instantaneous, t = 30 d | 3.679 m | 3.808 m (−0.13 m) |
+| (35, 2) | instantaneous, t = 30 d | 2.244 m | 2.331 m (−0.09 m) |
 
-The interior field tracks SEEP/W to within 0.10–0.20 m of head, 1.3–2.5% of the 8 m
+The interior field tracks SEEP/W to within 0.09–0.20 m of head, 1.1–2.5% of the 8 m
 drawdown, the largest at the t = 0 steady initial condition. XSLOPE runs a little below
 SEEP/W at every station and both rates, so the offset is in the steady field the transient
 starts from; two setup differences remain untranscribed, the vendor's finer quad-dominant core
@@ -1061,37 +1061,37 @@ Each SLOPE/W value below is the vendor's own solved minimum at that step.
 
 | step | t (days) | XSLOPE FS | SLOPE/W FS (Δ) |
 |:---:|:---:|:---:|:---:|
-| 0 | 0 | 1.686 | 1.672 (+0.014) |
+| 0 | 0 | 1.688 | 1.672 (+0.016) |
 | 1 | 0.25 | 0.941 | 0.829 (+0.112) |
-| 2 | 0.63 | 0.998 | 0.965 (+0.033) |
-| 3 | 1.20 | 1.028 | 1.009 (+0.019) |
-| 4 | 2.06 | 1.054 | 1.039 (+0.015) |
-| 5 | 3.37 | 1.079 | 1.065 (+0.014) |
-| 6 | 5.35 | 1.107 | 1.094 (+0.013) |
-| 7 | 8.33 | 1.136 | 1.124 (+0.012) |
-| 8 | 12.85 | 1.168 | 1.157 (+0.011) |
-| 9 | 19.68 | 1.203 | 1.194 (+0.009) |
+| 2 | 0.63 | 0.999 | 0.965 (+0.034) |
+| 3 | 1.20 | 1.029 | 1.009 (+0.020) |
+| 4 | 2.06 | 1.055 | 1.039 (+0.016) |
+| 5 | 3.37 | 1.081 | 1.065 (+0.016) |
+| 6 | 5.35 | 1.108 | 1.094 (+0.014) |
+| 7 | 8.33 | 1.137 | 1.124 (+0.013) |
+| 8 | 12.85 | 1.169 | 1.157 (+0.012) |
+| 9 | 19.68 | 1.204 | 1.194 (+0.010) |
 | 10 | 30.00 | 1.241 | 1.234 (+0.007) |
 
 **Slow drawdown** (reservoir falls 8 → 0 m over 5 days):
 
 | step | t (days) | XSLOPE FS | SLOPE/W FS (Δ) |
 |:---:|:---:|:---:|:---:|
-| 0 | 0 | 1.686 | 1.672 (+0.014) |
-| 1 | 0.25 | 1.585 | 1.579 (+0.006) |
-| 2 | 0.63 | 1.488 | 1.480 (+0.008) |
-| 3 | 1.20 | 1.373 | 1.366 (+0.007) |
-| 4 | 2.06 | 1.243 | 1.236 (+0.007) |
-| 5 | 3.37 | 1.121 | 1.107 (+0.014) |
-| 6 | 5.35 | 1.090 | 1.078 (+0.012) |
-| 7 | 8.33 | 1.125 | 1.114 (+0.011) |
-| 8 | 12.85 | 1.161 | 1.151 (+0.010) |
-| 9 | 19.68 | 1.198 | 1.190 (+0.008) |
-| 10 | 30.00 | 1.237 | 1.231 (+0.006) |
+| 0 | 0 | 1.688 | 1.672 (+0.016) |
+| 1 | 0.25 | 1.586 | 1.579 (+0.007) |
+| 2 | 0.63 | 1.489 | 1.480 (+0.009) |
+| 3 | 1.20 | 1.375 | 1.366 (+0.009) |
+| 4 | 2.06 | 1.244 | 1.236 (+0.008) |
+| 5 | 3.37 | 1.122 | 1.107 (+0.015) |
+| 6 | 5.35 | 1.091 | 1.078 (+0.013) |
+| 7 | 8.33 | 1.126 | 1.114 (+0.012) |
+| 8 | 12.85 | 1.162 | 1.151 (+0.011) |
+| 9 | 19.68 | 1.199 | 1.190 (+0.009) |
+| 10 | 30.00 | 1.238 | 1.231 (+0.007) |
 
 Both curves match in shape: the instantaneous case drops below 1 immediately and climbs
 back as the trapped pore pressures dissipate, the slow case never reaches 1, and both end at
-the same drained state. Nineteen of the twenty-two steps agree to 0.014 or better, all above
+the same drained state. Nineteen of the twenty-two steps agree to 0.016 or better, all above
 SLOPE/W, the sign XSLOPE's lower interior heads predict. The exception is the instantaneous
 case's minimum six hours after drawdown, 0.941 against 0.829, where the slope is held up almost
 entirely by undissipated pore pressure and the head offset weighs most.
@@ -1099,11 +1099,11 @@ entirely by undissipated pore pressure and the head offset weighs most.
 **Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent).
 
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=0, max_head_change_frac=0.05, points=20:5:7.147;25:5:6.056;30:3:4.826;35:2:3.264, tolerance=0.03, benchmark=SEEPW-RDD-inst-ic -->
-<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.685;25:5:3.714;30:3:3.139;35:2:2.215, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
-<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.409;25:5:5.874;30:3:4.761;35:2:3.273, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
-<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.721;25:5:3.749;30:3:3.172;35:2:2.240, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
-<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.686;0.941;0.998;1.028;1.054;1.079;1.107;1.136;1.168;1.203;1.241, critical_time=21600, min_fs=0.941, tolerance=0.005, benchmark=SEEPW-RDD-inst-fs -->
-<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.686;1.585;1.488;1.373;1.243;1.121;1.090;1.125;1.161;1.198;1.237, critical_time=461858, min_fs=1.090, tolerance=0.005, benchmark=SEEPW-RDD-slow-fs -->
+<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.679;25:5:3.721;30:3:3.143;35:2:2.244, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.403;25:5:5.871;30:3:4.760;35:2:3.273, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.715;25:5:3.757;30:3:3.176;35:2:2.269, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
+<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.688;0.941;0.999;1.029;1.055;1.081;1.108;1.137;1.169;1.204;1.241, critical_time=21600, min_fs=0.941, tolerance=0.005, benchmark=SEEPW-RDD-inst-fs -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.688;1.586;1.489;1.375;1.244;1.122;1.091;1.126;1.162;1.199;1.238, critical_time=461858, min_fs=1.091, tolerance=0.005, benchmark=SEEPW-RDD-slow-fs -->
 
 ### 🟢 SEEPW-T04 — Leakage from pond with clay liner {#seepw-t04}
 
@@ -1135,9 +1135,9 @@ comparison is SEEP/W's own solved `node.csv`, read with the same probe as on [T0
 | (5, 2) | IC (pre-fill) | 4.000 m | 4.000 m (0.00 m) |
 | (5, 2) | t = 24 d (filling) | 4.055 m | 4.133 m (−0.08 m) |
 | (3, 5) | t = 24 d (filling) | 4.112 m | 4.251 m (−0.14 m) |
-| (5, 2) | t = 240 d (near-steady) | 6.476 m | 6.463 m (+0.01 m) |
-| (10, 3) | t = 240 d (near-steady) | 5.901 m | 5.900 m (+0.00 m) |
-| (15, 4) | t = 240 d (near-steady) | 5.252 m | 5.238 m (+0.01 m) |
+| (5, 2) | t = 240 d (near-steady) | 6.472 m | 6.463 m (+0.01 m) |
+| (10, 3) | t = 240 d (near-steady) | 5.907 m | 5.900 m (+0.01 m) |
+| (15, 4) | t = 240 d (near-steady) | 5.241 m | 5.238 m (+0.00 m) |
 
 The initial condition is exact and the near-steady leaking state tracks SEEP/W to
 **±0.02 m** at every station, 0.3% of the 6.5 m pond head. The largest deltas are on the
@@ -1150,7 +1150,7 @@ unsaturated fill that convention governs the filling rate; the same term sets th
 **Sources:** GeoStudio SEEP/W example "Leakage from Pond with Clay Liner" (Seequent).
 
 <!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=0, max_head_change_frac=0.05, points=5:2:4.0000;10:3:4.0000;15:4:4.0000, tolerance=0.03, benchmark=SEEPW-POND-ic -->
-<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=2.0736e+07, max_head_change_frac=0.05, points=5:2:6.4757;10:3:5.9014;15:4:5.2516, tolerance=0.03, benchmark=SEEPW-POND-end -->
+<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=2.0736e+07, max_head_change_frac=0.05, points=5:2:6.4715;10:3:5.9072;15:4:5.2409, tolerance=0.03, benchmark=SEEPW-POND-end -->
 
 ### 🟢 SEEPW-T05 — Mineral heap leaching {#seepw-t05}
 
@@ -1181,8 +1181,8 @@ form, so the comparison is SEEP/W's own solved `node.csv`:
 
 | Frame | XSLOPE total head at y = 2 / 4 / 6 m | Δ vs SEEP/W (bound over the sampled stations) |
 |---|---|---|
-| Initial condition, low rate (t = 0) | 1.2197 / 3.2165 / 5.2190 | within 0.003 m of head |
-| High-rate near-steady (t = 96 h) | 1.8055 / 3.8369 / 5.8370 | within 0.07 m, and 0.001 m at y = 6 m |
+| Initial condition, low rate (t = 0) | 1.2205 / 3.2179 / 5.2179 | within 0.003 m of head |
+| High-rate near-steady (t = 96 h) | 1.8003 / 3.8368 / 5.8370 | within 0.07 m, and 0.001 m at y = 6 m |
 
 SEEP/W's per-station values are Seequent's and are not reproduced, so the comparison column
 carries the bound the frames satisfy. Both unit-gradient plateaus land on SEEP/W's. What stands
@@ -1192,8 +1192,8 @@ side of the same (α, n), which the conductivity fit does not reach.
 
 **Sources:** GeoStudio SEEP/W example "Mineral Heap Leaching" (Seequent).
 
-<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=0, max_head_change_frac=0.05, points=0.1:2:1.2197;0.1:4:3.2165;0.1:6:5.2190, tolerance=0.03, benchmark=SEEPW-HEAP-ic -->
-<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=345600, max_head_change_frac=0.05, points=0.1:2:1.8055;0.1:4:3.8369;0.1:6:5.8370, tolerance=0.03, benchmark=SEEPW-HEAP-end -->
+<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=0, max_head_change_frac=0.05, points=0.1:2:1.2205;0.1:4:3.2179;0.1:6:5.2179, tolerance=0.03, benchmark=SEEPW-HEAP-ic -->
+<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=345600, max_head_change_frac=0.05, points=0.1:2:1.8003;0.1:4:3.8368;0.1:6:5.8370, tolerance=0.03, benchmark=SEEPW-HEAP-end -->
 
 ### ⊘ SEEPW-T06 — Infiltration into multi-layered system {#seepw-t06}
 
@@ -1245,8 +1245,8 @@ XSLOPE's own solved head field with SEEP/W's `node.csv` as the comparison.
 | t (s) | Stage base suction (m) | XSLOPE total head at y = 0.02 / 0.06 / 0.10 m | Nearest SEEP/W `node.csv` frame |
 |---|---|---|---|
 | 46,000 | −0.093 | −0.0932 / −0.0932 / −0.0930 | 46,650 s: −0.0932 / −0.0932 / −0.0931 |
-| 132,000 | −0.134 | −0.1341 / −0.1333 / −0.1187 | 133,130 s: −0.1386 / −0.1333 / −0.1190 |
-| 219,600 | −0.175 | −0.1740 / −0.1562 / −0.1292 | 219,600 s: −0.1740 / −0.1560 / −0.1294 |
+| 132,000 | −0.134 | −0.1341 / −0.1332 / −0.1187 | 133,130 s: −0.1386 / −0.1333 / −0.1190 |
+| 219,600 | −0.175 | −0.1740 / −0.1561 / −0.1292 | 219,600 s: −0.1740 / −0.1560 / −0.1294 |
 
 Both columns carry the same gradient through the sample at every reporting time: 0.0001 m
 apart at the first stage and 0.0002 m at the last, against the 0.102 m the base suction is
@@ -1256,8 +1256,8 @@ not; that accounts for all of the 0.0045 m in that row's first column, and the v
 pre-step frame reads −0.1341 m there, XSLOPE's value to four decimals.
 
 <!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=46000, points=0.003:0.02:-0.0932;0.003:0.06:-0.0932;0.003:0.1:-0.0930, tolerance=0.01, benchmark=SEEPW-T07-t46000 -->
-<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=132000, points=0.003:0.02:-0.1341;0.003:0.06:-0.1333;0.003:0.1:-0.1187, tolerance=0.01, benchmark=SEEPW-T07-t132000 -->
-<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=219600, points=0.003:0.02:-0.1740;0.003:0.06:-0.1562;0.003:0.1:-0.1292, tolerance=0.01, benchmark=SEEPW-T07-t219600 -->
+<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=132000, points=0.003:0.02:-0.1341;0.003:0.06:-0.1332;0.003:0.1:-0.1187, tolerance=0.01, benchmark=SEEPW-T07-t132000 -->
+<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=219600, points=0.003:0.02:-0.1740;0.003:0.06:-0.1561;0.003:0.1:-0.1292, tolerance=0.01, benchmark=SEEPW-T07-t219600 -->
 
 **Sources:** GeoStudio SEEP/W example "GeoStudio-PEST – Multistep Outflow" (Seequent).
 

@@ -66,7 +66,9 @@ coordinates being inputs like `time=`). So a wrong digit in one cell of an
 eleven-row table fails. Two restatements count as printing the lock, because
 each is the same number read the way the comparison is made: the value rounded
 to the page's own precision (`tag_round_dp`), and, for a `points` element, the
-pressure head ψ = h − y at that station.
+pressure head ψ = h − y at that station. A number behind a minus sign never prints a
+positive value: a head of 0.176 m is not printed by a head difference of
+−0.18 m.
 
 Most locks are factors of safety, and two are not. A `slip_depth` tag locks
 `expected_depth`, the depth of the critical slip surface below a stated point,

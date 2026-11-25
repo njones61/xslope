@@ -98,8 +98,14 @@ def _forms(v, dp):
 
 
 def _printed(v, body, dp):
-    """True when `body` prints the tag value `v` at some accepted precision."""
-    if any(re.search(r"(?<![\w.])" + re.escape(f) + r"(?![\w.])", body)
+    """True when `body` prints the tag value `v` at some accepted precision.
+
+    A printed number carrying a minus sign is a different number from the same
+    digits unsigned, so a positive form never matches inside one: a pressure
+    head of 0.176 m is not printed by a head difference of −0.18 m. The forward
+    pass reads the page with U+2212 folded to "-", so a "-" that does not follow
+    a digit is a sign; one between two digits is a range, and still matches."""
+    if any(re.search(r"(?<![\w.\u2212])(?<![^\d]-)" + re.escape(f) + r"(?![\w.])", body)
            for f in _forms(v, dp)):
         return True
     return bool("e" in v or "E" in v) and _sci_match(v, body)

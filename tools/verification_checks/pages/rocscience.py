@@ -87,6 +87,7 @@ CONFIG = PageConfig(
         ('−0.4', '| II | 5 |', '0.905', '0.909'),
         ('−0.3', '| III | 10 |', '1.042', '1.045'),
         ('−0.2', '| IV | 15 |', '1.152', '1.154'),
+        ('−0.4', '| pool +30 ft |', '1.596', '1.603'),
         # Cai & Ugai D1/D = 3: the two published values against each other
         ('+4.4', 'Slide sits 4.4% above the paper', '1.43', '1.37'),
     ],

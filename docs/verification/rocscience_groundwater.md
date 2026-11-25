@@ -29,23 +29,23 @@ Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
 <!-- test: file=files/rocscience_gw/gw001.xlsx, type=seep, target_size=0.2, expected_flowrate=2.500e-05, tolerance=0.02, benchmark=GW1-q -->
-<!-- test: file=files/rocscience_gw/gw001.xlsx, type=seep_head, target_size=0.2, points=2:2:4.052;4:2:4.150;6:2:4.030, tolerance=0.02, benchmark=GW1-h -->
+<!-- test: file=files/rocscience_gw/gw001.xlsx, type=seep_head, target_size=0.2, points=2:2:4.053;4:2:4.152;6:2:4.033, tolerance=0.02, benchmark=GW1-h -->
 <!-- test: file=files/rocscience_gw/gw002.xlsx, type=seep, target_size=0.10, expected_flowrate=4.534e-06, tolerance=0.02, benchmark=GW2-q -->
-<!-- test: file=files/rocscience_gw/gw002.xlsx, type=seep_head, target_size=0.10, points=4:1:0.500;4.5:0.866:0.381;5:0:0.263;6:0:0.202, tolerance=0.01, benchmark=GW2-h -->
+<!-- test: file=files/rocscience_gw/gw002.xlsx, type=seep_head, target_size=0.10, points=4:1:0.500;4.5:0.866:0.381;5:0:0.262;6:0:0.203, tolerance=0.01, benchmark=GW2-h -->
 <!-- test: file=files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.10, expected_flowrate=2.351e-07, tolerance=0.02, benchmark=GW3-q -->
 <!-- test: file=files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.10, points=0:-4:4.47;10:-4:3.40;14:-4:2.44;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
 <!-- test: file=files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.06, max_iter=2500, expected_flowrate=5.487e-08, tolerance=0.02, benchmark=GW4-q -->
-<!-- test: file=files/rocscience_gw/gw004.xlsx, type=seep_head, target_size=0.06, max_iter=2500, points=6:1:3.906;12:1:3.183;16:1:2.441;20:0.5:1.356, tolerance=0.01, benchmark=GW4-h -->
+<!-- test: file=files/rocscience_gw/gw004.xlsx, type=seep_head, target_size=0.06, max_iter=2500, points=6:1:3.906;12:1:3.183;16:1:2.441;20:0.5:1.354, tolerance=0.01, benchmark=GW4-h -->
 <!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep, target_size=0.5, expected_flowrate=8.165e-11, tolerance=0.05, benchmark=GW5-q -->
-<!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep_head, target_size=0.5, points=5:2:9.041;15:2:7.090;25:2:5.093;15:8:9.855;35:1:4.087, tolerance=0.05, benchmark=GW5-h -->
+<!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep_head, target_size=0.5, points=5:2:9.043;15:2:7.079;25:2:5.108;15:8:9.856;35:1:4.089, tolerance=0.05, benchmark=GW5-h -->
 <!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.808e-07, tolerance=0.05, benchmark=GW6a-q -->
-<!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.2516;26:2:7.2571;26:4:7.3727;26:6:7.5047, tolerance=0.05, benchmark=GW6a-h -->
+<!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.2516;26:2:7.2571;26:4:7.3728;26:6:7.5047, tolerance=0.05, benchmark=GW6a-h -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.692e-06, tolerance=0.05, benchmark=GW6b-q -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.5688;26:2:6.7452;26:4:7.2663;26:6:7.8577, tolerance=0.05, benchmark=GW6b-h -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.880e-08, tolerance=0.05, benchmark=GW6c-q -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7968;26:2:5.7863;26:4:6.3613;26:6:7.0788, tolerance=0.05, benchmark=GW6c-h -->
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.737e-07, tolerance=0.05, benchmark=GW6d-q -->
-<!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.8970;26:2:7.9161;26:4:8.0363;26:6:8.1847;26:8:8.4101;26:10:8.6738;26:12:9.1446, tolerance=0.05, benchmark=GW6d-h -->
+<!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.8969;26:2:7.9160;26:4:8.0362;26:6:8.1847;26:8:8.4101;26:10:8.6738;26:12:9.1446, tolerance=0.05, benchmark=GW6d-h -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.777e-07, tolerance=0.05, benchmark=GW6e-q -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.3539;26:2:8.3537;26:4:8.4092;26:6:8.4682, tolerance=0.05, benchmark=GW6e-h -->
 <!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.3070e-05, tolerance=0.05, benchmark=GW9a-q -->
@@ -71,7 +71,7 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 | # | Match | Problem | Results | Notes |
 |:---:|:-:|---|---|---|
 | [1](#gw1) | 🟢 | Shallow unconfined flow with rainfall | Crest x_a ≈ 4.1 vs Slide2 4.06 (~0.05 m) · h_max 4.61 vs Slide2 4.49 (~0.12 m), inside the 0.16 m Slide2 and RS2 differ by · Q = P·L = 2.5×10⁻⁵, exact by construction | slightly-high free-surface family, above Haar's Dupuit closed form (SEEP2D cross-check) |
-| [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide2 at every printed point · closed form matched within its own idealization error | |
+| [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0005 m of Slide2 at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide2 chart everywhere | |
 | [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 publishes both quantities and governs; x₁ turns on an unsaturated curve the vendor file does not store |
 | [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%) · solved pressure head inside Fig 5-4's own 1 m color bands at 46 of 49 grid points | chart-keyed target; the pressure-head field is read against Fig 5-4's color bands |
@@ -86,9 +86,9 @@ Match dots and status terms follow the shared [definitions](index.md#status-term
 | [14](#gw14) | <span class="nodata">⊘</span> | Unsaturated soil column | | *blocked* — the closed form assumes an exponential conductivity law XSLOPE does not implement |
 | [15](#gw15) | 🟢 | 1-D consolidation, uniform initial excess pore pressure | Isochrones within ≈0.3% of u₀ of the Terzaghi Eq 17.3 closed form | both cases |
 | [16](#gw16) | 🟢 | Pore pressure dissipation of stratified soil | Within ≈0.3–0.5% of u₀ of the recomputed Pyrah 1996 two-layer eigen-series | 3 cases |
-| [17](#gw17) | <span class="nodata">⊘</span> | Transient seepage, earth fill dam with toe drain | At 15 h XSLOPE's *h* = 7 front stands 1.1–1.8 m inside the upstream face against RS2's 1.5–3.3 m · the steady field reproduces RS2's Fig 19-5 total-head contours, and the 16383 h frame is still short of it, settling to within 0.01 m of steady by ≈5×10⁴ h | *unconfirmed* — the targets are contour plates with no tabulated profile, and the 16383 h frame is still short of steady where RS2 has arrived; both vendor stage times and the steady field are built, and the retention transcription that closed [GW20](#gw20) is measured here and moves the 15 h front by under 0.1 m |
-| [18](#gw18) | 🟢 | Transient seepage through an earth fill dam | Toe-slope total head within 0.058 m rms of the digitized RS2 Fig 20.5 profile at t = 0.6 h and 0.197 m rms at t = 19656 h, over 11 stations · XSLOPE's steady profile within 0.127 m rms of that chart's 19656 h curve | both vendor stage times and the steady field; the elastic *S*<sub>s</sub> acts in the saturated zone only, as Slide2's *m*<sub>v</sub> does — the term that sets the drainage time-scale of every transient row here |
-| [19](#gw19) | 🟢 | Transient seepage below a lagoon | Near-steady (11340 min) pressure head along the top boundary within 0.045 m rms of the digitized RS2 Fig 21.9 markers over 20 stations — under 1% of the driving head · early frames 0.07–0.35 m rms, XSLOPE's mound running slightly *ahead* of RS2's | all four frames; both vendor curves are reproduced rather than fitted, and the near-steady frame is checked against the vendor profile |
+| [17](#gw17) | <span class="nodata">⊘</span> | Transient seepage, earth fill dam with toe drain | At 15 h XSLOPE's *h* = 7 front stands 1.1–1.8 m inside the upstream face against RS2's 1.5–3.3 m · the steady field reproduces RS2's Fig 19-5 total-head contours, and the 16383 h frame is still short of it, settling to within 0.01 m of steady by ≈5.6×10⁴ h | *unconfirmed* — the targets are contour plates with no tabulated profile, and the 16383 h frame is still short of steady where RS2 has arrived; both vendor stage times and the steady field are built, and the retention transcription that closed [GW20](#gw20) is measured here and moves the 15 h front by under 0.1 m |
+| [18](#gw18) | 🟢 | Transient seepage through an earth fill dam | Toe-slope total head within 0.058 m rms of the digitized RS2 Fig 20.5 profile at t = 0.6 h and 0.204 m rms at t = 19656 h, over 11 stations · XSLOPE's steady profile within 0.127 m rms of that chart's 19656 h curve | both vendor stage times and the steady field; the elastic *S*<sub>s</sub> acts in the saturated zone only, as Slide2's *m*<sub>v</sub> does — the term that sets the drainage time-scale of every transient row here |
+| [19](#gw19) | 🟢 | Transient seepage below a lagoon | Near-steady (11340 min) pressure head along the top boundary within 0.041 m rms of the digitized RS2 Fig 21.9 markers over 20 stations — under 1% of the driving head · early frames 0.07–0.31 m rms, XSLOPE's mound running slightly *ahead* of RS2's | all four frames; both vendor curves are reproduced rather than fitted, and the near-steady frame is checked against the vendor profile |
 | [20](#gw20) | 🟢 | Transient seepage in a layered slope | Total head down RS2's own Fig 22.7 query line within 0.007 / 0.003 / 0.001 m rms of RS2's markers at 4.6 / 31 / 208 s over 21 stations · closer to each published series than the two are to each other at every frame | all three frames; storage is the vendor's straight water-content line, and the conductivity fit is placed over the suctions the model reaches |
 | [21](#gw21) | 🟢 | Transient seepage through a fully confined aquifer | Within ≈0.02 ft of the Ferris erfc closed form at 600 hr | both cases |
 
@@ -162,11 +162,11 @@ same points to the decimals both tables carry, so the two programs agree here.
 |---|---|---|---|---|
 | (4, 1) | 0.500 | 0.500 (0.000 m) | 0.500 (0.000 m) | 0.500 (0.000 m) |
 | (4.5, 0.866) | 0.381 | 0.381 (0.000 m) | 0.375 (+0.006 m) | 0.378 (+0.003 m) |
-| (5, 0) | 0.263 | 0.263 (0.000 m) | 0.250 (+0.013 m) | 0.277 (−0.014 m) |
-| (6, 0) | 0.202 | 0.203 (−0.001 m) | 0.188 (+0.014 m) | 0.213 (−0.011 m) |
+| (5, 0) | 0.262 | 0.263 (−0.001 m) | 0.250 (+0.012 m) | 0.277 (−0.015 m) |
+| (6, 0) | 0.203 | 0.203 (0.000 m) | 0.188 (+0.015 m) | 0.213 (−0.010 m) |
 | (8, 0) | 0.000 | 0.000 (0.000 m) | −0.031 (+0.031 m) | 0.000 (0.000 m) |
 
-The two finite-element solutions agree with each other within 0.0013 m everywhere; both depart
+The two finite-element solutions agree with each other within 0.0005 m everywhere; both depart
 from the closed form near the downstream edge, where the analytical solution assumes an
 infinite domain, so its −0.031 at the finite model's zero-head boundary measures that
 idealization rather than an error. The flowrate is held as a regression value on XSLOPE's own solve.
@@ -467,7 +467,7 @@ right place:
 
 | $y$ on the query line ($x=1.6$) | 1.00 | 0.85 | 0.70 | 0.65 | 0.60 | 0.30 | 0.00 |
 |---|---|---|---|---|---|---|---|
-| XSLOPE total head | 0.868 | 0.850 | 0.827 | 0.743 | 0.632 | 0.614 | 0.607 |
+| XSLOPE total head | 0.868 | 0.850 | 0.827 | 0.743 | 0.632 | 0.613 | 0.607 |
 | RS2 Fig 22.7 at 208 s | 0.862 | 0.845 | 0.832 | 0.730 | 0.628 | 0.610 | 0.605 |
 
 The second series on the same chart, the Fredlund & Rahardjo (1993) curve, runs a little
@@ -478,8 +478,8 @@ the flowrate (Q = q·L, exact by construction on the flux boundary) and a three-
 regression on the solved field.
 
 <!-- test: file=files/rocscience_gw/gw007.xlsx, type=seep, target_size=0.04, max_iter=1000, expected_flowrate=1.680e-04, tolerance=0.02, benchmark=GW7-q -->
-<!-- test: file=files/rocscience_gw/gw007.xlsx, type=seep_head, target_size=0.04, max_iter=1000, points=1:0.1:0.518;2:0.1:0.642;2.2:0.3:0.657, tolerance=0.02, benchmark=GW7-h -->
-<!-- test: file=files/rocscience_gw/gw007.xlsx, type=seep_head, target_size=0.04, max_iter=1000, points=1.6:0.05:0.608;1.6:0.3:0.614;1.6:0.6:0.632;1.6:0.8:0.844;1.6:1:0.868, tolerance=0.02, benchmark=GW7-q22 -->
+<!-- test: file=files/rocscience_gw/gw007.xlsx, type=seep_head, target_size=0.04, max_iter=1000, points=1:0.1:0.519;2:0.1:0.642;2.2:0.3:0.657, tolerance=0.02, benchmark=GW7-h -->
+<!-- test: file=files/rocscience_gw/gw007.xlsx, type=seep_head, target_size=0.04, max_iter=1000, points=1.6:0.05:0.608;1.6:0.3:0.613;1.6:0.6:0.632;1.6:0.8:0.844;1.6:1:0.868, tolerance=0.02, benchmark=GW7-q22 -->
 
 ![gw007: mesh and solved heads](images/gw007.png)
 
@@ -533,7 +533,7 @@ bias the [SEEP2D cross-check](#seep2d-crosscheck) documents across this panel. T
 (*q*·*L*, exact by construction) is checked together with the head at five stations.
 
 <!-- test: file=files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.4444e-05, tolerance=0.02, benchmark=GW8-q -->
-<!-- test: file=files/rocscience_gw/gw008.xlsx, type=seep_head, target_size=0.025, element_type=tri3, points=0.25:0.25:0.183;0.5:0.25:0.220;0.75:0.25:0.243;1:0.25:0.253;1:0.5:0.347, tolerance=0.01, benchmark=GW8-h -->
+<!-- test: file=files/rocscience_gw/gw008.xlsx, type=seep_head, target_size=0.025, element_type=tri3, points=0.25:0.25:0.184;0.5:0.25:0.220;0.75:0.25:0.244;1:0.25:0.252;1:0.5:0.347, tolerance=0.01, benchmark=GW8-h -->
 
 ### 🟢 GW9: Seepage through dam {#gw9}
 
@@ -753,10 +753,10 @@ $h_\text{ref}+u_0\,(u_e/u_0)$ at three depths and two time factors per case, tol
 
 ![gw015: Terzaghi isochrones, analytical vs XSLOPE](images/gw015.png)
 
-<!-- test: file=files/rocscience_gw/gw015a.xlsx, type=tseep_head, target_size=0.02, time=500, points=0.125:0.25:154.766;0.125:0.5:176.533;0.125:0.75:154.766, tolerance=0.6, benchmark=GW15a-t500 -->
-<!-- test: file=files/rocscience_gw/gw015a.xlsx, type=tseep_head, target_size=0.02, time=1000, points=0.125:0.25:132.924;0.125:0.5:146.551;0.125:0.75:132.924, tolerance=0.6, benchmark=GW15a-t1000 -->
-<!-- test: file=files/rocscience_gw/gw015b.xlsx, type=tseep_head, target_size=0.02, time=2000, points=0.125:0.25:170.955;0.125:0.5:154.766;0.125:0.75:129.887, tolerance=0.6, benchmark=GW15b-t2000 -->
-<!-- test: file=files/rocscience_gw/gw015b.xlsx, type=tseep_head, target_size=0.02, time=4000, points=0.125:0.25:143.010;0.125:0.5:132.924;0.125:0.75:117.821, tolerance=0.6, benchmark=GW15b-t4000 -->
+<!-- test: file=files/rocscience_gw/gw015a.xlsx, type=tseep_head, target_size=0.02, time=500, points=0.125:0.25:154.766;0.125:0.5:176.533;0.125:0.75:154.766, tolerance=0.6, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW15a-t500 -->
+<!-- test: file=files/rocscience_gw/gw015a.xlsx, type=tseep_head, target_size=0.02, time=1000, points=0.125:0.25:132.924;0.125:0.5:146.551;0.125:0.75:132.924, tolerance=0.6, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW15a-t1000 -->
+<!-- test: file=files/rocscience_gw/gw015b.xlsx, type=tseep_head, target_size=0.02, time=2000, points=0.125:0.25:170.955;0.125:0.5:154.766;0.125:0.75:129.887, tolerance=0.6, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW15b-t2000 -->
+<!-- test: file=files/rocscience_gw/gw015b.xlsx, type=tseep_head, target_size=0.02, time=4000, points=0.125:0.25:143.010;0.125:0.5:132.924;0.125:0.75:117.821, tolerance=0.6, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW15b-t4000 -->
 
 ### 🟢 GW16: Pore-pressure dissipation in stratified soil {#gw16}
 
@@ -798,12 +798,12 @@ is temporal.
 
 ![gw016: Pyrah two-layer isochrones, recomputed series vs XSLOPE](images/gw016.png)
 
-<!-- test: file=files/rocscience_gw/gw016a.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:816.227;0.25:0.5:653.176;0.25:0.75:402.084, tolerance=4.0, benchmark=GW16a-t0.2 -->
-<!-- test: file=files/rocscience_gw/gw016a.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:442.557;0.25:0.5:362.188;0.25:0.75:241.899, tolerance=4.0, benchmark=GW16a-t0.5 -->
-<!-- test: file=files/rocscience_gw/gw016b.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:1046.604;0.25:0.5:1013.431;0.25:0.75:562.623, tolerance=6.0, benchmark=GW16b-t0.2 -->
-<!-- test: file=files/rocscience_gw/gw016b.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:945.851;0.25:0.5:916.037;0.25:0.75:512.850, tolerance=6.0, benchmark=GW16b-t0.5 -->
-<!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:601.928;0.25:0.5:340.125;0.25:0.75:255.692, tolerance=6.0, benchmark=GW16c-t0.2 -->
-<!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:181.529;0.25:0.5:131.238;0.25:0.75:119.462, tolerance=6.0, benchmark=GW16c-t0.5 -->
+<!-- test: file=files/rocscience_gw/gw016a.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:816.227;0.25:0.5:653.176;0.25:0.75:402.084, tolerance=4.0, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW16a-t0.2 -->
+<!-- test: file=files/rocscience_gw/gw016a.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:442.557;0.25:0.5:362.188;0.25:0.75:241.899, tolerance=4.0, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW16a-t0.5 -->
+<!-- test: file=files/rocscience_gw/gw016b.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:1046.604;0.25:0.5:1013.431;0.25:0.75:562.623, tolerance=6.0, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW16b-t0.2 -->
+<!-- test: file=files/rocscience_gw/gw016b.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:945.851;0.25:0.5:916.037;0.25:0.75:512.850, tolerance=6.0, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW16b-t0.5 -->
+<!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:601.928;0.25:0.5:340.125;0.25:0.75:255.692, tolerance=6.0, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW16c-t0.2 -->
+<!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:181.529;0.25:0.5:131.238;0.25:0.75:119.462, tolerance=6.0, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW16c-t0.5 -->
 
 ### ⊘ GW17: Transient seepage through an earth fill dam with a toe drain {#gw17}
 
@@ -836,9 +836,9 @@ ramp at **1.5 to 3.3 m**: the reservoir raise has barely entered the fill in bot
 **The late frame is a timing difference, not a field difference.** XSLOPE's steady total-head
 field reproduces Fig 19-5 as described — reservoir head 10 drawn down through the dam to the
 toe drain at 0, phreatic surface descending to the drain — but it is not yet fully there at
-16383 h, where RS2 essentially is. XSLOPE's four station heads read 6.35 / 6.55 / 3.96 / 2.93
-there against a steady 7.06 / 7.25 / 5.77 / 4.21, settling to within 0.01 m of steady by
-$\approx5\times10^{4}$ h; the two stations furthest from steady sit between the crest and the
+16383 h, where RS2 essentially is. XSLOPE's four station heads read 6.331 / 6.535 / 3.973 / 2.909
+there against a steady 7.061 / 7.250 / 5.765 / 4.212, settling to within 0.01 m of steady by
+$\approx5.6\times10^{4}$ h; the two stations furthest from steady sit between the crest and the
 drain, where the drain paces the last of the drawdown. At 238 nodes this is one of the coarsest
 transient meshes in the corpus, and a triangulation change moves those station heads by a few
 tenths of a meter while leaving the shape of the field unchanged, which is why the station
@@ -849,8 +849,8 @@ read with Fig 19-5's key it places the 15 h front at the wrong end of the dam.*
 
 ![gw017: steady total-head field vs Fig 19-5](images/gw017.png)
 
-<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=15, max_head_change_frac=0.25, points=26:4:2.103;26:8:2.134;32:10:1.518;36:8:1.028, tolerance=0.15, benchmark=GW17-t15 -->
-<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=16383, max_head_change_frac=0.25, points=26:4:6.346;26:8:6.548;32:10:3.955;36:8:2.928, tolerance=0.15, benchmark=GW17-t16383 -->
+<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=15, max_head_change_frac=0.25, points=26:4:2.105;26:8:2.131;32:10:1.537;36:8:0.994, tolerance=0.15, benchmark=GW17-t15 -->
+<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=16383, max_head_change_frac=0.25, points=26:4:6.331;26:8:6.535;32:10:3.973;36:8:2.909, tolerance=0.15, benchmark=GW17-t16383 -->
 <!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=200000, max_head_change_frac=0.25, points=26:4:7.061;26:8:7.250;32:10:5.765;36:8:4.212, tolerance=0.15, benchmark=GW17-tsteady -->
 
 ### 🟢 GW18: Transient seepage through an earth fill dam {#gw18}
@@ -890,19 +890,19 @@ profile is solved and checked as a third frame.
 | RS2 Fig 20.5, $t=0.6$ h | 2.887 | 2.775 | 2.687 | 2.560 | 2.448 | 2.323 | 2.177 | 2.047 | 1.882 | 1.680 | 1.406 |
 | XSLOPE, $t=0.6$ h | 2.862 | 2.756 | 2.637 | 2.510 | 2.380 | 2.253 | 2.107 | 1.960 | 1.810 | 1.636 | 1.368 |
 | RS2 Fig 20.5, $t=19656$ h | 8.330 | 8.001 | 7.639 | 7.238 | 6.794 | 6.286 | 5.683 | 4.970 | 4.019 | 3.014 | 2.009 |
-| XSLOPE, $t=19656$ h | 8.051 | 7.718 | 7.360 | 6.979 | 6.570 | 6.112 | 5.540 | 4.838 | 4.000 | 3.084 | 2.000 |
+| XSLOPE, $t=19656$ h | 8.043 | 7.709 | 7.350 | 6.969 | 6.560 | 6.103 | 5.532 | 4.833 | 4.000 | 3.083 | 2.000 |
 | XSLOPE, steady | 8.128 | 7.805 | 7.456 | 7.079 | 6.668 | 6.201 | 5.613 | 4.886 | 4.000 | 3.086 | 2.000 |
 
 | frame | rms | worst |
 |---|---|---|
 | $t=0.6$ h vs RS2 Fig 20.5 at 0.6 h | 0.058 m | 0.087 m |
-| $t=19656$ h vs RS2 Fig 20.5 at 19656 h | 0.197 m | **0.283 m** |
+| $t=19656$ h vs RS2 Fig 20.5 at 19656 h | 0.204 m | **0.292 m** |
 | XSLOPE steady vs RS2 Fig 20.5 at 19656 h | 0.127 m | 0.202 m |
 
 **The two solutions agree on the shape of the steady profile and on the timing of the
 approach to it, and differ by about 0.2 m of head along it** — at the ≈0.2 m the chart can be
 read to in rms, and past it over the upper third of the slope. By 19656 h XSLOPE has closed
-to 0.073 m rms of its own steady profile, the same "already steady" state the chart's
+to 0.080 m rms of its own steady profile, the same "already steady" state the chart's
 19656 h curve represents. At 228 nodes this is one of the coarsest transient meshes in the corpus,
 and its station heads move under a triangulation change by the same order as the gap to the
 digitized curve.
@@ -917,7 +917,7 @@ acts above the water table governs the drainage time-scale outright.
 ![gw018: toe-slope total head, XSLOPE against the digitized RS2 Fig 20.5](images/gw018.png){width=800px}
 
 <!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=0.6, max_head_change_frac=0.25, points=30:11:2.756;35:8.5:2.460;40:6:2.107;45:3.5:1.707, tolerance=0.15, benchmark=GW18-t0.6 -->
-<!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=19656, max_head_change_frac=0.25, points=30:11:7.718;35:8.5:6.823;40:6:5.540;45:3.5:3.422, tolerance=0.15, benchmark=GW18-t19656 -->
+<!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=19656, max_head_change_frac=0.25, points=30:11:7.709;35:8.5:6.813;40:6:5.532;45:3.5:3.422, tolerance=0.15, benchmark=GW18-t19656 -->
 <!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=60000, max_head_change_frac=0.25, points=30:11:7.805;35:8.5:6.923;40:6:5.613;45:3.5:3.424, tolerance=0.15, benchmark=GW18-tsteady -->
 
 ### 🟢 GW19: Transient seepage below a lagoon {#gw19}
@@ -947,15 +947,15 @@ markers sit at the initial water table and its lagoon markers at the 1 m of pond
 digitized against those it resolves to ≈0.005 m.
 
 **The near-steady frame.** Against RS2's own markers at 20 stations along the top boundary,
-XSLOPE's 11340 min profile agrees to **0.045 m rms and 0.126 m at worst** — under 1% of the
+XSLOPE's 11340 min profile agrees to **0.041 m rms and 0.128 m at worst** — under 1% of the
 driving head. Five of those stations are checked.
 
 | $x$ (m) | 3 | 6 | 10 | 14 | 19 |
 |---|---|---|---|---|---|
-| XSLOPE pressure head | −0.37 | −1.83 | −2.73 | −3.54 | −4.15 |
-| RS2 Fig 21.9 | −0.48 (+0.10) | −1.79 (−0.05) | −2.76 (+0.03) | −3.57 (+0.04) | −4.18 (+0.02) |
+| XSLOPE pressure head | −0.44 | −1.78 | −2.73 | −3.56 | −4.15 |
+| RS2 Fig 21.9 | −0.48 (+0.04) | −1.79 (+0.01) | −2.76 (+0.03) | −3.57 (+0.02) | −4.18 (+0.03) |
 
-**The early frames.** These track less closely than the near-steady one — 0.35 / 0.14 /
+**The early frames.** These track less closely than the near-steady one — 0.31 / 0.09 /
 0.07 m rms at 73 / 416 / 792 min — and the residual has a consistent sign: XSLOPE's mound runs
 slightly *ahead* of RS2's, and the lead closes monotonically as the field fills.
 
@@ -966,11 +966,11 @@ lead is what remains once both curves are the vendor's own.
 
 ![gw019: pressure head along the top boundary, XSLOPE against the digitized RS2 Fig 21.9](images/gw019.png){width=800px}
 
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=73, max_head_change_frac=0.25, points=1:8:6.088;3:8:5.417;1:5:5.033, tolerance=0.15, benchmark=GW19-t73 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=416, max_head_change_frac=0.25, points=1:8:7.706;3:8:6.960;1:5:5.924, tolerance=0.15, benchmark=GW19-t416 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=792, max_head_change_frac=0.25, points=1:8:8.113;3:8:7.416;1:5:6.464, tolerance=0.15, benchmark=GW19-t792 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=1:8:9.470;3:8:9.028;1:5:8.626, tolerance=0.15, benchmark=GW19-t11340 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=3:10:9.626;6:10:8.166;10:10:7.266;14:10:6.465;19:10:5.846, tolerance=0.15, benchmark=GW19-top-t11340 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=73, max_head_change_frac=0.25, points=1:8:6.174;3:8:5.349;1:5:5.019, tolerance=0.15, benchmark=GW19-t73 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=416, max_head_change_frac=0.25, points=1:8:7.759;3:8:6.871;1:5:5.903, tolerance=0.15, benchmark=GW19-t416 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=792, max_head_change_frac=0.25, points=1:8:8.153;3:8:7.330;1:5:6.437, tolerance=0.15, benchmark=GW19-t792 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=1:8:9.487;3:8:8.981;1:5:8.604, tolerance=0.15, benchmark=GW19-t11340 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=3:10:9.559;6:10:8.222;10:10:7.268;14:10:6.443;19:10:5.854, tolerance=0.15, benchmark=GW19-top-t11340 -->
 
 ### 🟢 GW20: Transient seepage in a layered slope {#gw20}
 
@@ -1021,19 +1021,19 @@ published series at the same frame.**
 | frame | XSLOPE vs RS2 | XSLOPE vs Fredlund & Rahardjo | RS2 vs Fredlund & Rahardjo |
 |---|---|---|---|
 | $t$ = 4.6 s | 0.007 m rms, 0.026 m worst | 0.012 m rms, 0.045 m worst | 0.018 m rms, 0.071 m worst |
-| $t$ = 31 s | 0.003 m rms, 0.007 m worst | 0.052 m rms, 0.064 m worst | 0.054 m rms, 0.065 m worst |
+| $t$ = 31 s | 0.003 m rms, 0.006 m worst | 0.052 m rms, 0.064 m worst | 0.054 m rms, 0.065 m worst |
 | $t$ = 208 s | 0.001 m rms, 0.002 m worst | 0.017 m rms, 0.030 m worst | 0.018 m rms, 0.031 m worst |
 
 What residual there is against RS2 sits at the top of the line: at 4.6 s the crest station
-accounts for 0.026 m of it and the next for 0.011 m, with the other 19 within 0.006 m; at
-31 s and 208 s the largest anywhere is 0.007 m and 0.002 m. The crest is where the rainfall
+accounts for 0.026 m of it and the next for 0.013 m, with the other 19 within 0.006 m; at
+31 s and 208 s the largest anywhere is 0.006 m and 0.002 m. The crest is where the rainfall
 enters and the wetting front is still inside the top element, and it is also where RS2 departs
 furthest from its own reference:
 
 | total head at the crest, $y=1.0$ | XSLOPE | RS2, Fig 22.7 | Fredlund & Rahardjo, Fig 22.7 | Slide2, Fig 20.7 |
 |---|---|---|---|---|
 | $t$ = 4.6 s | 0.417 | 0.392 | 0.462 | ≈0.43 |
-| $t$ = 31 s | 0.612 | 0.605 | 0.652 | ≈0.67 |
+| $t$ = 31 s | 0.611 | 0.605 | 0.652 | ≈0.67 |
 | $t$ = 208 s | 0.863 | 0.862 | 0.877 | ≈0.89 |
 
 The fourth column is the same problem in the Slide2 manual, whose Fig 20.7 draws Slide2's own
@@ -1048,7 +1048,7 @@ Seven stations of the query line are checked at each of the three report times.
 |---|---|---|---|---|---|---|---|
 | XSLOPE, $t$ = 4.6 s | 0.417 | 0.373 | 0.362 | 0.329 | 0.306 | 0.303 | 0.302 |
 | RS2 Fig 22.7, $t$ = 4.6 s | 0.392 | 0.375 | 0.365 | 0.332 | 0.308 | 0.303 | 0.302 |
-| XSLOPE, $t$ = 31 s | 0.612 | 0.593 | 0.582 | 0.498 | 0.418 | 0.405 | 0.400 |
+| XSLOPE, $t$ = 31 s | 0.611 | 0.593 | 0.581 | 0.498 | 0.418 | 0.405 | 0.400 |
 | RS2 Fig 22.7, $t$ = 31 s | 0.605 | 0.588 | 0.577 | 0.495 | 0.418 | 0.404 | 0.400 |
 | XSLOPE, $t$ = 208 s | 0.863 | 0.846 | 0.832 | 0.730 | 0.629 | 0.611 | 0.605 |
 | RS2 Fig 22.7, $t$ = 208 s | 0.862 | 0.845 | 0.832 | 0.730 | 0.628 | 0.610 | 0.605 |
@@ -1056,7 +1056,7 @@ Seven stations of the query line are checked at each of the three report times.
 ![gw020: total head down the query line, XSLOPE against both RS2 Fig 22.7 series](images/gw020.png){width=800px}
 
 <!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=4.6, max_head_change_frac=0.25, points=1.6:1:0.417;1.6:0.85:0.373;1.6:0.7:0.362;1.6:0.65:0.329;1.6:0.6:0.306;1.6:0.3:0.303;1.6:0:0.302, tolerance=0.15, benchmark=GW20-t4.6 -->
-<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=31, max_head_change_frac=0.25, points=1.6:1:0.612;1.6:0.85:0.593;1.6:0.7:0.582;1.6:0.65:0.498;1.6:0.6:0.418;1.6:0.3:0.405;1.6:0:0.400, tolerance=0.15, benchmark=GW20-t31 -->
+<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=31, max_head_change_frac=0.25, points=1.6:1:0.611;1.6:0.85:0.593;1.6:0.7:0.581;1.6:0.65:0.498;1.6:0.6:0.418;1.6:0.3:0.405;1.6:0:0.400, tolerance=0.15, benchmark=GW20-t31 -->
 <!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=208, max_head_change_frac=0.25, points=1.6:1:0.863;1.6:0.85:0.846;1.6:0.7:0.832;1.6:0.65:0.730;1.6:0.6:0.629;1.6:0.3:0.611;1.6:0:0.605, tolerance=0.15, benchmark=GW20-t208 -->
 
 ### 🟢 GW21: Transient flow in a fully confined aquifer {#gw21}
@@ -1078,8 +1078,8 @@ The check holds the closed-form head at five stations, tolerance 0.05 ft.
 
 ![gw021: Ferris confined-aquifer profile, erfc vs XSLOPE](images/gw021.png){width=800px}
 
-<!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, benchmark=GW21a -->
-<!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, benchmark=GW21b -->
+<!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW21a -->
+<!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, precision=tolerance, precision_reason=the tag holds the closed-form value and the solve differs from it by the discretization error the tolerance covers, benchmark=GW21b -->
 
 ## SEEP2D cross-check: free-surface daylight point {#seep2d-crosscheck}
 

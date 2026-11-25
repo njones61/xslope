@@ -1081,8 +1081,8 @@ Slide2 counterpart: [VP71](rocscience.md#vp71) (= Slide2 VP71, not
 
 | Method | XSLOPE | RS2 SSRM | Referee | XSLOPE LEM |
 |---|---|---|---|---|
-| SSRM (vp071a, FE seepage) | 1.111 | 1.12 (−0.8%) | 1.138 (−2.4%) | 1.132 |
-| SSRM (vp071b, piezo approximation) | 1.111 | 1.12 (−0.8%) | 1.141 (−2.6%) | 1.132 |
+| SSRM (vp071a, FE seepage) | 1.111 | 1.12 (−0.8%) | 1.138 (−2.4%) | Bishop 1.135 / Spencer 1.135 |
+| SSRM (vp071b, piezo approximation) | 1.111 | 1.12 (−0.8%) | 1.141 (−2.6%) | Bishop 1.132 / Spencer 1.133 |
 
 The seepage case runs on a tri6 mesh.
 
@@ -2644,9 +2644,9 @@ pressure on the whole submerged surface and pore pressures from the piezometric 
 
 | Method | XSLOPE | RS2 SSRM (Part IV VP70) | RS2 SSRM (Part II §35, native) | D&W referee | Slide2 | XSLOPE LEM |
 |---|---|---|---|---|---|---|
-| SSRM (3.0 m mesh) | 1.594 | 1.58 (+0.9%) | 1.64 (−2.8%) | 1.60 (−0.4%) | Bishop 1.603 / Spencer 1.599 | Bishop 1.596 / Spencer 1.593 |
+| SSRM (3.0 m mesh) | 1.594 | 1.58 (+0.9%) | 1.64 (−2.8%) | 1.60 (−0.4%) | Bishop 1.603 / Spencer 1.599 | Bishop 1.596 / Spencer 1.594 |
 
-*The XSLOPE LEM values are identical at both pool depths.*
+*The XSLOPE LEM values agree to within 0.001 at both pool depths.*
 
 The pond-load and pore-pressure treatments balance over the submerged surface, the same check the
 [VP70](rocscience.md#vp70) LEM row makes.

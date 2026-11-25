@@ -236,17 +236,17 @@ MUTATIONS = [
 
     # ---------------------------------------------------- list-valued locks ---
     ("geostudio", "tags", "G5 one step of a printed 11-value FS row is wrong",
-     "| 1 | 0.25 | 1.585 | 1.579 (+0.006) |",
-     "| 1 | 0.25 | 1.595 | 1.579 (+0.006) |"),
+     "| 1 | 0.25 | 1.586 | 1.579 (+0.007) |",
+     "| 1 | 0.25 | 1.596 | 1.579 (+0.007) |"),
     ("geostudio", "tags", "G6 one element of the FS list tag drifts",
-     "expected=1.686;1.585;", "expected=1.686;1.595;"),
+     "expected=1.688;1.586;", "expected=1.688;1.596;"),
     ("geostudio", "tags", "G7 a printed head cell drifts from its probe",
-     "| (5, 2) | t = 240 d (near-steady) | 6.476 m |",
-     "| (5, 2) | t = 240 d (near-steady) | 6.486 m |"),
+     "| (5, 2) | t = 240 d (near-steady) | 6.472 m |",
+     "| (5, 2) | t = 240 d (near-steady) | 6.482 m |"),
     ("rocscience_groundwater", "tags",
      "G8 a printed pressure head drifts from its total-head probe",
-     "| XSLOPE pressure head | −0.37 | −1.83 |",
-     "| XSLOPE pressure head | −0.37 | −1.93 |"),
+     "| XSLOPE pressure head | −0.44 | −1.78 |",
+     "| XSLOPE pressure head | −0.44 | −1.88 |"),
     ("rocscience_groundwater", "tags",
      "G9 a printed value drops out of a partly published probe set",
      "| XSLOPE, $t=0.6$ h | 2.862 | 2.756 |",
@@ -254,7 +254,7 @@ MUTATIONS = [
     ("rocscience_groundwater", "tags",
      "G10 a probe set publishes one more than it declares",
      "Sampled at five elevations, XSLOPE's",
-     "Sampled at five elevations (the crest station reads 2.103 m), XSLOPE's"),
+     "Sampled at five elevations (the crest station reads 2.105 m), XSLOPE's"),
 
     # ---------------------------------------- slip-surface depth locks -----
     # A slip-surface depth is locked the way a factor of safety is — the tag
@@ -350,11 +350,18 @@ NEGATIVE = [
      CAP_ANCHOR + " XSLOPE has no staged construction: staged excavation is "
      "outside a slope program's scope."),
     ("rocscience_groundwater", "tags",
-     "N1 a list element reprinted at the tag's own precision",
-     "read 6.35 / 6.55", "read 6.346 / 6.55"),
+     "N1 a list element reprinted at the page's two places",
+     "read 6.331 / 6.535", "read 6.33 / 6.535"),
+    # A positive tag value is not printed by the same digits behind a minus
+    # sign: before the forward pass read signs, T03's slow end-state head 3.715
+    # (declared unprinted) was "found" in a head difference of −3.72 m.
+    ("geostudio", "tags", "N8 a negative number does not print a positive lock",
+     "The interior field tracks SEEP/W to within",
+     "A drop of −3.72 m here is a different number.\n\n"
+     "The interior field tracks SEEP/W to within"),
     ("rocscience_groundwater", "tags",
      "N2 a pressure head reprinted one place finer",
-     "| XSLOPE pressure head | −0.37 |", "| XSLOPE pressure head | −0.374 |"),
+     "| XSLOPE pressure head | −0.44 |", "| XSLOPE pressure head | −0.441 |"),
     # A banned word inside a code span, a file name or a URL is not prose, and a
     # "now sits" describing a variant of the model is ordinary English.  A voice
     # check that fired on these would push the pages toward avoiding words rather

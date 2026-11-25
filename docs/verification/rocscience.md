@@ -184,7 +184,7 @@ Full bibliographic details for the author-year citations on this page are on the
 <!-- test: file=files/rocscience/vp084d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.152, fs_spencer=1.131, benchmark=VP84-IV -->
 <!-- test: file=files/rocscience/vp071a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.135, fs_spencer=1.135, benchmark=VP71-seep -->
 <!-- test: file=files/rocscience/vp071b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.133, benchmark=VP71-piezo -->
-<!-- test: file=files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
+<!-- test: file=files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.594, benchmark=VP70-p30 -->
 <!-- test: file=files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
 <!-- test: file=files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.195, fs_janbu=1.163, benchmark=VP74 -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=single_circle, num_slices=60, fs_oms=1.506, fs_bishop=1.652, fs_spencer=1.724, fs_mprice=1.734, benchmark=VP77-seep-circle -->
@@ -238,7 +238,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [28](#vp28) | 🟢 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | Congress St.: Bishop 1.129 vs Slide 1.128 (+0.1%) · embankment, interface: Bishop 1.159 vs Slide 1.160 (−0.1%) · embankment, base: Bishop 1.178 vs Slide 1.185 (−0.6%) | 3 of Chowdhury & Xu's 10 cases; all ten are compared at [SLOPE/W §2.17](geostudio.md) |
 | [29](#vp29) | 🟢 | Submerged slope, homogenous, probabilistic analysis, water table | Spencer 1.145 vs Slide 1.157 (−1.0%) · Spencer 1.145 vs Duncan 1.17 (−2.1%) |  |
 | [30](#vp30) | 🟢 | Reinforced embankment, (4) materials, tension crack, geosynthetic | circle A: Bishop 1.689 vs Slide 1.69 (−0.1%) · circle B: Bishop 1.655 vs Slide 1.66 (−0.3%) | the manual specifies Bishop for this problem |
-| [31](geostudio.md#gs-2-18) | 🟢 | Reinforced embankment, (5) materials, geosynthetic | M-P 1.153 vs SLOPE/W 1.171 (−1.5%) · M-P 1.153 vs Borges & Cardoso 1.15 (+0.3%) · Bishop 1.154 vs SLOPE/W 1.170 (−1.4%) | *covered* — Borges & Cardoso Case 2, built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) (identical embankment c'=0, φ'=35, γ=20; soft-clay layers Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding; unanchored 200 kN/m geosynthetic at δ=33.7°). Slide2's own Circle A/B read 1.18 / 1.16 (Borges 1.19 / 1.15); the VP30 reverse-curvature blocker does not arise here. |
+| [31](geostudio.md#gs-2-18) | 🟢 | Reinforced embankment, (5) materials, geosynthetic | M-P 1.155 vs SLOPE/W 1.171 (−1.4%) · M-P 1.155 vs Borges & Cardoso 1.15 (+0.4%) · Bishop 1.156 vs SLOPE/W 1.170 (−1.2%) | *covered* — Borges & Cardoso Case 2, built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) (identical embankment c'=0, φ'=35, γ=20; soft-clay layers Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding; unanchored 200 kN/m geosynthetic at δ=33.7°). Slide2's own Circle A/B read 1.18 / 1.16 (Borges 1.19 / 1.15); the VP30 reverse-curvature blocker does not arise here. |
 | [32](#vp32) | 🟢 | Reinforced embankment, (7) materials, geosynthetic | H = 7, circle A: Bishop 1.220 vs Slide 1.23 (−0.8%) · circle B: Bishop 1.217 vs Slide 1.22 (−0.2%) · H = 8.75, circle C: Bishop 0.982 vs Slide 0.98 (+0.2%) |  |
 | [33](#vp33) | 🟢 | Dike, (5) materials, probabilistic analysis, water table | Bishop 1.321 vs Slide 1.305 (+1.2%) | deterministic factor of safety; composite critical surface. El-Ramly et al.'s own deterministic Bishop, 1.30, rests on measured band pore pressures the model does not carry and is shown, not scored; the 1.31 the manual quotes is their Monte Carlo mean. The probability of failure sits about two times above the paper's simplified-analysis figure, 1.6×10⁻². |
 | [34](#vp34) | 🟢 | Dam, (3) materials, probabilistic analysis, water table | M-P 2.384 vs Wolff & Harr 2.36 (+1.0%) | deterministic factor of safety; the Phase I COV of 124% is outside the Taylor series' domain |
@@ -277,7 +277,7 @@ Full bibliographic details for the author-year citations on this page are on the
 | [67](#vp67) | 🟢 | Embankment, (2) materials | Spencer 1.317 vs Slide 1.328 (−0.8%) · Spencer 1.317 vs USACE 1.33 (−1.0%) |  |
 | [68](#vp68) | 🟢 | Embankment, (3) materials, ponded water | Bishop 1.236 vs Slide 1.241 (−0.4%) | Spencer's base-tension guard declines this surface |
 | [69](#vp69) | 🟢 | Embankment, (2) materials, water table, ponded water | Spencer 2.013 vs Slide 2.026 (−0.6%) · Bishop 1.999 vs USACE 2.01 (−0.5%) |  |
-| [70](#vp70) | 🟢 | Submerged slope, homogenous, water table, ponded water | pool +30 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) · pool +60 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) | identical FS at both pools — the depth-independence reproduces exactly |
+| [70](#vp70) | 🟢 | Submerged slope, homogenous, water table, ponded water | pool +30 ft: Spencer 1.594 vs Slide 1.599 (−0.3%) · pool +60 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) | FS at both pools to within 0.001 — the depth-independence reproduces |
 | [71](#vp71) | 🟢 | Slope, homogenous, finite element groundwater seepage analysis, water table | FE seepage: Spencer 1.135 vs Slide 1.141 (−0.5%) · piezometric line: Spencer 1.133 vs Slide 1.142 (−0.8%) | the two pore-pressure models agree with each other |
 | [72](#vp72) | 🟢 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | FE seepage, tangent 197: Spencer 1.341 vs Slide 1.312 (+2.2%) · piezometric line: Spencer 1.563 vs Slide 1.557 (+0.4%) |  |
 | [73](#vp73) | 🟢 | Excavated slope, (4) materials, tension crack | Spencer 1.766 vs Slide 1.758 (+0.5%) · Spencer 1.766 vs D&W 1.76 (+0.3%) |  |
@@ -1895,10 +1895,10 @@ Slide #70 / Duncan & Wright (2005) Fig. 6.27: a fully submerged homogeneous slop
 
 | Case | Method | XSLOPE | Slide | D&W |
 |---|---|---|---|---|
-| pool +30 ft | Bishop / Spencer | 1.596 / 1.593 | 1.603 / 1.599 (−0.4% / −0.4%) | 1.60 (−0.3% / −0.4%) |
+| pool +30 ft | Bishop / Spencer | 1.596 / 1.594 | 1.603 / 1.599 (−0.4% / −0.3%) | 1.60 (−0.3% / −0.4%) |
 | pool +60 ft | Bishop / Spencer | 1.596 / 1.593 | 1.603 / 1.599 (−0.4% / −0.4%) | 1.60 (−0.3% / −0.4%) |
 
-*xslope reproduces the depth-independence exactly (identical FS at both pools) — a direct check on the consistency of the pond-load and pore-pressure treatments.*
+*xslope reproduces the depth-independence: the factors of safety at the two pools agree to within 0.001 — a direct check on the consistency of the pond-load and pore-pressure treatments.*
 
 ![vp070a: inputs and representative solution](images/vp070a.png)
 ![vp070b: inputs and representative solution](images/vp070b.png)

@@ -17,7 +17,7 @@ instead, one per material zone, and the base of the model is whatever the polygo
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>~30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to enter geometry as material-zone polygons: when
@@ -285,8 +285,8 @@ However you built it, the model is now the same:
 
 The two zones are filled in their materials' colors, the hatched line under them
 is the base of the domain — falling left to right across the whole section — and
-the two dashed red arcs are the starting circles. Their radius arrows run off the
-top of the frame: the center the two share, (20, 40), sits above it.
+the two dashed red arcs are the starting circles. Both radius arrows start at
+the red cross at (20, 40), the center the two circles share.
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, with the slice count left at 40:
@@ -306,7 +306,7 @@ circle in red:
 
 ![The circular search](images/lem06_search.png){width=1000}
 
-**FS = 1.244**, on a circle centered at (18.28, 43.84) with a radius of 43.84.
+**FS = 1.245**, on a circle centered at (18.27, 43.41) with a radius of 43.41.
 Notice how the gray family thins out and stops as it approaches the hatched
 line: a circle that would cut below the domain is not a surface this model
 has, so the dipping base bounds what the search can try.
@@ -319,15 +319,15 @@ Its lowest point is at elevation 0.000 — tangent to the contact between the tw
 soils, running along the top of the foundation without entering it. All 40 slice
 bases carry c = 400 psf, the fill's strength (the green bars are the effective
 normal stress on each base; the dashed red curve is the line of thrust), and
-the sliding mass weighs 60,960 lb/ft. The dipping base is nowhere near it:
+the sliding mass weighs 60,559 lb/ft. The dipping base is nowhere near it:
 beneath the circle's lowest point the bedrock is at −10.98, so this answer
 would be the same under a level base at any elevation below −11. Solved on its
 own, the deeper of the two starting circles — the deepest that fits — comes to
-1.655, carrying 167,130 lb/ft against the critical circle's 60,960 and still a
+1.656, carrying 167,120 lb/ft against the critical circle's 60,559 and still a
 third safer, because everything it adds is foundation at twice the fill's
 cohesion.
 
-<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.655, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=1.656, tolerance=0.005 -->
 
 The solution has the interslice-tension and line-of-thrust warnings a φ = 0
 crest produces, which are diagnosed and fixed with a tension crack in
@@ -339,12 +339,12 @@ Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.244 | 1.244 | 1.314 | 1.326 | 1.285 | 1.244 | 1.244 |
+| 1.245 | 1.245 | 1.314 | 1.327 | 1.286 | 1.245 | 1.245 |
 
-<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
+<!-- test: file=../lem/files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.245, fs_bishop=1.245, fs_janbu=1.314, fs_corps=1.327, fs_lowe=1.286, fs_spencer=1.245, fs_mprice=1.245, tolerance=0.005 -->
 
 The four that satisfy moment equilibrium — OMS, Bishop, Spencer and
-Morgenstern-Price — land on the same circle and the same 1.244; with φ = 0 they
+Morgenstern-Price — land on the same circle and the same 1.245; with φ = 0 they
 give the same factor of safety on any circle. The three force-equilibrium procedures each settle on
 a flatter, larger-radius circle of their own and come out 3–7% higher. Spencer
 satisfies both force and moment equilibrium and is the one to report.
@@ -367,9 +367,9 @@ the Run LEM dialog has a checkbox for exactly that: **Composite surfaces
 
 ![Spencer on the truncated circle](images/lem06_solution_composite.png){width=1000}
 
-**FS = 1.685.** The surface follows the arc down until it meets the bedrock at
+**FS = 1.687.** The surface follows the arc down until it meets the bedrock at
 x = 11.87, runs *along* the bedrock for 22.3 ft to x = 34.10, and climbs back out
-on the arc — 11 of its 41 slice bases sitting on the dipping base itself, each
+on the arc — 9 of its 39 slice bases sitting on the dipping base itself, each
 inclined at the base's own 3.4° rather than at the circle's tangent. A surface
 built this way is a **composite surface**; the mechanics are in
 [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces).
@@ -380,26 +380,28 @@ In a profile-line model the bottom is the maximum depth — a limit on how deep
 the search looks — and truncating circles against a limit chosen for the search
 has no physical meaning.
 
-Running the search itself with the box ticked returns **1.244**, on the same
+Running the search itself with the box ticked returns **1.245**, on the same
 circle as before. Nothing changed, because the critical mechanism here never
 approaches the base. The option matters where the failure follows the base.
 
 ### A weak foundation {#when-the-base-decides}
 
 Which layer is weak is a property of the soils, not of the geometry. Now we give
-the foundation c = 300 psf — below the fill's 400 — with everything else
-unchanged, and search again:
+the foundation c = 300 psf — below the fill's 400 — and search again, with the
+model otherwise as it was built: set the first circle's **Depth** back to
+`-10.7887` and untick **Composite surfaces** before running:
 
 ![Spencer on the same section with a weak foundation](images/lem06_solution_weak.png){width=1000}
 
-**FS = 0.783**, and the mechanism is a different one: the critical circle now
-bottoms out at elevation −10.85, grazing the bedrock, with 153,546 lb/ft of soil
+**FS = 0.784**, and the mechanism is a different one: the critical circle now
+bottoms out at elevation −10.85, grazing the bedrock, with 159,732 lb/ft of soil
 above it and most of its base in the foundation. This is the mechanism the deep
 starting circle was placed for, and the search reached it from that seed.
 
-We run this one with composite surfaces on: it returns 0.781 — two tenths of a
-percent. A 3.4° dip is gentle enough that an ordinary circle can follow it
-closely for most of its length, so there is little left for truncation to add.
+We run this one with composite surfaces on: it returns 0.783, less than two
+tenths of a percent lower. A 3.4° dip is gentle enough that an ordinary circle
+can follow it closely for most of its length, so there is little left for
+truncation to add.
 The difference is larger on a
 base that is steep or irregular, or on a soft seam lying directly on rock, where
 the mechanism runs flat along the boundary for tens of feet and no circle can

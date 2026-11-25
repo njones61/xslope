@@ -71,13 +71,13 @@ from it finds the deep mechanism:
 
 ![Spencer on the deep foundation surface](images/lem10_solution_deep.png){width=1000}
 
-**FS = 1.376**, on a circle centered at (16.90, 26.22) with a radius of 46.22 —
+**FS = 1.377**, on a circle centered at (16.90, 26.22) with a radius of 46.22 —
 tangent to the limiting depth at elevation −20, entering at the crest and exiting
-21 ft beyond the toe, 105.7 ft of failure surface carrying 204,041 lb/ft of soil.
+21 ft beyond the toe, 106.0 ft of failure surface carrying 204,000 lb/ft of soil.
 The starting circle is only a starting point — solved as entered it gives
-1.426, and the search deepens and lengthens it to 1.376.
+1.427, and the search deepens and lengthens it to 1.377.
 
-<!-- test: file=../lem/files/xslope_mult_min_KEY.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.376, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_mult_min_KEY.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.377, tolerance=0.005 -->
 
 ### Changing the starting circle {#move-the-seed-and-the-answer-moves}
 
@@ -126,13 +126,13 @@ Back in **Run LEM…**, tick the box and set the depth to `5`:
 
 ![The Run LEM dialog with the surficial filter on](images/lem10_studio_run_lem_filtered.png)
 
-From the embankment seed, the search now returns **1.455**, on a circle of
-radius 39.5 ft that stays inside the fill — deeper than the sliver it rejected, still clear
+From the embankment seed, the search now returns **1.456**, on a circle of
+radius 38.7 ft that stays inside the fill — deeper than the sliver it rejected, still clear
 of the foundation:
 
 ![Spencer on the filtered fill circle](images/lem10_solution_filter5.png){width=1000}
 
-Only at 8 ft does the embankment seed reach 1.376. The filter sets which
+Only at 8 ft does the embankment seed reach 1.377. The filter sets which
 surfaces are admissible; the starting circles set which of them the search
 examines. Commercial searches have the same filter for the same reason: on
 [verification problem VP107](../verification/rocscience.md#vp107), Slide2's
@@ -145,7 +145,7 @@ reporting the answer.
 One search over both circles does not report both mechanisms. A seeded search
 scores each starting circle's own neighborhood first and then refines only the
 best-scoring one, so with the deep circle and the embankment circle together on
-the sheet it follows the deep one and returns **1.376**, in either row order. The
+the sheet it follows the deep one and returns **1.377**, in either row order. The
 1.299 sliver is the lower of the two answers and a single seeded run does not
 reach it. A competing mechanism is found by running a search from each starting
 circle — the two runs above — or by the grid seeding of [Part B](#grid-search);
@@ -188,12 +188,12 @@ Click **Run**:
 
 ![Spencer from the single mid-depth seed](images/lem10_vp75_single.png){width=1000}
 
-**FS = 1.744**, with no warnings: the circle bottoms on the base of the model,
+**FS = 1.743**, with no warnings: the circle bottoms on the base of the model,
 cuts all three clays, and converged cleanly. It exits through the berm, however,
 and the berm is there to resist that mechanism, so a surface that passes beneath
 the berm also needs to be checked.
 
-<!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.744, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.743, tolerance=0.005 -->
 
 ### Grid search
 
@@ -210,17 +210,17 @@ Run again:
 
 ![Spencer with grid seeding](images/lem10_vp75_grid.png){width=1000}
 
-**FS = 1.420**, on a wider circle that runs under the berm and daylights beyond
-it — 19% below the single seed's answer, against Slide's 1.464 and Duncan &
+**FS = 1.421**, on a wider circle that runs under the berm and daylights beyond
+it — 18% below the single seed's answer, against Slide's 1.464 and Duncan &
 Wright's (2005) published 1.45. The wrongly seeded search missed by far more than the
 published values differ among themselves, and it reported nothing
-unusual. The full **Generate starting circles…** set also finds 1.420 with the
+unusual. The full **Generate starting circles…** set also finds 1.421 with the
 2 m filter on — the deep member of the per-layer family reaches it, as the
 per-layer rule of [LEM-3](lem03_layered_slope.md#guarding-against-local-minima)
 intends. Grid search is the version of that rule that does not depend on any
 circle having been placed at all.
 
-<!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.420, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_james_bay.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.421, tolerance=0.005 -->
 
 ---
 
@@ -252,11 +252,11 @@ entered with no search:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.354 | 1.434 | 1.417 | 1.719 | 1.524 | 1.426 | 1.431 |
+| 1.355 | 1.435 | 1.418 | 1.721 | 1.525 | 1.427 | 1.432 |
 
-<!-- test: file=../lem/files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.354, fs_bishop=1.434, fs_janbu=1.417, fs_corps=1.719, fs_lowe=1.524, fs_spencer=1.426, fs_mprice=1.431 -->
+<!-- test: file=../lem/files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.355, fs_bishop=1.435, fs_janbu=1.418, fs_corps=1.721, fs_lowe=1.525, fs_spencer=1.427, fs_mprice=1.432, tolerance=0.005 -->
 
-Spencer's 1.426 is the value the starting circle gave before the search moved it.
-On the same slices Morgenstern-Price agrees with Spencer to 0.4% and Bishop to
+Spencer's 1.427 is the value the starting circle gave before the search moved it.
+On the same slices Morgenstern-Price agrees with Spencer to 0.3% and Bishop to
 0.6%, Janbu is 0.6% lower and the Ordinary Method of Slices (OMS) 5.0% lower. Lowe
-& Karafiath and the Corps of Engineers method come out 6.9% and 20.5% higher.
+& Karafiath and the Corps of Engineers method come out 6.9% and 20.6% higher.

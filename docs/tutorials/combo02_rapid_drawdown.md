@@ -33,7 +33,7 @@ set the three answers side by side.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium + seepage</p></div>
-<div class="tgt-tile"><span class="tg-label">Build &amp; run</span><p>~35 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Build &amp; run</span><p>~45 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn what the three-stage rapid-drawdown procedure computes and
@@ -620,6 +620,12 @@ face**, select its rows and click **Remove selected**. Click **OK**. Set 1 is
 untouched: it holds the reservoir boundary the schedule drives, and the transient run
 starts from its steady solution.
 
+Removing boundary blocks clears the mesh, so build it again before going on.
+Switch the mode strip to **Seepage** (`Ctrl+2`), click **Run → Build Mesh…**, and
+build with the same settings as before: **Linear triangles (tri3)**, with
+**Auto-size from geometry** ticked at **100** size divisions. It comes out at
+the same 2,080 nodes and 3,923 triangles.
+
 Left on the file Set 2 changes nothing the run computes, and the drawdown run
 below adds a second warning, which sorts above the d / ψ one — *"Boundary set 2 carries 2 specified
 head(s) and 0 specified flux(es), but this rapid drawdown reads BOTH its stages
@@ -630,8 +636,7 @@ from the transient seepage analysis"*:
 ### The pool schedule and the stage times
 
 The storage properties set how the dam responds; the schedule sets what the
-reservoir does. Switch to **Seepage** and click **Transient** in the Inputs
-dock.
+reservoir does. Click **Transient** in the Inputs dock.
 
 ![The schedule, with both stage times filled](images/combo02_studio_run_transient.png)
 
@@ -705,15 +710,17 @@ the steady run — and then prints a line per saved frame:
   t=400: frame saved (steps so far=145, mass-balance closure=1.50e-04)
   t=600: frame saved (steps so far=176, mass-balance closure=1.46e-04)
   t=800: frame saved (steps so far=210, mass-balance closure=1.43e-04)
-  t=1000: frame saved (steps so far=232, mass-balance closure=1.42e-04)
+  t=1000: frame saved (steps so far=233, mass-balance closure=1.42e-04)
 ```
 
 **Twelve frames** come out of the run, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
 600, 800 and 1000: the union of the save-interval grid, the extra
 save times, the schedule's own breakpoints, and the two stage times. The run
-took **232 steps**, and their distribution shows where the field changes:
+took about **233 steps**, and their distribution shows where the field changes:
 **59 of them, 25%, are inside the first 50 days**, which are 5% of the run's
 duration. The field moves while the pool is falling and barely at all afterward.
+Step counts like these can differ by a few between computers; the frames the
+drawdown reads, and the factors of safety below, do not.
 
 The two frames the drawdown will read are the first and the fourth. The
 **Seep · Transient** tab holds one frame at a time, so we step its play bar back

@@ -1903,7 +1903,7 @@ def scaled_sensitivity(slope_data, params, method='spencer', search=True,
 def variance_contribution(slope_data, method='spencer', circular=True, rapid=False,
                           search=True, progress_callback=None, cancel_check=None,
                           fs_tol=None, tol=None, max_iter=None, composite=False,
-                          seed='circles'):
+                          seed='circles', num_slices=None):
     """Per-parameter contribution to Var(FS), reusing the Taylor-series reliability
     machinery in :func:`xslope.advanced.reliability` (not reimplemented).
 
@@ -1918,14 +1918,15 @@ def variance_contribution(slope_data, method='spencer', circular=True, rapid=Fal
     Returns (success, result). ``result['bars']`` is one dict per uncertain
     parameter (``label``, ``param``, ``variance``, ``pct`` = % of Var(FS),
     ``cumulative`` = running % after sorting, ``delta_F``, ``sigma``), plus
-    ``sigma_F``, ``F_MLV``, ``COV_F`` and ``method``.
+    ``sigma_F``, ``F_MLV``, ``COV_F`` and ``method``. ``num_slices`` goes to the
+    reliability run unchanged (``None`` keeps its defaults).
     """
     from .advanced import reliability
     ok, res = reliability(slope_data, method, rapid=rapid, circular=circular,
                           debug_level=-1, search=search,
                           progress_callback=progress_callback, cancel_check=cancel_check,
                           fs_tol=fs_tol, tol=tol, max_iter=max_iter,
-                          composite=composite, seed=seed)
+                          composite=composite, seed=seed, num_slices=num_slices)
     if not ok:
         return False, res
     bars = []

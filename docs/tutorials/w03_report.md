@@ -51,8 +51,11 @@ zoned embankment with a shell, a keyed clay core and a foundation, under 60 ft o
 water. Eight companion files sit beside it: `..._mesh.json` holds the mesh all
 three analyses share, `..._seep.csv` the steady head and pore pressure at every
 node, and six `..._fem_*` files the strength reduction solution and the mechanism
-it failed on. Download the workbook and its companions into one folder, then open
-the workbook with **File → Open…**.
+it failed on. The workbook's **Download** link saves all nine files as one project
+package, `xslope_johnson_res_solved.xslz`. Open the package with **File → Open…**
+and click **Unpack and Open**: Studio unpacks the nine files into a folder beside
+the package and opens the workbook from there
+([`.xslz` packages](building_models.md#sending-a-project-xslz-packages)).
 
 Studio reads those companions on open, so the seepage and finite element
 solutions are attached before anything is run. A report **documents** an
@@ -83,8 +86,8 @@ Three groups sit on the left — Output, Limit equilibrium analysis, and Title
 page — and a contents tree on the right. Every field opens on a default that
 works; this report changes the methods and the title page, and nothing else.
 
-**Output.** **Format** stays on Word (`.docx`), the one format reports come in
-today. **Save
+**Output.** **Format** stays on `Word document (.docx)`, the one format reports
+come in; the `PDF (.pdf)` item under it is grayed out. **Save
 as** defaults to `<model>_report.docx` beside the model. **Template** reads
 *Shipped template*, which gives the layout we want here; the company template
 below changes it. Leave all three.

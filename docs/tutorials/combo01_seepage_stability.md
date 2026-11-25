@@ -138,17 +138,18 @@ seepage dialog. Click **Run → Run Seep…**
 The **Model checks** panel shows the preflight report for this run, and on this
 model it reports **No problems found for this run.** Leave **Convergence tol** at
 `0.0001` and **Max iterations** at `400`, and click **Run**. The unconfined
-iteration settles in **24 iterations**, the last of them
-[Newton steps](../seep/overview.md#newton-steps), and the run is over almost as
-soon as it starts. The Log pane's closing lines show the last Newton step and the
-convergence it reached:
+iteration settles in about **27 iterations**, and the run is over almost as soon
+as it starts. The Log pane's closing lines show the last iteration it printed and
+the convergence it reached:
 
 ```text
-Iteration 23: Newton step, residual = 1.306733e-12
-Iteration 23: Newton steps settled; the next iteration tests the exit face
-Converged in 24 iterations (residual = 2.302e-12, closure = 5.964e-11, exit face stable)
-Flow closure check: inflow = 6.506577e-01, outflow = 6.506577e-01, error = 6.782352e-13
+Iteration 25: residual = 4.631814e-03, closure = 4.268e-03, relax = 0.500, 1/52 exit face active
+Converged in 27 iterations (residual = 1.119e-03, closure = 8.304e-04, exit face stable)
+Flow closure check: inflow = 6.506483e-01, outflow = 6.506202e-01, error = 2.818074e-05
 ```
+
+Iteration counts like this one can differ by a few between computers, and the
+residuals printed beside them differ with them; the discharge does not.
 
 ![The seepage solution](images/combo01_seepage.png){width=1000}
 
@@ -209,7 +210,8 @@ at its saturated unit weight.
 The model checks catch the omission both ways. A material set to `seep` on a
 model that has no solved field is an **error** that blocks the run — *"takes
 pore pressure from a seepage solution (u = seep), but this model carries no
-pore-pressure field"* — so the sequence cannot be run backwards. A solved field
+mesh"* on the file as first opened, and *"…carries no pore-pressure field"* once
+a mesh is built but not yet solved — so the sequence cannot be run backwards. A solved field
 that no material reads raises a **warning** — *"This model carries a solved
 seepage field, but no material takes its pore pressure from it"* — and the run
 is allowed, because a total stress analysis on a wet section is a legitimate
@@ -244,7 +246,7 @@ lines read:
 [↻ iteration 10] center=(505.97, 258.32), FS=1.2763, grid=1.4927
 [✓ converged] Iter=10, FS=1.2763 (ΔFS<0.0005) at (x=505.97, y=258.32, depth=78.17), elapsed time=4.72 seconds
 Critical FS = 1.276
-Sliding mass = 1,279,440.5 lb/ft over 284.28 ft of failure surface
+Sliding mass = 1,279,440.6 lb/ft over 284.28 ft of failure surface
 ```
 
 ![Spencer's critical circle](images/combo01_lem_solution.png){width=1000}

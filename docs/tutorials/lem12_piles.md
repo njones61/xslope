@@ -8,7 +8,7 @@ description: "A 20 ft clay slope stabilized by two rows of drilled shafts in XSL
 This tutorial shows how to model stabilizing piles in a limit equilibrium
 analysis. The example is a 20 ft slope in medium-stiff clay that stands at a
 factor of safety of 1.149 on its own; two rows of 2 ft drilled shafts
-through the face bring it to 1.842. The pile force is not entered anywhere
+through the face bring it to 1.845. The pile force is not entered anywhere
 in the model. XSLOPE computes it instead — the lateral force the soil can
 push onto each pile, from the pile diameter and the center-to-center
 spacing, by the Ito & Matsui (1975) method — and recomputes it for every
@@ -125,26 +125,26 @@ and **Analysis** = `Auto search`, with the slice count left at 40:
 ![The Run LEM dialog on the loaded model](images/lem12_studio_run_lem.png)
 
 Click **Run**. The circle in the file runs along the rigid base and gives
-2.643; the search does not stay down there, settling instead on a smaller circle
-whose lowest point is 4.90 ft above the base, at 1.842. The position of the
+2.645; the search does not stay down there, settling instead on a smaller circle
+whose lowest point is 4.94 ft above the base, at 1.845. The position of the
 surface sets where it crosses each pile row, and that crossing sets the
 Ito & Matsui force the row provides. The plot draws every circle it tried in
 gray with the one it kept in red:
 
 ![The Spencer search with the pile rows in place](images/lem12_search.png){width=1000}
 
-<!-- test: file=../lem/files/xslope_piles.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=2.643, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=single_circle, circle_index=0, method=spencer, num_slices=40, expected_fs=2.645, tolerance=0.005 -->
 
-**FS = 1.842**, on a circle centered at (3.79, 26.69) with a radius of 31.79,
-tangent at elevation −5.10. The solution plot draws that surface with its base
+**FS = 1.845**, on a circle centered at (3.79, 27.05) with a radius of 32.11,
+tangent at elevation −5.06. The solution plot draws that surface with its base
 stresses and marks the two points where it cuts the piles:
 
 ![Spencer on the surface the search found](images/lem12_solution.png){width=1000}
 
-The surface enters 13.5 ft out in front of the toe, exits 14.9 ft behind the
-crest and carries 62,198 lb/ft of clay on 61.27 ft of base. The two red dots are
-the pile crossings, at elevation −5.07 on the lower shaft and −4.48 on the upper
-one — 10.07 ft and 14.48 ft of soil above the surface at each pile, which is the
+The surface enters 13.5 ft out in front of the toe, exits 15.1 ft behind the
+crest and carries 62,436 lb/ft of clay on 61.59 ft of base. The two red dots are
+the pile crossings, at elevation −5.03 on the lower shaft and −4.44 on the upper
+one — 10.02 ft and 14.44 ft of soil above the surface at each pile, which is the
 depth the force is computed over.
 
 The Log pane prints the computed forces with the answer — one line per pile
@@ -152,18 +152,18 @@ row, running from the soil force through the capacity that governed it to
 the force each row applies:
 
 ```text
-Critical FS = 1.842
-Sliding mass = 62,198.1 lb/ft over 61.27 ft of failure surface
-Pile row 'lower row': Ito & Matsui soil force = 44,178 lb per pile; bending governs (Mcap/Lm, Lm = 3.94) -> 15,244 lb per pile = 2,540.7 lb/ft applied
-Pile row 'upper row': Ito & Matsui soil force = 81,729 lb per pile; bending governs (Mcap/Lm, Lm = 5.47) -> 10,962 lb per pile = 1,827.0 lb/ft applied
-Total pile resistance = 4,367.6 lb/ft
+Critical FS = 1.845
+Sliding mass = 62,436.4 lb/ft over 61.59 ft of failure surface
+Pile row 'lower row': Ito & Matsui soil force = 43,843 lb per pile; bending governs (Mcap/Lm, Lm = 3.92) -> 15,307 lb per pile = 2,551.2 lb/ft applied
+Pile row 'upper row': Ito & Matsui soil force = 81,370 lb per pile; bending governs (Mcap/Lm, Lm = 5.46) -> 10,987 lb per pile = 1,831.2 lb/ft applied
+Total pile resistance = 4,382.5 lb/ft
 ```
 
 The **Analysis Report** (**File → Generate Report…**) contains the same
 numbers in full: the pile inputs echoed, with `H` reading *computed* rather
 than a number, and the slice table's **H<sub>p</sub>** column — *pile
 resistance mobilized at the slice base, per unit thickness* — placing
-**2,540.7** and **1,827.0 lb/ft** on the two slices the rows cross
+**2,551.2** and **1,831.2 lb/ft** on the two slices the rows cross
 ([Analysis Report](../studio/reports.md)).
 
 The sections below explain those Log lines: where the soil force comes from,
@@ -171,7 +171,7 @@ and what "bending governs" means for the shafts.
 
 ### Contribution of each pile row {#what-the-two-rows-are-worth}
 
-FS = 1.842 describes the reinforced slope, but it does not say what the
+FS = 1.845 describes the reinforced slope, but it does not say what the
 piles contributed. To measure that we make two comparisons: first the slope
 without any piles, then the same surface with each row removed in turn.
 
@@ -182,10 +182,10 @@ gives the slope on its own:
 ![Spencer on the same slope with no piles](images/lem12_solution_nopiles.png){width=1000}
 
 **FS = 1.149** on a shallower circle from the toe, tangent at elevation −0.04,
-moving 21,166 lb/ft against the 62,198 on the surface found with the pile
+moving 21,514 lb/ft against the 62,436 on the surface found with the pile
 rows in place. The piles raise the
-factor of safety by 0.69, and they also change the failure mechanism: the surface the
-search settles on with them present is deeper, longer and three times the mass,
+factor of safety by 0.70, and they also change the failure mechanism: the surface the
+search settles on with them present is deeper, longer and nearly three times the mass,
 because the shallower one now has two shafts across it.
 
 To separate the two rows' contributions, we fix the surface. On the
@@ -194,10 +194,10 @@ search, only which piles are present changing** — we remove each row on its ow
 
 | Piles present | Spencer FS |
 | --- | :---: |
-| Neither | 1.481 |
-| Lower row only | 1.675 |
-| Upper row only | 1.613 |
-| Both | 1.842 |
+| Neither | 1.482 |
+| Lower row only | 1.677 |
+| Upper row only | 1.615 |
+| Both | 1.845 |
 
 The lower row contributes slightly more than the upper one on this surface even
 though it is the shallower of the two, because its crossing sits nearer the toe
@@ -227,21 +227,21 @@ pushing on the pile. On the critical surface above:
 
 | | Lower row | Upper row |
 | --- | :---: | :---: |
-| Depth to the surface, z<sub>f</sub> (ft) | 10.07 | 14.48 |
-| Soil force per pile, F<sub>pile</sub> (lb) | 44,178 | 81,729 |
-| Soil force per foot of slope, F<sub>pile</sub>/S (lb/ft) | 7,363.0 | 13,621.5 |
+| Depth to the surface, z<sub>f</sub> (ft) | 10.02 | 14.44 |
+| Soil force per pile, F<sub>pile</sub> (lb) | 43,843 | 81,370 |
+| Soil force per foot of slope, F<sub>pile</sub>/S (lb/ft) | 7,307.2 | 13,561.7 |
 
 The deeper the surface, the larger the force: the upper row, whose head
 stands 5 ft higher on the
-face, has 44% more soil above the surface and develops 85% more force per shaft.
+face, has 44% more soil above the surface and develops 86% more force per shaft.
 [Piles and Concrete Piers](../piles/lem.md#ito-matsui-1975-theory)
 gives the derivation, the coefficients in full and the φ = 0 and c = 0 special
 cases; the method is applicable for S/D between about **2 and 8**, and this
 model's S/D = 3 sits in the middle of that band.
 
 These are the forces the soil can deliver, not the forces the run applied.
-The Log lines show 2,540.7 and 1,827.0 lb/ft — a fraction of the 7,363.0
-and 13,621.5 computed above. The difference is the structural capacity of
+The Log lines show 2,551.2 and 1,831.2 lb/ft — a fraction of the 7,307.2
+and 13,561.7 computed above. The difference is the structural capacity of
 the shafts, which we take up next.
 
 ---
@@ -259,17 +259,17 @@ On the critical surface both shafts are governed by bending:
 
 | | Lower row | Upper row |
 | --- | :---: | :---: |
-| Soil force per pile (lb) | 44,178 | 81,729 |
+| Soil force per pile (lb) | 43,843 | 81,370 |
 | Shear limit, V<sub>cap</sub> (lb) | 46,000 | 46,000 |
-| Moment arm, L<sub>m</sub> (ft) | 3.94 | 5.47 |
-| Bending limit, M<sub>cap</sub>/L<sub>m</sub> (lb) | 15,244 | 10,962 |
-| Force used, per pile (lb) | 15,244 | 10,962 |
-| Force used, per foot of slope (lb/ft) | 2,540.7 | 1,827.0 |
+| Moment arm, L<sub>m</sub> (ft) | 3.92 | 5.46 |
+| Bending limit, M<sub>cap</sub>/L<sub>m</sub> (lb) | 15,307 | 10,987 |
+| Force used, per pile (lb) | 15,307 | 10,987 |
+| Force used, per foot of slope (lb/ft) | 2,551.2 | 1,831.2 |
 
 The lower shaft's soil force is inside its shear capacity and still nearly three
 times what its section can carry in bending; the upper shaft exceeds both — by
-78% in shear and by a factor of seven and a half in bending. The caps cut the
-delivered force by 65% and 87%, and the deeper pile — the one the soil pushes
+77% in shear and by a factor of 7.4 in bending. The caps cut the
+delivered force by 65% and 86%, and the deeper pile — the one the soil pushes
 hardest on — ends up delivering *less* than the shallower one, because its
 pressure centroid sits further above the failure surface and the same moment
 capacity gives a smaller force at a longer arm.
@@ -280,16 +280,16 @@ changing**:
 
 | Capacities given | ΣH (lb/ft) | Spencer FS |
 | --- | :---: | :---: |
-| Vcap and Mcap (as shipped) | 4,367.6 | 1.842 |
-| Mcap only | 4,367.6 | 1.842 |
-| Vcap only | 15,029.7 | 4.207 |
-| Neither | 20,984.6 | 12.739 |
+| Vcap and Mcap (as shipped) | 4,382.5 | 1.845 |
+| Mcap only | 4,382.5 | 1.845 |
+| Vcap only | 14,973.8 | 4.172 |
+| Neither | 20,868.8 | 12.143 |
 
 Bending alone reproduces the answer from the file exactly, so the moment
 capacity alone limits the force on this surface. Without the caps, the soil
-force gives a factor of safety of 12.739 on a slope that stands at 1.149 without
-the piles — an answer that requires the two shafts to carry three and seven and
-a half times the moment their sections are designed for.
+force gives a factor of safety of 12.143 on a slope that stands at 1.149 without
+the piles — an answer that requires the two shafts to carry nearly three and more
+than seven times the moment their sections are designed for.
 
 ---
 
@@ -304,15 +304,15 @@ carry it. The Ito & Matsui force is not a shared demand; it is the
 largest force the sliding soil can press onto one pile before it squeezes
 through the gap and escapes downhill. A narrower gap makes that harder, so
 the soil loads each pile more, not less — the sweep below
-measures one pile carrying 188,549 lb at 3 ft spacing, four times what the
-same pile carries at 6 ft. The limiting cases are consistent with this: spread
+measures one pile carrying 187,205 lb at 3 ft spacing, more than four times what
+the same pile carries at 6 ft. The limiting cases are consistent with this: spread
 far apart, the shafts are isolated posts the slope flows around; pushed
 together until they touch, they are a wall, and a wall resists more per
 foot than any row of separated posts.
 
 The analysis then works per foot of slope: one pile serves S feet of it,
 so the force per foot is the per-pile force divided by the spacing. At 6 ft
-that is 44,178 / 6 = 7,363 lb/ft; at 3 ft it is 188,549 / 3 = 62,850.
+that is 43,843 / 6 = 7,307 lb/ft; at 3 ft it is 187,205 / 3 = 62,402.
 Changing only the spacing raised the per-foot force 8.5-fold: a factor
 of 4.3 because the arching raised the per-pile force, and the remaining
 factor of 2 because the divisor is the spacing itself.
@@ -330,18 +330,18 @@ capacities and reaches the slices:
 
 | S (ft) | S/D | A₁ (ft) | A₂ (ft) | Soil force per pile (lb) | ΣH used (lb/ft) | Spencer FS |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 3 | 1.5 | 41.709 | 17.181 | 188,549 / 336,891 | 8,386.6 | 2.354 |
-| 4 | 2.0 | 15.184 | 7.526 | 76,378 / 138,639 | 6,405.7 | 2.072 |
-| 5 | 2.5 | 9.792 | 5.564 | 53,579 / 98,345 | 5,192.2 | 1.929 |
-| 6 | 3.0 | 7.569 | 4.755 | 44,178 / 81,729 | 4,367.6 | 1.842 |
-| 8 | 4.0 | 5.621 | 4.046 | 35,938 / 67,165 | 3,316.3 | 1.741 |
-| 10 | 5.0 | 4.741 | 3.725 | 32,217 / 60,588 | 2,673.4 | 1.684 |
-| 12 | 6.0 | 4.241 | 3.544 | 30,104 / 56,854 | 2,239.4 | 1.648 |
-| 16 | 8.0 | 3.695 | 3.345 | 27,796 / 52,774 | 1,690.7 | 1.604 |
+| 3 | 1.5 | 41.709 | 17.181 | 187,205 / 335,487 | 8,414.9 | 2.359 |
+| 4 | 2.0 | 15.184 | 7.526 | 75,818 / 138,047 | 6,427.4 | 2.076 |
+| 5 | 2.5 | 9.792 | 5.564 | 53,179 / 97,918 | 5,209.8 | 1.932 |
+| 6 | 3.0 | 7.569 | 4.755 | 43,843 / 81,370 | 4,382.5 | 1.845 |
+| 8 | 4.0 | 5.621 | 4.046 | 35,660 / 66,865 | 3,327.6 | 1.743 |
+| 10 | 5.0 | 4.741 | 3.725 | 31,965 / 60,315 | 2,682.6 | 1.686 |
+| 12 | 6.0 | 4.241 | 3.544 | 29,867 / 56,597 | 2,247.1 | 1.650 |
+| 16 | 8.0 | 3.695 | 3.345 | 27,575 / 52,534 | 1,696.5 | 1.606 |
 
 The arching coefficients fall steeply as the gap opens — A₁ loses nine tenths of
 its value between S/D = 1.5 and 8 — and the force per foot of slope falls with
-them, from 8,386.6 lb/ft to 1,690.7. The table touches both limits of
+them, from 8,414.9 lb/ft to 1,696.5. The table touches both limits of
 the applicable band. The top row, at S/D = 1.5, is below it: that close, the
 row acts more like a continuous wall than a line of piles soil can flow
 between. (A wall itself is modeled the other way — a pile line with its
@@ -352,8 +352,8 @@ a wall has no gaps for the soil to arch across.) The bottom row sits at the band
 wider, the arching the theory is built on fades away and the computed force
 overestimates what the row can develop. XSLOPE warns about this before the run: enter
 the 3 ft spacing and the **Model checks** panel warns that S/D = 1.5 is
-below the S/D of about 2 to 8 the theory is applicable for, and the Log adds
-a warning at solve time that the computed force is very large.
+below the S/D of about 2 to 8 the theory is applicable for; opening **Run LEM…**
+also prints a warning in the Log that the computed force is very large.
 
 Widening the spacing does not only lower the number on this surface. Searching
 the model at 12 ft — a separate search with its own critical surface — finds a
@@ -361,13 +361,13 @@ different critical surface:
 
 ![Spencer at 12 ft spacing](images/lem12_solution_wide.png){width=1000}
 
-**FS = 1.409**, and the surface is not the deep one the table's 1.648 was measured
-on: it leaves the toe, reaches 10.1 ft below the ground at its deepest, exits
-8.5 ft behind the crest, and carries 20,525 lb/ft against the deep surface's
-62,198. At 6 ft spacing this shallower surface stood above 1.842 — the deep
+**FS = 1.410**, and the surface is not the deep one the table's 1.650 was measured
+on: it leaves the toe, reaches 9.7 ft below the ground at its deepest, exits
+7.7 ft behind the crest, and carries 19,343 lb/ft against the deep surface's
+62,436. At 6 ft spacing this shallower surface stood above 1.845 — the deep
 circle was more critical, because the rows crossing the shallower surface
 provided enough force to keep its factor of safety higher. At 12 ft they
-provide less, and it drops to 1.409 and becomes the critical surface. Widening
+provide less, and it drops to 1.410 and becomes the critical surface. Widening
 the spacing did not just lower the factor of safety on the deep circle; it
 changed which surface governs. For this reason the fixed-surface sweep shows
 only the trend, and any spacing actually being considered gets its own
@@ -393,13 +393,13 @@ two values the report printed:
 
 | H |
 | :---: |
-| 2540.7 |
-| 1827.0 |
+| 2551.2 |
+| 1831.2 |
 
 ![The piles editor with the force stated on both rows](images/lem12_studio_piles_h.png)
 
 **Solved on the search's own critical circle — one surface, no search, only the
-H column changing — the two paths give the same answer**, 1.842 either way: a
+H column changing — the two paths give the same answer**, 1.845 either way: a
 stated force and a computed force enter the equilibrium equations identically.
 The two differ only when the surface moves.
 
@@ -407,24 +407,24 @@ Searching with the stated forces shows the difference:
 
 ![Spencer with the force stated instead of computed](images/lem12_solution_statedh.png){width=1000}
 
-**FS = 1.752**, on a shallower circle from the toe — tangent at elevation −0.04,
-14.5 ft below the ground at its deepest, carrying 32,929 lb/ft. Solved on that
+**FS = 1.755**, on a shallower circle from the toe — tangent at elevation −0.04,
+14.4 ft below the ground at its deepest, carrying 32,812 lb/ft. Solved on that
 circle alone, the two ways of entering the pile no longer agree:
 
-| Surface | Computed (H blank) | Stated (2,540.7 / 1,827.0) | No piles |
+| Surface | Computed (H blank) | Stated (2,551.2 / 1,831.2) | No piles |
 | --- | :---: | :---: | :---: |
-| The auto search's critical circle | 1.842 | 1.842 | 1.481 |
-| The shallower circle above | 1.896 | 1.752 | 1.213 |
+| The auto search's critical circle | 1.845 | 1.845 | 1.482 |
+| The shallower circle above | 1.896 | 1.755 | 1.213 |
 
 With Ito & Matsui, every
 trial surface gets its own H, because the force depends on how deep the
 surface crosses each row; a stated H never changes. The two searches can
 therefore settle on different circles — and here they do. On this shallow
-circle the computed path develops **5,178.6 lb/ft** (a shallower crossing
+circle the computed path develops **5,174.0 lb/ft** (a shallower crossing
 on the lower row, a shorter moment arm on the upper), while the stated
-numbers remain at the 4,367.6 that was right for the deep circle —
-16% less than these piles would provide here. With the lower force, the surface
-gives 1.752 instead of 1.896, and the stated-force search reports it as
+numbers remain at the 4,382.4 that was right for the deep circle —
+15% less than these piles would provide here. With the lower force, the surface
+gives 1.755 instead of 1.896, and the stated-force search reports it as
 the minimum. A stated force is only correct for the surface it was
 computed from, and the surface that governs is not known until the search
 finishes. [VP54](../verification/rocscience.md#vp54) is the verified case of the
@@ -462,23 +462,24 @@ Run again:
 
 ![Spencer with grid seeding](images/lem12_solution_bypass.png){width=1000}
 
-**FS = 1.702**, below the 1.842 the seeded search reported, on a surface that
+**FS = 1.703**, below the 1.845 the seeded search reported, on a surface that
 never engages the piles. It daylights (cuts back up to the ground surface)
 at (10.00, 10.00), the head of the upper shaft, runs back to the crest at
 x = 24.3, and is 6.5 ft deep at its deepest,
 moving 6,867 lb/ft. The depth from the ground surface to the failure surface at
-the pile is zero, so the Ito & Matsui integral over that depth is zero: the whole
-pile row contributes **0.04 lb/ft** to a surface that slides over the top of it.
+the pile is essentially zero, so the Ito & Matsui integral over that depth is too:
+the Log reports **0.0 lb/ft** from the pile rows on a surface that slides over
+the top of them.
 
 This check is important for any pile design. The piles resist the deep
 mechanism, which makes the next mechanism critical; here that mechanism runs
 above the pile heads and receives no force from them. It is not a numerical
 artifact — tick **Ignore surficial (skin) failures** in **Run LEM…**, which
-activates the **Min slip depth** box beside it, and 5 ft there leaves the answer
+activates the **Min slip depth** box below it, and 5 ft there leaves the answer
 unchanged, because 6.5 ft of clay is moving —
-and the same slope searched without piles at all returns 1.149 from either
-seeding, so the shallow surface becomes critical only because the piles were
-added.
+and the same slope searched without piles at all returns 1.149 from the file's
+circle and 1.150 from the grid, so the shallow surface becomes critical only
+because the piles were added.
 The same behavior is
 recorded on [VP54](../verification/rocscience.md#vp54), where a free search on a
 micro-piled slope finds a circle exiting upslope of the pile row.
@@ -525,13 +526,13 @@ started from the file's circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.634 | 1.852 | 1.692 | 1.884 | 1.978 | 1.842 | 1.843 |
+| 1.634 | 1.854 | 1.692 | 1.881 | 1.975 | 1.845 | 1.845 |
 
-<!-- test: file=../lem/files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.634, fs_bishop=1.852, fs_janbu=1.692, fs_corps=1.884, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.843 -->
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.634, fs_bishop=1.854, fs_janbu=1.692, fs_corps=1.881, fs_lowe=1.975, fs_spencer=1.845, fs_mprice=1.845 -->
 
 Morgenstern-Price agrees with Spencer to within 0.001, and Bishop sits 0.5%
-above it. The Corps of Engineers method and Lowe & Karafiath come out 2.3% and
-7.4% above Spencer, and Janbu and the Ordinary Method of Slices (OMS) 8.1% and
-11.3% below it. The grid search in
+above it. The Corps of Engineers method and Lowe & Karafiath come out 2.0% and
+7.0% above Spencer, and Janbu and the Ordinary Method of Slices (OMS) 8.3% and
+11.4% below it. The grid search in
 [Looking above the pile row](#looking-above-the-pile-row) finds Spencer a lower
-surface, at 1.702, that slides over the top of the piles.
+surface, at 1.703, that slides over the top of the piles.

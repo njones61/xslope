@@ -35,6 +35,10 @@ learn how to check each kind of answer it gives back.
     were recorded.
     Both change over time: models are updated or replaced, and providers change
     their prices.
+    The factors of safety and surfaces quoted from a conversation are the ones it
+    printed when it was recorded. Each **Check its work** list gives what this release of
+    XSLOPE returns for the same files, which can differ from them in the third
+    decimal.
 
 ---
 
@@ -240,11 +244,11 @@ The session saved
 exchange is in
 [w1_build_from_image_transcript.md](files/w1_build_from_image_transcript.md).
 
-<!-- test: file=files/w1_build_from_image_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.2441, tolerance=0.005 -->
+<!-- test: file=files/w1_build_from_image_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.2445, tolerance=0.005 -->
 
 ### Check its work
 
-- **Reopen the workbook and search.** 1.2441, on a circle tangent to the
+- **Reopen the workbook and search.** 1.2445, on a circle tangent to the
   contact — [LEM-3](lem03_layered_slope.md)'s published answer and its
   mechanism.
 - **Materials editor.** 130 pcf / 400 psf and 135 pcf / 800 psf, φ = 0 and
@@ -254,7 +258,7 @@ exchange is in
 - **Profile lines editor.** The foundation line runs from x = −60 to 130 and the
   crest to x = 130: 30 ft beyond the drawing's left edge and 40 ft beyond its
   right. Set those ends back to −30 and 90 if the model should match the drawing
-  exactly; the search returns the same 1.2441.
+  exactly; the search returns the same 1.2445.
 
 ---
 
@@ -298,8 +302,9 @@ The first turn moved the crest break to (60, 20) on the profile lines,
 re-centered the starting circles over the new face, and reran: **FS = 1.546**,
 still bottoming at elevation 0. It also extended the crest and the foundation
 from x = 90 to x = 100, to keep 40 ft of ground behind the crest, which nothing
-asked for. Its reply says so, and the change is harmless: the same edit on the
-file's own extents searches to the same 1.546. The reply has one slip: it says
+asked for. Its reply says so, and the change is harmless: on the file's own
+extents the same edit searches to 1.547, as the saved workbook does. The reply
+has one slip: it says
 the circle comes out on the face about 12 ft up from the toe. The exit is at
 x = 12.4, which on a 3:1 face is about 4 ft up.
 
@@ -310,7 +315,7 @@ warnings the dry run raised. It added no distributed load for the pool, because
 submerged ground comes from the piezometric line itself. It put the rise down to
 the water pressing on the face, and said it had not tested how much comes from
 the water and how much from the heavier saturated soil. The water is the source:
-with the saturated weights taken out, the same model searches to 2.972, so the
+with the saturated weights taken out, the same model searches to 2.974, so the
 heavier weights take some of the rise back rather than adding to it.
 
 The third turn drops the foundation to 250 psf: **FS = 1.418**, on a critical
@@ -328,22 +333,22 @@ One workbook was saved per turn —
 [w1_modify_after_3.xlsx](files/w1_modify_after_3.xlsx) — and the conversation is
 in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 
-<!-- test: file=files/w1_modify_after_1.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.5460, tolerance=0.005 -->
-<!-- test: file=files/w1_modify_after_2.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=2.7673, tolerance=0.005 -->
-<!-- test: file=files/w1_modify_after_3.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.4184, tolerance=0.005 -->
+<!-- test: file=files/w1_modify_after_1.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.5465, tolerance=0.005 -->
+<!-- test: file=files/w1_modify_after_2.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=2.7689, tolerance=0.005 -->
+<!-- test: file=files/w1_modify_after_3.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.4198, tolerance=0.005 -->
 
 ### Check its work
 
-- **Reload each workbook and search.** 1.5460, 2.7673 and 1.4184.
+- **Reload each workbook and search.** 1.5465, 2.7689 and 1.4198.
 - **Read the lowest point beside each number.** Elevation 0, then 0, then −10.
   The third run is a different mechanism, not the same surface re-solved.
 - **Profile lines editor, first workbook.** The crest and the foundation run to
   x = 100, 10 ft past the file we opened. Decide whether to keep that before
-  comparing 1.546 with anything.
+  comparing 1.547 with anything.
 - **Circles editor, first workbook.** Three starting circles: one tangent to the
   top of the foundation (Depth 0) and two identical ones tangent to the rock
   (Depth −10). The duplicate only repeats work. A search started only from
-  circles that cut into the foundation can stay deep and miss the 1.546 surface.
+  circles that cut into the foundation can stay deep and miss the 1.547 surface.
 - **Materials editor, second workbook.** `u = none` on both soils, with the
   saturated unit weights beside the total ones. On a φ = 0 soil the water acts
   through the load on the submerged ground and the saturated weights below the
@@ -388,7 +393,7 @@ offered the likely cause of the plateau, the critical surface moving up into the
 embankment, as untested. Re-running the steps confirms it. Below 600 psf every
 critical circle bottoms on the rock at elevation −10, and from 600 psf up the
 surface sits on the contact and the embankment governs, capping the factor of
-safety at 1.244.
+safety at 1.245.
 
 The weakest steps are the ones to treat with care, and the reply says so. Beside
 the unsolved trial circles, every step raised at least one admissibility note:
@@ -402,10 +407,11 @@ no step reaches. The transcript is
 
 ### Check its work
 
-- **Re-run any step.** All seven values reproduce; the 200-psf step is the one
-  to watch, because a fifth of its trial circles go unsolved.
-- **Read two rows against LEM-3.** 0.792 at 300 psf is its weak-foundation
-  answer; 1.244 at 800 psf is its published one.
+- **Re-run any step.** Each comes back within 0.002 of the table: 0.628,
+  0.793, 0.965 and 1.137, then 1.245 from 600 psf up. The 200-psf step is the
+  one to watch, because about a fifth of its trial circles go unsolved.
+- **Read two rows against LEM-3.** On a re-run the 300-psf step gives 0.793,
+  LEM-3's weak-foundation answer, and the 800-psf step 1.245, its published one.
 - **Read the circle at 500 and at 600 psf.** It bottoms at −10, then at 0: the
   switch from the rock to the contact is the mechanism change.
 - **Materials editor.** The foundation's cohesion reads 800 psf again.
@@ -452,9 +458,10 @@ is
 
 ### Check its work
 
-- **Re-run the three steps.** The three values reproduce, and the 3:1 row agrees
-  with the 3:1 face change in [Modifying the model](#modifying-the-model), which
-  ran on ground extended to x = 100.
+- **Re-run the three steps.** They give 1.245, 1.397 and 1.547, each within
+  0.001 of the table, and the 3:1 row agrees with the 3:1 face change in
+  [Modifying the model](#modifying-the-model), which ran on ground extended to
+  x = 100.
 - **Read the circle at each step, not only the number.** All three bottom at
   elevation 0, tangent to the top of the foundation. The 3:1 circle reaches the
   crest at about x = 75, inside the model, so the short crest does not change
@@ -495,7 +502,7 @@ foundation as **Medium Clay** at E = 668,300 psf with ν = 0.40 — and the
 assistant entered both, calling them generic textbook values rather than site
 data since the model states no stiffnesses.
 
-The second turn ran the limit equilibrium search at **FS = 1.244** — Spencer,
+As recorded, the second turn ran the limit equilibrium search at **FS = 1.244** — Spencer,
 the method a run takes when the model names none — then built the mesh and ran
 the strength reduction to **1.270**, 2.0% higher. That number comes out of a
 bisection on the factor the strengths are divided by: nine trials, each of them
@@ -555,7 +562,7 @@ Both soils are undrained. What should the pore-pressure option be, and what woul
 **It corrected the premise.** One snippet ran five of the methods, each with its
 own search, and the answer says first that not quite all of them match.
 
-| Method | Equilibrium satisfied | FS (searched) |
+| Method | Equilibrium satisfied | FS (searched, as recorded) |
 | :--- | :--- | :---: |
 | Ordinary Method of Slices (OMS) | moment only | 1.244 |
 | Bishop | moment, and vertical force | 1.244 |
@@ -563,7 +570,7 @@ own search, and the answer says first that not quite all of them match.
 | Morgenstern-Price | moment and force | 1.244 |
 | Janbu (corrected) | force only | 1.314 |
 
-<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.314, fs_spencer=1.244, fs_mprice=1.244 -->
+<!-- test: file=../lem/files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.245, fs_bishop=1.245, fs_janbu=1.314, fs_spencer=1.245, fs_mprice=1.245 -->
 
 The reason it gives is the right one: at φ = 0 the base resistance is c·L, which
 has no normal-force term, so moment equilibrium about the center is the same
@@ -594,11 +601,11 @@ stands. The transcript is
 - **Check that nothing moved.** Both turns changed the model only for the length
   of a run and put it back, and no workbook was written. Run the search again
   before reading the result tabs: the stored result is the last test run.
-- **Search with each method.** 1.244 for the four moment methods and 1.314 for
-  Janbu's, as in LEM-3's table, which adds 1.285 for Lowe & Karafiath and 1.326
+- **Search with each method.** 1.245 for the four moment methods and 1.314 for
+  Janbu's, as in LEM-3's table, which adds 1.286 for Lowe & Karafiath and 1.327
   for the Corps of Engineers method.
 - **Test the water attribution.** Add the piezometric line at elevation 10 and
-  search with the pore-pressure option at `none` and then at `piezo`: 1.416 both
+  search with the pore-pressure option at `none` and then at `piezo`: 1.417 both
   times. The rise is the water load and nothing else.
 
 ---
@@ -651,7 +658,7 @@ that table top down. The transcript is
 ### Check its work
 
 - **Reload the repaired workbook and search.** 1.2445 on a contact-tangent
-  circle, against LEM-3's published 1.244.
+  circle, LEM-3's published 1.245.
 - **Materials and Profile lines editors, before trusting the row order.** The
   foundation is still listed first, with profile line 1 pointing at material 2.
 - **Maximum depth.** It reads −10 in the repaired file; the file that came in read
@@ -684,29 +691,32 @@ Write the analysis report.
 
 ![Both turns in the dock: the search returning 1.244 with its circle laid out in a table and its plot, then the one line of code that writes the report, the name of the finished document, and a note that its contents page has no page numbers yet](images/w1_report_2.png){width=560}
 
-The first turn returns **FS = 1.244** — [LEM-3](lem03_layered_slope.md)'s
-published answer, on its published circle — and places that circle correctly: it
+The first turn returns **FS = 1.244** on the mechanism
+[LEM-3](lem03_layered_slope.md) publishes, and places that circle correctly: it
 just touches the top of the foundation and does not cut into it. The second turn
 generates the document and gives its name. The step that
 [numbers the contents page](../studio/reports.md#building-the-page-numbers) was
 switched off for this session, and the reply says the page has no numbers yet
 and how to fill them in: open the file in Word, select all and press F9. With
-that step on, as it is by default, Studio fills them in itself, and the linked
-copy below has been through it. The report contains
+that step on, as it is by default, Studio fills them in itself. The report contains
 six figures and three tables across its Traceability, Project Definition and
 Limit Equilibrium Analysis sections — a short version of the full report built
 in [W-3](w03_report.md), where the model includes all three engines and the
-dialog's options are walked through. The session saved
-[w1_report_after.docx](files/w1_report_after.docx); the transcript is
+dialog's options are walked through. The linked
+[w1_report_after.docx](files/w1_report_after.docx) is the report the same two
+snippets write from
+[xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx),
+with the page-number step on; the transcript is
 [w1_report_transcript.md](files/w1_report_transcript.md).
 
 ### Check its work
 
 - **Open the report at §3.4.2.** "Spencer's Method gives a factor of safety of
-  1.244 on the critical surface of Figure 4" — the run made in the first turn,
-  not a second analysis the report performed for itself.
+  1.245 on the critical surface of Figure 4" — the search run before the report
+  was asked for, not a second analysis the report performed for itself.
 - **Read the traceability page.** It names the input file and its SHA-256 digest,
-  so the document identifies the model it was written from.
+  so the document identifies the model it was written from: the digest matches
+  the linked workbook.
 - **Read what it says about water and loads.** No groundwater, no external water,
   no distributed loads — this section as built.
 
@@ -739,7 +749,7 @@ about the mechanism or the finding is right.
 | GLM-5V-Turbo (Z.ai) | 39 | 557,212 (500,352) | 15,825 | \$0.25 | 6 of 8 | 1 of 8 |
 
 gpt-6-astra is the model OpenAI names as its flagship. Four of the five build the
-section the drawing shows and get the 1.244 that LEM-3 publishes for this slope,
+section the drawing shows and report 1.244 for it, LEM-3's answer to within 0.001,
 all five run the strength reduction to the same 1.270, and in the cohesion sweep
 all five report the trial circles Spencer could not solve at the weakest steps.
 They part ways elsewhere. GLM-5V-Turbo drew the top of the foundation along the
@@ -801,7 +811,7 @@ the checks above re-run the measurements rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about \$0.93.
+  13 turns of work for about \$0.80.
 - Building a layered model from a drawing and editing it three ways — face, water
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without leaving a

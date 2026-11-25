@@ -98,6 +98,17 @@ An optional benchmark=<ID> key (e.g. benchmark=SSRM-2) marks a verification
 benchmark; these can be excluded with --skip-benchmarks for quicker routine
 runs.
 
+A tag on a TUTORIAL page (docs/tutorials/) is checked twice: inside its
+tolerance, as every tag is, and at the precision the tag writes its number.
+``expected_fs=0.918`` passes only if today's run rounds to 0.918 at three
+decimals, so 0.9186 fails it and 0.9184 passes. A tutorial prints the number
+the reader will see on their own screen, so a change in the last printed digit
+is a stale page, however small it is next to the tolerance. A number that
+legitimately varies (a count that differs between computers, a value that
+depends on the solver kernel) opts out per tag with ``precision=tolerance`` and
+a ``precision_reason=<why, without commas>``; the row is refused without the
+reason. Every other page keeps the tolerance alone. See ``_as_written_miss``.
+
 Runs each test and compares results against expected values.
 As new samples are added with test tags, they automatically become part of the suite.
 
@@ -125,6 +136,7 @@ import os
 import re
 import sys
 import time
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from pathlib import Path
 
 import matplotlib
@@ -493,6 +505,11 @@ def parse_test_tags(md_path):
         for pair in tag_str.split(','):
             key, _, value = pair.partition('=')
             params[key.strip()] = value.strip()
+        # The tag's own text, before any number is floated: 1.210 is written to
+        # three decimals, and the float 1.21 no longer says so. A tutorial's
+        # numbers are checked at that precision (see _as_written_miss).
+        written = dict(params)
+        params['_as_written'] = written
 
         # Resolve file path relative to the markdown file's directory
         if 'file' in params:
@@ -540,6 +557,126 @@ def parse_test_tags(md_path):
             tests.append(params)
 
     return tests
+
+
+# ===================== TUTORIAL NUMBERS, AT THEIR PRINTED PRECISION =====================
+# A tag's tolerance says how far a rerun may land from the lock before the code is
+# wrong. On a tutorial it is also what decided whether the PAGE was wrong, and those
+# are different questions: the page prints the number the reader will see on their
+# own screen, so a run that moves its last printed digit makes the page stale while
+# staying well inside a 0.005 tolerance. 1.0.8's circle slicing moved tutorial
+# factors of safety in the third decimal (0.918 -> 0.9186, 1.301 -> 1.305); every
+# tag kept passing, the next refresh re-recorded only the tags that had moved 0.005,
+# and the prose stayed wrong for weeks. So a tutorial's tag also checks its number
+# at the precision the tag writes it: the value a row returns (the summary), and the
+# numbers a runner compares itself (a head at a point, an instant of an FS-vs-time
+# curve, a probability of failure). The element-coverage rows (seep_elements,
+# fem_elements) are not read this way: their one number is a band every element
+# type must land in, not any one run's answer. Mesh counts are integers, compared
+# exactly already.
+
+#: The tutorial pages. A tag on one of these is checked at its written precision.
+TUTORIAL_DIR = REPO_ROOT / 'docs' / 'tutorials'
+
+#: The tag key a row's computed value is compared with, where it is not
+#: ``expected_fs`` (the keys _expected_and_tol reads).
+_EXPECTED_KEYS = {
+    'seep': 'expected_flowrate', 'reliability': 'expected_beta',
+    'fem_reliability': 'expected_beta', 'reliability_mc': 'expected_beta',
+    'reliability_rs': 'expected_beta', 'critical_kc': 'expected_kc',
+    'newmark': 'expected_d', 'fem_tilt': 'expected_tilt', 'fem_kc': 'expected_kc',
+    'slip_depth': 'expected_depth', 'support_force': 'expected_force',
+    'sensitivity': 'expected_base'}
+
+
+def _precision_refusal(test):
+    """Why this tag's precision opt-out is refused, or None.
+
+    ``precision=tolerance`` takes a tag back to the tolerance alone, for a number
+    that legitimately varies: a step count that differs between computers, a
+    value that depends on which solver kernel is built. The reason is part of the
+    opt-out, written on the tag as ``precision_reason=<words, no commas>``,
+    because an opt-out nobody explained cannot be reviewed and outlives its
+    cause. A tag without the reason, a reason with no opt-out, or any other
+    ``precision`` value is refused, so a misspelt key never quietly widens a
+    check."""
+    value = str(test.get('precision', '')).strip().lower()
+    reason = str(test.get('precision_reason', '')).strip()
+    if not value:
+        if reason:
+            return ("precision_reason is read only with precision=tolerance; "
+                    "this tag carries the reason and no opt-out")
+        return None
+    if value != 'tolerance':
+        return (f"precision={test.get('precision')!r}: the one value a tag may "
+                f"carry is 'tolerance'")
+    if not reason:
+        return ("precision=tolerance needs precision_reason=<why this number "
+                "legitimately varies> on the same tag")
+    return None
+
+
+def _checks_as_written(test):
+    """Is this row checked at its written precision? Yes for a tag on a tutorial
+    page that does not opt out; every other page keeps the tolerance alone."""
+    source = test.get('source')
+    if not source or str(test.get('precision', '')).strip().lower() == 'tolerance':
+        return False
+    try:
+        return Path(source).resolve().parent == TUTORIAL_DIR.resolve()
+    except OSError:
+        return False
+
+
+def _as_written_miss(test, key, computed, written=None):
+    """The failure for a tutorial number today's run no longer prints, else None.
+
+    ``computed`` must round to the tagged number at the precision the tag writes
+    it: ``0.918`` is three decimals, so 0.9184 passes and 0.9186 (which rounds to
+    0.919) fails; ``4.916e-07`` is four significant figures. Rounding is the one
+    Python's own formatting does, which is what Studio and the Log print. The
+    tag's text is ``test['_as_written'][key]``, or ``written`` for one element of
+    a list-valued key (a series of factors of safety, a head at one point).
+
+    Not applied (None) off the tutorial pages, on an opted-out tag, or where the
+    tag does not write ``key``."""
+    if computed is None or not _checks_as_written(test):
+        return None
+    if written is None:
+        written = (test.get('_as_written') or {}).get(key)
+    try:
+        want = Decimal(str(written).strip())
+    except (InvalidOperation, ValueError):
+        return None
+    got = Decimal(float(computed)).quantize(want, rounding=ROUND_HALF_EVEN)
+    if got == want:
+        return None
+    places = -want.as_tuple().exponent
+    if 'e' in str(written).lower():
+        digits = len(str(written).lower().split('e')[0].partition('.')[2])
+        rounded = f"{float(computed):.{digits}e}"
+        shown = f"{float(computed):.{digits + 2}e}"
+    else:
+        rounded = f"{float(computed):.{max(places, 0)}f}"
+        shown = f"{float(computed):.{max(places, 0) + 2}f}"
+    return (f"the page prints {key}={str(written).strip()}; this run gives "
+            f"{shown}, which rounds to {rounded}")
+
+
+def _primary_as_written_miss(test, expected, computed):
+    """``_as_written_miss`` for the value a row's runner returns, the one the
+    summary compares with ``expected``. A pass/fail row returns a 0.0 success
+    code, which no tag writes, so only a key whose value IS ``expected`` is read
+    (a pass/fail row that also carries an ``expected_fs`` is not misread)."""
+    key = _EXPECTED_KEYS.get(test.get('type', ''), 'expected_fs')
+    try:
+        if test.get(key) is None or float(test[key]) != float(expected):
+            return None
+    except (TypeError, ValueError):
+        return None
+    if key == 'expected_fs' and key not in (test.get('_as_written') or {}):
+        key = f"fs_{test.get('method')}"      # one method's row of an fs_* tag
+    return _as_written_miss(test, key, computed)
 
 
 def _refine_kwargs(test):
@@ -2610,10 +2747,12 @@ def _run_fem_ssrm_bracket(test):
     # records. The row's own pass tolerance is deliberately NOT used here — it is
     # also the bisection's stopping width, so it is wide enough to hide a full
     # one-bracket-step divergence between the two kernels (RS2-40-d20). Any miss
-    # falls through to Tier 2.
+    # falls through to Tier 2. A tutorial tag is read at the precision its text
+    # writes (1.730 is three decimals, where the float 1.73 reads as two).
     fast_fs, fast_err = run_fem_test(test, fast_kernel=True)
     if (fast_err is None and expected is not None
-            and abs(fast_fs - expected) < _lock_exact_window(expected)):
+            and abs(fast_fs - expected) < _lock_exact_window(expected)
+            and _as_written_miss(test, 'expected_fs', fast_fs) is None):
         return fast_fs, None, ('fast', 'via fast kernel')
 
     # Tier 2 — reference fallback. The reference verdict is FINAL (PASS or FAIL); the
@@ -2703,8 +2842,12 @@ def run_seep_head_test(test):
     for triplet in str(test['points']).split(';'):
         xs_, ys_, hs_ = (float(v) for v in triplet.split(':'))
         got = head_at(xs_, ys_)
+        miss = _as_written_miss(test, f"head at ({xs_:g},{ys_:g})", got,
+                                written=triplet.split(':')[2])
         if abs(got - hs_) > tol:
             errs.append(f"({xs_:g},{ys_:g}): expected {hs_:.3f}, got {got:.3f}")
+        elif miss:
+            errs.append(miss)
     if errs:
         return None, "head mismatch: " + "; ".join(errs)
     return 0.0, None
@@ -2788,8 +2931,12 @@ def run_tseep_head_test(test):
     for triplet in str(test['points']).split(';'):
         xs_, ys_, hs_ = (float(v) for v in triplet.split(':'))
         got = head_at(xs_, ys_)
+        miss = _as_written_miss(test, f"head at ({xs_:g},{ys_:g}) @t={t:g}", got,
+                                written=triplet.split(':')[2])
         if abs(got - hs_) > tol:
             errs.append(f"({xs_:g},{ys_:g}) @t={t:g}: expected {hs_:.3f}, got {got:.3f}")
+        elif miss:
+            errs.append(miss)
     if errs:
         return None, "head mismatch: " + "; ".join(errs)
     return 0.0, None
@@ -2878,10 +3025,14 @@ def run_fs_vs_time_test(test):
         else:
             got = float(first.iloc[0]['fs'])
             want = float(test['expected_first'])
+            miss = _as_written_miss(test, 'expected_first', got)
             if abs(got - want) > tol:
                 errs.append(f"t={float(first.iloc[0]['value']):g} (first): expected "
                             f"{want:.4f}, got {got:.4f}")
-    for t, want in zip(times or [], expected):
+            elif miss:
+                errs.append(miss)
+    written = str(test.get('expected', '')).split(';')
+    for t, want, text in zip(times or [], expected, written):
         row = df.loc[(df['value'] - t).abs() < 1e-6]
         if row.empty:
             errs.append(f"t={t:g}: no row in the returned table")
@@ -2891,8 +3042,11 @@ def run_fs_vs_time_test(test):
             errs.append(f"t={t:g}: no result -- {row['msg']}")
             continue
         got = float(row['fs'])
+        miss = _as_written_miss(test, f"expected (t={t:g})", got, written=text)
         if abs(got - want) > tol:
             errs.append(f"t={t:g}: expected {want:.3f}, got {got:.3f}")
+        elif miss:
+            errs.append(miss)
     if 'critical_time' in test:
         ct = res.get('critical_time')
         if ct is None or abs(float(ct) - float(test['critical_time'])) > 1e-6:
@@ -2902,6 +3056,8 @@ def run_fs_vs_time_test(test):
         mf = res.get('min_fs')
         if mf is None or abs(float(mf) - float(test['min_fs'])) > tol:
             errs.append(f"minimum FS: expected {float(test['min_fs']):.3f}, got {mf}")
+        elif miss := _as_written_miss(test, 'min_fs', mf):
+            errs.append(miss)
     if errs:
         return None, "FS-vs-time mismatch: " + "; ".join(errs)
     return 0.0, None
@@ -3192,6 +3348,9 @@ def run_reliability_mc_test(test):
         if abs(result['pf_empirical'] - float(exp_pf)) > pf_tol:
             return None, (f"pf_empirical {result['pf_empirical']:.4f} vs expected "
                           f"{float(exp_pf):.4f} (tol {pf_tol})")
+        miss = _as_written_miss(test, 'expected_pf', result['pf_empirical'])
+        if miss:
+            return None, miss
     return result['beta_ln'], None
 
 
@@ -3236,6 +3395,9 @@ def run_reliability_rs_test(test):
         if abs(result['pf_empirical'] - float(exp_pf)) > pf_tol:
             return None, (f"pf_empirical {result['pf_empirical']:.5f} vs expected "
                           f"{float(exp_pf):.5f} (tol {pf_tol})")
+        miss = _as_written_miss(test, 'expected_pf', result['pf_empirical'])
+        if miss:
+            return None, miss
     return result['beta_ln'], None
 
 
@@ -9917,7 +10079,7 @@ def run_verification_pages_test(test):
 
 
 def run_tutorial_restatements_test(test):
-    """Restated factors of safety on the tutorial pages (reporting).
+    """Restated factors of safety on the tutorial pages.
 
     A tutorial walks the reader through runs it prints the answers to, and
     those answers go stale the moment a solver round moves them: the sample
@@ -9932,10 +10094,15 @@ def run_tutorial_restatements_test(test):
     Each number is guarded (it restates a lock, verbatim or correctly rounded),
     disagreeing (its own column header, row label or sentence names a method
     whose lock says something else), or unguarded (nothing in the docs locks
-    it). The row REPORTS the tally and passes: a tutorial legitimately re-runs
-    a sample under settings its tag does not use, so a finding is a sentence
-    someone reads before it is a defect. It fails only if the checker itself
-    raises.
+    it). A DISAGREEING number fails the row. Measured with every stale tutorial
+    tag of 1.1.0 re-recorded at today's value, all 62 disagreeing numbers were
+    stale restatements and none was a correct one misread, so the bucket is a
+    list of defects; a number that reports a different run of a named method is
+    guarded by tagging that run. Unguarded numbers are reported only: that
+    bucket mixes sweep rows and variant runs with stale numbers whose sentence
+    names no method. The tags themselves are kept current by the precision rule
+    on tutorial tags (_as_written_miss), which is what makes a stale page show
+    up here as a disagreement.
     """
     import io
     from contextlib import redirect_stdout
@@ -9944,11 +10111,17 @@ def run_tutorial_restatements_test(test):
     buf = io.StringIO()
     try:
         with redirect_stdout(buf):
-            tutorials.run(verbose=False)
+            n_disagreeing = tutorials.run(verbose=False)
+        lines = tutorials.disagreements() if n_disagreeing else []
     except Exception as exc:                       # the checker itself broke
         return None, f"tutorial restatement sweep raised {type(exc).__name__}: {exc}"
     head = next((l for l in buf.getvalue().splitlines() if l.strip()), '')
     print(f"    {head}")
+    if lines:
+        return None, (f"{len(lines)} tutorial number(s) disagree with the lock "
+                      f"they restate (correct the page, or tag the run it "
+                      f"reports): " + "; ".join(lines[:4])
+                      + (f"; ... and {len(lines) - 4} more" if len(lines) > 4 else ""))
     return 0.0, None
 
 
@@ -10814,6 +10987,12 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
+    'tutorial_precision': (
+        'tutorial_precision_check.py',
+        "A tutorial's tagged number is checked at the precision the tag writes "
+        "it: 0.918 fails a run of 0.9186 and passes 0.9184, fs_bishop=1.210 "
+        "reads three decimals, a verification page keeps its tolerance alone, "
+        "and precision=tolerance without a precision_reason is refused unsolved."),
     'strength_ratio': (
         'strength_ratio_check.py',
         "The strength ratio material, s_u = max(c, c/p x sigma'_v): on a planar "
@@ -18305,6 +18484,10 @@ def run_test(test):
     rather than mutating the test dict — is deliberate: parallel workers run under
     the ``spawn`` start method, so only the returned tuple crosses the process
     boundary back to the summary."""
+    # A malformed precision opt-out is refused before anything is solved.
+    refusal = _precision_refusal(test)
+    if refusal is not None:
+        return None, refusal, None
     if test.get('type', '') == 'fem_ssrm':
         return _run_fem_ssrm(test)
     if test.get('type', '') == 'fem_tilt':
@@ -18774,7 +18957,8 @@ def main():
     parser.add_argument('--rs2', action='store_true',
                         help='Run only the RS2 (.fez) import test')
     parser.add_argument('--tutorials', action='store_true',
-                        help='Run only the tutorial-page restatement sweep')
+                        help='Run only the tutorial-page checks: the restatement '
+                             'sweep and the precision rule\'s self-test')
     parser.add_argument('--preflight', action='store_true',
                         help='Run only the preflight (input dependency check) tests')
     parser.add_argument('--tolerance', type=float, default=0.01,
@@ -19872,11 +20056,17 @@ def main():
     # Standing sweep of the tutorial pages: every factor of safety a tutorial
     # attributes to a run of its own, read against the tags that guard the
     # model it walks — the page's own, and the sample or benchmark tags on the
-    # same workbook elsewhere in the docs. Reports a per-page tally and never
-    # fails on a finding; see tools/verification_checks/tutorials.py.
+    # same workbook elsewhere in the docs. Fails on a number that contradicts
+    # the lock of the method it names, and reports the rest of the per-page
+    # tally; see tools/verification_checks/tutorials.py.
     if run_tutorials:
         tests.append({'type': 'tutorial_restatements',
                       'file': 'docs/tutorials (restated factors of safety)',
+                      'method': '-', 'source': 'tutorials'})
+        # The rule the tutorial tags run under: checked at the precision each
+        # tag writes its number, with a reasoned opt-out. Synthetic tags, no solve.
+        tests.append({'type': 'tutorial_precision',
+                      'file': 'tutorial tags at their written precision',
                       'method': '-', 'source': 'tutorials'})
 
     # Structured DXF export/import round-trip tests. These touch the studio layer
@@ -20252,6 +20442,12 @@ def main():
             # a pass — surface it instead of crashing the summary.
             status = "ERROR: tag has no expected value for this test type"
             errors += 1
+            comp_str = _fmt(computed)
+        elif abs(computed - expected) <= tol and (
+                miss := _primary_as_written_miss(test, expected, computed)):
+            # Inside the tolerance, but no longer the number the tutorial prints.
+            status = f"FAIL ({miss}, {elapsed:.1f}s)"
+            failed += 1
             comp_str = _fmt(computed)
         elif abs(computed - expected) <= tol:
             status = f"PASS ({elapsed:.1f}s)"

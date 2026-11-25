@@ -20,7 +20,7 @@ reproduces the values verified there.
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>20–25 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>30–40 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model a tieback wall: how to enter grouted anchors
@@ -448,8 +448,9 @@ becomes a choice — and run the same Janbu auto search on `Circular`:
 
 ![Janbu on the best circle](images/lem09_solution_circle.png){width=1000}
 
-The best circle bottoms out deep and climbs back to the crest break, because a
-circle cannot run flat along a plane. It gives **FS = 1.473, 3% above the
+The best circle does not start at the toe. It leaves the wall face at
+elevation 8, just above the head of the lower anchor, so it crosses only the
+upper anchor, and climbs to the crest break. It gives **FS = 1.474, 3% above the
 wedge's 1.431**, and the other methods agree: Spencer 1.473 against 1.414, and
 Bishop — which joins the list because a circle restores its moment arm — 1.487.
 Searched only in circles, this wall would look 3 to 4% safer than it is; the
@@ -474,6 +475,8 @@ anchors, since it too crosses both outside their development lengths. Its
 lower leg leaves the toe at 42° against the search's 49°. A specified surface is a
 trial surface, not necessarily the critical one, which is why the search comes
 first.
+
+<!-- test: file=../verification/files/rocscience/vp049.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.469, fs_spencer=1.439, tolerance=0.005 -->
 
 ### Effect of the tiebacks {#what-the-tiebacks-are-worth}
 
@@ -514,12 +517,12 @@ evaluated on the circle its source prints for it, at 60 slices:
 
 | Model | Appl | XSLOPE FS |
 | --- | --- | :---: |
-| `vp085a` | Active | 1.567 |
-| `vp085b` | Passive | 1.319 |
+| `vp085a` | Active | 1.568 |
+| `vp085b` | Passive | 1.320 |
 
 Those two answers are on two different circles, so to isolate the setting we fix
 the surface. On the vp085a circle — **one surface, no search, Bishop, only
-Appl changing** — active gives 1.567 and passive 1.331, against 0.914 with no
+Appl changing** — active gives 1.568 and passive 1.331, against 0.915 with no
 anchor at all. Passive provides about six-tenths of the increase active provides here, and
 that fraction is not a constant, since the divisor is the factor of safety being
 solved for. Neither convention is a correction of the other. All four Type presets are

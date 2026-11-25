@@ -130,13 +130,13 @@ below redraws it over the stresses this slope actually generates:
 
 The red curve draws the envelope, and the shaded band marks the range of effective
 normal stress the critical surface found in the next section actually carries,
-−2 to 75 kPa (the band is clipped at zero). The curve is not a straight line: it is steepest near zero and
+−4 to 72 kPa (the band is clipped at zero). The curve is not a straight line: it is steepest near zero and
 flattens as the confinement grows, so the cohesion and friction angle it implies
 change from one slice base to the next. The dashed line shows how one slice
-is handled, using 47 kPa as the example — chosen only because it is the average
+is handled, using 45.6 kPa as the example — chosen only because it is the average
 base stress over the critical surface. A slice at that stress is solved with the
-straight line that touches the curve there: cohesion c<sub>i</sub> = 15.8 kPa
-(the line's intercept) and friction angle φ<sub>i</sub> = 25.7° (its slope). Any
+straight line that touches the curve there: cohesion c<sub>i</sub> = 15.6 kPa
+(the line's intercept) and friction angle φ<sub>i</sub> = 25.9° (its slope). Any
 other stress would give a different line — a slice at 20 kPa a steeper line with
 a smaller intercept, a slice at 70 kPa a flatter one with a larger intercept.
 Every slice is solved with its own line at its own base stress. That leaves tens
@@ -164,8 +164,8 @@ file's circle onto a surface that exits at the toe:
 ![Spencer's critical circle](images/lem13_spencer.png){width=1000}
 
 **FS = 1.152**, against Hammah's published 1.152, on a circle centered at
-(18.39, 19.93) tangent at elevation 4.92, 16.93 m of failure
-surface carrying 954 kN/m of rock. Bishop's simplified method on the same file
+(18.15, 20.05) tangent at elevation 4.89, 16.81 m of failure
+surface carrying 920 kN/m of rock. Bishop's simplified method on the same file
 gives 1.150 against the paper's 1.153.
 
 <!-- test: file=files/xslope_rock_slope.xlsx, type=circular_search, num_slices=40, fs_spencer=1.152, fs_bishop=1.150, tolerance=0.005 -->
@@ -177,15 +177,15 @@ every slice base sits at its own normal stress. The solved slice table has
 both, one row per slice: the effective normal force `N'` over the base length
 `Δl` is the stress, and the `c` and `φ` columns hold the tangent the criterion
 supplied there. Across the 40 slices the
-effective normal stress reaches 74.5 kPa at the deepest part of the arc
-and falls to −2.3 kPa at the crest, where the surface is nearly vertical
+effective normal stress reaches 71.8 kPa at the deepest part of the arc
+and falls to −3.9 kPa at the crest, where the surface is nearly vertical
 and there is almost nothing standing on it. The tangent XSLOPE linearized at those
-stresses runs from c<sub>i</sub> = 11.4 to 18.9 kPa with
-φ<sub>i</sub> from 23.2° to 36.9°; the steepest of them,
+stresses runs from c<sub>i</sub> = 11.4 to 18.6 kPa with
+φ<sub>i</sub> from 23.4° to 36.9°; the steepest of them,
 36.9°, is the envelope's own slope at zero confinement, which is where
 the criterion is evaluated for any slice the solution puts in tension.
-Length-weighted along the surface the pair averages c<sub>i</sub> = 15.9
-kPa and φ<sub>i</sub> = 26.7°, at a mean normal stress of 47.3
+Length-weighted along the surface the pair averages c<sub>i</sub> = 15.8
+kPa and φ<sub>i</sub> = 26.8°, at a mean normal stress of 45.6
 kPa.
 
 That single pair is not a substitute for the criterion. Entered as a
@@ -293,7 +293,7 @@ ticked:
 ![The Parametric dialog set up for the GSI sweep](images/lem13_studio_parametric.png)
 
 GSI runs to 100, but we stop the sweep at 20 on purpose. The factor of safety is
-1.152 at GSI 5 and already 2.806 at GSI 20, and above that the rock cannot fail
+1.152 at GSI 5 and already 2.807 at GSI 20, and above that the rock cannot fail
 at all — a search on a slope that is far from failure covers the whole domain
 before it settles, and each step takes many times longer than the ones
 below it.
@@ -305,8 +305,8 @@ than the single search in Part A:
 
 Six searches, and the factor of safety more than doubles across them: 1.152 at
 the file's own GSI = 5, then 1.439, 1.740, 2.069 and 2.419 at each further step of
-three, and 2.806 at GSI = 20. The green marker reads the target off the solved
-points — **GSI = 8.611 for FS = 1.5** — so a change of three and a half points in
+three, and 2.807 at GSI = 20. The green marker reads the target off the solved
+points — **GSI = 8.608 for FS = 1.5** — so a change of three and a half points in
 a chart-read index separates this cut from the factor of safety typically required
 of a permanent rock slope. Each step solved with its own rock-mass constants:
 
@@ -317,7 +317,7 @@ of a permanent rock slope. Each step solved with its own rock-mass constants:
 | 11 | 0.0833 | 5.07 × 10<sup>−5</sup> | 0.580 | 97.0 | 1.740 |
 | 14 | 0.0927 | 7.08 × 10<sup>−5</sup> | 0.565 | 135 | 2.069 |
 | 17 | 0.1032 | 9.88 × 10<sup>−5</sup> | 0.553 | 182 | 2.419 |
-| 20 | 0.1149 | 1.38 × 10<sup>−4</sup> | 0.544 | 239 | 2.806 |
+| 20 | 0.1149 | 1.38 × 10<sup>−4</sup> | 0.544 | 239 | 2.807 |
 
 ### Effect of GSI on the envelope {#why-the-index-carries-it}
 
@@ -329,7 +329,7 @@ a = \tfrac12 + \tfrac16\!\left(e^{-GSI/15} - e^{-20/3}\right)$$
 
 The one that matters most here is *s*, because it sets the strength of the mass
 at low confinement, and this slope is a low-confinement problem: its critical
-surface carries an average normal stress of only 47 kPa. The table's
+surface carries an average normal stress of only 46 kPa. The table's
 σ<sub>ci</sub>·s<sup>a</sup> column is the mass's strength at zero confinement,
 and it climbs from 43.5 kPa at GSI 5 to 239 kPa at GSI 20 — five and a half times
 as much for fifteen points of GSI. Drawn at GSI 5, 30 and 70 — the file's rock
@@ -354,7 +354,7 @@ Open **Run → Parametric…** again and change three things: **Property** to `h
 ![Factor of safety against the disturbance factor](images/lem13_d_sweep.png){width=800}
 
 Five searches, and the factor of safety falls throughout: 1.152 at D = 0, then
-0.873, 0.616 and 0.378, and 0.176 at D = 1. The target is never bracketed, and the
+0.874, 0.616 and 0.378, and 0.176 at D = 1. The target is never bracketed, and the
 banner across the top of the figure states this rather than extrapolating a value past
 the last solved point — the factor of safety spans [0.176, 1.15] over the entire
 range D has. The curve crosses FS = 1 instead, between D = 0 and D = 0.25:
@@ -362,7 +362,7 @@ range D has. The curve crosses FS = 1 instead, between D = 0 and D = 0.25:
 | D | m<sub>b</sub> | *s* | σ<sub>ci</sub>·s<sup>a</sup> (kPa) | FS |
 | :---: | :---: | :---: | :---: | :---: |
 | 0 | 0.0672 | 2.60 × 10<sup>−5</sup> | 43.5 | 1.152 |
-| 0.25 | 0.0414 | 9.98 × 10<sup>−6</sup> | 24.0 | 0.873 |
+| 0.25 | 0.0414 | 9.98 × 10<sup>−6</sup> | 24.0 | 0.874 |
 | 0.50 | 0.0217 | 3.15 × 10<sup>−6</sup> | 11.8 | 0.616 |
 | 0.75 | 0.0088 | 7.72 × 10<sup>−7</sup> | 4.92 | 0.378 |
 | 1 | 0.0023 | 1.33 × 10<sup>−7</sup> | 1.66 | 0.176 |

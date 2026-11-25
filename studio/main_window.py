@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+import threading
 import traceback
 from urllib.parse import urlparse
 
@@ -131,6 +132,14 @@ class _LogStream(QObject):
         self._original = original
         # Queued so a worker-thread write() appends on the widget's (GUI) thread.
         self._emitted.connect(widget.appendPlainText, Qt.QueuedConnection)
+        # print() hands its arguments, the spaces between them and the closing
+        # newline to write() as separate calls, and appendPlainText starts a new
+        # line on every call: emitting each piece printed
+        # print("Number of fixed-head nodes:", 82) on three lines. So only whole
+        # lines are emitted; a partial line waits here for its newline. The lock
+        # keeps a worker thread's pieces from interleaving with the GUI thread's.
+        self._pending = ""
+        self._lock = threading.Lock()
 
     def write(self, text):
         if self._original is not None:
@@ -138,11 +147,22 @@ class _LogStream(QObject):
                 self._original.write(text)   # console: keep color emoji
             except Exception:
                 pass
-        text = text.rstrip("\n")
-        if text:
-            self._emitted.emit(_log_sanitize(text))   # log pane: text-style markers
+        with self._lock:
+            self._pending += text
+            if "\n" not in self._pending:
+                return
+            done, self._pending = self._pending.rsplit("\n", 1)
+        done = done.rstrip("\n")
+        if done:
+            self._emitted.emit(_log_sanitize(done))   # log pane: text-style markers
 
     def flush(self):
+        # An explicit flush (print(..., end="", flush=True)) shows a partial line
+        # now rather than whenever its newline comes.
+        with self._lock:
+            done, self._pending = self._pending, ""
+        if done.strip():
+            self._emitted.emit(_log_sanitize(done))
         if self._original is not None:
             try:
                 self._original.flush()
@@ -2161,6 +2181,13 @@ class MainWindow(QMainWindow):
                 # restore the snapshot and bail (the document is unchanged).
                 traceback.print_exc()
                 self.doc.rollback_edit()
+                return
+            if self.doc.edit_changed_nothing():
+                # OK on an editor that changed nothing: no undo step, no dirty
+                # flag, and every result stays. Dropping them here used to take a
+                # loaded transient seepage solution with them, and a Save after
+                # that deleted its files beside the workbook.
+                self.doc.drop_noop_edit()
                 return
             self.doc.commit_edit()        # -> re-render + mark dirty
             self._populate_inputs_tree()

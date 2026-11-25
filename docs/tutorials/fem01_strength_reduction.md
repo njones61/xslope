@@ -164,13 +164,13 @@ use them: it reads only strength, geometry and weight. Click
 ![Spencer's critical circle](images/fem01_lem_solution.png){width=1000}
 
 **Spencer's method gives FS = 1.376** on a toe circle centered at (144.94,
-119.60) with a radius of 119.60 ft, entering the crest at x = 47.7 and leaving
+120.46) with a radius of 120.46 ft, entering the crest at x = 47.2 and leaving
 at x = 158.5, just short of the toe. The search evaluated 77 candidate circles
-and took a few seconds. Bishop's simplified method (1.378) and
-Morgenstern-Price (1.375) settle on the **same circle**, within a quarter of a
-percent of Spencer.
+and took a few seconds. Morgenstern-Price (1.376) settles on the **same
+circle**, and Bishop's simplified method (1.378) on one with the same center x
+and a radius 0.43 ft larger; both are within a quarter of a percent of Spencer.
 
-<!-- test: file=files/xslope_ssrm_embankment_start.xlsx, type=circular_search, num_slices=40, fs_spencer=1.376, fs_bishop=1.378, fs_mprice=1.375, tolerance=0.005 -->
+<!-- test: file=files/xslope_ssrm_embankment_start.xlsx, type=circular_search, num_slices=40, fs_spencer=1.376, fs_bishop=1.378, fs_mprice=1.376, tolerance=0.005 -->
 
 The finite element run below reaches its answer independently and is compared
 with this number.
@@ -376,6 +376,7 @@ from a starting width of 1.0 it takes seven halvings to get under the 0.01
 tolerance, and seven is what it took.
 
 <!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3711, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm, f_stand=1.3671875, f_fail=1.375, check=edges, expected_elements=1087, expected_nodes=2286 -->
+<!-- The yielded-element count in the failure-state table below (481) is the default solver path's (fast_kernel='auto'), the count a reader's Studio run shows. The reference path (fast_kernel=False), which decides this tag, gives 463 there; the factor of safety, the bracket, every trial and every other number in that table agree on both paths. -->
 
 **The iteration count rises toward the critical factor.** Trials well below the
 critical factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.
@@ -535,7 +536,7 @@ instead, which is how two figures are compared at one setting; Auto size dims wh
 redraw the view at every step, so the control can also animate the failure:
 start at Auto and hold the up arrow, and the mesh deforms a
 step at a time — the crest dropping and the toe bulging in what amounts to an
-animation of the slope failing. The next section shows why Auto exists — the same 15% asks for 7.5× on the converged state, because the
+animation of the slope failing. The next section shows why Auto exists — the same 15% asks for 6.6× on the converged state, because the
 two states differ eightfold in how far the slope moved.
 
 ### Displacement vectors
@@ -567,14 +568,14 @@ the same band without running away on it.
 | *F* | 1.3672 | 1.5768 |
 | Equilibrium reached | yes | no |
 | Viscoplastic iterations | 393 | 12,000 — the budget |
-| Elements that have yielded, of 1,087 | 463 | 522 |
+| Elements that have yielded, of 1,087 | 481 | 522 |
 | Largest displacement (ft) | 0.999 | 8.090 |
 | Relative to the elastic response | 17.6× | 142.6× |
 
 An element counts as yielded when its stress has reached the weakened strength
 envelope, so it is carrying all the shear it can.
 
-At *F* = 1.3672 the slope is not intact — 463 elements have yielded and the
+At *F* = 1.3672 the slope is not intact — 481 elements have yielded and the
 crest has moved 0.999 ft, about 18 times its own elastic response — but it
 **stops**. The stresses redistribute onto soil that has strength left, the
 iteration settles, and there is an equilibrium state to report. At *F* = 1.58
@@ -612,8 +613,8 @@ This tutorial covered:
   tan φ/*F* at every trial, and the factor of safety as the largest *F* the
   slope still finds equilibrium at.
 - The two elastic properties a mesh needs, where a nominal E comes from, and the
-  measurement that E fixes the scale of every displacement while changing the
-  factor of safety not at all.
+  measurement that E fixes the scale of every displacement while moving the
+  factor of safety by at most one bisection step.
 - Quadratic elements as a requirement rather than a preference, a target element
   size chosen against what the mechanism needs, and the base and side conditions
   the mesh is held by.
@@ -623,8 +624,8 @@ This tutorial covered:
   bracket's stopping width, and the per-trial iteration budget, after which a
   trial that is still moving goes on only if its movement is dying away.
 - Reading the mechanism out of shear strain, a deformed mesh and displacement
-  vectors, and the converged state against the failed one on a single color
-  scale.
+  vectors, and the converged state against the failed one, each on its own
+  color scale.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Finite Element Analysis](../fem/overview.md) gives the formulation, the

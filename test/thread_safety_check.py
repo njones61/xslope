@@ -40,6 +40,12 @@ result:
      sending one — and the window is then destroyed at interpreter shutdown with
      the persistent mesh thread still in its event loop, which aborts the process
      on the way out. Both paths are exercised here.
+  E. THE LOG PANE PRINTS WHOLE LINES, FROM ANY THREAD. print() hands write() its
+     arguments, the separators and the newline as separate calls, and the pane
+     starts a new line on each emit, so a stream that emitted every write printed
+     ``print("Number of fixed-head nodes:", 82)`` on three lines. The stream holds a
+     partial line until its newline, and engine output reaches it from worker
+     threads, so pieces from several threads must not interleave either.
 
 Nothing here is a solver check: one small LEM run is solved, for its allocations.
 
@@ -315,10 +321,48 @@ def test_quit_stops_threads():
     return failures
 
 
+# --- E. the Log pane prints whole lines ---------------------------------------
+
+def test_log_whole_lines():
+    """E. A multi-part print is one line in the Log pane, and lines printed from
+    several threads at once each arrive whole."""
+    from PySide6.QtWidgets import QApplication, QPlainTextEdit
+    from studio.main_window import _LogStream
+    app = QApplication.instance() or QApplication([])
+    pane = QPlainTextEdit()
+    stream = _LogStream(pane, None)
+    failures = []
+
+    def burst(tag):
+        for i in range(100):
+            print(tag, i, "of", 100)
+
+    with contextlib.redirect_stdout(stream):
+        print("Number of fixed-head nodes:", 82)
+        print("a", "b", sep="|")
+        workers = [threading.Thread(target=burst, args=(f"w{k}",)) for k in range(3)]
+        for t in workers:
+            t.start()
+        for t in workers:
+            t.join()
+    app.processEvents()
+    lines = pane.toPlainText().split("\n")
+    if lines[:2] != ["Number of fixed-head nodes: 82", "a|b"]:
+        failures.append(f"a multi-part print did not arrive as one line: {lines[:4]!r}")
+    burst_lines = lines[2:]
+    torn = [l for l in burst_lines
+            if len(l.split()) != 4 or l.split()[2:] != ["of", "100"]]
+    if len(burst_lines) != 300 or torn:
+        failures.append(f"{len(burst_lines)} of 300 threaded lines, "
+                        f"{len(torn)} torn (e.g. {torn[:2]!r})")
+    return failures
+
+
 CHECKS = [("nothing Qt reaches a runner", test_no_qt_in_runners),
           ("every runner is a RunnerThread", test_runner_base),
           ("the collector stays on the GUI thread", test_gc_stays_on_the_gui_thread),
-          ("quitting stops every thread", test_quit_stops_threads)]
+          ("quitting stops every thread", test_quit_stops_threads),
+          ("the Log pane prints whole lines", test_log_whole_lines)]
 
 
 @studio_settings.isolated

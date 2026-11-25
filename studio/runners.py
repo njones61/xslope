@@ -1083,6 +1083,7 @@ class SensitivityRunner(RunnerThread):
               f"every σ-carrying material…")
         ok, res = variance_contribution(self._sd, method=method,
                                         search=o.get("search", True),
+                                        num_slices=int(o.get("num_slices", 40)),
                                         progress_callback=cb,
                                         cancel_check=self._cancel.is_set)
         if not ok:
@@ -1195,6 +1196,7 @@ class ReliabilityRunner(RunnerThread):
         ok, result = reliability(
             sd, o["method"], engine="taylor", rapid=o.get("rapid", False),
             circular=circular, search=o.get("search", True), debug_level=0,
+            num_slices=int(o.get("num_slices", 40)),
             progress_callback=self._progress_cb(), cancel_check=self._cancel.is_set)
         if not ok:
             self.failed.emit(str(result))

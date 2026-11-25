@@ -246,7 +246,7 @@ def lem01_sheets():
            _filled_template("lem01_main.xlsx", {
                "main!D8": "Imperial", "main!D10": 62.4, "main!D11": 0,
                "main!D12": 0, "main!D13": 0}),
-           "main", rows=(1, 25), cols="A:D")
+           "main", rows=(1, 26), cols="A:D")
     render("lem01_sheet_mat.png", LEM01, "mat", rows=(9, 13), cols="A:Z")
     # profile spans two neighbouring tables so the capture reads like the real
     # sheet — Profile Line #2 sits empty beside the filled #1, as the reader
@@ -367,7 +367,7 @@ def t0_template():
     below it the sheet holds the hidden source data behind the dropdowns, which is
     not part of what a reader fills in.
     """
-    render("t0_template_main.png", TEMPLATE, "main", rows=(1, 25), cols="A:G")
+    render("t0_template_main.png", TEMPLATE, "main", rows=(1, 26), cols="A:G")
 
 
 # --------------------------------------------------------------------------- #
@@ -724,7 +724,7 @@ LEM04_SLICES = 40
 #: reader types back into the model. Every figure of the water comparison is
 #: this surface under a different water assumption, so the page's dry and wet
 #: readings differ by the water and by nothing else.
-LEM04_CIRCLE = dict(Xo=182.37, Yo=88.32, Depth=26.90, R=88.32 - 26.90)
+LEM04_CIRCLE = dict(Xo=182.37, Yo=90.37, Depth=27.04, R=90.37 - 27.04)
 
 
 def _lem04_solve(model, method="spencer", circle=None):
@@ -1598,7 +1598,7 @@ LEM12_METHOD = "spencer"
 LEM12_SLICES = 40
 #: The page's specified-force edit: the two forces the auto run develops at its own
 #: critical surface, to the digits the report's slice table prints them at.
-LEM12_H = (2540.7, 1827.0)
+LEM12_H = (2551.2, 1831.2)
 #: The page's spacing edit: 6 ft out to 12 ft, S/D from 3 to 6.
 LEM12_S = 12.0
 #: The held spacing sweep, in feet. D = 2, so this is S/D from 1.5 to 8 — either
@@ -2226,7 +2226,7 @@ def seep01_sheets():
     render("seep01_sheet_main.png",
            _filled_template("seep01_main.xlsx", {
                "main!D8": "SI", "main!D9": "yr", "main!D10": 9.81}),
-           "main", rows=(1, 25), cols="A:D")
+           "main", rows=(1, 26), cols="A:D")
     render("seep01_sheet_mat.png", SEEP01, "mat", rows=(10, 12), cols="AG:AQ",
            identity_cols="A:B")
     render("seep01_sheet_profile.png", SEEP01, "profile", rows=(1, 15), cols="A:H")

@@ -238,8 +238,8 @@ Click **Run → Run Seep…**
 ![The Run Seepage dialog](images/seep04_studio_run_seep.png)
 
 The dialog offers two settings, **Convergence tol** and **Max iterations**.
-Leave both at their defaults, `0.00010000` and `400` — this model closes in well
-under ten sweeps — and click **Run**. The **Model checks** panel reads
+Leave both at their defaults, `0.00010000` and `400` — this model closes in about
+eight sweeps — and click **Run**. The **Model checks** panel reads
 **No problems found for this run.**
 
 In the **Display** panel, tick **Filled contours**.
@@ -385,8 +385,9 @@ set **Flux value (m/sec):**, and enter or copy-paste the block's two points.
 
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 
-The list now reads `Head 1  (h = 10)`, the three flux blocks with their rates,
-and `Exit face`. Flux 1 is selected in the shot — its rate in the value box
+The list now holds `Head 1  (h = 10)`, the three flux blocks and `Exit face`.
+A new block's label in the list shows its rate the next time the editor opens;
+the value box shows it now. Flux 1 is selected in the shot — its rate in the value box
 (displayed shortened), its two points below — and the preview draws the selected
 boundary bold over its stretch of the upstream face, dimming the others.
 
@@ -430,10 +431,15 @@ Save the model. The completed file calls it `xslope_dam_infiltration.xlsx`.
 
 ## Running it again
 
-Click **Run → Run Seep…** and **Run**, with the same two settings as before —
-there is no need to rebuild the mesh, because every vertex of the three rain
-blocks already sits on a pinned node of the one built earlier. The solver
-reaches the answer in the same handful of sweeps it took in dry weather, with
+Adding boundary blocks clears the mesh, so **Run → Run Seep…** is grayed out
+until the mesh is built again. Click **Run → Build Mesh…** and build it with the
+same settings as before (**Linear triangles (tri3)**, **Auto-size from geometry**
+unticked, **Target element size** `1.0`). Every vertex of the three rain blocks
+already sits on a node of the first mesh, so the mesh comes out the same: 473
+nodes and 833 triangles.
+
+Click **Run → Run Seep…** and **Run**, with the same two settings as before. The
+solver reaches the answer in the same eight sweeps it took in dry weather, with
 the same 13 of 13 exit-face nodes draining at the end.
 
 ![The dam under steady rain](images/seep04_wet.png){width=1000}
@@ -514,7 +520,7 @@ afterwards.)
 
 The discharge comes out at **6.949 × 10<sup>−7</sup> m³/s per m**, against
 4.916 × 10<sup>−7</sup> at the file's rain rate, and the phreatic surface on
-the crest centerline stands at **9.55 m**, up from 8.49 m. Doubling the rain
+the crest centerline stands at **9.55 m**, up from 8.50 m. Doubling the rain
 raised the phreatic surface by about a meter.
 
 ### Six rates on one section
@@ -529,7 +535,7 @@ whole family on one section:
 | 0 | 0 | 2.808 × 10<sup>−7</sup> | 7.58 |
 | 0.025 | 2.5 × 10<sup>−9</sup> | 3.340 × 10<sup>−7</sup> | 7.80 |
 | 0.05 | 5 × 10<sup>−9</sup> | 3.869 × 10<sup>−7</sup> | 8.03 |
-| 0.1 | 1 × 10<sup>−8</sup> | 4.916 × 10<sup>−7</sup> | 8.49 |
+| 0.1 | 1 × 10<sup>−8</sup> | 4.916 × 10<sup>−7</sup> | 8.50 |
 | 0.2 | 2 × 10<sup>−8</sup> | 6.949 × 10<sup>−7</sup> | 9.55 |
 | 0.4 | 4 × 10<sup>−8</sup> | 1.246 × 10<sup>−6</sup> | none — saturated to the surface |
 
@@ -651,8 +657,8 @@ series on the left.
 ![The Transient editor with the storm defined](images/seep04_studio_transient.png)
 
 Type `storm` over the default `t1` in the first **Series names:** box and
-`storm_face` over `t2` in the second, then enter or copy-paste the schedule into the
-series table:
+`storm_face` over `t2` in the second, then type the schedule into the series
+table cell by cell (this table does not take a paste):
 
 | time | storm | storm_face |
 | :---: | :---: | :---: |
@@ -702,10 +708,10 @@ drives it:
 
 ![The boundary list with the flux values bound to series](images/seep04_studio_seep_bc_series.png)
 
-The list now reads `Flux 1  (q = storm_face)`, `Flux 2  (q = storm)` and
-`Flux 3  (q = storm_face)` where it read three rates, and the head boundary is still
-the number 10 — a model can mix constant and time-varying boundaries freely.
-Click **OK**, and save the model under a name of your own; the file linked at the
+Click **OK** and open **Seep BC** again: the list reads `Flux 1  (q = storm_face)`,
+`Flux 2  (q = storm)` and `Flux 3  (q = storm_face)` where it read three rates,
+and the head boundary is still the number 10 — a model can mix constant and
+time-varying boundaries freely. Click **OK**, and save the model under a name of your own; the file linked at the
 top of this section calls it `xslope_dam_infiltration_storm.xlsx`.
 
 ### Running the transient analysis
@@ -716,15 +722,20 @@ before, because the file has a `tseep` sheet. Set it to **Transient
 defaults, and click **Run**.
 
 The run reports **28 saved frames** — t = 0, the 24 times on the 25-day grid, and
-the three series breakpoints that do not fall on it — reached in **129 steps**. The
+the three series breakpoints that do not fall on it — reached in about **130 steps**. The
 step size is chosen from how fast the field is moving, so the low count shows
-that the dam changes slowly for most of the 600 days.
+that the dam changes slowly for most of the 600 days. Counts like this one, and
+the sweep counts above, can differ by a few between computers; the discharges and
+heads do not.
 
 ### Reading the frames
 
 A transient run opens in a **Seep · Transient** tab holding every frame, with a
 play bar under the plot; [SEEP-3](seep03_reservoir_drawdown.md#reading-the-frames)
-covers its controls. Two of the 28 frames are described below.
+covers its controls. Two of the 28 frames are described below. The frames open as
+line contours at 20 levels with no arrows; to see them as the two figures draw
+them, tick **Velocity vectors** in the tab's Display panel and set **Contour
+levels** to `12`.
 
 ![Day 200: the last day of full-rate rain, the wettest the dam gets](images/seep04_studio_playbar_day200.png)
 

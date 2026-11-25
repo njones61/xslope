@@ -86,7 +86,7 @@ equilibrium methods point it in the direction that drives the slope, so k<sub>h<
 Open **Materials** and set the **Show parameters for:** toggles to **LEM** alone. The starter file has one material, the
 fill, with the R envelope as its strength:
 
-| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ (deg) | c/p | r-elev | d (psf) | ψ (deg) | u |
+| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ | c/p | r-elev | d | psi | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | fill | 135 | | mc | 60 | 23 | 0 | 0 | 0 | 0 | none |
 
@@ -97,6 +97,9 @@ fill, with the R envelope as its strength:
   it would any c and φ.
 - **d** and **psi** are 0, so nothing in the run treats the fill as undrained in a second stage.
 - **u** is `none`: the slope is dry.
+- The columns to the right of **u** (**ru**, **phi_b**, **s_cap**, and the **pow_** and **hb_** columns) belong to other
+  pore-pressure and strength options. This tutorial leaves them as they are, and every row below gives only the columns
+  from **name** to **u**.
 
 Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** = `Auto search`, and leave **Number of slices**
 at 40 and every box under **Seismic** clear:
@@ -117,7 +120,7 @@ The two-stage analysis needs the drained strengths and the K<sub>c</sub> = 1 env
 **Materials** again and enter the row below (or paste it into the table view starting at **name**). The c and φ columns now hold c′ and φ′, and the **d** and **psi** columns hold the
 K<sub>c</sub> = 1 envelope:
 
-| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ (deg) | c/p | r-elev | d (psf) | ψ (deg) | u |
+| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ | c/p | r-elev | d | psi | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | fill | 135 | | mc | 0 | 45 | 0 | 0 | 64 | 24.4 | none |
 
@@ -258,7 +261,7 @@ Two-stage seismic stages on the critical circle: Stage 1 (static) FS = 2.0855, S
 
 To put the R envelope back, open **Materials** and enter the row below, with d and ψ set back to 0:
 
-| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ (deg) | c/p | r-elev | d (psf) | ψ (deg) | u |
+| name | γ (pcf) | γsat (pcf) | option | c (psf) | φ | c/p | r-elev | d | psi | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | fill | 135 | | mc | 60 | 23 | 0 | 0 | 0 | 0 | piezo |
 

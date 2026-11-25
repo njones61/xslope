@@ -171,7 +171,7 @@ enough to put a dozen interface elements on the two joint lines. Quadratic
 elements are a requirement for a stability mesh rather than a preference, for the
 reason [FEM-1](fem01_strength_reduction.md) gives.
 
-The dialog reports what it built: **768 nodes, 344 elements, and 12 joint
+The Log pane reports what it built: **768 nodes, 344 elements, and 12 joint
 elements on 2 jointed lines.**
 
 ![The mesh, with the two jointed lines drawn over it](images/fem05_mesh.png){width=900}
@@ -217,7 +217,9 @@ vectors** or **Displacement vs F**. The rock is elastic, so no part of it can
 strain plastically and there is no strain field to draw; everything that
 happened, happened on the two lines, and **Viscoplastic shear strain** draws as
 **Joint slip** instead: the section a flat gray, and the only colorbar the slip
-on the joints, in meters.
+on the joints, in meters. The view opens on the **At failure** field state; set
+**Field state** to **Last converged**, the last strength at which the slab stood,
+which is the state the figures below are drawn at.
 
 ![The joint slip at the critical factor: the bedding plane bright along nearly its whole length, the release joint drawn as two parted lines where it has opened](images/fem05_joint_slip.png){width=900}
 
@@ -312,16 +314,19 @@ The region is entered in the polygons editor, reached from the Inputs tree
 under **Polygons**, the same editor the section itself is in. Add a polygon, set
 its **Type** to `joints`, type `Toppling zone` in the **Name** box below it, and
 enter or paste its four vertices. The shape is the wedge the base plane cuts off, the counterpart of
-Part 1's slab: from the base plane's upper tip at (9, 6.887), down the plane to
-the toe at (20.928, 0), up the face to the crest at (14, 12), and back along the
+Part 1's slab: from the base plane's upper tip at (9, 6.8868), down the plane to
+the toe at (20.9282, 0), up the face to the crest at (14, 12), and back along the
 ground surface to (9, 12) above the tip.
 
 | x | y |
 | :---: | :---: |
-| 9.000 | 6.887 |
-| 20.928 | 0.000 |
-| 14.000 | 12.000 |
-| 9.000 | 12.000 |
+| 9.0000 | 6.8868 |
+| 20.9282 | 0.0000 |
+| 14.0000 | 12.0000 |
+| 9.0000 | 12.0000 |
+
+Enter these to the four decimals shown, here and in the base plane row below;
+rounded to three decimals, the mesh build fails.
 
 The second input to build a joint network is the **Build network…** dialog,
 which defines *what* the set is. Open the joints editor from the Inputs tree under
@@ -343,7 +348,7 @@ stated dip; the other two are `Cross-jointed (two sets)`, which crosses two sets
 and `Voronoi (blocky mass)`, which fills the region with a tessellated block mass
 at no preferred orientation. This set is a parallel one.
 
-**Dip** is the orientation, measured counterclockwise from horizontal, so a dip
+**Dip (deg)** is the orientation, measured counterclockwise from horizontal, so a dip
 between 0 and 90 leans out of the face and a dip between 90 and 180 leans back
 into it. **110°** here is a set standing 70° from horizontal and leaning back
 into the slope, so the rock above the base plane forms a stack of
@@ -382,7 +387,7 @@ paste it in.
 
 | Label | x1 | y1 | x2 | y2 | c | phi |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| base plane | 9.000 | 6.887 | 20.928 | 0.000 | 0 | 35 |
+| base plane | 9.0000 | 6.8868 | 20.9282 | 0.0000 | 0 | 35 |
 
 Close the joints editor. The Inputs plot now shows six joint lines — the base
 plane and the five columns standing on it — with the joint region's outline
@@ -395,7 +400,7 @@ dashed behind them:
 ### Running the toppling stack
 
 The joints have changed, so the mesh has to be built again: **Run → Build
-Mesh…**, **tri6** at **1.5 m** as before. The dialog reports **947 nodes, 402
+Mesh…**, **tri6** at **1.5 m** as before. The Log pane reports **947 nodes, 402
 elements, and 41 joint elements on 6 jointed lines** — six lines from one typed
 row and five generated ones. Then **Run → Run FEM…** with the same settings as
 Part 1: SSRM, the bracket from 1.0 to 2.0, tolerance 0.01, **Max iterations per
@@ -408,7 +413,8 @@ about two minutes and reports
 
 ![The deformed blocks: the columns lean out over the base plane rather than sliding along it](images/fem05_fem_blocks_topple.png){width=900}
 
-Read the deformed-block figure first. The columns are separate bodies and they
+Set **Field state** to **Last converged** again, as in Part 1; the figures
+here are drawn there. Read the deformed-block figure first. The columns are separate bodies and they
 move as bodies, but they do not slide down the base plane the way Part 1's slab
 slid down its bedding plane. Each column rotates
 forward about its own downslope corner, opening the joint behind it and closing
@@ -487,8 +493,8 @@ summary notes that the factor of safety depends on the iteration limit here and
 may change if **Max iterations per trial** is raised. With the limit raised to
 200,000 the answer does not change: the trial at 1.0938 is still creeping at the
 new limit, and the search returns the same 1.090. The factor is a little under
-the column set's 1.105, and the figures show why the two are close in number and
-differ in kind:
+the column set's 1.105, and the figures, at **Last converged** as before, show
+why the two are close in number and differ in kind:
 
 ![Joint slip on the Voronoi mass: the base plane slipping along all but its upper end, a chain of block walls slipping from its upper tip up to the crest, and the walls nearest the face opened](images/fem05_joint_slip_voronoi.png){width=900}
 

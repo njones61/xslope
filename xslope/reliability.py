@@ -184,7 +184,7 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
                 progress_callback=None, cancel_check=None,
                 fs_tol=None, tol=None, max_iter=None, composite=False, seed='circles',
                 search=True, search_opts=None, use_file_window=True,
-                check_inputs=True):
+                check_inputs=True, num_slices=None):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
 
@@ -223,6 +223,12 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
             windowed model gets the same surface family here as anywhere else.
             Explicit ``search_opts`` win per limit. Set False to search
             unconstrained regardless of what the file declares.
+        num_slices : int, optional
+            Slices per surface, for every one of the ``1 + 2N`` solves. ``None``
+            (the default) keeps each step's own default: 40 on a specified
+            surface (``search=False``) and in a circular search, and the
+            non-circular search's own 30. Studio passes its dialog's Number of
+            slices here, as its Run LEM does.
 
     Returns:
         tuple: (success, result) where result contains reliability analysis results
@@ -246,6 +252,10 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         _circ_kwargs['composite'] = True
     if seed != 'circles':
         _circ_kwargs['seed'] = seed
+    if num_slices is not None:
+        _search_kwargs['num_slices'] = int(num_slices)
+        _circ_kwargs['num_slices'] = int(num_slices)
+    _fixed_slices = 40 if num_slices is None else int(num_slices)
 
     # The search window, read once from the model and applied to all 1 + 2N
     # searches. A Taylor run DIFFERENCES the F+ and F- searches against each
@@ -304,10 +314,11 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         # mistake and must not refuse the run.
         if circular:
             ok_, res_ = generate_slices(sd_, circle=sd_['circles'][0],
-                                        num_slices=40, composite=composite,
+                                        num_slices=_fixed_slices, composite=composite,
                                         check_inputs=False, rapid=rapid)
         else:
-            ok_, res_ = generate_slices(sd_, non_circ=sd_['non_circ'], num_slices=40,
+            ok_, res_ = generate_slices(sd_, non_circ=sd_['non_circ'],
+                                        num_slices=_fixed_slices,
                                         check_inputs=False, rapid=rapid)
         if not ok_:
             return None

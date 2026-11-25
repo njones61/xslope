@@ -12,6 +12,14 @@ wrong, so the only symptom is a reader who cannot make a second run.
 Each leg opens a results view, closes it the way the action does, lets Qt delete the
 widgets, and then updates the Run menu exactly as the window does.
 
+The fourth check is the other side of the first: OK on an editor that changed
+nothing closes nothing. Every editor used to drop every result on OK, so opening
+Materials just to read it took a loaded transient seepage solution with it, and a
+Save afterwards deleted that solution's files beside the workbook. Each editor is
+opened and accepted unchanged on the transient earth dam: the results stay, no undo
+step is added, the file stays clean, and a redo branch survives. A real edit still
+drops the results.
+
 Every window here is built against a scratch settings store
 (``tools.studio_settings``): opening a file appends it to Studio's recent-files list,
 and a check must never reorder the person's own.
@@ -93,9 +101,99 @@ def run():
             got = _leg(mw, name, close)
             print(f"  {name:<40s} {'ok' if not got else 'FAIL'}")
             fails += got
+        got = _noop_ok(mw)
+        print(f"  {'OK on an editor that changed nothing':<40s} "
+              f"{'ok' if not got else 'FAIL'}")
+        fails += got
     finally:
         mw.doc._dirty = False
         mw.close()
+    return fails
+
+
+#: The transient earth dam: circles, profile lines, seepage blocks, a transient
+#: schedule and a saved transient solution, so most editors have something to show.
+NOOP_MODEL = os.path.join(_REPO, "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+
+#: RS2-51's geotextile wall: jointed reinforcement lines with a pullout profile the
+#: loader derives (an object with no equality of its own) and a joint word the
+#: Reinforcement editor writes in its own case. Profile lines is left out on it:
+#: the model has no bottom elevation and that editor writes 0 for a blank one, a
+#: real change (queued after 1.1.0).
+NOOP_WALL = os.path.join(_REPO, "docs/verification/files/rocscience/vp090_fem.xlsx")
+
+
+def _noop_ok(mw):
+    """OK on every editor with nothing changed keeps every result and the history;
+    a real edit still drops them."""
+    import shutil
+    import tempfile
+    from PySide6.QtWidgets import QDialog
+    from studio.main_window import CATEGORY_EDITORS
+    fails = []
+    tmp = tempfile.mkdtemp(prefix="noop_ok_")
+    for src in (NOOP_MODEL, NOOP_WALL):
+        base = os.path.splitext(os.path.basename(src))[0]
+        for f in os.listdir(os.path.dirname(src)):
+            if f.startswith(base + ".") or f.startswith(base + "_"):
+                shutil.copy(os.path.join(os.path.dirname(src), f), tmp)
+    model = os.path.join(tmp, os.path.basename(NOOP_MODEL))
+    wall = os.path.join(tmp, os.path.basename(NOOP_WALL))
+    real_exec = QDialog.exec
+    QDialog.exec = lambda self: 1          # every editor accepted as opened
+    try:
+        runs = [(model, cat) for cat in CATEGORY_EDITORS]
+        runs += [(wall, cat) for cat in CATEGORY_EDITORS if cat != "profile"]
+        for path, cat in runs:
+            mw.doc._dirty = False
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.open_path(path)
+            keep = object()
+            mw.doc.results["transient_seep"] = keep
+            n_undo = len(mw.doc._undo)
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.edit_category(cat)
+            if mw.doc.results.get("transient_seep") is not keep:
+                fails.append(f"OK on the unchanged {cat} editor dropped the results "
+                             f"({os.path.basename(path)})")
+            if len(mw.doc._undo) != n_undo or mw.doc.dirty:
+                fails.append(f"OK on the unchanged {cat} editor added an undo step "
+                             f"or marked the file changed ({os.path.basename(path)})")
+        # A redo branch survives an unchanged OK; a real edit still drops results.
+        mw.doc._dirty = False
+        with contextlib.redirect_stdout(io.StringIO()):
+            mw.open_path(model)
+        mats = mw.doc.slope_data["materials"]
+        mw.doc.begin_edit("test edit")
+        mats[0]["c"] = float(mats[0].get("c") or 0.0) + 1.0
+        mw.doc.commit_edit()
+        mw.doc.undo()
+        if not mw.doc._redo:
+            fails.append("the test could not set up a redo branch")
+        with contextlib.redirect_stdout(io.StringIO()):
+            mw.edit_category("materials")
+        if not mw.doc._redo:
+            fails.append("OK on the unchanged materials editor lost the redo branch")
+        keep = object()
+        mw.doc.results["transient_seep"] = keep
+        editor = CATEGORY_EDITORS["materials"]
+        real_apply = editor.apply
+
+        def bump(sd, dlg):
+            real_apply(sd, dlg)
+            sd["materials"][0]["c"] = float(sd["materials"][0].get("c") or 0.0) + 1.0
+        editor.apply = bump
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.edit_category("materials")
+        finally:
+            editor.apply = real_apply
+        if mw.doc.results.get("transient_seep") is keep:
+            fails.append("a real Materials edit kept a result it should have dropped")
+    finally:
+        QDialog.exec = real_exec
+        mw.doc._dirty = False
+        shutil.rmtree(tmp, ignore_errors=True)
     return fails
 
 

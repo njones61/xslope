@@ -358,10 +358,13 @@ Iteration 5: residual = 3.232851e+00, closure = 5.411e+00, relax = 1.000, 0/30 e
 Iteration 15: exit face unchanged for 10 iterations — Newton steps from here
 Iteration 16: Newton step, residual = 6.761394e-01, step shortened to 0.5
 ...
-Iteration 22: Newton step, residual = 5.121811e-11
+Iteration 22: Newton step, residual = 5.121776e-11
 Iteration 22: Newton steps settled; the next iteration tests the exit face
-Converged in 23 iterations (residual = 4.441e-14, closure = 1.011e-11, exit face stable)
+Converged in 23 iterations (residual = 5.329e-14, closure = 1.025e-11, exit face stable)
 ```
+
+Residuals this small can differ in their last digits between computers; the
+iteration count and the flow do not.
 
 The last column is the number of active exit-face nodes, and on this dam it
 ends at **zero**. The iteration starts by holding 12 of the 30 nodes wet,
@@ -549,6 +552,7 @@ and then prints a line per saved frame:
 ```text
 Building seepage data (transient, BC set 1)…
 Running transient seepage analysis… (initial condition: up to 2000 iterations)
+…
   t=2: frame saved (steps so far=6, mass-balance closure=1.38e-07)
   t=15: frame saved (steps so far=53, mass-balance closure=7.12e-05)
   t=30: frame saved (steps so far=136, mass-balance closure=6.37e-05)
@@ -585,8 +589,9 @@ and barely at all by the end.
 A transient run opens in a **Seep · Transient** tab holding all twelve frames,
 with a play bar under the plot. The tab has a
 Display panel of its own, so the **Filled contours** you ticked on the steady
-view does not follow you here — the frames open on the transient defaults shown
-below:
+view does not follow you here. The frames open as line contours at 20 levels with
+no arrows. To see them as the figure below draws them, tick **Velocity vectors**
+in that panel and set **Contour levels** to `12`:
 
 ![The play bar at day 30, mid drawdown](images/seep03_studio_playbar.png)
 
@@ -612,8 +617,8 @@ vectors in the upstream shell point back *toward* the reservoir: with the pool
 down to elevation 8 and still falling, the shell drains out through the face it
 was filled through.
 
-The play bar shows one frame at a time, drawn on the transient view's defaults —
-line contours with velocity vectors, each frame scaled to itself. The figure
+The play bar shows one frame at a time, drawn as line contours with the
+velocity vectors you ticked, each frame scaled to itself. The figure
 below draws four of the saved frames differently, as one picture: filled
 contours, no vectors, and a single color scale pinned across the panels — which
 the play bar does not do — so the panels can be compared directly:

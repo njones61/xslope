@@ -8,8 +8,8 @@ description: "Build a three-layer slope with a piezometric line in XSLOPE, searc
 A 44 ft slope in three soil layers, with a piezometric line falling from
 elevation 80 behind the crest to the toe. Every strength here is an **effective
 stress** strength — a c′ and a φ′ — so each one depends on the pore pressure on
-the failure surface: on the critical circle the factor of safety is **1.667 with
-the pore pressures switched off and 1.301 with them on.**
+the failure surface: on the critical circle the factor of safety is **1.671 with
+the pore pressures switched off and 1.305 with them on.**
 
 ![The slope: 44 ft in three soils on a rigid base, with the piezometric line falling from behind the crest to the toe](images/lem04_problem_sketch.png){width=1000}
 
@@ -17,7 +17,7 @@ the pore pressures switched off and 1.301 with them on.**
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
 <div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>20–25 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>~35 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to put water in a slope model: how to define a
@@ -337,14 +337,14 @@ the critical one in red:
 
 ![The circular search](images/lem04_search.png){width=1000}
 
-**FS = 1.301**, and the critical circle is not the one we entered: the search
+**FS = 1.305**, and the critical circle is not the one we entered: the search
 settled on a deep circle through the soft foundation clay — **Xo = 182.37,
-Yo = 88.32, Depth = 26.90** — entering the crest well behind the shoulder and
+Yo = 90.37, Depth = 27.04** — entering the crest well behind the shoulder and
 exiting past the toe, with most of its base in soil 3. That is to be expected:
 soil 3 is the weakest soil in the section, and circles that stay
 above it come back around 1.37 or higher.
 
-<!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.301, tolerance=0.005 -->
+<!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.305, tolerance=0.005 -->
 
 ### Holding the circle still {#holding-the-circle-still}
 
@@ -354,25 +354,26 @@ model and stop searching.
 
 There is no need to read the circle off the picture: the search prints it when
 it converges, in Studio's **Log** pane, as
-`at (x=182.37, y=88.32, depth=26.90)`. Those are the three numbers to enter:
+`at (x=182.37, y=90.37, depth=27.04)`. Those are the three numbers to enter:
 
 - **Studio** — open **Circles**, and set the one row to **Xo** `182.37`,
-  **Yo** `88.32`, **Option** `Depth`, **Depth** `26.9`. Then **Run LEM…** with
+  **Yo** `90.37`, **Option** `Depth`, **Depth** `27.04`. Then **Run LEM…** with
   **Analysis** = `Single surface`, which solves the first circle exactly as
   entered.
-- **Excel** — `circles!B3` = `182.37`, `circles!C3` = `88.32`, `circles!E3` =
-  `26.9`.
+- **Excel** — `circles!B3` = `182.37`, `circles!C3` = `90.37`, `circles!E3` =
+  `27.04`.
 - **Assistant** — say: *"Replace the circle with the critical one: Xo 182.37,
-  Yo 88.32, Depth 26.9, and run a single-surface analysis."*
+  Yo 90.37, Depth 27.04, and run a single-surface analysis."*
 
 ![Spencer on the held circle, wet](images/lem04_solution_wet.png){width=1000}
 
-**FS = 1.301** — the search's answer, reproduced on the fixed circle. The blue bars on the slice bases are the legend's **Pore Pressure (u)**,
-and on 38 of the 39 slice bases they are not zero. Each one is the piezometric
+**FS = 1.305** — the search's answer, reproduced on the fixed circle. The blue bars on the slice bases are the legend's **Pore Pressure (u)**,
+and on 37 of the 40 slice bases they are not zero. Each one is the piezometric
 reading — u = γ<sub>w</sub> × the vertical distance from the base to the line
-— and the largest, **2064 psf at x = 163.6**, is a base sitting 33.1 ft below
-the line (62.4 × 33.1). Only the first slice reads zero: the circle enters the
-crest at elevation 84 and that slice's base, at 77.5, is still above the line.
+— and the largest, **2061 psf at x = 163.5**, is a base sitting 33.03 ft below
+the line (62.4 × 33.03). The first three slices read zero: the circle enters the
+crest at elevation 84, and their bases, down to elevation 75.7, are still above
+the line, which runs at about elevation 74 there.
 
 ### Effect of the pore pressure {#what-the-water-costs}
 
@@ -387,7 +388,7 @@ We run the same single surface again:
 
 ![Spencer on the held circle, dry](images/lem04_solution_dry.png){width=1000}
 
-**FS = 1.667.** Same circle, same 131.4 ft of base, same 349,677 lb/ft of soil
+**FS = 1.671.** Same circle, same 134.3 ft of base, same 355,845 lb/ft of soil
 — the pore pressure costs **22% of the factor of safety** and nothing else
 moved. (The weight is identical because the piezometric line is still in the
 model for its *other* use, [splitting the weight](#the-two-unit-weight-columns);
@@ -397,10 +398,10 @@ and with u = 0 everywhere the effective normal stress *is* the total normal
 stress: all of it contributes frictional strength at tan φ′.
 
 The strength on each base is τ = c′ + (σ − u) tan φ′. Cohesion is untouched
-— c′ Δℓ summed over the base is **99,507 lb/ft** in both states, because
+— c′ Δℓ summed over the base is **101,184 lb/ft** in both states, because
 neither c′ nor the base changed — so all of the strength the water removes is
-friction, and it can be computed: Σ u Δℓ tan φ′ over the 39 slices is
-**46,471 lb/ft** of frictional resistance that the pore pressure removes. In the
+friction, and it can be computed: Σ u Δℓ tan φ′ over the 40 slices is
+**47,050 lb/ft** of frictional resistance that the pore pressure removes. In the
 wet figure the green effective-stress bars are reduced by the blue pore-pressure
 bars.
 
@@ -408,17 +409,17 @@ We run the other methods on both states, and the pattern holds everywhere:
 
 | | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| u = `none` | 1.502 | 1.696 | 1.633 | 2.084 | 1.810 | 1.667 | 1.669 |
-| Piezometric line | 1.115 | 1.328 | 1.266 | 1.690 | 1.421 | 1.301 | 1.303 |
+| u = `none` | 1.514 | 1.698 | 1.650 | 2.070 | 1.809 | 1.671 | 1.674 |
+| Piezometric line | 1.128 | 1.330 | 1.281 | 1.677 | 1.422 | 1.305 | 1.307 |
 
-Spencer and Morgenstern-Price agree to 0.2% wet or dry — both satisfy force
+Spencer and Morgenstern-Price agree to 0.1% wet or dry — both satisfy force
 *and* moment equilibrium, so where they agree either is defensible. Spencer is
 the one to report because it reaches the same complete equilibrium on the
 simpler assumption — one constant interslice force inclination, where
 Morgenstern-Price assumes an interslice force distribution function — which is
 why it is the standard reference method. Bishop, which satisfies moment
 equilibrium alone, sits 2% above them on this circle. The water also widens the
-spread between methods: the Ordinary Method of Slices (OMS) sits 10% under
+spread between methods: the Ordinary Method of Slices (OMS) sits 9% under
 Spencer dry but 14% under it wet,
 because OMS computes each slice's normal force from the weight alone and then
 subtracts the full u·dℓ from it — on a deep circle under high pore pressure
@@ -429,7 +430,7 @@ A held surface also cannot show that the water changes *which* mechanism is
 critical, not just how strong it is. Set the three `u` cells to `none` and run
 **Auto search** rather than the single surface, and the dry slope's own
 critical circle is a shorter, shallower one that never reaches as far into the
-foundation — 1.650, on a mass of 241,357 lb/ft. Isolating a variable and
+foundation — 1.658. Isolating a variable and
 finding the critical surface are two different runs, and they answer two
 different questions.
 
@@ -451,8 +452,8 @@ three **gsat** cells and run the held circle again:
 
 | | ΣW (lb/ft) | FS (Spencer) |
 | --- | :---: | :---: |
-| γ only (gsat blank) | 340,385 | 1.311 |
-| γ above the line, γ_sat below | 349,677 | 1.301 |
+| γ only (gsat blank) | 346,387 | 1.315 |
+| γ above the line, γ_sat below | 355,845 | 1.305 |
 
 The sliding mass gains 2.7% of its weight, all of it below the water table,
 and the factor of safety falls 0.8%. Both effects are small and neither
@@ -529,14 +530,14 @@ method's own search.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.310 | 1.475 | 1.469 | 1.641 | 1.522 | 1.462 | 1.464 |
+| 1.311 | 1.476 | 1.470 | 1.643 | 1.524 | 1.462 | 1.464 |
 
-<!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.310, fs_bishop=1.475, fs_janbu=1.469, fs_corps=1.641, fs_lowe=1.522, fs_spencer=1.462, fs_mprice=1.464 -->
+<!-- test: file=../lem/files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.311, fs_bishop=1.476, fs_janbu=1.470, fs_corps=1.643, fs_lowe=1.524, fs_spencer=1.462, fs_mprice=1.464 -->
 
-Spencer gives 1.462 on this circle, against the 1.301 its search reaches. On the
-same slices Spencer and Morgenstern-Price agree to 0.1% and Bishop sits 0.9% above
-them; the Ordinary Method of Slices (OMS) comes out 10.4% below and the Corps of
-Engineers method 12.2% above.
+Spencer gives 1.462 on this circle, against the 1.305 its search reaches. On the
+same slices Spencer and Morgenstern-Price agree to 0.2% and Bishop sits 0.9% above
+them; the Ordinary Method of Slices (OMS) comes out 10.3% below and the Corps of
+Engineers method 12.4% above.
 
 **Each method's own search**, run on
 [xslope_method_slices_problem2.xlsx](../lem/files/xslope_method_slices_problem2.xlsx),
@@ -545,12 +546,12 @@ of the one above:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1.097 | 1.327 | 1.272 | 1.436 | 1.376 | 1.301 | 1.302 |
+| 1.097 | 1.329 | 1.272 | 1.438 | 1.379 | 1.305 | 1.306 |
 
-<!-- test: file=../lem/files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.097, fs_bishop=1.327, fs_janbu=1.272, fs_corps=1.436, fs_lowe=1.376, fs_spencer=1.301, fs_mprice=1.302 -->
+<!-- test: file=../lem/files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.097, fs_bishop=1.329, fs_janbu=1.272, fs_corps=1.438, fs_lowe=1.379, fs_spencer=1.305, fs_mprice=1.306 -->
 
-Spencer's search returns the same 1.301 as the search from the single circle, and
-Morgenstern-Price's 1.302 agrees with it. Bishop sits 2.0% above Spencer. Of the
-force-equilibrium procedures, Janbu comes out 2.2% below Spencer, Lowe & Karafiath
-5.8% above and the Corps of Engineers 10.4% above, and OMS is the lowest of the
-seven at 1.097, 15.7% below Spencer.
+Spencer's search returns the same 1.305 as the search from the single circle, and
+Morgenstern-Price's 1.306 agrees with it. Bishop sits 1.9% above Spencer. Of the
+force-equilibrium procedures, Janbu comes out 2.5% below Spencer, Lowe & Karafiath
+5.7% above and the Corps of Engineers 10.2% above, and OMS is the lowest of the
+seven at 1.097, 16.0% below Spencer.

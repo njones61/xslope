@@ -230,6 +230,16 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
   dense sand below the clay layer the water table's pore pressure, as the limit
   equilibrium sample does. Their factors of safety, 1.609 and 1.621, are
   unchanged.
+- Studio's Log prints each line whole. A line the program wrote in several
+  pieces appeared on three lines, the label on one, a blank line, and the value
+  on the next; seepage runs printed many lines this way.
+- The Number of slices in Studio's Reliability dialog reaches a Taylor series
+  run and the Variance Pareto. Both always used 40 slices, or 30 in a
+  non-circular search, whatever the dialog said.
+- Clicking OK in one of Studio's input editors without changing anything keeps
+  your results and doesn't mark the file as changed. It used to clear every
+  result. A transient seepage solution cleared this way, for example by opening
+  Materials just to read it, had its saved files deleted at the next Save.
 
 ### Changed
 

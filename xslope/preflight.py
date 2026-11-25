@@ -3541,7 +3541,7 @@ def _seep_field_no_consumer(ctx):
             "seepage run was not meant to feed this analysis.")
 
 
-@rule("seep_field.missing", ERROR, ("lem",),
+@rule("seep_field.missing", ERROR, ("lem", "fem"),
       "A material with u = seep needs a solved pore-pressure field.")
 def _seep_field_missing(ctx):
     if not ctx.uses_seep_u:
@@ -3552,11 +3552,28 @@ def _seep_field_missing(ctx):
     # run the transient controls exist to start. ``seep_field.transient_frame`` then
     # says which instant, as an INFO. Neither substitutes for the MESH the field is
     # read onto: without one, nothing can supply pore pressures at all.
-    if ctx.mesh is not None and (ctx.sd.get("seep_u") is not None
-                                 or ctx.seep_frame is not None):
-        return None
+    has_field = (ctx.sd.get("seep_u") is not None or ctx.seep_frame is not None)
     names = [ctx.mat_label(i) for i, m in ctx.pore_pressure_materials()
              if str(m.get("u", "")).strip().lower() == "seep"]
+    if "lem" not in ctx.analyses:
+        # A finite element run reads the field at the mesh's nodes, each element
+        # through its own material's u. Without it the engine warns and goes on
+        # with zero pore pressure in those elements (measured: SEEP-2's dam with
+        # its field cleared builds every node at u = 0), a drier and stronger
+        # section than the one modeled. The mesh is the run's own (Studio's
+        # Build mesh, or the mesh a script hands the run), so a model checked
+        # before it has one is not judged here; the node count of a field that
+        # is there is seep_field.node_count_mismatch's question.
+        if ctx.mesh is None or has_field:
+            return None
+        return (f"{names[0]} takes pore pressure from a seepage solution (u = seep), "
+                f"but this model carries no pore-pressure field on its mesh. Run the "
+                f"seepage analysis on this mesh first, or choose a different "
+                f"pore-pressure option -- every element of that material would "
+                f"otherwise carry zero pore pressure, which over-predicts the "
+                f"factor of safety.")
+    if ctx.mesh is not None and has_field:
+        return None
     missing = "mesh" if ctx.mesh is None else "pore-pressure field"
     return (f"{names[0]} takes pore pressure from a seepage solution (u = seep), but "
             f"this model carries no {missing}. Run the seepage analysis first, or "

@@ -6782,6 +6782,16 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, u='seep'),
          expect='carries no mesh'),
+    # The finite element run (602a): u = seep on a model whose mesh is built and
+    # carries no field, which the engine would run at zero pore pressure. The
+    # control is the same model with a field on that mesh. SSRM inherits it.
+    *[dict(rule='seep_field.missing', base=PREFLIGHT_BASE_FEM, mode='dict',
+           analysis=analysis,
+           mutation=lambda sd: _pf_set(_pf_mats(sd, u='seep'), seep_u=None),
+           control=lambda sd: _pf_set(_pf_mats(sd, u='seep'),
+                                      seep_u=[0.0] * len(sd['mesh']['nodes'])),
+           expect='carries no pore-pressure field on its mesh')
+      for analysis in ('fem', 'ssrm')],
     # The twin of piezo.no_consumer: a solved field is attached and no material
     # reads it. Built on the LEM base (no mesh, so the node-count rule stays
     # silent) with a field simply present.

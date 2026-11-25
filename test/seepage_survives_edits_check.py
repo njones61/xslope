@@ -34,7 +34,9 @@ and its instant), and they used to outlive the solution: after a k1 edit the mod
 checks passed ``u = seep`` on the old field and Save rewrote ``_seep.csv`` from
 it. A dropped solution now takes its field with it, Save deletes the companion,
 and the file reopens with no seepage solution; a field no Studio solve put there
-stays, and a kept steady solution keeps its field in the model.
+stays, and a kept steady solution keeps its field in the model. With the field
+gone, Run FEM's model checks refuse the run (seep_field.missing, 602a) instead of
+letting it go on at zero pore pressure.
 
 Every window is built against a scratch settings store. Skips cleanly (exit 0)
 when PySide6 is not installed.
@@ -495,6 +497,80 @@ def test_stale_field_cleared(mw, tmp):
     return out
 
 
+FEM_REFUSAL = "carries no pore-pressure field on its mesh"
+
+
+def _run_fem_dialog(mw):
+    """Run → Run FEM… as the menu opens it; returns the dialog, closed unrun."""
+    from PySide6.QtWidgets import QDialog
+    seen = []
+    real = QDialog.exec
+
+    def exec_(self):
+        seen.append(self)
+        return 0                                   # Cancel: nothing is run
+    QDialog.exec = exec_
+    try:
+        _quiet(mw.run_fem)
+    finally:
+        QDialog.exec = real
+    return seen[0] if seen else None
+
+
+def test_fem_refused_without_its_field(mw, tmp):
+    """A finite element run with u = seep and no field on its mesh is refused
+    (602a). After a k1 edit drops SEEP-2's solution and its field, Run FEM's model
+    checks used to pass, and the run went on at zero pore pressure in every
+    element; the Run button now stays off, with the sentence saying why. With the
+    solution loaded the run is not refused for it."""
+    out = []
+    sub = os.path.join(tmp, "fem_refused")
+    os.makedirs(sub, exist_ok=True)
+    path = _copy_model(STEADY, sub)
+    for what, change, refused in (("as opened", None, False),
+                                  ("after k1 x10", _bump("k1", 9.0), True)):
+        mw.doc._dirty = False
+        _quiet(mw.open_path, path)
+        if change is not None:
+            _edit(mw, "materials", change)
+        dlg = _run_fem_dialog(mw)
+        if dlg is None:
+            out.append(f"SEEP-2 {what}: Run FEM opened no dialog")
+            continue
+        rep = dlg.preflight.report
+        mine = [f for f in (rep.findings if rep is not None else ())
+                if f.rule_id == "seep_field.missing"]
+        if refused:
+            out += _fail(mine and FEM_REFUSAL in mine[0].message
+                         and dlg.preflight.blocked and not dlg._ok.isEnabled(),
+                         f"SEEP-2 {what}: Run FEM is not refused for the missing "
+                         f"field (field in model: {_field(mw) is not None}); the run "
+                         f"would go on at zero pore pressure")
+        else:
+            out += _fail(not mine, f"SEEP-2 {what}: Run FEM is refused for a field "
+                                   f"the model carries")
+        out += _fail(mw._fem_runner is None, f"SEEP-2 {what}: an FEM run started")
+        dlg.deleteLater()
+
+    # A transient model carries no stored field: the run stages a frame of its
+    # loaded solution before the solver starts, and the dialog says so. COMBO-3's
+    # dam, opened with its solution, is not refused for the field.
+    sub = os.path.join(tmp, "fem_transient")
+    os.makedirs(sub, exist_ok=True)
+    mw.doc._dirty = False
+    _quiet(mw.open_path, _copy_model(TRANSIENT, sub))
+    dlg = _run_fem_dialog(mw)
+    rep = dlg.preflight.report if dlg is not None else None
+    mine = [f for f in (rep.findings if rep is not None else ())
+            if f.rule_id == "seep_field.missing"]
+    out += _fail(dlg is not None and mw.transient_solution() is not None and not mine,
+                 "COMBO-3's dam with its transient solution loaded: Run FEM is refused "
+                 "for a field the run stages from the solution")
+    if dlg is not None:
+        dlg.deleteLater()
+    return out
+
+
 def test_kept_steady_field_restored(mw, tmp):
     """A steady solution that stays puts its own field back where a dropped
     transient frame had replaced it."""
@@ -535,6 +611,7 @@ CHECKS = [
     ("a steady solution survives what it does not read", test_steady_solution),
     ("a dropped solution takes its field with it", test_stale_field_cleared),
     ("a kept steady solution keeps its field", test_kept_steady_field_restored),
+    ("Run FEM is refused without its field", test_fem_refused_without_its_field),
 ]
 
 

@@ -41,11 +41,11 @@ XSLOPE's own with no published counterpart and takes no dot.
 | # | Match | Problem | Results | Notes |
 |:---:|:-:|---|---|---|
 | [E1](#fhwa-e1) | 🟢 | FHWA MSE wall — per-layer geogrid pullout | All eleven layers of Table E1-7.5 reproduced within 0.1% of the manual's nominal pullout resistance | **built**; the example defers global and compound stability, so XSLOPE's searched Spencer 1.427 has no published counterpart |
-| [E3](#fhwa-e3) | 🟢 | FHWA MSE wall — sloping backfill, steel strips | Every one of the twelve levels of Table E3-7.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.404 has no published counterpart |
-| [E4](#fhwa-e4) | 🟢 | FHWA MSE wall — level backfill, steel bar mats | All ten levels of Table E4-7.4 within 0.1% of the manual's per-mat pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.536 has no published counterpart |
-| [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.637 has no published counterpart |
-| [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands rather than properties of the reinforcement, so they leave the capacity envelope where it stands, and XSLOPE's searched Spencer 1.542 has no published counterpart |
-| [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.122 has no published counterpart |
+| [E3](#fhwa-e3) | 🟢 | FHWA MSE wall — sloping backfill, steel strips | Every one of the twelve levels of Table E3-7.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.406 has no published counterpart |
+| [E4](#fhwa-e4) | 🟢 | FHWA MSE wall — level backfill, steel bar mats | All ten levels of Table E4-7.4 within 0.1% of the manual's per-mat pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.537 has no published counterpart |
+| [E5](#fhwa-e5) | 🟢 | FHWA bridge abutment on a spread footing | All eleven levels of Table E5-8.3 within 0.1% of the manual's per-strip pullout resistance | **built**; the example works no stability analysis, so XSLOPE's searched Spencer 1.638 has no published counterpart |
+| [E6](#fhwa-e6) | 🟢 | FHWA MSE wall — traffic barrier impact | Both layers the impact check covers within 0.3% of the manual's full-length pullout resistance | **built**; the impact loads are tension demands rather than properties of the reinforcement, so they leave the capacity envelope where it stands, and XSLOPE's searched Spencer 1.544 has no published counterpart |
+| [E7](#fhwa-e7) | 🟢 | FHWA MSE wall — seismic loading | All ten levels of Table E7-7 within 0.1% of the manual's reduced seismic pullout resistance | **built**; the example checks capacity against demand rather than solving for a factor of safety, so XSLOPE's searched Spencer 1.121 has no published counterpart |
 | [Wedge](#dwb-10-1) | 🟢 | Yield coefficient of a rigid wedge (Duncan, Wright & Brandon, Figure 10.1) | c–φ wedge: k<sub>y</sub> 0.2366 vs closed form 0.2366 (0.0%) · frictional wedge: k<sub>y</sub> 0.0875 vs closed form 0.0875 (0.0%) | **built**; Spencer's method finds no solution on the frictional wedge, which the Corps of Engineers and Lowe & Karafiath rows cover |
 | [Two-stage](#dwb-10-4) | 🟢 | Pseudostatic slope, single-stage and two-stage (Duncan, Wright & Brandon, Table 10.4) | All 16 values within 1.3%: dry within 0.4%, submerged within 1.3% | **built**; the two-stage columns are XSLOPE's two-stage analysis with the K<sub>c</sub> = 1 envelope; its default interpolated values have no published counterpart |
 | [Newmark](#newmark-1965) | 🟢 | Rigid sliding block under a rectangular pulse (Newmark 1965) | k<sub>y</sub> = 0.1: D 73.575 cm vs closed form 73.575 cm (0.0%) · k<sub>y</sub> = 0.2: D 18.394 cm vs closed form 18.394 cm (0.0%) · imperial: D 28.957 in vs closed form 28.957 in (0.0%) | **built**; the record's other sign never pushes the block, so that direction stays at zero |
@@ -299,7 +299,7 @@ factors, so its crossover sits higher: pullout sets the strip count at the
 topmost level and tension breakage at every level under it.
 
 **Global stability.** With the twelve levels in place, a Spencer search returns
-FS = 1.404 on a surface that passes under the wall and daylights in the level
+FS = 1.406 on a surface that passes under the wall and daylights in the level
 ground in front of the toe. Example E3 works no stability analysis at all — its
 Step 9 declares overall stability adequate by observation — so this is XSLOPE's
 own number with no published value behind it, and it takes no part in the match
@@ -312,7 +312,7 @@ above.
 (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e3.xlsx, type=pullout_envelope, expected_pullout=10.59:4173;10.59:4774;10.59:5196;10.59:5433;10.59:5487;9.75:5647;8.25:5796;6.75:5662;5.25:8875;3.75:10298;2.25:11827;0.75:13461, expected_envelope=10.59:4173;10.59:4774;10.59:5196;10.59:5200;10.59:5200;9.75:5200;8.25:5200;6.75:5200;5.25:7784;3.75:7784;2.25:7784;0.75:7784, tolerance=0.002, benchmark=FHWA-E3 -->
-<!-- test: file=files/published/fhwa_e3.xlsx, type=circular_search, method=spencer, expected_fs=1.404, num_slices=30, benchmark=FHWA-E3-global -->
+<!-- test: file=files/published/fhwa_e3.xlsx, type=circular_search, method=spencer, expected_fs=1.406, num_slices=30, benchmark=FHWA-E3-global -->
 
 ---
 
@@ -393,7 +393,7 @@ own Step 7.6 compares factored resistances and adds a wire to the pullout
 requirement, so its split between the two is not this one.
 
 **Global stability.** With the ten levels in place, a Spencer search returns
-FS = 1.536 on a surface that passes under the wall and daylights in the level
+FS = 1.537 on a surface that passes under the wall and daylights in the level
 ground in front of the toe. Example E4 works no stability analysis — its Step 9
 declares overall stability adequate by observation — so this is XSLOPE's own
 number with no published value behind it.
@@ -405,7 +405,7 @@ number with no published value behind it.
 (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e4.xlsx, type=pullout_envelope, expected_pullout=7.69:1718;7.69:2501;7.69:5488;7.69:6919;7.69:4020;6.76:4833;5.26:5803;3.76:4427;2.26:5370;0.76:6554, expected_envelope=7.69:1718;7.69:2501;7.69:4136;7.69:4136;7.69:4020;6.76:4833;5.26:5803;3.76:4427;2.26:5370;0.76:5936, tolerance=0.002, benchmark=FHWA-E4 -->
-<!-- test: file=files/published/fhwa_e4.xlsx, type=circular_search, method=spencer, expected_fs=1.536, num_slices=30, benchmark=FHWA-E4-global -->
+<!-- test: file=files/published/fhwa_e4.xlsx, type=circular_search, method=spencer, expected_fs=1.537, num_slices=30, benchmark=FHWA-E4-global -->
 
 ---
 
@@ -479,7 +479,7 @@ resistances rather than nominal ones and lands on tension breakage at all eleven
 levels.
 
 **Global stability.** With the eleven levels in place, a Spencer search returns
-FS = 1.637 on a surface that passes under the wall and daylights well out in the
+FS = 1.638 on a surface that passes under the wall and daylights well out in the
 level ground in front of the toe. Example E5 works no stability analysis — its
 Step 10 declares overall stability adequate by observation — so this is XSLOPE's
 own number with no published value behind it.
@@ -491,7 +491,7 @@ own number with no published value behind it.
 (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e5.xlsx, type=pullout_envelope, expected_pullout=11.25:5060;11.25:5232;11.25:7017;10.94:6466;9.46:6565;7.99:8025;6.51:9632;5.03:11383;3.56:14293;2.08:16489;0.61:18832, expected_envelope=11.25:5060;11.25:5232;11.25:7017;10.94:6466;9.46:6565;7.99:7143;6.51:7143;5.03:7143;3.56:7692;2.08:7692;0.61:7692, tolerance=0.002, benchmark=FHWA-E5 -->
-<!-- test: file=files/published/fhwa_e5.xlsx, type=circular_search, method=spencer, expected_fs=1.637, num_slices=30, benchmark=FHWA-E5-global -->
+<!-- test: file=files/published/fhwa_e5.xlsx, type=circular_search, method=spencer, expected_fs=1.638, num_slices=30, benchmark=FHWA-E5-global -->
 
 ---
 
@@ -555,7 +555,7 @@ conclusion on the two levels it checks, where tension breakage sets the wire
 count on both.
 
 **Global stability.** With the ten levels in place and the surcharge standing as
-soil, a Spencer search returns FS = 1.542 on a surface that passes under the
+soil, a Spencer search returns FS = 1.544 on a surface that passes under the
 wall and daylights in the level ground in front of the toe. Example E6 works no
 stability analysis, so this is XSLOPE's own number with no published value
 behind it.
@@ -566,7 +566,7 @@ behind it.
 (printed pages E6-1 to E6-9) (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e6.xlsx, type=pullout_envelope, expected_pullout=0:6196;0:6353;0:12339;0:14622;0:8181;0:8796;0:9148;0:6158;0:6686;0:7387, expected_envelope=0:4136;0:3102;0:4136;0:4136;0:5936;0:5936;0:5936;0:5936;0:5936;0:5936, tolerance=0.002, benchmark=FHWA-E6 -->
-<!-- test: file=files/published/fhwa_e6.xlsx, type=circular_search, method=spencer, expected_fs=1.542, num_slices=30, benchmark=FHWA-E6-global -->
+<!-- test: file=files/published/fhwa_e6.xlsx, type=circular_search, method=spencer, expected_fs=1.544, num_slices=30, benchmark=FHWA-E6-global -->
 
 ---
 
@@ -623,7 +623,7 @@ alone, so the bottom level, which broke before it pulled under static loading,
 now pulls first.
 
 **Global stability.** With the ten levels in place and the seismic coefficient
-applied, a Spencer search returns FS = 1.122 on a surface that passes under the
+applied, a Spencer search returns FS = 1.121 on a surface that passes under the
 wall and daylights in the level ground in front of the toe, reaching further out
 in front and further back into the fill than the static one does. Example E7
 checks capacity against demand
@@ -637,7 +637,7 @@ Steps 2–5 (printed pages E7-2 to E7-4) and internal Steps 1–4 (printed pages
 E7-11 to E7-14) (Berg et al., 2009).
 
 <!-- test: file=files/published/fhwa_e7.xlsx, type=pullout_envelope, expected_pullout=7.69:1374;7.69:2000;7.69:4390;7.69:5535;7.69:3216;6.76:3867;5.26:4642;3.76:3542;2.26:4296;0.76:5243, expected_envelope=7.69:1374;7.69:2000;7.69:4136;7.69:4136;7.69:3216;6.76:3867;5.26:4642;3.76:3542;2.26:4296;0.76:5243, tolerance=0.002, benchmark=FHWA-E7 -->
-<!-- test: file=files/published/fhwa_e7.xlsx, type=circular_search, method=spencer, expected_fs=1.122, num_slices=30, benchmark=FHWA-E7-global -->
+<!-- test: file=files/published/fhwa_e7.xlsx, type=circular_search, method=spencer, expected_fs=1.121, num_slices=30, benchmark=FHWA-E7-global -->
 
 ---
 

@@ -22356,7 +22356,8 @@
         {
           "anchor": "vp77",
           "checks": [
-            "VP77-piezo-circle"
+            "VP77-piezo-circle",
+            "VP77-piezo-search"
           ],
           "level": 2,
           "page": "verification/rocscience/",
@@ -29701,7 +29702,7 @@
       "verification/ssrm/",
       "videos/"
     ],
-    "tags": 745,
+    "tags": 746,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

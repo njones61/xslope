@@ -52,7 +52,7 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=38.760, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=38.761, tolerance=0.05 -->
 <!-- Element-type coverage (unsaturated/unconfined, linear-front): tri3, tri6, quad4, quad8, quad9. -->
 <!-- The linear front spans |h0| = 0.3 m, so the element size has to resolve it: at a 2 m -->
 <!-- target the quad8 solve stalls on the unresolved front. 0.6 m is two elements across it -->

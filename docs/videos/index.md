@@ -62,7 +62,7 @@ tension and lowers the factor of safety.
 A 20 ft slope of undrained clay, with the soil continuing 10 ft below the toe to
 a rigid base, built three ways: in the Excel input template, in Studio's editors,
 and by Studio's AI assistant from the problem sketch. All three builds give the
-same model and the same factor of safety, 0.964: the slope as drawn is unstable.
+same model and the same factor of safety, 0.965: the slope as drawn is unstable.
 
 <p class="vid-meta"><a class="vid-pill vid-watch" href="https://youtu.be/mjhU-9LGG4k">▶ Watch · 17 min</a></p>
 
@@ -153,7 +153,7 @@ strength, the water adds load without adding pore pressure in the soil.
 
 **Completed model** — [xslope_video05_submerged.xlsx](files/xslope_video05_submerged.xlsx)
 
-<!-- test: file=files/xslope_video05_submerged.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.154, tolerance=0.005 -->
+<!-- test: file=files/xslope_video05_submerged.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.158, tolerance=0.005 -->
 
 **Related page** — [LEM sample problem 2](../lem/samples.md#2-submerged-slope)
 
@@ -180,7 +180,7 @@ coefficient. Each load moves the critical circle, so each case gets its own sear
 
 **Completed model** — [xslope_video06_loads.xlsx](files/xslope_video06_loads.xlsx)
 
-<!-- test: file=files/xslope_video06_loads.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.890, tolerance=0.005 -->
+<!-- test: file=files/xslope_video06_loads.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=0.895, tolerance=0.005 -->
 
 **Related tutorial** — [LEM-2. Loads on the Crest](../tutorials/lem02_loads_on_the_crest.md)
 

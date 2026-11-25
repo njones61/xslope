@@ -17,10 +17,9 @@ CONFIG = PageConfig(
         # agreement bounds over a whole set of surfaces or cases, where no
         # single pair exists to re-derive
         ('+1', "Taylor σ_F within ≈ 1% of SLOPE/W's Monte Carlo"),
-        ('+0.19', "Morgenstern-Price within 0.19% of SLOPE/W's own M-P"),
+        ('+0.18', "Morgenstern-Price within 0.18% of SLOPE/W's own M-P"),
         ('+0.5', 'Bishop within 0.5% of Slide2 Table'),
         ('+0.17', 'Bishop within 0.5% of Slide2 Table'),
-        ('+0.17', 'per-slice table to'),
         ('+372', 'too much weight'),
         ('+0.01', 'to within 0.01%, and the Baker'),
         ('+0.004', "Total sliding weight matches SLOPE/W's to"),
@@ -43,8 +42,8 @@ CONFIG = PageConfig(
         # Hassan & Wolff G/H transposition: the two reversed-row residuals,
         # each against the paper's own printed value for that surface (the two
         # un-reversed residuals reconcile from the same paragraph unaided)
-        ('−3.7', "moves XSLOPE's residuals against them from", '6.059', '6.293'),
-        ('+9.3', "moves XSLOPE's residuals against them from", '11.561', '10.576'),
+        ('−3.7', "moves XSLOPE's residuals against them from", '6.060', '6.293'),
+        ('+9.3', "moves XSLOPE's residuals against them from", '11.562', '10.576'),
         # gs2_45: the Note cell and the paragraph below restate the row's −0.1%
         # to two decimals, from the same two factors the row prints
         ('−0.09', 'the two agree to −0.09%', '1.173', '1.174'),

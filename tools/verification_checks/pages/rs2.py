@@ -43,6 +43,10 @@ CONFIG = PageConfig(
         # paper's Table 4 range for Phase on RS2-62 Analysis III; and the paper's
         # own strength-reduction value on RS2-63, recorded, not a referee.
         ('1.30', "so the paper's 1.30 answers a different water"),
+        # RS2-25: the 1.31 both vendor manuals quote, El-Ramly et al.'s Monte
+        # Carlo mean on another surface (it sat inside the VP33 lock's tolerance
+        # until the lock moved to 1.321)
+        ('1.31', 'The 1.31 both'),
         ('1.415', 'toe-to-top-crest surface of Fig. 13c (Cheng 1.415'),
         ('0.74', 'inside the 0.74–0.84 the paper reports for Phase'),
         ('1.47', "The paper's own strength-reduction result for this slope is 1.47"),

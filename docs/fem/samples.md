@@ -133,7 +133,7 @@ method gives each parameter's contribution directly as its ΔF.
      on a deliberately coarse 253-element mesh (target_size=5): at 2.4 this one test WAS the suite's
      wall clock (~510s; 5.0 runs in ~110s). beta is mesh-dependent but bit-reproducible for a fixed
      mesh, and the test guards the TSPM-over-SSRM pipeline, not mesh convergence. -->
-<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.356, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.345, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
 
 ---

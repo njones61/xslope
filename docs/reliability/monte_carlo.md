@@ -215,7 +215,7 @@ Both thresholds are calibrated against what the fit error costs the answer, meas
 by solving tens of thousands of realizations for real and predicting the same draws
 with the surrogate. On the submerged-slope model below the surrogate fits to 0.043
 of the real spread ($R^2$ = 0.9982) and its probability of failure differs from the
-solver's, over the same 30,000 realizations, by **0.08 percentage points** — 0.5% of
+solver's, over the same 30,000 realizations, by **0.03 percentage points** — 0.2% of
 its own value, well inside the sampling noise of the Monte Carlo campaign it
 replaces. Every check measurement is reported with the answer, in the console
 summary and in the result dictionary.

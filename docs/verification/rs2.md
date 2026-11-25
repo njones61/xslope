@@ -150,7 +150,7 @@ tension crack.
 | [64](#rs2-64) | 🔴 | Three homogeneous landslides | C1: SSRM 5.189 vs RS2 SSR 5.14 (+1.0%) · C3: SSRM 4.807 vs RS2 SSR 4.69 (+2.5%) · C5: SSRM 5.620 vs RS2 SSR 5.47 (+2.7%) · C7: SSRM 1.639 vs RS2 SSR 1.70 (−3.6%) · C11: SSRM 1.413 vs RS2 SSR 1.46 (−3.2%) · C12: SSRM 1.147 vs RS2 SSR 1.22 (−6.0%) · C2: SSRM 6.564 vs RS2 SSR 6.10 (+7.6%) · C4: SSRM 5.461 vs RS2 SSR 4.95 (+10.3%) | (8 of 12 cases scored; C6 and C8–C10 are built and measured but not scored) Teoman et al. (2004) Ankara clay E90 highway, twelve cases on three sections; RS2 pinned each strength reduction to a band of its own construction, and the paper's values are minima of Bishop circle searches. C4 sets the dot; on it and C2 the Teoman and Slide2 Bishop columns (5.32 / 5.32 and 6.67 / 6.64) sit beside XSLOPE, but they are cross-method and cannot carry the comparison. |
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are shown beside it. |
 | [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, worst case (h₁ = 4, 6 and 8 m): SSRM 1.031 vs closed form 1.050 (−1.8%) · thinnest and thickest bands (h₁ = 2 and 10 m): SSRM 1.044 vs 1.050 (−0.6%) | Two mechanisms, both scored across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.169 at h₁ = 2 and 4 m, 1.044–1.094 at 6, 8 and 10 m) is shown beside RS2's SSR column: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. |
-| [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.502 vs RS2 SSR 2.48 (+0.9%) · Case 2 (steady): SSRM 1.695 vs RS2 SSR 1.70 (−0.3%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.023 vs RS2 SSR 2.04 (−0.8%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.7%) | (6 of 6) Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
+| [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.502 vs RS2 SSR 2.48 (+0.9%) · Case 2 (steady): SSRM 1.695 vs RS2 SSR 1.70 (−0.3%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.023 vs RS2 SSR 2.04 (−0.8%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.758 vs RS2 SSR 2.76 (−0.1%) | (6 of 6) Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
 | [68](#rs2-68) | 🟡 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.432 vs Loukidis Spencer 0.431 (+0.2%) · Case 3 Spencer: k꜀ 0.156 vs Loukidis Spencer 0.155 (+0.6%) · Case 1 FEM: k꜀ 0.123 vs RS2 SSR 0.125 (−1.6%) · Case 2 FEM: k꜀ 0.403 vs RS2 SSR 0.413 (−2.4%) · Case 3 FEM: k꜀ 0.152 vs RS2 SSR 0.161 (−5.6%) | The target is a **critical seismic coefficient** k꜀, the seismic coefficient at which FS = 1. XSLOPE finds it two ways. By limit equilibrium, each Spencer k꜀ is the lower of a circular and a non-circular search, since the paper searched irregular surfaces; on Case 3 only a non-circular surface can follow the weak layer. By the finite element method, XSLOPE solves on RS2's own mesh, and its Case 3 comparison sets the dot. |
 
 </div>
@@ -403,7 +403,7 @@ Slide2 counterpart: [VP14](rocscience.md#vp14) (Arai & Tagyo 1).
 
 | Method | XSLOPE | RS2 SSRM | XSLOPE LEM | Slide2 LEM |
 |---|---|---|---|---|
-| SSRM | 1.411 | 1.40 (+0.8%) | Bishop 1.404 / Spencer 1.401 | 1.409 / 1.406 |
+| SSRM | 1.411 | 1.40 (+0.8%) | Bishop 1.404 / Spencer 1.402 | 1.409 / 1.406 |
 
 <!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=fem_ssrm, expected_fs=1.411, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.2, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-10, f_stand=1.403125, f_fail=1.41875, check=edges, expected_elements=1630, expected_nodes=3407 -->
 
@@ -437,7 +437,7 @@ Slide2 counterpart: [VP16](rocscience.md#vp16).
 
 | Method | XSLOPE | RS2 SSRM | XSLOPE LEM |
 |---|---|---|---|
-| SSRM | 1.115 | 1.09 (+2.3%) | Bishop 1.112 / Spencer 1.113 |
+| SSRM | 1.115 | 1.09 (+2.3%) | Bishop 1.113 / Spencer 1.114 |
 
 The FEM piezo pore pressure uses the vertical-distance convention, consistent with the LEM
 slicer and the published analyses.
@@ -454,7 +454,7 @@ Slide2 counterpart: [VP17](rocscience.md#vp17).
 
 | Method | XSLOPE | RS2 SSRM | Greco Spencer | XSLOPE LEM | Yamagami & Ueta |
 |---|---|---|---|---|---|
-| SSRM | 1.332 | 1.33 (+0.2%) | 1.33 | Bishop 1.342 / Spencer 1.340 | 1.348 / 1.339 |
+| SSRM | 1.332 | 1.33 (+0.2%) | 1.33 | Bishop 1.343 / Spencer 1.341 | 1.348 / 1.339 |
 
 <!-- test: file=files/rocscience/vp017.xlsx, type=fem_ssrm, expected_fs=1.332, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=1.65, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-13, f_stand=1.3234375, f_fail=1.340625, check=edges, expected_elements=1935, expected_nodes=4004 -->
 
@@ -593,7 +593,7 @@ Low's Example 1 is a 6 m cut at 1V:3H through three equal 4.5 m clay layers, c =
 and that is the referee. The 1.44 printed beside it in the paper, which the vendor manuals
 attribute to Low, is the circle search of another program (STABR), shown beside with RS2's SSRM.
 For a purely cohesive soil the factor on any circle is an upper bound on the collapse factor, so
-a strength reduction on this model should land at or under the best circle, 1.435 on this file
+a strength reduction on this model should land at or under the best circle, 1.436 on this file
 ([VP24](rocscience.md#vp24)). The mechanism shears the 3 m of c = 20 clay below the base of the
 cut, and that layer carries a local element size of 0.25 m, about twelve element rows across it.
 
@@ -745,7 +745,7 @@ non-circular search's starting surface)
 | Case | XSLOPE SSRM | Published |
 |---|---|---|
 | Strength reduction (5 m mesh) | 1.202 | XSLOPE non-circular limit equilibrium, Spencer, **1.194** (+0.7%) |
-| Beside it | | RS2 SSRM 1.29 · Slide2 Bishop 1.305 and XSLOPE Bishop 1.320 on Slide's circle |
+| Beside it | | RS2 SSRM 1.29 · Slide2 Bishop 1.305 and XSLOPE Bishop 1.321 on Slide's circle |
 
 **One mechanism, found by both engines.** Geometry, material zones, unit weights and elastic
 constants follow the RS2 vendor `.fez` (`slope stability #025.fez`). The strength reduction fails
@@ -753,7 +753,7 @@ the dike as one block: an active scarp through the tailings sand, a flat run alo
 the clay-shale band and a passive exit through the till past the toe. No circle can follow that
 shape. XSLOPE's non-circular Spencer search on the same model, started from a surface of that
 shape, finds the same slide at **1.194**, and the strength reduction lands on it. The circle values,
-Slide2's 1.305 and XSLOPE's 1.320 on Slide's circle, sit above it because the circle cannot run
+Slide2's 1.305 and XSLOPE's 1.321 on Slide's circle, sit above it because the circle cannot run
 along the band. RS2's SSR on the same model, 1.29, sits above that limit-equilibrium minimum and is
 shown beside. A finer mesh lowers the strength reduction a little further: at a 2.5 m element size
 the model meshes to 5,239 elements against 1,457 (3,080 nodes) at the 5 m size and reads **1.188**.
@@ -1122,7 +1122,7 @@ A cohesionless sand embankment (c = 0, φ = 40°) on a saturated clay foundation
 
 | Method | XSLOPE | RS2 SSRM (Part 4) | RS2 SSRM (Part 2) | Slide2 Spencer | D&W referee | XSLOPE LEM |
 |---|---|---|---|---|---|---|
-| SSRM (7.0 m mesh) | 1.201 | 1.17 (+2.6%) | 1.21 | 1.20 circular / 1.18 non-circular | 1.22 (Bishop) / 1.19 (Spencer) | Bishop/Spencer/Janbu 1.219 / 1.194 / 1.161 |
+| SSRM (7.0 m mesh) | 1.201 | 1.17 (+2.6%) | 1.21 | 1.20 circular / 1.18 non-circular | 1.22 (Bishop) / 1.19 (Spencer) | Bishop/Spencer/Janbu 1.219 / 1.195 / 1.163 |
 
 RS2 re-ran this problem between its two manuals, and XSLOPE sits between the two published
 factors.
@@ -1194,7 +1194,7 @@ returns that band, at **1.521**, −0.6% on RS2's 1.53:
 
 | `min_slip_depth` (ft) | off | 15 | 20 | 30 | 50 | 80 |
 |---|---|---|---|---|---|---|
-| XSLOPE SSRM | 1.109 | 1.229 | 1.470 | **1.521** | 1.521 | 1.583 |
+| XSLOPE SSRM | 1.109 | 1.229 | 1.470 | **1.521** | 1.521 | 1.590 |
 
 The 30 and 50 ft cutoffs return the same 1.521, so the deep answer is the one they agree on; at
 80 ft the cutoff excludes the upper reach of the basal band along with the skin. A finer mesh
@@ -1214,7 +1214,7 @@ bisection step, to **1.607**, so the shallow skin carries little weight on this 
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.229, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=15, k0=1, benchmark=RS2-40-d15, f_stand=1.2203125, f_fail=1.2375, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.470, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=20, k0=1, benchmark=RS2-40-d20, f_stand=1.4609375, f_fail=1.478125, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=50, k0=1, benchmark=RS2-40-d50, f_stand=1.5125, f_fail=1.5296875, check=edges, expected_elements=2223, expected_nodes=4656 -->
-<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.583, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=80, k0=1, benchmark=RS2-40-d80, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.521, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep, f_stand=1.5125, f_fail=1.5296875, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.590, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, seep=steady, benchmark=RS2-40-seep, f_stand=1.58125, f_fail=1.5984375, check=edges, expected_elements=2223, expected_nodes=4656 -->
 <!-- test: file=files/rocscience/vp077a.xlsx, type=fem_ssrm, expected_fs=1.607, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, seep=steady, benchmark=RS2-40-seep-d30, f_stand=1.5984375, f_fail=1.615625, check=edges, expected_elements=2223, expected_nodes=4656 -->
@@ -2115,7 +2115,7 @@ on the upstream face:
 | Case 3 — 90 h, downstream | **1.820** | 1.83 (−0.5%) | 1.77 / 1.68 / 1.88 / 1.85 | 1.92 | 2.08 (−12.5%) | RS2's field |
 | Case 3 — 90 h, upstream | **2.023** | 2.04 (−0.8%) | 1.99 / 1.89 / 2.07 / 2.06 | 2.03 | — | RS2's field |
 | Case 4 — 1500 h, downstream | **2.320** | 2.34 (−0.9%) | 2.22 / 2.09 / 2.35 / 2.31 | 2.38 | 2.42 (−4.1%) | own flow field |
-| Case 4 — 1500 h, upstream | **2.742** | 2.76 (−0.7%) | 2.66 / 2.52 / 2.79 / 2.76 | 2.80 | — | own flow field |
+| Case 4 — 1500 h, upstream | **2.758** | 2.76 (−0.1%) | 2.66 / 2.52 / 2.79 / 2.76 | 2.80 | — | own flow field |
 
 All six stages land within 1% of RS2's own SSR column. Huang & Jia's own FEM values are shown
 beside it.
@@ -2125,7 +2125,7 @@ beside it.
 <!-- test: file=files/rocscience/rs2_67d.xlsx, type=fem_ssrm, expected_fs=2.023, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-6.95691;-29.8799;102.318;-29.8799;102.318;66.9821;-6.95691;66.9821, tension_srf=true, k0=1, benchmark=RS2-67d, f_stand=2.015625, f_fail=2.03125, check=edges, expected_elements=865, expected_nodes=1822 -->
 <!-- test: file=files/rocscience/rs2_67b.xlsx, type=fem_ssrm, expected_fs=1.695, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67b, f_stand=1.6875, f_fail=1.703125, check=edges, expected_elements=770, expected_nodes=1681 -->
 <!-- test: file=files/rocscience/rs2_67e.xlsx, type=fem_ssrm, expected_fs=2.320, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67e, f_stand=2.3125, f_fail=2.328125, check=edges, expected_elements=770, expected_nodes=1681 -->
-<!-- test: file=files/rocscience/rs2_67f.xlsx, type=fem_ssrm, expected_fs=2.742, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-5.89862;-33.6746;102.478;-33.6746;102.478;70.3747;-5.89862;70.3747, tension_srf=true, k0=1, benchmark=RS2-67f, expected_elements=770, expected_nodes=1681 -->
+<!-- test: file=files/rocscience/rs2_67f.xlsx, type=fem_ssrm, expected_fs=2.758, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-5.89862;-33.6746;102.478;-33.6746;102.478;70.3747;-5.89862;70.3747, tension_srf=true, k0=1, benchmark=RS2-67f, expected_elements=770, expected_nodes=1681 -->
 
 **Case 2 — steady full pool, own flow field (rs2_67b)**
 
@@ -2420,7 +2420,7 @@ base of the slope.
 
 | Method | XSLOPE | RS2 SSRM | Slide2 Spencer | SLOPE/W | XSTABL | XSLOPE LEM |
 |---|---|---|---|---|---|---|
-| SSRM (3.0 m mesh) | 1.323 | 1.32 (+0.2%) | 1.40 composite / 1.42 not-composite | 1.40 | 1.41 | Bishop/Spencer 1.389 / 1.396 composite |
+| SSRM (3.0 m mesh) | 1.323 | 1.32 (+0.2%) | 1.40 composite / 1.42 not-composite | 1.40 | 1.41 | Bishop/Spencer 1.389 / 1.397 composite |
 
 The reduction rides the weak c = 0 seam, the same mechanism that puts RS2's own SSRM below the
 composite LEM cluster (~1.40). The crest cutoff does nothing here, since the slide never opens the
@@ -2678,7 +2678,7 @@ returns the same value with and without it.
 
 | Method | XSLOPE | Huang & Jia FEM | RS2 SSRM | Huang & Jia Bishop | Slide2 Spencer | XSLOPE LEM |
 |---|---|---|---|---|---|---|
-| SSRM (2.5 m mesh) | 2.470 | 2.50 (−1.2%) | 2.43 | 2.43 | 2.455 | Bishop 2.452 / Spencer 2.451 |
+| SSRM (2.5 m mesh) | 2.470 | 2.50 (−1.2%) | 2.43 | 2.43 | 2.455 | Bishop 2.453 / Spencer 2.451 |
 
 The paper states every input the dry strength reduction needs, so its own finite-element factor,
 2.50, is the referee. The 2.43 the vendor manuals print as the paper's reference is the paper's

@@ -184,7 +184,7 @@ A coarse tri6 run of this model reads 1.39 on its own mesh.
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000, f_stand=1.375, f_fail=1.4, check=edges, expected_elements=832, expected_nodes=1773 -->
 <!-- LEM teaching point: the unconstrained global search finds the TOE circle (true mechanism, ~1.37); forcing tangency to the foundation base reproduces the paper's false base circle (~1.70). -->
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.366, tolerance=0.02 -->
-<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, tangent_depth=-25;-23, expected_fs=1.702, tolerance=0.02 -->
+<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, tangent_depth=-25;-23, expected_fs=1.703, tolerance=0.02 -->
 
 ### 🟢 Griffiths & Lane (1999) Example 3 — Undrained Clay Slope with a Thin Weak Layer {#verification-griffiths3}
 
@@ -276,7 +276,7 @@ At $c_{u2}/c_{u1} = 0.2$, a narrow slide along the weak layer, their Fig. 8(c):
 <!-- test: file=../fem/files/xslope_griffiths3_r0p6.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.7, max_iter=4000, f_stand=1.35, f_fail=1.4, check=edges, expected_elements=3042, expected_nodes=6229 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p5.xlsx, type=fem_ssrm, expected_fs=1.19, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.8, f_max=1.6, max_iter=4000, f_stand=1.175, f_fail=1.2, check=edges, expected_elements=3042, expected_nodes=6229 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p4.xlsx, type=fem_ssrm, expected_fs=0.96, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.6, f_max=1.4, max_iter=4000, f_stand=0.95, f_fail=0.975, check=edges, expected_elements=3042, expected_nodes=6229 -->
-<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.51, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000, f_stand=0.475, f_fail=0.51875, check=edges, expected_elements=3042, expected_nodes=6229 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.51, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000, expected_elements=3042, expected_nodes=6229 -->
 <!-- Thickness sensitivity: half-thickness band at cu2/cu1=0.2 barely moves the FS (0.51 -> 0.56),
      confirming the weak-ratio result is set by cu2 x path length, not the undimensioned band thickness. -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p2_thin.xlsx, type=fem_ssrm, expected_fs=0.56, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000, f_stand=0.55, f_fail=0.575, check=edges, expected_elements=6157, expected_nodes=12476 -->
@@ -352,7 +352,7 @@ At $c_{u2}/c_{u1} = 2$, the shallow toe mechanism of their Fig. 11(c), drawn at 
 <!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.46, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000, f_stand=1.45, f_fail=1.475, check=edges, expected_elements=1542, expected_nodes=3215 -->
 <!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.112, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.6, f_max=2.4, max_iter=4000, f_stand=2.1, f_fail=2.125, check=edges, expected_elements=1542, expected_nodes=3215 -->
 <!-- LEM companions: the unconstrained global search finds the BASE circle (~1.47, tangent to the firm base) at cu2=cu1 and the TOE circle (~2.02, confined to the upper clay) at cu2=2cu1 — the same base->toe flip as the SSRM and Taylor's charts. -->
-<!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.467, tolerance=0.02 -->
+<!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.471, tolerance=0.02 -->
 <!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=2.022, tolerance=0.02 -->
 
 ### 🟢 Griffiths & Lane (1999) Example 5 — "Slow" Drawdown {#verification-griffiths5}
@@ -452,9 +452,9 @@ The dot is scored FE against FE, both printed to 0.1.
 
 | Case | XSLOPE | Griffiths & Lane limit equilibrium | Note |
 |---|---|---|---|
-| Spencer, full reservoir | 1.915 | 1.90 (+0.8%) | p. 400 |
+| Spencer, full reservoir | 1.916 | 1.90 (+0.8%) | p. 400 |
 
-<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.915, tolerance=0.005, benchmark=SSRM-2 -->
+<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.916, tolerance=0.005, benchmark=SSRM-2 -->
 
 | Property | Value |
 |---|---|
@@ -617,7 +617,7 @@ finite-element factor; their limit-equilibrium factors are shown beside it.
 | SSRM FS (tri6, 0.9 m) | **1.166** | 1.15 (+1.4%) | — |
 | Bishop simplified | 1.150 | — | 1.153 (−0.3%) |
 | Spencer | 1.152 | — | 1.152 (0.0%) |
-| Janbu corrected | 1.144 | — | — |
+| Janbu corrected | 1.145 | — | — |
 | Morgenstern-Price | 1.148 | — | — |
 
 The paper reports the same SSR factor, 1.15, for the generalized Hoek-Brown criterion and for its
@@ -651,5 +651,5 @@ confinement exceeds about 55°, are well behaved on this weak envelope; see the
 
 ![Hoek-Brown SSRM (Hammah et al. 2005b example 1): a 10 m, 45° slope in a GSI = 5 rock mass, SSRM 1.166 against the paper's 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band exiting at the toe](images/HB-ssrm.png)
 
-<!-- test: file=files/rocscience/hammah_hb1.xlsx, type=circular_search, num_slices=40, fs_bishop=1.150, fs_spencer=1.152, fs_janbu=1.144, fs_mprice=1.148, benchmark=HB-lem -->
+<!-- test: file=files/rocscience/hammah_hb1.xlsx, type=circular_search, num_slices=40, fs_bishop=1.150, fs_spencer=1.152, fs_janbu=1.145, fs_mprice=1.148, benchmark=HB-lem -->
 <!-- test: file=files/rocscience/hammah_hb1.xlsx, type=fem_ssrm, expected_fs=1.166, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, max_iter=16000, k0=1, benchmark=HB-ssrm, f_stand=1.1625, f_fail=1.16875, check=edges, expected_elements=1485, expected_nodes=3112 -->

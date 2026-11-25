@@ -228,7 +228,7 @@ MUTATIONS = [
     ("ssrm", "tags", "G1b the same lock drifts in the note instead",
      "against this model's 1.35", "against this model's 1.45"),
     ("geostudio", "tags", "G2 tagged value dropped from its section",
-     "| Janbu | 1.329 | 1.233 |", "| Janbu | — | 1.233 |"),
+     "| Janbu | 1.334 | 1.233 |", "| Janbu | — | 1.233 |"),
     ("rocscience_groundwater", "tags", "G3 scientific-notation tag mantissa drifts",
      "6.070×10⁻⁵", "6.170×10⁻⁵", "all"),
     ("rocscience_groundwater", "tags", "G4 scientific-notation tag exponent drifts",
@@ -267,7 +267,7 @@ MUTATIONS = [
     ("rocscience", "tags", "G12 a printed slip-surface depth drifts from its tag",
      "| S/D = 4 | 3.261 |", "| S/D = 4 | 3.361 |"),
     ("rocscience", "tags", "G13 a back-analyzed support force drifts in the tag",
-     "expected_force=351.4", "expected_force=352.4"),
+     "expected_force=351.3", "expected_force=352.3"),
 
     # ----------------------------------------------------------- figures ---
     ("rocscience_groundwater", "figures", "F1 two-panel caption on a one-panel figure",

@@ -98,16 +98,17 @@ An optional benchmark=<ID> key (e.g. benchmark=SSRM-2) marks a verification
 benchmark; these can be excluded with --skip-benchmarks for quicker routine
 runs.
 
-A tag on a TUTORIAL page (docs/tutorials/) is checked twice: inside its
-tolerance, as every tag is, and at the precision the tag writes its number.
-``expected_fs=0.918`` passes only if today's run rounds to 0.918 at three
-decimals, so 0.9186 fails it and 0.9184 passes. A tutorial prints the number
-the reader will see on their own screen, so a change in the last printed digit
-is a stale page, however small it is next to the tolerance. A number that
-legitimately varies (a count that differs between computers, a value that
-depends on the solver kernel) opts out per tag with ``precision=tolerance`` and
-a ``precision_reason=<why, without commas>``; the row is refused without the
-reason. Every other page keeps the tolerance alone. See ``_as_written_miss``.
+A tag on any page under docs/ is checked twice: inside its tolerance, as every
+tag is, and at the precision the tag writes its number. ``expected_fs=0.918``
+passes only if today's run rounds to 0.918 at three decimals, so 0.9186 fails
+it and 0.9184 passes. The page prints the number a reader will get on their own
+screen, so a change in the last printed digit is a stale page, however small it
+is next to the tolerance. A number that legitimately varies (a count that
+differs between computers, a value that depends on the solver kernel) opts out
+per tag with ``precision=tolerance`` and a ``precision_reason=<why, without
+commas>``; the row is refused without the reason. The private course rows
+(the private repo's tests/ folder) keep the tolerance alone. See
+``_as_written_miss``.
 
 Runs each test and compares results against expected values.
 As new samples are added with test tags, they automatically become part of the suite.
@@ -562,24 +563,28 @@ def parse_test_tags(md_path):
     return tests
 
 
-# ===================== TUTORIAL NUMBERS, AT THEIR PRINTED PRECISION =====================
+# ===================== DOCS NUMBERS, AT THEIR PRINTED PRECISION =====================
 # A tag's tolerance says how far a rerun may land from the lock before the code is
-# wrong. On a tutorial it is also what decided whether the PAGE was wrong, and those
-# are different questions: the page prints the number the reader will see on their
+# wrong. On a page it was also what decided whether the PAGE was wrong, and those
+# are different questions: the page prints the number a reader will see on their
 # own screen, so a run that moves its last printed digit makes the page stale while
-# staying well inside a 0.005 tolerance. 1.0.8's circle slicing moved tutorial
-# factors of safety in the third decimal (0.918 -> 0.9186, 1.301 -> 1.305); every
-# tag kept passing, the next refresh re-recorded only the tags that had moved 0.005,
-# and the prose stayed wrong for weeks. So a tutorial's tag also checks its number
-# at the precision the tag writes it: the value a row returns (the summary), and the
-# numbers a runner compares itself (a head at a point, an instant of an FS-vs-time
-# curve, a probability of failure). The element-coverage rows (seep_elements,
-# fem_elements) are not read this way: their one number is a band every element
-# type must land in, not any one run's answer. Mesh counts are integers, compared
-# exactly already.
+# staying well inside a 0.005 tolerance. 1.0.8's circle slicing moved factors of
+# safety in the third decimal (0.918 -> 0.9186, 1.301 -> 1.305); every tag kept
+# passing, the next refresh re-recorded only the tags that had moved 0.005, and the
+# pages printed the old numbers: the tutorials for weeks, and 162 values on 93
+# sample and verification tags until 1.1.1. So every tag under docs/ also checks
+# its number at the precision the tag writes it: the value a row returns (the
+# summary), and the numbers a runner compares itself (a head at a point, an
+# instant of an FS-vs-time curve, a probability of failure). The element-coverage
+# rows (seep_elements, fem_elements) are not read this way: their one number is a
+# band every element type must land in, not any one run's answer. Mesh counts are
+# integers, compared exactly already. The private course rows (the private repo's
+# tests/ folder) are the course's own answer keys, not a published page, and keep
+# the tolerance alone.
 
-#: The tutorial pages. A tag on one of these is checked at its written precision.
-TUTORIAL_DIR = REPO_ROOT / 'docs' / 'tutorials'
+#: The published pages. A tag on any page under this folder is checked at its
+#: written precision.
+DOCS_DIR = REPO_ROOT / 'docs'
 
 #: The tag key a row's computed value is compared with, where it is not
 #: ``expected_fs`` (the keys _expected_and_tol reads).
@@ -620,19 +625,20 @@ def _precision_refusal(test):
 
 
 def _checks_as_written(test):
-    """Is this row checked at its written precision? Yes for a tag on a tutorial
-    page that does not opt out; every other page keeps the tolerance alone."""
+    """Is this row checked at its written precision? Yes for a tag on any page
+    under docs/ that does not opt out; a row from anywhere else (the private
+    course rows) keeps the tolerance alone."""
     source = test.get('source')
     if not source or str(test.get('precision', '')).strip().lower() == 'tolerance':
         return False
     try:
-        return Path(source).resolve().parent == TUTORIAL_DIR.resolve()
+        return Path(source).resolve().is_relative_to(DOCS_DIR.resolve())
     except OSError:
         return False
 
 
 def _as_written_miss(test, key, computed, written=None):
-    """The failure for a tutorial number today's run no longer prints, else None.
+    """The failure for a page's number today's run no longer prints, else None.
 
     ``computed`` must round to the tagged number at the precision the tag writes
     it: ``0.918`` is three decimals, so 0.9184 passes and 0.9186 (which rounds to
@@ -641,8 +647,8 @@ def _as_written_miss(test, key, computed, written=None):
     tag's text is ``test['_as_written'][key]``, or ``written`` for one element of
     a list-valued key (a series of factors of safety, a head at one point).
 
-    Not applied (None) off the tutorial pages, on an opted-out tag, or where the
-    tag does not write ``key``."""
+    Not applied (None) to a row from outside docs/ (the private course rows), on
+    an opted-out tag, or where the tag does not write ``key``."""
     if computed is None or not _checks_as_written(test):
         return None
     if written is None:
@@ -2791,7 +2797,7 @@ def _run_fem_ssrm_bracket(test):
     # records. The row's own pass tolerance is deliberately NOT used here — it is
     # also the bisection's stopping width, so it is wide enough to hide a full
     # one-bracket-step divergence between the two kernels (RS2-40-d20). Any miss
-    # falls through to Tier 2. A tutorial tag is read at the precision its text
+    # falls through to Tier 2. A docs tag is read at the precision its text
     # writes (1.730 is three decimals, where the float 1.73 reads as two).
     fast_fs, fast_err = run_fem_test(test, fast_kernel=True)
     if (fast_err is None and expected is not None
@@ -6400,6 +6406,15 @@ def _pf_extra_profile_point(sd):
     return sd
 
 
+def _pf_profile_turns_back(sd):
+    """Leave a stray row at the end of profile line 1, left of where the line
+    starts: the row an extra Add row leaves behind."""
+    line = sd['profile_lines'][0]
+    x0, y0 = line['coords'][0]
+    line['coords'] = list(line['coords']) + [(x0 - 1.0, y0)]
+    return sd
+
+
 def _pf_overlap(sd):
     """Draw a second copy of polygon 1 over it."""
     p = sd['polygons'][0]
@@ -7833,6 +7848,8 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='geometry.profile_line_too_short', base=PREFLIGHT_BASE_PROFILE,
          mode='excel', mutation=_pf_extra_profile_point,
          expect='so it bounds no zone'),
+    dict(rule='geometry.profile_line_turns_back', base=PREFLIGHT_BASE_PROFILE,
+         mode='excel', mutation=_pf_profile_turns_back, expect='turns back'),
     dict(rule='geometry.zones_overlap', base=PREFLIGHT_BASE_THIN, mode='excel',
          analysis='fem', mutation=_pf_overlap,
          expect='Material zones must tile the section'),
@@ -10145,7 +10162,7 @@ def run_tutorial_restatements_test(test):
     guarded by tagging that run. Unguarded numbers are reported only: that
     bucket mixes sweep rows and variant runs with stale numbers whose sentence
     names no method. The tags themselves are kept current by the precision rule
-    on tutorial tags (_as_written_miss), which is what makes a stale page show
+    on every docs tag (_as_written_miss), which is what makes a stale page show
     up here as a disagreement.
     """
     import io
@@ -10377,6 +10394,9 @@ def _tilt_pair_problems(t):
     if (a_fail - a_stand) > 2.0 * tol + 1e-12:
         out.append(f"{name}: k pair is {a_fail - a_stand:.4g} deg wide, more than "
                    f"twice the tolerance {tol:g} — not the sweep's final pair")
+    if miss := _primary_as_written_miss(t, expected, mid):
+        out.append(f"{name}: the tilt the pair brackets does not reproduce the "
+                   f"lock ({miss})")
     return out
 
 
@@ -10405,6 +10425,9 @@ def _kc_pair_problems(t):
     if (k_fail - k_stand) > 2.0 * tol + 1e-12:
         out.append(f"{name}: k pair is {k_fail - k_stand:.4g} wide, more than "
                    f"twice kc_tol {tol:g} — not the bisection's final pair")
+    if miss := _primary_as_written_miss(t, expected, mid):
+        out.append(f"{name}: the k_c the pair brackets does not reproduce the "
+                   f"lock ({miss})")
     return out
 
 
@@ -10414,7 +10437,7 @@ def run_lock_edges_test(test):
 
     Edges mode checks a lock with two solves instead of nine, and what makes that
     a check of the lock rather than of two arbitrary factors is that the pair is
-    the bracket the bisection closed on. Three properties say it is:
+    the bracket the bisection closed on. Four properties say it is:
 
     * both factors are present. ``check=edges`` without them is a tag that asks
       for a check it does not describe;
@@ -10427,7 +10450,14 @@ def run_lock_edges_test(test):
     * ``f_fail - f_stand <= 2 x tolerance``. The bisection stops when the bracket
       is narrower than the tolerance, so a wider pair is not a final bracket: it
       is two trials from somewhere in the middle of the search, and they would
-      pass while the lock moved between them.
+      pass while the lock moved between them;
+    * the value the pair reports (its midpoint, or the standing edge of a
+      lower-bound lock) rounds to the lock at the precision the tag writes it
+      (``_as_written_miss``), which is what an edges row is checked against.
+      Straddling is not enough: a pair copied from another lock on the same
+      file (two element types share one model and one trial record) can
+      straddle this lock and still report a different number, and a lock left
+      behind by a re-cut straddles its own new bracket.
 
     ``tools/lock_edges.py`` writes the fields, from the trial record the figure
     producers persist beside each model; this is what stops a hand-edited or
@@ -10435,11 +10465,12 @@ def run_lock_edges_test(test):
 
     A ``fem_tilt`` tag is ALWAYS an edge pair — ``k_stand`` and ``k_fail``, the
     last coefficient the sweep stood at and the first it failed at — and the same
-    three properties are checked on it in angles: both present with
+    properties are checked on it in angles: both present with
     ``|k_stand| < |k_fail|``; the tilt they bracket (the mean of the two angles)
-    within ``tolerance`` degrees of ``expected_tilt``; and the two angles no more
-    than twice the tolerance apart. It carries no ``f_stand``/``f_fail``/
-    ``check`` keys, which would not be read.
+    within ``tolerance`` degrees of ``expected_tilt``, and reproducing it at the
+    precision the tag writes it; and the two angles no more than twice the
+    tolerance apart. It carries no ``f_stand``/``f_fail``/``check`` keys, which
+    would not be read. A ``fem_kc`` pair is read the same way in k.
     """
     problems = []
     n_edges = 0
@@ -10489,6 +10520,12 @@ def run_lock_edges_test(test):
                 problems.append(f"{name}: edge pair is {f_fail - f_stand:.4g} wide, "
                                 f"more than twice the tolerance {tol:g} — not a "
                                 f"final bracket")
+            # What an edges row reports when its two trials hold: the bracket's
+            # midpoint (the lock's own standing edge for a lower bound).
+            reported = f_stand if lower else 0.5 * (f_stand + f_fail)
+            if miss := _primary_as_written_miss(t, expected, reported):
+                problems.append(f"{name}: the pair's midpoint does not reproduce "
+                                f"the lock ({miss})")
     if problems:
         return None, (f"{len(problems)} edge-pair problem(s): "
                       + "; ".join(problems[:5]))
@@ -11031,12 +11068,13 @@ def run_interslice_admissibility_test(test):
 #: prints. Each module exposes ``run()`` returning a list of failure strings, so
 #: one runner serves them all rather than a near-identical function each.
 MODULE_CHECKS = {
-    'tutorial_precision': (
-        'tutorial_precision_check.py',
-        "A tutorial's tagged number is checked at the precision the tag writes "
-        "it: 0.918 fails a run of 0.9186 and passes 0.9184, fs_bishop=1.210 "
-        "reads three decimals, a verification page keeps its tolerance alone, "
-        "and precision=tolerance without a precision_reason is refused unsolved."),
+    'tag_precision': (
+        'tag_precision_check.py',
+        "A tagged number on any page under docs/ is checked at the precision the "
+        "tag writes it: 0.918 fails a run of 0.9186 and passes 0.9184, "
+        "fs_bishop=1.210 reads three decimals, a private course row outside "
+        "docs/ keeps its tolerance alone, and precision=tolerance without a "
+        "precision_reason is refused unsolved."),
     'strength_ratio': (
         'strength_ratio_check.py',
         "The strength ratio material, s_u = max(c, c/p x sigma'_v): on a planar "
@@ -12655,6 +12693,18 @@ AUDIT_CHECK_MODULES = {
     # Not an audit check, wired the same way: a git worktree finds the main
     # checkout's row timings and the private test repo beside the main checkout.
     'runner_home': ('runner_home_check.py', 'preflight'),
+    # Studio's editors: a new profile line or polygon and its vertex rows, and
+    # an input edit that keeps the mesh and seepage solutions it cannot change.
+    'studio_model_edits': ('studio_model_edits_check.py', 'roundtrip'),
+    'seepage_survives_edits': ('seepage_survives_edits_check.py', 'roundtrip'),
+    # A jointed line whose end the mesher moves onto a zone corner still meshes;
+    # the FS-versus-time figure's legend covers none of the figure's own words.
+    'joint_end_snap': ('joint_end_snap_check.py', 'fem'),
+    'fs_vs_time_legend': ('fs_vs_time_legend_check.py', 'preflight'),
+    # A pile's moment at failure is read from the element end that carries the
+    # hinge; a polygon model's base is labeled "Bottom boundary", not "Max Depth".
+    'pile_hinge_end': ('pile_hinge_end_check.py', 'fem'),
+    'polygon_base_label': ('polygon_base_label_check.py', 'preflight'),
 }
 
 
@@ -20050,6 +20100,12 @@ def main():
         # other tag guards; --fem picks it up too when that scope runs alone.
         tests.append({'type': 'lock_edges', 'file': 'check=edges tags vs their locks',
                       'method': '-', 'source': 'lock_edges'})
+        # Every tag under docs/ is checked at the precision it writes its number
+        # (_as_written_miss); this row proves that rule bites and that every opt-out
+        # on the real pages is well formed. Synthetic tags, no solve.
+        tests.append({'type': 'tag_precision',
+                      'file': 'docs tags at their written precision',
+                      'method': '-', 'source': 'tag_precision'})
         # Editor no-drop guard (studio.editors). Touches the studio/Qt layer, so
         # it's skipped cleanly when PySide6 is absent (engine-only installs), like
         # the DXF round-trip tests.
@@ -20125,11 +20181,14 @@ def main():
         tests.append({'type': 'tutorial_restatements',
                       'file': 'docs/tutorials (restated factors of safety)',
                       'method': '-', 'source': 'tutorials'})
-        # The rule the tutorial tags run under: checked at the precision each
-        # tag writes its number, with a reasoned opt-out. Synthetic tags, no solve.
-        tests.append({'type': 'tutorial_precision',
-                      'file': 'tutorial tags at their written precision',
-                      'method': '-', 'source': 'tutorials'})
+        # The rule every docs tag runs under (checked at the precision each tag
+        # writes its number, with a reasoned opt-out). It is a tag guard and
+        # rides --roundtrip with the others; --tutorials adds it when that scope
+        # runs alone. Synthetic tags, no solve.
+        if not run_roundtrip:
+            tests.append({'type': 'tag_precision',
+                          'file': 'docs tags at their written precision',
+                          'method': '-', 'source': 'tag_precision'})
 
     # Structured DXF export/import round-trip tests. These touch the studio layer
     # (build_from_dxf_mapping) and ezdxf, so they're skipped cleanly when either

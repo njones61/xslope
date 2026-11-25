@@ -19,6 +19,10 @@ CONFIG = PageConfig(
         ('1.107', 'Power-curve case'),
         ('0.86', 'Power-curve case'),
         ('0.152', 'power curve'),
+        # VP33: the manual's quoted 1.31 is El-Ramly et al.'s Monte Carlo mean on
+        # another surface, a source value named as such (it sat inside the VP33
+        # lock's tolerance until the lock moved to 1.321)
+        ('1.31', 'The 1.31 the manual quotes is the mean'),
     ],
     name="rocscience",
 
@@ -55,6 +59,9 @@ CONFIG = PageConfig(
         ('+2.4', 'and with the originating paper within 2.4%'),
         ('+0.5', "within 0.5% of Slide's limit-filtered search"),
         ('+0.7', "Slide's constrained block search lands within 0.7%"),
+        # VP23: how far the best single circle through the model misses Slide's
+        # two values; the circle's own pair is not printed
+        ('+0.9', 'the nearest pair misses by 0.9%'),
 
         # ---- probabilities of failure and reliability spreads ----
         ('+18', "reproduces Duncan's own 18% almost exactly"),
@@ -73,12 +80,13 @@ CONFIG = PageConfig(
         # Bishop/Spencer pair cells: the delta pair is printed as one cell, so
         # the FIRST member's two operands are named (the second reconciles from
         # the last number before it)
-        ('−1.8', '| Piezometric line |', '1.070', '1.090'),
+        ('−1.7', '| Piezometric line |', '1.071', '1.090'),
         ('−0.6', '| tangent 15 ft |', '1.389', '1.398'),
-        ('−0.6', '| I: c<sub>u</sub> = 200 + 15·z |', '1.305', '1.313'),
-        ('−0.5', '| II: c<sub>u</sub> = 300 |', '1.328', '1.335'),
+        ('−0.5', '| I: c<sub>u</sub> = 200 + 15·z |', '1.306', '1.313'),
+        ('−0.4', '| II: c<sub>u</sub> = 300 |', '1.330', '1.335'),
         ('−0.4', '| II | 5 |', '0.905', '0.909'),
         ('−0.3', '| III | 10 |', '1.042', '1.045'),
+        ('−0.2', '| IV | 15 |', '1.152', '1.154'),
         # Cai & Ugai D1/D = 3: the two published values against each other
         ('+4.4', 'Slide sits 4.4% above the paper', '1.43', '1.37'),
     ],

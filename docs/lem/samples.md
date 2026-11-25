@@ -36,10 +36,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 0.964 | 0.964 | 1.029 | 1.120 | 1.041 | 0.964 | 0.964 |
+| 0.965 | 0.965 | 1.032 | 1.121 | 1.043 | 0.965 | 0.965 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_foundation.xlsx, type=circular_search, num_slices=40, fs_oms=0.964, fs_bishop=0.964, fs_janbu=1.029, fs_corps=1.120, fs_lowe=1.041, fs_spencer=0.964, fs_mprice=0.964 -->
+<!-- test: file=files/xslope_simple_foundation.xlsx, type=circular_search, num_slices=40, fs_oms=0.965, fs_bishop=0.965, fs_janbu=1.032, fs_corps=1.121, fs_lowe=1.043, fs_spencer=0.965, fs_mprice=0.965 -->
 
 ### 2. Submerged Slope
 
@@ -65,10 +65,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1.154 | 1.154 | 1.253 | 2.011 | 1.861 | 1.154 | 1.154 |
+| 1.158 | 1.158 | 1.253 | 2.011 | 1.863 | 1.158 | 1.158 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.154, fs_bishop=1.154, fs_janbu=1.253, fs_corps=2.011, fs_lowe=1.861, fs_spencer=1.154, fs_mprice=1.154 -->
+<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.158, fs_bishop=1.158, fs_janbu=1.253, fs_corps=2.011, fs_lowe=1.863, fs_spencer=1.158, fs_mprice=1.158 -->
 
 ### 3. Slope with Eight Layers
 
@@ -106,10 +106,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 0.805 | 1.154 | 1.160 | 1.240 | 1.060 | 1.189 | 1.170 |
+| 0.808 | 1.154 | 1.162 | 1.240 | 1.060 | 1.190 | 1.170 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, num_slices=40, fs_oms=0.805, fs_bishop=1.154, fs_janbu=1.160, fs_corps=1.240, fs_lowe=1.060, fs_spencer=1.189, fs_mprice=1.170 -->
+<!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, num_slices=40, fs_oms=0.808, fs_bishop=1.154, fs_janbu=1.162, fs_corps=1.240, fs_lowe=1.060, fs_spencer=1.190, fs_mprice=1.170 -->
 
 A grid search on this model (`seed='grid'`, which sweeps a coarse grid of centers and
 tangent depths before refining) reaches circles that the search from the file's circles
@@ -192,12 +192,12 @@ Toe circle, shown close up:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| n/a\* | 1.327 | 1.224 | 1.381 | 1.327 | 1.323 | 1.324 |
+| n/a\* | 1.327 | 1.227 | 1.381 | 1.329 | 1.323 | 1.326 |
 
 \* OMS is not reported for this problem's toe circle. The circle is small, and its last slices, where it rises steeply to the ground beyond the toe, have bases inclined up to 57°. There the Fellenius base normal force, $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, goes negative, on 6 of the 40 slices of the surface it settles on, so the shear resistance it computes there is meaningless and the factor of safety it reports (0.845) sits far below every other method's. See the [OMS method note](oms.md).
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, seed=grid, exit_range=500;638, na=oms, fs_bishop=1.327, fs_janbu=1.224, fs_corps=1.381, fs_lowe=1.327, fs_spencer=1.323, fs_mprice=1.324 -->
+<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, seed=grid, exit_range=500;638, na=oms, fs_bishop=1.327, fs_janbu=1.227, fs_corps=1.381, fs_lowe=1.329, fs_spencer=1.323, fs_mprice=1.326 -->
 
 Circle tangent to El. 197:
 
@@ -208,10 +208,10 @@ Circle tangent to El. 197:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1.394 | 1.572 | 1.537 | 1.609 | 1.579 | 1.568 | 1.570 |
+| 1.394 | 1.572 | 1.538 | 1.609 | 1.579 | 1.568 | 1.570 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, tangent_depth=197;197, fs_oms=1.394, fs_bishop=1.572, fs_janbu=1.537, fs_corps=1.609, fs_lowe=1.579, fs_spencer=1.568, fs_mprice=1.570 -->
+<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, tangent_depth=197;197, fs_oms=1.394, fs_bishop=1.572, fs_janbu=1.538, fs_corps=1.609, fs_lowe=1.579, fs_spencer=1.568, fs_mprice=1.570 -->
 
 *Pore pressures from the seepage solution*
 
@@ -313,12 +313,12 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| n/a\* | 1.828 | 1.752 | 2.076 | 2.025 | 1.812 | 1.807 |
+| n/a\* | 1.829 | 1.754 | 2.076 | 2.026 | 1.813 | 1.808 |
 
 \* OMS is not reported for this problem. Its base normal force is the Fellenius value $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, which under a full reservoir goes negative on the deepest slices — a quarter of them on the surface it settles on here — so the shear resistance it computes there is meaningless and the factor of safety it reports (0.897) sits far below every other method's. See the [OMS method note](oms.md).
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.828, fs_janbu=1.752, fs_corps=2.076, fs_lowe=2.025, fs_spencer=1.812, fs_mprice=1.807 -->
+<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.829, fs_janbu=1.754, fs_corps=2.076, fs_lowe=2.026, fs_spencer=1.813, fs_mprice=1.808 -->
 
 ### 5. Tension Crack
 
@@ -331,7 +331,7 @@ mobilized strengths $c_d = c/F$, $\tan\phi_d = \tan\phi / F$. Because the crack
 depth depends on $F$, it is iterated to convergence; this model carries the
 converged depth (`tcrack_depth` = 4.5 ft on the **main** sheet), at which the crest
 tension just vanishes. The crack is taken as full of water (`tcrack_water` = 4.5 ft). The complete-equilibrium methods agree (Spencer and
-Morgenstern-Price both 1.414, matching Bishop).
+Morgenstern-Price both 1.415, matching Bishop).
 
 ![Slope with a tension crack](sample_images/tension_problem_sketch.png){width=1000}
 
@@ -350,10 +350,10 @@ Solution (critical surface with the tension crack, Spencer's method):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1.413 | 1.414 | 1.448 | 1.673 | 1.544 | 1.414 | 1.414 |
+| 1.413 | 1.415 | 1.450 | 1.673 | 1.545 | 1.415 | 1.415 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.414, fs_janbu=1.448, fs_corps=1.673, fs_lowe=1.544, fs_spencer=1.414, fs_mprice=1.414 -->
+<!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.415, fs_janbu=1.450, fs_corps=1.673, fs_lowe=1.545, fs_spencer=1.415, fs_mprice=1.415 -->
 
 ### 6. Saturated vs. Moist Unit Weight (γ_sat)
 
@@ -370,7 +370,7 @@ This problem features a slope in undrained clay ($S_u = 600$ psf, $\phi = 0$) wi
 an internal water table: γ = 120 pcf above the water table and γ_sat = 127 pcf
 below. The strength is a total-stress strength, so pore pressure never enters the
 analysis (`u = none`) and the piezometric line serves only to locate the water
-table. Spencer's method gives $F = 1.420$.
+table. Spencer's method gives $F = 1.422$.
 
 ![Clay slope with an internal water table](sample_images/gsat_problem_sketch.png){width=1000}
 
@@ -380,20 +380,20 @@ Solution (critical surface and factor of safety, Spencer's method):
 
 ![gsat_sidecar_results.png](sample_images/gsat_sidecar_results.png){width=1000}
 
-<!-- test: file=files/xslope_gsat_sidecar.xlsx, type=circular_search, num_slices=40, fs_bishop=1.420, fs_spencer=1.420, fs_janbu=1.518 -->
+<!-- test: file=files/xslope_gsat_sidecar.xlsx, type=circular_search, num_slices=40, fs_bishop=1.422, fs_spencer=1.422, fs_janbu=1.522 -->
 
 The same slope built as two material zones split at the water table — 120 pcf clay
 above, 127 pcf clay below — reproduces that factor of safety:
 [xslope_gsat_zoned.xlsx](files/xslope_gsat_zoned.xlsx).
 
 <!-- test: file=files/xslope_gsat_zoned.xlsx, type=gsat_pair, file2=files/xslope_gsat_sidecar.xlsx -->
-<!-- test: file=files/xslope_gsat_zoned.xlsx, type=circular_search, num_slices=40, fs_spencer=1.420 -->
+<!-- test: file=files/xslope_gsat_zoned.xlsx, type=circular_search, num_slices=40, fs_spencer=1.422 -->
 
 A model can also supply γ_sat with no water table anywhere
 ([xslope_gsat_nowater.xlsx](files/xslope_gsat_nowater.xlsx)); with no elevation
 below which the saturated weight applies, the slope is analyzed with γ throughout.
 
-<!-- test: file=files/xslope_gsat_nowater.xlsx, type=circular_search, num_slices=40, fs_bishop=1.468, fs_spencer=1.468, fs_janbu=1.571 -->
+<!-- test: file=files/xslope_gsat_nowater.xlsx, type=circular_search, num_slices=40, fs_bishop=1.471, fs_spencer=1.471, fs_janbu=1.571 -->
 
 The same slope and water table with a drained strength ($c' = 200$ psf,
 $\phi' = 25°$) and `u = piezo`: the piezometric line now supplies the pore
@@ -405,7 +405,7 @@ Solution (critical surface and factor of safety, Spencer's method):
 
 ![gsat_piezo_results.png](sample_images/gsat_piezo_results.png){width=1000}
 
-<!-- test: file=files/xslope_gsat_piezo.xlsx, type=circular_search, num_slices=40, fs_bishop=1.538, fs_spencer=1.539, fs_janbu=1.503 -->
+<!-- test: file=files/xslope_gsat_piezo.xlsx, type=circular_search, num_slices=40, fs_bishop=1.539, fs_spencer=1.540, fs_janbu=1.507 -->
 
 The water table can also come from a seepage solution. This is the upstream slope
 of the earth dam of [Problem 4](#4-earth-dam-duncan-wright-and-brandon), with the same saturated unit weights
@@ -437,7 +437,7 @@ Solution (governing rapid-drawdown surface and factor of safety):
 
 ![gsat_rapid_results.png](sample_images/gsat_rapid_results.png){width=1000}
 
-<!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.095, fs_spencer=1.094 -->
+<!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.094, fs_spencer=1.094 -->
 
 ### 7. Pile-Stabilized Slope (Hassiotis et al. 1997)
 
@@ -485,7 +485,7 @@ Bishop's method gives 1.106 against the 1.12 Hull & Poulos (1999) report with th
 same method (−1.2%). Hassiotis et al. report 1.08 and Ausilio et al. (2001) 1.11,
 both by the friction-circle method, which XSLOPE does not implement.
 
-<!-- test: file=files/xslope_hassiotis.xlsx, type=circular_search, num_slices=50, fs_oms=1.056, fs_bishop=1.106, fs_janbu=1.105, fs_corps=1.167, fs_lowe=1.135, fs_spencer=1.105, fs_mprice=1.104, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis.xlsx, type=circular_search, num_slices=50, fs_oms=1.056, fs_bishop=1.106, fs_janbu=1.106, fs_corps=1.168, fs_lowe=1.135, fs_spencer=1.105, fs_mprice=1.104, benchmark=LEM-HASSIOTIS -->
 
 #### Pile row 13.7 m from the toe (FS = 1.855)
 
@@ -554,5 +554,5 @@ show the range of published results.
 | 1.822 | 1.859 | 1.788 | 1.885 | 1.871 | 1.855 | 1.855 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_hassiotis_p1.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=11.01;33.7, fs_oms=1.822, fs_bishop=1.859, fs_janbu=1.788, fs_corps=1.885, fs_lowe=1.871, fs_spencer=1.855, fs_mprice=1.855, benchmark=LEM-HASSIOTIS -->
-<!-- test: file=files/xslope_hassiotis_p2.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=16.44;33.7, fs_oms=1.244, fs_bishop=1.289, fs_janbu=1.373, fs_corps=1.385, fs_lowe=1.340, fs_spencer=1.281, fs_mprice=1.289, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis_p1.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=11.01;33.7, fs_oms=1.822, fs_bishop=1.859, fs_janbu=1.788, fs_corps=1.884, fs_lowe=1.871, fs_spencer=1.855, fs_mprice=1.855, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis_p2.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=16.44;33.7, fs_oms=1.247, fs_bishop=1.289, fs_janbu=1.376, fs_corps=1.385, fs_lowe=1.338, fs_spencer=1.281, fs_mprice=1.290, benchmark=LEM-HASSIOTIS -->

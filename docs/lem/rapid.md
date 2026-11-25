@@ -311,7 +311,7 @@ The colors say what governed each slice. Most interpolated their undrained stren
 | **3, ten slices drained** | **1.048** |
 | Published (Duncan, Wright, and Wong 1990) | 1.04 |
 
-The search on the verification page, with 40 slices, gives 1.047.
+The search on the verification page, with 40 slices, gives 1.048.
 
 ### Surfaces that cross no material with d and ψ {#drained-surfaces}
 
@@ -452,9 +452,9 @@ Because the Stage 2 field is the transient frame at t = 50 day rather than a re-
 
 | Dam | xslope (Spencer) | Published |
 |-----|:----------------:|:---------:|
-| [VP96](../verification/rocscience.md#vp96): USACE EM 1110-2-1902 example | 1.434 | 1.44, USACE (2003) |
+| [VP96](../verification/rocscience.md#vp96): USACE EM 1110-2-1902 example | 1.435 | 1.44, USACE (2003) |
 | [VP97](../verification/rocscience.md#vp97): Pilarcitos Dam (failed) | 1.044 | 1.05, Duncan, Wright, and Wong (1990) |
-| [VP98](../verification/rocscience.md#vp98): Walter Bouldin Dam (failed) | 1.047 | 1.04, Duncan, Wright, and Wong (1990) |
+| [VP98](../verification/rocscience.md#vp98): Walter Bouldin Dam (failed) | 1.048 | 1.04, Duncan, Wright, and Wong (1990) |
 | [VP99](../verification/rocscience.md#vp99): pumped-storage dam | 1.527 | 1.56, Duncan, Wright, and Wong (1990) |
 
 ### See also

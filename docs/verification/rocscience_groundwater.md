@@ -48,8 +48,8 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.8970;26:2:7.9161;26:4:8.0363;26:6:8.1847;26:8:8.4101;26:10:8.6738;26:12:9.1446, tolerance=0.05, benchmark=GW6d-h -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.777e-07, tolerance=0.05, benchmark=GW6e-q -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.3539;26:2:8.3537;26:4:8.4092;26:6:8.4682, tolerance=0.05, benchmark=GW6e-h -->
-<!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.3069e-05, tolerance=0.05, benchmark=GW9a-q -->
-<!-- test: file=files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2824e-06, tolerance=0.05, benchmark=GW9b-q -->
+<!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.3070e-05, tolerance=0.05, benchmark=GW9a-q -->
+<!-- test: file=files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2823e-06, tolerance=0.05, benchmark=GW9b-q -->
 <!-- test: file=files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
 <!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
 <!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, expected_flowrate=2.086e-02, tolerance=0.05, benchmark=GW13-q -->

@@ -1,34 +1,36 @@
-"""The tutorial precision rule bites: a tutorial's tagged number is checked at the
-precision the tag writes it, not only inside its tolerance, and a page whose prose
-no longer agrees with its tag fails the restatement row.
+"""The printed-precision rule bites: a tagged number on any page under docs/ is
+checked at the precision the tag writes it, not only inside its tolerance, and a
+tutorial whose prose no longer agrees with its tag fails the restatement row.
 
-1.0.8's circle slicing moved tutorial factors of safety in the third decimal
-(0.918 -> 0.9186, 1.301 -> 1.305). Every tag guarding them carried a tolerance of
-0.005 or 0.01, so every tag kept passing, and the pages printed the old numbers for
-weeks. run_tests.py now also requires a tutorial's run to ROUND to the tagged
-number at the tag's own precision (``_as_written_miss``). This file proves that
-rule fails what it must and passes what it must, on synthetic tags, solving
-nothing:
+1.0.8's circle slicing moved factors of safety in the third decimal (0.918 ->
+0.9186, 1.301 -> 1.305). Every tag guarding them carried a tolerance of 0.005 or
+0.01, so every tag kept passing, and the pages printed the old numbers: the
+tutorials for weeks (fixed in 1.1.0, when the rule covered them alone), and 162
+values on 93 sample and verification tags until 1.1.1. run_tests.py requires a
+row's run to ROUND to the tagged number at the tag's own precision
+(``_as_written_miss``) on every page under docs/. This file proves that rule
+fails what it must and passes what it must, on synthetic tags, solving nothing:
 
-  1. THE RULE. A tutorial tag written 0.918 fails a run of 0.9186 (it rounds to
-     0.919) and passes 0.9184. A per-method tag keeps each method's written
-     precision, trailing zeros included: fs_bishop=1.210 is three decimals, so
-     1.2106 fails although the float 1.21 reads as two. A number written in
-     scientific notation is read to its significant figures. One element of a
-     list-valued key (an instant of a curve, a head at a point) is read from its
-     own text.
+  1. THE RULE. A tag written 0.918 fails a run of 0.9186 (it rounds to 0.919)
+     and passes 0.9184. A per-method tag keeps each method's written precision,
+     trailing zeros included: fs_bishop=1.210 is three decimals, so 1.2106 fails
+     although the float 1.21 reads as two. A number written in scientific
+     notation is read to its significant figures. One element of a list-valued
+     key (an instant of a curve, a head at a point) is read from its own text.
 
-  2. THE SCOPE. The same tag on a verification page passes 0.9186: every page
-     other than the tutorials keeps the tolerance alone.
+  2. THE SCOPE. Every page under docs/ is read this way: the same tag on a
+     tutorial, a verification page and a sample page fails 0.9186. A page
+     outside docs/ (the private course rows, the private repo's tests/ folder)
+     keeps the tolerance alone and passes it.
 
   3. THE OPT-OUT. ``precision=tolerance`` with a ``precision_reason`` takes a tag
      back to the tolerance alone. Without the reason the row is refused before
      anything is solved; so is a misspelt value, and a reason with no opt-out.
-     Every tag on the real tutorial pages must carry a well-formed opt-out or
+     Every tag on every real page under docs/ must carry a well-formed opt-out or
      none, including rows the standard tier holds back and so never reaches.
 
   4. THE FAST KERNEL. A strength-reduction row's fast-kernel pass must reproduce
-     the tutorial's number at its written precision too: 1.730 is three decimals,
+     the page's number at its written precision too: 1.730 is three decimals,
      so a kernel reading of 1.7334, inside the old two-decimal window of the
      float 1.73, falls through to the reference solve.
 
@@ -69,20 +71,21 @@ TAGS = """
 
 
 def _pages(RT, root):
-    """The synthetic tags parsed from a tutorial page and a verification page
-    under ``root``, with the rule's tutorial folder pointed at ``root``'s."""
-    tutorials = Path(root) / 'docs' / 'tutorials'
-    verification = Path(root) / 'docs' / 'verification'
-    for folder in (tutorials, verification):
+    """The synthetic tags parsed from a tutorial page, a verification page, a
+    sample page two folders down, and a private course page outside docs/, all
+    under ``root``, with the rule's docs folder pointed at ``root``'s."""
+    docs = Path(root) / 'docs'
+    folders = (docs / 'tutorials', docs / 'verification', docs / 'lem' / 'files',
+               Path(root) / 'private' / 'tests' / 'hw')
+    for folder in folders:
         folder.mkdir(parents=True)
         (folder / 'selftest.md').write_text(TAGS)
-    RT.TUTORIAL_DIR = tutorials
-    return (RT.parse_test_tags(tutorials / 'selftest.md'),
-            RT.parse_test_tags(verification / 'selftest.md'))
+    RT.DOCS_DIR = docs
+    return tuple(RT.parse_test_tags(folder / 'selftest.md') for folder in folders)
 
 
 def check_rule(RT, tut):
-    """1. The rule, on the tutorial page."""
+    """1. The rule, on a tutorial page."""
     single, spencer, bishop, seep = tut[0], tut[1], tut[2], tut[3]
     miss = RT._primary_as_written_miss(single, 0.918, 0.9186)
     check("0.918 written, 0.9186 computed: fails", bool(miss), miss or "passed")
@@ -107,10 +110,20 @@ def check_rule(RT, tut):
           RT._as_written_miss(single, 'expected (t=50)', 1.05784, written='1.0578') is None)
 
 
-def check_scope(RT, ver):
-    """2. A verification page keeps the tolerance alone."""
-    check("the same tag on a verification page passes 0.9186",
-          RT._primary_as_written_miss(ver[0], 0.918, 0.9186) is None)
+def check_scope(RT, ver, sample, private):
+    """2. Every page under docs/ is read at its written precision; a page outside
+    docs/ (the private course rows) keeps the tolerance alone."""
+    miss = RT._primary_as_written_miss(ver[0], 0.918, 0.9186)
+    check("the same tag on a verification page fails 0.9186", bool(miss),
+          miss or "passed")
+    check("... and passes 0.9184",
+          RT._primary_as_written_miss(ver[0], 0.918, 0.9184) is None)
+    check("the same tag on a sample page two folders under docs/ fails 0.9186",
+          bool(RT._primary_as_written_miss(sample[0], 0.918, 0.9186)))
+    check("a fs_bishop=1.210 row on a verification page fails 1.2106",
+          bool(RT._primary_as_written_miss(ver[2], 1.21, 1.2106)))
+    check("the same tag on a private course page (outside docs/) passes 0.9186",
+          RT._primary_as_written_miss(private[0], 0.918, 0.9186) is None)
 
 
 def check_opt_out(RT, tut):
@@ -142,19 +155,21 @@ def check_opt_out(RT, tut):
 
 
 def check_real_pages(RT):
-    """3. Every tag on the real tutorial pages: a well-formed opt-out or none."""
-    bad = []
-    for md in sorted((Path(_ROOT) / 'docs' / 'tutorials').glob('*.md')):
+    """3. Every tag on every real page under docs/: a well-formed opt-out or none."""
+    bad, n = [], 0
+    for md in sorted((Path(_ROOT) / 'docs').rglob('*.md')):
         for t in RT.parse_test_tags(md):
+            n += 1
             why = RT._precision_refusal(t)
             if why:
-                bad.append(f"{md.name}: {t.get('benchmark') or t.get('type')}: {why}")
-    check("every tutorial tag's precision opt-out is well formed", not bad,
-          "; ".join(bad[:3]))
+                bad.append(f"{md.relative_to(_ROOT)}: "
+                           f"{t.get('benchmark') or t.get('type')}: {why}")
+    check(f"every docs tag's precision opt-out is well formed ({n} rows)",
+          not bad and n > 0, "; ".join(bad[:3]))
 
 
 def check_fast_kernel(RT, tut):
-    """4. The fast-kernel pass reads the tutorial's written precision."""
+    """4. The fast-kernel pass reads the page's written precision."""
     row = dict(tut[8], _default_tol=0.01)
     real = (RT.run_fem_test, RT._fast_kernel_available)
     RT.run_fem_test = lambda test, fast_kernel=None: (1.7334 if fast_kernel else 1.7302, None)
@@ -208,19 +223,19 @@ def check_prose(RT, root):
 
 def main():
     print("=" * 72)
-    print("Tutorial precision rule")
+    print("Printed-precision rule (every page under docs/)")
     print("=" * 72)
     import run_tests as RT
-    saved = RT.TUTORIAL_DIR
+    saved = RT.DOCS_DIR
     with tempfile.TemporaryDirectory() as root:
         try:
-            tut, ver = _pages(RT, root)
+            tut, ver, sample, private = _pages(RT, root)
             check_rule(RT, tut)
-            check_scope(RT, ver)
+            check_scope(RT, ver, sample, private)
             check_opt_out(RT, tut)
             check_fast_kernel(RT, tut)
         finally:
-            RT.TUTORIAL_DIR = saved
+            RT.DOCS_DIR = saved
     with tempfile.TemporaryDirectory() as root:
         check_prose(RT, root)
     check_real_pages(RT)
@@ -228,7 +243,7 @@ def main():
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))
         return 1
-    print("All tutorial precision checks passed.")
+    print("All printed-precision checks passed.")
     return 0
 
 

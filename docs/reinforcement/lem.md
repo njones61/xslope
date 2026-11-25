@@ -220,7 +220,7 @@ force:
 ![The crossing table for the LEM-8 critical circle with 10 ft pullout lengths](../lem/images/reinf_crossings_pullout.png){width=579}
 
 Lines 2 and 6 are limited from end 1, at the slope face, and Lines 3 to 5 from end 2, behind the surface. The five
-forces total 3,553 lb/ft, and Spencer's factor of safety drops from 1.587 to 1.539.
+forces total 3,535 lb/ft, and Spencer's factor of safety drops from 1.589 to 1.540.
 
 ## References
 

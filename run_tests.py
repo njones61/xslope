@@ -3339,11 +3339,151 @@ def run_design_callable_test(test):
     return 0.0, None
 
 
+#: Every expected_* key a reliability row may carry, by row type, with the result
+#: key it is compared with. ``expected_beta`` is the row's primary value, which the
+#: summary compares (``_EXPECTED_KEYS``); ``_reliability_misses`` checks the rest. A
+#: key not listed for the row's type is refused before anything is solved
+#: (``_unknown_expected_keys``), so a page can never print a number its tag claims
+#: to lock while the runner ignores it. Probabilities are written as fractions (a
+#: page's 88.4% is expected_r=0.884, the same precision). A key mapped to None is
+#: checked elsewhere (the mesh counts, ``_check_mesh_counts``).
+_REL_EXPECTED = {
+    'reliability': {
+        'expected_beta': 'beta_ln', 'expected_fmlv': 'F_MLV',
+        'expected_sigma': 'sigma_F', 'expected_cov': 'COV_F',
+        'expected_r': 'reliability', 'expected_pf': 'prob_failure',
+        'expected_beta_n': 'beta_normal', 'expected_pf_n': 'pf_normal'},
+    'reliability_mc': {
+        'expected_beta': 'beta_ln', 'expected_mean': 'mean_FS',
+        'expected_fmlv': 'F_MLV', 'expected_sigma': 'sigma_F', 'expected_cov': 'COV_F',
+        'expected_pf': 'pf_empirical', 'expected_beta_n': 'beta_normal',
+        'expected_pf_n': 'pf_normal', 'expected_pf_ln': 'pf_lognormal',
+        'expected_n': 'n_used', 'expected_n_valid': 'n_valid'},
+    'reliability_rs': {
+        'expected_beta': 'beta_ln', 'expected_mean': 'mean_FS',
+        'expected_fmlv': 'F_MLV', 'expected_sigma': 'sigma_F', 'expected_cov': 'COV_F',
+        'expected_pf': 'pf_empirical', 'expected_beta_n': 'beta_normal',
+        'expected_pf_n': 'pf_normal', 'expected_pf_ln': 'pf_lognormal',
+        'expected_r2': 'gate_r2'},
+    'fem_reliability': {
+        'expected_beta': 'beta_ln', 'expected_fmlv': 'F_MLV',
+        'expected_sigma': 'sigma_F', 'expected_cov': 'COV_F',
+        'expected_r': 'reliability', 'expected_pf': 'prob_failure',
+        'expected_beta_n': 'beta_normal', 'expected_pf_n': 'pf_normal',
+        'expected_elements': None, 'expected_nodes': None},
+}
+
+#: Counts, compared exactly: the realizations a converged Monte Carlo campaign
+#: used, and how many of them had an analyzable solution.
+_REL_COUNT_KEYS = frozenset(('expected_n', 'expected_n_valid'))
+
+#: The default ``pf_tol`` of a sampling row's counted probability of failure; any
+#: other row's expected_pf, and every other key, uses the tag's ``tolerance``.
+_REL_PF_TOL = {'reliability_mc': 0.02, 'reliability_rs': 0.01}
+
+#: The per-parameter table's columns a Taylor-series tag may lock (reliability,
+#: fem_reliability): the tag key (a semicolon list, one value per ``params``
+#: entry) and the param_info key.
+_REL_TABLE = (('f_plus', 'F_plus'), ('f_minus', 'F_minus'), ('delta_f', 'delta_F'))
+
+
+def _unknown_expected_keys(test):
+    """The refusal for an expected_* key this row type does not check, else None."""
+    allowed = _REL_EXPECTED.get(test.get('type'), {})
+    unknown = sorted(k for k in test if k.startswith('expected_') and k not in allowed)
+    if not unknown:
+        return None
+    return (f"the tag carries {', '.join(unknown)}, which a {test.get('type')} row "
+            f"does not check (it checks {', '.join(sorted(allowed))})")
+
+
+def _reliability_misses(test, result):
+    """Every number a reliability tag locks besides expected_beta that this run no
+    longer gives, all of them, not only the first: inside its tolerance and, on a
+    page under docs/, at the precision the tag writes it (``_as_written_miss``).
+    Counts must match exactly. The per-parameter table is keyed by
+    ``params=<material number>.<parameter>;...`` (``1.phi;1.c;...``), and a run that
+    perturbs a parameter the list leaves out is a miss too, so a page's table
+    cannot silently lose a row."""
+    ttype = test.get('type')
+    tol = float(test.get('tolerance', 0.02))
+    pf_tol = float(test.get('pf_tol', _REL_PF_TOL.get(ttype, tol)))
+    written = test.get('_as_written') or {}
+    misses = []
+
+    def one(key, got, want, text=None, band=tol):
+        if got is None:
+            misses.append(f"{key}: the result has no value for it")
+            return
+        if key in _REL_COUNT_KEYS:
+            if int(round(float(got))) != int(round(float(want))):
+                misses.append(f"{key}: this run gives {int(round(float(got)))}, the "
+                              f"tag {int(round(float(want)))}")
+            return
+        if abs(float(got) - float(want)) > band:
+            misses.append(f"{key}: this run gives {float(got):.5f}, the tag "
+                          f"{float(want)} (tol {band:g})")
+            return
+        miss = _as_written_miss(test, key, got, written=text)
+        if miss:
+            misses.append(miss)
+
+    for key, rkey in _REL_EXPECTED.get(ttype, {}).items():
+        if key == 'expected_beta' or rkey is None or key not in test:
+            continue
+        one(key, result.get(rkey), test[key],
+            band=pf_tol if key == 'expected_pf' else tol)
+
+    names = [s.strip() for s in str(test.get('params', '')).split(';') if s.strip()]
+    if names:
+        by_name = {f"{p['material_id']}.{p['param']}": p
+                   for p in (result.get('param_info') or [])}
+        for extra in sorted(set(by_name) - set(names)):
+            misses.append(f"params: the run perturbs {extra}, which the tag's "
+                          f"table leaves out")
+        for key, pkey in _REL_TABLE:
+            if key not in test:
+                continue
+            texts = [s.strip() for s in str(written.get(key, test[key])).split(';')]
+            if len(texts) != len(names):
+                misses.append(f"{key}: {len(texts)} values for {len(names)} params")
+                continue
+            for name, text in zip(names, texts):
+                p = by_name.get(name)
+                if p is None:
+                    misses.append(f"params: {name} is not a parameter the run "
+                                  f"perturbs")
+                    continue
+                one(f"{key} ({name})", p.get(pkey), float(text), text)
+    return misses
+
+
+def _reliability_verdict(test, result):
+    """``(beta_ln, None)`` for a run that gives every number its tag locks, else
+    ``(None, message)`` naming every miss."""
+    misses = _reliability_misses(test, result)
+    if misses:
+        return None, (f"beta_ln {result['beta_ln']:.4f}; " + "; ".join(misses))
+    return result['beta_ln'], None
+
+
 def run_reliability_test(test):
-    """Run a single reliability analysis, returning the lognormal reliability index beta."""
+    """Taylor-series reliability regression: run ``reliability`` and return the
+    lognormal reliability index beta_ln (compared to expected_beta). The other
+    numbers a page prints are locked by the keys in ``_REL_EXPECTED`` and the
+    per-parameter table keys (``_reliability_misses``).
+
+    ``circle_xo=``, ``circle_yo=``, ``circle_r=`` put a circle in the tag, as on a
+    single_circle row: with ``search=false`` every one of the 1 + 2N solves is made
+    on that circle instead of the circles sheet's first one, for a published or
+    plotted circle the workbook does not store. ``num_slices`` sets the slices per
+    solve (the engine's own default otherwise)."""
     from xslope.fileio import load_slope_data
     from xslope.advanced import reliability as reliability_analysis
 
+    refusal = _unknown_expected_keys(test)
+    if refusal:
+        return None, refusal
     file_path = test['file']
     method = test.get('method', 'spencer')
     circular = str(test.get('circular', 'true')).lower() not in ('false', '0', 'no')
@@ -3351,23 +3491,42 @@ def run_reliability_test(test):
     do_search = str(test.get('search', 'true')).lower() not in ('false', '0', 'no')
 
     slope_data = load_slope_data(file_path)
+    keys = ('circle_xo', 'circle_yo', 'circle_r')
+    given = [str(test.get(k, '')).strip() for k in keys]
+    if any(given) and not all(given):
+        return None, ("circle_xo, circle_yo and circle_r must all be given to put a "
+                      "circle in the tag; got only "
+                      + ", ".join(k for k, v in zip(keys, given) if v))
+    if all(given):
+        if do_search or not circular:
+            return None, ("a circle in the tag is a fixed circular surface: give it "
+                          "with search=false and circular=true")
+        xo, yo, r = (float(v) for v in given)
+        slope_data['circles'] = [{"Xo": xo, "Yo": yo, "Depth": yo - r, "R": r}]
+    kw = {}
+    if test.get('num_slices') is not None:
+        kw['num_slices'] = int(test['num_slices'])
     success, result = reliability_analysis(slope_data, method, circular=circular, debug_level=0,
-                                           search=do_search)
+                                           search=do_search, **kw)
     if not success:
         return None, f"reliability failed: {result}"
-    return result['beta_ln'], None
+    return _reliability_verdict(test, result)
 
 
 def run_reliability_mc_test(test):
     """Monte Carlo reliability regression: sample the material sigmas, evaluate the
     factor of safety of each realization on the fixed surface, and return the
     lognormal reliability index beta_ln (compared to expected_beta). The seed is a
-    fixed constant, so a given (file, n_samples, seed) is bit-reproducible. An
-    optional expected_pf/pf_tol pair additionally checks the empirical probability
-    of failure."""
+    fixed constant, so a given (file, n_samples, seed) is bit-reproducible. The
+    other numbers a page prints are locked by the keys in ``_REL_EXPECTED``: the
+    counted probability of failure (expected_pf, inside ``pf_tol``), the mean and
+    sigma of F, the normal index, and the realization counts."""
     from xslope.fileio import load_slope_data
     from xslope.advanced import reliability_mc
 
+    refusal = _unknown_expected_keys(test)
+    if refusal:
+        return None, refusal
     file_path = test['file']
     method = test.get('method', 'spencer')
     circular = str(test.get('circular', 'true')).lower() not in ('false', '0', 'no')
@@ -3391,17 +3550,7 @@ def run_reliability_mc_test(test):
                                      debug_level=-1, **kw)
     if not success:
         return None, f"reliability_mc failed: {result}"
-
-    exp_pf = test.get('expected_pf')
-    if exp_pf is not None:
-        pf_tol = float(test.get('pf_tol', 0.02))
-        if abs(result['pf_empirical'] - float(exp_pf)) > pf_tol:
-            return None, (f"pf_empirical {result['pf_empirical']:.4f} vs expected "
-                          f"{float(exp_pf):.4f} (tol {pf_tol})")
-        miss = _as_written_miss(test, 'expected_pf', result['pf_empirical'])
-        if miss:
-            return None, miss
-    return result['beta_ln'], None
+    return _reliability_verdict(test, result)
 
 
 def run_reliability_rs_test(test):
@@ -3409,13 +3558,18 @@ def run_reliability_rs_test(test):
     central composite design, put it through its accuracy gate, sample it, and
     return the lognormal reliability index beta_ln (compared to expected_beta). The
     surrogate is fitted to deterministic design points and sampled from a fixed
-    seed, so a given (file, n_surrogate, seed) is bit-reproducible. An optional
-    expected_pf/pf_tol pair additionally checks the probability of failure. A
-    surrogate that fails its gate returns a refusal, which fails the test — the
-    engine is never allowed to degrade into an answer."""
+    seed, so a given (file, n_surrogate, seed) is bit-reproducible. The other
+    numbers a page prints are locked by the keys in ``_REL_EXPECTED``: the counted
+    probability of failure (expected_pf, inside ``pf_tol``), the mean and sigma of
+    F, the normal index, and the fit's R^2. A surrogate that fails its gate returns
+    a refusal, which fails the test — the engine is never allowed to degrade into
+    an answer."""
     from xslope.fileio import load_slope_data
     from xslope.advanced import reliability_rs
 
+    refusal = _unknown_expected_keys(test)
+    if refusal:
+        return None, refusal
     file_path = test['file']
     method = test.get('method', 'spencer')
     circular = str(test.get('circular', 'true')).lower() not in ('false', '0', 'no')
@@ -3438,81 +3592,7 @@ def run_reliability_rs_test(test):
                                      debug_level=-1, **kw)
     if not success:
         return None, f"reliability_rs failed: {result}"
-
-    exp_pf = test.get('expected_pf')
-    if exp_pf is not None:
-        pf_tol = float(test.get('pf_tol', 0.01))
-        if abs(result['pf_empirical'] - float(exp_pf)) > pf_tol:
-            return None, (f"pf_empirical {result['pf_empirical']:.5f} vs expected "
-                          f"{float(exp_pf):.5f} (tol {pf_tol})")
-        miss = _as_written_miss(test, 'expected_pf', result['pf_empirical'])
-        if miss:
-            return None, miss
-    return result['beta_ln'], None
-
-
-#: The summary numbers a fem_reliability tag may lock beside expected_beta: the tag
-#: key and the reliability_fem result key it is compared with. Probabilities are
-#: written as fractions (a page's 88.4% is expected_r=0.884, the same precision).
-_FEM_REL_SUMMARY = (('expected_fmlv', 'F_MLV'), ('expected_sigma', 'sigma_F'),
-                    ('expected_cov', 'COV_F'), ('expected_r', 'reliability'),
-                    ('expected_pf', 'prob_failure'),
-                    ('expected_beta_n', 'beta_normal'), ('expected_pf_n', 'pf_normal'))
-
-#: The per-parameter table's columns a fem_reliability tag may lock: the tag key
-#: (a semicolon list, one value per ``params`` entry) and the param_info key.
-_FEM_REL_TABLE = (('f_plus', 'F_plus'), ('f_minus', 'F_minus'), ('delta_f', 'delta_F'))
-
-
-def _fem_reliability_misses(test, result):
-    """Every number a fem_reliability tag locks besides expected_beta that this run
-    no longer gives: inside ``tolerance`` and, on a page under docs/, at the
-    precision the tag writes it (``_as_written_miss``). The per-parameter table is
-    keyed by ``params=<material number>.<parameter>;...`` (``1.phi;1.c;...``), and
-    a run that perturbs a parameter the list leaves out is a miss too, so the
-    page's table cannot silently lose a row."""
-    tol = float(test.get('tolerance', 0.02))
-    written = test.get('_as_written') or {}
-    misses = []
-
-    def one(key, got, want, text=None):
-        if got is None:
-            misses.append(f"{key}: the result has no value for it")
-            return
-        if abs(float(got) - float(want)) > tol:
-            misses.append(f"{key}: this run gives {float(got):.5f}, the tag "
-                          f"{float(want)} (tol {tol:g})")
-            return
-        miss = _as_written_miss(test, key, got, written=text)
-        if miss:
-            misses.append(miss)
-
-    for key, rkey in _FEM_REL_SUMMARY:
-        if key in test:
-            one(key, result.get(rkey), test[key])
-
-    names = [s.strip() for s in str(test.get('params', '')).split(';') if s.strip()]
-    if names:
-        by_name = {f"{p['material_id']}.{p['param']}": p
-                   for p in (result.get('param_info') or [])}
-        for extra in sorted(set(by_name) - set(names)):
-            misses.append(f"params: the run perturbs {extra}, which the tag's "
-                          f"table leaves out")
-        for key, pkey in _FEM_REL_TABLE:
-            if key not in test:
-                continue
-            texts = [s.strip() for s in str(written.get(key, test[key])).split(';')]
-            if len(texts) != len(names):
-                misses.append(f"{key}: {len(texts)} values for {len(names)} params")
-                continue
-            for name, text in zip(names, texts):
-                p = by_name.get(name)
-                if p is None:
-                    misses.append(f"params: {name} is not a parameter the run "
-                                  f"perturbs")
-                    continue
-                one(f"{key} ({name})", p.get(pkey), float(text), text)
-    return misses
+    return _reliability_verdict(test, result)
 
 
 def run_fem_reliability_test(test):
@@ -3529,7 +3609,7 @@ def run_fem_reliability_test(test):
     reader gets. ``expected_elements`` / ``expected_nodes`` hold the lock to its mesh.
 
     A tag that prints more than the index locks the rest too (see
-    ``_fem_reliability_misses``): expected_fmlv, expected_sigma, expected_cov,
+    ``_reliability_misses``): expected_fmlv, expected_sigma, expected_cov,
     expected_r and expected_pf (the lognormal reliability and probability of
     failure), expected_beta_n and expected_pf_n (the normal ones), and the
     per-parameter table as params / f_plus / f_minus / delta_f lists."""
@@ -3540,6 +3620,9 @@ def run_fem_reliability_test(test):
                              extract_constraint_line_geometry, extract_size_regions)
     from xslope.advanced import reliability_fem
 
+    refusal = _unknown_expected_keys(test)
+    if refusal:
+        return None, refusal
     slope_data = load_slope_data(test['file'])
     if str(test.get('mesh', '')).strip().lower() == 'file':
         mesh = slope_data.get('mesh')
@@ -3566,10 +3649,7 @@ def run_fem_reliability_test(test):
             failure_criterion=test.get('criterion', 'non_convergence'))
     if not success:
         return None, f"reliability_fem failed: {result}"
-    misses = _fem_reliability_misses(test, result)
-    if misses:
-        return None, (f"beta_ln {result['beta_ln']:.4f}; " + "; ".join(misses))
-    return result['beta_ln'], None
+    return _reliability_verdict(test, result)
 
 
 def run_gsat_pair_test(test):

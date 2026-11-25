@@ -241,6 +241,7 @@ problem 35). A design screened on the factor of safety alone can examine the wro
 <!-- test: file=../verification/files/rocscience/vp035.xlsx, type=circular_search, num_slices=50, fs_bishop=2.53, benchmark=REL-VP35-fs -->
 <!-- test: file=../verification/files/rocscience/vp035.xlsx, type=single_circle, circle_index=0, num_slices=40, fs_bishop=2.97, benchmark=REL-VP35-B -->
 <!-- test: file=../verification/files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.35, tolerance=0.03, benchmark=REL-VP35-beta -->
+<!-- test: file=../verification/files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, num_slices=40, circle_xo=348.899, circle_yo=265.399, circle_r=118.617, expected_beta=6.79, expected_fmlv=2.53, tolerance=0.03, benchmark=REL-VP35-A-beta -->
 
 XSLOPE does not search for the surface of lowest β. The search checkbox in the Reliability dialog decides
 which surface each solve uses:

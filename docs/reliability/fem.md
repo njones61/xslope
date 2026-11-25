@@ -23,8 +23,10 @@ The analysis uses the same **Taylor Series Probability Method (TSPM)**:
    that parameter set to $MLV \pm \sigma_i$ (all others held at their most-likely
    value), then $\Delta F_i = |F_i^+ - F_i^-|$.
 3. Combine: $\sigma_F = \sqrt{\sum_i (\Delta F_i / 2)^2}$, $COV_F = \sigma_F / F_{MLV}$,
-   and finally the lognormal reliability index $\beta_{LN}$ and the reliability
-   $R = \Phi(\beta_{LN})$.
+   and finally the lognormal reliability index $\beta_{LN}$ with the reliability
+   $R = \Phi(\beta_{LN})$, and the normal reliability index
+   $\beta_N = (F_{MLV} - 1)/\sigma_F$ with its probability of failure $\Phi(-\beta_N)$
+   (see the [Reliability Equation](index.md#reliability-equation)).
 
 The analysis runs $1 + 2N$ SSRM solves (one at the most-likely values plus a
 $F^+$/$F^-$ pair for each of the $N$ uncertain parameters), all on a **single
@@ -144,13 +146,14 @@ success, result = reliability_fem(
     # tolerance defaults to a tight 0.001 here (see Numerical precision above)
 )
 # reliability_fem already prints the per-parameter ΔF table and the summary
-# (F_MLV, COV_F, beta, reliability, Pf); all of these are also in `result`.
+# (F_MLV, COV_F, both betas, both Pf, reliability); all are also in `result`.
 ```
 
 `reliability_fem` returns the same reliability keys as the LEM `reliability`
-function (`F_MLV`, `sigma_F`, `COV_F`, `beta_ln`, `reliability`, `prob_failure`,
-`param_info`), plus `mlv_solution` (the SSRM result at the most-likely values) and
-the `mesh` used for every trial. Only the most-likely-values solve — the one
+function: `F_MLV`, `sigma_F`, and `COV_F`; the lognormal `beta_ln`, `reliability`,
+and `prob_failure` (also given as `pf_lognormal`); the normal `beta_normal` and
+`pf_normal`; and `param_info`. It adds `mlv_solution` (the SSRM result at the
+most-likely values) and the `mesh` used for every trial. Only the most-likely-values solve — the one
 result that is plotted — captures the at-failure mechanism for the
 deformation/vector/strain figures; the perturbation solves report only their
 factor of safety. Building the mesh is the same as for a single

@@ -436,16 +436,19 @@ arithmetic rather than solves, and its accuracy is set by the fit rather than by
 count. **FEM** shows the SSRM `F_min` / `F_max` bracket and a tight reliability
 tolerance. Settings are remembered for the session.
 
-The run reports β, the probability of failure, and the mean / σ of the factor of
-safety in a summary, with the per-parameter table in the Log pane. The result view
-follows the engine:
+The run's summary reports the factor of safety (the most-likely value for the Taylor
+series, the mean for a sampling run) and its σ, and β and the probability of failure by
+both the normal and the lognormal conventions (see the
+[Reliability Equation](../reliability/index.md#reliability-equation)). A Monte Carlo
+or response-surface run adds the counted probability of failure. The per-parameter
+table is in the Log pane. The result view follows the engine:
 
 | Engine | Result tab |
 | --- | --- |
 | **Taylor series (LEM)** | **LEM · Reliability** — the most-likely-value surface with the F⁺/F⁻ perturbation surfaces. |
 | **Monte Carlo (LEM)** | **Reliability · MC** — the FS histogram with the FS = 1 line, the mean, and fitted normal / lognormal overlays (a display-panel toggle). β in both conventions and the probability of failure are in the title. |
 | **Response surface (LEM)** | **Reliability · RS** — the same FS histogram, drawn from a 10,000-realization subsample of the surrogate draws. The fit and accuracy-check summary — design solves, $R^2$, RMS error, the failure-region check — is in the Log pane and the run summary. |
-| **Taylor series (FEM)** | **FEM · Results** — the deformation at the most-likely values; β and the probability of failure are in the run summary. |
+| **Taylor series (FEM)** | **FEM · Results** — the deformation at the most-likely values; β and the probability of failure, normal and lognormal, are in the run summary. |
 
 ![LEM Reliability view](images/analysis_lem_reliability.png)
 

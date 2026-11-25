@@ -16,8 +16,10 @@ The Taylor Series Probability Method (TSPM) is a more efficient approach for cal
 
 >>$COV_F = \dfrac{\sigma_F}{F_{MLV}}$
 
-$\sigma_F$ and $COV_F$ then feed the lognormal reliability index $\beta_{LN}$ and the
-reliability $R$ from the [Reliability Equation](index.md#reliability-equation). Each
+$\sigma_F$ and $COV_F$ then feed the two reliability indices of the
+[Reliability Equation](index.md#reliability-equation): the lognormal $\beta_{LN}$, with
+its reliability $R$ and probability of failure, and the normal
+$\beta_N = (F_{MLV} - 1)/\sigma_F$, with its probability of failure. Each
 parameter is evaluated at exactly two points — $MLV + \sigma_i$ and $MLV - \sigma_i$ —
 so TSPM is, per parameter, a two-point (Rosenblueth-style) point-estimate method; see
 [How commercial software does it](index.md#how-commercial-software-does-it) for how
@@ -31,7 +33,7 @@ The strength parameters that are perturbed depend on each material's strength mo
 
 The Monte Carlo campaign is called the same way through `reliability_mc`, which reads the identical MLV and standard-deviation inputs and adds only the sampling controls (`n_samples`, `distribution`, `rng_seed`). It is a limit-equilibrium path only, for the compute reason discussed in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope).
 
-One of the arguments to the function is `method`, which specifies the limit equilibrium method to be used for the analysis. The available methods are 'bishop', 'janbu', and 'spencer'. The function will return the probability of failure ($P_f$) and reliability ($R$) of the slope. Either a circular or non-circular slope can be analyzed. If a circular slope is analyzed, care should be taken to select a set of starting circles in the circles table of the input file to ensure that the automated search finds the global minimum factor of safety for each analysis. It is good practice to include a circle that touches the bottom of each material zone and perhaps a circle that passes through the toe of the slope.
+One of the arguments to the function is `method`, which specifies the limit equilibrium method to be used for the analysis. The available methods are 'bishop', 'janbu', and 'spencer'. The function returns the reliability index and the probability of failure ($P_f$) of the slope by both the lognormal and the normal conventions, and the lognormal reliability ($R$). The result dictionary holds `F_MLV`, `sigma_F`, and `COV_F`; the lognormal `beta_ln`, `reliability`, and `prob_failure` (also given as `pf_lognormal`); and the normal `beta_normal` and `pf_normal`. Either a circular or non-circular slope can be analyzed. If a circular slope is analyzed, care should be taken to select a set of starting circles in the circles table of the input file to ensure that the automated search finds the global minimum factor of safety for each analysis. It is good practice to include a circle that touches the bottom of each material zone and perhaps a circle that passes through the toe of the slope.
 
 ## Visualizing the perturbation surfaces
 
@@ -108,9 +110,11 @@ Processing parameter 3/3: Material 1, phi
 
 σ_F = 0.1643
 COV_F = 0.1232
+β_normal = 2.0301
 β_ln = 2.2838
-Reliability = 98.88%
-Probability of failure = 1.12%
+Probability of failure (normal) = 2.12%
+Probability of failure (lognormal) = 1.12%
+Reliability (lognormal) = 98.88%
 
 === RELIABILITY ANALYSIS RESULTS ===
 +-------------+-------+-----+---------+---------+-------+-------+-------+
@@ -127,9 +131,11 @@ Summary Statistics:
 F_MLV: 1.334
 σ_F: 0.164
 COV_F: 0.123
+β_normal: 2.030
 β_ln: 2.284
-Reliability: 98.88%
-Probability of failure: 1.12%
+Probability of failure (normal): 2.12%
+Probability of failure (lognormal): 1.12%
+Reliability (lognormal): 98.88%
 
 Reliability analysis completed in 18.45 seconds.
 ```

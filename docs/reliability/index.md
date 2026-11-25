@@ -136,6 +136,21 @@ def calculate_reliability(F_MLV, COV_F):
     return R
 ```
 
+The lognormal index treats the factor of safety as lognormally distributed. If the
+factor of safety is treated as normally distributed instead, the reliability index is:
+
+>>$\beta_N = \dfrac{F_{MLV} - 1}{\sigma_F}$
+
+where $\sigma_F = COV_F \times F_{MLV}$ is the standard deviation of the factor of
+safety. The probability of failure is then $P_f = \Phi(-\beta_N)$, where $\Phi$ is the
+standard normal distribution function (`NORMSDIST(-beta_N)` in Excel,
+`norm.cdf(-beta_N)` in Python). Duncan, Wright, and Brandon (2014) find some
+justification for either distribution and suggest computing both. Every XSLOPE
+reliability analysis reports both: the lognormal $\beta_{LN}$ with its reliability and
+probability of failure, and the normal $\beta_N$ with its probability of failure. The
+two can differ by a wide margin. At a large factor of safety the lognormal index is
+the larger of the two, and its probability of failure is the smaller.
+
 But first, we have to calculate the factor of safety based on the most likely values of the parameters ($F_{MLV}$) and the coefficient of variation of the factor of safety ($COV_F$). Calculating the $F_{MLV}$ is straightforward, as it is simply the factor of safety calculated using the most likely values of the parameters. This can be done using any of the limit equilibrium methods implemented in the **xslope** package, such as Bishop's method, Janbu's method, or Spencer's method.
 
 To calculate the $COV_F$, there are two common approaches to calculate these values: the [Monte Carlo method](monte_carlo.md) and the [Taylor Series Probability Method (TSPM)](taylor.md).

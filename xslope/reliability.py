@@ -180,6 +180,20 @@ def _sentinel_reason(label, value):
             f"index cannot be formed from it.")
 
 
+def _normal_index(F_mean, sigma_F):
+    """The normal reliability index and its probability of failure.
+
+    ``beta_normal = (F - 1) / sigma_F`` and ``pf_normal = Phi(-beta_normal)``: the
+    convention that takes the factor of safety as normally distributed. Duncan,
+    Wright and Brandon (2014) find some justification for either a normal or a
+    lognormal F and suggest computing both, so the Taylor series reports this one
+    beside its lognormal ``beta_ln``, as the sampling engines do. Returns
+    ``(beta_normal, pf_normal)`` as floats.
+    """
+    beta_normal = (F_mean - 1.0) / sigma_F if sigma_F > 0 else float('inf')
+    return float(beta_normal), float(norm.cdf(-beta_normal))
+
+
 def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_level=0,
                 progress_callback=None, cancel_check=None,
                 fs_tol=None, tol=None, max_iter=None, composite=False, seed='circles',
@@ -231,7 +245,12 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
             slices here, as its Run LEM does.
 
     Returns:
-        tuple: (success, result) where result contains reliability analysis results
+        tuple: (success, result). ``result`` holds ``F_MLV``, ``sigma_F`` and
+        ``COV_F``; the lognormal reliability index ``beta_ln`` with its
+        ``reliability`` and ``prob_failure`` (also given as ``pf_lognormal``); the
+        normal index ``beta_normal`` = (F_MLV - 1)/sigma_F with its ``pf_normal``;
+        the per-parameter ``param_info``; and the surfaces (``fs_cache``,
+        ``critical_surface``, ``critical_slices``).
 
     See Also:
         reliability : the front door — ``engine='taylor'`` routes here.
@@ -496,13 +515,16 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
     beta_ln = np.log(F_MLV / np.sqrt(1 + COV_F**2)) / np.sqrt(np.log(1 + COV_F**2))
     reliability = norm.cdf(beta_ln)
     prob_failure = 1 - reliability
-    
+    beta_normal, pf_normal = _normal_index(F_MLV, sigma_F)
+
     if debug_level >= 1:
         print(f"\nσ_F = {sigma_F:.4f}")
         print(f"COV_F = {COV_F:.4f}")
+        print(f"β_normal = {beta_normal:.4f}")
         print(f"β_ln = {beta_ln:.4f}")
-        print(f"Reliability = {reliability*100:.2f}%")
-        print(f"Probability of failure = {prob_failure*100:.2f}%")
+        print(f"Probability of failure (normal) = {pf_normal*100:.2f}%")
+        print(f"Probability of failure (lognormal) = {prob_failure*100:.2f}%")
+        print(f"Reliability (lognormal) = {reliability*100:.2f}%")
     
     # Print summary table
     if debug_level >= 0:
@@ -531,11 +553,16 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         print(f"F_MLV: {F_MLV:.3f}")
         print(f"σ_F: {sigma_F:.3f}")
         print(f"COV_F: {COV_F:.3f}")
+        print(f"β_normal: {beta_normal:.3f}")
         print(f"β_ln: {beta_ln:.3f}")
-        print(f"Reliability: {reliability*100:.2f}%")
-        print(f"Probability of failure: {prob_failure*100:.2f}%")
-    
-    # Prepare results
+        print(f"Probability of failure (normal): {pf_normal*100:.2f}%")
+        print(f"Probability of failure (lognormal): {prob_failure*100:.2f}%")
+        print(f"Reliability (lognormal): {reliability*100:.2f}%")
+
+    # Prepare results. beta_ln, reliability and prob_failure are the lognormal
+    # convention; beta_normal and pf_normal the normal one. pf_lognormal repeats
+    # prob_failure under the name the sampling engines give it, so all four engines
+    # carry the pair pf_normal / pf_lognormal.
     result = {
         'method': f'{method}_reliability',
         'F_MLV': F_MLV,
@@ -544,6 +571,9 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         'beta_ln': beta_ln,
         'reliability': reliability,
         'prob_failure': prob_failure,
+        'beta_normal': beta_normal,
+        'pf_normal': pf_normal,
+        'pf_lognormal': float(prob_failure),
         'param_info': param_info,
         'fs_cache': reliability_fs_cache,
         'critical_surface': critical_surface,
@@ -671,8 +701,9 @@ def _perturbed_slope_data(slope_data, materials, param, sign):
 
 def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug_level=0):
     """TSPM combination shared by the LEM and FEM paths: sigma_F from the parameter
-    delta_Fs, COV_F, lognormal beta, reliability and probability of failure, plus a
-    printed summary table. Returns a result dict, or an error string."""
+    delta_Fs, COV_F, the lognormal beta with its reliability and probability of
+    failure, the normal beta with its probability of failure, plus a printed
+    summary table. Returns a result dict, or an error string."""
     sigma_F = np.sqrt(sum((df / 2) ** 2 for df in delta_F_values))
     COV_F = sigma_F / F_MLV if F_MLV else 0.0
     if COV_F < COV_FLOOR:
@@ -680,6 +711,7 @@ def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug
     beta_ln = np.log(F_MLV / np.sqrt(1 + COV_F ** 2)) / np.sqrt(np.log(1 + COV_F ** 2))
     reliability = float(norm.cdf(beta_ln))
     prob_failure = 1 - reliability
+    beta_normal, pf_normal = _normal_index(F_MLV, sigma_F)
 
     if debug_level >= 0:
         print("\n=== RELIABILITY ANALYSIS RESULTS ===")
@@ -692,12 +724,19 @@ def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug
         print(tabulate(table_data, headers=headers, tablefmt="grid",
                        colalign=["left"] + ["center"] * 7))
         print(f"\nF_MLV: {F_MLV:.3f}\nσ_F: {sigma_F:.3f}\nCOV_F: {COV_F:.3f}\n"
-              f"β_ln: {beta_ln:.3f}\nReliability: {reliability*100:.2f}%\n"
-              f"Probability of failure: {prob_failure*100:.2f}%")
+              f"β_normal: {beta_normal:.3f}\nβ_ln: {beta_ln:.3f}\n"
+              f"Probability of failure (normal): {pf_normal*100:.2f}%\n"
+              f"Probability of failure (lognormal): {prob_failure*100:.2f}%\n"
+              f"Reliability (lognormal): {reliability*100:.2f}%")
 
+    # Same keys as reliability_taylor: the lognormal beta_ln / reliability /
+    # prob_failure, the normal beta_normal / pf_normal, and pf_lognormal (=
+    # prob_failure) under the sampling engines' name.
     return {
         'method': method_label, 'F_MLV': F_MLV, 'sigma_F': sigma_F, 'COV_F': COV_F,
         'beta_ln': beta_ln, 'reliability': reliability, 'prob_failure': prob_failure,
+        'beta_normal': beta_normal, 'pf_normal': pf_normal,
+        'pf_lognormal': prob_failure,
         'param_info': param_info,
     }
 

@@ -104,9 +104,9 @@ Every number in an answer is one a snippet printed, or one you did not compute.
   `reliability_taylor` / `reliability_mc` / `reliability_rs`; a discharge comes
   from `run_seep`; E and nu come from `suggest_elastic`. Never work an arithmetic
   example the tool would answer differently — the reliability engines report
-  `beta_ln`, the LOGNORMAL index, not `(E[FS] - 1)/sigma_FS`, and an answer that
-  defines it the textbook way sends the reader to a different number than the run
-  gives.
+  `beta_ln` (LOGNORMAL) and `beta_normal` = `(E[FS] - 1)/sigma_FS`; quote the one
+  the run printed and say which, since an answer that mixes them sends the reader
+  to a different number than the run gives.
 - **Say "not computed", or run it.** What a run would return, what a blank column
   would do, what a curve does past its last point — if you did not run it, say so.
 - **A cause is a measurement, not a story.** Before writing that something is

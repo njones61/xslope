@@ -3977,8 +3977,10 @@ class MainWindow(QMainWindow):
                     f"{rel['mean_FS']:.3f}, β_ln = {rel['beta_ln']:.3f}, "
                     f"Pf = {rel['pf_empirical'] * 100:.2f}%")
         return (f"Reliability — F_MLV = {rel['F_MLV']:.3f}, "
+                f"β_normal = {rel['beta_normal']:.3f}, "
                 f"β_ln = {rel['beta_ln']:.3f}, "
-                f"Pf = {rel['prob_failure'] * 100:.2f}%")
+                f"Pf = {rel['pf_normal'] * 100:.2f}% (normal), "
+                f"{rel['prob_failure'] * 100:.2f}% (lognormal)")
 
     @staticmethod
     def _reliability_summary(rel, engine, app_mode):
@@ -4020,9 +4022,11 @@ class MainWindow(QMainWindow):
             f"{tag}\n\n"
             f"F_MLV = {rel['F_MLV']:.3f}\n"
             f"σ_F = {rel['sigma_F']:.3f}    COV_F = {rel['COV_F']:.3f}\n"
+            f"β (normal) = {rel['beta_normal']:.3f}\n"
             f"β (lognormal) = {rel['beta_ln']:.3f}\n"
-            f"Reliability = {rel['reliability'] * 100:.2f}%\n"
-            f"Probability of failure = {rel['prob_failure'] * 100:.2f}%"
+            f"Pf (normal) = {rel['pf_normal'] * 100:.2f}%    "
+            f"Pf (lognormal) = {rel['prob_failure'] * 100:.2f}%\n"
+            f"Reliability (lognormal) = {rel['reliability'] * 100:.2f}%"
             + extra + "\n\nThe per-parameter ΔF table is in the Log pane.")
 
     def _show_solution(self, bundle):

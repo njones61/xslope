@@ -1576,7 +1576,8 @@ elif analysis_type == "reliability":
     success, result = reliability_analysis(slope_data, method, rapid=rapid_drawdown,
                                            circular=circular, debug_level=1)
     if success:
-        # result keys: 'F_MLV', 'sigma_F', 'COV_F', 'beta_ln', 'reliability', 'prob_failure'
+        # result keys: 'F_MLV', 'sigma_F', 'COV_F'; lognormal 'beta_ln', 'reliability',
+        # 'prob_failure' (= 'pf_lognormal'); normal 'beta_normal', 'pf_normal'
         plot_reliability_results(slope_data, result, save_png=save_png)
         print(f"F_MLV={result['F_MLV']:.3f}  beta_ln={result['beta_ln']:.3f}  "
               f"Pf={result['prob_failure']:.1%}")

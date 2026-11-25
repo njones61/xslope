@@ -2111,7 +2111,8 @@ class PythonKernel:
             keyword arguments (e.g. `fs_tol`, `tol`, `max_iter`, `composite`, `seed`)
             pass straight through. Renders the MLV / F± surface plot when `plot=True`.
             Returns the reliability result dict (`F_MLV`, `sigma_F`, `COV_F`,
-            `beta_ln`, `reliability`, `prob_failure`, `param_info`, …).
+            `beta_ln`, `reliability`, `prob_failure` (lognormal), `beta_normal`,
+            `pf_normal` (normal), `param_info`, …).
             """
             from xslope.reliability import reliability_taylor as _rt
             from xslope.plot import plot_reliability_results

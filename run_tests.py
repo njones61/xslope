@@ -159,20 +159,23 @@ def _repo(rel):
     return str(REPO_ROOT / rel)
 
 
-def _private_dir():
+def _private_dir(root=None):
     """The private test repo, or None when this clone does not have one.
 
-    $XSLOPE_PRIVATE_TESTS wins; otherwise the repo's own SIBLING directories are
-    searched, which is what the name means — a checkout beside this one, not a
-    directory beside wherever the suite was invoked from. Absent on public clones,
-    where the private rows are simply not collected.
+    $XSLOPE_PRIVATE_TESTS wins; otherwise the SIBLING directories of the main
+    checkout are searched, which is what the name means — a checkout beside this
+    one, not a directory beside wherever the suite was invoked from. A git
+    worktree looks beside its main checkout (``_main_checkout``), not beside
+    itself: worktrees live in a folder of their own, and looking beside the
+    worktree silently dropped every private row from runs made there. Absent on
+    public clones, where the private rows are simply not collected.
     """
     d = os.environ.get('XSLOPE_PRIVATE_TESTS')
     if d:
         return d
     # 'xslope_private_tests' is the pre-rename name, still used by old clones.
     for name in ('xslope_private', 'xslope_private_tests'):
-        cand = REPO_ROOT.parent / name
+        cand = _main_checkout(root).parent / name
         if cand.is_dir():
             return str(cand)
     return None
@@ -2100,12 +2103,45 @@ DEFAULT_TRIAL_CEILING = 50000
 #: Raising it does not make a run safer — it makes the standard run longer.
 GATE_SECONDS = 600.0
 
+def _main_checkout(root=None):
+    """The main checkout of the clone that ``root`` (default: this repo) is in.
+
+    Two things belong to it rather than to a branch: the row-timing record below
+    and the private test repo beside it (``_private_dir``). The record is what
+    this MACHINE measured, not what a branch measured, so a git worktree (a
+    second working copy of the same clone, whose ``.git`` is a file pointing into
+    the main checkout's) shares its main checkout's record. A new worktree has no
+    record of its own, and reading its own would hold back nothing: every row
+    nothing has timed runs in the standard tier, so the first standard run from a
+    fresh worktree ran the gate's eight-hour rows. Anything that is not a
+    readable worktree pointer — a plain clone, an unpacked archive — is its own
+    main checkout, so a fresh clone still runs everything and learns."""
+    root = REPO_ROOT if root is None else Path(root)
+    dotgit = root / '.git'
+    if not dotgit.is_file():
+        return root
+    try:
+        line = dotgit.read_text().strip()
+        if not line.startswith('gitdir:'):
+            return root
+        gitdir = Path(line[len('gitdir:'):].strip())
+        if not gitdir.is_absolute():
+            gitdir = root / gitdir
+        pointer = gitdir / 'commondir'
+        common = (gitdir / pointer.read_text().strip()) if pointer.is_file() else gitdir.parent.parent
+        main = common.resolve().parent
+    except OSError:
+        return root
+    return main if (main / 'test').is_dir() else root
+
+
 #: Where the suite records what each row cost, so the threshold above can be
 #: revisited against measurements instead of guessed again. It is written after
 #: every run and is NOT committed: it is what this machine measured, and a clone
-#: that has measured nothing runs everything. The durable, reviewable half of the
+#: that has measured nothing runs everything. A worktree shares its main
+#: checkout's record (``_main_checkout``). The durable, reviewable half of the
 #: rule is the tag — ``tier=gate``.
-ROW_TIMINGS_PATH = _repo('test/row_timings.json')
+ROW_TIMINGS_PATH = str(_main_checkout() / 'test' / 'row_timings.json')
 
 
 def _row_key(test):
@@ -2173,12 +2209,20 @@ def _save_row_timings(updates, path=None):
                     "file is not committed."),
         'rows': {k: dict(sorted(rows[k].items())) for k in sorted(rows)},
     }
+    # Written whole and swapped in, because worktrees share one record and two
+    # suites finishing together must not leave it half-written.
+    tmp = f"{path}.{os.getpid()}.tmp"
     try:
-        with open(path, 'w') as fh:
+        with open(tmp, 'w') as fh:
             json.dump(payload, fh, indent=1, sort_keys=False)
             fh.write('\n')
+        os.replace(tmp, path)
     except OSError:
-        pass          # a read-only checkout still runs; it just records nothing
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        # a read-only checkout still runs; it just records nothing
 
 
 def _row_mode(test):
@@ -12608,6 +12652,9 @@ AUDIT_CHECK_MODULES = {
     # water table, the older tie-back capacity tag, the phreatic switch, partial
     # factors, and what the skill says an import carries.
     'gsz_gaps': ('gsz_gaps_check.py', 'gsz'),
+    # Not an audit check, wired the same way: a git worktree finds the main
+    # checkout's row timings and the private test repo beside the main checkout.
+    'runner_home': ('runner_home_check.py', 'preflight'),
 }
 
 
@@ -19022,6 +19069,11 @@ def main():
                              'bisection forced on every strength-reduction row '
                              '(check=edges is ignored). Hours, not minutes — run '
                              'it before a release, not to check a change.')
+    parser.add_argument('--private', action='store_true',
+                        help='Run only the private repo\'s rows (its tests/ '
+                             'folder: the course homework and exam locks). '
+                             'Errors when there is no private repo, so an '
+                             'empty run cannot pass for a green one.')
     parser.add_argument('--list', action='store_true',
                         help='Print the discovered test count and a per-source '
                              'breakdown, then exit without running anything. '
@@ -19048,6 +19100,16 @@ def main():
     run_mesh = args.mesh or run_all
     run_joints = args.joints or run_all
     run_tutorials = args.tutorials or run_all
+    if args.private:
+        # The private rows are tag rows of the three tag families; everything
+        # else is public and is filtered out again before the tier step.
+        run_lem = run_fem = run_seep = True
+        run_tseep = run_roundtrip = run_dxf = run_gsz = run_slide2 = False
+        run_rs2 = run_preflight = run_mesh = run_joints = run_tutorials = False
+        if not _private_dir():
+            print("--private: no private repo beside the main checkout and "
+                  "no $XSLOPE_PRIVATE_TESTS")
+            sys.exit(1)
 
     # Discover tests from markdown files
     tests = []
@@ -20296,6 +20358,10 @@ def main():
     # owns. Naming rows with --benchmark is itself a request for them, so it
     # overrides the hold — the tier decides what a blanket run covers, not what a
     # deliberate one may ask for.
+    if args.private:
+        _priv = Path(_private_dir()).resolve()
+        tests = [t for t in tests
+                 if t.get('source') and _priv in Path(str(t['source'])).resolve().parents]
     row_timings = _load_row_timings()
     gate_run = bool(args.gate)
     gate_held = []

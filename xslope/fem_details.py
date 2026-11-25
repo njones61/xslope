@@ -1477,6 +1477,54 @@ def _pile_reaction(fem_data, field, sel, node_ids, node_depth, elem_depth):
                      0.0))
 
 
+def _hinge_end_moments(fem_data, sel, n_pile, moment):
+    """The moment profile with each interior node read from the element end that
+    carries the hinge there.
+
+    ``moment`` holds two values per element, head to toe: its upper end's and its
+    lower end's, so every interior node is stated twice, once by each element
+    meeting there. The beam law lets exactly ONE of those two ends release when
+    the moment reaches the capacity (:func:`xslope.fem._pile_hinge_ends`, the
+    solver's own rule, used here so the two cannot differ). That end's moment is
+    the section's: it is held on the capacity once the hinge forms. The other end
+    is elastic, and stands on the capacity only through equilibrium at the node.
+
+    In a state in equilibrium -- every converged field -- the two ends agree (to
+    a part in 10^11 on the shipped pile models and FEM-4's runs), and reading
+    either is the same.
+    In the at-failure capture they need not: it is the iterate the capture solve
+    was stopped at, not a state in equilibrium, and on FEM-4's tip-fixed piles the
+    elastic ends stood at up to 2,684 times the capacity while every hinged end sat
+    on it. So both values at a node are replaced by the hinge end's, and the
+    profile, its peak and the utilization read from it state the moment the
+    section carries. The head and the toe have one element end each and are read
+    as they are.
+
+    Returns a new array; ``moment`` is not modified. Where the elements do not
+    meet node to node as the solver's rule expects, the profile is returned as it
+    was given.
+    """
+    from .fem import _pile_hinge_ends
+
+    elem_nodes = fem_data.get("pile_elem_nodes")
+    if elem_nodes is None or len(elem_nodes) != n_pile or len(sel) < 2:
+        return moment
+    ends = _pile_hinge_ends(elem_nodes, n_pile)
+    out = np.array(moment, dtype=float, copy=True)
+    for k in range(len(sel) - 1):
+        a, b = int(sel[k]), int(sel[k + 1])
+        # Element a's end 1 and element b's end 0 are the two ends at this node,
+        # in the order the profile above lays them out.
+        if int(elem_nodes[a][1]) != int(elem_nodes[b][0]):
+            return moment
+        hinge_a, hinge_b = bool(ends[a, 1]), bool(ends[b, 0])
+        if hinge_a == hinge_b:
+            continue
+        value = out[2 * k + 1] if hinge_a else out[2 * k + 2]
+        out[2 * k + 1] = out[2 * k + 2] = value
+    return out
+
+
 def pile_profile(fem_data, solution, pile_index, slope_data=None,
                  field_state="converged", failure_solution=None):
     """Everything the detail view draws for one pile, ordered head to toe.
@@ -1645,6 +1693,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         moment_depth[2 * k + 1] = end_depth[k + 1]
         moment[2 * k] = fm[k, 0]
         moment[2 * k + 1] = -fm[k, 1]
+    moment = _hinge_end_moments(fem_data, sel, n_pile, moment)
 
     # Lateral soil reaction per unit length. Where the elements carry a midside
     # node each one reports its own, from the distributed load its deflected

@@ -27,11 +27,14 @@ from xslope.plot import get_material_color
 from xslope.style import default_style_sheet
 
 # Non-material features exposed in the dialog (label, feature key). Profile/polygon
-# inherit material color, so they're not listed here.
+# inherit material color, so they're not listed here. The "max_depth" feature
+# styles the model's base line under both geometries: a profile-line model's Max
+# depth and a polygon model's bottom boundary (plot_max_depth / plot_domain_base),
+# so its row names both.
 FEATURES = [
     ("Piezometric line", "piezo_line"),
     ("Piezometric line 2", "piezo_line2"),
-    ("Max depth", "max_depth"),
+    ("Max depth / bottom boundary", "max_depth"),
     ("Tension crack", "tcrack"),
     ("Failure surfaces (circular & non-circular)", "failure_surface"),
     ("Distributed load", "dloads"),

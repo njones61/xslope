@@ -912,11 +912,16 @@ def plot_max_depth(ax, profile_lines, max_depth, style=None):
         ax.plot([x, x - dx], [max_depth, max_depth - dy], color=color, linewidth=1, gid='MAX_DEPTH')
 
 
-def plot_domain_base(ax, domain_polygon, label='Max Depth', style=None):
+def plot_domain_base(ax, domain_polygon, label='Bottom boundary', style=None):
     """Draw the domain's lower boundary as a hatched base line (the polygon
-    analog of plot_max_depth). Works for a flat bottom — reproducing the old
-    horizontal hatched 'Max Depth' line — and for an irregular/sloping bottom,
-    where the hatch marks follow the base."""
+    analog of plot_max_depth). Works for a flat bottom and for an
+    irregular/sloping bottom, where the hatch marks follow the base.
+
+    Labeled 'Bottom boundary', not 'Max Depth': a polygon model has no Max Depth
+    input -- its base is the bottom of its zones, drawn rather than typed -- and
+    'bottom boundary' is what Studio's editors and the docs call that line. A
+    profile-line model's base is its Max Depth and keeps that label
+    (plot_max_depth). Both are styled by the one 'max_depth' feature."""
     if domain_polygon is None:
         return
     from .style import resolve_style, feature_style
@@ -5501,11 +5506,120 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
                     textcoords='offset points', fontsize=8.5, color='#3f4a55',
                     ha='center', va='top')
         ax.set_xlim(t_lo, t_hi)
-    ax.legend(handles, labels_, fontsize=9)
+    # The figure writes on itself -- the full-pool value, the lowest point, the
+    # drawdown band's name -- and the schedule is drawn on a twin axis, so the
+    # legend is placed by measuring the laid-out figure rather than by
+    # loc='best' (see _legend_clear_of_labels).
     fig.tight_layout()
+    _legend_clear_of_labels(ax, handles, labels_,
+                            twins=(sched,) if series else (), fontsize=9)
     if save_png:
         fig.savefig("fs_vs_time.png", dpi=dpi, bbox_inches='tight')
     return fig
+
+
+#: The in-axes legend positions, in the order matplotlib's ``loc='best'`` tries
+#: them ('right' is 'center right' and is not repeated).
+_IN_AXES_LEGEND_LOCS = ('upper right', 'upper left', 'lower left', 'lower right',
+                        'center left', 'center right', 'lower center',
+                        'upper center', 'center')
+
+
+def _legend_clear_of_labels(ax, handles, labels, twins=(), **kw):
+    """Draw ``ax``'s legend where it covers none of the figure's own words.
+
+    ``loc='best'`` falls short on a figure that labels its own marks. It weighs a
+    covered text label the same as one crossed line, so where every position
+    crosses something it will settle on the one holding a label -- the full-pool
+    value on the FS versus time figure. And it sees only the artists of the axes
+    the legend belongs to, so a trace on a twin axis is not there to avoid.
+
+    So the positions are measured here, on the figure as laid out (call it after
+    the layout is set). Each of the positions ``loc='best'`` tries is ruled out
+    if the legend there would cover a text on ``ax`` or the arrow of an
+    annotation. Among the rest, the one hiding least of the drawing wins: each
+    drawn line it crosses, on ``ax`` or on an axis in ``twins``, each marker it
+    covers, and each shaded patch it overlaps count one, ties going to the
+    earlier position as they do for ``loc='best'``. Where every position covers a
+    label, the legend goes below the axes, under the tick labels and the axis
+    label, and the layout is redone to make room for it.
+
+    ``kw`` passes to ``ax.legend``. Returns the legend.
+    """
+    import matplotlib.transforms as mtransforms
+
+    fig = ax.figure
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+    except Exception:
+        return ax.legend(handles, labels, **kw)
+
+    hard = []
+    for t in ax.texts:
+        if not t.get_visible() or not t.get_text():
+            continue
+        hard.append(t.get_window_extent(renderer))
+        arrow = getattr(t, 'arrow_patch', None)
+        if arrow is not None and arrow.get_visible():
+            hard.append(arrow.get_window_extent(renderer))
+
+    paths, markers, shaded = [], [], []
+    for a in (ax,) + tuple(twins):
+        for ln in a.get_lines():
+            if not ln.get_visible():
+                continue
+            path = ln.get_transform().transform_path(ln.get_path())
+            if ln.get_linestyle() not in ('None', 'none', '', ' ') \
+                    and len(path.vertices) > 1:
+                paths.append(path)
+            if ln.get_marker() not in (None, 'None', 'none', '', ' '):
+                markers.append(path.vertices)
+        for p in a.patches:
+            if p.get_visible():
+                shaded.append(p.get_window_extent(renderer))
+
+    best = None
+    for loc in _IN_AXES_LEGEND_LOCS:
+        leg = ax.legend(handles, labels, loc=loc, **kw)
+        box = leg.get_window_extent(renderer)
+        leg.remove()
+        if any(box.overlaps(h) for h in hard):
+            continue
+        hidden = (sum(bool(p.intersects_bbox(box, filled=False)) for p in paths)
+                  + sum(int(box.count_contains(v)) for v in markers)
+                  + sum(bool(box.overlaps(s)) for s in shaded))
+        if best is None or hidden < best[0]:
+            best = (hidden, loc)
+            if hidden == 0:
+                break
+    if best is not None:
+        return ax.legend(handles, labels, loc=best[1], **kw)
+
+    # Below the axes: hung from the lowest of the x tick labels and the x-axis
+    # label, measured here and carried as a fixed distance in inches, so it
+    # stays under them wherever the layout then moves the axes. As many columns
+    # as fit the figure's width.
+    spine = ax.get_window_extent(renderer).y0
+    low = spine
+    for t in list(ax.get_xticklabels()) + [ax.xaxis.get_label()]:
+        if t.get_visible() and t.get_text():
+            low = min(low, t.get_window_extent(renderer).y0)
+    drop = mtransforms.ScaledTranslation(0.0, -(spine - low) / fig.dpi,
+                                         fig.dpi_scale_trans)
+    anchor = dict(loc='upper center', bbox_to_anchor=(0.5, 0.0),
+                  bbox_transform=ax.transAxes + drop)
+    ncol = max(1, len(labels))
+    while ncol > 1:
+        leg = ax.legend(handles, labels, ncol=ncol, **anchor, **kw)
+        wide = leg.get_window_extent(renderer).width
+        leg.remove()
+        if wide <= fig.bbox.width:
+            break
+        ncol -= 1
+    leg = ax.legend(handles, labels, ncol=ncol, **anchor, **kw)
+    fig.tight_layout()
+    return leg
 
 
 def _bar_chart_height_in(n_bars, per_bar_in=0.5, margin_in=1.4, min_in=2.4,

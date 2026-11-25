@@ -1657,6 +1657,10 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                                    target_size, debug=debug)
         _validate_joint_lines(lines, _joint_opts, point_constraints, polygon_coords)
         _insert_joint_junction_points(lines, _joint_opts, debug=debug)
+        # A jointed line ending a hair inside the outer boundary ends ON it. See
+        # _move_joint_ends_onto_boundary.
+        _move_joint_ends_onto_boundary(lines, _joint_opts, polygon_coords,
+                                       target_size)
 
     # Bonded lines that meet — a bar ending on or crossing a pile, two bars
     # crossing — get the meeting point as a vertex of both, so the two members
@@ -3036,7 +3040,9 @@ def _joint_line_tol(lines, polygon_coords=None):
 def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=None):
     """Refuse the joint geometries the split cannot represent.
 
-    Three cases, each raising a ValueError that names the lines involved:
+    Three cases, each raising a MeshInputError (a ValueError) that names the
+    lines involved, so Studio's Build Mesh reports it as a message rather than
+    a traceback:
 
     * a jointed line that meets a line which is NOT a joint — a plain
       reinforcement line or a pile. The split gives every node on the jointed
@@ -3065,7 +3071,7 @@ def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=No
     for li in sorted(opts):
         seg_i = segs[li]
         if seg_i is None:
-            raise ValueError(
+            raise MeshInputError(
                 f"Constraint line {li + 1} is flagged as a joint but has fewer "
                 "than two points.")
         for lj in range(len(lines)):
@@ -3079,7 +3085,7 @@ def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=No
                 shared = seg_i.intersection(segs[lj])
                 if shared.geom_type == 'Point' or shared.length <= tol:
                     continue        # a junction: the split makes it
-                raise ValueError(
+                raise MeshInputError(
                     f"Jointed constraint lines {li + 1} and {lj + 1} lie on one "
                     f"another over {shared.length:.4g} of their length. Two "
                     "jointed lines may MEET — at a T, a crossing or a corner, "
@@ -3087,7 +3093,7 @@ def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=No
                     "material around it — but they cannot share a stretch: the "
                     "mesh has one edge chain there and it can carry one interface "
                     "law. Make the overlapping stretch one line.")
-            raise ValueError(
+            raise MeshInputError(
                 f"Jointed constraint line {li + 1} touches another constraint "
                 f"line (a reinforcement line or a pile), line {lj + 1}. "
                 "The mesh splits along a jointed line and every node on it is "
@@ -3097,7 +3103,7 @@ def _validate_joint_lines(lines, opts, point_constraints=None, polygon_coords=No
                 f"clear the Joint flag on line {li + 1}.")
         for (px, py) in (point_constraints or []):
             if seg_i.distance(_Pt(px, py)) <= tol:
-                raise ValueError(
+                raise MeshInputError(
                     f"Jointed constraint line {li + 1} carries a point constraint "
                     f"at ({px}, {py}) — a line load's application point. After the "
                     "split there are several nodes at that place and no rule says "
@@ -3474,6 +3480,81 @@ def _insert_joint_junction_points(lines, opts, tol=1e-9, debug=False):
     return n_inserted
 
 
+def _move_joint_ends_onto_boundary(lines, opts, polygon_coords, target_size):
+    """Put a jointed line's end that stops just short of the section's outer
+    boundary ON the boundary.
+
+    A joint whose end stands a hair inside the outer boundary -- a column joint
+    clipped to a joint region typed to three decimals, 0.07 mm under the slope
+    face it was meant to reach (Tutorial FEM-5) -- leaves a rock bridge that thin
+    between its tip and the face. No element of the target size resolves it, and
+    it is not in the rock either: it is the precision the region was typed to. It
+    changes the answer all the same, because a joint that stops inside the rock
+    is a buried tip, where the two faces rejoin, and one that reaches the face is
+    a cut the block can slide out along (FEM-5's toppling slope: 1.152 against
+    the completed file's 1.105).
+
+    So an end within the mesher's end-snap distance of the outer boundary -- a
+    twentieth of an element, the distance within which it already moves a line
+    end onto a zone corner (``_BOUNDARY_END_MERGE_FRAC``) -- is moved onto it, at
+    the foot of the perpendicular on the nearest boundary edge. An end with a zone
+    corner within that distance is left to the end snap in
+    ``build_mesh_from_polygons``, which puts it on the corner; an end already on
+    the boundary, or outside the section, is left alone. Only the OUTER boundary:
+    an end near an interior material boundary is a joint stopping inside rock.
+
+    Runs after the junction points are placed (``_insert_joint_junction_points``),
+    so the lines that end on a moved line keep the vertex they meet it at; the
+    moved line bends there by at most the distance its end moved, and the joint
+    split reads the curve as meshed. Each move is printed, since it changes the
+    model as typed.
+
+    In place, on ``lines``. Returns ``[(line index, old end, new end), ...]``.
+    """
+    idx = sorted(opts or {})
+    if not idx or not polygon_coords or not (target_size and target_size > 0):
+        return []
+    from shapely.geometry import Polygon as _Poly, Point as _Pt
+    from shapely.ops import nearest_points as _nearest, unary_union as _union
+
+    reach = _BOUNDARY_END_MERGE_FRAC * float(target_size)
+    tol = _joint_line_tol(lines, polygon_coords)
+    rings, corners = [], []
+    for coords in polygon_coords:
+        pts = remove_duplicate_endpoint(list(coords))
+        if len(pts) >= 3:
+            rings.append(_Poly(pts).buffer(0))
+            corners.extend((float(x), float(y)) for x, y in pts)
+    if not rings:
+        return []
+    dom = _union(rings)
+    outer = _union([g.exterior for g in getattr(dom, 'geoms', [dom])])
+
+    moved = []
+    for li in idx:
+        line = lines[li]
+        if not line or len(line) < 2:
+            continue
+        pts = [tuple(map(float, v[:2])) for v in line]
+        for e in (0, len(pts) - 1):
+            p = pts[e]
+            gap = float(outer.distance(_Pt(p)))
+            if gap <= tol or gap > reach or not dom.covers(_Pt(p)):
+                continue
+            if any(math.hypot(p[0] - c[0], p[1] - c[1]) <= reach for c in corners):
+                continue                     # the end snap puts it on the corner
+            foot = _nearest(outer, _Pt(p))[0]
+            q = (float(foot.x), float(foot.y))
+            pts[e] = q
+            moved.append((li, p, q))
+            print(f"Jointed line {li + 1} ends {gap:.3g} inside the section's outer "
+                  f"boundary, within a twentieth of an element of it: its end "
+                  f"({p[0]:.6g}, {p[1]:.6g}) is moved onto the boundary at "
+                  f"({q[0]:.6g}, {q[1]:.6g}).")
+        lines[li] = pts
+    return moved
+
+
 def _insert_bonded_junction_points(lines, opts=None, polygon_coords=None,
                                    debug=False):
     """Give every meeting point of two BONDED constraint lines a vertex on both.
@@ -3726,6 +3807,19 @@ def _element_corner_edges(elements, element_types, ei):
     return out
 
 
+def _distance_to_polyline(q, verts):
+    """Distance from point ``q`` to the polyline through ``verts`` (an (n, 2)
+    array): the least distance to any of its segments."""
+    best = float("inf")
+    for a, b in zip(verts[:-1], verts[1:]):
+        ab = b - a
+        L2 = float(ab @ ab)
+        t = 0.0 if L2 == 0.0 else min(1.0, max(0.0, float((q - a) @ ab) / L2))
+        r = q - (a + t * ab)
+        best = min(best, float(np.hypot(r[0], r[1])))
+    return best
+
+
 def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
     """Split the mesh along every jointed constraint line, in place.
 
@@ -3838,7 +3932,7 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
 
     e1d = mesh.get("elements_1d")
     if e1d is None or len(e1d) == 0:
-        raise ValueError(
+        raise MeshInputError(
             "A constraint line is flagged as a joint, but the mesh carries no 1D "
             "elements: gmsh did not recover the line. Check that the line lies "
             "inside the section and that its endpoints are polygon vertices.")
@@ -3873,35 +3967,53 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
         d = p2 - p1
         length = float(np.hypot(d[0], d[1]))
         if length <= tol:
-            raise ValueError(f"Jointed constraint line {li + 1} has zero length.")
+            raise MeshInputError(f"Jointed constraint line {li + 1} has zero length.")
         d = d / length
         normal = np.array([-d[1], d[0]])
 
         bar_idx = [int(i) for i in np.where(mats_1d == li + 1)[0]]
         if not bar_idx:
-            raise ValueError(
+            raise MeshInputError(
                 f"Constraint line {li + 1} is flagged as a joint but has no 1D "
                 "elements in the mesh — gmsh did not recover it, so there is "
                 "nothing to split along.")
 
-        # The curve's nodes, ordered from end 1. A constraint line is straight
-        # (two endpoints), so the order is the projection onto its direction.
+        # The curve's nodes, ordered from end 1. A constraint line is stated
+        # straight, so the order is the projection onto its direction.
+        #
+        # The curve gmsh meshed is the POLYLINE through ``line``'s vertices, which
+        # is not always the straight chord between its ends. The junction points of
+        # the lines that end on this one are placed on it as stated
+        # (_insert_joint_junction_points), and then the mesher's end snap may move
+        # an end of the line onto a zone corner up to a twentieth of an element
+        # away (build_mesh_from_polygons). The end moves; the junction vertices
+        # stay where the other lines meet them. So the curve bends at its vertices
+        # by at most that move — 0.1 mm on Tutorial FEM-5 typed to three decimals,
+        # whose base plane ends 0.2 mm from the toe corner. Each node is therefore
+        # measured against the curve as meshed, segment by segment, and only a
+        # node off THAT is a mesh the split cannot read.
         station_ids = set()
         for i in bar_idx:
             for k in range(int(types_1d[i])):
                 station_ids.add(int(e1d[i, k]))
+        verts = np.array([q[:2] for q in line], dtype=float)
         t_of = {}
         for nid in sorted(station_ids):
-            v = np.array(nodes[nid][:2], dtype=float) - p1
-            off = float(v @ normal)
-            if abs(off) > tol:
-                raise ValueError(
-                    f"Node {nid} of jointed line {li + 1} lies {off:.3g} off the "
-                    "line; the split needs every node of the curve on it.")
-            t_of[nid] = float(v @ d)
+            q = np.array(nodes[nid][:2], dtype=float)
+            off = _distance_to_polyline(q, verts)
+            if off > tol:
+                raise MeshInputError(
+                    f"Jointed line {li + 1}: the mesh node at ({q[0]:.6g}, "
+                    f"{q[1]:.6g}) lies {off:.3g} off the line between "
+                    f"({p1[0]:.6g}, {p1[1]:.6g}) and ({p2[0]:.6g}, {p2[1]:.6g}), "
+                    "so the mesh cannot be split along it. Check that the lines "
+                    "that meet this one end exactly on it (constraint lines are "
+                    "numbered reinforcement lines first, then piles, then "
+                    "joints-sheet lines).")
+            t_of[nid] = float((q - p1) @ d)
         ordered = sorted(station_ids, key=lambda n: t_of[n])
         if abs(t_of[ordered[0]]) > tol or abs(t_of[ordered[-1]] - length) > tol:
-            raise ValueError(
+            raise MeshInputError(
                 f"The meshed curve of jointed line {li + 1} runs from "
                 f"{t_of[ordered[0]]:.3g} to {t_of[ordered[-1]]:.3g} along a line of "
                 f"length {length:.3g}; it must reach both stated endpoints.")
@@ -3934,28 +4046,36 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
     # from somewhere else — or a recovery that failed quietly — would leave two
     # curves passing through each other, and the split would then tear each line
     # along a mesh that is not conforming at the crossing. Checked, not assumed.
+    # The meeting points are those of the curves as meshed, segment by segment:
+    # a curve whose end the mesher moved onto a zone corner bends at its
+    # vertices (see step 1), and its straight chord no longer passes through the
+    # vertex where another line meets it.
     if len(opts) > 1:
         idx = sorted(opts)
         for _a in range(len(idx)):
             for _b in range(_a + 1, len(idx)):
                 li, lj = idx[_a], idx[_b]
-                cross = line_segment_intersection(
-                    tuple(lines[li][0][:2]), tuple(lines[li][-1][:2]),
-                    tuple(lines[lj][0][:2]), tuple(lines[lj][-1][:2]))
-                if cross is None:
-                    continue
-                cx, cy = float(cross[0]), float(cross[1])
-                for lk in (li, lj):
-                    hit = any(abs(nodes[n][0] - cx) <= tol
-                              and abs(nodes[n][1] - cy) <= tol
-                              for n in info[lk]['ordered'])
-                    if not hit:
-                        raise ValueError(
-                            f"Jointed constraint lines {li + 1} and {lj + 1} meet "
-                            f"at ({cx:g}, {cy:g}), but line {lk + 1} has no mesh "
-                            "node there: the two curves cross without sharing a "
-                            "node, and a split along either of them would tear a "
-                            "mesh that is not conforming at the crossing.")
+                crossings = set()
+                for sa in range(len(lines[li]) - 1):
+                    for sb in range(len(lines[lj]) - 1):
+                        cross = line_segment_intersection(
+                            tuple(lines[li][sa][:2]), tuple(lines[li][sa + 1][:2]),
+                            tuple(lines[lj][sb][:2]), tuple(lines[lj][sb + 1][:2]))
+                        if cross is not None:
+                            crossings.add((float(cross[0]), float(cross[1])))
+                for cx, cy in sorted(crossings):
+                    for lk in (li, lj):
+                        hit = any(abs(nodes[n][0] - cx) <= tol
+                                  and abs(nodes[n][1] - cy) <= tol
+                                  for n in info[lk]['ordered'])
+                        if not hit:
+                            raise MeshInputError(
+                                f"Jointed constraint lines {li + 1} and {lj + 1} "
+                                f"meet at ({cx:g}, {cy:g}), but line {lk + 1} has no "
+                                "mesh node there: the two curves cross without "
+                                "sharing a node, and a split along either of them "
+                                "would tear a mesh that is not conforming at the "
+                                "crossing.")
 
     # ---- 2. the joint edges: the mesh edges a jointed line runs along ----------
     joint_edge = {}
@@ -3964,7 +4084,7 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
             key = (min(a, b), max(a, b))
             prev = joint_edge.get(key)
             if prev is not None and prev != li:
-                raise ValueError(
+                raise MeshInputError(
                     f"Jointed constraint lines {prev + 1} and {li + 1} share the "
                     f"mesh edge {key}: they lie on one another there. One edge "
                     "carries one interface law.")
@@ -3983,7 +4103,7 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
             continue
         for k in range(int(types_1d[i])):
             if int(e1d[i, k]) in all_stations:
-                raise ValueError(
+                raise MeshInputError(
                     f"Constraint line {int(mats_1d[i])} shares mesh node "
                     f"{int(e1d[i, k])} with a jointed line. A bonded member "
                     "standing on a node the split copies has no defined side to "
@@ -4003,13 +4123,26 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
             if key in joint_edge:
                 edge_elems[key].append(ei)
 
-    def _centroid_side(ei, li):
-        """Which side of line ``li`` element ``ei`` stands on, by its centroid."""
+    def _centroid_side(ei, li, key):
+        """Which side of line ``li`` element ``ei`` stands on, by its centroid.
+
+        Read against the joint edge ``key`` the element stands on, with that
+        edge's normal turned the way the line's own normal points. On a straight
+        line it is the line's normal; on a curve that bends at a vertex (see
+        step 1) it is the side of the segment the edge is part of, which is what
+        a side means there.
+        """
         et = int(element_types[ei])
         n_corner = 3 if et in (3, 6) else 4
         cen = np.mean([nodes[int(elements[ei, k])][:2] for k in range(n_corner)],
                       axis=0)
-        return float((cen - info[li]['p1']) @ info[li]['normal'])
+        a = np.array(nodes[key[0]][:2], dtype=float)
+        e = np.array(nodes[key[1]][:2], dtype=float) - a
+        n_e = np.array([-e[1], e[0]])
+        if n_e @ info[li]['normal'] < 0.0:
+            n_e = -n_e
+        n_e = n_e / float(np.hypot(n_e[0], n_e[1]))
+        return float((cen - a) @ n_e)
 
     _sides_cache = {}
 
@@ -4020,16 +4153,16 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
             return hit
         members = edge_elems.get(key, ())
         if len(members) != 2:
-            raise ValueError(
+            raise MeshInputError(
                 f"The mesh edge {key} on jointed line {li + 1} is carried by "
                 f"{len(members)} two-dimensional element(s), not two. A joint is "
                 "an interface between two bodies, so the line must run through "
                 "the section with material on both sides of it — a line on the "
                 "domain boundary has material on one side only.")
-        s0 = _centroid_side(members[0], li)
-        s1 = _centroid_side(members[1], li)
+        s0 = _centroid_side(members[0], li, key)
+        s1 = _centroid_side(members[1], li, key)
         if abs(s0) <= tol or abs(s1) <= tol or (s0 > 0) == (s1 > 0):
-            raise ValueError(
+            raise MeshInputError(
                 f"The two elements on mesh edge {key} of jointed line {li + 1} "
                 f"stand on the same side of it ({s0:.3g}, {s1:.3g}); the line is "
                 "not a conforming edge of the mesh there.")
@@ -4043,7 +4176,7 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
     for nid in sorted(all_stations):
         star = node_elems.get(nid, ())
         if not star:
-            raise ValueError(
+            raise MeshInputError(
                 f"Node {nid} of a jointed line stands on no 2D element, so there "
                 "is no material to split there.")
         incident = defaultdict(list)
@@ -4090,7 +4223,7 @@ def split_mesh_along_joints(mesh, lines, joint_lines, debug=False):
                 if len(gl) > 1:
                     key = inf['first_edge'].get(nid)
                     if key is None:
-                        raise ValueError(
+                        raise MeshInputError(
                             f"Node {nid} is a station of jointed line {li + 1} but "
                             "stands on none of its bar elements.")
                     _e_up, e_low = _sides_of_edge(key, li)

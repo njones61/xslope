@@ -1148,7 +1148,8 @@ the standard Taylor-series cross-terms; the value compared is the uncorrelated �
 | Minimum-β surface: β_ln | 3.353 | 4.351 (−22.9%) | 3.987 (−15.9%) |
 
 All three programs agree on the structure: a mid-depth circle through the Phase II fill and upper
-Phase I carries roughly one-third the reliability index of the factor-of-safety-critical surface,
+Phase I carries less than half the reliability index of the factor-of-safety-critical surface
+(Slide 4.351 against 10.953, Hassan & Wolff 3.987 against 10.356, in the Slide2 manual's Table 35.2),
 so a design screened on the factor of safety alone would examine the wrong surface. The β
 magnitudes spread with the estimator at these extreme COVs — the Taylor series evaluates strength
 at φ − σ = 0° for the Phase I fill, a tail truncated-normal Monte Carlo sampling rarely reaches —

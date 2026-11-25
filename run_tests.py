@@ -3434,7 +3434,10 @@ def _reliability_misses(test, result):
         one(key, result.get(rkey), test[key],
             band=pf_tol if key == 'expected_pf' else tol)
 
-    names = [s.strip() for s in str(test.get('params', '')).split(';') if s.strip()]
+    if ttype == 'reliability_mc' and 'draws' in test:
+        misses.extend(_draws_misses(test, result))
+
+    names =[s.strip() for s in str(test.get('params', '')).split(';') if s.strip()]
     if names:
         by_name = {f"{p['material_id']}.{p['param']}": p
                    for p in (result.get('param_info') or [])}
@@ -3455,6 +3458,37 @@ def _reliability_misses(test, result):
                                   f"perturbs")
                     continue
                 one(f"{key} ({name})", p.get(pkey), float(text), text)
+    return misses
+
+
+def _draws_misses(test, result):
+    """A Monte Carlo page's table of its first realizations, locked by ``draws``:
+    one realization per ``;``, each ``value/value/.../F`` with the inputs in the
+    run's parameter order (``param_info``) and the realization's factor of safety
+    last. Every number must round to the page's at the precision the page writes
+    it, so a sampler or solver change that moves a row is caught."""
+    misses = []
+    rows = [r.strip() for r in str(test.get('draws', '')).split(';') if r.strip()]
+    xs = result.get('param_samples')
+    fs = result.get('fs_samples')
+    if xs is None or fs is None:
+        return ["draws: the result has no param_samples or fs_samples"]
+    names = [f"{p['material_id']}.{p['param']}" for p in (result.get('param_info') or [])]
+    for i, row in enumerate(rows):
+        texts = [t.strip() for t in row.split('/')]
+        if len(texts) != len(names) + 1:
+            misses.append(f"draws row {i + 1}: {len(texts)} values for {len(names)} "
+                          f"inputs and F")
+            continue
+        if i >= len(fs):
+            misses.append(f"draws row {i + 1}: the run has only {len(fs)} realizations")
+            break
+        got = [float(v) for v in xs[i]] + [float(fs[i])]
+        for name, text, value in zip(names + ['F'], texts, got):
+            want = Decimal(text)
+            if Decimal(value).quantize(want, rounding=ROUND_HALF_EVEN) != want:
+                misses.append(f"draws row {i + 1} {name}: this run gives {value:.6g}, "
+                              f"the page {text}")
     return misses
 
 
@@ -19365,6 +19399,12 @@ def main():
         # docs/parametric/ as three pages; scan all of them for tags.
         for parametric_md in sorted(Path(_repo('docs/parametric')).glob('*.md')):
             tests.extend(parse_test_tags(parametric_md))
+        # The Reliability section (docs/reliability/*.md; it moved out of
+        # docs/parametric/ in July 2026 and its tags went unscanned until this).
+        # Its finite element rows are taken with the FEM group below.
+        for rel_md in sorted(Path(_repo('docs/reliability')).glob('*.md')):
+            tests.extend(t for t in parse_test_tags(rel_md)
+                         if not str(t.get('type', '')).startswith('fem_'))
         # File-less unit guard for the design()/back_analysis() modify= callable
         # path: param-vs-equivalent-callable equivalence plus a hand-computable
         # (OMS fixed-surface) crossing. A callable cannot be written in a doc tag,
@@ -19376,6 +19416,9 @@ def main():
         fem_samples = Path(_repo('docs/fem/samples.md'))
         if fem_samples.exists():
             tests.extend(parse_test_tags(fem_samples))
+        for rel_md in sorted(Path(_repo('docs/reliability')).glob('*.md')):
+            tests.extend(t for t in parse_test_tags(rel_md)
+                         if str(t.get('type', '')).startswith('fem_'))
         # Side-roller assignment on an off-vertical truncation face.
         tests.append({'type': 'side_roller', 'file': 'off-vertical side face (fem)',
                       'method': '-', 'source': 'side_roller'})
@@ -19815,10 +19858,11 @@ def main():
         tests.extend(_audit_module_tests('preflight'))
         _preflight_sources = ([
             _repo('docs/lem/samples.md'), _repo('docs/lem/design.md'),
-            _repo('docs/parametric/sensitivity.md'), _repo('docs/parametric/reliability.md'),
+            _repo('docs/parametric/sensitivity.md'),
             _repo('docs/fem/samples.md'), _repo('docs/seep/samples.md'),
             _repo('docs/seep/seep_slope.md'),
-        ] + sorted(glob.glob(_repo('docs/verification/*.md')))
+        ] + sorted(glob.glob(_repo('docs/reliability/*.md')))
+          + sorted(glob.glob(_repo('docs/verification/*.md')))
           + sorted(glob.glob(_repo('docs/tutorials/*.md')))
           + sorted(glob.glob(_repo('docs/videos/*.md'))))
         # The private fixtures are corpus too: they carry the same tags and the same

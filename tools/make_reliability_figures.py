@@ -23,6 +23,8 @@ The runs (each made once per invocation, and only for the figures asked for):
 - LEM-11 again, for the scatter between runs: twenty Monte Carlo runs of 1,000
   realizations each way (random and Latin hypercube, seeds 1 to 20), on the
   critical circle of a search at the means.
+- LEM-11 again, for the segments of a Latin hypercube: Monte Carlo at ten Latin
+  hypercube realizations, the default seed, searched once at the means.
 
 ``--cache DIR`` keeps the runs' results in DIR between invocations (for
 restyling without re-solving); the figures are the same either way.
@@ -33,8 +35,8 @@ Figures (page: name):
   vp035_surfaces
 - taylor.md: taylor_gamma, taylor_shapes, reliability_taylor_vp036
 - monte_carlo.md: mc_inputs, mc_histogram, mc_check_shape, mc_sampling_band,
-  mc_realizations_needed, lhs_vs_random, lhs_repeat, mc_convergence_trace,
-  reliability_mc_vp034, rs_surface_fit
+  mc_realizations_needed, lhs_vs_random, lhs_segments, lhs_bins, lhs_repeat,
+  mc_convergence_trace, reliability_mc_vp034, rs_surface_fit
 
 The Studio captures on fem.md come from tools/capture_reliability_fem.py.
 """
@@ -78,6 +80,12 @@ SKY = "#dce6f2"        # the area above F = 1
 # functions (Studio's) keep theirs
 STYLE = {"font.size": 10.5, "axes.spines.top": False, "axes.spines.right": False,
          "legend.frameon": False}
+# label placement, in points on the page: every label is placed from the
+# geometry it labels and clears every line, curve, marker and label by GAP; a
+# pointer line starts GAP from its label and stops POINTER_GAP short of its target
+GAP = 3.0
+POINTER_GAP = 4.0
+POINTER_LEN = 12.0
 
 CACHE = None           # --cache DIR
 _RUNS = {}
@@ -93,6 +101,7 @@ def _quiet(fn, *args, **kwargs):
 
 
 def _save(fig, name, tight=True):
+    _grid_backs(fig)
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name)
     if tight:
@@ -153,11 +162,82 @@ def _no_y(ax):
     ax.spines["left"].set_visible(False)
 
 
-def _f1(ax, top, label=True, ha="center"):
+def _ink(s, size=None):
+    """A label's ink extents (x0, y0, x1, y1), in points from the start of its
+    baseline (y0 < 0 is ink below the baseline, a subscript's)."""
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.textpath import TextPath
+    size = size or plt.rcParams["font.size"]
+    return TextPath((0, 0), s, size=size, prop=FontProperties(size=size)).get_extents().extents
+
+
+def _to_pt(ax):
+    """Data -> points on the page, and back (the axes' limits must be set)."""
+    k = 72 / ax.figure.dpi
+
+    def fwd(xy):
+        return ax.transData.transform(np.atleast_2d(xy)) * k
+
+    def inv(p):
+        return ax.transData.inverted().transform(np.atleast_2d(p) / k)
+    return fwd, inv
+
+
+def _top_labels(ax, top, labels):
+    """Labels (x, text, color) centered over the tops of vertical lines that end
+    at y = top, on one baseline, the lowest ink of any GAP above the lines."""
+    base = GAP - min(_ink(s)[1] for _, s, _ in labels)
+    for x, s, col in labels:
+        ax.annotate(s, xy=(x, top), xytext=(0, base), textcoords="offset points",
+                    ha="center", va="baseline", color=col)
+
+
+def _on_grid(t):
+    """Mark a label that sits over grid lines: at save, _grid_backs puts a white
+    box GAP around its ink, over the grid and under every line, marker and label,
+    so the grid stops GAP short of the label and no data is hidden (the label
+    must not sit on a shaded area, which the box would also cover)."""
+    t._on_grid = True
+    return t
+
+
+def _grid_backs(fig):
+    marked = [t for ax in fig.axes for t in ax.texts
+              if getattr(t, "_on_grid", False) and not getattr(t, "_backed", False)]
+    if not marked:
+        return
+    from matplotlib.patches import Rectangle
+    dpi = fig.dpi
+    fig.set_dpi(DPI)
+    fig.canvas.draw()
+    r = fig.canvas.get_renderer()
+    g = GAP * DPI / 72
+    for t in marked:
+        arrow = getattr(t, "arrow_patch", None)
+        if arrow is not None:
+            arrow.set_visible(False)              # the label's ink only
+        r.clear()
+        t.draw(r)
+        if arrow is not None:
+            arrow.set_visible(True)
+        a = np.asarray(r.buffer_rgba())[..., 3]
+        ys, xs = np.nonzero(a)
+        assert len(xs), f"{t.get_text()!r} is off the canvas"
+        H = a.shape[0]
+        (x0, y0), (x1, y1) = t.axes.transData.inverted().transform(
+            [(xs.min() - g, H - ys.max() - 1 - g), (xs.max() + 1 + g, H - ys.min() + g)])
+        t.axes.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, fc="white", ec="none",
+                                   zorder=1.6, gid="grid_back"))
+        t._backed = True
+    r.clear()
+    fig.set_dpi(dpi)
+
+
+def _f1(ax, top, label=True):
     """The line F = 1, labeled at its top."""
-    ax.plot([1, 1], [0, top], color=RED, lw=1.5, zorder=4)
+    ax.plot([1, 1], [0, top], color=RED, lw=1.5, zorder=4, solid_capstyle="butt")
     if label:
-        ax.text(1, top, "F = 1", color=RED, ha=ha, va="bottom")
+        _top_labels(ax, top, [(1, "F = 1", RED)])
 
 
 # ---------------------------------------------------------------------------
@@ -332,18 +412,26 @@ def sigma_rules():
     ax.plot(x, y4, color=BLUE, lw=2,
             label=f"$N_σ$ rule: σ = (600 − 200)/4 = {s4:.0f} psf")
     top = norm_pdf(mlv, mlv, s6) * 1.08
-    for v, lab in ((lcv, "LCV = 200"), (hcv, "HCV = 600")):
+    for v in (lcv, hcv):
         ax.plot([v, v], [0, top], color="0.25", lw=1, ls=":")
-        ax.text(v, top, lab, ha="center", va="bottom")
-    ya = 0.00045
-    ax.annotate("", xy=(lcv, ya), xytext=(hcv, ya),
-                arrowprops=dict(arrowstyle="<->", color="0.15", lw=1.1,
-                                shrinkA=0, shrinkB=0))
-    ax.text(mlv, ya + 0.00006, "±2σ: 95%", ha="center", va="bottom")
+    _top_labels(ax, top, [(lcv, "LCV = 200", "black"), (hcv, "HCV = 600", "black")])
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=1,
               handlelength=2.4, borderaxespad=0)
     ax.set_xlim(50, 750)
     ax.set_ylim(0, top * 1.16)
+    # the +/-2 sigma arrow, its heads (half-width 0.2 of the text size, the "<->"
+    # style's) GAP below the curve where the curve is lowest over it, at LCV and HCV
+    fwd, inv = _to_pt(ax)
+    lw = 1.1
+    head = 0.2 * plt.rcParams["font.size"] + lw / 2
+    (xl, yc), = fwd([(lcv, norm_pdf(lcv, mlv, s4))])
+    (_, ya), = inv([(xl, yc - 1.0 - GAP - head)])
+    ax.annotate("", xy=(lcv, ya), xytext=(hcv, ya),
+                arrowprops=dict(arrowstyle="<->", color="0.15", lw=lw,
+                                shrinkA=0, shrinkB=0))
+    s = "±2σ: 95%"
+    ax.annotate(s, xy=(mlv, ya), xytext=(0, lw / 2 + GAP - _ink(s)[1]),
+                textcoords="offset points", ha="center", va="baseline")
     _no_y(ax)
     ax.set_xticks([100, 200, 300, 400, 500, 600, 700])
     ax.set_xlabel("Cohesion, c (psf)")
@@ -361,28 +449,89 @@ def beta_on_f():
     ax.fill_between(x, y, where=x <= 1, color=ORANGE, alpha=0.75, lw=0)
     ax.plot(x, y, color=BLUE, lw=2)
     top = pk * 1.1
-    _f1(ax, top, ha="right")
-    ax.plot([F, F], [0, top], color="0.15", lw=1.3)
-    ax.text(F, top, "  $F_{MLV}$", ha="left", va="bottom")
+    _f1(ax, top, label=False)
+    ax.plot([F, F], [0, top], color="0.15", lw=1.3, solid_capstyle="butt")
+    _top_labels(ax, top, [(1, "F = 1", RED), (F, "$F_{MLV}$", "0.15")])
     ym = pk * 0.55
-    ax.annotate("", xy=(1, ym), xytext=(F, ym),
-                arrowprops=dict(arrowstyle="<->", color="0.15", lw=1.1,
-                                shrinkA=0, shrinkB=0))
-    ax.text((1 + F) / 2, ym + 0.04, "$β\\,σ_F$", ha="center", va="bottom",
-            fontsize=12)
     yl = pk * 0.22
     ax.plot([F + sd, F + sd], [0, norm_pdf(F + sd, F, sd)], color=GREY, lw=1,
             ls="--")
-    ax.annotate("", xy=(F, yl), xytext=(F + sd, yl),
-                arrowprops=dict(arrowstyle="<->", color="0.15", lw=1.1,
-                                shrinkA=0, shrinkB=0))
-    ax.text(F + sd / 2, yl + 0.04, "$σ_F$", ha="center", va="bottom",
-            fontsize=12)
-    ax.text(0.93, 0.03, "$P_f$", ha="center", va="bottom", fontsize=12)
+    for a, b, ya in ((1, F, ym), (F, F + sd, yl)):
+        ax.annotate("", xy=(a, ya), xytext=(b, ya),
+                    arrowprops=dict(arrowstyle="<->", color="0.15", lw=1.1,
+                                    shrinkA=0, shrinkB=0))
     ax.set_xlim(0.4, 2.3)
     ax.set_ylim(0, top * 1.15)
     _no_y(ax)
     ax.set_xlabel("Factor of safety, F")
+
+    # the labels, placed from the geometry (in points on the page)
+    from shapely.geometry import LineString, Point, Polygon, box
+    fwd, inv = _to_pt(ax)
+    size = 12
+    curve = LineString(fwd(np.column_stack([x, y])))
+    half = {"curve": 1.0, "F1": 0.75, "MLV": 0.65, "dash": 0.5, "arrow": 0.55}
+    lines = {"curve": curve,
+             "F1": LineString(fwd([(1, 0), (1, top)])),
+             "MLV": LineString(fwd([(F, 0), (F, top)])),
+             "dash": LineString(fwd([(F + sd, 0), (F + sd, norm_pdf(F + sd, F, sd))]))}
+
+    def under(s, a, b, y):
+        """A dimension label under its arrow (from a to b at height y): its ink
+        top GAP below the arrow, centered under it, or moved along it just far
+        enough to clear the curve and the lines by GAP."""
+        x0, y0, x1, y1 = _ink(s, size)
+        (pa, py), (pb, _) = fwd([(a, y), (b, y)])
+        base = py - half["arrow"] - GAP - y1
+        w = x1 - x0
+
+        def ink(cx):
+            return box(cx - w / 2, base + y0, cx + w / 2, base + y1)
+
+        def clear(cx):
+            return min(ink(cx).distance(ln) - half[k] for k, ln in lines.items())
+        steps = np.linspace(0, (pb - pa) / 2, 400)
+        cx = next((pa + pb) / 2 + d * sgn for d in steps for sgn in (1, -1)
+                  if clear((pa + pb) / 2 + d * sgn) >= GAP)
+        assert pa <= cx - w / 2 and cx + w / 2 <= pb, s
+        (xd, yd), = inv([(cx - (x0 + x1) / 2, base)])
+        ax.text(xd, yd, s, ha="left", va="baseline", fontsize=size)
+        return ink(cx)
+    labels = [under("$\\beta\\sigma_F$", 1, F, ym), under("$σ_F$", F, F + sd, yl)]
+
+    # P_f outside the orange area, its pointer aimed at the area's centroid along
+    # the curve's normal and stopping POINTER_GAP short of the curve
+    left = x <= 1
+    area = Polygon(np.vstack([fwd(np.column_stack([x[left], y[left]])),
+                              fwd([(1, 0), (x[left][0], 0)])]))
+    c = np.array(area.centroid.coords[0])
+    branch = LineString(fwd(np.column_stack([x[left], y[left]])))
+    q = np.array(branch.interpolate(branch.project(Point(c))).coords[0])
+    u = (q - c) / np.linalg.norm(q - c)
+    p1 = q + u * (half["curve"] + POINTER_GAP)
+    p0 = p1 + u * POINTER_LEN
+    x0, y0, x1, y1 = _ink("$P_f$", size)
+    w, h = x1 - x0, y1 - y0
+
+    def pf_ink(t):
+        cx, cy = p0 + u * t
+        return box(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+    lo, hi = 0.0, w + h
+    for _ in range(60):                              # pf_ink(t) GAP from p0
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if pf_ink(mid).distance(Point(p0)) < GAP else (lo, mid)
+    pf = pf_ink(hi)
+    cx, cy = pf.centroid.coords[0]
+    (xd, yd), = inv([(cx - (x0 + x1) / 2, cy - (y0 + y1) / 2)])
+    ax.text(xd, yd, "$P_f$", ha="left", va="baseline", fontsize=size)
+    (ax0, ay0), (ax1, ay1) = inv([p0, p1])
+    ax.plot([ax0, ax1], [ay0, ay1], color="0.15", lw=0.9, label="pointer")
+    seg = LineString([p0, p1])
+    assert abs(seg.distance(curve) - half["curve"] - POINTER_GAP) < 0.01
+    assert seg.distance(area) > POINTER_GAP
+    for ink_box in labels + [pf]:
+        assert min(ink_box.distance(ln) - half[k] for k, ln in lines.items()) >= GAP - 1e-6
+    assert pf.distance(seg) >= GAP - 1e-6 and not pf.intersects(area)
     _save(fig, "beta_on_f.png")
 
 
@@ -403,11 +552,12 @@ def beta_pf():
     for v, txt in ((1, "16%"), (2, "2.3%"), (3, "0.13%")):
         pv = Phi(-v)
         ax.plot(v, pv, "o", color=BLUE, ms=6, zorder=5)
-        ax.text(v + 0.09, pv * 1.25, txt, va="bottom")
+        _on_grid(ax.text(v + 0.09, pv * 1.25, txt, va="bottom"))
     bb = 2.326
     ax.plot([0, bb, bb], [0.01, 0.01, 1e-5], color=ORANGE, lw=1.3, ls="--")
     ax.plot(bb, 0.01, "o", color=ORANGE, ms=6, zorder=5)
-    ax.text(0.08, 0.0125, "$P_f$ = 1% at β = 2.33", color=ORANGE, va="bottom")
+    _on_grid(ax.text(0.08, 0.0125, "$P_f$ = 1% at β = 2.33", color=ORANGE,
+                     va="bottom"))
     _save(fig, "beta_pf.png")
 
 
@@ -512,9 +662,8 @@ def taylor_gamma():
     mid = (y[0] + y[2]) / 2
     fig, ax = plt.subplots(figsize=(5.4, 3.5))
     ax.plot([x[0], x[2]], [y[0], y[2]], color=GREY, lw=1.2, ls="--", zorder=2)
-    ax.plot(x, y, "o", ms=7, color=BLUE, zorder=4)
-    for xi, yi, lab in zip(x, y, ("$F^-$", "$F_{MLV}$", "$F^+$")):
-        ax.text(xi - 1.0, yi, f"{lab} = {yi:.3f}", ha="right", va="center")
+    ms = 7
+    ax.plot(x, y, "o", ms=ms, color=BLUE, zorder=4)
     # the gap between the line and F_MLV, at the most likely value
     xd = x[1] + 2.4
     ax.annotate("", xy=(xd, mid), xytext=(xd, y[1]),
@@ -531,6 +680,30 @@ def taylor_gamma():
     ax.set_xlabel("Unit weight, γ (pcf)")
     ax.set_ylabel("Factor of safety, F")
     ax.grid(True, color="0.9")
+    # each point's label to its left, at its height, all three the same distance
+    # from their points: the ink GAP from the marker, or farther if a label's
+    # grid box (GAP around its ink) would otherwise reach the dashed line
+    from shapely.geometry import LineString, box
+    fwd, inv = _to_pt(ax)
+    line = LineString(fwd([(x[0], y[0]), (x[2], y[2])]))
+    labels = []
+    for xi, yi, lab in zip(x, y, ("$F^-$", "$F_{MLV}$", "$F^+$")):
+        s = f"{lab} = {yi:.3f}"
+        (px, py), = fwd([(xi, yi)])
+        labels.append((s, _ink(s), px, py))
+
+    def grid_box(ink, px, py, off):
+        x0, y0, x1, y1 = ink
+        r = px - off
+        return box(r - (x1 - x0) - GAP, py - (y1 - y0) / 2 - GAP, r + GAP,
+                   py + (y1 - y0) / 2 + GAP)
+    off = ms / 2 + GAP
+    while any(grid_box(ink, px, py, off).distance(line) < 1.2 / 2
+              for _, ink, px, py in labels):
+        off += 0.1
+    for s, (x0, y0, x1, y1), px, py in labels:
+        (xt, yt), = inv([(px - off - x1, py - (y0 + y1) / 2)])
+        _on_grid(ax.text(xt, yt, s, ha="left", va="baseline"))
     _save(fig, "taylor_gamma.png")
 
 
@@ -639,7 +812,7 @@ def mc_histogram():
     F = M["fs"][np.isfinite(M["fs"])]
     fig, ax = plt.subplots(figsize=(6.6, 3.4))
     top = _hist(ax, F) * 1.08
-    _f1(ax, top, ha="right")
+    _f1(ax, top)
     n_fail = int((F < 1).sum())
     hi = top * 1.2
     ax.plot([M["mean_FS"]] * 2, [0, hi], color="0.15", lw=1.2, ls="--", zorder=5)
@@ -697,14 +870,14 @@ def mc_sampling_band():
     ax.plot([0, len(F)], [p * 100] * 2, color=GREY, lw=1, ls="--")
     ax.plot(k[99:], run[99:], color=BLUE, lw=1.4)
     h = 1.96 * math.sqrt(p * (1 - p) / len(F)) * 100
-    ax.annotate(f"±{h:.1f} points\nat n = {len(F):,}",
+    _on_grid(ax.annotate(f"±{h:.1f} points\nat n = {len(F):,}",
                 xy=(len(F) * 0.97, p * 100 + h + 0.25),
                 xytext=(len(F) * 0.97, p * 100 + h + 3.2), ha="right",
                 va="bottom", arrowprops=dict(arrowstyle="-", color="0.3", lw=0.8,
-                                             shrinkA=2, shrinkB=0))
+                                             shrinkA=2, shrinkB=0)))
     ax.text(350, p * 100 + 6.0, "95% band", color=BLUE, va="center")
-    ax.text(len(F) / 2, p * 100 - 1.6, f"$P_f$ = {p * 100:.2f}%", ha="center",
-            va="top")
+    _on_grid(ax.text(len(F) / 2, p * 100 - 1.6, f"$P_f$ = {p * 100:.2f}%",
+                     ha="center", va="top"))
     ax.set_xlim(0, len(F))
     ax.set_ylim(5, 27)
     ax.set_xticks([0, 2500, 5000, 7500, 10000])
@@ -729,8 +902,8 @@ def mc_realizations_needed():
         nv = 1.96 ** 2 * (1 - pv) / (pv * 0.01)
         nr = float(f"{nv:.2g}")
         ax.plot(pv * 100, nv, "o", color=ORANGE, ms=6, zorder=5)
-        ax.text(pv * 100 * 1.25, nv * 1.15, f"{pv * 100:g}%: {nr:,.0f}",
-                va="bottom")
+        _on_grid(ax.text(pv * 100 * 1.25, nv * 1.15, f"{pv * 100:g}%: {nr:,.0f}",
+                         va="bottom"))
     ax.set_xlim(0.01, 50)
     ax.set_ylim(100, 1e7)
     ax.set_xticks([0.01, 0.1, 1, 10])
@@ -743,8 +916,8 @@ def mc_realizations_needed():
 
 def lhs_vs_random():
     """250 draws of LEM-11's unit weight, random and Latin hypercube, through the
-    one routine both sampling engines draw with (same seed), counted in 25 bins
-    of equal probability: each bin should hold 10."""
+    one routine both sampling engines draw with (same seed), counted in 25
+    segments of equal probability: each segment should hold 10."""
     from scipy.stats import norm
     from xslope.reliability import _draw_sample_matrix, MC_DEFAULT_SEED
     M = run_lem11_mc()
@@ -766,13 +939,33 @@ def lhs_vs_random():
         ax.set_xlim(0, nb)
         ax.set_xticks([0, nb / 2, nb])
         ax.set_xticklabels(["lowest", "middle", "highest"])
-        ax.set_xlabel(f"Unit weight, in {nb} bins of equal probability")
+        ax.set_xlabel(f"Unit weight, in {nb} segments of equal probability")
         ax.grid(True, axis="y", color="0.9")
-    axs[0].set_ylabel("Draws in the bin")
-    axs[1].text(nb - 0.3, n / nb + 0.4, "10 per bin", color=ORANGE, ha="right",
-                va="bottom")
+        ax.set_axisbelow(True)                   # the grid behind the bars
+    axs[0].set_ylabel("Draws in the segment")
+    axs[1].annotate("10 per segment", xy=(nb - 0.3, n / nb),
+                    xytext=(0, 1.3 / 2 + GAP - _ink("10 per segment")[1]),
+                    textcoords="offset points", color=ORANGE, ha="right", va="baseline")
     fig.tight_layout(w_pad=2.0)
     _save(fig, "lhs_vs_random.png")
+
+
+def run_lem11_lhs10():
+    """LEM-11's Monte Carlo at ten Latin hypercube realizations, the default
+    seed, searched once at the means: small enough to show every draw."""
+    from xslope.fileio import load_slope_data
+    from xslope.reliability import reliability_mc
+
+    def go():
+        ok, r = _quiet(reliability_mc, load_slope_data(LEM11), "spencer",
+                       n_samples=10, search=True, num_slices=40, sampling="lhs")
+        assert ok, r
+        return {"names": [p["param"] for p in r["param_info"]],
+                "param_info": r["param_info"],
+                "fs": np.asarray(r["fs_samples"], float),
+                "x": np.asarray(r["param_samples"], float),
+                "rng_seed": r["rng_seed"]}
+    return _run("lem11_lhs10", go)
 
 
 def run_lem11_repeats():
@@ -803,6 +996,121 @@ def run_lem11_repeats():
     return _run("lem11_repeats", go)
 
 
+def _lhs_rows(L):
+    """Each realization's segment and place in its segment, for each input,
+    recovered from its draw: u = Phi((x - mean)/sd), segment = floor(10 u) + 1,
+    position = 10 u - floor(10 u); checked to be a Latin hypercube (each input's
+    ten segments used once)
+    and to give the draws back."""
+    from scipy.stats import norm
+    n = len(L["fs"])
+    out = {}
+    for j, p in enumerate(L["param_info"]):
+        xj = L["x"][:, j]
+        u = norm.cdf((xj - p["mlv"]) / p["std"])
+        b = np.floor(n * u).astype(int) + 1
+        pos = n * u - np.floor(n * u)
+        assert sorted(b) == list(range(1, n + 1)), (p["param"], b)
+        back = p["mlv"] + p["std"] * norm.ppf((b - 1 + pos) / n)
+        assert np.abs(back - xj).max() < 1e-9, (p["param"], np.abs(back - xj).max())
+        out[p["param"]] = {"seg": b, "pos": pos, "x": xj, "mlv": p["mlv"], "std": p["std"]}
+    return out
+
+
+def lhs_segments():
+    """Step 1 of a Latin hypercube, before anything is drawn: LEM-11's two inputs,
+    each cut into the ten segments of equal probability of a ten-realization run,
+    bounded by dashed red lines and numbered near the base."""
+    _lhs_figure("lhs_segments.png", draws=False)
+
+
+def lhs_bins():
+    """The ten-realization run's draws on its segments (``_lhs_figure``)."""
+    _lhs_figure("lhs_bins.png", draws=True)
+
+
+def _lhs_figure(fname, draws=True):
+    """How a Latin hypercube draws, in the style of the course slide: LEM-11's two
+    inputs, each split into the ten segments of equal probability of a
+    ten-realization run (LEM-11 at the default seed), bounded by dashed red lines
+    and numbered near the base, and each realization's draw on the curve in its
+    segment: every segment used once, at a random place inside it. Prints the
+    realizations, for the page's table."""
+    from scipy.stats import norm
+    from shapely.geometry import LineString, Point, box
+    L = run_lem11_lhs10()
+    rows = _lhs_rows(L)
+    n = len(L["fs"])
+    if draws:
+        print("  n | gamma: segment, position, value | c: segment, position, value | F")
+    for i in range(n if draws else 0):
+        g, c = rows["gamma"], rows["c"]
+        print(f"  {i + 1} | {g['seg'][i]}, {float(g['pos'][i])!r}, {float(g['x'][i])!r} | "
+              f"{c['seg'][i]}, {float(c['pos'][i])!r}, {float(c['x'][i])!r} | "
+              f"{float(L['fs'][i])!r}")
+    fig, axs = plt.subplots(2, 1, figsize=(7.2, 4.6))
+    ms, lw_seg = 6, 1.1
+    for ax, (name, xlabel) in zip(axs, (("gamma", "Unit weight, γ (pcf)"),
+                                        ("c", "Cohesion, c (psf)"))):
+        R = rows[name]
+        m, s = R["mlv"], R["std"]
+        pk = norm_pdf(m, m, s)
+        top = pk * 1.1                           # the segment lines' top, over the curve
+        x = np.linspace(m - 3.6 * s, m + 3.6 * s, 1200)
+        y = norm_pdf(x, m, s)
+        ax.fill_between(x, y, color=SKY, lw=0)
+        for e in m + s * norm.ppf(np.arange(1, n) / n):
+            ax.plot([e, e], [0, top], color=RED, lw=lw_seg, ls="--", zorder=3)
+        ax.plot(x, y, color=BLUE, lw=2, zorder=4)
+        if draws:
+            ax.plot(R["x"], norm_pdf(R["x"], m, s), "o", ms=ms, color=ORANGE, mec="white",
+                    mew=0.8, zorder=5)
+        _no_y(ax)
+        ax.set_xticks([m - 2 * s, m - s, m, m + s, m + 2 * s])
+        ax.set_xlim(x[0], x[-1])
+        ax.set_ylim(0, top)
+        ax.set_xlabel(xlabel)
+    fig.tight_layout(h_pad=1.0)
+
+    # the segment numbers inside the shaded area near its base: on one baseline,
+    # their lowest ink GAP above the axis, each centered in the room its segment
+    # has at that height (between its lines, and inside the curve for the two
+    # outer ones); each clears the lines, the curve, the draws and the others by GAP
+    inks = [_ink(str(k)) for k in range(1, n + 1)]
+    for ax, name in zip(axs, ("gamma", "c")):
+        R = rows[name]
+        m, s = R["mlv"], R["std"]
+        fwd, inv = _to_pt(ax)
+        lo, hi = ax.get_xlim()
+        _, top = ax.get_ylim()
+        xx = np.linspace(lo, hi, 1200)
+        curve = LineString(fwd(np.column_stack([xx, norm_pdf(xx, m, s)])))
+        edges = m + s * norm.ppf(np.arange(1, n) / n)
+        segs = [LineString(fwd([(e, 0), (e, top)])) for e in edges]
+        dots = ([Point(p) for p in fwd(np.column_stack([R["x"], norm_pdf(R["x"], m, s)]))]
+                if draws else [])
+        (x_lo, y_axis), (x_hi, _) = fwd([(lo, 0), (hi, 0)])
+        base = y_axis + 0.8 / 2 + GAP - min(i[1] for i in inks)
+        y_top = base + max(i[3] for i in inks)
+        px = np.r_[x_lo, [sg.coords[0][0] for sg in segs], x_hi]
+        # where the curve is GAP over the numbers' top, on each side
+        cv = np.asarray(curve.coords)
+        tall = cv[:, 1] >= y_top + GAP + 1.0
+        px[0], px[-1] = cv[tall, 0].min(), cv[tall, 0].max()
+        placed = []
+        for k, (x0, y0, x1, y1) in enumerate(inks):
+            cx = (px[k] + px[k + 1]) / 2
+            b = box(cx - (x1 - x0) / 2, base + y0, cx + (x1 - x0) / 2, base + y1)
+            gaps = ([b.distance(sg) - lw_seg / 2 for sg in segs] + [b.distance(curve) - 1.0]
+                    + [b.distance(d) - ms / 2 - 0.8 / 2 for d in dots]
+                    + [b.distance(o) for o in placed])
+            assert min(gaps) >= GAP - 1e-6, (name, k + 1, min(gaps))
+            placed.append(b)
+            (xt, yt), = inv([(cx - (x0 + x1) / 2, base)])
+            ax.text(xt, yt, str(k + 1), ha="left", va="baseline", color="0.15")
+    _save(fig, fname)
+
+
 def lhs_repeat():
     """P_f from twenty 1,000-realization runs with different seeds, random and
     Latin hypercube, beside the 10,000-realization answer."""
@@ -815,13 +1123,14 @@ def lhs_repeat():
         y = 1 - k
         ax.plot(pf, np.full(len(pf), y), "o", ms=7, mfc=col, mec="0.25", mew=0.6,
                 alpha=0.9, zorder=3)
-        ax.text(pf.min() - 0.25, y, name, ha="right", va="center")
+        _on_grid(ax.text(pf.min() - 0.25, y, name, ha="right", va="center"))
         print(f"  {name}: P_f {pf.min():.2f}% to {pf.max():.2f}%, sd {pf.std(ddof=1):.3f} points")
     ax.plot([M["pf_empirical"] * 100] * 2, [-0.7, 1.55], color=GREY, lw=1, ls="--",
             zorder=1)
-    ax.text(M["pf_empirical"] * 100, 1.58,
-            f"{M['pf_empirical'] * 100:.2f}% from 10,000 realizations", color=GREY,
-            ha="center", va="bottom")
+    s = f"{M['pf_empirical'] * 100:.2f}% from 10,000 realizations"
+    _on_grid(ax.annotate(s, xy=(M["pf_empirical"] * 100, 1.55),
+                         xytext=(0, GAP - _ink(s)[1]), textcoords="offset points",
+                         color=GREY, ha="center", va="baseline"))
     ax.set_ylim(-0.7, 1.85)
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
@@ -863,19 +1172,7 @@ def rs_surface_fit():
     ax.contourf(G, C, Fz, levels=[-10, 1, 100], colors=[ORANGE, SKY], alpha=0.45)
     cs = ax.contour(G, C, Fz, levels=[0.5, 1.5, 2.0, 2.5, 3.0], colors=GREY,
                     linewidths=0.8)
-    # each label on its own contour, inside the frame: where the contour crosses
-    # gamma = 97.5 pcf (0.5 and F = 1, lower down, further along)
-
-    def on(level, gx):
-        k = int(np.argmin(np.abs(g - gx)))
-        col = Fz[:, k]
-        i = int(np.argmax(col >= level)) if level > col[0] else 0
-        return (g[k], c[i])
-    ax.clabel(cs, fmt="%.1f", fontsize=8.5, inline_spacing=3,
-              manual=[on(v, 97.5) for v in (1.5, 2.0, 2.5, 3.0)] + [on(0.5, 122)])
     one = ax.contour(G, C, Fz, levels=[1.0], colors=RED, linewidths=1.8)
-    ax.clabel(one, fmt="F = 1", fontsize=9.5, inline_spacing=4,
-              manual=[on(1.0, 104)])
     D = R["x"][:: max(1, len(R["x"]) // 2000)]
     ax.plot(D[:, ig], D[:, ic], ".", ms=2.0, color="0.2", alpha=0.35,
             label="Draws from the inputs")
@@ -909,6 +1206,82 @@ def rs_surface_fit():
     bx.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), fontsize=9.5,
               borderaxespad=0.3)
     fig.tight_layout(w_pad=3.0)
+
+    # each contour's label on its own contour, inside the frame: as near as it can
+    # be to where the contour crosses gamma = 97.5 pcf (0.5 and F = 1, lower down,
+    # further along) with its ink GAP clear of every draw, solve, other contour,
+    # other label and the frame
+    def on(level, gx):
+        k = int(np.argmin(np.abs(g - gx)))
+        col = Fz[:, k]
+        i = int(np.argmax(col >= level)) if level > col[0] else 0
+        return (g[k], c[i])
+    fwd, _ = _to_pt(ax)
+    (fx0, fy0), (fx1, fy1) = fwd([(g[0], c[0]), (g[-1], c[-1])])
+    marks = [(fwd(D[:, [ig, ic]]), 2.0 / 2),                  # the dots, ms 2
+             (fwd(P[:, [ig, ic]]), 7 * math.sqrt(2) / 2 + 1.4 / 2)]   # the diamonds' tips
+    sets = [(cs, lv, "%.1f" % lv, 8.5, 0.4) for lv in cs.levels] + [(one, 1.0, "F = 1", 9.5, 0.9)]
+    def dense(seg, step=0.5):
+        """A polyline resampled every `step` points along its length."""
+        s_ = np.r_[0, np.cumsum(np.hypot(*np.diff(seg, axis=0).T))]
+        t_ = np.linspace(0, s_[-1], max(2, int(s_[-1] / step) + 1))
+        return np.column_stack([np.interp(t_, s_, seg[:, 0]), np.interp(t_, s_, seg[:, 1])])
+    lines = {}
+    for cset, lv, _, _, hw in sets:
+        k = list(cset.levels).index(lv)
+        lines[lv] = ([dense(fwd(seg)) for seg in
+                      cset.get_paths()[k].to_polygons(closed_only=False) if len(seg) > 1], hw)
+    placed = []
+
+    def clearance(p, t, a, b, lv):
+        n = np.array([-t[1], t[0]])
+
+        def to_rect(q, r):
+            d = q - p
+            u, v = np.abs(d @ t) - a, np.abs(d @ n) - b
+            return np.hypot(np.maximum(u, 0), np.maximum(v, 0)) - r
+        out = min(to_rect(q, r).min() for q, r in marks)
+        for olv, (segs, hw) in lines.items():
+            if olv != lv:
+                out = min(out, min(to_rect(sg, hw).min() for sg in segs))
+        corners = p + np.array([[sa * a, sb * b] for sa in (-1, 1) for sb in (-1, 1)]) @ np.array([t, n])
+        out = min(out, (corners[:, 0] - fx0).min(), (fx1 - corners[:, 0]).min(),
+                  (corners[:, 1] - fy0).min(), (fy1 - corners[:, 1]).min())
+        for q in placed:                                        # other labels' inks
+            out = min(out, to_rect(q, 0).min())
+        return out
+    manual = {}
+    order = [(1.0, 104)] + [(lv, 122 if lv == 0.5 else 97.5) for lv in cs.levels]
+    for lv, gx in order:
+        cset, _, text, size, _ = next(st for st in sets if st[1] == lv and
+                                      (st[0] is one) == (lv == 1.0))
+        x0, y0, x1, y1 = _ink(text, size)
+        a, b = (x1 - x0) / 2, (y1 - y0) / 2
+        want = fwd([on(lv, gx)])[0]
+        segs = lines[lv][0]
+        home = int(np.argmin([np.hypot(*(sg - want).T).min() for sg in segs]))
+        best = None
+        for i, sg in enumerate(segs):
+            seglen = np.r_[0, np.cumsum(np.hypot(*np.diff(sg, axis=0).T))]
+            j0 = int(np.argmin(np.hypot(*(sg - want).T)))
+            for j in range(1, len(sg) - 1):
+                t = sg[j + 1] - sg[j - 1]
+                t = t / np.hypot(*t)
+                if clearance(sg[j], t, a, b, lv) >= GAP:
+                    # along the contour from the preferred place
+                    key = (abs(seglen[j] - seglen[j0]) if i == home
+                           else 1e6 + np.hypot(*(sg[j] - want)))
+                    if best is None or key < best[0]:
+                        best = (key, sg[j], t)
+        assert best is not None, f"no clear place for the {text} label"
+        _, p, t = best
+        n = np.array([-t[1], t[0]])
+        placed.append(p + np.array([[u, v] for u in np.linspace(-a, a, 9)
+                                    for v in np.linspace(-b, b, 5)]) @ np.array([t, n]))
+        manual[lv] = ax.transData.inverted().transform(p * ax.figure.dpi / 72)
+    ax.clabel(cs, fmt="%.1f", fontsize=8.5, inline_spacing=3,
+              manual=[manual[lv] for lv in cs.levels])
+    ax.clabel(one, fmt="F = 1", fontsize=9.5, inline_spacing=4, manual=[manual[1.0]])
     _save(fig, "rs_surface_fit.png")
 
 
@@ -945,7 +1318,7 @@ FIGURES = {f.__name__: f for f in (
     same_f, r_pf, sigma_normal, sigma_rules, beta_on_f, beta_pf, vp035_surfaces,
     taylor_gamma, taylor_shapes, reliability_taylor_vp036,
     mc_inputs, mc_histogram, mc_check_shape, mc_sampling_band,
-    mc_realizations_needed, lhs_vs_random, lhs_repeat, rs_surface_fit,
+    mc_realizations_needed, lhs_vs_random, lhs_segments, lhs_bins, lhs_repeat, rs_surface_fit,
     mc_convergence_trace,
     reliability_mc_vp034)}
 # drawn by XSLOPE's own plot functions, in their own style

@@ -45,7 +45,7 @@ strength reduction solves. The results come in three places.
 the failure mechanism, with $F_{MLV}$ in the title. Below it, the Log pane holds the table of the
 analyses.
 
-![Studio after the FEM reliability run: the FEM Results view over the Log pane](images/fem_reliability_window.png){width=1280}
+![Studio after the FEM reliability run: the FEM Results view over the Log pane](images/fem_reliability_window.png){width=800}
 
 **2. The results box** Studio shows at the end of the run gives $F_{MLV}$, $\sigma_F$, $COV_F$, and the
 reliability index and probability of failure by both shapes. The status bar repeats β and $P_f$.

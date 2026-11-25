@@ -144,14 +144,32 @@ Taylor series, read the same columns, so changing the method never changes the d
 Uncertain inputs make the factor of safety uncertain: every combination of strengths and unit weights
 gives its own factor of safety, and together they make a distribution of $F$. Two numbers describe it
 well enough for most purposes: $F_{MLV}$, and the standard deviation of the factor of safety,
-$\sigma_F$, or its coefficient of variation, $COV_F = \sigma_F / F_{MLV}$. XSLOPE computes them three
-ways:
+$\sigma_F$, or its coefficient of variation, $COV_F = \sigma_F / F_{MLV}$.
 
-| Method | How | Real solves | Page |
-|---|---|---|---|
-| Taylor series | Moves each input up and down one standard deviation and measures how far $F$ swings | $1 + 2N$ for $N$ uncertain inputs | [Taylor Series](taylor.md) |
-| Monte Carlo | Solves thousands of versions of the slope drawn from the input distributions and counts the failures | thousands | [Monte Carlo](monte_carlo.md) |
-| Response surface | Fits a formula for $F$ to a few real solves, checks it, and counts on the formula | a few hundred | [Response surface](monte_carlo.md#sampling-a-fitted-response-surface) |
+There is no formula for $\sigma_F$. The factor of safety comes out of a slope stability solve, not an
+equation in the inputs, so the only way to learn how it varies is to solve the slope at chosen values
+of the inputs and watch what $F$ does. XSLOPE has three methods, and they differ in which values they
+solve at and how many:
+
+- **The Taylor series** measures how sensitive $F$ is to each input. It solves the slope at the most
+  likely values, then moves each input up and down one standard deviation while holding the others,
+  and combines the swings in $F$ into $\sigma_F$. That is only $1 + 2N$ solves for $N$ uncertain inputs.
+  It gives $F_{MLV}$ and $\sigma_F$ but not the shape of the distribution, so to turn them into a
+  probability of failure it assumes one, normal or lognormal.
+- **Monte Carlo** builds the distribution itself. It draws thousands of combinations of the inputs from
+  their distributions, solves every one, and counts the fraction with $F < 1$. It assumes nothing about
+  the shape of $F$'s distribution, but it takes thousands of solves, and more the smaller the
+  probability of failure.
+- **The response surface** keeps Monte Carlo's counting but makes it cheap. It solves the slope at a
+  handful of chosen combinations of the inputs, fits a quadratic formula for $F$ through them, checks
+  the formula against a few hundred more real solves, and then runs Monte Carlo on the formula, where
+  ten million realizations need no further solves.
+
+| Method | Real solves | Page |
+|---|---|---|
+| Taylor series | $1 + 2N$ for $N$ uncertain inputs | [Taylor Series](taylor.md) |
+| Monte Carlo | thousands | [Monte Carlo](monte_carlo.md) |
+| Response surface | a few hundred | [Response surface](monte_carlo.md#sampling-a-fitted-response-surface) |
 
 ## Reliability Equation
 
@@ -243,20 +261,19 @@ problem 35). A design screened on the factor of safety alone can examine the wro
 <!-- test: file=../verification/files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.35, tolerance=0.03, benchmark=REL-VP35-beta -->
 <!-- test: file=../verification/files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, num_slices=40, circle_xo=348.899, circle_yo=265.399, circle_r=118.617, expected_beta=6.79, expected_fmlv=2.53, tolerance=0.03, benchmark=REL-VP35-A-beta -->
 
-XSLOPE does not search for the surface of lowest β. The search checkbox in the Reliability dialog decides
-which surface each solve uses:
+XSLOPE does not search for the surface of lowest β. A reliability analysis uses one of two surfaces:
 
-| Method | Search ticked | Search unticked |
-|---|---|---|
-| Taylor series | A search for the critical surface at each of the $1 + 2N$ solves | Every solve on the file's own surface |
-| Monte Carlo, response surface | One search, at the most likely values; every realization on that surface | Every realization on the file's own surface |
+- **The critical surface.** The Taylor series searches again at each of its $1 + 2N$ solves, so each
+  varied slope finds its own critical surface. Monte Carlo and the response surface search once, at the
+  most likely values, and solve every realization on that surface, because a search for every
+  realization would cost hundreds of solves each. For some realizations the critical surface lies
+  elsewhere, so a fixed surface understates the probability of failure of the slope as a whole a
+  little.
+- **The file's own surface**, the first circle on the circles sheet or the non-circular surface, for
+  every solve. Use it for a prescribed surface: a published benchmark's circle, an observed failure
+  surface, a bedding plane, or a candidate surface whose β you want to check.
 
-The file's own surface is the first circle on the circles sheet, or the non-circular surface. Untick
-the search for a prescribed surface: a published benchmark's circle, an observed failure surface, a
-bedding plane, or a candidate surface whose β you want to check. Monte Carlo holds one surface because
-a search for every realization would cost hundreds of solves each. For some realizations the critical
-surface lies elsewhere, so a fixed surface understates the probability of failure of the slope as a
-whole a little.
+[Running a Reliability Analysis](#running-a-reliability-analysis) shows where to choose.
 
 ## Choosing a Method {#when-to-use-monte-carlo-versus-the-taylor-series}
 
@@ -269,6 +286,11 @@ LEM-11's slope their probabilities of failure are within about a percentage poin
 | Taylor series | $F$ changes in a straight line over $\pm\sigma$, and $F$'s distribution has a known shape | The quick first look: $1 + 2N$ solves, and its table ranks the inputs by how much each contributes |
 | Monte Carlo | Nothing about $F$: only the input distributions | The reference answer; and the cases the Taylor series cannot handle, below |
 | Response surface | $F$ follows a quadratic formula, which it checks | A probability of failure too small for Monte Carlo to find affordably |
+
+Monte Carlo and the response surface are limit equilibrium analyses. Ten thousand factor-of-safety
+solves are affordable with limit equilibrium but not with the finite element strength reduction, so
+finite element reliability uses the Taylor series, $1 + 2N$ solves
+([Reliability Analysis (FEM)](fem.md)).
 
 Use Monte Carlo when the Taylor series' straight line cannot hold:
 
@@ -287,26 +309,69 @@ value and see whether the conclusion holds
 
 ## Reliability in Other Programs
 
-The commercial limit-equilibrium programs compute reliability by Monte Carlo: Rocscience **Slide2**
-and GeoStudio **SLOPE/W** sample the inputs, solve each realization, and count the realizations with
-$F < 1$, on a fixed surface as XSLOPE's Monte Carlo does. Both offer Latin hypercube sampling, and
-Slide2 adds a response surface and a spatially variable (random-field) mode
-([Slide2 Probabilistic Analysis](https://www.rocscience.com/help/slide2/documentation/slide-model/project-settings/statistics/probabilistic-analysis)).
-Finite element programs do not rely on mass sampling, because thousands of finite element solves are
-impractical. Rocscience **RS2** offers the Rosenblueth point-estimate method (two points per variable at
-$\pm\sigma$), a response surface, and Monte Carlo on that surface
-([RS2 Probabilistic Analysis](https://www.rocscience.com/help/rs2/documentation/rs2-model/project-settings/statistics/probabilistic-analysis)).
-XSLOPE's finite element reliability belongs to the point-estimate family: its $1 + 2N$ Taylor series
-evaluates each variable at the same two points.
+Here is how XSLOPE's reliability analysis compares with three commercial programs: two limit
+equilibrium programs, Rocscience Slide2 and GeoStudio SLOPE/W, and a finite element program,
+Rocscience RS2.
+
+**Limit equilibrium**
+
+| | XSLOPE | Slide2 | SLOPE/W | Notes |
+|---|:---:|:---:|:---:|---|
+| Taylor series | ✓ | | | Solves at the most likely values, then moves one input at a time to $\pm\sigma$: $1 + 2N$ solves for $N$ inputs. Assumes the distribution of $F$ is normal or lognormal |
+| Monte Carlo, random sampling | ✓ | ✓ | ✓ | Draws each input independently from its distribution |
+| Monte Carlo, Latin hypercube sampling | ✓ | ✓ | ✓ | Cuts each input's distribution into segments of equal probability and draws once from each, so fewer realizations cover the distribution |
+| Response surface | ✓ | ✓ | | Fits a formula for $F$ to a few real solves, then runs Monte Carlo on the formula. XSLOPE's is a quadratic, checked against held-out solves; Slide2's is a third-order Hermite expansion trained on Latin hypercube solves |
+| Monte Carlo on one fixed surface | ✓ | ✓ | ✓ | One search, at the most likely values, finds the critical surface, and every realization is solved on it. Slide2 calls this mode Global Minimum |
+| Monte Carlo with a new search in every realization | | ✓ | | Each realization searches for its own critical surface, so $P_f$ is the slope's as a whole, not one surface's. Slide2's Overall Slope mode; it can take hours |
+| A property varying along the slip surface | | ✓ | ✓ | Within one realization, a soil's strength takes different values along the slip surface instead of one value. Slide2 uses random fields; SLOPE/W samples once per surface, at each column, or at a set distance. XSLOPE gives each input one value per realization |
+
+**Finite element (strength reduction)**
+
+Each strength reduction solve takes far longer than a limit equilibrium solve, so the number of solves
+a method needs matters most.
+
+| | XSLOPE | RS2 | Notes |
+|---|:---:|:---:|---|
+| Taylor series | ✓ | | The same $1 + 2N$ solves, each a strength reduction run ([Reliability Analysis (FEM)](fem.md)) |
+| Point estimate (Rosenblueth) | | ✓ | Solves every combination of the inputs at their mean $\pm\sigma$ (four combinations for two inputs), plus the mean, and takes the mean and $\sigma$ of $F$ from those solves |
+| Monte Carlo, random or Latin hypercube sampling | | ✓ | One full strength reduction run per realization. RS2 computes $P_f$ from the mean and $\sigma$ of the critical strength reduction factor, assuming a normal distribution |
+
+GeoStudio's finite element program, SIGMA/W, has a strength reduction analysis but no reliability
+analysis.
+
+Sources: [Slide2 Probabilistic Analysis](https://www.rocscience.com/help/slide2/documentation/slide-model/project-settings/statistics/probabilistic-analysis),
+[RS2 Probabilistic Analysis](https://www.rocscience.com/help/rs2/documentation/rs2-model/project-settings/statistics/probabilistic-analysis),
+Seequent's [Slope Stability Modeling with SLOPE/W](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Modeling.pdf),
+Ch. 12, with GeoStudio's example *Basic Probabilistic Stability Analysis*, and Seequent's *Stress-Strain
+Modeling with SIGMA/W*, Sec. 4.4.2.
 
 ## Running a Reliability Analysis
 
 In **XSLOPE Studio**, click **Reliability…** on the **Run** menu or the toolbar, beside
-**Parametric…**. Choose the method, then the limit equilibrium method and slice count (or, in FEM mode,
-the strength reduction bracket). **Standard deviations in this file**, at the bottom of the dialog, lists
-what the run will vary. The results open in their own tab, and the per-parameter table goes to the Log
-pane. [Studio: Reliability analysis](../studio/analysis.md#reliability-analysis) describes the dialog
-and the result views.
+**Parametric…**. This is the dialog in limit equilibrium mode, set for Monte Carlo:
+
+![The Reliability dialog, set for Monte Carlo](../studio/images/analysis_reliability_dialog_lem.png){width=935}
+
+- **Method**: Taylor series, Monte Carlo, or Response surface (RS). In FEM mode the dialog offers the
+  Taylor series on the strength reduction, with its bracket in place of the slice count
+  ([Reliability Analysis (FEM)](fem.md)).
+- **LEM method** and **Number of slices**: the limit equilibrium solve each factor of safety comes from.
+- **Rapid drawdown**: every solve becomes a three-stage [rapid drawdown](../lem/rapid.md) analysis.
+- **Search for the critical surface**: which surface each solve uses
+  ([Choosing the Slip Surface](#choosing-the-slip-surface)). Its label changes with the method, and so
+  does what it does (table below).
+- **MC samples**, **MC seed**, **MC distribution**, **MC sampling**, and **Stop when P_f converges**
+  with its **P_f tolerance**: the sampling controls
+  ([Monte Carlo in XSLOPE](monte_carlo.md#monte-carlo-in-xslope)).
+- **Standard deviations in this file**: what the run will vary.
+
+| Method | Search ticked | Search unticked |
+|---|---|---|
+| Taylor series | A search for the critical surface at each of the $1 + 2N$ solves | Every solve on the file's own surface |
+| Monte Carlo, response surface | One search, at the most likely values; every realization on that surface | Every realization on the file's own surface |
+
+The results open in their own tab, and the per-parameter table goes to the Log pane.
+[Studio: Reliability analysis](../studio/analysis.md#reliability-analysis) describes the result views.
 
 From **Python**, one entry point runs every method:
 

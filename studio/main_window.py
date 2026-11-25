@@ -3993,7 +3993,7 @@ class MainWindow(QMainWindow):
                 f"β (normal) = {rel['beta_normal']:.3f}\n"
                 f"β (lognormal) = {rel['beta_ln']:.3f}\n"
                 f"Pf (empirical) = {rel['pf_empirical'] * 100:.3f}%\n"
-                f"Pf (normal) = {rel['pf_normal'] * 100:.3f}%    "
+                f"Pf (normal) = {rel['pf_normal'] * 100:.3f}%\n"
                 f"Pf (lognormal) = {rel['pf_lognormal'] * 100:.3f}%\n\n"
                 f"Surrogate: {rel['n_design']} design solves, checked against "
                 f"{rel['n_gate_valid']} held-out solves — R² = {rel['gate_r2']:.5f}, "
@@ -4011,7 +4011,7 @@ class MainWindow(QMainWindow):
                 f"β (normal) = {rel['beta_normal']:.3f}\n"
                 f"β (lognormal) = {rel['beta_ln']:.3f}\n"
                 f"Pf (empirical) = {rel['pf_empirical'] * 100:.2f}%\n"
-                f"Pf (normal) = {rel['pf_normal'] * 100:.2f}%    "
+                f"Pf (normal) = {rel['pf_normal'] * 100:.2f}%\n"
                 f"Pf (lognormal) = {rel['pf_lognormal'] * 100:.2f}%\n\n"
                 "The FS histogram is on the Reliability · MC tab; the per-parameter "
                 "table is in the Log pane.")
@@ -4024,7 +4024,7 @@ class MainWindow(QMainWindow):
             f"σ_F = {rel['sigma_F']:.3f}    COV_F = {rel['COV_F']:.3f}\n"
             f"β (normal) = {rel['beta_normal']:.3f}\n"
             f"β (lognormal) = {rel['beta_ln']:.3f}\n"
-            f"Pf (normal) = {rel['pf_normal'] * 100:.2f}%    "
+            f"Pf (normal) = {rel['pf_normal'] * 100:.2f}%\n"
             f"Pf (lognormal) = {rel['prob_failure'] * 100:.2f}%\n"
             f"Reliability (lognormal) = {rel['reliability'] * 100:.2f}%"
             + extra + "\n\nThe per-parameter ΔF table is in the Log pane.")

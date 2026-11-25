@@ -34,9 +34,31 @@ realization's draws:
 
 ![LEM-11's two input distributions and the first realization's draws](images/mc_inputs.png){width=780}
 
+Realization 1 draws γ = 126.6 pcf and c = 340 psf, and the slope with those values solves to
+$F = 1.035$. A run repeats this thousands of times, each realization with its own draws; the run on this
+page has 10,000. Here are its first eleven, with realization 1, the draws marked in the figure, in red:
+
+| Realization | γ (pcf) | c (psf) | F | F < 1 |
+|---|---|---|---|---|
+| <span style="color:#b03a2e">1</span> | <span style="color:#b03a2e">126.6</span> | <span style="color:#b03a2e">340</span> | <span style="color:#b03a2e">1.035</span> |  |
+| 2 | 108.6 | 524 | 2.221 |  |
+| 3 | 110.0 | 348 | 1.431 |  |
+| 4 | 132.5 | 547 | 1.525 |  |
+| 5 | 137.9 | 90 | 0.234 | yes |
+| 6 | 116.9 | 398 | 1.431 |  |
+| 7 | 123.7 | 306 | 0.977 | yes |
+| 8 | 117.5 | 401 | 1.426 |  |
+| 9 | 103.1 | 500 | 2.408 |  |
+| 10 | 129.5 | 428 | 1.249 |  |
+| 11 | 127.6 | 327 | 0.982 | yes |
+
+Three of these eleven fail. Realization 5 is heavy and weak, c = 90 psf. Realizations 7 and 11 are
+less extreme: a little heavier than the most likely 120 pcf, with a cohesion nearly one standard
+deviation low.
+
 ## Monte Carlo on LEM-11's Slope
 
-Here are ten thousand realizations of LEM-11's slope, solved with Spencer's method on the critical
+Here are all ten thousand realizations of LEM-11's slope, solved with Spencer's method on the critical
 circle of a search at the most likely values:
 
 ![LEM-11's 10,000 Monte Carlo factors of safety](images/mc_histogram.png){width=600}
@@ -47,7 +69,7 @@ is 1.386 and its standard deviation 0.404. For comparison with the Taylor series
 the two reliability indices from that mean and standard deviation: $\beta_N = 0.956$ and
 $\beta_{LN} = 1.001$.
 
-<!-- test: file=../lem/files/xslope_reliability.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10000, expected_beta=1.001, tolerance=0.01, expected_pf=0.1613, pf_tol=0.005, expected_mean=1.386, expected_sigma=0.404, expected_beta_n=0.956 -->
+<!-- test: file=../lem/files/xslope_reliability.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10000, expected_beta=1.001, tolerance=0.01, expected_pf=0.1613, pf_tol=0.005, expected_mean=1.386, expected_sigma=0.404, expected_beta_n=0.956, benchmark=REL-LEM11-MC, draws=126.6/340/1.035;108.6/524/2.221;110.0/348/1.431;132.5/547/1.525;137.9/90/0.234;116.9/398/1.431;123.7/306/0.977;117.5/401/1.426;103.1/500/2.408;129.5/428/1.249;127.6/327/0.982 -->
 <!-- test: file=../lem/files/xslope_reliability.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.359, tolerance=0.005 -->
 
 **Why the mean sits above $F_{MLV}$.** The Taylor series reports $F_{MLV} = 1.359$, the factor of
@@ -106,7 +128,7 @@ That is the case the [response surface](#sampling-a-fitted-response-surface) is 
 ### Stopping on Convergence
 
 The convergence stop ends a run once the probability of failure is known well enough. In Studio, tick
-**Stop when P_f converges** in the Reliability dialog and set its tolerance; in Python, pass
+**Stop when P_f converges** in the [Reliability dialog](index.md#running-a-reliability-analysis) and set its tolerance; in Python, pass
 `converge_rel`. Every 100 realizations, the run checks the 95% half-width, $1.96\,\sigma_p$, and it
 stops once that is within the tolerance **as a fraction of $P_f$ itself** (Studio's default is ±5%).
 The sample count is then the upper limit.
@@ -127,6 +149,94 @@ LEM-11's full run, with the ±5% target it meets at 8,100 realizations:
 
 ![LEM-11's running P_f with its 95% band and the ±5% stop target](images/mc_convergence_trace.png){width=900}
 
+## Latin Hypercube Sampling {#latin-hypercube-sampling}
+
+With random sampling, each draw lands anywhere in its distribution, independently of the others. Over
+a short run the draws bunch up by chance: one part of a distribution gets several and another none, and
+the counted probability of failure wanders with them. **Latin hypercube sampling**, XSLOPE's default,
+spreads each input's draws evenly over its distribution. The idea is this:
+
+**A run of $n$ realizations cuts each input's distribution into $n$ segments of equal probability and
+takes exactly one draw from each segment.**
+
+The number of segments is the number of realizations. The 10,000-realization run above cuts each input
+into 10,000 segments. Ten are easier to see, so here is a run of ten realizations of LEM-11's slope,
+step by step.
+
+**Step 1: cut each distribution into ten segments.** Each segment holds a tenth of the area under the
+curve, so the segments are narrow near the mean, where the curve is tall, and wide in the tails:
+
+![LEM-11's unit weight and cohesion, each cut into ten segments of equal probability](images/lhs_segments.png){width=780}
+
+**Step 2: pair the segments.** Each realization takes one segment of γ and one of c. Each input's ten
+segment numbers are shuffled into a random order, a different order for each input, and realization
+$i$ takes the $i$-th number from each:
+
+| Realization | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| γ segment | 6 | 2 | 9 | 5 | 8 | 7 | 10 | 1 | 3 | 4 |
+| c segment | 7 | 6 | 9 | 2 | 4 | 10 | 5 | 3 | 1 | 8 |
+
+Each row holds every segment number once: the ten realizations draw from every segment of both inputs,
+and which γ segment goes with which c segment is random.
+
+**Step 3: draw a value inside each segment.** Segment $k$ of $n$ covers the fraction of the
+distribution's area from $(k - 1)/n$ to $k/n$. A random number $u$ between 0 and 1 picks a spot inside
+it, and the inverse of the normal distribution, $\Phi^{-1}$, turns that fraction into a value:
+
+$$x = \mu + \sigma\,\Phi^{-1}\!\left(\frac{k - 1 + u}{n}\right)$$
+
+Realization 1 takes γ's segment 6 at $u = 0.098$ and c's segment 7 at $u = 0.673$:
+
+$$\gamma = 120 + 8\,\Phi^{-1}\!\left(\frac{6 - 1 + 0.098}{10}\right) = 120 + 8\,\Phi^{-1}(0.510) = 120.2\ \text{pcf}$$
+
+$$c = 400 + 100\,\Phi^{-1}\!\left(\frac{7 - 1 + 0.673}{10}\right) = 400 + 100\,\Phi^{-1}(0.667) = 443.2\ \text{psf}$$
+
+(For a lognormal distribution, the same is done on $\ln x$.)
+
+In the figure below, **each orange dot is one draw**: one realization's value of that input. The dot's
+position along the axis is the value drawn; it is placed on the curve so that it shows against the
+shading. Each input has ten dots, one in each of its ten segments. A few dots sit almost on a segment
+line, such as γ's draws for realizations 1, 2, and 6; each is still inside one segment, the one the
+step 2 table gives.
+
+![The ten realizations' draws, one in each segment of each input](images/lhs_bins.png){width=780}
+
+Each realization is then solved with its two draws:
+
+| Realization | γ (pcf) | c (psf) | F |
+|---|---|---|---|
+| 1 | 120.2 | 443.2 | 1.501 |
+| 2 | 113.1 | 419.1 | 1.618 |
+| 3 | 128.4 | 507.7 | 1.505 |
+| 4 | 119.2 | 310.3 | 1.069 |
+| 5 | 125.0 | 368.7 | 1.154 |
+| 6 | 124.0 | 618.3 | 1.964 |
+| 7 | 134.3 | 388.4 | 1.058 |
+| 8 | 99.4 | 344.0 | 1.819 |
+| 9 | 115.5 | 262.2 | 0.966 |
+| 10 | 117.6 | 480.7 | 1.705 |
+
+<!-- test: file=../lem/files/xslope_reliability.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10, sampling=lhs, expected_beta=1.375, tolerance=0.01, expected_pf=0.10, pf_tol=0.001, benchmark=REL-LEM11-LHS10, draws=120.2/443.2/1.501;113.1/419.1/1.618;128.4/507.7/1.505;119.2/310.3/1.069;125.0/368.7/1.154;124.0/618.3/1.964;134.3/388.4/1.058;99.4/344.0/1.819;115.5/262.2/0.966;117.6/480.7/1.705 -->
+
+Only realization 9 fails, so these ten give $P_f = 10\%$: far too few realizations to count a
+probability of failure, but enough to show the method.
+
+With random sampling (`sampling="random"`), each value is drawn independently, and nothing stops two
+draws landing in the same segment while another gets none. Here are 250 draws of LEM-11's unit weight
+each way, counted in 25 segments of equal probability:
+
+![250 random and 250 Latin hypercube draws, counted in 25 segments of equal probability](images/lhs_vs_random.png){width=860}
+
+Even coverage makes runs repeat more closely. These are twenty runs of 1,000 realizations each way,
+with seeds 1 to 20: the Latin hypercube runs land closer together, and closer to the answer of a much
+longer run.
+
+![P_f from twenty short runs, random and Latin hypercube](images/lhs_repeat.png){width=560}
+
+The convergence stop's band assumes independent draws. Latin hypercube draws are not independent, so
+under Latin hypercube the band overstates the uncertainty and the stop errs on the long side.
+
 ## Monte Carlo in XSLOPE {#monte-carlo-in-xslope}
 
 **The inputs.** Monte Carlo reads the same values as the Taylor series: each material's most likely
@@ -139,22 +249,9 @@ below zero. Every draw is cut off at its physical floor, since a strength or a u
 negative, and a friction angle is capped at 89°. The cutoff matters only when a standard deviation is
 large next to its value (see [VP34](#vp34-a-standard-deviation-larger-than-its-value)).
 
-**Latin hypercube sampling.** Realizations are drawn by Latin hypercube sampling by default
-(`sampling="lhs"`): each input's distribution is cut into $n$ bins of equal probability, and exactly one
-draw falls in each, so the draws cover the distribution by construction rather than by luck.
-`sampling="random"` draws every value independently. Here are 250 draws of LEM-11's unit weight each
-way, counted in 25 bins of equal probability:
-
-![250 random and 250 Latin hypercube draws, counted in 25 bins of equal probability](images/lhs_vs_random.png){width=860}
-
-Even coverage makes runs repeat more closely. These are twenty runs of 1,000 realizations each way,
-with seeds 1 to 20: the Latin hypercube runs land closer together, and closer to the answer of a much
-longer run.
-
-![P_f from twenty short runs, random and Latin hypercube](images/lhs_repeat.png){width=560}
-
-The convergence stop's band assumes independent draws. Latin hypercube draws are not independent, so
-under Latin hypercube the band overstates the uncertainty and the stop errs on the long side.
+**Sampling.** Realizations are drawn by Latin hypercube sampling by default (**MC sampling** in Studio,
+`sampling="lhs"` in Python), or with every value drawn independently (`sampling="random"`); see
+[Latin Hypercube Sampling](#latin-hypercube-sampling).
 
 **The seed.** The random number generator starts from a fixed seed (**MC seed** in Studio, `rng_seed`
 in Python), so the same file gives the same realizations, and the same results, on every run. Run again
@@ -166,10 +263,6 @@ search at the most likely values (search ticked, `search=True`), or the file's o
 A search for every realization would multiply the cost by hundreds. For some realizations the critical
 surface lies elsewhere, so a fixed surface understates the probability of failure of the slope as a
 whole a little. [Choosing the Slip Surface](index.md#choosing-the-slip-surface) covers the choice.
-
-**Limit equilibrium only.** Ten thousand factor-of-safety solves are affordable with limit equilibrium
-but not with the finite element strength reduction, so finite element reliability uses the Taylor
-series, $1 + 2N$ solves ([Reliability Analysis (FEM)](fem.md)).
 
 **Rapid drawdown.** With **Rapid drawdown** ticked (`rapid=True`), every realization is a three-stage
 [rapid drawdown](../lem/rapid.md) on the fixed surface, and an `mc` material's $K_c = 1$ envelope is

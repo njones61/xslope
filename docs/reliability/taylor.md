@@ -121,7 +121,7 @@ slope has roughly a one-in-six chance of failing.
 The Taylor series varies every value that has a standard deviation, as
 [Standard Deviations in XSLOPE](index.md#standard-deviations-in-xslope) lists. Two cases need care:
 
-- **Rapid drawdown.** With **Rapid drawdown** ticked in the Reliability dialog (`rapid=True`), every
+- **Rapid drawdown.** With **Rapid drawdown** ticked in the [Reliability dialog](index.md#running-a-reliability-analysis) (`rapid=True`), every
   factor of safety is a three-stage [rapid drawdown](../lem/rapid.md) factor of safety, and an `mc`
   material's $K_c = 1$ envelope, $d$ and $\psi$, is varied by σ(d) and σ(ψ).
 - **A standard deviation larger than its value.** Then $MLV - \sigma$ is a negative strength, and the
@@ -135,7 +135,7 @@ all five searches find the same circle: on a one-material φ = 0 slope, scaling 
 weight does not move the critical circle. On other slopes the surfaces separate. This is
 [VP36](../verification/rocscience.md#vp36), a homogeneous slope with standard deviations on γ, c, and φ:
 
-![The F_MLV surface and the six F⁺ and F⁻ surfaces of VP36](images/reliability_taylor_vp036.png){width=750}
+![The F_MLV surface and the six F⁺ and F⁻ surfaces of VP36](images/reliability_taylor_vp036.png){width=900}
 
 The red $F_{MLV}$ surface and the six $F^+$ and $F^-$ surfaces fan out: the critical surface, as well
 as the factor of safety, shifts with each change of one standard deviation. Where the surfaces separate

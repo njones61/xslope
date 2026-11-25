@@ -18,7 +18,8 @@ run, so the machine's own Studio settings are left as they are.
 Writes docs/reliability/images/, at Studio's native resolution:
 
 - fem_reliability_window.png: the main window at the end of the run, the FEM
-  Results view at the most-likely values over the Log pane's table.
+  Results view at the most-likely values over the Log pane's table (the pane
+  a whole number of lines tall, so no line is cut off at its foot).
 - fem_reliability_summary.png: the Reliability results box Studio shows.
 
 and prints the summary's numbers and the Log pane's per-parameter table.
@@ -141,9 +142,34 @@ def capture(work):
     i = text.rfind("=== RELIABILITY ANALYSIS RESULTS ===")
     assert i >= 0, "no table in the Log pane"
     line = mw.log.document().findBlock(i).blockNumber()
-    mw.log.verticalScrollBar().setValue(line)
-    mw.log.horizontalScrollBar().setValue(0)
-    settle()
+
+    def scroll():
+        mw.log.verticalScrollBar().setValue(line)
+        mw.log.horizontalScrollBar().setValue(0)
+        settle()
+
+    def cut_off():
+        """How far the last line the Log pane shows runs past its bottom (px)."""
+        h = mw.log.viewport().height()
+        block = mw.log.firstVisibleBlock()
+        y = mw.log.blockBoundingGeometry(block).translated(mw.log.contentOffset()).top()
+        while block.isValid():
+            bottom = y + mw.log.blockBoundingRect(block).height()
+            if bottom > h:
+                return h - y if y < h else 0.0      # the part of a line showing
+            y, block = bottom, block.next()
+        return 0.0
+    scroll()
+    # the Log pane a whole number of lines tall: no line cut off at its bottom
+    for _ in range(4):
+        shown = cut_off()
+        if shown <= 0:
+            break
+        mw.resizeDocks([mw.log_dock], [mw.log_dock.height() - max(1, round(shown))],
+                       Qt.Vertical)
+        settle()
+        scroll()
+    assert cut_off() <= 0, f"the Log pane still cuts a line ({cut_off():.1f} px of it shows)"
     view._render_timer.stop()
     view._render_current()
     settle()

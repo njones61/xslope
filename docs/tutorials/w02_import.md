@@ -110,7 +110,7 @@ typed. We open the materials editor and fill in the three rows. Unit weights are
 pcf, cohesions psf and φ′ degrees; the columns none of the three soils use stay
 blank:
 
-| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
+| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | ν | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | `embankment` | 125 | 130 | `mc` | 250 | 28 |  |  |  |  |  |  |  | `piezo` |
 | `silty clay` | 118 | 123 | `mc` | 700 | 0 |  |  |  |  |  |  |  | `none` |

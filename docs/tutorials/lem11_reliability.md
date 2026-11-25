@@ -306,11 +306,10 @@ distribution get sampled repeatedly while others are missed.
 `Latin hypercube`, the default, is structured sampling — each parameter's
 distribution is cut into equal-probability bins and exactly one draw is
 taken from each, so the whole range is covered by construction. Exploring
-the parameter space more evenly extracts the same information from fewer
-runs: measured on this model, a Latin hypercube campaign matches the
-precision of a purely random one roughly three times its size; the
-measurement is documented on the
-[Monte Carlo documentation page](../reliability/monte_carlo.md).
+the parameter space more evenly gives answers that land closer together from one
+run to the next; the
+[Monte Carlo documentation page](../reliability/monte_carlo.md) shows the
+measurement.
 
 **Stop when P_f converges** ends the campaign early once the probability of
 failure is known to within a stated percentage of its own value — ±5% of a
@@ -374,14 +373,10 @@ count of 10,000 can resolve. The dialog opens on the settings of the last run, s
 set **MC sampling** back to `Latin hypercube` before going on.
 
 The default's structured sampling gives more consistent results. A random
-campaign lands somewhere different in that band every time the seed changes;
-a Latin hypercube campaign lands closer to the same place every time. The
+run lands somewhere different in that band every time the seed changes; a
+Latin hypercube run lands closer to the same place every time. The
 [Monte Carlo documentation page](../reliability/monte_carlo.md) repeats both
-campaigns twenty times and measures the difference: the Latin hypercube
-answers scatter about half as widely. Half the scatter at the same cost is
-the earlier "three times its size" figure from the other direction — a
-random campaign needs roughly three times the realizations to be as
-repeatable.
+kinds of run twenty times to show the difference.
 
 ---
 

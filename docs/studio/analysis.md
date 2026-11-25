@@ -423,8 +423,8 @@ will vary. **LEM** adds the solver method, surface, slice count, rapid-drawdown 
 and a *search the critical surface at the mean values* toggle; **Monte Carlo** adds an
 **MC samples** count, a **seed** (fixed by default, so the result is reproducible),
 a normal / lognormal **distribution** choice, an **MC sampling** choice (random,
-or Latin hypercube — measured at roughly 3× the information per realization on
-the sample models), and an optional convergence stop —
+or Latin hypercube, whose answers land closer together from one run to the
+next), and an optional convergence stop —
 **Stop when P_f converges** with a **P_f tolerance (±)** as a percentage *of P_f
 itself* ends the campaign once the 95% confidence half-width on the empirical
 probability of failure is inside that fraction, with the samples count as the cap

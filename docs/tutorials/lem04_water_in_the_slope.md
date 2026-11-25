@@ -42,7 +42,7 @@ ID. The columns none of the three soils use are left empty below; a blank cell
 and the `0` the worksheet figure further down shows both reach the solver as
 zero:
 
-| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
+| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | ν | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | `soil 1` | 125 | 130 | `mc` | 400 | 30 |  |  |  |  |  |  |  | `piezo` |
 | `soil 2` | 122 | 127 | `mc` | 600 | 28 |  |  |  |  |  |  |  | `piezo` |

@@ -44,7 +44,7 @@ further down shows both reach the solver as zero. The UTEXASED manual gives one
 unit weight per soil, so γsat is left blank and each soil weighs γ both above and
 below the water table:
 
-| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
+| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | ν | u |
 | --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | `Sand Fill` | 120 |  | `mc` | 0 | 37 |  |  |  |  |  |  |  | `piezo` |
 | `Sand` | 123 |  | `mc` | 0 | 33 |  |  |  |  |  |  |  | `piezo` |

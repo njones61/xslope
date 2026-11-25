@@ -5240,17 +5240,37 @@ def _fem04_mechanism(fem_data, solution):
                float(cent[hot, 1].min()), float(cent[hot, 1].max())))
 
 
-def _fem04_beam(field, spacing, m_cap, v_cap):
+def _fem04_beam(model, fem_data, solution, state, spacing, m_cap, v_cap):
     """What the beam elements carry in one field: the peaks per unit width of
-    section, what those are per member, and how many elements have yielded."""
+    section, what those are per member, and how many elements have yielded.
+
+    The peaks are read the way Studio's 1D Details panel reads them, through
+    ``fem_details.pile_profile`` on every pile row: an interior node's moment is
+    the one at the element end that carries the plastic hinge. At failure the
+    other end of that node is not in equilibrium, so reading both ends would put
+    a number on the page that the panel never shows (on the 12 ft row, 102% of
+    the moment capacity where the panel reads 100%).
+
+    ``state`` is ``'converged'`` or ``'failure'``; with no at-failure capture the
+    failure state falls back to the converged field, as the panel's does.
+    """
     import numpy as np
 
-    mom = np.asarray(field.get("forces_pile_moment", []), dtype=float)
-    shear = np.asarray(field.get("forces_pile_lateral", []), dtype=float)
-    y_m = np.asarray(field.get("yielded_pile_M", []), dtype=bool)
-    y_v = np.asarray(field.get("yielded_pile_V", []), dtype=bool)
-    m_peak = float(np.abs(mom).max()) if mom.size else float("nan")
-    v_peak = float(np.abs(shear).max()) if shear.size else float("nan")
+    from xslope import fem_details
+
+    fail = solution.get("failure_solution")
+    field = fem_details.field_solution(solution, state, fail)
+    m_peak = v_peak = float("nan")
+    for i in range(len(model.get("pile_lines") or [])):
+        prof = fem_details.pile_profile(fem_data, solution, i, slope_data=model,
+                                        field_state=state, failure_solution=fail)
+        if prof["max_moment"] is not None:
+            m_peak = np.nanmax([m_peak, abs(prof["max_moment"])])
+        if prof["max_shear"] is not None:
+            v_peak = np.nanmax([v_peak, abs(prof["max_shear"])])
+    m_peak, v_peak = float(m_peak), float(v_peak)
+    y_m = np.asarray((field or {}).get("yielded_pile_M", []), dtype=bool)
+    y_v = np.asarray((field or {}).get("yielded_pile_V", []), dtype=bool)
     return ("peak moment %.0f per unit width (%.0f per member, %s) · "
             "peak shear %.0f per unit width (%.0f per member, %s) · "
             "%d element(s) yielded in bending, %d in shear"
@@ -5277,20 +5297,22 @@ def _fem04_report(label, model, mesh, fem_data, result, solution, seconds,
              len(mesh.get("elements_1d", [])), seconds))
     if not (beam and row):
         return
-    fail = solution.get("failure_solution") or solution
     # A run whose at-failure capture ran away publishes no failure state: the
     # field standing in its place is the last converged one, and the line has to
     # say which state it is rather than label a converged field "at failure".
     print("      converged  %s"
-          % _fem04_beam(solution, spacing, row["M_cap"], row["V_cap"]))
+          % _fem04_beam(model, fem_data, solution, "converged", spacing,
+                        row["M_cap"], row["V_cap"]))
     if result.get("capture_failed"):
         print("      last converged state (at-failure capture not available) %s"
-              % _fem04_beam(fail, spacing, row["M_cap"], row["V_cap"]))
+              % _fem04_beam(model, fem_data, solution, "failure", spacing,
+                            row["M_cap"], row["V_cap"]))
         print("         no capture: %s"
               % (result.get("capture_failed_reason") or "runaway"))
     else:
         print("      at failure %s"
-              % _fem04_beam(fail, spacing, row["M_cap"], row["V_cap"]))
+              % _fem04_beam(model, fem_data, solution, "failure", spacing,
+                            row["M_cap"], row["V_cap"]))
     print("      mechanism  %s" % _fem04_mechanism(fem_data, solution))
 
 

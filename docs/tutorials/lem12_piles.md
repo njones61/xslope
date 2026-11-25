@@ -143,7 +143,7 @@ stresses and marks the two points where it cuts the piles:
 
 The surface enters 13.5 ft out in front of the toe, exits 15.1 ft behind the
 crest and carries 62,436 lb/ft of clay on 61.59 ft of base. The two red dots are
-the pile crossings, at elevation −5.03 on the lower shaft and −4.44 on the upper
+the pile crossings, at elevation −5.02 on the lower shaft and −4.44 on the upper
 one — 10.02 ft and 14.44 ft of soil above the surface at each pile, which is the
 depth the force is computed over.
 

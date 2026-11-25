@@ -167,13 +167,14 @@ neither fit has to be extended past what was measured.
 Each fit is its own model, and both are in the verification corpus:
 [vp061a.xlsx](../verification/files/rocscience/vp061a.xlsx) has the power
 curve and [vp061b.xlsx](../verification/files/rocscience/vp061b.xlsx) the
-straight line, with the same geometry under both. Open the first and run
-Spencer's search on the power curve:
+straight line, with the same geometry under both. Open the first. The corpus
+file carries a mesh, so Studio opens it on **FEM**; switch the mode strip to
+**LEM** (`Ctrl+1`) and run Spencer's search on the power curve:
 
 ![Spencer on the London clay power curve](images/lem07_london_pow.png){width=1000}
 
 **FS = 1.466**, against Slide's 1.468 and Baker's 1.48. And on the second
-model, the fitted Mohr-Coulomb envelope:
+model, the fitted Mohr-Coulomb envelope, again with the mode strip on **LEM**:
 
 ![Spencer on the London clay Mohr-Coulomb fit](images/lem07_london_mc.png){width=1000}
 

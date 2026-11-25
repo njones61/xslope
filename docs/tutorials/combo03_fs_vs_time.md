@@ -184,10 +184,9 @@ gets its pore pressure, and `seep` takes it from a solved seepage field;
 its four values. With a transient solution loaded, `seep` means one frame of it,
 chosen at the run rather than here.
 
-Click **OK**. An editor's **OK** that changes the model clears the results
-Studio holds for it, so the seepage solution the file loaded is gone from the session
-and the **Seep · Transient** tab has closed. We solve it again once the circles
-are checked.
+Click **OK**. None of these values is an input to the seepage analysis, so the
+seepage solution that came with the file stays loaded and the
+**Seep · Transient** tab stays open.
 
 ### Starting circles
 
@@ -248,22 +247,6 @@ ground into a distributed load, re-derived at every instant from the pool as it
 stood then. The
 two red dashed arcs are the starting circles, both centers sitting above the
 frame.
-
-### Solving the seepage again
-
-Typing the strengths in cleared the seepage solution, so solve it again before
-the stability runs read it. Switch the mode strip to **Seepage** (`Ctrl+2`) and
-click **Run → Run Seep…**. **Run type** already reads **Transient
-(time-dependent)**, because the file has a schedule; leave it and the other
-settings at their defaults and click **Run**. The run repeats the one behind the
-shipped solution, on the same mesh and schedule: it takes about 600 steps and
-about ten seconds, saves the same nineteen frames, and reopens the
-**Seep · Transient** tab. Step counts like this one can differ by a few between
-computers; the frames do not. Switch the mode strip back to **LEM** (`Ctrl+1`).
-
-If the **Seep · Transient** tab is still open (you opened the completed file and
-closed each editor with **Cancel**), its solution is still loaded, and you can go
-on to the next section.
 
 ### Stability at one time step
 
@@ -572,8 +555,8 @@ loaded. Studio opens this file with the mode strip on **FEM**; switch it to
 Nothing on this dam has to be built, so before running anything we go through
 what came with it. Five things in the file determine what the sweep can do. Close
 each editor you open here with **Cancel**, so that nothing touched by accident
-changes the model: an **OK** that changes anything clears the results Studio
-holds, the loaded seepage solution among them, and the sweep needs that solution.
+changes the model: an **OK** that changes an input of the seepage analysis clears
+the loaded seepage solution, and the sweep needs that solution.
 
 **The undrained envelope.** Click **Materials** and set the **Show parameters
 for:** toggles to **LEM** alone. Only the core has a $K_c = 1$ envelope —

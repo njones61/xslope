@@ -130,8 +130,9 @@ polygons, and an empty joints worksheet. Units are metric.
 The joints worksheet is reached from the Inputs tree under **Joints**. Each row
 is one line: a label, the two endpoints, and the strength of the contact. The wall
 has seven contacts: one under the base of the block column, one on its back face
-against the reinforced fill, and one between each pair of courses. Enter the seven
-rows below, or paste them straight into the worksheet.
+against the reinforced fill, and one between each pair of courses. Open
+**Joints**, press **Table view**, and enter the seven rows below, or paste them
+straight into the table.
 
 | Label | x1 | y1 | x2 | y2 | c | phi |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -681,8 +682,9 @@ sheet, or **along** it. In the second case the wrong choice gives a large error.
 Two versions of the embankment show the two cases, one at a time.
 The embankment is 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation,
 with one 32 m sheet under it. Each version is built twice with the `Joint` cell
-as the only difference, and each is run at the settings this page has used
-throughout.
+as the only difference. Mesh each file at **tri6, 1.2 m**, the size the files
+declare (the Build Mesh dialog keeps the 0.8 m of Parts 1 and 2 until it is
+changed), and run it at the settings this page has used throughout.
 
 ![The Part 3 embankment: 5 m high on 2:1 slopes with a 12 m crest, on a 4 m foundation, with one 32 m sheet under it](images/fem03_sheet_problem_sketch.png){width=1000}
 

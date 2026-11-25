@@ -411,7 +411,7 @@ with it. Each row below is read at that spacing's captured mechanism:
 | :---: | :---: | :---: | :---: | :---: |
 | 3 | 1.357 × 10<sup>8</sup> | 4,752 | 14,256 | 24% |
 | 6 | 6.786 × 10<sup>7</sup> | 4,752 | 28,512 | 48% |
-| 12 | 3.393 × 10<sup>7</sup> | 5,093 | 61,116 | 102% |
+| 12 | 3.393 × 10<sup>7</sup> | 5,000 | 60,000 | 100% |
 
 At 3 and 6 ft the moment *per unit width of slope* does not move at all, which
 is the quantity the smear holds constant, so the moment *per shaft* is that
@@ -474,7 +474,7 @@ two Bishop searches that follow are of
 The unpiled row agrees to 0.4%, so the other two rows can be compared. With
 the row in place the plane-strain model credits it ×1.389, where the
 three-dimensional model credits ×1.193. On the same slope a Bishop search reads
-1.143 with no pile and 1.451 with it, a credit of ×1.269. Both two-dimensional
+1.143 with no pile and 1.450 with it, a credit of ×1.269. Both two-dimensional
 routes sit above the three-dimensional answer — the limit equilibrium one by
 less — and neither recovers it. This benchmark establishes the direction of the
 plane-strain error, not which of the two routes to trust.

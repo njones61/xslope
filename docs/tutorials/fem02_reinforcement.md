@@ -301,13 +301,12 @@ of the soil it is buried in.
 Click **Materials** in the Inputs dock. On **Table view**, set
 the **Show parameters for:** toggles to **FEM** alone, and give both soils an
 elastic modulus of 1.0 × 10<sup>6</sup> psf and a Poisson's ratio of 0.3, in the
-columns headed `E (psf)` and `n` (the Poisson's ratio column is labeled with a
-plain `n`);
+columns headed `E (psf)` and `ν`;
 [FEM-1](fem01_strength_reduction.md#where-e-comes-from-and-what-it-changes)
 covers what each of the two is and where a nominal modulus comes from when no
 measured values are available.
 
-| E (psf) | n |
+| E (psf) | ν |
 | :---: | :---: |
 | 1000000 | 0.3 |
 
@@ -327,8 +326,8 @@ covers what the cap does to a strength reduction run and when a material takes a
 value above zero. Click **OK**.
 
 The reinforcement's two columns are next. Open **Reinforcement** in the Inputs
-dock, and set the **Show parameters for:** toggles to **FEM** alone, as on the
-materials table. The columns with blue headers, at the right end, are the ones
+dock, press **Table view**, and set the **Show parameters for:** toggles to
+**FEM** alone, as on the materials table. The columns with blue headers, at the right end, are the ones
 only the finite element engine reads.
 
 ![The reinforcement table on the starter: Tres, E and Area empty](images/fem02_studio_reinforce_blank.png)

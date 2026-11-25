@@ -256,17 +256,16 @@ the **Show parameters for:** toggles to **FEM** alone.
 
 Both elastic columns read **`0`**. Nothing was typed there — the cells are
 blank, and a blank numeric cell loads as zero, which is what the model checks
-reported. Enter the two values, in the columns headed `E (psf)` and `n`
-(the Poisson's ratio column is labeled with a plain `n`):
+reported. Enter the two values, in the columns headed `E (psf)` and `ν`:
 
-| E (psf) | n |
+| E (psf) | ν |
 | :---: | :---: |
 | 2088500 | 0.3 |
 
 ![The materials table with the FEM parameters filled in](images/fem01_studio_materials.png)
 
 The FEM toggle shows the unit weight and strength parameters the finite element
-run reads alongside `t_cut`, `E` and `n`. `γsat` and `t_cut` stay blank. Click
+run reads alongside `t_cut`, `E` and `ν`. `γsat` and `t_cut` stay blank. Click
 **OK** and save the model with **File → Save As…** under a name of your own.
 
 ### Where E comes from, and what it changes

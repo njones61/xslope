@@ -12804,6 +12804,9 @@ AUDIT_CHECK_MODULES = {
     # The Taylor series (LEM and FEM) reports the normal index and P_f beside the
     # lognormal ones, as Monte Carlo does, in its result, Log table and Studio summary.
     'taylor_normal': ('taylor_normal_check.py', 'lem'),
+    # Every tutorial page walked as written, Studio offscreen and the engine, in one
+    # process per page (591a): about two hours for the 31 pages, so the gate runs it.
+    'tutorial_walk': ('tutorial_walk_check.py', 'tutorials'),
 }
 
 
@@ -12840,14 +12843,21 @@ def run_audit_module_test(test):
     return 0.0, None
 
 
+#: Check modules too long for a routine run: held for the release gate (--gate), as a
+#: ``tier=gate`` tag holds a row (see _row_tier).
+GATE_AUDIT_MODULES = {'tutorial_walk'}
+
+
 def _audit_module_tests(group):
     """The AUDIT_CHECK_MODULES rows that ride with flag ``group`` and whose module
     file exists, as test dicts."""
     out = []
     for t, (filename, g) in AUDIT_CHECK_MODULES.items():
         if g == group and _audit_module_path(t).exists():
-            out.append({'type': t, 'file': f'test/{filename}', 'method': '-',
-                        'source': t})
+            row = {'type': t, 'file': f'test/{filename}', 'method': '-', 'source': t}
+            if t in GATE_AUDIT_MODULES:
+                row['tier'] = 'gate'
+            out.append(row)
     return out
 
 
@@ -20277,6 +20287,8 @@ def main():
     # the lock of the method it names, and reports the rest of the per-page
     # tally; see tools/verification_checks/tutorials.py.
     if run_tutorials:
+        # The standing tutorial walk (gate tier) and any other tutorials-group module.
+        tests.extend(_audit_module_tests('tutorials'))
         tests.append({'type': 'tutorial_restatements',
                       'file': 'docs/tutorials (restated factors of safety)',
                       'method': '-', 'source': 'tutorials'})

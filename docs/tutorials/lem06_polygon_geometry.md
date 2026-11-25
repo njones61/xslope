@@ -394,7 +394,7 @@ model otherwise as it was built: set the first circle's **Depth** back to
 ![Spencer on the same section with a weak foundation](images/lem06_solution_weak.png){width=1000}
 
 **FS = 0.784**, and the mechanism is a different one: the critical circle now
-bottoms out at elevation −10.85, grazing the bedrock, with 159,732 lb/ft of soil
+bottoms out at elevation −10.86, grazing the bedrock, with 159,732 lb/ft of soil
 above it and most of its base in the foundation. This is the mechanism the deep
 starting circle was placed for, and the search reached it from that seed.
 

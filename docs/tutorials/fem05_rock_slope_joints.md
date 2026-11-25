@@ -132,7 +132,8 @@ joint's x = 12 it stands
 above the base. That point is where the two lines meet: the release joint runs
 from it straight up to the ground surface at elevation 12.
 
-Enter the two rows below, or paste them straight into the worksheet.
+Open **Joints**, press **Table view**, and enter the two rows below, or paste
+them straight into the table.
 
 | Label | x1 | y1 | x2 | y2 | c | phi |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -325,9 +326,6 @@ ground surface to (9, 12) above the tip.
 | 14.0000 | 12.0000 |
 | 9.0000 | 12.0000 |
 
-Enter these to the four decimals shown, here and in the base plane row below;
-rounded to three decimals, the mesh build fails.
-
 The second input to build a joint network is the **Build network…** dialog,
 which defines *what* the set is. Open the joints editor from the Inputs tree under
 **Joints**, as in Part 1, and press the **Build network…** button beside its
@@ -382,8 +380,8 @@ stored, so a set is changed by deleting its rows and building another.
 
 The base of the stack is typed by hand, because it is one surface rather than a
 set: a **base plane** dipping 30° out of the face, from its upper tip down to
-the toe, cohesionless at φ = 35°. Enter the row below in the joints editor, or
-paste it in.
+the toe, cohesionless at φ = 35°. Enter the row below on the joints editor's
+**Table view**, or paste it in.
 
 | Label | x1 | y1 | x2 | y2 | c | phi |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |

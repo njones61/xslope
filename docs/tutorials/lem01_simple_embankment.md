@@ -291,9 +291,8 @@ on the material you just created, closed from below by the rigid base. Click
 1. Set **Max depth (bottom boundary elevation):** to `0`. This is an *elevation*,
    not a thickness: it places a horizontal rigid base at the toe of the slope.
 2. Set **Material:** to `1: soil`.
-3. The new line starts with one vertex row. **Add row** twice, for three rows, and
-   enter `0, 0` / `20, 20` / `60, 20` — the toe, the crest break at the top of the
-   1:1 face, and the back of the crest.
+3. **Add row** three times and enter `0, 0` / `20, 20` / `60, 20` — the toe, the
+   crest break at the top of the 1:1 face, and the back of the crest.
 
 ![The profile lines editor](images/lem01_studio_profile.png)
 

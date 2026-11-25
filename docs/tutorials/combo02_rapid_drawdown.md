@@ -620,7 +620,9 @@ face**, select its rows and click **Remove selected**. Click **OK**. Set 1 is
 untouched: it holds the reservoir boundary the schedule drives, and the transient run
 starts from its steady solution.
 
-Removing boundary blocks clears the mesh, so build it again before going on.
+Set 2's residual pool ended at (220, 110), partway up the upstream face, and the
+mesh was built with a node at that point. With that boundary gone the mesh no
+longer matches the model, so Studio clears it; build it again before going on.
 Switch the mode strip to **Seepage** (`Ctrl+2`), click **Run → Build Mesh…**, and
 build with the same settings as before: **Linear triangles (tri3)**, with
 **Auto-size from geometry** ticked at **100** size divisions. It comes out at
@@ -949,11 +951,11 @@ meshed — and not in preference to a solution that can be had.
 The procedure itself is the same in all three cases, and it is verified against
 published answers on four dams:
 [VP96](../verification/rocscience.md#vp96), the USACE EM 1110-2-1902 Appendix G
-example (1.434 against the manual's 1.44);
+example (1.435 against the manual's 1.44);
 [VP97](../verification/rocscience.md#vp97), Pilarcitos Dam, which failed in
 drawdown (1.044 against 1.05);
 [VP98](../verification/rocscience.md#vp98), the Walter Bouldin Dam failure
-(1.047 against 1.04); and
+(1.048 against 1.04); and
 [VP99](../verification/rocscience.md#vp99), the pumped-storage dam of Duncan,
 Wright and Wong's own paper (1.527 against 1.56). All four supply their two water
 states as piezometric pairs, which is how their sources published them.

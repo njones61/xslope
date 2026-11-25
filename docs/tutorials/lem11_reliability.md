@@ -206,7 +206,9 @@ each swing enters the variance, σ<sub>F</sub>² = Σ(ΔF/2)², which here gives
 **σ<sub>F</sub> = 0.391** and **COV<sub>F</sub> = 0.287**. From the factor of
 safety and its coefficient of variation comes the lognormal reliability index
 **β<sub>LN</sub> = 0.949**, a **reliability of 82.86%** and a **probability of
-failure of 17.14%**.
+failure of 17.14%**. The normal reliability index,
+β<sub>N</sub> = (F<sub>MLV</sub> − 1)/σ<sub>F</sub> = **0.920**, gives a
+probability of failure of **17.89%**; the run summary shows both.
 
 The plot's legend names F⁺ and F⁻ surfaces that cannot be found on it. This is
 not a drawing error: all five searches returned the same
@@ -368,7 +370,8 @@ We can test the **MC sampling** control with one click: set it to `Random` and
 **Run** again. The result is **P<sub>f</sub> = 16.43%**, with the mean and
 σ<sub>F</sub> nearly unchanged. That is the expected outcome: both runs
 estimate the same number, and both landed inside the ±0.7-point band that a
-count of 10,000 can resolve.
+count of 10,000 can resolve. The dialog opens on the settings of the last run, so
+set **MC sampling** back to `Latin hypercube` before going on.
 
 The default's structured sampling gives more consistent results. A random
 campaign lands somewhere different in that band every time the seed changes;
@@ -597,7 +600,7 @@ not, so the choice is about cost and about what is being asked.
 
 | Engine | Real solves here | What it returns | What it assumes |
 | --- | :---: | --- | --- |
-| Taylor series | 5 | β, lognormal P<sub>f</sub>, the per-parameter table | F changes in a straight line near the means |
+| Taylor series | 5 | β and P<sub>f</sub>, normal and lognormal, the per-parameter table | F changes in a straight line near the means |
 | Monte Carlo | 2,000–10,000 | the whole distribution; P<sub>f</sub> *counted* | only the input distributions |
 | Response surface | ~710 | MC-grade statistics with sampling error removed | F fits a curved formula — an assumption it checks |
 

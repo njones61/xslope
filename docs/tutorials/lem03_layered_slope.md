@@ -222,10 +222,9 @@ Click **Profile lines**, and set **Max depth (bottom boundary elevation):** to
 `-10` — an elevation, which puts the rigid base 10 ft below the toe.
 
 1. Press **Add line**, set **Material:** to `1: embankment`, and **Add row**
-   twice for `0, 0` / `40, 20` / `90, 20`. A new line starts with one vertex
-   row, so two more make the three.
+   three times for `0, 0` / `40, 20` / `90, 20`.
 2. Press **Add line** again, set **Material:** to `2: foundation`, and **Add
-   row** once for `-30, 0` and `90, 0`.
+   row** twice for `-30, 0` and `90, 0`.
 
 The second line is the contact: by the [top-of-a-layer rule](#the-problem),
 everything below it down to the maximum depth is foundation. With it selected,

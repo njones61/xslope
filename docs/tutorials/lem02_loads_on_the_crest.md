@@ -303,7 +303,16 @@ displacement.
 
 ### Finding the cohesion for a target factor of safety {#what-strength-would-carry-it}
 
-The model as it stands is not supportable: its factor of safety, 0.919, is
+This section uses the model with the distributed load, so put it back first:
+
+- **Studio** — **Edit → Undo** twice. The line load goes and the distributed
+  load returns.
+- **Excel** — delete the row on `lloads` and enter the two `dloads` points
+  again.
+- **Assistant** — say: *"Put the distributed load back and remove the line
+  load."*
+
+The model with the surcharge is not supportable: its factor of safety, 0.919, is
 below 1. The next question is what strength would raise the factor of safety
 to the value required, and a parametric sweep answers it.
 

@@ -613,8 +613,8 @@ This tutorial covered:
   tan φ/*F* at every trial, and the factor of safety as the largest *F* the
   slope still finds equilibrium at.
 - The two elastic properties a mesh needs, where a nominal E comes from, and the
-  measurement that E fixes the scale of every displacement while changing the
-  factor of safety not at all.
+  measurement that E fixes the scale of every displacement while moving the
+  factor of safety by at most one bisection step.
 - Quadratic elements as a requirement rather than a preference, a target element
   size chosen against what the mechanism needs, and the base and side conditions
   the mesh is held by.
@@ -624,8 +624,8 @@ This tutorial covered:
   bracket's stopping width, and the per-trial iteration budget, after which a
   trial that is still moving goes on only if its movement is dying away.
 - Reading the mechanism out of shear strain, a deformed mesh and displacement
-  vectors, and the converged state against the failed one on a single color
-  scale.
+  vectors, and the converged state against the failed one, each on its own
+  color scale.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Finite Element Analysis](../fem/overview.md) gives the formulation, the

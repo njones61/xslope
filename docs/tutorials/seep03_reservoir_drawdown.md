@@ -358,10 +358,13 @@ Iteration 5: residual = 3.232851e+00, closure = 5.411e+00, relax = 1.000, 0/30 e
 Iteration 15: exit face unchanged for 10 iterations — Newton steps from here
 Iteration 16: Newton step, residual = 6.761394e-01, step shortened to 0.5
 ...
-Iteration 22: Newton step, residual = 5.121811e-11
+Iteration 22: Newton step, residual = 5.121776e-11
 Iteration 22: Newton steps settled; the next iteration tests the exit face
-Converged in 23 iterations (residual = 4.441e-14, closure = 1.011e-11, exit face stable)
+Converged in 23 iterations (residual = 5.329e-14, closure = 1.025e-11, exit face stable)
 ```
+
+Residuals this small can differ in their last digits between computers; the
+iteration count and the flow do not.
 
 The last column is the number of active exit-face nodes, and on this dam it
 ends at **zero**. The iteration starts by holding 12 of the 30 nodes wet,

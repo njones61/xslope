@@ -361,7 +361,7 @@ Set `Tip` back to `pinned` on both rows before going on.
 
 ### What decides the finite element answer
 
-Three more runs on the same mesh, each changing one thing on both rows, show what
+Five more runs on the same mesh, each changing one thing on both rows, show what
 controls the answer:
 
 | Change | FS |

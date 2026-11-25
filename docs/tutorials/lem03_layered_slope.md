@@ -267,7 +267,10 @@ Continue below.
 
 However you built it, the geometry and materials are now the same. The Studio
 path has one more starting circle than the file, the toe circle, and the search
-gives the same answer from either set. The figure shows the file's two circles:
+gives the same factor of safety from either set. The circle it ends on differs
+by a fraction of a foot: from Studio's three circles the search stops at
+(18.3, 43.4) with a radius of 43.4, and the warnings below come out a little
+different. The figures and numbers below are from the file's two circles:
 
 ![The finished model](images/lem03_inputs.png){width=1000}
 

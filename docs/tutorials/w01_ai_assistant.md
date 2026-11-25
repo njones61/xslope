@@ -35,8 +35,8 @@ learn how to check each kind of answer it gives back.
     were recorded.
     Both change over time: models are updated or replaced, and providers change
     their prices.
-    The factors of safety quoted from a conversation are the ones it printed when
-    it was recorded. Each **Check its work** list gives what this release of
+    The factors of safety and surfaces quoted from a conversation are the ones it
+    printed when it was recorded. Each **Check its work** list gives what this release of
     XSLOPE returns for the same files, which can differ from them in the third
     decimal.
 

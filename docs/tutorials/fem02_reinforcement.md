@@ -616,7 +616,7 @@ rows. Once those two are filled, `Lp1` and `Lp2` are no longer read. Click
 **OK**, then **Run → Run FEM…** and **Run**.
 
 **FS = 1.527**, against 1.566 with the stated 4 ft lengths — 2.5% lower, five
-bisection cells. To see why, open **Results → 1D Details** and select line 2,
+bisection cells. To see why, press **1D Details…** on the results toolbar and select line 2,
 the second from the bottom, which is the line the new law changes most:
 
 ![Line 2 under the overburden law: a curved capacity envelope](images/fem02_bar_profile_law.png){width=1000}

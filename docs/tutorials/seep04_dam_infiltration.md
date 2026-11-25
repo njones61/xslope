@@ -385,8 +385,9 @@ set **Flux value (m/sec):**, and enter or copy-paste the block's two points.
 
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 
-The list now reads `Head 1  (h = 10)`, the three flux blocks with their rates,
-and `Exit face`. Flux 1 is selected in the shot — its rate in the value box
+The list now holds `Head 1  (h = 10)`, the three flux blocks and `Exit face`.
+A new block's label in the list shows its rate the next time the editor opens;
+the value box shows it now. Flux 1 is selected in the shot — its rate in the value box
 (displayed shortened), its two points below — and the preview draws the selected
 boundary bold over its stretch of the upstream face, dimming the others.
 
@@ -707,10 +708,10 @@ drives it:
 
 ![The boundary list with the flux values bound to series](images/seep04_studio_seep_bc_series.png)
 
-The list now reads `Flux 1  (q = storm_face)`, `Flux 2  (q = storm)` and
-`Flux 3  (q = storm_face)` where it read three rates, and the head boundary is still
-the number 10 — a model can mix constant and time-varying boundaries freely.
-Click **OK**, and save the model under a name of your own; the file linked at the
+Click **OK** and open **Seep BC** again: the list reads `Flux 1  (q = storm_face)`,
+`Flux 2  (q = storm)` and `Flux 3  (q = storm_face)` where it read three rates,
+and the head boundary is still the number 10 — a model can mix constant and
+time-varying boundaries freely. Click **OK**, and save the model under a name of your own; the file linked at the
 top of this section calls it `xslope_dam_infiltration_storm.xlsx`.
 
 ### Running the transient analysis

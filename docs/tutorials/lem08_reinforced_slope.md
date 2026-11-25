@@ -509,6 +509,9 @@ section returns 1.252. Then put the first row back to `0`, `40`, `Depth`, `0`.
 The gap between that and the searched 1.168 is the part of the loss that comes
 from the slope having a worse mechanism available, not from the missing tension.
 
+Put the six lines back before going on: reopen your saved file, or in Studio
+press **Edit → Undo** until the six lines are back.
+
 ### Effect of the reinforcement length {#how-long-the-lines-have-to-be}
 
 Next we re-cut all six layers to a different length and search again — the face

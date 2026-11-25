@@ -184,8 +184,8 @@ gets its pore pressure, and `seep` takes it from a solved seepage field;
 its four values. With a transient solution loaded, `seep` means one frame of it,
 chosen at the run rather than here.
 
-Click **OK**. An editor's **OK** clears the results Studio holds for the model,
-so the seepage solution the file loaded is gone from the session
+Click **OK**. An editor's **OK** that changes the model clears the results
+Studio holds for it, so the seepage solution the file loaded is gone from the session
 and the **Seep · Transient** tab has closed. We solve it again once the circles
 are checked.
 
@@ -571,9 +571,9 @@ loaded. Studio opens this file with the mode strip on **FEM**; switch it to
 
 Nothing on this dam has to be built, so before running anything we go through
 what came with it. Five things in the file determine what the sweep can do. Close
-each editor you open here with **Cancel**: clicking **OK** clears the results
-Studio holds for the model, the loaded seepage solution among them, even when
-nothing was changed, and the sweep needs that solution.
+each editor you open here with **Cancel**, so that nothing touched by accident
+changes the model: an **OK** that changes anything clears the results Studio
+holds, the loaded seepage solution among them, and the sweep needs that solution.
 
 **The undrained envelope.** Click **Materials** and set the **Show parameters
 for:** toggles to **LEM** alone. Only the core has a $K_c = 1$ envelope —

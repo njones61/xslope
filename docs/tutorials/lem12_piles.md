@@ -467,14 +467,15 @@ never engages the piles. It daylights (cuts back up to the ground surface)
 at (10.00, 10.00), the head of the upper shaft, runs back to the crest at
 x = 24.3, and is 6.5 ft deep at its deepest,
 moving 6,867 lb/ft. The depth from the ground surface to the failure surface at
-the pile is zero, so the Ito & Matsui integral over that depth is zero: the whole
-pile row contributes **0.04 lb/ft** to a surface that slides over the top of it.
+the pile is essentially zero, so the Ito & Matsui integral over that depth is too:
+the Log reports **0.0 lb/ft** from the pile rows on a surface that slides over
+the top of them.
 
 This check is important for any pile design. The piles resist the deep
 mechanism, which makes the next mechanism critical; here that mechanism runs
 above the pile heads and receives no force from them. It is not a numerical
 artifact — tick **Ignore surficial (skin) failures** in **Run LEM…**, which
-activates the **Min slip depth** box beside it, and 5 ft there leaves the answer
+activates the **Min slip depth** box below it, and 5 ft there leaves the answer
 unchanged, because 6.5 ft of clay is moving —
 and the same slope searched without piles at all returns 1.149 from the file's
 circle and 1.150 from the grid, so the shallow surface becomes critical only

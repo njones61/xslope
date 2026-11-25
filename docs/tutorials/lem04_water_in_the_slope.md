@@ -430,7 +430,7 @@ A held surface also cannot show that the water changes *which* mechanism is
 critical, not just how strong it is. Set the three `u` cells to `none` and run
 **Auto search** rather than the single surface, and the dry slope's own
 critical circle is a shorter, shallower one that never reaches as far into the
-foundation — 1.658, on a mass of 277,946 lb/ft. Isolating a variable and
+foundation — 1.658. Isolating a variable and
 finding the critical surface are two different runs, and they answer two
 different questions.
 

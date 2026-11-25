@@ -633,6 +633,7 @@ class MainWindow(QMainWindow):
         self._mode = "lem"
         self._runner = None
         self._seep_runner = None
+        self._seep_run_record = {}
         self._fem_runner = None
         self._sens_runner = None
         self._rel_runner = None
@@ -1860,7 +1861,8 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()   # streams to the Log pane; load still succeeds
                 continue
             bundle = {"seep_data": seep_data, "solution": solution,
-                      "options": {"bc": bc}}
+                      "options": {"bc": bc},
+                      "solved_from": self._seepage_record(bc)}
             self.doc.results.setdefault("seep_solutions", {})[bc] = bundle
             # load_slope_data has normally already read this same sidecar into
             # seep_u/seep_u2. Applying it again here costs nothing and closes the
@@ -1888,7 +1890,8 @@ class MainWindow(QMainWindow):
             return
         bundle = {"mode": "transient", "seep_data": seep_data,
                   "transient": loaded, "frames": loaded["frames"],
-                  "options": {"mode": "transient"}}
+                  "options": {"mode": "transient"},
+                  "solved_from": self._seepage_record("transient")}
         self.doc.results["transient_seep"] = bundle
         self._show_transient_seep(bundle, keep_index=False)
         print(f"Restored saved transient seepage solution "
@@ -2216,8 +2219,10 @@ class MainWindow(QMainWindow):
     #     the mesh with its capacity, which the FEM reads from there);
     #   * the refine, joint-network and SSR regions, whose Sizes size the mesh;
     #   * the points the mesher pins as polygon vertices so element edges meet
-    #     them: every distributed-load vertex (and, with automatic water loads, the
-    #     derived ones) and every seepage boundary-condition vertex;
+    #     them: the distributed-load vertices (and, with automatic water loads, the
+    #     derived ones) and the seepage boundary-condition vertices — read through
+    #     the zone polygons they are inserted into, so only a vertex that lands
+    #     part way along a zone edge counts (mesh_signature);
     #   * the point constraints it puts a node at: each line load's point of
     #     application (its position, not its magnitude or angle).
     MESH_KEYS = ("profile_lines", "polygons", "max_depth", "reinforcement_lines",
@@ -2233,8 +2238,12 @@ class MainWindow(QMainWindow):
         mesher reads of it, so a property edit — a Tmax, a pile's D, a load's
         magnitude, a head value — keeps the mesh. Two parts come from the mesher's
         own readers, so the signature follows them: the size regions
-        (``extract_size_regions``) and, in automatic water-load mode, the derived
-        water-load blocks whose vertices the mesher pins (``with_water_loads``)."""
+        (``extract_size_regions``) and the zone polygons as the mesher receives
+        them (``get_material_polygons``), which is where the distributed-load and
+        seepage-boundary vertices act — including, in automatic water-load mode,
+        the derived water-load blocks. A load or boundary edit therefore drops the
+        mesh only when it pins a point the zones did not already have, or unpins
+        one they did."""
         def clean(o):
             if hasattr(o, "wkt"):
                 return o.wkt
@@ -2314,16 +2323,42 @@ class MainWindow(QMainWindow):
                 pass
             return clean(rows)
 
-        def mesher_view():
+        def zones_as_meshed():
+            # The zone polygons exactly as the Build mesh runner hands them to the
+            # mesher (runners.MeshWorker.build: get_material_polygons with the
+            # constraint lines), after the distributed-load vertices (typed and, in
+            # automatic mode, derived) and the seepage boundary vertices have been
+            # inserted. That insertion is the ONLY way a load or boundary vertex
+            # reaches the mesh: a vertex that falls part way along a zone edge
+            # becomes a polygon vertex, so the mesh gets a node there; one that is
+            # already a vertex, or lies on no zone edge, changes nothing. Reading
+            # the result rather than the raw vertex lists keeps the mesh through a
+            # boundary block drawn over existing vertices (SEEP-4's rain blocks on
+            # the dam faces) and drops it for one that pins a new point.
+            from xslope.mesh import (extract_constraint_line_geometry,
+                                     get_material_polygons)
+            lines = extract_constraint_line_geometry(sd)[0]
+            return [[clean(p.get("coords")), clean(p.get("mat_id")),
+                     clean(p.get("size"))] if isinstance(p, dict) else clean(p)
+                    for p in get_material_polygons(sd, reinf_lines=lines)]
+
+        def mesher_view(zones):
             # What the mesher's own readers make of the model, where it is not a
-            # key read directly: the size regions it is handed, and the water
-            # loads it derives in automatic mode and pins vertices for.
+            # key read directly: the size regions it is handed, and the zone
+            # polygons with their pinned vertices. When the zones cannot be built
+            # (a model part way through being drawn), the vertex lists themselves
+            # stand in for them, and so do the water loads the mesher would derive
+            # in automatic mode -- every vertex counted, as before the zones were
+            # read.
             out = {}
             try:
                 from xslope.mesh import extract_size_regions
                 out["size_regions"] = clean(extract_size_regions(sd))
             except Exception as e:
                 out["size_regions"] = f"error: {type(e).__name__}"
+            if zones is not None:
+                out["zones"] = zones
+                return out
             try:
                 from xslope.water import DERIVED_KEYS, water_loads_mode, with_water_loads
                 if water_loads_mode(sd) == "auto":
@@ -2335,30 +2370,135 @@ class MainWindow(QMainWindow):
             return out
 
         try:
-            sig = {k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS}
-            sig["_mesher"] = mesher_view()
+            try:
+                zones = zones_as_meshed()
+            except Exception:
+                zones = None
+            pinned_only = ("dloads", "dloads2", "seepage_bc", "seepage_bc2")
+            sig = {k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS
+                   if zones is None or k not in pinned_only}
+            sig["_mesher"] = mesher_view(zones)
             return json.dumps(sig, sort_keys=True, default=str)
         except Exception:
             return None
 
+    # What a seepage solve reads of each material (xslope.seep.build_seep_data):
+    # the conductivities and their angle, and the unsaturated model with its
+    # parameters. A transient march also reads the storage. Nothing else on the
+    # Materials table reaches a seepage solution: unit weights, strengths, E and ν,
+    # u and the standard deviations are read only by the stability and finite
+    # element engines, and a name only labels the plots.
+    SEEP_MATERIAL_KEYS = ("k1", "k2", "alpha", "unsat", "kr0", "h0",
+                          "vg_a", "vg_n", "vg_l")
+    TSEEP_MATERIAL_KEYS = SEEP_MATERIAL_KEYS + ("Ss", "Sy")
+    # The transient controls that say where a stability run READS the march rather
+    # than what it solves. A run that needs an instant the solution did not save
+    # re-runs the march with that instant added (_start_remarch), which is also
+    # what happens when the Run dialog changes these (_store_transient_times).
+    TSEEP_READ_POINTS = ("stage_1", "stage_2", "stability_time")
+
+    @classmethod
+    def seepage_inputs(cls, sd, which):
+        """Everything besides the mesh that the seepage solve ``which`` reads from
+        the model: 1 or 2 for the steady solve of that boundary set, "transient"
+        for the march (which runs on set 1).
+
+        Read from the solver's own inputs (``build_seep_data``,
+        ``build_tseep_data``): each material's seepage parameters
+        (``SEEP_MATERIAL_KEYS``, with the storage for the march), the boundary set,
+        the unit weight of water (pore pressure is γw times pressure head) and the
+        declared units. A steady set reads the tseep sheet only through a boundary
+        bound to a series, at t = 0, so only such a series is part of it; the
+        march reads the whole sheet except the instants a stability run reads it
+        at (``TSEEP_READ_POINTS``). Returned as a copy, so a later edit of the
+        model cannot change a record taken from it."""
+        import copy
+        keys = cls.TSEEP_MATERIAL_KEYS if which == "transient" else cls.SEEP_MATERIAL_KEYS
+        mats = [{k: m.get(k) for k in keys} if isinstance(m, dict) else m
+                for m in (sd.get("materials") or [])]
+        tseep = sd.get("tseep")
+        if which == "transient":
+            bc = sd.get("seepage_bc")
+            ts = (None if tseep is None else
+                  {k: v for k, v in tseep.items() if k not in cls.TSEEP_READ_POINTS})
+        else:
+            bc = sd.get("seepage_bc" if which == 1 else "seepage_bc2")
+            bound = sorted({str(b.get(v)) for v, blocks in
+                            (("head", (bc or {}).get("specified_heads")),
+                             ("flux", (bc or {}).get("specified_fluxes")))
+                            for b in (blocks or [])
+                            if isinstance(b, dict) and isinstance(b.get(v), str)})
+            ts = None
+            if bound:
+                series = (tseep or {}).get("series") or {}
+                ts = {"times": (tseep or {}).get("times"),
+                      "series": {name: series.get(name) for name in bound}}
+        return copy.deepcopy({"materials": mats, "bc": bc, "tseep": ts,
+                              "gamma_water": sd.get("gamma_water"),
+                              "unit_system": sd.get("unit_system"),
+                              "time_unit": sd.get("time_unit")})
+
+    def _seepage_record(self, which, sd=None):
+        """What a seepage result is solved from, kept on its bundle so that a
+        later change to the model can be tested against it: the mesh object it
+        was solved on and ``seepage_inputs``."""
+        sd = self.doc.slope_data if sd is None else sd
+        return {"mesh": sd.get("mesh"), "inputs": self.seepage_inputs(sd, which)}
+
+    def _seepage_result_holds(self, bundle, which):
+        """True when ``bundle`` (a steady set's or the transient march's result) is
+        still the solution of the model as it stands: solved on the mesh the model
+        holds now, from the same seepage inputs. A bundle that carries no record
+        of its inputs (one an assistant run stored) never holds."""
+        from .document import _same_value
+        rec = bundle.get("solved_from") if isinstance(bundle, dict) else None
+        sd = self.doc.slope_data
+        if not rec or sd is None:
+            return False
+        mesh = sd.get("mesh")
+        if mesh is None or rec.get("mesh") is not mesh:
+            return False
+        try:
+            return _same_value(rec.get("inputs"), self.seepage_inputs(sd, which))
+        except Exception:
+            return False
+
     def invalidate_results(self, clear_mesh=False):
-        """Inputs changed (via an editor or the assistant), so any cached analysis
-        solution is stale — drop the solution result tabs and their cached results.
-        ``clear_mesh`` (set when the geometry changed) also drops the mesh, which
-        is then rebuilt explicitly. Leaves the user on a valid view (Inputs), which
-        is why an edit visibly refreshes."""
+        """Inputs changed (via an editor, the assistant, an undo or a new mesh), so
+        the cached analysis solutions are stale — drop the result tabs and their
+        cached results. ``clear_mesh`` (set when the geometry changed) also drops
+        the mesh, which is then rebuilt explicitly. Leaves the user on a valid view
+        (Inputs), which is why an edit visibly refreshes.
+
+        A seepage result (each steady boundary set's, and the transient march) is
+        kept when it still holds (``_seepage_result_holds``): the change left its
+        mesh and every input its solve reads alone — a strength, a circle, a load,
+        a seismic coefficient. Every other result is dropped: a stability or
+        finite element run reads nearly everything the editors edit."""
         if not self.doc.is_open:
             return
+        keep_bc, keep_transient = set(), False
+        if not clear_mesh:
+            keep_bc = {bc for bc, bundle in
+                       (self.doc.results.get("seep_solutions") or {}).items()
+                       if self._seepage_result_holds(bundle, bc)}
+            tbundle = self.doc.results.get("transient_seep")
+            keep_transient = bool(tbundle) and self._seepage_result_holds(
+                tbundle, "transient")
+        # The Monte Carlo / response-surface histogram goes too: it was missing
+        # here (opening a file cleared it, an edit did not), so a reliability
+        # result outlived the strengths and deviations it was sampled from.
         single = ["search_canvas", "solution_canvas", "reliability_canvas",
-                  "sens_canvas", "sens_curve_canvas", "design_canvas",
-                  "fs_time_canvas", "newmark_canvas",
+                  "reliability_hist_canvas", "sens_canvas", "sens_curve_canvas",
+                  "design_canvas", "fs_time_canvas", "newmark_canvas",
                   "fem_data_canvas", "fem_results_canvas"]
         if clear_mesh:
             single.append("mesh_canvas")
         canvases = [getattr(self, a) for a in single]
-        canvases += list(self.seep_data_canvas.values())
-        canvases += list(self.seep_solution_canvas.values())
-        if self.transient_seep_view is not None:
+        canvases += [c for bc, c in self.seep_data_canvas.items() if bc not in keep_bc]
+        canvases += [c for bc, c in self.seep_solution_canvas.items()
+                     if bc not in keep_bc]
+        if self.transient_seep_view is not None and not keep_transient:
             canvases.append(self.transient_seep_view)
         removed = False
         for canvas in canvases:
@@ -2378,13 +2518,26 @@ class MainWindow(QMainWindow):
         # menu update must not reach the deleted widgets.
         self.fem_details_btn = None
         self.fem_continue_btn = None
-        self.seep_data_canvas = {}
-        self.seep_solution_canvas = {}
-        self.transient_seep_view = None
-        for key in ("lem_solution", "seep_solutions", "transient_seep",
-                    "fem_solution", "design", "sensitivity", "fs_vs_time",
-                    "newmark"):
+        self.seep_data_canvas = {bc: c for bc, c in self.seep_data_canvas.items()
+                                 if bc in keep_bc}
+        self.seep_solution_canvas = {bc: c for bc, c in self.seep_solution_canvas.items()
+                                     if bc in keep_bc}
+        if not keep_transient:
+            self.transient_seep_view = None
+        for key in ("lem_solution", "fem_solution", "design", "sensitivity",
+                    "fs_vs_time", "newmark", "reliability"):
             self.doc.results.pop(key, None)
+        self._clear_dropped_seep_fields(keep_bc, keep_transient)
+        steady = {bc: b for bc, b in (self.doc.results.get("seep_solutions") or {}).items()
+                  if bc in keep_bc}
+        if steady:
+            self.doc.results["seep_solutions"] = steady
+        else:
+            self.doc.results.pop("seep_solutions", None)
+        if not keep_transient:
+            self.doc.results.pop("transient_seep", None)
+        if keep_bc or keep_transient:
+            self._relabel_kept_seepage(keep_bc, keep_transient)
         if clear_mesh:
             self.doc.slope_data["mesh"] = None
             self.doc.results.pop("mesh", None)
@@ -2392,7 +2545,103 @@ class MainWindow(QMainWindow):
         if removed:
             self._show_display_for_tab(self.view_tabs.currentWidget())
             what = "results and mesh" if clear_mesh else "result(s)"
-            self.statusBar().showMessage(f"Inputs changed — cleared the now-stale {what}.")
+            kept = (" The seepage solution is kept: nothing it is solved from "
+                    "changed." if (keep_bc or keep_transient) else "")
+            self.statusBar().showMessage(
+                f"Inputs changed — cleared the now-stale {what}.{kept}")
+
+    def _clear_dropped_seep_fields(self, keep_bc, keep_transient):
+        """Take out of the model the pore-pressure field a dropped seepage solution
+        put there, so a stability run, the model checks and Save no longer read or
+        write it.
+
+        A solved field belongs to the model (``seep_u`` for boundary set 1,
+        ``seep_u2`` for set 2): a steady solve writes its own ``u`` there
+        (``apply_steady_stability_field``), and a run on a transient solution
+        writes the frame or the two stage frames it reads, with the instants they
+        belong to (``seep_u_time``, ``seep_u2_time``). The model carries no mark
+        of where a field came from, so the field is matched by value against the
+        dropped solution: the steady set's ``u``, or any saved frame of the march.
+        Equal values mean that solution put them there (a copy restored by undo
+        still matches). A field nothing here matches — one imported from SEEP/W,
+        or a saved ``_seep.csv`` the loader read with no solution restored beside
+        it — has no Studio solve behind it, so there is nothing to test it
+        against, and it stays.
+
+        A cleared field reads as the loader leaves a ``u = seep`` model with no
+        companion file (``seep_u`` None, no ``seep_u2``); Save then deletes the
+        companion instead of rewriting it (``_sync_sidecars``), and the model
+        checks ask for a seepage solution again (seep_field.missing). A steady
+        solution that stays puts its own field back where the dropped transient
+        frame had replaced it, as its solve did."""
+        import numpy as np
+        sd = self.doc.slope_data
+        res = self.doc.results
+
+        def same(field, u):
+            try:
+                a = np.asarray(field, dtype=float)
+                b = np.asarray(u, dtype=float)
+                return a.size > 0 and a.shape == b.shape and bool(np.array_equal(a, b))
+            except Exception:
+                return False
+
+        cleared = set()
+
+        def clear(key):
+            if key == "seep_u":
+                sd["seep_u"] = None
+            else:
+                sd.pop(key, None)
+            sd.pop(f"{key}_time", None)
+            cleared.add(key)
+
+        for bc, bundle in (res.get("seep_solutions") or {}).items():
+            if bc in keep_bc:
+                continue
+            key = "seep_u" if bc == 1 else "seep_u2"
+            try:
+                u = bundle["solution"]["u"]
+            except Exception:
+                continue
+            if sd.get(key) is not None and same(sd[key], u):
+                clear(key)
+        tbundle = res.get("transient_seep")
+        if tbundle and not keep_transient:
+            try:
+                frames = [fr["u"] for fr in tbundle["transient"]["frames"]]
+            except Exception:
+                frames = []
+            for key in ("seep_u", "seep_u2"):
+                field = sd.get(key)
+                if field is not None and any(same(field, u) for u in frames):
+                    clear(key)
+        for bc in keep_bc:
+            key = "seep_u" if bc == 1 else "seep_u2"
+            if key in cleared:
+                self._apply_seep_field(res["seep_solutions"][bc], bc)
+        return cleared
+
+    def _relabel_kept_seepage(self, keep_bc, keep_transient):
+        """A kept seepage result labels its zones with the material names it was
+        solved under; a rename (which a solve does not read) is carried into it
+        and its views redrawn, so the plots name the materials the model does."""
+        names = [m.get("name", f"Material {i + 1}") if isinstance(m, dict)
+                 else f"Material {i + 1}"
+                 for i, m in enumerate(self.doc.slope_data.get("materials") or [])]
+        bundles = [(bc, self.doc.results["seep_solutions"][bc]) for bc in keep_bc]
+        if keep_transient:
+            bundles.append(("transient", self.doc.results["transient_seep"]))
+        for which, bundle in bundles:
+            seep_data = bundle.get("seep_data") if isinstance(bundle, dict) else None
+            if not isinstance(seep_data, dict) or seep_data.get("material_names") == names:
+                continue
+            seep_data["material_names"] = list(names)
+            if which == "transient":
+                self._rerender_transient_seep()
+            else:
+                self._rerender_seep_data(which)
+                self._rerender_seep_solution(which)
 
     def _file_defaults(self, which):
         """Dialog defaults for ``which`` ("lem" | "mesh" | "fem"), seeded from the
@@ -2579,6 +2828,10 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 100 if transient else 0)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
+        # What this run solves from, taken as it starts: kept on each result it
+        # returns, so a later edit can be tested against it (invalidate_results).
+        self._seep_run_record = {w: self._seepage_record(w)
+                                 for w in (1, 2, "transient")}
         self._seep_runner = SeepRunner(self.doc.slope_data, opts, parent=self)
         self._seep_runner.succeeded.connect(self._on_seep_succeeded)
         self._seep_runner.failed.connect(self._on_seep_failed)
@@ -2598,6 +2851,7 @@ class MainWindow(QMainWindow):
         bc = bundle["options"].get("bc", 1)
         # Keep one solution per BC set so BC 1 and BC 2 (rapid drawdown) coexist
         # in separate tabs and can be compared side by side.
+        bundle["solved_from"] = self._seep_run_record.get(bc)
         self.doc.results.setdefault("seep_solutions", {})[bc] = bundle
         # A solved field belongs to the MODEL, not only to a results tab: a stability
         # run with u = seep reads slope_data['seep_u'], and so does the gate that
@@ -2720,6 +2974,10 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
+        # What this run solves from, taken as it starts: kept on each result it
+        # returns, so a later edit can be tested against it (invalidate_results).
+        self._seep_run_record = {w: self._seepage_record(w)
+                                 for w in (1, 2, "transient")}
         self._seep_runner = SeepRunner(self.doc.slope_data, opts, parent=self)
         self._seep_runner.succeeded.connect(self._on_seep_succeeded)
         self._seep_runner.failed.connect(self._on_seep_failed)
@@ -2788,6 +3046,7 @@ class MainWindow(QMainWindow):
 
     # --- transient seepage (frames + play bar) ---------------------------
     def _on_transient_seep_succeeded(self, bundle):
+        bundle["solved_from"] = self._seep_run_record.get("transient")
         self.doc.results["transient_seep"] = bundle
         # Persist the frame bundle next to the .xlsx ({stem}_tseep.csv + meta).
         if self.doc.path:

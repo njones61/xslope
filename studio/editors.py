@@ -5019,7 +5019,7 @@ class MaterialsEditor(CategoryEditor):
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
         Field("E", "E", usage="fem", unit="stress"),
-        Field("nu", "n", usage="fem"),
+        Field("nu", "ν", usage="fem"),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
         Field("ru", "ru", applies=LF),
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — the red
@@ -6705,6 +6705,7 @@ class _SeepBcSetWidget(QWidget):
                 "number. Time-varying (tseep series) values and reservoir boundaries "
                 "belong on Set 1.")
         hrow.addWidget(self.head_edit, 1)
+        self.head_edit.textChanged.connect(self._relabel_current)
         right.addLayout(hrow)
         frow = QHBoxLayout()
         self.flux_label = QLabel(flux_text)
@@ -6716,6 +6717,7 @@ class _SeepBcSetWidget(QWidget):
                 "Set 2 is the constant, steady rapid-drawdown boundary set — enter a "
                 "number. Time-varying (tseep series) values belong on Set 1.")
         frow.addWidget(self.flux_edit, 1)
+        self.flux_edit.textChanged.connect(self._relabel_current)
         right.addLayout(frow)
         self._holder = QVBoxLayout()
         right.addLayout(self._holder, 1)
@@ -6769,15 +6771,57 @@ class _SeepBcSetWidget(QWidget):
     def _is_exit(self, idx):
         return idx == len(self._heads) + len(self._fluxes)
 
+    @staticmethod
+    def _head_label(i, value):
+        return f"Head {i + 1}  (h = {_bc_value_label(value)})"
+
+    @staticmethod
+    def _flux_label(j, value):
+        return f"Flux {j + 1}  (q = {_bc_value_label(value)})"
+
     def _refresh(self):
         self.list.blockSignals(True)
         self.list.clear()
         for i, h in enumerate(self._heads):
-            self.list.addItem(f"Head {i + 1}  (h = {_bc_value_label(h['head'])})")
+            self.list.addItem(self._head_label(i, h["head"]))
         for i, f in enumerate(self._fluxes):
-            self.list.addItem(f"Flux {i + 1}  (q = {_bc_value_label(f['flux'])})")
+            self.list.addItem(self._flux_label(i, f["flux"]))
         self.list.addItem("Exit face")
         self.list.blockSignals(False)
+
+    def _value_for_text(self, text, stored):
+        """The value a head or flux field's text stands for, exactly as OK stores
+        it: blank is blank (never 0), a number left as it was displayed keeps the
+        stored value, a typed number is that number, and any other text is a tseep
+        series name (time-varying BC) -- allowed on set 1 only; set 2 is constant,
+        so it is coerced to 0."""
+        txt = (text or "").strip()
+        if not txt:
+            return _bc_blank(stored)
+        if _unedited(txt, stored):             # untouched keeps the stored value
+            return stored
+        try:
+            return float(txt)
+        except ValueError:
+            return 0.0 if self._constant_only else txt
+
+    def _relabel_current(self, *_):
+        """Keep the selected boundary's list row naming the value in its field as
+        it is typed, as the row reads once the editor is reopened; the list used to
+        catch up only when a row was added or removed."""
+        idx = self._cur
+        item = self.list.item(idx) if idx >= 0 else None
+        if item is None:
+            return
+        if self._is_head(idx):
+            stored = self._heads[idx].get("head")
+            item.setText(self._head_label(
+                idx, self._value_for_text(self.head_edit.text(), stored)))
+        elif self._is_flux(idx):
+            j = self._flux_idx(idx)
+            stored = self._fluxes[j].get("flux")
+            item.setText(self._flux_label(
+                j, self._value_for_text(self.flux_edit.text(), stored)))
 
     def _commit(self):
         if self._cur < 0:
@@ -6787,29 +6831,11 @@ class _SeepBcSetWidget(QWidget):
             self._exit = coords
         elif self._is_flux(self._cur):
             f = self._fluxes[self._flux_idx(self._cur)]
-            txt = self.flux_edit.text().strip()
-            try:
-                if not txt:
-                    f["flux"] = _bc_blank(f.get("flux"))
-                elif not _unedited(txt, f.get("flux")):  # untouched keeps the stored value
-                    f["flux"] = float(txt)
-            except ValueError:
-                # a non-numeric flux value is a tseep series name (time-varying BC) —
-                # allowed on set 1 only; set 2 is constant, so coerce it to 0.
-                f["flux"] = 0.0 if self._constant_only else txt
+            f["flux"] = self._value_for_text(self.flux_edit.text(), f.get("flux"))
             f["coords"] = coords
         elif self._is_head(self._cur):
-            txt = self.head_edit.text().strip()
-            try:
-                if not txt:
-                    self._heads[self._cur]["head"] = _bc_blank(
-                        self._heads[self._cur].get("head"))
-                elif not _unedited(txt, self._heads[self._cur].get("head")):
-                    self._heads[self._cur]["head"] = float(txt)
-            except ValueError:
-                # a non-numeric head value is a tseep series name (time-varying BC) —
-                # allowed on set 1 only; set 2 is constant, so coerce it to 0.
-                self._heads[self._cur]["head"] = 0.0 if self._constant_only else txt
+            h = self._heads[self._cur]
+            h["head"] = self._value_for_text(self.head_edit.text(), h.get("head"))
             # Set 2 is plain-head only; its Type selector is hidden, so force "head".
             self._heads[self._cur]["kind"] = (
                 "head" if self._constant_only else self.type_combo.currentText())
@@ -7447,10 +7473,22 @@ def _resync_geometry(slope_data):
 
     profile_lines = slope_data.get("profile_lines") or []
     if profile_lines:
+        # As the loader builds them: no zones until the model has a bottom
+        # elevation and a line with two points to bound one (a model part way
+        # through being drawn opens, and saves, without them; the model checks say
+        # what is missing before a run).
+        md = slope_data.get("max_depth")
+        has_bottom = isinstance(md, (int, float)) and not isinstance(md, bool) and md == md
+        if not (has_bottom and any(len(p.get("coords") or []) >= 2
+                                   for p in profile_lines)):
+            from shapely.geometry import LineString
+            _set_derived_geometry(slope_data, [])
+            slope_data["ground_surface"] = LineString([])   # the loader's empty ground
+            return
         polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"],
                   "size": p.get("size")}
                  for p in build_polygons(slope_data={"profile_lines": profile_lines,
-                                                      "max_depth": slope_data.get("max_depth")})]
+                                                      "max_depth": md})]
         _set_derived_geometry(slope_data, polys)
         return
     raw = slope_data.get("polygons") or []
@@ -7470,15 +7508,20 @@ class MatGeometryDialog(QDialog):
     def __init__(self, title, help_text, item_label, items, materials, parent=None,
                  select=None, max_depth=None, preview_draw=None, preview_caption=None,
                  slope_data=None, style=None, pick_resolve=None, field_help=None,
-                 poly_types=False):
+                 poly_types=False, max_depth_field=False, left_to_right=False):
         # items: list of {"mat_id": int|None, "coords": [(x, y), ...],
         #                 "kind": str, "size": float|None}
         # poly_types: show the v21 Type combo (polygon sheet only — a profile line is
         #   always a material boundary, so the profile sheet has no Type cell).
         # select: row to pre-highlight (e.g. the double-clicked line); else first.
-        # max_depth: when not None, show a "Max depth" field (profile sheet only —
-        #   it has no meaning for polygon input); the bottom boundary elevation
-        #   used when building zone polygons from the profile lines.
+        # max_depth_field: show a "Max depth" field (profile sheet only — it has no
+        #   meaning for polygon input), holding ``max_depth``: the bottom boundary
+        #   elevation used when building zone polygons from the profile lines. A
+        #   model with no bottom yet (None) shows it blank and keeps it blank.
+        #   (A max_depth given without the flag shows the field too, as it did
+        #   before the flag existed.)
+        # left_to_right: refuse OK on an item whose x values turn back (profile
+        #   lines; a polygon ring runs either way round).
         # preview_draw: draw(ax, lines, selected_index, max_depth) — a per-editor
         #   hook that renders the full section with the selected item highlighted.
         #   When given, a live preview pane is added on the right behind a splitter.
@@ -7517,15 +7560,16 @@ class MatGeometryDialog(QDialog):
         # a material index it isn't.
         self._mat_ids = list(range(len(self._materials)))
         self._poly_types = bool(poly_types)
+        self._left_to_right = bool(left_to_right)
 
         main = QVBoxLayout(self)
         main.addWidget(_help_label(help_text))
 
         self._max_depth_edit = None
-        if max_depth is not None:
+        self._max_depth = max_depth
+        if max_depth_field or max_depth is not None:
             mdrow = QHBoxLayout()
             mdrow.addWidget(QLabel("Max depth (bottom boundary elevation):"))
-            self._max_depth = max_depth
             self._max_depth_edit = QLineEdit(_display_number(max_depth))
             self._max_depth_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self._max_depth_edit.setToolTip(
@@ -7880,12 +7924,14 @@ class MatGeometryDialog(QDialog):
     def _add_line(self):
         self._commit_current()
         # As the workbook's profile and polygon sheets are laid out: item N starts on
-        # material N (the last material once N runs past them), and with one vertex
-        # row ready to type into.
+        # material N (the last material once N runs past them). Its vertex table
+        # starts empty, as every other point table does: Add row makes exactly the
+        # rows asked for, and a pasted block grows the table to its own length. A
+        # starting (0, 0) row was a vertex nobody typed, and one row too many left
+        # it at the end of the line, where it turned the line back to the origin.
         n = len(self._lines)
         mat_id = min(n, len(self._materials) - 1) if self._materials else 0
-        pt = _new_pt()
-        self._lines.append({"mat_id": mat_id, "coords": [(pt["x"], pt["y"])],
+        self._lines.append({"mat_id": mat_id, "coords": [],
                             "kind": "material", "size": None, "label": None,
                             "stray_mat_id": None})
         self._refresh_list()
@@ -7927,25 +7973,76 @@ class MatGeometryDialog(QDialog):
         return out
 
     def result_max_depth(self):
-        """The edited max-depth value (float), or None if the field isn't shown."""
+        """The edited max-depth value: the stored value while the field still shows
+        it untouched (a blank stays exactly the blank it was), a float for a typed
+        number, and None for a field left blank or one that isn't shown. A blank
+        is how a model with no bottom elevation yet reads and saves (profile sheet
+        B2 empty); writing 0 for it was an elevation nobody entered."""
         if self._max_depth_edit is None:
             return None
         text = self._max_depth_edit.text()
         if _unedited(text, self._max_depth):     # untouched: keep the stored value
             return self._max_depth
+        if not text.strip() and _is_blank_value(self._max_depth):
+            return self._max_depth               # blank, and blank it stays
         try:
             return float(text)
         except (TypeError, ValueError):
             return None
 
+    def _max_depth_text_ok(self):
+        """True when the Max depth field is absent, blank, or a number."""
+        if self._max_depth_edit is None:
+            return True
+        text = self._max_depth_edit.text().strip()
+        if not text or _unedited(self._max_depth_edit.text(), self._max_depth):
+            return True
+        try:
+            float(text)
+            return True
+        except ValueError:
+            return False
+
     def accept(self):
         """Validate the two Size rules before closing: a Size must be a positive
         number, and a 'refine' polygon must have one. Both are load-time errors in
         the engine — catching them here means the user fixes the item they are
-        already looking at instead of meeting a traceback on the next Open."""
+        already looking at instead of meeting a traceback on the next Open.
+
+        On the profile sheet (``left_to_right``) a line whose x values turn back is
+        refused too, naming the line and the point: the zones are built from the
+        lines left to right, so a stray last row back at (0, 0) silently builds a
+        different section (the model checks' geometry.profile_line_turns_back,
+        through the same test)."""
         from PySide6.QtWidgets import QMessageBox
         self._commit_current()
         title = self.windowTitle()
+        if not self._max_depth_text_ok():
+            QMessageBox.warning(
+                self, title,
+                "Max depth must be a number (the elevation of the model's bottom "
+                "boundary), or blank while the model has no bottom yet.")
+            self._max_depth_edit.setFocus()
+            return
+        if self._left_to_right:
+            from xslope.preflight import profile_line_turn_back
+            for i, ln in enumerate(self._lines):
+                k = profile_line_turn_back(ln.get("coords") or [])
+                if k is None:
+                    continue
+                (x0, y0), (x1, y1) = ln["coords"][k - 1], ln["coords"][k]
+                self.list.setCurrentRow(i)
+                if self.table is not None:
+                    self.table.select_row(k)
+                QMessageBox.warning(
+                    self, title,
+                    f"{self._item_label} {i + 1} turns back: point {k + 1} "
+                    f"({_display_number(x1)}, {_display_number(y1)}) lies to the "
+                    f"left of point {k} ({_display_number(x0)}, "
+                    f"{_display_number(y0)}). A profile line is drawn left to "
+                    f"right, each point at or to the right of the one before. "
+                    f"Delete the point or put the points in order.")
+                return
         for i, ln in enumerate(self._lines):
             name = f"{self._item_label} {i + 1}"
             if i == self._cur:
@@ -7996,7 +8093,8 @@ class ProfileEditor(CategoryEditor):
             "Line",
             slope_data.get("profile_lines") or [],
             slope_data.get("materials") or [], parent,
-            select=select, max_depth=slope_data.get("max_depth") or 0.0,
+            select=select, max_depth=slope_data.get("max_depth"),
+            max_depth_field=True, left_to_right=True,
             preview_draw=preview,
             preview_caption="Preview shows the pending profile lines over the current "
                             "model (selected line highlighted). Material zones aren't "
@@ -8008,9 +8106,10 @@ class ProfileEditor(CategoryEditor):
 
     def apply(self, slope_data, dlg):
         slope_data["profile_lines"] = dlg.result_lines()
-        md = dlg.result_max_depth()
-        if md is not None:
-            slope_data["max_depth"] = md
+        # The field is always shown here, so what it holds is the model's bottom:
+        # a number, or blank (None) while the model has none, as the loader reads
+        # an empty profile!B2.
+        slope_data["max_depth"] = dlg.result_max_depth()
         _resync_geometry(slope_data)  # rebuild polygons / ground surface / t-crack
 
 

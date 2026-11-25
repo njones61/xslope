@@ -18,7 +18,8 @@ Materials just to read it took a loaded transient seepage solution with it, and 
 Save afterwards deleted that solution's files beside the workbook. Each editor is
 opened and accepted unchanged on the transient earth dam: the results stay, no undo
 step is added, the file stays clean, and a redo branch survives. A real edit still
-drops the results.
+drops the stability result (which a seepage solution, kept on edits that cannot
+change it, is not: test/seepage_survives_edits_check.py).
 
 Every window here is built against a scratch settings store
 (``tools.studio_settings``): opening a file appends it to Studio's recent-files list,
@@ -117,15 +118,14 @@ NOOP_MODEL = os.path.join(_REPO, "docs/tutorials/files/xslope_earth_dam_fs_time.
 
 #: RS2-51's geotextile wall: jointed reinforcement lines with a pullout profile the
 #: loader derives (an object with no equality of its own) and a joint word the
-#: Reinforcement editor writes in its own case. Profile lines is left out on it:
-#: the model has no bottom elevation and that editor writes 0 for a blank one, a
-#: real change (queued after 1.1.0).
+#: Reinforcement editor writes in its own case. It has no bottom elevation, which
+#: the Profile lines editor used to write back as 0, a real change on every OK.
 NOOP_WALL = os.path.join(_REPO, "docs/verification/files/rocscience/vp090_fem.xlsx")
 
 
 def _noop_ok(mw):
     """OK on every editor with nothing changed keeps every result and the history;
-    a real edit still drops them."""
+    a real edit still drops the stability result."""
     import shutil
     import tempfile
     from PySide6.QtWidgets import QDialog
@@ -143,7 +143,7 @@ def _noop_ok(mw):
     QDialog.exec = lambda self: 1          # every editor accepted as opened
     try:
         runs = [(model, cat) for cat in CATEGORY_EDITORS]
-        runs += [(wall, cat) for cat in CATEGORY_EDITORS if cat != "profile"]
+        runs += [(wall, cat) for cat in CATEGORY_EDITORS]
         for path, cat in runs:
             mw.doc._dirty = False
             with contextlib.redirect_stdout(io.StringIO()):
@@ -159,7 +159,8 @@ def _noop_ok(mw):
             if len(mw.doc._undo) != n_undo or mw.doc.dirty:
                 fails.append(f"OK on the unchanged {cat} editor added an undo step "
                              f"or marked the file changed ({os.path.basename(path)})")
-        # A redo branch survives an unchanged OK; a real edit still drops results.
+        # A redo branch survives an unchanged OK; a real edit still drops the
+        # stability result, which reads every material property.
         mw.doc._dirty = False
         with contextlib.redirect_stdout(io.StringIO()):
             mw.open_path(model)
@@ -175,7 +176,7 @@ def _noop_ok(mw):
         if not mw.doc._redo:
             fails.append("OK on the unchanged materials editor lost the redo branch")
         keep = object()
-        mw.doc.results["transient_seep"] = keep
+        mw.doc.results["lem_solution"] = keep
         editor = CATEGORY_EDITORS["materials"]
         real_apply = editor.apply
 
@@ -188,8 +189,8 @@ def _noop_ok(mw):
                 mw.edit_category("materials")
         finally:
             editor.apply = real_apply
-        if mw.doc.results.get("transient_seep") is keep:
-            fails.append("a real Materials edit kept a result it should have dropped")
+        if mw.doc.results.get("lem_solution") is keep:
+            fails.append("a real Materials edit kept the stability result")
     finally:
         QDialog.exec = real_exec
         mw.doc._dirty = False

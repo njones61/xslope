@@ -721,6 +721,35 @@ def _monotonic_x(pts):
     return "mixed"
 
 
+def profile_line_turn_back(coords):
+    """The index of the first point of a profile line that lies to the LEFT of the
+    point before it, or ``None`` when the x values never decrease.
+
+    A profile line is the top of a layer drawn left to right: each point at or to
+    the right of the one before (equal x is a vertical step, as at a wall or a
+    sheetpile). The zones are built from the lines by interpolating each one in x
+    between its first and last points, so a line that turns back is not the layer
+    drawn. Measured on LEM-3's section: a stray (0, 0) left at the end of the
+    foundation line builds a self-crossing foundation zone and the search returns
+    FS 1.007 against the section's 1.245; on LEM-1 the same stray point turns the
+    embankment into a triangle and no trial surface solves. Unlike a piezometric
+    line, a profile line gets no allowance for a small backtrack: the zones cannot
+    use one, and none of the 916 profile lines in the shipped and corpus models
+    has one. The tolerance is only floating-point noise on the line's own span.
+
+    Shared by the model check (``geometry.profile_line_turns_back``) and the
+    Profile lines editor, so the editor refuses exactly what the run would."""
+    pts = _coords(coords)
+    if len(pts) < 2:
+        return None
+    xs = [p[0] for p in pts]
+    tol = 1e-9 * max(1.0, max(xs) - min(xs))
+    for i in range(1, len(xs)):
+        if xs[i] < xs[i - 1] - tol:
+            return i
+    return None
+
+
 def _fmt(v):
     """Format a number the way the messages do -- short, and never ``1.0000000001``."""
     f = _num(v)
@@ -1938,6 +1967,28 @@ def _profile_line_short(ctx):
                f"{'' if len(pts) == 1 else 's'}, so it bounds no zone and the "
                f"section is built without it. Add at least one more point, or "
                f"delete the line {_AT_PROFILE}.")
+
+
+@rule("geometry.profile_line_turns_back", ERROR, ("*",),
+      "A profile line runs left to right; one whose x values turn back builds "
+      "zones that are not the layers drawn.")
+def _profile_line_turns_back(ctx):
+    # Measured (profile_line_turn_back): a stray last point back at the left edge
+    # gives LEM-3's section FS 1.007 instead of 1.245 with no other finding, and
+    # leaves LEM-1's embankment with no trial surface that solves.
+    for k, line in enumerate(ctx.sd.get("profile_lines") or []):
+        pts = _coords(line.get("coords") if isinstance(line, dict) else line)
+        i = profile_line_turn_back(pts)
+        if i is None:
+            continue
+        (x0, y0), (x1, y1) = pts[i - 1], pts[i]
+        yield (f"Profile line {k + 1} turns back: point {i + 1} ({_fmt(x1)}, "
+               f"{_fmt(y1)}) lies to the left of point {i} ({_fmt(x0)}, {_fmt(y0)}). "
+               f"A profile line is the top of a layer drawn left to right, each "
+               f"point at or to the right of the one before, so the zones built "
+               f"from this one are not the layers drawn. A stray row left at the "
+               f"end of the table, often (0, 0), is the usual cause. Delete the "
+               f"point or put the points in order {_AT_PROFILE}.")
 
 
 @rule("geometry.zones_overlap", ERROR, ("*",),

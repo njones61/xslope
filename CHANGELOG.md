@@ -6,6 +6,8 @@ release are on the [releases page](https://github.com/njones61/xslope/releases).
 
 ## Unreleased
 
+## 1.1.0 — 2026-11-24
+
 ### New
 
 - Seismic analysis, following Duncan, Wright, and Brandon (2014), Chapter 10. A

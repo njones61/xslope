@@ -99,8 +99,9 @@ psf, pcf, ft/day.
 The cells below the seismic coefficients record **how this model is meant to be
 analyzed**, so the analysis travels with the file instead of living only in a dialog.
 Every one of them is optional, and **blank always means unspecified** — the solver or
-the Studio dialog uses its own default. A choice you make in a Studio dialog always takes
-precedence over the value in the file.
+the Studio dialog uses its own default. A choice you make in a Studio dialog takes
+precedence over the value in the file while that file stays open; opening a file starts
+the dialogs again from the values it declares.
 
 - **LEM method** (`oms`, `janbu`, `bishop`, `corps`, `lowe`, `spencer`, `mprice`, or `all`) — **[–]**: the limit-equilibrium method this model is built for. `all` means "run every method" and is used by the batch drivers; the Studio run dialog, which solves one method at a time, leaves its own default in place for it. An unrecognized value is an error at load time, never a silent fallback to some other method.
 - **Number of slices** — **[–]**: the slice count for limit-equilibrium runs. Minimum 2; blank uses the solver default.

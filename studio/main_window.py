@@ -1755,6 +1755,12 @@ class MainWindow(QMainWindow):
         self.act_export_pkg.setEnabled(True)
         self.styles_btn.setEnabled(True)
         self.assistant.reset()        # new project -> fresh conversation
+        # The Run LEM, Build Mesh, and Run FEM dialogs remember their last choices
+        # only while the file they were made on is open: a newly opened file opens
+        # them on the run options it declares (main sheet), not on the last file's.
+        self._last_lem_opts = {}
+        self._last_mesh_opts = {}
+        self._last_fem_opts = {}
         self._clear_result_tabs()
         # Restore saved solutions first so the default mode can see whether an FEM
         # solution exists, then pick the mode that fits this file.
@@ -2648,11 +2654,12 @@ class MainWindow(QMainWindow):
         run options the OPEN FILE declares (template v19, main sheet and circles
         sheet).
 
-        Precedence is: this session's last dialog choice > the file > the dialog's
-        own hardcoded default. The session cache is checked first because an
-        explicit choice the user has already made in this window must never be
-        overwritten by the file on the next open of the dialog; before any run this
-        session the cache is empty, so the file's declaration is what greets them.
+        Precedence is: the last dialog choice made on this file > the file > the
+        dialog's own hardcoded default. The cache is checked first because an
+        explicit choice the user has already made on this file must never be
+        overwritten by the file on the next open of the dialog; it is emptied
+        whenever a file is opened or a new one started (``_on_loaded``), so a newly
+        opened file's declaration is what greets them, never the last file's choice.
         A key the file leaves blank is simply absent, and the dialog falls through
         to its own default exactly as before.
         """

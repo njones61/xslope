@@ -696,7 +696,7 @@ argument that set it.
 - **Set capture iteration budget / Capture max iterations** — override the automatic capture budget (SSRM only).
 - **Seepage time** — select the transient pore-pressure instant, when a solution is loaded; see [Seepage time](#seepage-time).
 
-Options start from the open file and are remembered for the session, not written back to the file.
+Options start from the open file and are remembered while it stays open, not written back to the file.
 
 Check the **Model checks** column for missing Poisson's ratio, zero modulus, undefined mesh materials and missing tensile caps; resolve errors before running (see [Model checks](#model-checks-before-a-run)).
 

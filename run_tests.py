@@ -12906,6 +12906,7 @@ AUDIT_CHECK_MODULES = {
     # Studio's editors: a new profile line or polygon and its vertex rows, and
     # an input edit that keeps the mesh and seepage solutions it cannot change.
     'studio_model_edits': ('studio_model_edits_check.py', 'roundtrip'),
+    'dialog_defaults_reset': ('dialog_defaults_reset_check.py', 'roundtrip'),
     'seepage_survives_edits': ('seepage_survives_edits_check.py', 'roundtrip'),
     # A jointed line whose end the mesher moves onto a zone corner still meshes;
     # the FS-versus-time figure's legend covers none of the figure's own words.

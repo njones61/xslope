@@ -77,21 +77,35 @@ def _blank_material(name):
 #: Option and intercept point out; the Circles editor writes them back explicitly.
 _RECORD_DEFAULTS = {"circles": {"Option": "Depth", "Xi": 0.0, "Yi": 0.0}}
 
+#: Record keys holding a word the loader reads whatever its case, which an editor
+#: writes back in its own spelling (the file's "yes" comes back from the
+#: Reinforcement editor as "Yes"). Only these are compared without case: a label
+#: or a name is the user's text, and a change to it must still count.
+_RECORD_WORDS = {"reinforcement_lines": ("joint",), "circles": ("Option",)}
+
 
 def _as_read(key, value):
     """A top-level model value in the form it is read in, so two spellings of one
     model compare equal: in a list of records, a key holding None is the same as a
     key left out (``rec.get(k)`` is None either way: the Profile lines editor drops
-    an empty Size the loader wrote), and a key with a documented default is the
-    same as that default (``_RECORD_DEFAULTS``)."""
+    an empty Size the loader wrote), a key with a documented default is the same
+    as that default (``_RECORD_DEFAULTS``), and a key starting with an underscore
+    is left out: it is derived from the record's own fields (a reinforcement
+    line's ``_pullout_profile``), so it changes only when they do, and the object
+    it holds has no equality of its own, so a snapshot's copy never equals it."""
     if not isinstance(value, list) or not all(isinstance(r, dict) for r in value):
         return value
     defaults = _RECORD_DEFAULTS.get(key, {})
+    words = _RECORD_WORDS.get(key, ())
     out = []
     for rec in value:
-        r = {k: v for k, v in rec.items() if v is not None}
+        r = {k: v for k, v in rec.items()
+             if v is not None and not (isinstance(k, str) and k.startswith("_"))}
         for k, v in defaults.items():
             r.setdefault(k, v)
+        for k in words:
+            if isinstance(r.get(k), str):
+                r[k] = r[k].strip().lower()
         out.append(r)
     return out
 

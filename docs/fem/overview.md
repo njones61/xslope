@@ -132,7 +132,11 @@ In principal-stress space the yield function is the surface below:
 ![yield_surface.png](images/yield_surface.png)
 
 The six-sided cone bounds the stresses the soil can carry; its faces are the shear limits
-for the different pairs of principal stresses.
+for the different pairs of principal stresses. The cone applies to a two-dimensional model too.
+Plane strain still carries the out-of-plane stress $\sigma_z$, so every point has three principal
+stresses, and the solver checks all three against the cone. The in-plane Mohr circle governs when
+$\sigma_z$ lies between the two in-plane principal stresses; when it lies outside them, the circle
+through $\sigma_z$ reaches the envelope first.
 
 The solver evaluates $f$ at every Gauss point, an integration point inside an element where stress
 is computed; the form it uses is given on the

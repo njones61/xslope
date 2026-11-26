@@ -43,13 +43,15 @@ thick, and the shear band that controls the failure mechanism forms inside it. A
 develop through a layer that thin only if the mesh places enough element rows across it:
 the model checks name a zone that carries fewer than three, and **Refine thin zones** in the
 Build Mesh dialog meshes one at about four (see
-[Thin material zones](mesh.md#thin-material-zones)). The mesh shown is built at a target
-element size of 1.0 ft without that refinement, so the layer is about two elements thick. A
-coarser mesh stiffens the thin layer artificially and distorts the strain field within it:
+[Thin material zones](mesh.md#thin-material-zones)). The mesh shown is the one Build Mesh
+makes at a target element size of 1.0 ft with **Refine thin zones** ticked, which is how the
+dialog opens on a model set up for FEM. The clay gets about four element rows across it, and
+away from the layer the mesh grades back to the 1.0 ft target. A coarser mesh stiffens the
+thin layer artificially and distorts the strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.609**. The plots show the slope
+SSRM results. The computed factor of safety is **FS = 1.591**. The plots show the slope
 at failure. The middle plot shows the concentration of viscoplastic shear strain, which
 follows a non-circular failure mechanism through the thin weak clay layer. The finite
 element solution finds this shape without any assumption about the shape of the failure
@@ -60,8 +62,12 @@ laterally along the clay layer.
 
 <!-- mesh resolution: the 2-ft soft clay layer. The model checks flag a zone with fewer than
      three element rows; Refine thin zones sizes it for about four (docs/fem/mesh.md). This lock
-     is the target_size=1.0 mesh without that refinement. -->
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.609, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000, f_stand=1.60625, f_fail=1.6125, check=edges, expected_elements=2588, expected_nodes=5349 -->
+     is the target_size=1.0 mesh WITH that refinement, the mesh Studio's Build Mesh makes for
+     this model (the box starts ticked on a model set up for FEM): refine_factor=3 and
+     refine_features=thin_zones are what the dialog passes with only that box ticked, and they
+     give the same 5,832 elements and 11,855 nodes (local clay size 0.486 for the 1.944-ft
+     zone). The same model without the refinement (2,588 elements) gave 1.609. -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.591, element_type=tri6, target_size=1, refine_factor=3, refine_features=thin_zones, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000, f_stand=1.5875, f_fail=1.59375, check=edges, expected_elements=5832, expected_nodes=11855 -->
 
 ### 2. Reliability Analysis: Two-Layer c–φ Slope
 

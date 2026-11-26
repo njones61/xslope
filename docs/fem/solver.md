@@ -123,11 +123,6 @@ The displacement of a failing trial depends on the iteration budget it was given
 why the bisection uses the trial's verdict (standing, failed or undecided; see
 [SSRM failure criteria](#ssrm-failure-criteria)) rather than the displacement magnitude.
 
-A search reads those verdicts one trial at a time. On the two-layer clay slope it makes nine trials from the default
-bracket of 1.0 to 2.0, and closes on 1.2188 to 1.2266, whose midpoint, 1.223, is the factor of safety:
-
-![The nine trials of a strength reduction search on the two-layer clay slope, in order](images/fem_ssrm_trials.png){width=974}
-
 ## Elastic-plastic behavior: the viscoplastic algorithm {#elastic-plastic-behavior-viscoplastic-algorithm}
 
 At a fixed trial factor, the solver reduces the material strengths and seeks equilibrium

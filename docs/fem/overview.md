@@ -32,13 +32,13 @@ equilibrium defines as the ratio of available to mobilized strength; see the [So
 geometry, water and loads come from the same Excel input file the limit-equilibrium solvers read,
 with Young's modulus $E$ and Poisson's ratio $\nu$ added on the **mat** sheet.
 
-A strength reduction run returns the deformed mesh, the shear-strain field and the displacement
-vectors of the failure mechanism:
+A strength reduction run also returns the deformed mesh and the displacement vectors. On the same
+slope, at the last trial that stood:
 
-![plot_fem_results.png](images/plot_fem_results.png){width=800}
+![The deformed mesh and the displacement vectors of the two-layer clay slope at F = 1.219](images/fem_ssrm_mechanism.png){width=617}
 
-Shear strain concentrates along the band where the slope slides; the vectors show the block
-moving out of the face.
+The block above the band moves down and out of the face, bulging at the toe; the soil below and
+behind the band hardly moves.
 
 The same analysis runs point-and-click in [XSLOPE Studio](../studio/index.md): build a mesh, run a
 single trial or an SSRM search (with cancel), and view deformation and shear-strain results. See

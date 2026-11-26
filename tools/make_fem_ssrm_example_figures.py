@@ -20,8 +20,8 @@ Runs, one process each, cached in .figure_cache/fem_ssrm_examples/ (about two mi
 Figures, in docs/fem/images/ at 200 dpi, each shown at half its pixel width:
 
   fem_ssrm_lem_fem.png   Spencer's critical circle above the strength-reduction shear strain.
+  fem_ssrm_mechanism.png The deformed mesh and the displacement vectors at the last trial that stood.
   fem_ssrm_yielding.png  Shear stress over strength, and shear strain, at three standing trials.
-  fem_ssrm_trials.png    The search's trials in order: largest displacement against F, standing or not.
   fem_ssrm_history.png   Largest displacement against iteration, one trial that stands and one that fails.
   fem_ssrm_tension.png   The soil in tension when tension is allowed, and one element's Mohr circle.
 
@@ -161,9 +161,16 @@ def run_ssrm(label, scale_E=1.0, tcut_blank=False):
         fem._early_failure, fem.solve_fem = ef0, sf0
     trials = [{"F": float(t["F"]), "stable": bool(t["stable"]), "iterations": int(t["iterations"]),
                "max_displacement": float(t["max_displacement"])} for t in res["trials"]]
+    last = {}
+    for k, v in (res.get("last_solution") or {}).items():     # the last trial that stood, whole, for the mechanism
+        try:
+            pickle.dumps(v)
+            last[k] = v
+        except Exception:
+            pass
     out = {"label": label, "FS": float(res["FS"]), "final_interval": [float(v) for v in res["final_interval"]],
-           "trials": trials, "fields": fields, "hist": hist, "mesh": mesh, "seconds": time.time() - t0,
-           "scale_E": scale_E, "tcut_blank": tcut_blank}
+           "trials": trials, "fields": fields, "hist": hist, "mesh": mesh, "last_solution": last,
+           "seconds": time.time() - t0, "scale_E": scale_E, "tcut_blank": tcut_blank}
     shutil.rmtree(work, ignore_errors=True)
     print(f"{label}: FS {out['FS']:.4f} {out['final_interval']} in {out['seconds']:.0f} s; "
           f"{len(mesh['elements'])} elements, {len(mesh['nodes'])} nodes; "
@@ -324,6 +331,32 @@ def fig_lem_fem(plt, sd, fd, base, spencer):
     finish(fig, "fem_ssrm_lem_fem.png")
 
 
+def fig_mechanism(plt, sd, fd, base):
+    """The deformed mesh and the displacement vectors at the last trial that stood, drawn by XSLOPE's own panel
+    functions, on the frame of fem_ssrm_lem_fem.png."""
+    from xslope.plot_fem import deformation_scale, plot_deformed_mesh, plot_displacement_vectors
+    sol = base["last_solution"]
+    lo = base["final_interval"][0]
+    assert abs(float(sol.get("F", lo)) - lo) < 1e-9, "the stored last solution is not the last trial that stood"
+    scale = deformation_scale(fd, sol, 15)
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(9.0, 6.0))
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_deformed_mesh(a1, fd, sol, scale, single_panel=True, at_failure=True)
+        plot_displacement_vectors(a2, fd, sol, True, False, displacement_tolerance=0.5, single_panel=True)
+    for ax, title in ((a1, f"Deformed mesh at F = {lo:.3f} (displacements ×{scale:.1f})"),
+                      (a2, f"Displacement vectors at F = {lo:.3f}")):
+        if ax.get_legend():
+            ax.get_legend().remove()
+        ax.set_title("")
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.set_title(title, loc="left")
+        frame(ax)
+    fig.tight_layout(h_pad=1.2)
+    finish(fig, "fem_ssrm_mechanism.png")
+    return scale
+
+
 def fig_yielding(plt, sd, fd, base, strain_top=0.02):
     """Rows: three standing trials. Left: shear stress over strength (orange at the limit). Right: XSLOPE's
     viscoplastic shear strain on one scale for all three, topping out at strain_top."""
@@ -375,56 +408,6 @@ def fig_yielding(plt, sd, fd, base, strain_top=0.02):
         cb.set_label(label)
     finish(fig, "fem_ssrm_yielding.png")
     return at_limit, largest
-
-
-def fig_trials(plt, base):
-    """The search's trials in order: largest displacement against F. A standing trial's point is where it came to
-    rest; a failing trial's is where it was when stopped, still moving (the arrow)."""
-    from matplotlib.lines import Line2D
-    from matplotlib.patches import Rectangle
-    lo, hi = base["final_interval"]
-    FS = base["FS"]
-    T = [(t["F"], t["stable"], t["max_displacement"]) for t in base["trials"]]
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(10.0, 4.0), gridspec_kw={"width_ratios": [1.25, 1]})
-    zoom = (1.175, 1.26)
-    for ax, (x0, x1) in ((a1, (0.95, 2.08)), (a2, zoom)):
-        ax.axvspan(lo, hi, color=C_GRID, lw=0, zorder=0)
-        for i, (F, ok, d) in enumerate(T, 1):
-            if not (x0 <= F <= x1):
-                continue
-            if ok:
-                ax.plot(F, d, "o", color=C_GREEN, ms=8, zorder=3)
-            else:
-                ax.plot(F, d, "o", mfc="white", mec=C_RED, mew=1.8, ms=8, zorder=3)
-                ax.annotate("", xy=(F, d + 0.30), xytext=(F, d + 0.07),
-                            arrowprops=dict(arrowstyle="-|>", color=C_RED, lw=1.4))
-            if ax is a2 or not (zoom[0] <= F <= zoom[1]):
-                dx = (x1 - x0) * 0.018
-                left = ax is a2 and ok and F > lo - 1e-9
-                if ax is a1:
-                    ax.text(F, d + (0.36 if not ok else 0.10), str(i), fontsize=10, color=C_MUTED,
-                            ha="center", va="bottom")
-                else:
-                    ax.text(F - dx if left else F + dx, d - 0.05, str(i), fontsize=10, color=C_MUTED,
-                            ha="right" if left else "left", va="top")
-        ax.set_xlim(x0, x1)
-        ax.set_ylim(0, 2.75)
-        ax.grid(color=C_GRID, lw=0.6)
-        ax.set_xlabel("trial F")
-    a1.set_ylabel("largest displacement (ft)")
-    a1.add_patch(Rectangle((zoom[0], 0.02), zoom[1] - zoom[0], 2.0, fill=False, ec=C_MUTED, lw=0.9, ls=":", zorder=4))
-    a1.text(zoom[1] + 0.02, 1.95, "close up →", fontsize=10, color=C_MUTED, ha="left", va="center")
-    a2.axvline(FS, color=C_INK, ls="--", lw=1.2)
-    a2.text(FS + 0.002, 2.6, f"FS = {FS:.3f}", color=C_INK, ha="left", va="top")
-    a2.set_xticks([1.18, 1.20, 1.22, 1.24, 1.26])
-    a1.set_title(f"All {len(T)} trials, numbered in order", loc="left")
-    a2.set_title(f"The final bracket, {lo:.4f} to {hi:.4f}", loc="left")
-    a1.legend([Line2D([], [], ls="", marker="o", color=C_GREEN, ms=8),
-               Line2D([], [], ls="", marker="o", mfc="white", mec=C_RED, mew=1.8, ms=8)],
-              ["stands: where it came to rest", "fails: where it was stopped,\nstill moving"],
-              loc="lower right", bbox_to_anchor=(1.0, 0.06), handletextpad=0.3)
-    fig.tight_layout(w_pad=2.0)
-    finish(fig, "fem_ssrm_trials.png")
 
 
 def fig_history(plt, base):
@@ -540,10 +523,10 @@ def figures():
     for name, run in (("base", base), ("e01", e01), ("e10", e10)):
         check(f"{name}_disp_F1", disp_at(run, 1.0), EXPECTED[f"{name}_disp_F1"])
     fig_lem_fem(plt, sd, fd, base, spencer)
+    fig_mechanism(plt, sd, fd, base)
     at_limit, largest = fig_yielding(plt, sd, fd, base)
     for k, v in EXPECTED["at_limit"].items():
         check(f"at_limit {k}", at_limit[k], v)
-    fig_trials(plt, base)
     hist = fig_history(plt, base)
     tsd = load(write_workbook(os.path.join(tempfile.mkdtemp(), "t.xlsx"), tcut_blank=True))
     ten = fig_tension(plt, tsd, fem_data(tension, tsd), tension)

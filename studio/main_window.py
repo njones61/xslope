@@ -772,7 +772,11 @@ class MainWindow(QMainWindow):
         self._log_font.setFixedPitch(True)
         self._log_font.setPointSize(self._saved_log_font_pt())
         self.log.setFont(self._log_font)
-        self.log.setLineWrapMode(QPlainTextEdit.NoWrap)
+        # Long lines wrap at the pane's width, so a run's closing summary (one
+        # sentence-long line) reads without scrolling sideways. A table narrower
+        # than the pane, which is every table the Log prints at a normal window
+        # width, keeps its columns; only one wider than the pane wraps.
+        self.log.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         dock = QDockWidget("Log", self)
         dock.setObjectName("log_dock")
         dock.setWidget(self.log)

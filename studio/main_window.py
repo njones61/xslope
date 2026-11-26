@@ -2683,6 +2683,16 @@ class MainWindow(QMainWindow):
             d["search_tols"] = {s: dict(v) for s, v in self._lem_search_tols.items()}
         elif which == "mesh":
             seed("element_type", sd.get("element_type"), bool)
+            # Refine thin zones guards a strength reduction against a thin band meshed
+            # too coarsely to carry a shear band (its F comes out too high). A model
+            # whose materials are not set up for FEM (no E) is meshed for seepage,
+            # where the refinement multiplies the elements without changing the
+            # answers (period 21's dam: 7,492 elements against 2,140, F and flows the
+            # same to 0.1%), so the box starts ticked only on an FEM-ready model
+            # (Norm 669a). A seepage mesh later used for FEM is caught before the run
+            # by mesh.thin_zone_unresolved, which measures the rows the mesh has.
+            seed("refine_thin_zones",
+                 self._materials_fem_ready(sd.get("materials", [])))
             # The 1D element size is a model input the dialog writes back, so the
             # model wins over the last run's value: the box always shows what the
             # file states, including a value cleared since the last build.

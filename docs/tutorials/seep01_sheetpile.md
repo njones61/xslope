@@ -839,12 +839,14 @@ zones, and crack and notch tips — which is what the bottom of the sheetpile sl
 is. Crack tips are refined twice as strongly as the rest, so the mesh at the toe
 is finer still.
 
-**Refine thin zones** below it is ticked by default, and can stay ticked. It is a
-guarantee rather than a second refinement setting: it makes sure a thin material
-layer gets enough rows of elements across it to carry a shear band, whatever the
-element type. Unticking it adds nothing and removes nothing else — the feature
-refinement above is left exactly as you set it. This model has one material and no
-thin layer, so the setting changes nothing here either way.
+**Refine thin zones** below it starts unticked on a seepage model like this one.
+It is a guarantee for a strength reduction rather than a second refinement
+setting: it makes sure a thin material layer gets enough rows of elements across
+it to carry a shear band, whatever the element type, and Studio ticks it by
+default when every material has a Young's modulus, a model set up for FEM.
+Ticking it changes nothing else: the feature refinement above is left exactly as
+you set it. This model has one material and no thin layer, so the setting changes
+nothing here either way.
 
 Click **Build**. At section scale the two meshes look the same; at the toe they do
 not:

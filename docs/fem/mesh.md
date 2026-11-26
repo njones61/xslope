@@ -349,7 +349,8 @@ A thin zone is the one refinement case that is not an efficiency question. A sof
 one element thick cannot carry a shear band, so the model finds no mechanism through it
 and the analysis returns a factor of safety that is too high, with nothing in the factor of
 safety itself to show that the mesh was the reason. Because of this, Studio's
-**Build mesh** dialog carries a **Refine thin zones** checkbox that is **on by default**;
+**Build mesh** dialog carries a **Refine thin zones** checkbox that is **ticked by default on a model
+set up for FEM** (every material has a Young's modulus; a seepage-only model starts with it clear);
 it sizes every thin zone for about four element rows across its local width. A section
 with no thin zone is meshed exactly as it would be with the box clear, and the Log names
 each zone that was refined with the local size it received.

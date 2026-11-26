@@ -498,7 +498,9 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
   everywhere. Refinement is detected automatically from the geometry — there is nothing
   to place by hand. (Selecting individual feature classes is available in the Python API
   via `refine_features`; the dialog refines near all of them.)
-- **Refine thin zones** — on by default. A material zone too thin for the mesh to
+- **Refine thin zones** — ticked by default when every material has a Young's modulus (a
+  model set up for FEM), and unticked on a seepage-only model, where it adds elements without
+  changing the answers. A material zone too thin for the mesh to
   resolve does not fail: it solves, and returns a factor of safety that is too high,
   because a shear band cannot form across a single element. Checked, every thin zone
   is meshed with about four element rows across its local width, down to a limit of one

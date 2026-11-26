@@ -98,16 +98,18 @@ QUAD_STYLE_TRI_TIP = ("Quadrilateral styles apply to quad meshes only — choose
                       "quad element type to set one.")
 
 # "Refine thin zones" — the whole of what a user needs to decide it. It says what
-# the option guarantees (element rows across a thin zone), why it is on by default
-# (the failure it prevents is silent), and that it costs nothing on a section with
-# no thin zone. The mechanism differs by element family (a size field on triangles,
+# the option guarantees (element rows across a thin zone), when it starts ticked
+# (a model set up for FEM, where the failure it prevents is silent; Norm 669a), and
+# that it costs nothing on a section with no thin zone. The mechanism differs by element family (a size field on triangles,
 # a derived local size on quads) and is deliberately NOT in the tooltip: it is the
 # mesher's business, not a choice the user makes.
 REFINE_THIN_ZONES_TIP = (
-    "Give every thin material zone about four element rows across its width. A "
-    "band too thin to resolve does not fail — it returns a factor of safety that "
-    "is too high — so this is on by default. A section with no thin zone meshes "
-    "exactly as it would with this off.")
+    "Give every thin material zone about four element rows across its width. In a "
+    "strength reduction a band too thin to resolve does not fail — it returns a "
+    "factor of safety that is too high — so this starts ticked when every material "
+    "has a Young's modulus (a model set up for FEM). A seepage-only model starts "
+    "with it off: there it adds elements without changing the answers. A section "
+    "with no thin zone meshes exactly as it would with this off.")
 
 # "1D element size" — the model's main!D20 cell, edited where the mesh is built.
 ELEMENT_SIZE_1D_TIP = (

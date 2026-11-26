@@ -1461,9 +1461,10 @@ nodes with; pass `slope_data.get('element_size_1d')` through so a stated cell is
 Mohr-Coulomb plastic flow is nearly incompressible, a linear element cannot shear at constant
 volume, so it resists the mechanism and needs a larger reduction to collapse — FS comes back
 **too high, in the unconservative direction**. On a homogeneous 2:1 slope with φ′ = 20° and
-c′/γH = 0.05 (Griffiths & Lane 1999), whose factor of safety is about 1.4, `tri3` returns 1.70
-(+21%) and `quad4` 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return
-1.41. Use `tri6` (conforms best to irregular/zoned geometry — the default choice) or `quad8`/
+c′/γH = 0.05 (Griffiths & Lane 1999), whose factor of safety is 1.372 on a quad8 mesh at target size 3.5, an
+SSRM at target size 5 under the `'non_convergence'` criterion returns 1.762 (+28%) on `tri3`
+and 1.738 (+27%) on `quad4`, against 1.395 (+1.7%) on `tri6`, 1.379 (+0.5%) on `quad8` and
+1.402 (+2.2%) on `quad9`. Use `tri6` (conforms best to irregular/zoned geometry — the default choice) or `quad8`/
 `quad9` (more regular layout on block-like sections). The model checks warn before an SSRM on a
 linear mesh; it is a warning rather than an error, but a linear mesh is still wrong for an SSRM.
 

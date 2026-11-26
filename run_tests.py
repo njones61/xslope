@@ -19417,6 +19417,10 @@ def main():
         fem_samples = Path(_repo('docs/fem/samples.md'))
         if fem_samples.exists():
             tests.extend(parse_test_tags(fem_samples))
+        # The FEM overview's element-type table (locking, one target size per type).
+        fem_overview = Path(_repo('docs/fem/overview.md'))
+        if fem_overview.exists():
+            tests.extend(parse_test_tags(fem_overview))
         for rel_md in sorted(Path(_repo('docs/reliability')).glob('*.md')):
             tests.extend(t for t in parse_test_tags(rel_md)
                          if str(t.get('type', '')).startswith('fem_'))

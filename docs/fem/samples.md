@@ -39,10 +39,13 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 ![non_circ_inputs.png](images/non_circ_inputs.png){width=1000}
 
 FEM mesh with boundary conditions and material zones. The soft clay layer is only 2 ft
-thick, and the mesh must place at least two elements through its thickness to resolve the
-shear band that controls the failure mechanism, which requires a target element size of
-1.0 ft (or finer). A coarser mesh stiffens the thin layer artificially and distorts the
-strain field within it:
+thick, and the shear band that controls the failure mechanism forms inside it. A band can
+develop through a layer that thin only if the mesh places enough element rows across it:
+the model checks name a zone that carries fewer than three, and **Refine thin zones** in the
+Build Mesh dialog meshes one at about four (see
+[Thin material zones](mesh.md#thin-material-zones)). The mesh shown is built at a target
+element size of 1.0 ft without that refinement, so the layer is about two elements thick. A
+coarser mesh stiffens the thin layer artificially and distorts the strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
@@ -55,8 +58,9 @@ laterally along the clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-<!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
-     target_size=1.0 or finer -->
+<!-- mesh resolution: the 2-ft soft clay layer. The model checks flag a zone with fewer than
+     three element rows; Refine thin zones sizes it for about four (docs/fem/mesh.md). This lock
+     is the target_size=1.0 mesh without that refinement. -->
 <!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.609, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000, f_stand=1.60625, f_fail=1.6125, check=edges, expected_elements=2588, expected_nodes=5349 -->
 
 ### 2. Reliability Analysis: Two-Layer c–φ Slope
@@ -122,10 +126,10 @@ method gives each parameter's contribution directly as its ΔF.
 !!! note "Mesh dependence of the result"
     These numbers are for the tri6 mesh above. A finer mesh, or a different element
     type, gives a slightly different factor of safety and therefore a different
-    reliability. The FEM factor of safety decreases toward the LEM value as the mesh
-    is refined (on this slope, quad8 at target_size 2 gives FS ≈ 1.25, against LEM's
-    1.244). For a **fixed mesh** the reliability is reproducible: `reliability_fem`
-    runs each SSRM on a fixed global grid, so the result is identical to every
+    reliability. On this slope, an SSRM on quad8 elements at target_size 2, under the
+    Non-convergence criterion `reliability_fem` uses, gives FS = 1.132 against the
+    1.147 of the shipped mesh. For a **fixed mesh** the reliability is reproducible:
+    `reliability_fem` runs each SSRM on a fixed global grid, so the result is identical to every
     decimal for any `F_min`/`F_max` bracket. See
     [Numerical precision](../reliability/fem.md#numerical-precision-and-reproducibility).
     The reliability index is more sensitive to the mesh than the factor of safety
@@ -140,7 +144,9 @@ method gives each parameter's contribution directly as its ΔF.
      locks every number the example prints, on the shipped mesh the page describes (mesh=file); it
      takes 8-17 minutes, so it is pinned to the gate tier. REL-FEM runs the same pipeline on a
      deliberately coarse 253-element mesh (target_size=5, ~110-290s) as the standard-tier check.
-     beta is mesh-dependent but bit-reproducible for a fixed mesh. -->
+     beta is mesh-dependent but bit-reproducible for a fixed mesh. REL-FEM-quad8 locks the
+     mesh-dependence note's single SSRM on a finer quad8 mesh. -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_ssrm, expected_fs=1.132, element_type=quad8, target_size=2, tolerance=0.01, f_min=0.7, f_max=1.6, criterion=non_convergence, f_stand=1.12890625, f_fail=1.1359375, check=edges, expected_elements=682, expected_nodes=2189, benchmark=REL-FEM-quad8 -->
 <!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, mesh=file, element_type=tri6, expected_elements=985, expected_nodes=2080, f_min=0.7, f_max=1.6, ssrm_tol=0.001, expected_beta=1.225, tolerance=0.01, expected_fmlv=1.147, expected_sigma=0.124, expected_cov=0.108, expected_r=0.890, expected_pf=0.110, expected_beta_n=1.191, expected_pf_n=0.117, params=1.phi;1.c;1.gamma;2.phi;2.c;2.gamma, f_plus=1.236;1.228;1.131;1.147;1.147;1.147, f_minus=1.058;1.059;1.164;1.147;1.147;1.147, delta_f=0.178;0.169;0.033;0.000;0.000;0.000, tier=gate, benchmark=REL-FEM-page -->
 <!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.345, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
@@ -152,9 +158,12 @@ solver follows the methodology of
 [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387), "Slope
 stability analysis by finite elements" (*Géotechnique* 49(3), 387–403): a
 plane-strain elasto-plastic (Mohr–Coulomb) formulation solved by viscoplastic
-**strength reduction**, with the factor of safety located by the
-**hybrid failure criterion**, combining non-convergence and displacement evidence. The verification set reproduces **all six** of the
-paper's worked examples:
+**strength reduction**. Griffiths & Lane take a trial as failed when the iteration does not
+converge. XSLOPE offers that criterion, Non-convergence, and adds its own **hybrid failure
+criterion**, which also reads displacement evidence and which the verification rows'
+bisections use; see [SSRM failure criteria](solver.md#ssrm-failure-criteria). The
+verification set reproduces
+**all six** of the paper's worked examples:
 
 - [Example 1 — homogeneous slope](../verification/ssrm.md#verification-griffiths1)
 - [Example 2 — foundation layer, the false base circle](../verification/ssrm.md#verification-griffiths2)

@@ -13,8 +13,10 @@ are on the shared [References](references.md) page.
 
 - **Solver.** The Smith & Griffiths 4-component plane-strain Mohr-Coulomb viscoplastic
   formulation. The factor of safety is found by bisection on the hybrid failure criterion, the
-  default: a trial fails when the viscoplastic iteration cannot reach equilibrium *and* the
-  displacement field shows genuine growth (see [Solver](../fem/solver.md#2-hybrid-hybrid-default)).
+  default of `solve_ssrm()`: a trial fails when the viscoplastic iteration cannot reach
+  equilibrium *and* the displacement field shows genuine growth (see
+  [Solver](../fem/solver.md#2-hybrid-hybrid-default)). Studio's Run FEM dialog opens on
+  Non-convergence for a model without joints and on Hybrid for a model with joints.
 - **Water.** Pore pressures enter through the effective-stress formulation, and reservoir loads
   are applied as consistent boundary tractions.
 - **Elastic constants.** Every Griffiths & Lane example carries the paper's nominal values,

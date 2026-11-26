@@ -43,7 +43,7 @@ compiled kernel.
 | K0 initial stress | `main!D17` (blank disables) | `k0=` (both functions) | [At-rest initialization and equilibration](#in-situ-equilibration), off when unspecified. |
 | K0 | `main!D17` | `k0=` (both functions) | [At-rest lateral stress coefficient](#in-situ-equilibration); the dialog value starts at 1.0 when enabled. |
 | Reduce the tensile cap with F (Tension SRF, strength reduction factor) | `main!D18` | `tension_srf=` (both functions) | [Reduce a stated positive tensile cap](#tensile-strength-in-ssrm), on by default. |
-| Failure criterion | — | `failure_criterion=` (both functions) | [Trial classification](#ssrm-failure-criteria); the API default is `hybrid`. |
+| Failure criterion | — | `failure_criterion=` (both functions) | [Trial classification](#ssrm-failure-criteria). The dialog opens on Non-convergence, or on Hybrid for a model with joints; the API default is `hybrid`. |
 | Ignore surficial (skin) failures | — | `min_slip_depth=None` disables (both functions) | [Depth filter](#surficial-skin-failures-and-the-minimum-slip-depth-filter), off by default. |
 | Min slip depth | — | `min_slip_depth=` (both functions) | [Depth below ground](#surficial-skin-failures-and-the-minimum-slip-depth-filter), in model length units. |
 | SSR exclusions… | `polygon` sheet SSR zones; no cell for the material picker | `solve_ssrm(ssr_exclude=)`; `ssr_zone=` for a search polygon | [Hold selected regions at full strength](#ssr-exclusion-zones). |
@@ -188,10 +188,16 @@ The plastic strain flows along $\partial Q/\partial\sigma$, while the stress is 
 toward the surface in a different direction.
 
 The **pseudo-time step** $\Delta t$ sets how much plastic strain is accumulated in one iteration.
-With Young's modulus $E$ and Poisson's ratio $\nu$, it is a numerical parameter, not a time;
-XSLOPE uses $\Delta t = 4(1+\nu)/(3E)$, the value in
-Smith & Griffiths' Program 6.1, which keeps the iteration stable where a stress state sits in
-slight effective tension. Because the displacement change per iteration scales with $\Delta t$,
+With Young's modulus $E$ and Poisson's ratio $\nu$, it is a numerical parameter, not a time.
+XSLOPE uses $\Delta t = 4(1+\nu)/(3E)$, the smallest value over the model's materials, for every
+trial. This is the step for numerical stability that Smith, Griffiths & Margetts (2014, Eq. 6.22,
+p. 241) give for a von Mises material. Their step for a Mohr-Coulomb material (Eq. 6.23),
+$\Delta t = 4(1+\nu)(1-2\nu)/[E(1-2\nu+\sin^2\phi)]$, depends on the friction angle, and their
+slope stability program (Program 6.4) evaluates it at each trial's reduced angle. XSLOPE's step
+does not depend on $\phi$, so one value serves every trial of a search. It is the smaller of the
+two, and so inside the Mohr-Coulomb limit, wherever $\sin^2\phi < 2(1-2\nu)$, which at
+$\nu = 0.3$ is any friction angle below about 63°.
+Because the displacement change per iteration scales with $\Delta t$,
 the convergence tolerance and the failure criteria are calibrated to this value;
 [`dt_scale`](#the-solve_ssrm-function), accepted by both solve functions, changes it and should be left at 1.
 
@@ -243,7 +249,8 @@ oscillation. Because the residual is measured node by node against that node's o
 enlarging the model does not dilute it.
 
 The displacement test alone can pass on a slope creeping toward failure, and the force test alone
-can stall on a slope standing still; the [hybrid criterion](#2-hybrid-hybrid-default) handles both.
+can stall on a slope standing still. Requiring both tests answers the first; the
+[hybrid criterion](#2-hybrid-hybrid-default) also reads the displacements of a trial that stalls.
 
 The defaults are $\text{tol} = 10^{-3}$ for displacement and $\tau_f = 10^{-3}$
 for force equilibrium, with a budget of `max_iterations` = 12000 per trial. A few thousand
@@ -339,8 +346,11 @@ The [trial checks](#convergence-criterion) describe the evidence a trial produce
 forces settled, whether the corrector could certify a balanced state, whether the stresses are
 admissible. A failure criterion is the rule that turns that evidence into the trial's verdict,
 standing, failed or undecided, which the search then uses to move its bracket. XSLOPE offers
-four, chosen by the `failure_criterion` argument of `solve_ssrm()`. The default, hybrid, is the
-one to use; the others exist to reproduce published results that used them. The first three give
+four. Studio's Run FEM dialog opens on Non-convergence for a model without joints and on Hybrid
+for a model with joints. In Python, the `failure_criterion` argument of `solve_ssrm()` and
+`solve_fem()` selects the criterion, and it defaults to `"hybrid"`; `reliability_fem()` and the
+finite element mode of `sensitivity()`, `design()` and `tornado()` use `"non_convergence"` unless
+another is passed. The first three give
 each trial a verdict for the bisection; the fourth does not judge trials at all but reads the
 shape of the displacement-against-$F$ curve from a sweep.
 
@@ -358,13 +368,13 @@ the displacement test plus an iteration ceiling, which
 Under this criterion XSLOPE reproduces Griffiths & Lane's published results; see the
 [SSRM verification page](../verification/ssrm.md).
 
-### 2. Hybrid (`"hybrid"`, default) {#2-hybrid-hybrid-default}
+### 2. Hybrid (`"hybrid"`) {#2-hybrid-hybrid-default}
 
 Under non-convergence, a trial that has not reached equilibrium by the end of its budget counts
-as failed. That is not always right. The force test can stall just above its tolerance on a slope
-that has stopped moving, because a few Gauss points resting on the yield surface keep the
-residual from decaying all the way to zero, and such a trial would be counted as failed although
-the slope stands. The hybrid criterion, the default, asks a second question before it accepts a
+as failed. That includes a trial whose force test stalls just above its tolerance on a slope that
+has stopped moving, because a few Gauss points resting on the yield surface keep the residual from
+decaying all the way to zero. The hybrid criterion, the default of `solve_ssrm()` and
+`solve_fem()`, asks a second question before it accepts a
 failure: does the displacement field show the slope failing? Two signals answer it, both
 measured against the trial's elastic displacement (the displacement the same model would have if
 nothing yielded, which every solve computes): the scale of the displacement at the end of the
@@ -426,16 +436,19 @@ to the average-residual-displacement criterion of
 
 ### Choosing a criterion
 
-The four are not alternatives of equal standing. The default is the one to use for an analysis;
-the others exist to reproduce a published result obtained their way, or to produce a particular
-kind of evidence:
+Studio's Run FEM dialog opens on Non-convergence for a model without joints. On a model with
+joints it opens on Hybrid: a trial there often neither settles nor runs away, because the joints
+keep slipping a little each iteration after the displacement field has stopped growing, and
+Non-convergence counts every such trial as failed. `solve_ssrm()` and `solve_fem()` default to
+`hybrid` on every model. On almost all of the 103 FEM benchmarks the two criteria give the same
+factor of safety; see the [comparison under Hybrid](#2-hybrid-hybrid-default).
 
-| Criterion | Use it when |
+| Criterion | What decides a trial |
 |---|---|
-| `hybrid` (default) | Any analysis, including submerged slopes and reservoir loading. A non-converged trial counts as failed only when its displacements show the slope failing. |
-| `non_convergence` | Reproducing Griffiths & Lane's verdict, or a published result obtained with it: a trial that has not converged at the limit is failed. |
-| `displacement_limit` | Reproducing a result that used a displacement cap: a trial is failed when its displacement passes `max_disp_factor` of the mesh height. Its verdict depends on the iteration budget. |
-| `displacement_increase` | The displacement-against-F curve is wanted as the evidence: a sweep of trial factors read at its sharpest upturn, rather than a bisection. |
+| `non_convergence` | Whether it reached equilibrium, both displacement and force, within its iterations; one that did not has failed. This is Griffiths & Lane's verdict with the force-equilibrium test added. |
+| `hybrid` | The same test, and for a trial that did not reach equilibrium, its displacements: it has failed only when they are beyond elastic scale and still growing. |
+| `displacement_limit` | Whether its displacement passes `max_disp_factor` of the mesh height within the iteration budget; the verdict depends on that budget. |
+| `displacement_increase` | No trial is judged on its own: a sweep of trial factors is read where the displacement-against-$F$ curve turns sharply upward. |
 
 ## Trials that reach the iteration limit {#creep-trend}
 
@@ -501,7 +514,8 @@ A trial counts as standing when the joints and ground have stopped moving, the s
 from the joints is in balance, and the leftover force on the joints has stopped falling.
 If that force is still falling, the trial runs on because it may yet converge outright.
 
-Under the default `hybrid` criterion, standing raises the search's lower edge and sliding
+Under the `hybrid` criterion, which the Run FEM dialog opens on for a model with joints and
+`solve_ssrm()` uses by default, standing raises the search's lower edge and sliding
 lowers its upper edge. `non_convergence` requires convergence instead of accepting a standing
 trial whose force tolerance was not met; undecided trials remain undecided under either criterion.
 
@@ -866,6 +880,8 @@ Methods in Engineering*, 1(3), 275–277.
 Matsui, T., & San, K.C. (1992). Finite element slope stability analysis by shear strength reduction technique. *Soils and Foundations*, 32(1), 59-70.
 
 Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.
+
+Smith, I.M., Griffiths, D.V., & Margetts, L. (2014). *Programming the Finite Element Method* (5th ed.). John Wiley & Sons.
 
 Sun, W., Wang, G., & Zhang, L. (2021). [Slope stability analysis by strength reduction method
 based on average residual displacement increment criterion](https://doi.org/10.1007/s10064-021-02237-y).

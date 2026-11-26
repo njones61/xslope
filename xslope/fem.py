@@ -16485,10 +16485,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         print("!  These elements have too few DOFs to represent the nearly")
         print("!  incompressible plastic strains produced by Mohr-Coulomb")
         print("!  yielding, causing an artificially stiff response that")
-        print("!  overestimates the factor of safety by 10-20% or more.")
+        print("!  overestimates the factor of safety: by about 28% on Griffiths")
+        print("!  and Lane's Example 1 at a 5 ft target size (tri3 and quad4).")
         print("!")
         print("!  Use quadratic elements (tri6, quad8, or quad9) for reliable SSRM")
-        print("!  results. The default element type quad8 is recommended.")
+        print("!  results. The default element type is tri6.")
         print("!" * 72 + "\n")
 
     # solve_ssrm is the SOLE auto-wiring point for the SSRM path: it resolved the
@@ -16775,9 +16776,10 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
-            "'non_convergence' (default; bisection on true viscoplastic "
-            "equilibrium), 'hybrid' (non-convergence corroborated by "
-            "displacement evidence), 'displacement_limit' (displacement-budget "
+            "'non_convergence' (bisection on true viscoplastic equilibrium; "
+            "what Studio's Run FEM dialog opens on without joints), 'hybrid' "
+            "(the default here: non-convergence corroborated by displacement "
+            "evidence), 'displacement_limit' (displacement-budget "
             "backstop), and "
             "'displacement_increase' (displacement-catastrophe sweep) - see "
             "https://xslope.org/en/latest/fem/solver/#choosing-a-criterion.")

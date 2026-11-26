@@ -9,7 +9,7 @@ The finite element method (FEM) removes the central assumption of limit equilibr
 the engineer already knows the shape and location of the failure surface. Instead of imposing a
 surface and checking equilibrium on it, the FEM solves the stress-strain problem over the whole
 slope domain and lets the failure mechanism emerge where the soil actually runs out of strength
-(Griffiths & Lane, 1999; Duncan, 1996). Stress redistributes as elements yield, and the shear band
+(Griffiths & Lane, 1999; Dawson et al., 1999). Stress redistributes as elements yield, and the shear band
 that develops is an output rather than an input.
 
 XSLOPE's implementation is the viscoplastic elastic-perfectly-plastic algorithm of Griffiths &
@@ -637,18 +637,28 @@ three-node triangle (tri3), with one integration point and six degrees of freedo
 affected; the four-node quadrilateral (quad4) is better but still locked.
 
 Quadratic elements — tri6, quad8 and quad9 — have enough degrees of freedom to represent
-incompressible plastic deformation without artificial stiffness. The following are SSRM results for
-the Griffiths & Lane (1999) Example 1 benchmark, with slope height $H$ (homogeneous slope, $c/\gamma H = 0.05$,
-$\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expected FS of about 1.40
-(Griffiths & Lane report 1.4 by FEM; Spencer's method gives 1.376):
+incompressible plastic deformation without artificial stiffness. The table gives SSRM results for
+the [Griffiths & Lane (1999) Example 1](../verification/ssrm.md#verification-griffiths1) slope
+(homogeneous, $c/\gamma H = 0.05$ with slope height $H$, $\phi = 20°$, slope angle 26.57°) on each
+element type at a target mesh size of 5. Every run uses the Non-convergence failure criterion,
+which the Run FEM dialog opens on for a model without joints, and the dialog's other defaults
+(bracket 1.0 to 2.0, tolerance 0.01). Each error is measured against 1.372, the factor of safety
+the verification page reports for this slope on a finer quad8 mesh (target size 3.5); Griffiths &
+Lane report 1.4.
 
-| Element Type | Nodes per Element | SSRM Factor of Safety | Error vs. Reference |
+| Element Type | Nodes per Element | SSRM Factor of Safety | Error vs. 1.372 |
 |:---:|:---:|:---:|:---:|
-| tri3 | 3 | 1.70 | +21% |
-| quad4 | 4 | 1.56 | +11% |
-| **tri6** | **6** | **1.41** | **< 1%** |
-| **quad8** | **8** | **1.41** | **< 1%** |
-| **quad9** | **9** | **1.41** | **< 1%** |
+| tri3 | 3 | 1.762 | +28% |
+| quad4 | 4 | 1.738 | +27% |
+| **tri6** | **6** | **1.395** | **+1.7%** |
+| **quad8** | **8** | **1.379** | **+0.5%** |
+| **quad9** | **9** | **1.402** | **+2.2%** |
+
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.762, element_type=tri3, target_size=5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=non_convergence, f_stand=1.7578125, f_fail=1.765625, check=edges, expected_elements=545, expected_nodes=312, benchmark=FEM-locking-tri3 -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.738, element_type=quad4, target_size=5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=non_convergence, f_stand=1.734375, f_fail=1.7421875, check=edges, expected_elements=232, expected_nodes=267, benchmark=FEM-locking-quad4 -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.395, element_type=tri6, target_size=5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=non_convergence, f_stand=1.390625, f_fail=1.3984375, check=edges, expected_elements=545, expected_nodes=1168, benchmark=FEM-locking-tri6 -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.379, element_type=quad8, target_size=5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=non_convergence, f_stand=1.375, f_fail=1.3828125, check=edges, expected_elements=232, expected_nodes=765, benchmark=FEM-locking-quad8 -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.402, element_type=quad9, target_size=5, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=non_convergence, f_stand=1.3984375, f_fail=1.40625, check=edges, expected_elements=232, expected_nodes=987, benchmark=FEM-locking-quad9 -->
 
 Use quadratic elements for every stress analysis, whether a single trial or a strength-reduction
 search; tri6 is the default. Linear elements lock, and the only place for them is a seepage
@@ -915,7 +925,7 @@ and plastic rotations that describe yielding.
 
 ## References
 
-Duncan, J.M. (1996). State-of-the-art: Limit equilibrium and finite element analysis of slopes. *Journal of Geotechnical Engineering*, 122(7), 577-596.
+Dawson, E.M., Roth, W.H., & Drescher, A. (1999). Slope stability analysis by strength reduction. *Géotechnique*, 49(6), 835-840.
 
 Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Géotechnique*, 49(3), 387-403.
 

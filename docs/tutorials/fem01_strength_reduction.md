@@ -192,9 +192,9 @@ Set **Element type** to **Quadratic triangles (tri6)**. On a seepage run element
 order trades accuracy against cost; on a stability run it is not a trade.
 Linear elements cannot represent the constant-volume shearing a Mohr-Coulomb
 mechanism develops, so they **lock**, carrying load they should not and
-reporting a factor of safety that is too high. Measured on this embankment, tri3
-reads **+21%** high and quad4 **+11%**, while tri6, quad8 and quad9 all land
-within 1% of the reference —
+reporting a factor of safety that is too high. Measured on this embankment at a
+target size of 5, tri3 reads **+28%** high and quad4 **+27%**, while tri6, quad8
+and quad9 all land within about 2% of the reference —
 [element type and volumetric locking](../fem/overview.md#element-type-selection-and-volumetric-locking)
 gives the comparison. XSLOPE defaults to tri6 and prints a boxed warning if a
 run starts on a linear mesh anyway.

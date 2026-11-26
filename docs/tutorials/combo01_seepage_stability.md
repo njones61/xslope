@@ -106,8 +106,8 @@ faster for a little less accuracy, which is what we build in
 [SEEP-2](seep02_johnson_dam.md). Here it is not a trade. The same mesh goes on to
 carry the strength reduction, and linear elements lock volumetrically in an
 elastic-plastic solution and report a factor of safety that is too high — in
-[FEM-1](fem01_strength_reduction.md#building-the-mesh) we measure the error at
-+21% for tri3. Because both analyses share one mesh, the element type has to be
+[FEM-1](fem01_strength_reduction.md#building-the-mesh) the error is +28% for
+tri3. Because both analyses share one mesh, the element type has to be
 chosen for the stricter of the two, which is why quadratic is both the default
 and the requirement here.
 

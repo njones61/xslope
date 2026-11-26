@@ -145,13 +145,13 @@ def _stacked_figure(panels, names, out, extras=None, windows=None):
         handles = _draw(ax, mesh, names, window=windows)
         if extras:
             extras[i](ax)
-        ax.set_title(title, fontsize=11, fontweight="bold", pad=6)
+        ax.set_title(title, fontsize=13, fontweight="bold", pad=6)
         fig.text(left + (right - left) / 2,
                  bottom - CAPTION_H_IN / fig_h_in * 0.62, caption,
-                 ha="center", va="center", fontsize=8.5, color="0.25")
+                 ha="center", va="center", fontsize=12, color="0.25")
 
     fig.legend(handles=handles, loc="lower center", ncol=max(1, len(handles)),
-               frameon=False, fontsize=9,
+               frameon=False, fontsize=12,
                bbox_to_anchor=(0.5, 0.10 / fig_h_in))
     _save(fig, out)
 

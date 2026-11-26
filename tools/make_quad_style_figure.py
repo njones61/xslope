@@ -182,14 +182,14 @@ def figure(root, model, out):
                   + CAPTION_H_IN) / fig_h_in
         ax = fig.add_axes((left, bottom, right - left, panel_h_in / fig_h_in))
         handles = _draw(ax, mesh, names)
-        ax.set_title(label, fontsize=11, fontweight="bold", pad=6)
+        ax.set_title(label, fontsize=13, fontweight="bold", pad=6)
         fig.text(left + (right - left) / 2,
                  bottom - CAPTION_H_IN / fig_h_in * 0.62,
                  _caption(_metrics(mesh, target)),
-                 ha="center", va="center", fontsize=8.5, color="0.25")
+                 ha="center", va="center", fontsize=12, color="0.25")
 
     fig.legend(handles=handles, loc="lower center", ncol=len(handles),
-               frameon=False, fontsize=9,
+               frameon=False, fontsize=12,
                bbox_to_anchor=(0.5, 0.10 / fig_h_in))
 
     path = os.path.join(root, out)

@@ -28,7 +28,7 @@ In **Seepage** or **FEM** mode, **Build Mesh** opens a dialog that sets the elem
 target element size (entered, or auto-sized from the section width), the 1D element size, the
 quadrilateral style, and refinement near features and in thin zones:
 
-![Build Mesh dialog](../studio/images/analysis_build_mesh_dialog.png)
+![Build Mesh dialog](../studio/images/analysis_build_mesh_dialog.png){width=389}
 
 Auto-sizing divides the width of the section by a number of divisions, 100 by default. The
 mesh is built on a background thread and appears in a **Mesh** tab; **Run** stays disabled
@@ -137,7 +137,7 @@ The last column gives the linear type each quadratic type is built from
 
 Both fill any section. The difference is what they cost and how they behave:
 
-![The same section meshed with triangles and with quadrilaterals](images/mesh_tri_vs_quad.png)
+![The same section meshed with triangles and with quadrilaterals](images/mesh_tri_vs_quad.png){width=950}
 
 At one requested element size the two meshes carry a similar number of nodes — which is
 what sets the size of the solve — but the quadrilateral mesh reaches it with roughly half
@@ -226,20 +226,20 @@ embankment is a trapezoid whose base and crest differ by about 5:1, and a grid s
 through that shape would have to stretch its elements by the same ratio, so it is declined
 and stays free-meshed in both panels.
 
-![Free and structured quadrilateral meshes of the levee section](images/quad_styles_levee.png)
+![Free and structured quadrilateral meshes of the levee section](images/quad_styles_levee.png){width=1000}
 
 **An earth dam with a central clay core.** Only the core is mappable; the shell that wraps
 around it is not. The swept core is visibly regular, and the aspect ratio of the mesh as a
 whole improves, but the free-meshed shell now has to close against a fixed grid, which
 leaves a few more triangles behind than the free mesh did.
 
-![Free and structured quadrilateral meshes of the earth dam](images/quad_styles_earth_dam.png)
+![Free and structured quadrilateral meshes of the earth dam](images/quad_styles_earth_dam.png){width=1000}
 
 **A dredged trench in silt.** No zone passes the check — the trench gives each of them
 more corners than the four a swept grid needs — so every zone falls back to the free
 mesher and the two panels are the same mesh, element for element.
 
-![Free and structured quadrilateral meshes of the sea trench section](images/quad_styles_sea_trench.png)
+![Free and structured quadrilateral meshes of the sea trench section](images/quad_styles_sea_trench.png){width=1000}
 
 The style is not stored in the input file. A model re-opened elsewhere meshes in the
 default style unless a mesh built at the other setting travels with it as the companion
@@ -270,7 +270,7 @@ A material zone can be given a finer size of its own through the **Size** cell o
 polygon (or on its profile line). Everything outside keeps the global target size, and the
 size grades back to it across the zone boundary:
 
-![A local Size on the dam core](images/mesh_zone_size.png)
+![A local Size on the dam core](images/mesh_zone_size.png){width=950}
 
 A Size only ever refines — a value at or above the global target has no effect, and
 XSLOPE warns rather than silently ignoring it. A polygon whose **Type** is `refine`
@@ -306,7 +306,7 @@ mesh = build_mesh_from_polygons(
 
 Both panels are the same reinforced slope at the same target size.
 
-![A mesh refined near reinforcement lines](images/mesh_refine_features.png)
+![A mesh refined near reinforcement lines](images/mesh_refine_features.png){width=950}
 
 In the lower one every one of the six reinforcement lines carries a band of finer
 elements, and the thin shell along the face — detected as a thin zone, not as a line — is

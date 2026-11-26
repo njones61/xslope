@@ -348,11 +348,85 @@ a million; the tutorial shows both runs.
 
 ### How a trial is decided {#how-a-trial-is-decided}
 
-A jointed trial is decided by extra rules, because a contact at its limit can keep flickering
-between slipping and gripping, or open and closed, after the slope has come to rest.
+<span id="the-joint-verdict"></span>
+
+A jointed trial is decided by extra rules, because a contact at its limit can keep switching between
+slipping and gripping, or open and closed, after the slope has come to rest. A trial that converges needs no extra reading; the extra rules
+judge one that neither converges nor runs away.
+
+#### Slipping or standing
+
+A trial counts as sliding when the ground keeps moving without appreciable slowing, or it
+keeps moving while joint slip continues without slowing. The check made before the iteration
+limit (see [Limits](#jointed-numerical-limits)) waits until late
+in the allowance, because a slow trial can initially look like a sliding one.
+A trial counts as standing when the joints and ground have stopped moving, the soil or rock away
+from the joints is in balance, and the leftover force on the joints has stopped falling.
+If that force is still falling, the trial runs on because it may yet converge outright.
+
+Under the `hybrid` criterion, which the Run FEM dialog opens on for a model with joints and
+`solve_ssrm()` uses by default, standing raises the search's lower edge and sliding
+lowers its upper edge. `non_convergence` requires convergence instead of accepting a standing
+trial whose force tolerance was not met; undecided trials remain undecided under either criterion.
+
+A standing trial is recorded as standing without convergence (force tolerance not met);
+a sliding one as failed; one neither test decides goes to the hybrid criterion and the
+[iteration-limit rules](solver.md#creep-trend).
+
+#### Contacts that cycle
+
+A cohesive contact with no tensile strength at zero normal stress can cycle between closed,
+carrying shear, and open, carrying nothing, while the rest of the slope stands still.
+At the hard ceiling it counts as standing only if the whole contact-state set repeats exactly
+with a period of at most 64 iterations over the last 256, one to four contacts change state,
+and the field returns each period within $5\times10^{-8}$ elastic displacements per iteration.
+The Log names those contacts and reports that force balance was not met.
+
+#### Finishing a slow jointed trial {#finishing-a-slow-jointed-trial}
+
+<span id="joint-corrector-and-hold-test"></span>
+
+The ordinary iteration keeps the elastic joint stiffness, so a slipping joint can settle slowly.
+The [Newton corrector](solver.md#finishing-a-trial-with-the-newton-corrector) seeks a balanced state from
+the current slip and opening history; the ordinary iteration then continues from it for a hold
+test, up to 3,000 iterations with no more than 0.01 elastic displacements of movement.
+Only a state that also passes the standing reading is accepted; a refused corrector or hold test
+leaves the continuing iteration unchanged. The shortcut is on by default.
+
+#### Limits {#jointed-numerical-limits}
+
+The standing and sliding tests of [Slipping or standing](#slipping-or-standing) are made on five
+measured quantities: the slip gained along the joints, the ground movement, its rate, the force
+imbalance in the soil and the force imbalance on the joints. The standing test reads them over
+the second half of the run; the sliding test over the [five-block window](solver.md#creep-trend) described
+earlier. A trial counts as sliding when the movement limit is met together with either the
+ground-rate limit or both slip limits. The table gives each quantity's limit for each test:
+
+| Quantity | Standing limit | Sliding limit |
+|---|---|---|
+| Slip gain | At most 0.01% of accumulated slip | At least 2% of accumulated slip, for the slip route |
+| Ground movement | At most $10^{-4}$ elastic displacements | At least 0.02 elastic displacements |
+| Movement rate | No separate rate test | Geometric-mean ground block-rate ratio at least 0.9 with every block moving forward, or slip-rate ratio at least 0.9 |
+| Soil force imbalance | Every sample no greater than `force_tol` | Not required |
+| Joint force imbalance trend | Mean in second half of the window / mean in first half at least 0.85 | Not required |
+| Timing | After 5,000 iterations | Before-limit decisions: at least 25,000 iterations and the last tenth of the current allowance; also read at the limit |
+
+### Solver options {#jointed-model-solver-policy}
+
+<span id="jointed-model-acceleration"></span>
+
+These settings change how a jointed trial is iterated, not the rules that decide it:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `joint_newton` | On | Enables the corrector and hold test on joints; `False` turns the shortcut off. |
+| `fem_solver` | `'auto'` | Ordinary iteration with corrector; `'viscoplastic'` disables it; `'newton'` starts Newton cold, without accumulated slip. |
+| `joint_tangent`; `joint_tangent_factor` | Off; 0.01 | `'slip'` enables optional relief of slipping/open interfaces, scaling their stiffness by the factor; the ordinary iteration decides the trial. |
+| `accelerate` | `None`: on for joints | Steps are lengthened by extrapolation, up to 50 times, while the solution keeps heading the same way; the answer is unchanged; `False` turns it off. |
+
 For a standing trial that did not meet force balance, the Log reports, for example,
 "stands: the only movement is 3 contacts cycling (period 8 iterations), no net movement;
-force balance not met". The [Solver page](solver.md#jointed-models) gives the rules.
+force balance not met".
 
 ### What the results show
 

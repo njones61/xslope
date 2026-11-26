@@ -38,7 +38,7 @@ compiled kernel.
 | Tolerance (SSRM) | — | `solve_ssrm(tolerance=)` | [Final bracket width](#the-solve_ssrm-function), default 0.01; not the displacement convergence tolerance. |
 | Max iterations per trial | — | `max_iterations=` (both functions) | [Trial budget](#creep-trend), default 12000. |
 | Iteration ceiling | — | `max_iterations_ceiling=` (both functions) | [Hard limit on budget extensions](#creep-trend), default 50000. |
-| Accelerate convergence | — | `accelerate=` (both functions) | [Lengthen admissible iteration steps](#jointed-model-acceleration) (Irons & Tuck, 1969); `False` runs the ordinary iteration. |
+| Accelerate convergence | — | `accelerate=` (both functions) | [Lengthen admissible iteration steps](joints.md#jointed-model-acceleration) (Irons & Tuck, 1969); `False` runs the ordinary iteration. |
 | Side BC | `main!D24` | `build_fem_data()` reads `slope_data['side_bc']`; no solve argument | [Side restraint](overview.md#what-xslope-assigns-automatically), rollers by default. |
 | K0 initial stress | `main!D17` (blank disables) | `k0=` (both functions) | [At-rest initialization and equilibration](#in-situ-equilibration), off when unspecified. |
 | K0 | `main!D17` | `k0=` (both functions) | [At-rest lateral stress coefficient](#in-situ-equilibration); the dialog value starts at 1.0 when enabled. |
@@ -347,7 +347,7 @@ the viscoplastic loop alone, or a cold-start Newton solve; `fem_solver` on `solv
 >  described under [the convergence, corrector and yield checks](#convergence-criterion).<br>
 >- **`'viscoplastic'`** — that loop on its own: no corrector, no yield check. A trial ends
 >  on ordinary convergence or the [iteration-limit rules](#creep-trend).<br>
->- **`'newton'`** — a cold-start Newton-Raphson solve, with [restrictions for jointed models](#jointed-model-solver-policy).
+>- **`'newton'`** — a cold-start Newton-Raphson solve, with [restrictions for jointed models](joints.md#jointed-model-solver-policy).
 
 Setting `XSLOPE_FEM_SOLVER` selects the driver for a whole process. When the environment rather than
 a call argument selects a non-default driver, one warning line is printed, because a shell variable
@@ -512,86 +512,9 @@ it only arms the [yield gate](#the-yield-check) when the trailing displacements 
 
 ## Jointed models {#jointed-models}
 
-A joint in XSLOPE is a zero-thickness interface along which two bodies of soil or rock can slip
-and open, with its own friction, cohesion and stiffness. Joints model bedding or discontinuities
-in rock slopes, block-wall contacts, and a sheet acting as a contact rather than a bonded bar.
-The [Joints page](joints.md) describes how to define and mesh them.
-
-### How a jointed trial is decided {#the-joint-verdict}
-
-A contact at its limit can keep switching between slipping and gripping, or open and closed,
-after the slope has come to rest. A trial that converges needs no extra reading; the extra rules
-judge one that neither converges nor runs away.
-
-#### Slipping or standing
-
-A trial counts as sliding when the ground keeps moving without appreciable slowing, or it
-keeps moving while joint slip continues without slowing. The check made before the iteration
-limit (see [Limits](#jointed-numerical-limits)) waits until late
-in the allowance, because a slow trial can initially look like a sliding one.
-A trial counts as standing when the joints and ground have stopped moving, the soil or rock away
-from the joints is in balance, and the leftover force on the joints has stopped falling.
-If that force is still falling, the trial runs on because it may yet converge outright.
-
-Under the `hybrid` criterion, which the Run FEM dialog opens on for a model with joints and
-`solve_ssrm()` uses by default, standing raises the search's lower edge and sliding
-lowers its upper edge. `non_convergence` requires convergence instead of accepting a standing
-trial whose force tolerance was not met; undecided trials remain undecided under either criterion.
-
-A standing trial is recorded as standing without convergence (force tolerance not met);
-a sliding one as failed; one neither test decides goes to the hybrid criterion and the
-[iteration-limit rules](#creep-trend).
-
-#### Contacts that cycle
-
-A cohesive contact with no tensile strength at zero normal stress can cycle between closed,
-carrying shear, and open, carrying nothing, while the rest of the slope stands still.
-At the hard ceiling it counts as standing only if the whole contact-state set repeats exactly
-with a period of at most 64 iterations over the last 256, one to four contacts change state,
-and the field returns each period within $5\times10^{-8}$ elastic displacements per iteration.
-The Log names those contacts and reports that force balance was not met.
-
-#### Finishing a slow jointed trial {#finishing-a-slow-jointed-trial}
-
-<span id="joint-corrector-and-hold-test"></span>
-
-The ordinary iteration keeps the elastic joint stiffness, so a slipping joint can settle slowly.
-The [Newton corrector](#finishing-a-trial-with-the-newton-corrector) seeks a balanced state from
-the current slip and opening history; the ordinary iteration then continues from it for a hold
-test, up to 3,000 iterations with no more than 0.01 elastic displacements of movement.
-Only a state that also passes the standing reading is accepted; a refused corrector or hold test
-leaves the continuing iteration unchanged. The shortcut is on by default.
-
-### Limits {#jointed-numerical-limits}
-
-The standing and sliding tests of [Slipping or standing](#slipping-or-standing) are made on five
-measured quantities: the slip gained along the joints, the ground movement, its rate, the force
-imbalance in the soil and the force imbalance on the joints. The standing test reads them over
-the second half of the run; the sliding test over the [five-block window](#creep-trend) described
-earlier. A trial counts as sliding when the movement limit is met together with either the
-ground-rate limit or both slip limits. The table gives each quantity's limit for each test:
-
-| Quantity | Standing limit | Sliding limit |
-|---|---|---|
-| Slip gain | At most 0.01% of accumulated slip | At least 2% of accumulated slip, for the slip route |
-| Ground movement | At most $10^{-4}$ elastic displacements | At least 0.02 elastic displacements |
-| Movement rate | No separate rate test | Geometric-mean ground block-rate ratio at least 0.9 with every block moving forward, or slip-rate ratio at least 0.9 |
-| Soil force imbalance | Every sample no greater than `force_tol` | Not required |
-| Joint force imbalance trend | Mean in second half of the window / mean in first half at least 0.85 | Not required |
-| Timing | After 5,000 iterations | Before-limit decisions: at least 25,000 iterations and the last tenth of the current allowance; also read at the limit |
-
-### Solver options {#jointed-model-solver-policy}
-
-<span id="jointed-model-acceleration"></span>
-
-These settings change how a jointed trial is iterated, not the rules that decide it:
-
-| Setting | Default | What it does |
-|---|---|---|
-| `joint_newton` | On | Enables the corrector and hold test on joints; `False` turns the shortcut off. |
-| `fem_solver` | `'auto'` | Ordinary iteration with corrector; `'viscoplastic'` disables it; `'newton'` starts Newton cold, without accumulated slip. |
-| `joint_tangent`; `joint_tangent_factor` | Off; 0.01 | `'slip'` enables optional relief of slipping/open interfaces, scaling their stiffness by the factor; the ordinary iteration decides the trial. |
-| `accelerate` | `None`: on for joints | Steps are lengthened by extrapolation, up to 50 times, while the solution keeps heading the same way; the answer is unchanged; `False` turns it off. |
+A model with joints is decided by extra rules, because a contact at its limit can keep slipping a
+little, or opening and closing, after the slope has come to rest. The
+[Joints page](joints.md#how-a-trial-is-decided) gives them, with the solver options for jointed models.
 
 ## Equilibration and running the solver
 
@@ -809,36 +732,7 @@ else:
           f"({solution['exit_reason']}, verdict {solution['verdict']})")
 ```
 
-Its principal arguments:
-
->- **`F`** (default 1.0): strength reduction factor, applied as $c_r = c/F$ and
->  $\tan\phi_r = \tan\phi/F$.<br>
->- **`max_iterations`** (default 12000) and **`tolerance`** (default $10^{-3}$): the iteration budget
->  and the displacement convergence tolerance (Smith & Griffiths, 2004).<br>
->- **`max_iterations_ceiling`** (default 50000): hard stop on the extension a trial still dying
->  away, or with no clear trend, is given at `max_iterations` (see the
->  [trend reading](#creep-trend)). Reaching it with the
->  out-of-balance still falling leaves the trial inconclusive.<br>
->- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
->  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
->- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see
->  [SSRM failure criteria](#ssrm-failure-criteria).<br>
->- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
->  mesh height; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
->- **`early_exit`** (default `True`): watch the residual for the
->  [no-progress plateau](#the-yield-check) and report it.<br>
->- **`fem_solver`** (default `'auto'`): the per-trial driver — see
->  [Choosing the driver](#choosing-the-driver).<br>
->- **`k0`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
->  **`suction_phi_b`** / **`suction_cap`**: see [in-situ equilibration](#in-situ-equilibration),
->  the [depth filter](#surficial-skin-failures-and-the-minimum-slip-depth-filter),
->  [tensile strength](#tensile-strength-in-ssrm),
->  [elastic-only materials](overview.md#mohr-coulomb-failure-criterion) and
->  [matric suction](overview.md#matric-suction-apparent-cohesion-above-the-water-table); all default to off or to what the input file declares.<br>
->- **`elastic_materials`**: material names to keep elastic at every trial factor, taken from the
->  **option** column when left unset; `solve_ssrm()` accepts the same names. A
->  [polygon-addressed twin](#ssr-exclusion-zones) names the same treatment by outline.<br>
->- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
+Every argument is documented in the [API reference](../api/fem.md#xslope.fem.solve_fem).
 
 The returned dictionary carries `converged` and `stable`, the verdict metadata (`verdict`,
 [`u_ratio`](#2-hybrid-hybrid-default), `u_growth`, `exit_reason`), `iterations`, the nodal `displacements` and
@@ -862,38 +756,9 @@ if result['converged']:
     print(f"Final interval: {result['final_interval']}")
 ```
 
-Its principal arguments:
-
->- **`F_min`** (1.0) and **`F_max`** (2.0): the [starting bracket and its automatic expansion](#methodology).<br>
->- **`tolerance`** (0.01): the bisection stops when the bracket is narrower than this. The reported
->  FS is the bracket midpoint (± tolerance/2), or the bracket's bottom as a lower bound
->  (`fs_is_lower_bound`) when the top is an undecided trial; the bracket is returned in
->  `final_interval`.<br>
->- **`grid`** (`None`): bisect over a **fixed global grid** of this step instead of halving the
->  supplied bracket. Because the failure threshold sits between two fixed grid points — a property of
->  the slope and mesh, not of the bracket — every starting bracket then converges to the same cell and
->  the reported FS is independent of the bracket, at the same $\log_2$ cost. Used by the
->  [reliability analysis](../reliability/fem.md) for reproducible results.<br>
->- **`failure_criterion`** (`"hybrid"`), **`convergence_tol`** ($10^{-3}$), **`force_tol`**
->  ($10^{-3}$), **`max_iterations`** (12000), **`max_iterations_ceiling`** (50000): passed to each
->  trial.<br>
->- **`max_disp_factor`** (0.1): the displacement-limit fraction. It is what the
->  `"displacement_limit"` criterion bisects on; see [the displacement limit](#3-displacement-limit-displacement_limit).<br>
->- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
->  a model converge** — it shrinks the residual without making the slope any more stable, and can push
->  a failing state under an absolute `force_tol`.<br>
->- **`fem_solver`** (`'auto'`): the per-trial driver, passed to every trial — see
->  [Choosing the driver](#choosing-the-driver).<br>
->- **[`k0`](#in-situ-equilibration)**,
->  **[`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter)**,
->  **[`ssr_exclude` / `ssr_zone`](#ssr-exclusion-zones)**,
->  **[`tension_cutoff_by_material` / `tension_srf`](#tensile-strength-in-ssrm)**,
->  **[`elastic_materials`](overview.md#mohr-coulomb-failure-criterion)**,
->  **[`suction_phi_b` / `suction_cap`](overview.md#matric-suction-apparent-cohesion-above-the-water-table)**: follow the linked model and run settings.<br>
->- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
->- **`capture_failure_state`** (`True`): [capture the mechanism](#capturing-the-failure-mechanism) after the search.<br>
->- **`capture_margin`** (0.15): [strength margin](#capturing-the-failure-mechanism) above FS for the capture.<br>
->- **`capture_max_iterations`** (`None`): override the [automatic capture budget](#capturing-the-failure-mechanism).
+Every argument is documented in the [API reference](../api/fem.md#xslope.fem.solve_ssrm). One of them, `dt_scale`, scales the
+pseudo-time step for diagnosis only: lowering it shrinks the residual without making the slope any
+more stable, so never lower it to make a model converge.
 
 The result dictionary carries `FS`, the last converged solution (`last_solution`),
 `final_interval`, the per-trial records (`trials`), and, with capture on, `failure_solution`.

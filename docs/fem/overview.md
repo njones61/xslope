@@ -12,6 +12,16 @@ slope domain and lets the failure mechanism emerge where the soil actually runs 
 (Griffiths & Lane, 1999; Dawson et al., 1999). Stress redistributes as elements yield, and the shear band
 that develops is an output rather than an input.
 
+The figure shows the difference on a two-layer clay slope, the sample file
+[xslope_simple_mult_layers_clay_fem.xlsx](files/xslope_simple_mult_layers_clay_fem.xlsx): a 20 ft embankment
+($c$ = 400 psf) on a 10 ft foundation ($c$ = 800 psf), both with $\phi = 0$, over a firm base. Limit equilibrium
+searches circles for the critical one. Strength reduction is given no surface, and its shear band forms in nearly the
+same place, at a factor of safety within 2% of Spencer's.
+
+<!-- test: file=files/xslope_simple_mult_layers_clay_fem.xlsx, type=fem_ssrm, expected_fs=1.223, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, criterion=non_convergence, max_iter=12000, f_stand=1.21875, f_fail=1.2265625, check=edges, expected_elements=1581, expected_nodes=3306, benchmark=FEM-clay-two-layer -->
+
+![Spencer's critical circle and the strength-reduction shear band on the two-layer clay slope](images/fem_ssrm_lem_fem.png){width=748}
+
 XSLOPE's implementation is the viscoplastic elastic-perfectly-plastic algorithm of Griffiths &
 Lane (1999) and Smith & Griffiths (2004). The factor of safety comes from the
 [shear strength reduction method (SSRM)](solver.md#shear-strength-reduction-method-ssrm): the selected
@@ -103,6 +113,17 @@ How precisely $E$ must be known depends on the question. Under the SSRM the fact
 governed by $c$ and $\phi$; $E$ scales the computed displacements but has little effect on the
 critical strength reduction factor. Approximate moduli are therefore adequate unless the deformation
 prediction is itself a deliverable.
+
+On the two-layer clay slope at the top of this page, multiplying every $E$ by 0.1 and by 10 gives:
+
+| Stiffness | Factor of safety | Largest displacement at $F$ = 1 |
+|---|:-:|:-:|
+| every $E$ × 0.1 | 1.207 | 1.53 ft |
+| as given: 150,000 psf (embankment), 300,000 psf (foundation) | 1.223 | 0.153 ft |
+| every $E$ × 10 | 1.223 | 0.0153 ft |
+
+A hundredfold change in stiffness moves the factor of safety by about 1%, while the displacements scale with
+$1/E$. With an assumed modulus, only the pattern of the displacements means anything, not their size.
 
 ### Mohr-Coulomb failure criterion
 

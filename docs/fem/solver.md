@@ -77,6 +77,19 @@ stress is evaluated — yield, displacements grow, and at some point the
 stops reaching equilibrium at all. `solve_ssrm()` brackets that transition
 and bisects it.
 
+The figure follows that progression on the [two-layer clay slope](overview.md) (FS = 1.223), at two
+trials that stand and the last one that stands. The left column shades each element's shear stress over its reduced
+strength, read on the largest of its three Mohr circles; orange is at the limit. The right column is the
+viscoplastic shear strain, on one scale for all three.
+
+![Shear stress over strength and shear strain at F = 1.000, 1.125, and 1.219 on the two-layer clay slope](images/fem_ssrm_yielding.png){width=910}
+
+Yielding is not the same as moving. At $F$ = 1, 13% of the elements are already at their limit, at the base
+of the embankment under the crest, but the soil around them has strength to spare and the largest shear strain is
+0.003. At $F$ = 1.219, 40% are at the limit, and the strain has gathered into one band from the toe,
+along the top of the foundation, to behind the crest: the path along which a block can slide out. Much of the soil at
+its limit lies inside that block and hardly strains. One step weaker, and the slope no longer comes to rest.
+
 A bracket has a lower factor at which the slope stands and an upper factor at which it fails.
 Bisection tests the midpoint and replaces the appropriate end with that trial's factor, narrowing
 the interval until it reaches the requested tolerance. A trial that ends neither standing nor failed (undecided, see
@@ -109,6 +122,11 @@ lies above the stopped point at $F = 1.45$: the latter is not an equilibrium dis
 The displacement of a failing trial depends on the iteration budget it was given, which is
 why the bisection uses the trial's verdict (standing, failed or undecided; see
 [SSRM failure criteria](#ssrm-failure-criteria)) rather than the displacement magnitude.
+
+A search reads those verdicts one trial at a time. On the two-layer clay slope it makes nine trials from the default
+bracket of 1.0 to 2.0, and closes on 1.2188 to 1.2266, whose midpoint, 1.223, is the factor of safety:
+
+![The nine trials of a strength reduction search on the two-layer clay slope, in order](images/fem_ssrm_trials.png){width=974}
 
 ## Elastic-plastic behavior: the viscoplastic algorithm {#elastic-plastic-behavior-viscoplastic-algorithm}
 
@@ -360,6 +378,12 @@ The classical Griffiths & Lane (1999) approach: bisection on whether the viscopl
 converges. In XSLOPE "converges" means **true equilibrium** — both the displacement convergence test (Smith & Griffiths, 2004) and
 the force-equilibrium test — so the bisection brackets the genuine boundary between states that
 reach static equilibrium and states that creep indefinitely.
+
+The two show in a trial's record of its largest displacement. On the two-layer clay slope, the trial at $F$ = 1.125
+levels off and reaches equilibrium in 305 iterations; the trial at the upper edge of the final bracket,
+$F$ = 1.227, is still moving when its 12,000 iterations run out:
+
+![Largest displacement against iteration for a trial that stands and one that fails](images/fem_ssrm_history.png){width=694}
 
 The force-equilibrium half is Dawson, Roth & Drescher's; Griffiths & Lane's own criterion is
 the displacement test plus an iteration ceiling, which
@@ -704,6 +728,18 @@ divided by $F$ is zero. It matches RS2's tension-SRF switch. A joint's tension c
 the same setting ([Strength reduction](joints.md#strength-reduction) on the joints page).
 Set it with the **Tension SRF** cell on the main sheet, `tension_srf`, or the dialog checkbox,
 which is dimmed where it has nothing to act on.
+
+**An example.** Both clays of the [two-layer clay slope](overview.md) have $\phi = 0$, so with `t_cut` blank the
+tension they may carry is unbounded. Run that way, the slope carries tension in a skin a few feet deep along the face
+and across the crest (left, at $F$ = 1.289, the last trial that stood), up to 576 psf, more than the
+embankment's cohesion of 400 psf. The Mohr circle (right) is one element there, 7 ft behind the crest and
+3 ft down: it reaches the reduced strength line with $\sigma'_3$ = −241 psf. A `t_cut` of 0 holds
+$\sigma'_3$ at zero or above, and the tension a point cannot carry passes to the soil around it.
+
+![The soil in tension with tension allowed, and one element's Mohr circle](images/fem_ssrm_tension.png){width=1076}
+
+With tension allowed the factor of safety is 1.293; with `t_cut` = 0, the sample as shipped, it is
+1.223, 6% lower.
 
 **Which convention.** XSLOPE's default, a blank cell and the envelope's own limit, is
 Griffiths & Lane's convention, and every [Griffiths & Lane verification example](../verification/ssrm.md)

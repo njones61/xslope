@@ -361,6 +361,33 @@ def read_gsz(path):
         mfns[int(fid)] = {"name": _text(fn, "Name", ""),
                           "function": _text(fn, "Function", ""), "points": pts}
 
+    # Spatial Mohr-Coulomb's functions. A material whose <SlopeCohesionModel> (or Phi,
+    # or Weight) is "Function" names one of these curves by <CohesionFnNum>: the value
+    # against one coordinate, InputParam=X or Y. "Spatial Function" names a Fn3D by
+    # <CohesionSpatialFnNum>: the value over (x, y), its points stored as X, Y, Z.
+    sfns = {}
+    for kind in ("CohesionFn", "PhiFn", "WeightFn"):
+        for fn in root.findall(f"./Functions/Material/StressStrain/{kind}s/{kind}"):
+            fid = _text(fn, "ID")
+            if fid is None:
+                continue
+            expr = _text(fn, "Function", "") or ""
+            inp = re.search(r"InputParam=(\w+)", expr)
+            sfns[(kind, int(fid))] = {
+                "name": _text(fn, "Name", ""), "function": expr,
+                "input": inp.group(1) if inp else None,
+                "points": [(float(p.get("X")), float(p.get("Y")))
+                           for p in fn.findall("./Points/Point")]}
+    fn3ds = {}
+    for fn in root.findall("./Functions/Func3Ds/Fn3D"):
+        fid = _text(fn, "ID")
+        if fid is None:
+            continue
+        fn3ds[int(fid)] = {
+            "name": _text(fn, "Name", ""), "output": _text(fn, "OutputType", ""),
+            "points": [(float(p.get("X")), float(p.get("Y")), float(p.get("Z")))
+                       for p in fn.findall("./Points/Points_")]}
+
     # Boundary-condition library. The hydraulic ones encode their type in an
     # expression string, e.g. HydHeadvsTime(Variability=Constant,Value=8) or
     # HydTotalFlux(Variability=Constant,Value=0,Review=true).
@@ -426,7 +453,18 @@ def read_gsz(path):
             "plate_from_tensile": plate_from_tensile,
             "pullout": _num(rf, "PulloutResistance", 0.0),
             "spacing": _num(rf, "Spacing", None),          # out-of-plane, None = per metre
-            "distribution": _text(rf, "ForceDistribution", ""),
+            # GeoStudio writes a field only when it differs from the default, and
+            # these four defaults are measured from SLOPE/W's own files: no <Type> is
+            # an Anchor ("Reinforcement with Anchors" has no <Type> on any of its four
+            # products, which carry the anchor-only BondLength and BondDiameter); no
+            # <ForceDistribution> is Distributed (that file's "Distributed load"
+            # analysis uses the product with no tag, its "Concentrated load" analysis
+            # the one tagged Concentrated); no <FofSDependent> is No.
+            "distribution": _text(rf, "ForceDistribution", "") or "Distributed",
+            "fofs_dependent": (_text(rf, "FofSDependent", "") or "").strip().lower()
+                              == "true",
+            "shear": _num(rf, "Shear", None),              # anchor/nail/pile shear force
+            "shear_option": _text(rf, "ShearOption", ""),
             # The ALTERNATIVE pullout law, and xslope's Adhesion/Delta columns:
             # bond from soil adhesion + friction on the interface, growing with the
             # effective overburden. GeoStudio states the interface strength per unit
@@ -609,7 +647,8 @@ def read_gsz(path):
         "regions": regions, "lines": glines, "geometries": geometries,
         "materials": materials,
         "contexts": contexts, "water": water,
-        "stability": stability, "kfns": kfns, "mfns": mfns, "bcs": bcs,
+        "stability": stability, "kfns": kfns, "mfns": mfns, "sfns": sfns,
+        "fn3ds": fn3ds, "bcs": bcs,
         "hyd_bcs": hyd_bcs, "reinforcements": reinforcements,
         "unit_system": unit_system, "design_factors": design_factors,
     }
@@ -726,10 +765,17 @@ _MODEL_FIELDS = {
                 "NCUndrainedStrengthRatio", "SHANSEPExponent", "OCRFnNum",
                 "ShearVerticalFnNum", "CohesionPrime", "PhiPrime", "Cohesion"},
     "SFnDepth": {"CTopOfLayer", "CRateOfIncrease", "CohesionPrime", "PhiPrime"},
+    # TauSigmaRatio is SHANSEP's, left behind on a material switched to Spatial
+    # Mohr-Coulomb: SLOPE/W's own example carries it and its results ignore it.
+    "MohrCoulombSpatial": {"TauSigmaRatio", "CohesionPrime", "PhiPrime",
+                           "SlopeCohesionModel",
+                           "SlopePhiModel", "SlopeWeightModel", "CohesionFnNum",
+                           "PhiFnNum", "WeightFnNum", "CohesionSpatialFnNum",
+                           "PhiSpatialFnNum", "WeightSpatialFnNum"},
 }
 
 
-def _strength(src, mfns=None):
+def _strength(src, mfns=None, sfns=None, fn3ds=None):
     """``(fields, notes, from_top)`` for one GeoStudio material, by its SlopeModel.
 
     ``fields`` updates the xslope material (option, c, phi, cp); ``notes`` are its
@@ -849,6 +895,10 @@ def _strength(src, mfns=None):
         c_top, rate = f("CTopOfLayer"), f("CRateOfIncrease")
         return {"option": "cp", "c": c_top, "phi": 0.0, "cp": rate}, unread(), True
 
+    if model == "MohrCoulombSpatial":
+        fields, notes = _spatial_mc(name, s, f, sfns or {}, fn3ds or {})
+        return fields, notes + unread(), False
+
     # An unknown model. Take whatever strength fields exist, and say so plainly.
     c = f("CohesionPrime", f("Cohesion"))
     phi = f("PhiPrime")
@@ -856,6 +906,125 @@ def _strength(src, mfns=None):
         f"material '{name}' uses GeoStudio's {model or 'unnamed'} strength model, "
         f"which xslope does not have — imported as Mohr-Coulomb with c = {c:g}, "
         f"phi = {phi:g}, which is NOT the same strength; check it before solving"], False
+
+
+def _linear_in_y(points):
+    """``(c_top, rate, y_top, y_low, c_low)`` when a curve of value against elevation
+    is one straight line falling with elevation (so rising with depth), else None.
+
+    SLOPE/W's own Spatial Mohr-Coulomb example (in its SHANSEP example file) is one:
+    c' = 27.52 at y = 0 and 5.4 at y = 9, and its saved column strengths are that line
+    exactly, held at the end values beyond the two points. Above its top that is
+    XSLOPE's ``cp`` (c, c/p and r_elev), which holds c above r_elev too.
+    """
+    pts = sorted(points, key=lambda p: p[0])
+    if len(pts) < 2 or pts[-1][0] - pts[0][0] <= 0:
+        return None
+    (y0, c0), (y1, c1) = pts[0], pts[-1]
+    rate = (c0 - c1) / (y1 - y0)                 # strength gained per unit depth
+    if rate <= 0:
+        return None
+    tol = 1e-6 * max(1.0, abs(c0), abs(c1))
+    if any(abs(c - (c1 + rate * (y1 - y))) > tol for y, c in pts):
+        return None
+    return c1, rate, y1, y0, c0
+
+
+def _spatial_mc(name, s, f, sfns, fn3ds):
+    """``(fields, notes)`` for SLOPE/W's Spatial Mohr-Coulomb material.
+
+    Its cohesion, friction angle and unit weight can each be a constant, a curve
+    against x or y ("Function", <CohesionFnNum>), or a value over (x, y) ("Spatial
+    Function", <CohesionSpatialFnNum>). A cohesion that is a straight line rising
+    with depth, on a friction angle of zero, is XSLOPE's ``cp`` and imports as it.
+    Every other function is replaced by one value -- the lowest of a strength
+    function, the average of a unit weight function -- and the notes name the
+    material, the function, its range and the value used.
+    """
+    fields, notes = {}, []
+
+    def curve(prop, tag):
+        """(label, values, fn) for the property's function, or None if constant."""
+        how = s.get(f"Slope{prop}Model") or ""
+        if how == "Function":
+            fn = sfns.get((f"{prop}Fn", int(f(f"{prop}FnNum", -1))))
+            if fn is None or not fn["points"]:
+                return (f"a {tag} function the file does not define", [], None)
+            label = (f"'{fn['name']}', {tag} against {fn['input'] or 'a coordinate'}"
+                     if fn["name"] else f"a {tag} function")
+            return label, [v for _, v in fn["points"]], fn
+        if how == "Spatial Function":
+            fn = fn3ds.get(int(f(f"{prop}SpatialFnNum", -1)))
+            if fn is None or not fn["points"]:
+                return (f"a spatial {tag} function the file does not define", [], None)
+            label = (f"'{fn['name']}', {tag} over x and y" if fn["name"]
+                     else f"a spatial {tag} function over x and y")
+            return label, [z for _, _, z in fn["points"]], fn
+        return None
+
+    c_fn, phi_fn, w_fn = (curve("Cohesion", "cohesion"), curve("Phi", "friction angle"),
+                          curve("Weight", "unit weight"))
+    c, phi = f("CohesionPrime"), f("PhiPrime")
+
+    if phi_fn is not None:
+        label, vals, _ = phi_fn
+        if vals:
+            phi = min(vals)
+            notes.append(
+                f"material '{name}' takes its friction angle from {label}, from "
+                f"{min(vals):g} to {max(vals):g} degrees at its points. XSLOPE has one "
+                f"friction angle per material, so it was imported with the lowest, "
+                f"phi = {phi:g}. Where SLOPE/W's is higher, XSLOPE's strength is lower.")
+        else:
+            notes.append(f"material '{name}' takes its friction angle from {label}; "
+                         f"it was imported with phi = {phi:g}. Check it before solving.")
+
+    if c_fn is not None:
+        label, vals, fn = c_fn
+        # XSLOPE's cp is an undrained strength: it takes no friction angle. So only a
+        # cohesion line on phi = 0 is cp exactly; with friction it falls to the
+        # substitution below.
+        line = (_linear_in_y(fn["points"])
+                if fn is not None and fn.get("input") == "Y" and phi == 0
+                and phi_fn is None else None)
+        if line is not None:
+            c_top, rate, y_top, y_low, c_low = line
+            fields.update(option="cp", c=c_top, cp=rate, r_elev=y_top,
+                          _cp_floor=(y_low, c_low))
+            notes.append(
+                f"material '{name}' takes its cohesion from {label}, a straight line "
+                f"rising from {c_top:g} at y = {y_top:g} to {c_low:g} at y = {y_low:g}. "
+                f"That is XSLOPE's cp option: c = {c_top:g}, c/p = {rate:g} per unit of "
+                f"depth below r_elev = {y_top:g}.")
+        elif vals:
+            c = min(vals)
+            notes.append(
+                f"material '{name}' takes its cohesion from {label}, from {min(vals):g} "
+                f"to {max(vals):g} at its points. XSLOPE cannot represent that function, "
+                f"so the material was imported as Mohr-Coulomb with the lowest, c = "
+                f"{c:g}. Where SLOPE/W's is higher, XSLOPE's strength is lower"
+                + (f", by up to a factor of {max(vals) / c:.3g}" if c > 0 else "")
+                + ". Check it before solving.")
+        else:
+            notes.append(f"material '{name}' takes its cohesion from {label}; it was "
+                         f"imported with c = {c:g}. Check it before solving.")
+    if "option" not in fields:
+        fields.update(option="mc", c=c)
+    fields["phi"] = phi
+
+    if w_fn is not None:
+        label, vals, _ = w_fn
+        if vals:
+            fields["gamma"] = sum(vals) / len(vals)
+            notes.append(
+                f"material '{name}' takes its unit weight from {label}, from "
+                f"{min(vals):g} to {max(vals):g} at its points. XSLOPE has one unit "
+                f"weight per material, so it was imported with the average of those "
+                f"points, {fields['gamma']:.4g}. Check it before solving.")
+        else:
+            notes.append(f"material '{name}' takes its unit weight from {label}. "
+                         f"Set gamma before solving.")
+    return fields, notes
 
 
 def _circle_usable(slope_data, circle):
@@ -890,15 +1059,23 @@ def _circle_usable(slope_data, circle):
 # 'passive' means the force is divided by the factor of safety (an ultimate capacity),
 # 'active' means it is not.
 #
-# The file does NOT record a direction or an F-of-S dependence: GeoStudio implies both
-# from the Type. So does this table, and each row is measured against SLOPE/W's own
-# factor of safety rather than reasoned about -- see run_gsz_corpus().
+# The file does not record a direction: GeoStudio implies it from the Type. So does
+# this table, and each row is measured against SLOPE/W's own factor of safety rather
+# than reasoned about -- see run_gsz_corpus(). The F-of-S dependence IS recorded, as
+# <FofSDependent>true</FofSDependent> (absent = No), and a dependent product imports
+# as 'passive' whatever its Type.
 _REINF_TYPE = {
     "Nail":         ("nail",         "axial",   "active"),
     "Geosynthetic": ("geosynthetic", "axial",   "active"),
     "Anchor":       ("anchor",       "axial",   "active"),
     "Tieback":      ("tieback",      "axial",   "active"),
 }
+# A product with no <Type> is GeoStudio's default type, the Anchor: GeoStudio writes a
+# field only when it differs from the default. Every untyped product in SLOPE/W's own
+# files is an anchor (they carry the anchor-only BondLength and BondDiameter, and the
+# example "Reinforcement with Anchors" types none of its four), and on the Tie-Back
+# Wall example an untyped product read as an anchor matches SLOPE/W's factor of safety.
+_REINF_DEFAULT_TYPE = "Anchor"
 
 
 def _reinforcement(product, line, ground_surface):
@@ -921,9 +1098,24 @@ def _reinforcement(product, line, ground_surface):
     t_max = (product.get("tensile") or 0.0) / spacing
     plate = (product.get("plate") or 0.0) / spacing
     rate = (product.get("pullout") or 0.0) / spacing      # force per unit length
+
+    # An anchor develops its pullout only over its bond length, the grouted stretch at
+    # the buried end; the free length in front of it carries no bond. SLOPE/W's anchor
+    # force where a slip surface crosses is the smallest of the tensile capacity, the
+    # bond behind the crossing (rate x the bonded length behind it, at most rate x
+    # BondLength) and, at the face, the plate capacity plus any bond in front. Capping
+    # the member at rate x BondLength and ramping from the buried end over Lp =
+    # capacity / rate reproduces the first two exactly; on SLOPE/W's Reinforcement with
+    # Anchors example its column forces are 300 kN at both anchors, rate x BondLength.
+    # The face end is exact while the plate capacity is at least that capacity (every
+    # anchor in SLOPE/W's files); a smaller plate also earns bond over the free length
+    # here. (Nails are bonded over their whole length: their BondLength plays no part.)
+    gtype = product.get("type") or _REINF_DEFAULT_TYPE
+    p1, p2 = line["p1"], line["p2"]
+    if gtype == "Anchor" and _bond_limited(product, line):
+        t_max = min(t_max, rate * product["bond_length"])
     lp = (t_max / rate) if rate > 0 else 0.0              # 0 => that end is fully anchored
 
-    p1, p2 = line["p1"], line["p2"]
     # The plate/facing sits at the end that is AT the face — the endpoint on (or nearest)
     # the ground surface. The other end is buried and develops force only by bond.
     if ground_surface is not None and not ground_surface.is_empty:
@@ -934,8 +1126,9 @@ def _reinforcement(product, line, ground_surface):
     else:
         face_is_1 = True
 
-    xtype, xdir, xappl = _REINF_TYPE.get(product.get("type") or "",
-                                         ("", "tangent", "active"))
+    xtype, xdir, xappl = _REINF_TYPE.get(gtype, ("", "tangent", "active"))
+    if product.get("fofs_dependent"):
+        xappl = "passive"
     adhesion, delta = _interface_pullout(product, spacing)
     return {
         "x1": p1[0], "y1": p1[1], "x2": p2[0], "y2": p2[1],
@@ -950,6 +1143,15 @@ def _reinforcement(product, line, ground_surface):
         "type": xtype, "dir": xdir, "appl": xappl,
         "adhesion": adhesion, "delta": delta,
     }
+
+
+def _bond_limited(product, line):
+    """Does this anchor's bond length stop short of the bar, so that its pullout
+    develops over the bond length only? (The test ``_reinforcement`` applies.)"""
+    bond = product.get("bond_length")
+    p1, p2 = line["p1"], line["p2"]
+    return bool(bond and (product.get("pullout") or 0.0) > 0
+                and bond < math.hypot(p2[0] - p1[0], p2[1] - p1[1]))
 
 
 def _interface_pullout(product, spacing):
@@ -1267,6 +1469,65 @@ def _import_seep(gsz, analysis, step, caveats, polygons):
         f"solved on, with every material set to the 'seep' option. It is SLOPE/W's own "
         f"pore pressure. xslope did not run the seepage analysis")
     return mesh, u, chosen
+
+
+def _piezo_past_ends(line, domain_polygon, which="piezometric surface"):
+    """Carry SLOPE/W's no-water rule past a piezometric line's ends. Returns
+    ``(line, note)``; ``note`` is None when the line already spans the model.
+
+    SLOPE/W applies no pore pressure beyond the ends of a piezometric surface. Its
+    own Arai and Tagyo pore-water example shows it: the line starts on the slope at
+    x = 30, and SLOPE/W's saved pressure is zero at every column base left of that,
+    9 to 10 m below the line's level. XSLOPE refuses a slice past a line's end
+    rather than read zero there, so the import continues the line down to the
+    model's base and along it to the model's edge, which gives the same zero. Run
+    level instead, the line would stand above the toe and load it with ponded water
+    SLOPE/W does not have: 11% high on that example's 251 circles, against -0.2%
+    this way.
+    """
+    if len(line) < 2 or domain_polygon is None or domain_polygon.is_empty:
+        return line, None
+    x0m, y_base, x1m, _ = domain_polygon.bounds
+    pts = sorted(line)
+    tol = 1e-6 * max(1.0, x1m - x0m)
+    out, ends = list(pts), []
+    if pts[0][0] > x0m + tol:
+        x0 = pts[0][0]
+        out = [(x0m, y_base), (x0 - tol, y_base)] + out
+        ends.append(f"left of x = {x0:g}")
+    if pts[-1][0] < x1m - tol:
+        x1 = pts[-1][0]
+        out = out + [(x1 + tol, y_base), (x1m, y_base)]
+        ends.append(f"right of x = {x1:g}")
+    if not ends:
+        return line, None
+    return out, (
+        f"the {which} does not span the model (it runs from x = {pts[0][0]:g} to "
+        f"{pts[-1][0]:g}; the model from x = {x0m:g} to {x1m:g}). SLOPE/W applies no "
+        f"pore pressure beyond a line's ends, so the import continues the line down to "
+        f"the model's base (y = {y_base:g}) and along it, giving zero pore pressure "
+        f"{' and '.join(ends)}, as in SLOPE/W. Edit the line if the water continues "
+        f"there")
+
+
+def _piezo_without_continuation(line, y_base):
+    """The inverse of :func:`_piezo_past_ends`: ``line`` without the stretch along
+    the model's base (y = ``y_base``) the import added beyond either end. That stretch
+    is two points on the base, the inner one a hair (at most 1e-6 x the width) short
+    of the line's own end."""
+    pts = sorted(line)
+    if len(pts) < 4:
+        return line
+    width = max(1.0, pts[-1][0] - pts[0][0])
+    tol = 1e-6 * width
+    on_base = lambda q: abs(q[1] - y_base) <= 1e-9 * max(1.0, abs(y_base))  # noqa: E731
+    if (on_base(pts[0]) and on_base(pts[1]) and not on_base(pts[2])
+            and 0.0 < pts[2][0] - pts[1][0] <= 1.01 * tol):
+        pts = pts[2:]
+    if (len(pts) >= 4 and on_base(pts[-1]) and on_base(pts[-2]) and not on_base(pts[-3])
+            and 0.0 < pts[-2][0] - pts[-3][0] <= 1.01 * tol):
+        pts = pts[:-2]
+    return pts if len(pts) != len(line) else line
 
 
 def _line_on_ground(line, ground_surface, n=20):
@@ -1706,6 +1967,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     mat_index = {mid: i for i, mid in enumerate(used)}
     materials = []
     depth_from_top = []     # S=f(depth) materials, whose r_elev is their layer's top
+    spatial_cp = []         # (index, (y, c)): a cp cohesion SLOPE/W holds below y
     for mid in used:
         src = gsz["materials"].get(mid)
         if src is None:
@@ -1725,9 +1987,14 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 caveats.append(f"material '{src['name']}' has no unit weight in the "
                                f"file — set gamma before solving")
             continue
-        fields, notes, from_top = _strength(src, gsz.get("mfns"))
+        fields, notes, from_top = _strength(src, gsz.get("mfns"), gsz.get("sfns"),
+                                           gsz.get("fn3ds"))
         caveats.extend(notes)
-        mat.update(gamma=src["gamma"], **fields)
+        cp_floor = fields.pop("_cp_floor", None)
+        mat.update(gamma=src["gamma"])
+        mat.update(fields)
+        if cp_floor is not None:
+            spatial_cp.append((mat_index[mid], cp_floor))
         if from_top:
             depth_from_top.append(mat_index[mid])
         # SLOPE/W can scale any strength by a function of the base inclination (its
@@ -1791,6 +2058,19 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     for i in depth_from_top:
         caveats.extend(cp_from_layer_top(materials[i], polygons, i,
                                          "SLOPE/W", "S=f(depth)"))
+    # A Spatial Mohr-Coulomb cohesion line imported as cp: SLOPE/W holds the strength
+    # at the line's lowest point below it, and cp keeps rising.
+    for i, (y_low, c_low) in spatial_cp:
+        bottom = min((p["polygon"].bounds[1] for p in polygons if p["mat_id"] == i),
+                     default=None)
+        if bottom is not None and bottom < y_low - 1e-9:
+            m = materials[i]
+            c_bot = m["c"] + m["cp"] * (m["r_elev"] - bottom)
+            caveats.append(
+                f"material '{m['name']}' reaches y = {bottom:g}, below its cohesion "
+                f"function's lowest point (y = {y_low:g}). SLOPE/W holds the cohesion "
+                f"at {c_low:g} below that point; XSLOPE's cp keeps rising, to "
+                f"{c_bot:g} at y = {bottom:g}, so XSLOPE's strength is higher there")
 
     # Pore pressure. SLOPE/W names the option on the analysis; only a piezometric
     # surface maps onto xslope's piezo line. <MaterialUsesPiezs> says WHICH materials
@@ -1952,6 +2232,19 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             "s_cap) by hand if you want unsaturated strength credited")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
+
+    # A line that stops short of the model's edges: SLOPE/W has no water past its
+    # ends (see _piezo_past_ends).
+    piezo_line, note = _piezo_past_ends(
+        piezo_line, domain_polygon,
+        "piezometric surface" if not piezo_line2 else
+        "piezometric surface before drawdown (line 1)")
+    if note:
+        caveats.append(note)
+    piezo_line2, note = _piezo_past_ends(
+        piezo_line2, domain_polygon, "piezometric surface after drawdown (line 2)")
+    if note:
+        caveats.append(note)
 
     phreatic = bool(stab.get("phreatic"))
     if piezo_line and phreatic:
@@ -2251,6 +2544,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     from .fileio import build_reinforce_lines
 
     rlines = []
+    bonded = set()          # anchors whose pullout develops over their bond length only
     for rl in stab.get("reinf_lines", []):
         product = gsz["reinforcements"].get(rl["reinforcement"])
         if product is None:
@@ -2258,6 +2552,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                            "define — skipped")
             continue
         rlines.append(_reinforcement(product, rl, ground_surface))
+        if rlines[-1]["type"] == "anchor" and _bond_limited(product, rl):
+            bonded.add(rlines[-1]["label"])
     if rlines:
         from .fileio import attach_reinforce_pullout
         slope_data["reinforcement_lines"] = rlines
@@ -2314,8 +2610,44 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         if spread:
             caveats.append(
                 f"reinforcement {', '.join(repr(n) for n in spread)} spreads its force "
-                f"over the bar in GeoStudio rather than applying it at the slip surface; "
-                f"xslope applies it where the bar crosses the surface")
+                f"over the bar in GeoStudio (its Distributed option, GeoStudio's default) "
+                f"rather than applying it at the slip surface; xslope applies it where "
+                f"the bar crosses the surface")
+
+        untyped = sorted({p["name"] for p in used if not p.get("type")})
+        if untyped:
+            caveats.append(
+                f"reinforcement {', '.join(repr(n) for n in untyped)} has no type in the "
+                f"file, which is GeoStudio's default type, an anchor. It was imported as "
+                f"an anchor: axial, along the bar")
+        if bonded:
+            caveats.append(
+                f"anchor {', '.join(repr(n) for n in sorted(bonded))} develops its pullout only "
+                f"over its bond length at the buried end, so its capacity was set to "
+                f"the smaller of the tensile capacity and the pullout resistance times "
+                f"the bond length, reached over that length from the buried end, as in "
+                f"SLOPE/W")
+        passive = sorted({p["name"] for p in used if p.get("fofs_dependent")})
+        if passive:
+            caveats.append(
+                f"reinforcement {', '.join(repr(n) for n in passive)} is F of S "
+                f"dependent in GeoStudio, so it was imported with Appl = passive: its "
+                f"force is divided by the factor of safety, as in SLOPE/W")
+        sheared = sorted({p["name"] for p in used
+                          if p.get("shear") and (p.get("type") or "Anchor") != "Pile"})
+        if sheared:
+            caveats.append(
+                f"reinforcement {', '.join(repr(n) for n in sheared)} also carries a "
+                f"shear force in GeoStudio, which XSLOPE's reinforcement lines do not "
+                f"have. It was not imported, so XSLOPE's factor of safety will be lower "
+                f"than SLOPE/W's")
+        other = sorted({f"{p['name']!r} ({p['type']})" for p in used
+                        if p.get("type") and p["type"] not in _REINF_TYPE})
+        if other:
+            caveats.append(
+                f"reinforcement {', '.join(other)} is a GeoStudio type XSLOPE does not "
+                f"map. It was imported as a tensile line with the capacities the file "
+                f"gives, which may be none; re-create it by hand before solving")
 
     # --- line loads --------------------------------------------------------------
     lloads = []
@@ -2417,7 +2749,8 @@ def read_gsz_results(gsz, analysis_name, step=None):
     without the solver in the way.
 
     ``kind`` says what the surface is: 'circle', 'block', 'specified', 'automatic',
-    'optimized' or 'unknown', and ``circular`` is ``kind == 'circle'``. Every row
+    'optimized', 'axis' (a circle of a search with a moment axis, whose center the
+    file does not hold) or 'unknown', and ``circular`` is ``kind == 'circle'``. Every row
     carries a center and a radius, but for anything but a circle they describe a
     *fitted* circle, not the surface that was solved -- rebuilding them as circles
     silently scores the wrong geometry. Each row's SlipOrigSearchMethod decides it
@@ -2461,6 +2794,15 @@ def read_gsz_results(gsz, analysis_name, step=None):
     search = _search_option(gsz, analysis_name)
     by_option = (_OPTION_KIND.get(search["option"], "unknown") if search["found"]
                  else "unknown")
+    # A search with a moment axis (<Axis>) writes the AXIS as every row's SlipCenter,
+    # not the circle's center: on SLOPE/W's "Reinforcement with Anchors" every row
+    # gives (19, 18), and the critical circle's column bases lie on a circle centred
+    # at (187.64, 119.34) with the row's radius. Rebuilt from the row, the circle is
+    # a different surface (a sliding mass of 2.6 times SLOPE/W's weight). The one
+    # surface whose columns are saved gets its center back from them; the others are
+    # 'axis' rows, not rebuildable.
+    axis_fit = (_axis_circle_from_columns(zf, name.rsplit("/", 1)[0].lower() + "/", rows)
+                if search.get("axis") else {})
     for i, row in enumerate(rows):
         try:
             fs = float(row["SlipFOS"])
@@ -2483,16 +2825,59 @@ def read_gsz_results(gsz, analysis_name, step=None):
                     kind = "optimized"
             elif i == len(rows) - 1:
                 kind = "optimized"
+        if search.get("axis") and kind == "circle":
+            fit = axis_fit.get((row.get("SlipNum") or "").strip())
+            if fit is not None and abs(fit[2] - radius) <= 1e-3 * radius:
+                xo, yo = fit[0], fit[1]
+            else:
+                kind = "axis"
         out.append({"fs": fs, "xo": xo, "yo": yo, "r": radius, "weight": weight,
                     "circular": kind == "circle", "kind": kind,
                     "inherited": search["inherited"]})
     return out
 
 
+def _axis_circle_from_columns(zf, prefix, rows):
+    """``{SlipNum: (xc, yc, R)}`` for each saved slip whose column file
+    (``column_<SlipNum>.csv``) holds column bases lying on one circle.
+
+    A least-squares circle through the columns' base corners (XLeft, YBackBotLeft)
+    and (XRight, YBackBotRight), which lie on the slip surface itself, kept only when
+    every corner is within 1e-4 x R of it: a surface cut short by bedrock, or
+    optimized away from a circle, is not one circle and is left out.
+    """
+    names = {n.lower(): n for n in zf.namelist()}
+    out = {}
+    for row in rows:
+        num = (row.get("SlipNum") or "").strip()
+        name = names.get(f"{prefix}column_{num}.csv".lower())
+        if not num or name is None:
+            continue
+        try:
+            cols = list(csv.DictReader(io.StringIO(zf.read(name).decode("utf-8-sig"))))
+            x = np.array([float(c[k]) for c in cols for k in ("XLeft", "XRight")])
+            y = np.array([float(c[k]) for c in cols
+                          for k in ("YBackBotLeft", "YBackBotRight")])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if len(x) < 3:
+            continue
+        a = np.c_[2.0 * x, 2.0 * y, np.ones_like(x)]
+        (xc, yc, k), *_ = np.linalg.lstsq(a, x * x + y * y, rcond=None)
+        r2 = k + xc * xc + yc * yc
+        if r2 <= 0:
+            continue
+        r = math.sqrt(r2)
+        if np.abs(np.hypot(x - xc, y - yc) - r).max() <= 1e-4 * r:
+            out[num] = (float(xc), float(yc), float(r))
+    return out
+
+
 def _search_option(gsz, analysis_name):
     """How an analysis's slip surfaces were made, for classifying its saved trial rows.
 
-    Returns ``{'found', 'option', 'optimized', 'inherited'}``. ``option`` is the
+    Returns ``{'found', 'option', 'optimized', 'inherited', 'axis'}``. ``axis`` is
+    True when the search names a moment axis (``<Axis>``). ``option`` is the
     ``<SlipSurface><Option>`` of the search that made the surfaces: None for the default
     entry-and-exit search, which GeoStudio writes as no ``<Option>`` at all. A
     ``FromOther`` analysis solved its parent's surface, so it answers with the parent's
@@ -2504,7 +2889,8 @@ def _search_option(gsz, analysis_name):
     The XML saved in the analysis's own result folder is read first: it is the model
     SLOPE/W solved, where the root XML may have been edited since.
     """
-    none = {"found": False, "option": None, "optimized": False, "inherited": False}
+    none = {"found": False, "option": None, "optimized": False, "inherited": False,
+            "axis": False}
     zf = gsz["zip"]
     names = zf.namelist()
     folder = _result_folder(gsz, analysis_name)
@@ -2540,8 +2926,9 @@ def _search_option(gsz, analysis_name):
         option = _text(slip, "Option")
         if option != "FromOther":
             optimized = (_text(slip, "IsOptimizationOn", "") or "").lower() == "true"
+            axis = slip is not None and slip.find("Axis") is not None
             return {"found": True, "option": option, "optimized": optimized,
-                    "inherited": inherited}
+                    "inherited": inherited, "axis": axis}
         inherited = True
         aid = parents.get(aid)
     return none
@@ -3062,6 +3449,13 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             "the zones first.)")
     if not materials:
         raise ValueError("This model has no materials to export.")
+    # A line the import continued past its ends (_piezo_past_ends) goes back as the
+    # line SLOPE/W had: GeoStudio applies no water past a line's ends on its own.
+    y_base = min(p["polygon"].bounds[1] for p in polygons)
+    slope_data = dict(slope_data)
+    for key in ("piezo_line", "piezo_line2"):
+        if slope_data.get(key):
+            slope_data[key] = _piezo_without_continuation(slope_data[key], y_base)
 
     gamma_water = require_gamma_water(slope_data, "GeoStudio export")
     try:

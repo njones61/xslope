@@ -416,9 +416,32 @@ def _strength(name, props):
     c = _fnum(props.get("c", 0.0))
     phi = _fnum(props.get("phi", 0.0))
     gamma = _fnum(props.get("uw", 0.0))
-    if tcode in (_MC_TYPE, _INFINITE_TYPE):
+    if tcode == _INFINITE_TYPE:
         # Infinite Strength is handled as an elastic material by the caller.
         return {"option": "mc", "c": c, "phi": phi}, gamma, tcode, [], False
+    if tcode == _MC_TYPE:
+        fields = {"option": "mc", "c": c, "phi": phi}
+        if "mat_tensile" not in props:
+            return fields, gamma, tcode, [], False
+        # Slide2's Tensile Strength option: the key is written only when the box is
+        # checked, with the strength as its value (0 by default). It is the same cap as
+        # XSLOPE's t_cut, which the FEM applies. Slide2's limit equilibrium uses it too
+        # (Tutorial 29, "Tensile Strength Option"): where a slice base would carry more
+        # tension than the cap, Slide2 adjusts that slice so its effective normal stress
+        # is zero, which forms a tension crack on its own -- the tutorial's slope drops
+        # from 1.9 to 0.73, the same as a dry tension crack drawn by hand. XSLOPE's limit
+        # equilibrium does not read t_cut.
+        t = _fnum(props.get("mat_tensile"), 0.0)
+        fields["t_cut"] = t
+        return fields, gamma, tcode, [
+            f"material '{name}' has Slide2's tensile strength option on, with a tensile "
+            f"strength of {t:g}. It was imported as t_cut = {t:g}, which XSLOPE's finite "
+            f"element analysis applies. Slide2's limit equilibrium also uses it: where a "
+            f"slice base would be in tension, Slide2 sets that base's effective normal "
+            f"stress to zero, which acts as a tension crack. XSLOPE's limit equilibrium "
+            f"methods do not use t_cut, so where the slip surface puts this material in "
+            f"tension, XSLOPE's factor of safety will be higher than Slide2's. Add a "
+            f"tension crack to model it in the limit equilibrium analysis."], False
     if tcode == _UNDRAINED_TYPE:
         ctype = int(_fnum(props.get("ctype", 0)))
         # aniso_surface is a per-scenario flag; -1 means no anisotropic surface.

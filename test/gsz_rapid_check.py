@@ -142,11 +142,18 @@ def _import(path):
 
 def _drawdown_problems(label, sd, want):
     """How ``sd`` departs from the drawdown the XML states (an empty list if not)."""
+    # A surface that stops short of the model is continued along the model's base
+    # (SLOPE/W puts no water past a line's ends); the vendor's own surface is the line
+    # without that continuation.
+    from xslope.geostudio import _piezo_without_continuation
+    y_base = min(p["polygon"].bounds[1] for p in sd["polygons"])
     out = []
-    if not _same_line(sd.get("piezo_line") or [], want["before"]):
+    line1 = _piezo_without_continuation(sd.get("piezo_line") or [], y_base)
+    line2 = _piezo_without_continuation(sd.get("piezo_line2") or [], y_base)
+    if not _same_line(line1, want["before"]):
         out.append(f"{label}: piezo line 1 is {sd.get('piezo_line')}, expected the "
                    f"surface before drawdown {want['before']}")
-    if not _same_line(sd.get("piezo_line2") or [], want["after"]):
+    if not _same_line(line2, want["after"]):
         out.append(f"{label}: piezo line 2 is {sd.get('piezo_line2')}, expected the "
                    f"surface after drawdown {want['after']}")
     mats = {m["name"]: m for m in sd["materials"]}

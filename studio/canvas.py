@@ -35,7 +35,7 @@ from xslope.plot import (
     plot_circular_search_results, plot_inputs, plot_mesh,
     plot_noncircular_search_results, plot_reliability_results, plot_solution,
 )
-from xslope.plot_seep import plot_seep_data, plot_seep_solution
+from xslope.plot_seep import plot_seep_data, plot_seep_solution, seep_solution_plot_kwargs
 from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ZOOM_STEP = 1.25
@@ -285,21 +285,11 @@ class MplCanvas(QWidget):
 
     def render_seep_solution(self, seep_data, solution, opts, style=None):
         opts = opts or {}
+        # One option-to-keyword mapping, shared with the animation export, so a
+        # saved animation draws each frame as this view does.
+        kw = seep_solution_plot_kwargs(opts)
         self._draw(lambda fig: plot_seep_solution(
-            seep_data, solution, variable=opts.get("variable", "head"),
-            levels=opts.get("levels", 20), base_mat=opts.get("base_mat", 1),
-            alpha=opts.get("alpha", 0.4),
-            vector_scale=opts.get("vector_scale", 0.05),
-            pad_frac=opts.get("pad_frac", 0.05),
-            flowlines=opts.get("flowlines", True),
-            vectors=opts.get("vectors", False),
-            fill_contours=opts.get("fill_contours", False),
-            phreatic=opts.get("phreatic", True),
-            cmap=opts.get("cmap", "Spectral_r"),
-            cbar_shrink=opts.get("cbar_shrink", 0.8),
-            show_bc_levels=opts.get("show_bc_levels", False),
-            legend_ncol=opts.get("legend_ncol", "auto"),
-            legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), mesh=False, fig=fig, style=style))
+            seep_data, solution, fig=fig, style=style, **kw))
 
     def render_fem_data(self, fem_data, opts=None, style=None):
         opts = opts or {}

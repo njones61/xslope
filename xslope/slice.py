@@ -1997,17 +1997,27 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                                                      np.diff(_g_xy[:, 1])))))
     _g_x_sorted = np.sort(_g_xy[:, 0])
     _g_tol = 1e-9 * max(1.0, float(_g_s[-1]))
+    # The X of each vertical ground face. A slice edge on one is a corner where
+    # the ground has two heights, and the chord gets both of its ends wrong
+    # there: the slice beside a step took its top from the foot of the step to
+    # its top, and a load read by X counted both strips meeting at the step,
+    # 20 kPa on each side read as 40. Two 20 kPa strips meeting at a 3 m step
+    # put 90.8 kN/m on a 0.41 m slice (GitHub #11). By distance along the
+    # ground, the face lies between the two strips and carries neither.
+    _g_step_x = _g_xy[1:, 0][np.abs(np.diff(_g_xy[:, 0])) <= _g_tol]
 
     def _top_pieces(x_l, y_lt, x_r, y_rt, dl_top):
         """The ground under a slice top, ``[(x, y, s), ...]`` left to right, or
         None where it is the straight chord between the top corners."""
+        on_step = bool(np.any((np.abs(_g_step_x - x_l) <= _g_tol)
+                              | (np.abs(_g_step_x - x_r) <= _g_tol)))
         lo = np.searchsorted(_g_x_sorted, x_l, side='right')
         hi = np.searchsorted(_g_x_sorted, x_r, side='left')
-        if hi <= lo:                          # no ground vertex inside the slice
+        if hi <= lo and not on_step:          # no ground vertex inside the slice
             return None
         s_l = _g_line.project(Point(x_l, y_lt))
         s_r = _g_line.project(Point(x_r, y_rt))
-        if s_r - s_l <= dl_top * (1.0 + 1e-9):   # the vertices inside are in line
+        if s_r - s_l <= dl_top * (1.0 + 1e-9) and not on_step:   # in line
             return None
         inside = (_g_s > s_l + _g_tol) & (_g_s < s_r - _g_tol)
         return ([(x_l, y_lt, s_l)]

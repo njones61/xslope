@@ -17913,6 +17913,26 @@ def run_piezo_u_guard_test(test):
     return 0.0, None
 
 
+def run_bench_guard_test(test):
+    """A benchmarks/*_guard.py script run as its own process: pass on exit 0.
+
+    These scripts check themselves and print what they checked; running them in a
+    child keeps their module state and any subprocess they start (mesh_refine_guard's
+    hang trap) out of the suite. ``test['source']`` is the script's base name.
+    Returns (0.0, None) on pass, else (None, the last lines of its output)."""
+    import subprocess
+    root = Path(__file__).parent
+    script = root / 'benchmarks' / f"{test['source']}.py"
+    env = dict(os.environ, PYTHONPATH=str(root), MPLBACKEND='Agg')
+    proc = subprocess.run([sys.executable, '-P', str(script)], cwd=str(root), env=env,
+                          capture_output=True, text=True)
+    if proc.returncode == 0:
+        return 0.0, None
+    tail = [ln for ln in (proc.stdout + proc.stderr).splitlines()
+            if ln.strip() and not ln.startswith('Info ')][-4:]
+    return None, f"{test['source']} exited {proc.returncode}: " + " | ".join(tail)
+
+
 def run_rankine_tension_guard_test(test):
     """Rankine tension cutoff guard (benchmarks/rankine_tension_guard.py).
 
@@ -18939,6 +18959,8 @@ def _dispatch_test(test):
         return run_piezo_u_guard_test(test)
     if test_type == 'rankine_tension_guard':
         return run_rankine_tension_guard_test(test)
+    if test_type == 'bench_guard':
+        return run_bench_guard_test(test)
     if test_type == 'kernel_xcheck':
         return run_kernel_xcheck_test(test)
     if test_type == 'preflight_rules':
@@ -19239,7 +19261,7 @@ def _expected_and_tol(test, default_tolerance):
                        'circle_vertex', 'circle_above_center',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck',
-                       'rankine_tension_guard'):
+                       'rankine_tension_guard', 'bench_guard'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -19471,6 +19493,13 @@ def main():
         tests.append({'type': 'rankine_tension_guard',
                       'file': 'Rankine tension cutoff guard',
                       'method': '-', 'source': 'rankine_tension_guard'})
+        # The SSR search area and elastic materials (ssr_zone_guard, about 2 s) and
+        # local mesh refinement (mesh_refine_guard, about 4 s): each script checks
+        # itself and exits non-zero on a failure.
+        tests.append({'type': 'bench_guard', 'file': 'SSR search area and elastic materials guard',
+                      'method': '-', 'source': 'ssr_zone_guard'})
+        tests.append({'type': 'bench_guard', 'file': 'local mesh refinement guard',
+                      'method': '-', 'source': 'mesh_refine_guard'})
         # The input-graying audit's engine fixes, each against a hand number
         # (test/audit_engine_check.py, enqueued once the module exists).
         tests.extend(_audit_module_tests('fem'))
@@ -19773,6 +19802,10 @@ def main():
         # residuals, the early refusal that skips a cascade which cannot help, and
         # the search's disclosure of the trials its method could not answer on —
         # with a clean model as the control that says nothing extra.
+        # The circular search's window constraints: invariant by default, and
+        # they select RS2-61's upper-face local minimum when applied (about 80 s).
+        tests.append({'type': 'bench_guard', 'file': 'search window constraints guard',
+                      'method': '-', 'source': 'search_window_guard'})
         tests.append({'type': 'spencer_disclosure',
                       'file': 'Spencer insoluble surfaces + search disclosure',
                       'method': 'spencer', 'source': 'spencer_disclosure'})

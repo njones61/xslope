@@ -3,14 +3,12 @@
 Walked: the starter opened, the Run LEM dialog and the three methods' answers,
 FEM mode and the grayed Run FEM, the mesh at the page's settings, the refused
 run, the elastic properties typed into the columns the page names, the run's
-dialog defaults, the strength reduction and its trial table, and the
-yielded-element count at failure. Not walked: the sweeps the page reports but
+dialog defaults, and the strength reduction and its trial table. Not walked: the sweeps the page reports but
 does not ask the reader to make (E, tolerance, iteration budget, Hybrid, fixed
 sides), which the page's tags and the verification pages hold.
 """
 import re
 
-import numpy as np
 
 from tutorial_walks.harness import (StepFailed, column, editable, field, page_rows,
                                     preflight_items, press, rounds_to, run_button_enabled,
@@ -158,17 +156,6 @@ def walk(w):
             w.check(ok_f and ok_v and ok_i, "trial %s: the run gives F %.4f %s in %s iterations; the "
                     "page prints %s" % (row[0], float(t["F"]), "converged" if conv else "failed",
                                         t.get("iterations"), row[1:4]))
-
-    with w.step("The converged and failed states: yielded elements"):
-        b = st.results["fem_solution"]
-        fail = r.get("failure_solution") or b.get("failure_solution")
-        if fail is not None and fail.get("plastic_elements") is not None:
-            n = int(np.asarray(fail["plastic_elements"]).sum())
-            tbl = [t for _l, t in p.tables() if t and any("ielded" in c for c in t[0] + [r_[0] for r_ in t])]
-            row = next((rr for t in tbl for rr in t if rr and "ielded" in rr[0]), None)
-            if row is not None:
-                w.check(str(n) in [c.replace(",", "").replace("**", "") for c in row],
-                        "%d elements have yielded at failure; the page's row reads %s" % (n, row))
 
 
 def _has(dlg, label):

@@ -375,7 +375,6 @@ from a starting width of 1.0 it takes seven halvings to get under the 0.01
 tolerance, and seven is what it took.
 
 <!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3711, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm, f_stand=1.3671875, f_fail=1.375, check=edges, expected_elements=1087, expected_nodes=2286 -->
-<!-- The yielded-element count in the failure-state table below (481) is the default solver path's (fast_kernel='auto'), the count a reader's Studio run shows. The reference path (fast_kernel=False), which decides this tag, gives 463 there; the factor of safety, the bracket, every trial and every other number in that table agree on both paths. -->
 
 **The iteration count rises toward the critical factor.** Trials well below the
 critical factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.
@@ -567,20 +566,16 @@ the same band without running away on it.
 | *F* | 1.3672 | 1.5768 |
 | Equilibrium reached | yes | no |
 | Viscoplastic iterations | 393 | 12,000 — the budget |
-| Elements that have yielded, of 1,087 | 481 | 522 |
 | Largest displacement (ft) | 0.999 | 8.090 |
 | Relative to the elastic response | 17.6× | 142.6× |
 
-An element counts as yielded when its stress has reached the weakened strength
-envelope, so it is carrying all the shear it can.
-
-At *F* = 1.3672 the slope is not intact — 481 elements have yielded and the
-crest has moved 0.999 ft, about 18 times its own elastic response — but it
-**stops**. The stresses redistribute onto soil that has strength left, the
-iteration settles, and there is an equilibrium state to report. At *F* = 1.58
-there is none: 522 elements yield, the movement passes a hundred and forty
-times the elastic response, and it is still growing when the iteration budget
-runs out. The model does not break; it keeps moving, which is what the method
+At *F* = 1.3672 the slope is not intact — soil along the band has reached its
+weakened strength, carrying all the shear it can, and the crest has moved
+0.999 ft, about 18 times its own elastic response — but it **stops**. The
+stresses redistribute onto soil that has strength left, the iteration settles,
+and there is an equilibrium state to report. At *F* = 1.58 there is none: the
+movement passes a hundred and forty times the elastic response, and it is still
+growing when the iteration budget runs out. The model does not break; it keeps moving, which is what the method
 defines as failure.
 
 That second field is captured deliberately. Right at the critical factor the

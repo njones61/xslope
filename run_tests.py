@@ -11356,6 +11356,13 @@ MODULE_CHECKS = {
         "A surcharge that starts at the crest of a wall stays on the crest: a "
         "slice straddling a face drawn leaning by 0.001 takes its load from the "
         "ground under it, not along the chord up the face."),
+    'plastic_flag': (
+        'plastic_flag_check.py',
+        "A reported yielded element (plastic_elements, the plastic column, the "
+        "stress plot's outlines) has a Gauss point at its strength, within 1% of "
+        "its stress level, or at the tension cap: on a level clay layer every "
+        "element below the closed-form yield depth is flagged and none above it, "
+        "on both drivers, and none held linear elastic."),
     'newmark_record': (
         'newmark_record_check.py',
         "Every way a record file is written (two columns, an NGA-West2 .AT2, an "
@@ -19229,7 +19236,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'spencer_root': 3, 'base_normal_sign': 3, 'pile_symmetry': 3,
               'rapid_drained_surface': 3, 'noncircular_kink': 3,
               'fem_yield_coefficient': 1, 'vertical_seismic': 2, 'seismic2_factor': 2, 'strength_ratio': 2,
-              'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2,
+              'indep_bishop': 3, 'tension_crack_symmetry': 2, 'face_load': 2, 'circle_arc': 2, 'plastic_flag': 2,
               'dload_pass2b': 2, 'hybrid_criterion': 4, 'units_check': 2,
               'plot_aspect_limits': 2,
               'reinforce_mesh_geometry': 2, 'bonded_junction': 2, 'joint_mesh': 3,
@@ -19977,6 +19984,13 @@ def main():
         # no-op there. File-less (builds a 20 x 10 m block).
         tests.append({'type': 'k0_level_ground', 'file': 'K0 level-ground equilibrium',
                       'method': '-', 'source': 'k0_level_ground'})
+        # A yielded element is one with a Gauss point at its strength. The flag was
+        # f > 0 on the element-averaged stress (and the return map's branch on the
+        # corrector's), which the relaxation leaves a hair inside the surface: it
+        # read 0% on the two-layer clay sample at F = 1 where 13% are at the limit.
+        # File-less (a level clay layer with a closed-form yield depth).
+        tests.append({'type': 'plastic_flag', 'file': 'yielded elements on a level clay layer',
+                      'method': '-', 'source': 'plastic_flag'})
         tests.append({'type': 'water_table_profile', 'file': 'Water table from a seepage field',
                       'method': '-', 'source': 'water_table_profile'})
         tests.append({'type': 'mesh_interpolation', 'file': 'Nodal field read at a point',

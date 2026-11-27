@@ -6838,6 +6838,134 @@ def _yield_reading(gp_groups, u, sq3=None, floor=0.0, split_boundary=False):
     return max_viol, n_above, max_tens, worst
 
 
+# What a reported "yielded" element is: one with a Gauss point whose stress is at or
+# over its yield surface, within this fraction of the shear strength available
+# there. It is the yield check's own band (`_YIELD_FLAG_FRAC`): a point more than 1%
+# of its strength OUTSIDE the surface is a violation, and a point within 1% of it
+# from INSIDE is on it. Measured on the two-layer clay sample
+# (docs/fem/files/xslope_simple_mult_layers_clay_fem.xlsx, F = 1, 1.125, 1.219,
+# both drivers): the points the solve holds on the surface sit at a stress level
+# between 0.995 and 1.005 and none above, so 1% takes all of them; below 0.99 the
+# stress levels run on continuously, which is loading, not yield. See
+# `_at_yield_points`.
+_AT_YIELD_TOL = _YIELD_FLAG_FRAC
+
+
+def _at_yield_points(sig, c_env, snph, csph, t_cap=None, floor=0.0,
+                     tol=_AT_YIELD_TOL):
+    """Per Gauss point: True where the stress is at or over the yield surface.
+
+    REPORTING ONLY. Nothing in a solve reads this; it is what ``plastic_elements``
+    (and the element table's ``plastic`` column, ``plastic_fraction`` and the
+    yielded-element counts) is built from.
+
+    ``sig`` is the effective stress, tension-positive, ``(G, 4)`` as
+    ``[sx, sy, txy, sz]``; ``c_env``, ``snph``, ``csph`` the reduced envelope the
+    trial was solved on at each point (for a Hoek-Brown or power-curve point, its
+    converged tangent line; suction cohesion included); ``t_cap`` the Rankine cap
+    per point (``inf`` where there is none) or None.
+
+    THE RULE. The code's Mohr-Coulomb yield function (S&G MOCOUF, see
+    `mc_yield_invariants`) is exactly
+
+        f = tau - tau_f,   tau = (s1 - s3)/2,   tau_f = c cos(phi) - s sin(phi),
+
+    with s1, s3 the major and minor principal stresses and s = (s1 + s3)/2
+    (tension-positive). So ``f / tau_f = SL - 1``, where SL = tau / tau_f is the
+    stress level: the shear the point carries over the shear it can carry. A point
+    is at yield when SL >= 1 - ``tol``, i.e. ``f >= -tol * tau_f``. The test is
+    relative to the point's own strength, so it reads the same in any unit system
+    and at any depth.
+
+    Why not ``f > 0``: the viscoplastic iteration relaxes an over-stressed point
+    back onto the surface, so a point that is carrying all the shear it can ends
+    with f a hair either side of zero; and the Newton corrector's return map lands
+    it exactly on the surface or, from an equilibrated seed, just inside it on the
+    elastic branch. Either way ``f > 0`` misses most of the points that are at
+    their strength (on the two-layer clay sample it read 0% at F = 1, where 13%
+    of the elements carry SL >= 0.97).
+
+    ``tau_f`` is floored at ``floor`` (``prep['yield_floor']``, see
+    `_YIELD_ABS_FLOOR_FRAC`) so a cohesionless point with next to no stress does
+    not divide by zero. Where tau_f <= 0 the point is past the Mohr-Coulomb apex,
+    f >= 0, and it is at yield.
+
+    The Rankine cap: a point counts when its major principal stress is at or over
+    the cap to within ``floor``, ``s1 >= T - floor``. The cap has no strength of
+    its own to measure a band against (T is often 0), and the shear strength is the
+    wrong scale for it (a stiff clay's 1% of c would call a point carrying tens of
+    psf of compression "at the cutoff"). What it needs is round-off: the Newton
+    return puts a capped point on T to about 1e-12, either side, and the
+    viscoplastic relaxation leaves it within a fraction of a psf, both far inside
+    ``floor`` (1e-4 of the model's overburden scale, which is defined as far below
+    any stress a mechanism is carried at and far above round-off).
+
+    A point with no finite strength (a material held linear elastic carries
+    c = inf on the Newton path) is never at yield.
+    """
+    sig = np.asarray(sig, dtype=float)
+    sx, sy, txy, sz = sig[:, 0], sig[:, 1], sig[:, 2], sig[:, 3]
+    sigm = (sx + sy + sz) / 3.0
+    dsbar = np.sqrt(((sx - sy) ** 2 + (sy - sz) ** 2 + (sz - sx) ** 2
+                     + 6.0 * txy ** 2) / 2.0)
+    dxv, dyv, dzv = sx - sigm, sy - sigm, sz - sigm
+    ds3 = np.maximum(dsbar, 1e-10) ** 3
+    sine = np.clip(np.where(dsbar > 1e-10,
+                            -13.5 * (dxv * dyv * dzv - dzv * txy ** 2) / ds3,
+                            0.0), -1.0, 1.0)
+    th = np.arcsin(sine) / 3.0
+    c_env = np.broadcast_to(np.asarray(c_env, dtype=float), sigm.shape)
+    snph = np.broadcast_to(np.asarray(snph, dtype=float), sigm.shape)
+    csph = np.broadcast_to(np.asarray(csph, dtype=float), sigm.shape)
+    ok = np.isfinite(c_env)
+    with np.errstate(invalid='ignore'):
+        f = (sigm * snph
+             + dsbar * (np.cos(th) / np.sqrt(3.0) - np.sin(th) * snph / 3.0)
+             - c_env * csph)
+        s_ctr = sigm - dsbar * np.sin(th) / 3.0      # (s1 + s3)/2
+        tau_f = np.maximum(c_env * csph - s_ctr * snph, floor)
+        at = ok & (f >= -tol * tau_f)
+    if t_cap is not None:
+        t_cap = np.broadcast_to(np.asarray(t_cap, dtype=float), sigm.shape)
+        m = ok & np.isfinite(t_cap)
+        if np.any(m):
+            ctr = 0.5 * (sx + sy)
+            rad = np.sqrt((0.5 * (sx - sy)) ** 2 + txy ** 2)
+            s1 = np.maximum(ctr + rad, sz)
+            at = at | (m & (s1 >= t_cap - floor))
+    return at
+
+
+def _vp_at_yield_elements(gp_groups, u, n_elements, floor=0.0):
+    """``plastic_elements`` on a viscoplastic state: True for every element with a
+    Gauss point at or over its yield surface (see `_at_yield_points`). The stress
+    is the one the loop's own yield check reads, sigma = D (B u - evp) + sigma_0
+    with the pore pressure added back, on the envelope the loop last used.
+    Materials held linear elastic are never flagged."""
+    out = np.zeros(n_elements, dtype=bool)
+    for grp in gp_groups:
+        Bg, D4g, dofg, evpg = grp['B'], grp['D4'], grp['dof'], grp['evp']
+        eps = np.einsum('gij,gj->gi', Bg, u[dofg])
+        eps4 = np.empty((len(grp['w']), 4))
+        eps4[:, :3] = eps - evpg[:, :3]
+        eps4[:, 3] = -evpg[:, 3]
+        sig = np.einsum('gij,gj->gi', D4g, eps4)
+        _sig0 = grp.get('sig0')
+        if _sig0 is not None:
+            sig = sig + _sig0
+        sig[:, [0, 1, 3]] += grp['u_gp'][:, None]
+        _c_suc = grp.get('c_suc_r')
+        c_env = grp['c_r'] if _c_suc is None else grp['c_r'] + _c_suc
+        at = _at_yield_points(sig, c_env, grp['snph'], grp['csph'],
+                              t_cap=grp.get('t_cap'), floor=floor)
+        if grp.get('has_elastic'):
+            at = at & ~grp['elastic']
+        if np.any(at):
+            pairs = np.asarray(grp['pairs'])
+            out[pairs[at, 0]] = True
+    return out
+
+
 def _mc_apex_tension_cap(c_by_elem, phi_by_elem, exclude=None):
     """The Mohr-Coulomb apex tensile cap ``c/tan(phi)``, per element.
 
@@ -7265,7 +7393,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             marking elements that are PURE LINEAR ELASTIC — held out of the
             plastic-correction loop entirely. A True element accumulates no
             viscoplastic strain: it never yields, is never tension-relaxed, and is
-            never flagged in plastic_elements. Its converged stress is the linear
+            never flagged in plastic_elements, however far its stress lies outside
+            the envelope. Its converged stress is the linear
             elastic D*B*u, even where that state lies outside the Mohr-Coulomb
             envelope. This mirrors RS2's "Plasticity Specifications: None" placed
             materials. It is DISTINCT from ssr_exclude_mask: an SSR-excluded element
@@ -7481,7 +7610,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             - displacements (ndarray): Nodal displacement vector
             - stresses (ndarray): Element stress array (n_elements, 4) [sig_x, sig_y, tau_xy, sig_vm] compression-positive
             - strains (ndarray): Element strain array (n_elements, 4) [eps_x, eps_y, gamma_xy, max_shear]
-            - plastic_elements (ndarray): Boolean array of yielded elements
+            - plastic_elements (ndarray): Boolean per element: True where at least
+              one Gauss point is at or over its reduced yield surface, i.e. its
+              stress level (shear over reduced shear strength) is within 1% of 1 or
+              above (``_AT_YIELD_TOL``), or its major principal stress has reached
+              the tension cap; never True on an elastic_mask element. Reporting
+              only: no verdict reads it. See ``_at_yield_points``. It is not
+              ``yield_function > 0``, which is read on the element-averaged stress
+              and misses nearly every element at its strength.
+            - yield_function (ndarray): Mohr-Coulomb yield function on the
+              element-averaged effective stress (F > 0 outside the surface)
+            - plastic_fraction (float): Share of elements flagged in plastic_elements
             - F (float): Applied strength reduction factor
             - forces_1d (ndarray): Final axial forces in 1D truss elements (empty if none)
             - failed_1d_elements (ndarray): Boolean array of failed 1D elements (empty if none)
@@ -11000,7 +11139,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
     # ---- Step 10: Compute final stresses, strains, plastic elements ----
     final_stresses = np.zeros((n_elements, 4))  # [sig_x, sig_y, tau_xy, sig_vm] compression-positive
-    plastic_elements = np.zeros(n_elements, dtype=bool)
     yield_function_out = np.zeros(n_elements)
 
     for elem_idx in range(n_elements):
@@ -11088,13 +11226,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                                * float(_s_suc.mean()) / F_by_elem[elem_idx])
         f_yield = mc_yield_invariants(sigm, dsbar, theta, _c_rep, _phi_rep)
         yield_function_out[elem_idx] = f_yield
-        plastic_elements[elem_idx] = f_yield > 1e-8
+
+    # An element is reported yielded when one of its Gauss points is at or over its
+    # yield surface, within _AT_YIELD_TOL of its own strength (see _at_yield_points).
+    # It was f_yield > 1e-8 on the element-averaged stress, which the relaxation
+    # leaves a hair inside the surface even where every point is at its strength.
+    # Reporting only: nothing in any solve reads it.
+    plastic_elements = _vp_at_yield_elements(gp_groups, u, n_elements,
+                                             floor=_yield_floor)
 
     # Pure-elastic elements never entered the plastic loop, so they carry no
     # viscoplastic strain; but their linear elastic stress can still lie outside
-    # the Mohr-Coulomb envelope, which the per-element yield check above would read
-    # as "plastic". Force the failure flag off — RS2's "Plasticity: None" materials
-    # never show as yielded. No-op when elastic_mask is None (bit-identical).
+    # the Mohr-Coulomb envelope. Force the failure flag off — RS2's "Plasticity:
+    # None" materials never show as yielded. No-op when elastic_mask is None.
     if elastic_by_elem is not None:
         plastic_elements[elastic_by_elem] = False
 
@@ -14471,7 +14615,6 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     max_yield_violation = max(max_yield_violation, _j_viol)
 
     sig_by_gp = [[None] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
-    branch_by_gp = [[0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
     ep_by_gp = [[np.zeros(4)] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
     # The matric-suction apparent cohesion per Gauss point, or None on a model
     # without it. The REPORTED element yield function has to be read on the
@@ -14483,15 +14626,27 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         _cs = grp.get('c_suc')
         for k, (e, g) in enumerate(grp['pairs']):
             sig_by_gp[e][g] = grp['_sig'][k]
-            branch_by_gp[e][g] = int(grp['_branch'][k])
             ep_by_gp[e][g] = grp['ep'][k]
             if csuc_by_gp is not None and _cs is not None:
                 csuc_by_gp[e][g] = float(_cs[k])
 
     final_stresses = np.zeros((n_elements, 4))
-    plastic_elements = np.zeros(n_elements, dtype=bool)
     yield_function_out = np.zeros(n_elements)
     vp_shear_strain = np.zeros(n_elements)
+    # Reported yielded elements: a Gauss point at or over its yield surface, within
+    # _AT_YIELD_TOL of its own strength, on the envelope the return was taken on
+    # (see _at_yield_points). The return map's branch was the flag before; from an
+    # equilibrated corrector seed most points at their strength come back on the
+    # ELASTIC branch, a hair inside the surface, and were not counted. Reporting
+    # only. A material held elastic carries c = inf and is never flagged.
+    plastic_elements = np.zeros(n_elements, dtype=bool)
+    for grp in groups:
+        _at = _at_yield_points(grp['_sig'], grp.get('_c_eff', grp['c_r']),
+                               grp.get('_snph_eff', grp['snph']),
+                               grp.get('_csph_eff', grp['csph']),
+                               t_cap=grp.get('t_cap'), floor=_yield_floor_abs)
+        if np.any(_at):
+            plastic_elements[np.asarray(grp['pairs'])[_at, 0]] = True
     for e in range(n_elements):
         n_gp = len(sig_by_gp[e])
         sig_avg = sum(sig_by_gp[e]) / n_gp
@@ -14505,7 +14660,6 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             _c_rep = _c_rep + sum(csuc_by_gp[e]) / n_gp
         yield_function_out[e] = mc_yield_invariants(sigm, dsbar, theta,
                                                     _c_rep, phi_reduced[e])
-        plastic_elements[e] = any(b != _NR_ELASTIC for b in branch_by_gp[e])
         ep_avg = sum(ep_by_gp[e]) / n_gp
         vp_shear_strain[e] = float(np.sqrt((ep_avg[0] - ep_avg[1]) ** 2
                                            + ep_avg[2] ** 2))

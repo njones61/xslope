@@ -16,10 +16,12 @@ The fourth check is the other side of the first: OK on an editor that changed
 nothing closes nothing. Every editor used to drop every result on OK, so opening
 Materials just to read it took a loaded transient seepage solution with it, and a
 Save afterwards deleted that solution's files beside the workbook. Each editor is
-opened and accepted unchanged on the transient earth dam: the results stay, no undo
-step is added, the file stays clean, and a redo branch survives. A real edit still
-drops the stability result (which a seepage solution, kept on edits that cannot
-change it, is not: test/seepage_survives_edits_check.py).
+opened and accepted unchanged on the transient earth dam and on RS2-51's wall, which
+has no bottom elevation: the results stay, no undo step is added, the file stays
+clean, and a redo branch survives. A real edit still drops the stability result
+(which a seepage solution, kept on edits that cannot change it, is not:
+test/seepage_survives_edits_check.py), a bottom elevation typed, changed or cleared
+in the Profile lines editor among them.
 
 Every window here is built against a scratch settings store
 (``tools.studio_settings``): opening a file appends it to Studio's recent-files list,
@@ -191,10 +193,55 @@ def _noop_ok(mw):
             editor.apply = real_apply
         if mw.doc.results.get("lem_solution") is keep:
             fails.append("a real Materials edit kept the stability result")
+        # The bottom elevation is a real edit whichever way it goes: typed on the
+        # wall that has none, changed and cleared on the earth dam's 0.
+        fails += _bottom_edits(mw, [(wall, "-3", -3.0), (model, "-5", -5.0),
+                                    (model, "", None)])
     finally:
         QDialog.exec = real_exec
         mw.doc._dirty = False
         shutil.rmtree(tmp, ignore_errors=True)
+    return fails
+
+
+def _bottom_edits(mw, cases):
+    """Each ``(path, text, want)``: open ``path``, type ``text`` into the Profile
+    lines editor's Max depth field and press OK. The bottom becomes ``want``, an
+    undo step is added, the file is marked changed, and the stability result goes.
+    ``QDialog.exec`` is already patched to accept."""
+    from studio.main_window import CATEGORY_EDITORS
+    fails = []
+    editor = CATEGORY_EDITORS["profile"]
+    real_build = editor.build
+    for path, text, want in cases:
+        name = f"Max depth typed {text!r} on {os.path.basename(path)}"
+        mw.doc._dirty = False
+        with contextlib.redirect_stdout(io.StringIO()):
+            mw.open_path(path)
+        before = mw.doc.slope_data.get("max_depth")
+
+        def typed(sd, parent, select=None, _text=text):
+            dlg = real_build(sd, parent, select=select)
+            dlg._max_depth_edit.setText(_text)
+            return dlg
+        editor.build = typed
+        keep = object()
+        mw.doc.results["lem_solution"] = keep
+        n_undo = len(mw.doc._undo)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.edit_category("profile")
+        finally:
+            editor.build = real_build
+        got = mw.doc.slope_data.get("max_depth")
+        if got != want:
+            fails.append(f"{name}: the bottom is {got!r} (was {before!r}), "
+                         f"expected {want!r}")
+        if mw.doc.results.get("lem_solution") is keep:
+            fails.append(f"{name}: the stability result was kept")
+        if len(mw.doc._undo) != n_undo + 1 or not mw.doc.dirty:
+            fails.append(f"{name}: no undo step, or the file not marked changed")
+    mw.doc._dirty = False
     return fails
 
 

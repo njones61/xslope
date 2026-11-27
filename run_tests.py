@@ -16493,6 +16493,12 @@ def run_slide2_strength_test(test):
         "other": ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
                   "withru: 0\n"
                   "  soil2 = type: 1 ctype: 2 c: 25 wtable: 0 dc: 1 uw: 20 withru: 0\n"),
+        # Slide2's Tensile Strength option on a Mohr-Coulomb material: the key is
+        # written only when the box is checked (Tutorial 29 writes 'mat_tensile: 0').
+        "tensile": ("  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 "
+                    "withru: 0 mat_tensile: 2.5\n"
+                    "  soil2 = type: 0 water: 1 wtable: 1 c: 25 phi: 32 uw: 20 hutype: 0 "
+                    "withru: 0 mat_tensile: 0\n"),
     }
     problems = []
     got = {}
@@ -16551,6 +16557,21 @@ def run_slide2_strength_test(test):
     if (s2["option"], s2["c"]) != ("mc", 25.0) or \
             not has(cav, "soil2", "cohesion type 2"):
         problems.append("an undrained cohesion type XSLOPE does not read was not named")
+
+    # The tensile strength crosses as t_cut (the FEM's cap), 0 included, and the note
+    # says what Slide2's limit equilibrium does with it and XSLOPE's does not. A
+    # material without the option keeps t_cut unset.
+    sd, cav = got["tensile"]
+    s1, s2 = sd["materials"]
+    if s1.get("t_cut") != 2.5 or s2.get("t_cut") != 0.0:
+        problems.append(f"Slide2's tensile strengths 2.5 and 0 imported as t_cut "
+                        f"{s1.get('t_cut')} and {s2.get('t_cut')}")
+    if not (has(cav, "soil1", "t_cut = 2.5", "limit equilibrium", "tension crack")
+            and has(cav, "soil2", "t_cut = 0")):
+        problems.append("the tensile strength's import note is missing or does not say "
+                        "what the limit equilibrium does with it")
+    if got["constant"][0]["materials"][0].get("t_cut") is not None:
+        problems.append("a material without the tensile option imported a t_cut")
 
     if problems:
         return None, "Slide2 strength models: " + "; ".join(problems[:5])

@@ -911,13 +911,23 @@ XSLOPE's own where the two give the same strength, and names the rest in the not
 | SLOPE/W SHANSEP, constant ratio | [`ratio`](../lem/overview.md#undrained-strength-ratio), c = 0 | Under B-bar, XSLOPE's strength is higher (no B-bar in XSLOPE) |
 | SLOPE/W SHANSEP, S × OCR<sup>m</sup> | `ratio` at the lowest OCR | OCR varies with elevation; the notes give the largest difference |
 | SLOPE/W S=f(depth) | `cp` from the top of the layer | The layer's top is not level |
+| SLOPE/W Spatial Mohr-Coulomb, cohesion a straight line in elevation, φ = 0 | `cp` with r_elev at the line's upper end | The zone reaches below the line's lower end |
 | Slide2 Undrained, constant | `mc` with φ = 0 | — |
 | Slide2 Undrained, F(Depth from Top of Layer) | `cp` from the top of the layer | The layer's top is not level |
 | RS2 Mohr-Coulomb with cohesion changing below a datum (φ = 0) | `cp` with r_elev at the datum | The zone rises above the datum, or reaches RS2's cohesion cutoff |
 
 A strength cutoff the zone never reaches changes nothing, so it crosses silently. Slide2's
-F(Depth from Horizontal Datum) and Vertical Stress Ratio, and SLOPE/W's S=f(datum) and its
-SHANSEP strength curve, are not mapped, and the notes say so. [GeoStudio import](../usage/geostudio.md#materials)
+F(Depth from Horizontal Datum) and Vertical Stress Ratio, SLOPE/W's S=f(datum) and its
+SHANSEP strength curve, and any other Spatial Mohr-Coulomb function, are not mapped, and
+the notes say so; a Spatial Mohr-Coulomb strength function imports as its lowest value.
+
+**Tensile strength.** A Slide2 Mohr-Coulomb material with its Tensile Strength option on
+imports with that strength as `t_cut`, which the FEM applies. Slide2's limit equilibrium
+also uses it: where a slice base would be in tension, Slide2 sets that base's effective
+normal stress to zero, which acts as a tension crack. XSLOPE's limit equilibrium methods
+do not read `t_cut`, so on a slope that goes into tension XSLOPE's factor of safety is
+higher than Slide2's, and the notes say so. Add a tension crack to model it in the limit
+equilibrium analysis. [GeoStudio import](../usage/geostudio.md#materials)
 gives the SLOPE/W definitions in full.
 
 **Export** — **File → Export to GeoStudio (SLOPE/W)…** writes the current model out as a

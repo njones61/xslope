@@ -120,9 +120,9 @@ this page measures is the one the search finds, not this one:
 The section and this circle come from two exercises in
 [CE 544](https://byu-ce544.readthedocs.io/en/latest/), Seepage and Slope Stability
 Analysis, a graduate course at Brigham Young University — the
-[Ordinary Method of Slices exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_class/)
+[Ordinary Method of Slices exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/02_limiteq1/limiteq1_class/)
 and the
-[Bishop Simplified Procedure homework](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_hw/)
+[Bishop's Simplified Method exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/03_limiteq2/limiteq2_class/)
 — which solve the method of slices on this one circle in a spreadsheet, with
 material properties different from the ones above.
 

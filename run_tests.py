@@ -12908,6 +12908,10 @@ AUDIT_CHECK_MODULES = {
     'studio_model_edits': ('studio_model_edits_check.py', 'roundtrip'),
     'dialog_defaults_reset': ('dialog_defaults_reset_check.py', 'roundtrip'),
     'seepage_survives_edits': ('seepage_survives_edits_check.py', 'roundtrip'),
+    # Studio's Reliability · MC tab carries the running P_f (Convergence) between
+    # the histogram and the table, drawn by plot_reliability_convergence from the
+    # run's own realizations, and closes with the tab (638c).
+    'mc_convergence_tab': ('mc_convergence_tab_check.py', 'roundtrip'),
     # A jointed line whose end the mesher moves onto a zone corner still meshes;
     # the FS-versus-time figure's legend covers none of the figure's own words.
     'joint_end_snap': ('joint_end_snap_check.py', 'fem'),

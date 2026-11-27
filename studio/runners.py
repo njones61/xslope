@@ -1226,8 +1226,10 @@ class ReliabilityRunner(RunnerThread):
         if not ok:
             self.failed.emit(str(result))
             return
+        # The stopping target rides with the result, so the Convergence plot
+        # draws the band the run was stopping on.
         self.succeeded.emit({"engine": "mc", "app_mode": "lem",
-                             "reliability": result})
+                             "reliability": result, "converge_rel": conv})
 
     def _run_rs(self):
         from xslope.reliability import reliability, RS_DEFAULT_SURROGATE

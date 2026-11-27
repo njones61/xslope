@@ -272,7 +272,8 @@ full pool has failed before any drawdown, so it is counted as a failure at its s
 safety, and the run reports how many there were (`n_stage1_failed`).
 
 **Results.** Studio opens the **Reliability · MC** tab: the histogram of the factors of safety with the
-$F = 1$ line, the mean, and the fitted normal and lognormal curves. From Python:
+$F = 1$ line, the mean, and the fitted normal and lognormal curves. Its **Convergence** sub-tab is the
+running probability of failure above, drawn by `plot_reliability_convergence`. From Python:
 
 ```python
 from xslope.fileio import load_slope_data

@@ -253,6 +253,17 @@ class MplCanvas(QWidget):
             show_title=opts.get("show_title", True),
             show_legend=opts.get("show_legend", True), fig=fig, style=style), dxf=False)
 
+    def render_reliability_convergence(self, reliability_data, opts=None,
+                                       converge_rel=None):
+        """The Monte Carlo running P_f against realization count, drawn by the
+        engine's own plot_reliability_convergence (the same figure a script gets)."""
+        opts = opts or {}
+        from xslope.plot import plot_reliability_convergence
+        self._draw(lambda fig: plot_reliability_convergence(
+            reliability_data, show_title=opts.get("show_title", True),
+            show_legend=opts.get("show_legend", True), fig=fig,
+            converge_rel=converge_rel), dxf=False)
+
     def render_mesh(self, mesh, materials=None, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_mesh(

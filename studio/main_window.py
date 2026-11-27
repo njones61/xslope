@@ -3819,12 +3819,18 @@ class MainWindow(QMainWindow):
     def _show_reliability_histogram(self):
         if self.reliability_hist_canvas is None:
             self.reliability_hist_canvas = SweepResultView(MplCanvas(self), self)
+            # Monte Carlo's running P_f against realization count, beside the
+            # histogram; a response-surface result hides it (_rerender_…).
+            self.reliability_hist_canvas.add_plot_tab(MplCanvas(self), "Convergence")
             self.view_tabs.insertTab(1, self.reliability_hist_canvas,
                                      "Reliability · MC")
             panel = ReliabilityMcDisplayPanel()
             panel.changed.connect(self._rerender_reliability_histogram)
             self.display_stack.addWidget(panel)
             self._display_panels[self.reliability_hist_canvas] = panel
+            self.reliability_hist_canvas.tabs.currentChanged.connect(
+                self._sync_reliability_mc_panel)
+            self._sync_reliability_mc_panel()
         # One tab serves both sampling engines, named for the one that filled it.
         bundle = self.doc.results.get("reliability") or {}
         idx = self.view_tabs.indexOf(self.reliability_hist_canvas)
@@ -3849,6 +3855,43 @@ class MainWindow(QMainWindow):
                     rel, panel.options())
             except Exception:
                 traceback.print_exc()
+        self._rerender_reliability_convergence()
+
+    def _sync_reliability_mc_panel(self, *_):
+        """Point the Display panel's graying at the MC tab's showing sub-tab."""
+        view = self.reliability_hist_canvas
+        panel = self._display_panels.get(view) if view is not None else None
+        if panel is None:
+            return
+        w = view.tabs.currentWidget()
+        panel.set_sub_tab("plot" if w is view.canvas else
+                          "convergence" if w is view.plot_tab("Convergence")
+                          else "table")
+
+    def _rerender_reliability_convergence(self):
+        """The Monte Carlo tab's Convergence sub-tab: the running P_f over the
+        run's realizations in order. Shown only for a Monte Carlo result; the
+        response surface's samples are a stride through its surrogate draws, not
+        a sequence that converged."""
+        view = self.reliability_hist_canvas
+        conv = view.plot_tab("Convergence") if view is not None else None
+        if conv is None:
+            return
+        bundle = self.doc.results.get("reliability") or {}
+        rel = bundle.get("reliability")
+        show = bool(rel and (bundle.get("engine") or "mc") == "mc"
+                    and rel.get("fs_samples") is not None)
+        view.set_plot_tab_shown("Convergence", show)
+        if not show:
+            conv.clear()
+            return
+        panel = self._display_panels.get(view)
+        try:
+            conv.render_reliability_convergence(
+                rel, panel.options() if panel else None,
+                converge_rel=bundle.get("converge_rel"))
+        except Exception:
+            traceback.print_exc()
 
     # --- Newmark ----------------------------------------------------------
     def run_newmark(self):
@@ -4034,7 +4077,8 @@ class MainWindow(QMainWindow):
                 f"Pf (empirical) = {rel['pf_empirical'] * 100:.2f}%\n"
                 f"Pf (normal) = {rel['pf_normal'] * 100:.2f}%\n"
                 f"Pf (lognormal) = {rel['pf_lognormal'] * 100:.2f}%\n\n"
-                "The FS histogram is on the Reliability · MC tab; the per-parameter "
+                "The FS histogram is on the Reliability · MC tab, with the running "
+                "Pf on its Convergence sub-tab; the per-parameter "
                 "table is in the Log pane.")
         tag = "FEM (SSRM)" if app_mode == "fem" else "Taylor series (TSPM)"
         extra = ("\n\nThe FEM Results view shows the deformation at the most-likely "

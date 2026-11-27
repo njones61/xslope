@@ -446,7 +446,7 @@ table is in the Log pane. The result view follows the engine:
 | Engine | Result tab |
 | --- | --- |
 | **Taylor series (LEM)** | **LEM · Reliability** — the most-likely-value surface with the F⁺/F⁻ perturbation surfaces. |
-| **Monte Carlo (LEM)** | **Reliability · MC** — the FS histogram with the FS = 1 line, the mean, and fitted normal / lognormal overlays (a display-panel toggle). β in both conventions and the probability of failure are in the title. |
+| **Monte Carlo (LEM)** | **Reliability · MC** — the FS histogram with the FS = 1 line, the mean, and fitted normal / lognormal overlays (a display-panel toggle). β in both conventions and the probability of failure are in the title. The **Convergence** sub-tab plots the running probability of failure against the number of realizations, with its 95% confidence band and, when the run had one, the stop's target. |
 | **Response surface (LEM)** | **Reliability · RS** — the same FS histogram, drawn from a 10,000-realization subsample of the surrogate draws. The fit and accuracy-check summary — design solves, $R^2$, RMS error, the failure-region check — is in the Log pane and the run summary. |
 | **Taylor series (FEM)** | **FEM · Results** — the deformation at the most-likely values; β and the probability of failure, normal and lognormal, are in the run summary. |
 

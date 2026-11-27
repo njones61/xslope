@@ -235,8 +235,16 @@ class ReliabilityDisplayPanel(_CheckboxPanel):
 
 class ReliabilityMcDisplayPanel(_CheckboxPanel):
     """Display options for the Monte Carlo reliability FS histogram: a toggle for
-    the fitted normal / lognormal overlays (plus the shared title/legend toggles)."""
+    the fitted normal / lognormal overlays (plus the shared title/legend toggles,
+    which the Convergence sub-tab follows too)."""
     _FIELDS = (("show_fits", "Fitted normal / lognormal overlays", True),)
+
+    def set_sub_tab(self, which):
+        """Gray what the showing sub-tab ignores: the overlays belong to the
+        histogram ("plot") alone, and the title to the two plots — the Table
+        ("table") draws neither."""
+        self._boxes["show_fits"].setEnabled(which == "plot")
+        self._show_title.setEnabled(which in ("plot", "convergence"))
 
 
 class InputsDisplayPanel(QWidget):

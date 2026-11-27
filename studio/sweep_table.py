@@ -536,6 +536,7 @@ class SweepResultView(QWidget):
         self.tabs.addTab(canvas, "Plot")
         self.tabs.addTab(self.table_view, "Table")
         self.tabs.currentChanged.connect(self._on_sub_tab)
+        self._plot_tabs = {}         # label -> a second plot added by add_plot_tab
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -551,11 +552,38 @@ class SweepResultView(QWidget):
     def show_plot(self):
         self.tabs.setCurrentIndex(0)
 
+    def add_plot_tab(self, canvas, label):
+        """Add a second plot of the same result as its own sub-tab, between
+        **Plot** and **Table**, and return it. It is owned by this view, so it
+        goes wherever the view goes (a closed result tab takes it with it)."""
+        canvas.setParent(self)
+        self.tabs.insertTab(self.tabs.indexOf(self.table_view), canvas, label)
+        self._plot_tabs[label] = canvas
+        return canvas
+
+    def plot_tab(self, label):
+        """The plot added under ``label`` by :meth:`add_plot_tab`, or None."""
+        return self._plot_tabs.get(label)
+
+    def set_plot_tab_shown(self, label, shown):
+        """Show or hide an added plot's sub-tab (a result it does not apply to)."""
+        canvas = self._plot_tabs.get(label)
+        if canvas is not None:
+            self.tabs.setTabVisible(self.tabs.indexOf(canvas), bool(shown))
+
+    def ensure_fitted(self):
+        # Each plot re-fits only if it is the one showing; a hidden one stays
+        # pending until its sub-tab is chosen (_on_sub_tab).
+        self._canvas.ensure_fitted()
+        for canvas in self._plot_tabs.values():
+            canvas.ensure_fitted()
+
     def _on_sub_tab(self, index):
         # The canvas rasterizes to the viewport size, so coming back from the table
         # (where it had no size) needs the same re-fit a result tab gets.
-        if index == 0:
-            self._canvas.ensure_fitted()
+        widget = self.tabs.widget(index)
+        if widget is self._canvas or widget in self._plot_tabs.values():
+            widget.ensure_fitted()
 
     def __getattr__(self, name):
         # Only reached when normal lookup failed, so it never shadows this class's

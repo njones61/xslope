@@ -177,7 +177,7 @@ def _mirror(model):
               ground_surface=flip(sd['ground_surface']),
               domain_polygon=flip(sd['domain_polygon']),
               polygons=[dict(p, polygon=flip(p['polygon'])) for p in sd['polygons']],
-              profile_lines=[dict(p, coords=[(2 * axis - x, y) for x, y in p['coords']])
+              profile_lines=[dict(p, coords=[(2 * axis - x, y) for x, y in reversed(p['coords'])])
                              for p in sd['profile_lines']],
               circles=[dict(c, Xo=2 * axis - c['Xo']) for c in (sd['circles'] or [])])
     return md, (lambda spec: dict(spec, Xo=2 * axis - spec['Xo']))

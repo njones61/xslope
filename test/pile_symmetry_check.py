@@ -68,7 +68,7 @@ def mirror_slope_data(d):
     m["polygons"] = [{"polygon": _mirror_x(p["polygon"]), "mat_id": p["mat_id"]}
                      for p in d["polygons"]]
     if d.get("profile_lines"):
-        m["profile_lines"] = [{"coords": [(-x, y) for (x, y) in p["coords"]],
+        m["profile_lines"] = [{"coords": [(-x, y) for (x, y) in reversed(p["coords"])],
                                "mat_id": p["mat_id"]} for p in d["profile_lines"]]
     m["circles"] = [dict(c, Xo=-c["Xo"]) for c in d["circles"]]
     # Reflect the pile geometry; keep theta_p unchanged (relative-to-resisting convention).

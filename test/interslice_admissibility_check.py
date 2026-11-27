@@ -308,7 +308,7 @@ def leg_both_facings_read_the_same_state():
         ground_surface=flip(sd['ground_surface']),
         domain_polygon=flip(sd['domain_polygon']),
         polygons=[dict(p, polygon=flip(p['polygon'])) for p in sd['polygons']],
-        profile_lines=[dict(p, coords=[(2 * axis - x, y) for x, y in p['coords']])
+        profile_lines=[dict(p, coords=[(2 * axis - x, y) for x, y in reversed(p['coords'])])
                        for p in sd['profile_lines']],
         non_circ=[dict(p, X=2 * axis - p['X']) for p in reversed(sd['non_circ'])])
     ok, res = generate_slices(mirrored, non_circ=mirrored['non_circ'],

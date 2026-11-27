@@ -1146,8 +1146,9 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
 
     # Legend (below the axes, frameless by default) for the flow-net features that
     # were actually drawn — material zones plus phreatic / contour / flow lines —
-    # alongside the colorbar. Swatches use a fixed readable alpha so the material
-    # color key stays visible even when the fill opacity is 0 (clean flow net).
+    # alongside the colorbar. Swatches use the fill's own opacity, so a key color
+    # matches the zone it names, but never less than 0.6, so the key stays readable
+    # when the fill opacity is turned down to nothing (a clean flow net).
     from .plot import _legend_below
     mat_names = seep_data.get("material_names", [])
     leg_handles = []
@@ -1159,7 +1160,8 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if element_materials is not None and not fill_contours:
         for mat in materials:
             nm = mat_names[mat - 1] if (mat_names and mat <= len(mat_names)) else f"Material {mat}"
-            leg_handles.append(mpatches.Patch(facecolor=mat_to_color[mat], alpha=0.6,
+            leg_handles.append(mpatches.Patch(facecolor=mat_to_color[mat],
+                                              alpha=max(float(alpha), 0.6),
                                               edgecolor="none", label=nm))
     if has_phreatic:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=2.0, label="Phreatic surface"))

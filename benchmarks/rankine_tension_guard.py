@@ -12,7 +12,7 @@ crest tension and CONVERGES at F = 1:
      bit-identical to omitting the arguments (the historical no-cutoff path).
 
   2. ENGAGE. A finite cap T below the uncut major principal tension actually fires:
-     the converged max major-principal tension drops from ~13.6 to <= ~T (the
+     the converged max major-principal tension drops from ~16.5 to <= ~T (the
      surface is returned to), a large reduction the mean-stress primitive could
      not produce on this compression-dominated mean field.
 
@@ -34,7 +34,8 @@ within budget; the iteration counts are printed so a regression in convergence i
 visible.
 
 Run from the repo root:  PYTHONPATH=. python3 benchmarks/rankine_tension_guard.py
-Exits non-zero on any failure.
+Exits non-zero on any failure. run_tests.py runs check() as the
+rankine_tension_guard row with the FEM tests (about a second).
 """
 import hashlib
 import os
@@ -54,19 +55,28 @@ from xslope.fem import build_fem_data, solve_fem, solve_ssrm
 # stable-but-near-failure regime: too strong -> no tension, too weak -> fails).
 _C, _PHI, _E, _NU = 12.0, 18.0, 5000.0, 0.3
 _GEOM = [(0.0, 0.0), (10.0, 0.0), (8.0, 6.0), (0.0, 6.0)]
-_CAP = 6.0            # cap below the uncut max principal tension (~13.6)
+_CAP = 6.0            # cap below the uncut max principal tension (~16.5 on release-111; 13.6 when the guard was written)
 _MAX_ITER = 4000
+_BASE_XLSX = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 
 
 def _fixture():
     """Build the fem_data through the standard save/load + mesh pipeline so the
     base BCs are exactly what solve_fem consumes (deterministic mesh)."""
-    template = os.path.join(os.path.dirname(__file__), '..', 'docs', 'lem',
-                            'files', 'xslope_acads_simple.xlsx')
-    sd = load_slope_data(template)
+    sd = load_slope_data(_BASE_XLSX)
     base = dict(sd['materials'][0])
+    # t_cut=None: the fixture must carry NO stated tensile cap of its own. It copies
+    # the template's material row, and since 1339411e (2026-07-26, vendor tensile
+    # caps written into the RS2 corpus) that row carries t_cut = 3.0 (the file
+    # doubles as RS2-1). Inherited, solve_fem's template fallback applied T = 3 to
+    # every call that leaves tension_cap_by_elem None: the "uncut" fixture read a max
+    # principal tension of 3.00 instead of ~16.5, the global T = 0 flag was
+    # overridden element by element by the stated 3.0 and also read 3.00, and the
+    # cap of 6 RAISED the tension. The solver was right each time; the fixture had
+    # stopped being cap-free.
     mat = dict(base, c=_C, phi=_PHI, gamma=20.0, gamma_sat=20.0, E=_E, nu=_NU,
-               u='none', option='mc', psi=0.0, name='soil')
+               u='none', option='mc', psi=0.0, t_cut=None, name='soil')
     sd['materials'] = [mat]
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(_GEOM)}]
@@ -77,9 +87,10 @@ def _fixture():
     sd['circular'] = True
     sd['non_circ'] = []
     sd['circles'] = [{'Xo': 5.0, 'Yo': 12.0, 'Depth': 0.0, 'R': 12.0}]
-    tmp = os.path.join(tempfile.gettempdir(), 'rankine_tension_guard.xlsx')
-    save_slope_data_to_xlsx(sd, tmp)
-    sd = load_slope_data(tmp)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp = os.path.join(tmp_dir, 'rankine_tension_guard.xlsx')
+        save_slope_data_to_xlsx(sd, tmp)
+        sd = load_slope_data(tmp)
     cl, _, _ = extract_constraint_line_geometry(sd)
     polys = get_material_polygons(sd, reinf_lines=cl)
     mesh = build_mesh_from_polygons(polys, target_size=1.0, element_type='tri3',
@@ -106,7 +117,8 @@ def _digest(sol):
                      h(sol['plastic_elements'].astype(float))])
 
 
-def main():
+def check():
+    """Run the five checks; return the list of failure messages (empty = pass)."""
     fem = _fixture()
     n_elem = len(fem['element_materials'])
     cap = np.full(n_elem, _CAP)
@@ -176,7 +188,14 @@ def main():
         failures.append("unknown tension_cutoff_by_material name did not raise")
     except ValueError:
         print("[guard] unknown tension_cutoff_by_material name rejected")
+    return failures
 
+
+def main():
+    if not os.path.exists(_BASE_XLSX):
+        print(f"SKIP: base template not found ({_BASE_XLSX})")
+        return 0
+    failures = check()
     if failures:
         print("\nFAILED:")
         for f in failures:

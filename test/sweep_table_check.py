@@ -326,9 +326,13 @@ def check_every_view_has_a_table_sub_tab(failures):
                             "not the shared plot/table view")
             continue
         labels = [view.tabs.tabText(i) for i in range(view.tabs.count())]
-        if labels != ["Plot", "Table"]:
+        # Monte Carlo adds its running P_f between the two
+        # (test/mc_convergence_tab_check.py checks it).
+        expected = (["Plot", "Convergence", "Table"] if name == 'reliability_mc'
+                    else ["Plot", "Table"])
+        if labels != expected:
             failures.append(f"{name}: sub-tabs are {labels}, expected "
-                            "['Plot', 'Table']")
+                            f"{expected}")
         if view.tabs.currentIndex() != 0:
             failures.append(f"{name}: opens on sub-tab "
                             f"{view.tabs.currentIndex()}, not the plot")

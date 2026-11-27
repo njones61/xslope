@@ -668,7 +668,7 @@ class FlowTrace:
         return seg[keep], alpha[keep], rank[keep]
 
 
-def build_flow_trace(seep_data, solution, n_particles=1500, inflow_share=0.6,
+def build_flow_trace(seep_data, solution, n_particles=1500, inflow_share=0.35,
                      speed_scale="sqrt", loop_seconds=10.0, lit_seconds=2.0,
                      tail_seconds=0.5, n_tail=8, streak_length=0.04,
                      porosity=None, seed=0, ds_frac=0.3, field=None):

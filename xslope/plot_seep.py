@@ -1839,11 +1839,11 @@ def _fmt_duration(value, unit):
     return f"{txt} {unit}" if unit else f"{txt} (model time units)"
 
 
-def animate_flow_trace(seep_data, solution, n_particles=1500, inflow_share=0.6,
+def animate_flow_trace(seep_data, solution, n_particles=1500, inflow_share=0.35,
                        speed_scale="sqrt", loop_seconds=8.0, fps=20,
                        lit_seconds=2.0, tail_seconds=0.5, n_tail=8,
                        streak_length=0.04, porosity=None, seed=0,
-                       color=None, linewidth=1.4, materials=True, phreatic=True,
+                       color=None, linewidth=0.9, materials=True, phreatic=True,
                        material_alpha=0.25, figsize=None, dpi=100,
                        show_title=True, style=None, save_gif=None, save_mp4=None,
                        save_png=None, png_time=None, trace=None):

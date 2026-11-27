@@ -17913,6 +17913,29 @@ def run_piezo_u_guard_test(test):
     return 0.0, None
 
 
+def run_rankine_tension_guard_test(test):
+    """Rankine tension cutoff guard (benchmarks/rankine_tension_guard.py).
+
+    On a small cap-free slope that converges at F = 1 with crest tension, solve_fem
+    with no cap is bit-identical to the explicit off arguments; a per-element cap T
+    returns the major principal stress to T; the global tension_cutoff flag drives
+    it to ~0; tension_srf at F = 1 is bit-identical to the static cap; and
+    solve_ssrm rejects an unknown tension_cutoff_by_material name. Returns
+    (0.0, None) on pass, else (None, message). File-less: builds on
+    xslope_acads_simple.xlsx (about a second)."""
+    import importlib
+    bench = str(Path(__file__).parent / 'benchmarks')
+    if bench not in sys.path:
+        sys.path.insert(0, bench)
+    mod = importlib.import_module('rankine_tension_guard')
+    if not os.path.exists(mod._BASE_XLSX):
+        return 0.0, None                      # engine-only clone without the docs file
+    failures = mod.check()
+    if failures:
+        return None, "Rankine tension cutoff: " + "; ".join(failures[:4])
+    return 0.0, None
+
+
 def run_kernel_xcheck_test(test):
     """Fast-kernel divergence fence (benchmarks/kernel_xcheck.py).
 
@@ -18914,6 +18937,8 @@ def _dispatch_test(test):
         return run_suction_guard_test(test)
     if test_type == 'piezo_u_guard':
         return run_piezo_u_guard_test(test)
+    if test_type == 'rankine_tension_guard':
+        return run_rankine_tension_guard_test(test)
     if test_type == 'kernel_xcheck':
         return run_kernel_xcheck_test(test)
     if test_type == 'preflight_rules':
@@ -19213,7 +19238,8 @@ def _expected_and_tol(test, default_tolerance):
                        *MODULE_CHECKS,
                        'circle_vertex', 'circle_above_center',
                        'gsat_pair', 'seep_head',
-                       'tseep_head', 'design_callable', 'kernel_xcheck'):
+                       'tseep_head', 'design_callable', 'kernel_xcheck',
+                       'rankine_tension_guard'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -19438,6 +19464,13 @@ def main():
         # Side-roller assignment on an off-vertical truncation face.
         tests.append({'type': 'side_roller', 'file': 'off-vertical side face (fem)',
                       'method': '-', 'source': 'side_roller'})
+        # The Rankine tension cutoff on a cap-free slope at F = 1: off is the
+        # default path bit for bit, a cap T and the global T = 0 flag each return
+        # the major principal stress to their value, tension_srf is a no-op at
+        # F = 1, and an unknown material name raises. About a second.
+        tests.append({'type': 'rankine_tension_guard',
+                      'file': 'Rankine tension cutoff guard',
+                      'method': '-', 'source': 'rankine_tension_guard'})
         # The input-graying audit's engine fixes, each against a hand number
         # (test/audit_engine_check.py, enqueued once the module exists).
         tests.extend(_audit_module_tests('fem'))

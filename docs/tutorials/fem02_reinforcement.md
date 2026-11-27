@@ -127,8 +127,8 @@ finite element run solves. Click **Run**.
 
 **Spencer's method gives FS = 1.589**, on a circle centered at (−6.00, 49.48)
 with a radius of 49.83 ft. The surface daylights at the toe, cuts up through the
-reinforced block and comes out on the crest at **x = 36.8**, behind the last
-geogrid. It crosses five of the six layers and takes 800 lb/ft from each of
+reinforced block and comes out on the crest at **x = 36.8**, short of the back
+of the block, where the top layer ends at x = 45. It crosses five of the six layers and takes 800 lb/ft from each of
 them, for 4,000 lb/ft of tension in total.
 That crossing-by-crossing is worked through in
 [LEM-8](lem08_reinforced_slope.md#where-the-surface-meets-the-lines).

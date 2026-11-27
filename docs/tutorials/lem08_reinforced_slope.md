@@ -413,7 +413,8 @@ thrust:
 ![Spencer on the critical circle](images/lem08_solution.png){width=1000}
 
 The surface daylights at the toe, cuts up through the reinforced block and
-comes out on the crest at x ≈ 37, behind the last geogrid. It weighs 30,283
+comes out on the crest at x ≈ 37, short of the back of the block, where the
+top layer ends at x = 45. It weighs 30,283
 lb/ft, and the reinforcement it crosses contributes 4,000 lb/ft of tension —
 five lines at the full 800.
 

@@ -207,10 +207,10 @@ c = 200 psf (9.6 kPa) and $\phi$ = 20°, with two rows of 2 ft (0.6 m) drilled s
 
 | | Without piles | With piles | Credit for the row |
 |---|---|---|---|
-| **LEM** (Spencer) | 1.149 | 1.842 | ×1.60 |
+| **LEM** (Spencer) | 1.149 | 1.845 | ×1.61 |
 | **FEM** (SSRM) | 1.137 | 1.363 | ×1.20 |
 
-Without the piles, the two agree to about 1%. The LEM credits the pile rows with a factor of 1.60, and the FEM with
+Without the piles, the two agree to about 1%. The LEM credits the pile rows with a factor of 1.61, and the FEM with
 1.20.
 
 Neither is a three-dimensional answer. Cai & Ugai (2000) solved a pile-stabilized slope by three-dimensional
@@ -227,7 +227,7 @@ solves the same slope with both engines. The FEM gives:
 
 Without the pile, the two agree to 0.4%, so the other two rows' differences come from the pile. The FEM credits the
 row with a factor of 1.389, and the three-dimensional model with 1.193. On the same slope, an LEM Bishop search gives
-1.143 without the pile and 1.451 with the Ito & Matsui force, a credit of 1.269. The paper's own limit equilibrium
+1.143 without the pile and 1.450 with the Ito & Matsui force, a credit of 1.269. The paper's own limit equilibrium
 value is 1.37, and Slide2's is 1.43. Both two-dimensional credits are above the three-dimensional one, the FEM's by 0.196 and the LEM's by
 0.076, so the LEM lands nearer. This is the only benchmark here with a published three-dimensional answer
 ([VP106](../verification/rocscience.md#vp106), [the VP106 finite element diagnostic](../verification/rocscience.md#vp106-fem)).

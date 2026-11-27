@@ -7149,8 +7149,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             spirit to the tension cutoff used by commercial SSRM codes; Griffiths &
             Lane (1999) include no tension treatment. This is the T = 0 special case
             of the per-element cap below.
-        dt_scale (float): Multiplier on the viscoplastic pseudo-timestep
-            (research/diagnostic knob; default 1.0).
+        dt_scale (float): Multiplier on the viscoplastic pseudo-time step (default
+            1.0). For diagnosis only: the convergence tolerance and the failure
+            criteria are calibrated to the default step, and a smaller step shrinks
+            the residual without making the slope any more stable. Never lower it to
+            make a model converge.
         progress_callback (callable or None): If given, called (throttled, ~every
             10 iterations) as ``progress_callback(frac, label)`` where ``frac`` is
             ``(iteration + 1) / max_iterations`` in [0, 1] and ``label`` is a short
@@ -16044,6 +16047,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         convergence_tol (float): Convergence tolerance passed to solve_fem
         max_disp_factor (float): Displacement limit (fraction of mesh height) used as a
             backstop/early-termination cap inside solve_fem trials (default 0.1).
+        dt_scale (float): Multiplier on the viscoplastic pseudo-time step, passed to
+            every trial (default 1.0). For diagnosis only: the convergence tolerance
+            and the failure criteria are calibrated to the default step, and a smaller
+            step shrinks the residual without making the slope any more stable. Never
+            lower it to make a model converge.
         failure_criterion (str): How to determine failure. Default "hybrid"
             (since 2026-07-26).
             "non_convergence" - Bisection on TRUE viscoplastic

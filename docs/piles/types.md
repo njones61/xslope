@@ -119,7 +119,7 @@ wall.
 | <code class="rc rc-fem">E</code> | Modulus of the steel. | 29,000 ksi (4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa) ([micropile manual][mp] p. 5-16). |
 | <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | Per unit length of wall, from the section table. | The table below. |
 | <code class="rc rc-fem">Head</code> | Leave blank (free). Tiebacks are entered on the `reinforce` sheet and connected as described under [A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). | — |
-| <code class="rc rc-fem">Tip</code> | Leave blank (free), since the embedment holds the toe. | — |
+| <code class="rc rc-fem">Tip</code> | Leave blank (free) where the model includes the embedment below the slip surface, since that soil holds the toe. Where the wall runs down to the mesh's fixed base, set `fixed`: the base stands for the stratum the wall is driven into, as in [Tutorial FEM-4](../tutorials/fem04_piles.md). | — |
 
 Four common hot-rolled PZ (Z-shaped) sections, per foot and per meter of wall ([Nucor Skyline][nucor] p. 5). `Mcap` is
 50 ksi (345 MPa), the yield strength of Grade 50 steel, times Z:
@@ -176,7 +176,7 @@ and `I`, `Area` and `Mcap` are entered for one beam.
 | <code class="rc rc-fem">E</code> | Modulus of the steel. | 29,000 ksi (4.18 × 10⁹ psf, or about 2.0 × 10⁸ kPa) ([micropile manual][mp] p. 5-16). |
 | <code class="rc rc-fem">I</code>, <code class="rc rc-fem">Area</code> | For one beam, about its strong axis. | HP 12×84: `I` = 650 in⁴, or 0.0314 ft⁴ (2.71 × 10⁻⁴ m⁴); `Area` = 24.6 in², or 0.171 ft² (0.0159 m²). HP 14×117: `I` = 1,220 in⁴, or 0.0588 ft⁴ (5.08 × 10⁻⁴ m⁴); `Area` = 34.4 in², or 0.239 ft² (0.0222 m²) ([Nucor Skyline][nucor] p. 33). |
 | <code class="rc rc-fem">Head</code> | Leave blank (free). Tiebacks are connected as described under [A tieback and a soldier-pile or sheet-pile wall](#a-tieback-and-a-soldier-pile-or-sheet-pile-wall). | — |
-| <code class="rc rc-fem">Tip</code> | Leave blank (free), since the embedment holds the toe. | — |
+| <code class="rc rc-fem">Tip</code> | Leave blank (free) where the model includes the embedment below the slip surface, since that soil holds the toe. Where the beam runs down to the mesh's fixed base, set `fixed` for a beam driven into that stratum. | — |
 
 ## Segmental Block Wall
 

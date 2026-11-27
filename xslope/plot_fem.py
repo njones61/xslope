@@ -1825,23 +1825,35 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     return mappable if single_panel else None
 
 
+def _yielded_elements(solution, n_elements):
+    """The elements a solution reports as yielded: its ``plastic_elements`` flag,
+    True where a Gauss point is at or over its yield surface (see
+    ``xslope.fem._at_yield_points``). The element-averaged yield function is NOT a
+    substitute: the solve leaves points that are at their strength a hair inside the
+    surface, and the average of points on a convex surface lies inside it, so
+    ``yield_function > 0`` misses nearly all of them. It is read only for a field
+    that carries no flag."""
+    flag = solution.get("plastic_elements")
+    if flag is not None and len(flag) == n_elements:
+        return np.asarray(flag, dtype=bool)
+    yf = solution.get("yield_function")
+    if yf is not None and len(yf) == n_elements:
+        return np.asarray(yf) > 0
+    return np.zeros(n_elements, dtype=bool)
+
+
 def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                         cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
-    Plot von Mises stress contours with yielding elements highlighted.
+    Plot von Mises stress contours with yielded elements outlined (see
+    `_yielded_elements`).
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
     stresses = solution.get("stresses", np.zeros((len(elements), 4)))
-    
-    # Use yield function to determine plastic elements for consistency
-    # If yield_function is available, use it; otherwise fall back to plastic_elements
-    yield_function = solution.get("yield_function", None)
-    if yield_function is not None:
-        plastic_elements = yield_function > 0  # F > 0 means yielding
-    else:
-        plastic_elements = solution.get("plastic_elements", np.zeros(len(elements), dtype=bool))
+
+    plastic_elements = _yielded_elements(solution, len(elements))
     
     # Extract von Mises stresses
     von_mises = stresses[:, 3]  # 4th column is von Mises stress
@@ -3923,9 +3935,10 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
                        ha='center', va='center', fontsize=5,
                        color=color, fontweight=fontweight, alpha=0.8)
     
-    # Highlight yielding elements with thick red border
+    # Outline the yielded elements (the solution's flag, see _yielded_elements)
+    yielded = _yielded_elements(solution, len(elements))
     for i, elem in enumerate(elements):
-        if yield_function[i] > 0:
+        if yielded[i]:
             elem_type = element_types[i]
             if elem_type == 3:  # Triangle
                 coords = nodes[elem[:3]]
@@ -3952,7 +3965,7 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
     ax.set_title(_fallback_clause(solution, title), fontsize=12, pad=15)
     
     # Add statistics to the plot
-    n_yielding = np.sum(yield_function > 0)
+    n_yielding = int(np.sum(yielded))
     n_total = len(yield_function)
     n_critical = np.sum((yield_function > -10) & (yield_function <= 0))  # Near yielding
     

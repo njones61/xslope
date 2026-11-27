@@ -454,6 +454,8 @@ table is in the Log pane. The result view follows the engine:
 
 ![Monte Carlo reliability histogram](images/analysis_reliability_mc_histogram.png)
 
+![Monte Carlo convergence sub-tab: the running probability of failure with its 95% confidence band](images/analysis_reliability_mc_convergence.png)
+
 Those views carry the same **Table** sub-tab the Parametric ones do. The Taylor series lists
 each parameter with its most-likely value, its σ, the factor of safety at plus and minus one
 σ, and the swing ΔF the variance is built from; a sampling run lists the statistics behind

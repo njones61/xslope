@@ -449,15 +449,16 @@ class SeepDisplayPanel(QWidget):
             "waterline + apex-down symbol. On a transient frame the reservoir pool "
             "drops with the schedule; on a steady solution it is the constant level.")
 
+        # The contour toggles sit around the Variable they contour: lines above it,
+        # fill below it (Norm). Flow lines + base material are flow-net-only, so a
+        # transient view omits them (hidden, not just disabled — they cannot apply).
+        # Vectors stay: they read a transient frame's instantaneous flow direction.
+        form.addRow("", self.contour_lines)
         form.addRow("Variable", self.variable)
-        # Flow lines + base material are flow-net-only, so a transient view omits them
-        # (hidden, not just disabled — they cannot apply). Vectors stay: they read a
-        # transient frame's instantaneous flow direction.
+        form.addRow("", self.fill)
         if not self._transient:
             form.addRow("", self.flowlines)
         form.addRow("", self.vectors)
-        form.addRow("", self.contour_lines)
-        form.addRow("", self.fill)
         form.addRow("", self.phreatic)
         form.addRow("", self.bc_levels)
         if not self._transient:

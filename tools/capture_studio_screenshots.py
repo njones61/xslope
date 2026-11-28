@@ -1544,8 +1544,11 @@ def capture_seep_flow_trace():
     canvas.render_now()
     _settle()
     panel = mw._display_panels[canvas]
-    # Flow lines off, so the streaks read on their own in a page-sized still.
+    # Flow lines and contour lines off and the zones paler, so the streaks read on
+    # their own in a page-sized still (the page tells the reader to do the same).
     panel.flowlines.setChecked(False)
+    panel.contour_lines.setChecked(False)
+    panel.alpha.setValue(0.3)
     _settle()
     canvas.render_now()
     _settle()
@@ -1569,6 +1572,8 @@ def capture_seep_flow_trace():
     mw.view_tabs.grab().save(out)
     panel.flow_trace.setChecked(False)
     panel.flowlines.setChecked(True)
+    panel.contour_lines.setChecked(True)
+    panel.alpha.setValue(0.85)
     _settle()
     shutil.rmtree(tmp, ignore_errors=True)
     return out

@@ -572,7 +572,9 @@ view shows (contours, flow lines, the phreatic surface) and loops every 8 second
 without a visible seam. Zoom and pan work while it plays. It pauses while another
 tab is shown or the window is minimized, and resumes where it left off. **Trace
 particles** sets the streak density: about how many particles are lit at once
-(1,500 by default). Unticking the box removes the streaks.
+(1,500 by default). Unticking the box removes the streaks. The streaks stand out
+best over pale zones: lower **Fill opacity** (0.3 in the figure below), and untick
+**Contour lines** and **Flow lines** to show the streaks on their own.
 
 While the trace is on, a play bar sits below the plot:
 

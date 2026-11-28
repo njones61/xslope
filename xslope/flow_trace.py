@@ -86,10 +86,53 @@ def _nodal_porosity(porosity, n_nodes, elements, element_types, element_material
     return out
 
 
+class NoFlowError(ValueError):
+    """The solution has no flow to trace: its total head is one value everywhere
+    (water standing level), so its velocity is round-off."""
+
+
+def _merge_joint_split(seep_data, solution):
+    """A model on a joint-split mesh (``node_merge``, see
+    :func:`xslope.seep.joint_node_merge`) on its merged nodes, as the seepage
+    solve sees it: water crosses the joint. Node fields are read at each merged
+    node; the nodal flows ``q`` are summed over each node's copies. Any other
+    model is returned as it is."""
+    if seep_data.get("node_merge") is None:
+        return seep_data, solution
+    from .seep import _joint_merged
+    sd, rep, keep = _joint_merged(seep_data)
+    n, m = len(rep), len(keep)
+    sol = dict(solution)
+    for key, val in solution.items():
+        if key == "q" or val is None or np.isscalar(val):
+            continue
+        a = np.asarray(val)
+        if a.ndim >= 1 and len(a) == n and a.dtype.kind in "fiub":
+            sol[key] = a[keep]
+    q = solution.get("q")
+    if q is not None and len(q) == n:
+        qm = np.zeros(m)
+        np.add.at(qm, rep, np.asarray(q, dtype=float))
+        sol["q"] = qm
+    return sd, sol
+
+
 class TraceField:
-    """A seepage solution's velocity on a linear triangulation, ready to trace."""
+    """A seepage solution's velocity on a linear triangulation, ready to trace.
+
+    Raises :class:`NoFlowError` when nothing flows (the total head is one value
+    everywhere)."""
 
     def __init__(self, seep_data, solution, porosity=None):
+        # A joint-split mesh has two nodes at each point of a joint; the solve
+        # merges them, and so does the trace (the split pairs are not a valid
+        # triangulation, and water crosses the joint).
+        seep_data, solution = _merge_joint_split(seep_data, solution)
+        from .plot_seep import _head_is_flat
+        if _head_is_flat(seep_data, solution):
+            raise NoFlowError(
+                "Nothing flows: the total head is the same everywhere (the water "
+                "stands level), so there is no flow to trace.")
         nodes = np.asarray(seep_data["nodes"], dtype=float)
         elements = seep_data["elements"]
         et = seep_data.get("element_types")
@@ -149,6 +192,7 @@ class TraceField:
         # surface whose velocity is the kr-scaled trickle; area particles go only
         # where the pressure head is not negative. A confined solve is saturated.
         head = np.asarray(solution["head"], dtype=float)
+        self.head = head
         pc = (head - nodes[:, 1])[tris].mean(axis=1)
         try:
             from .plot_seep import flownet_has_phreatic
@@ -160,6 +204,7 @@ class TraceField:
 
         self._boundary(seep_data)
         self.bnd_inflow = self._edge_inflow(seep_data, solution, elements, et)
+        self._sinks(seep_data, solution)
 
         wet_nodes = np.unique(tris[self.wet]) if self.wet.any() else np.unique(tris)
         speed = np.linalg.norm(self.vel[wet_nodes], axis=1)
@@ -202,6 +247,102 @@ class TraceField:
         if flux is not None:
             is_open = is_open | (np.asarray(flux) != 0)
         self.bnd_open = is_open[a] & is_open[b]
+
+    def _sinks(self, seep_data, solution):
+        """Where water leaves the domain away from an open boundary edge.
+
+        A sink node is one the solve's nodal flows say water leaves by (a fixed
+        head or an active exit face with outflow, or a specified outflow), or,
+        without nodal flows, any node with a boundary condition. Open boundary
+        edges already let particles out by crossing them; the rest of the sinks
+        (a drain or well line inside the mesh, a drain of one boundary node with
+        no-flow edges either side) are kept as segments: every interior edge
+        between two sink nodes, and each sink node not on an open edge as a
+        point. ``sink_tri`` marks the triangles that touch one; a particle there
+        ends its path on the sink when its next step would reach it.
+
+        A sink node's nodal velocity is an average over elements whose flow
+        meets there from opposite sides (both faces of a drain line), so it says
+        nothing about the flow beside it: on the drain's downstream face it
+        points away, and particles stop short where the interpolated flow
+        reverses. In a triangle touching a sink, the sink corners take the
+        mean velocity of the triangle's other corners instead.
+        """
+        n = len(self.nodes)
+        self.sink_a = np.zeros((0, 2))
+        self.sink_b = np.zeros((0, 2))
+        self.sink_tri = np.zeros(len(self.tris), bool)
+        self.sink_nodes = np.zeros(n, bool)
+        self._tvel = self.vel[self.tris]
+        bc = seep_data.get("bc_type")
+        if bc is None:
+            return
+        bc = np.asarray(bc)
+        flux = seep_data.get("flux_nodal")
+        q = solution.get("q")
+        if q is not None and len(q) == n:
+            net = np.where(bc != 0, np.asarray(q, dtype=float), 0.0)
+            if flux is not None:
+                net = np.where(bc != 0, net, np.asarray(flux, dtype=float))
+            scale = float(np.abs(net).max()) if net.size else 0.0
+            sink = net < -1e-9 * scale
+        else:
+            sink = bc != 0
+            if flux is not None:
+                sink |= np.asarray(flux, dtype=float) < 0
+        used = np.zeros(n, bool)
+        used[self.tris] = True
+        sink &= used
+        self.sink_nodes = sink
+        if not sink.any():
+            return
+        on_open = np.zeros(n, bool)
+        on_open[self.bnd_a[self.bnd_open]] = True
+        on_open[self.bnd_b[self.bnd_open]] = True
+        bnd = set(zip(np.minimum(self.bnd_a, self.bnd_b).tolist(),
+                      np.maximum(self.bnd_a, self.bnd_b).tolist()))
+        ed = self.triang.edges
+        both = sink[ed[:, 0]] & sink[ed[:, 1]]
+        ed = np.array([e for e in ed[both].tolist()
+                       if (min(e), max(e)) not in bnd], dtype=int).reshape(-1, 2)
+        pts = np.nonzero(sink & ~on_open)[0]
+        a = np.concatenate([ed[:, 0], pts])
+        b = np.concatenate([ed[:, 1], pts])
+        if a.size == 0:
+            return
+        self.sink_a, self.sink_b = self.nodes[a], self.nodes[b]
+        near = np.zeros(n, bool)
+        near[a] = True
+        near[b] = True
+        corner = near[self.tris]
+        self.sink_tri = corner.any(axis=1)
+        mixed = self.sink_tri & ~corner.all(axis=1)
+        if mixed.any():
+            tv = self._tvel[mixed].copy()
+            c = corner[mixed]
+            other = np.where(c[..., None], 0.0, tv).sum(1) / (~c).sum(1)[:, None]
+            tv[c] = np.repeat(other, c.sum(1), axis=0)
+            self._tvel = self._tvel.copy()
+            self._tvel[mixed] = tv
+
+    def nearest_sink(self, pts):
+        """The nearest point on the sinks to each point, and its distance."""
+        A, B = self.sink_a, self.sink_b
+        d = B - A
+        L2 = (d ** 2).sum(1)
+        out = np.empty_like(pts)
+        dist = np.empty(len(pts))
+        for s in range(0, len(pts), 256):
+            p = pts[s:s + 256]
+            with np.errstate(invalid="ignore", divide="ignore"):
+                t = ((p[:, None] - A[None]) * d[None]).sum(2) / L2[None]
+            t = np.clip(np.where(L2[None] > 0, t, 0.0), 0, 1)
+            c = A[None] + d[None] * t[..., None]
+            r2 = ((c - p[:, None]) ** 2).sum(2)
+            k = np.argmin(r2, axis=1)
+            out[s:s + 256] = c[np.arange(len(p)), k]
+            dist[s:s + 256] = np.sqrt(r2[np.arange(len(p)), k])
+        return out, dist
 
     _ELEMENT_EDGES = {
         3: [(0, None, 1), (1, None, 2), (2, None, 0)],
@@ -283,7 +424,7 @@ class TraceField:
             t = ti[ok]
             l12 = np.einsum("nij,nj->ni", self._inv[t], xy[ok] - self._x0[t])
             lam = np.column_stack([1.0 - l12.sum(1), l12])
-            out[ok] = np.einsum("ni,nij->nj", lam, self.vel[self.tris[t]])
+            out[ok] = np.einsum("ni,nij->nj", lam, self._tvel[t])
         return out
 
     def display_speed_factor(self, speed, speed_scale):
@@ -443,9 +584,11 @@ def trace_paths(field, starts, speed_scale="sqrt", u_ref=1.0, max_tau=np.inf,
     records the display time it took, ``ds / (u_ref * g(|v|/v_ref))``, so a path
     can later be sampled at any display time. A path ends when it crosses an open
     boundary edge (it left the mesh: an exit face, a drain, a head boundary), when
-    its display time passes ``max_tau``, or when it stalls (no progress against a
-    no-flow wall, or a zero velocity). On a no-flow wall the step's normal part is
-    dropped and the particle slides along it.
+    its next step would reach a sink inside the mesh or at a lone boundary node
+    (``TraceField.sink_tri``; it ends on the sink), when its display time passes
+    ``max_tau``, or when it stalls (no progress against a no-flow wall, or a zero
+    velocity). On a no-flow wall the step's normal part is dropped and the
+    particle slides along it.
 
     Returns a dict: ``xy`` (list of (m, 2) arrays), ``tau`` (list of (m,)),
     ``exited`` (bool array).
@@ -536,6 +679,30 @@ def trace_paths(field, starts, speed_scale="sqrt", u_ref=1.0, max_tau=np.inf,
                 step_len[st] = np.where(gone, ds[st], 0.0)
                 dtau[st[~gone]] = 0.0
                 dtau[st[gone]] = 0.0
+        # A sink inside the mesh (a drain or well line, a one-node drain on a
+        # no-flow face): water leaves there, so a particle whose step would reach
+        # it, heading toward it, ends on it.
+        if field.sink_a.size:
+            ok_t = (ti >= 0) & field.sink_tri[np.maximum(ti, 0)]
+            ok_t |= (tn >= 0) & field.sink_tri[np.maximum(tn, 0)]
+            cand = np.nonzero(ok_t & ~exited[idx])[0]
+            if cand.size:
+                c, dist = field.nearest_sink(x[cand])
+                to = c - x[cand]
+                # Heading toward it here or at the step's midpoint (which may
+                # already lie past it, where the flow comes back the other way).
+                with np.errstate(invalid="ignore"):
+                    toward = ((to * d0[cand]).sum(1) > 0) | ((to * dm[cand]).sum(1) > 0)
+                cap = (dist <= ds[cand]) & (toward | (dist <= 1e-9 * ds[cand]))
+                if cap.any():
+                    k = cand[cap]
+                    xn[k] = c[cap]
+                    step_len[k] = dist[cap]
+                    with np.errstate(invalid="ignore", divide="ignore"):
+                        g = u_ref * field.display_speed_factor(spm[k], speed_scale)
+                        dtau[k] = np.where(dist[cap] > 0, dist[cap] / g, 0.0)
+                    bad[k] = False
+                    exited[idx[k]] = True
         progressed = step_len > 1e-3 * ds
         stall[idx] = np.where(progressed, 0, stall[idx] + 1)
         stall[idx[bad]] = 99

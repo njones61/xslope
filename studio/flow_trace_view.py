@@ -25,8 +25,9 @@ import threading
 import traceback
 
 import numpy as np
-from PySide6.QtCore import QElapsedTimer, QEvent, QLineF, QObject, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtCore import (QByteArray, QDataStream, QElapsedTimer, QEvent, QObject,
+                            QRectF, Qt, QTimer, Signal)
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QGraphicsItem, QHBoxLayout, QLabel, QWidget
 
 from .canvas import BASE_DPI
@@ -39,10 +40,25 @@ FRAME_MS = 33
 _ALPHA_STEPS = 16
 
 
+_PATH_REC = np.dtype([("t", ">i4"), ("x", ">f8"), ("y", ">f8")])
+
+
+def _segments_path(rec):
+    """A QPainterPath of separate line segments from ``rec`` (a _PATH_REC array
+    of moveTo/lineTo pairs), read in one go from QPainterPath's own stream
+    format, not built one Python call per segment."""
+    ba = QByteArray(np.array([len(rec)], ">i4").tobytes() + rec.tobytes()
+                    + np.array([0], ">i4").tobytes())         # fill rule
+    path = QPainterPath()
+    QDataStream(ba) >> path
+    return path
+
+
 class _StreakItem(QGraphicsItem):
     """The streaks of one frame, drawn over the plot's pixmap and clipped to the
-    plot area. Lines are grouped by pen (tail piece x opacity step), so a frame
-    is a few dozen ``drawLines`` calls."""
+    plot area. Segments are grouped by pen (tail piece x opacity step), each
+    group one path of separate segments, so a frame is a few dozen
+    ``drawPath`` calls."""
 
     def __init__(self):
         super().__init__()
@@ -66,9 +82,14 @@ class _StreakItem(QGraphicsItem):
             return
         painter.setClipRect(self._rect)
         painter.setRenderHint(QPainter.Antialiasing, True)
-        for pen, lines in self._groups:
+        painter.setBrush(Qt.NoBrush)
+        for pen, path in self._groups:
             painter.setPen(pen)
-            painter.drawLines(lines)
+            painter.drawPath(path)
+
+
+class _NoFlow(str):
+    """A build that found nothing flowing: its message, shown as it is."""
 
 
 class _Built(QObject):
@@ -187,13 +208,16 @@ class FlowTracePlayer(QObject):
         self._built = built           # keep the emitter alive until it reports
 
         def work():
-            from xslope.flow_trace import build_flow_trace
+            from xslope.flow_trace import NoFlowError, build_flow_trace
             try:
                 tr = build_flow_trace(
                     seep_data, solution, n_particles=int(n_particles),
                     inflow_share=d["inflow_share"], speed_scale=d["speed_scale"],
                     loop_seconds=d["loop_seconds"])
                 result, err = (tr, key, seep_data, solution), None
+            except NoFlowError as exc:
+                # Not a failure: the model has no flow. Said plainly, no traceback.
+                result, err = None, _NoFlow(str(exc))
             except Exception as exc:
                 result, err = None, f"{exc}\n{traceback.format_exc()}"
             try:
@@ -233,6 +257,9 @@ class FlowTracePlayer(QObject):
         if gen != self._gen:
             return
         self._building = False
+        if isinstance(err, _NoFlow):
+            self.bar.status.setText(str(err))
+            return
         if result is None:
             print("Flow trace: could not trace the flow:\n" + (err or ""))
             self.bar.status.setText("Could not trace the flow (see the Log pane).")
@@ -338,7 +365,11 @@ class FlowTracePlayer(QObject):
         key = rank.astype(int) * _ALPHA_STEPS + step
         order = np.argsort(key, kind="stable")
         ks = key[order]
-        flat = sc.reshape(-1, 4)[order].tolist()
+        pts = sc.reshape(-1, 2, 2)[order].reshape(-1, 2)
+        rec = np.empty(len(pts), _PATH_REC)
+        rec["t"][0::2] = 0                      # QPainterPath.MoveToElement
+        rec["t"][1::2] = 1                      # QPainterPath.LineToElement
+        rec["x"], rec["y"] = pts[:, 0], pts[:, 1]
         cut = np.flatnonzero(np.diff(ks)) + 1
         starts = np.concatenate([[0], cut])
         ends = np.concatenate([cut, [len(ks)]])
@@ -347,7 +378,7 @@ class FlowTracePlayer(QObject):
         for a, e in zip(starts.tolist(), ends.tolist()):
             k = int(ks[a])
             out.append((pens[k // _ALPHA_STEPS][k % _ALPHA_STEPS],
-                        [QLineF(*v) for v in flat[a:e]]))
+                        _segments_path(rec[2 * a:2 * e])))
         return out
 
     # --- following the plot and the window ---------------------------------

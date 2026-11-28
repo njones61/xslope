@@ -24,6 +24,18 @@ offscreen, with Studio's settings sandboxed (tools.studio_settings).
      of xslope_earth_dam_tseep), and asks for no trace even if the hidden box is
      ticked.
 
+  H. NO FLOW. Started on the same model with a solution whose head is one value
+     everywhere (velocity round-off, 1e-13), the play bar says nothing flows,
+     Play and Save stay off, and nothing is printed to the Log (no traceback).
+     Before the fix it animated the round-off.
+  I. PLAYBACK COST. At the Trace particles maximum, one frame (the trace's
+     frame, the pen groups, and a repaint of the view) takes less than the
+     animation's timer interval (FRAME_MS, 33 ms), fastest of 30 frames, so a
+     machine busy with other work (the overnight suite runs 8 at once) does not
+     fail it. One QLineF per segment took about 57 ms at 5000 particles.
+  J. TOOLTIP. The Flow trace box's tooltip names the Darcy velocity (Studio
+     passes no porosity), not the seepage velocity.
+
 Skipped without PySide6.
 """
 import contextlib
@@ -69,8 +81,11 @@ def _spin(app, seconds, until=None):
 
 def _lines(player):
     """The streak coordinates the item would paint now."""
-    pts = [(ln.x1(), ln.y1(), ln.x2(), ln.y2())
-           for _, lines in player.item._groups for ln in lines]
+    pts = []
+    for _, path in player.item._groups:
+        for i in range(0, path.elementCount(), 2):
+            a, b = path.elementAt(i), path.elementAt(i + 1)
+            pts.append((a.x, a.y, b.x, b.y))
     return np.array(sorted(pts))
 
 
@@ -179,6 +194,19 @@ def _checks():
             # E. save
             failures += _save_check(app, canvas, panel, player, tmp)
 
+            # J. tooltip
+            tip = panel.flow_trace.toolTip()
+            print(f"  J. tooltip names the Darcy velocity {'Darcy velocity' in tip}, "
+                  f"the seepage velocity {'seepage velocity' in tip}")
+            if "Darcy velocity" not in tip or "seepage velocity" in tip:
+                failures.append(f"J. the Flow trace tooltip reads: {tip}")
+
+            # I. playback cost at the maximum particle count
+            failures += _cost_check(app, panel, player)
+
+            # H. no flow
+            failures += _no_flow_check(app, panel, player)
+
             # F. another file clears the view and stops it
             with contextlib.redirect_stdout(io.StringIO()):
                 mw.open_path(_copy(_TSEEP, tmp))
@@ -203,6 +231,61 @@ def _checks():
         finally:
             mw.doc._dirty = False
             mw.close()
+    return failures
+
+
+def _cost_check(app, panel, player):
+    from studio.flow_trace_view import FRAME_MS
+    n_max = panel.trace_particles.maximum()
+    panel.trace_particles.setValue(n_max)
+    built = _spin(app, 120, lambda: player.trace is not None and player._key[1] == n_max)
+    if not built:
+        return [f"I. no trace built at {n_max} particles within 120 s"]
+    player.bar.btn_play.setChecked(False)
+    _spin(app, 0.1)
+    vp = player.canvas.view.viewport()
+    tr = player.trace
+    cost, segs = [], 0
+    for t in np.linspace(0, tr.P, 30, endpoint=False):
+        t0 = time.perf_counter()
+        seg, a, r = tr.frame(t)
+        player.item.set_groups(player._groups(seg, a, r))
+        vp.repaint()
+        cost.append(time.perf_counter() - t0)
+        segs = max(segs, len(seg))
+    med = 1e3 * float(np.min(cost))
+    print(f"  I. {n_max} particles (the maximum), up to {segs} streak pieces: a frame takes "
+          f"{med:.1f} ms (fastest of 30; timer {FRAME_MS} ms)")
+    player.bar.btn_play.setChecked(True)
+    panel.trace_particles.setValue(1500)
+    _spin(app, 60, lambda: player.trace is not None and player._key[1] == 1500)
+    if not med < FRAME_MS:
+        return [f"I. a frame at {n_max} particles takes {med:.1f} ms, over the {FRAME_MS} ms timer"]
+    return []
+
+
+def _no_flow_check(app, panel, player):
+    seep_data, solution = player._source
+    flat = dict(solution)
+    flat["head"] = np.full(len(solution["head"]), 10.0)
+    rng = np.random.default_rng(0)
+    flat["velocity"] = rng.normal(0, 1e-13, np.shape(solution["velocity"]))
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        player.start(seep_data, flat, 1500)
+        _spin(app, 30, lambda: not player._building)
+    text = player.bar.status.text()
+    log = out.getvalue()
+    play_off = not player.bar.btn_play.isEnabled() and not player.bar.btn_save.isEnabled()
+    print(f"  H. no flow: status '{text}'; Play and Save off {play_off}; "
+          f"Log lines {len(log.splitlines())}")
+    failures = []
+    if "Nothing flows" not in text or not play_off or player.trace is not None:
+        failures.append(f"H. no flow: status '{text}', buttons off {play_off}")
+    if "Traceback" in log or "could not trace" in log:
+        failures.append("H. no flow printed a traceback to the Log")
+    player.start(seep_data, solution, 1500)
+    _spin(app, 30, lambda: player.trace is not None)
     return failures
 
 

@@ -1957,7 +1957,7 @@ def animate_flow_trace(seep_data, solution, n_particles=1500, inflow_share=0.35,
     ax.add_collection(LineCollection(outline, colors="black", linewidths=1.0,
                                      capstyle="round", zorder=4))
     if phreatic and field.unconfined:
-        p_head = np.asarray(solution["head"]) - field.nodes[:, 1]
+        p_head = field.head - field.nodes[:, 1]
         cs = ax.tricontour(field.triang, p_head, levels=[0], colors="black",
                            linewidths=1.2, alpha=0.7, zorder=2)
         cs.set_gid("PHREATIC")

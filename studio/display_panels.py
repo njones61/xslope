@@ -436,7 +436,7 @@ class SeepDisplayPanel(QWidget):
         # own velocity field, so there is no one field for particles to follow.
         self.flow_trace = QCheckBox("Flow trace")
         self.flow_trace.setToolTip(
-            "Animate particles that follow the seepage velocity over the plot. "
+            "Animate particles that follow the Darcy velocity over the plot. "
             "Streaks are long where the flow is fast and short where it is slow; "
             "slow zones are sped up (square-root pace) so they still move. "
             "A play bar below the plot pauses it and saves it as an animation.")

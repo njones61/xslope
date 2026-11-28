@@ -598,7 +598,10 @@ the velocity field. Particles are traced through the solved nodal velocities, ea
 a moment with a short streak behind it, so the paths through a filter or under a cutoff
 stand out at a glance. About a third of the particles start on the inflow boundaries,
 spaced so that each carries an equal share of the inflow; the rest are dropped at random
-over the wetted area. By default the particles move at the Darcy velocity; pass `porosity`
+over the wetted area. A path ends where its water leaves the model: an exit face, a head
+boundary, or a drain or well inside the mesh. A solution in which nothing flows (the total
+head is the same everywhere) raises `xslope.flow_trace.NoFlowError` instead of animating
+round-off. By default the particles move at the Darcy velocity; pass `porosity`
 (one value, or one per material) to move them at the seepage velocity instead. Slow zones
 are sped up so they still visibly move (`speed_scale="sqrt"`, the default; `"true"` keeps
 real travel times), and the animation loops every 8 seconds without a visible seam. It can

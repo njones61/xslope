@@ -566,6 +566,9 @@ follows the square root of the speed); the paths themselves are not changed. The
 particles move at the Darcy velocity. About a third of them are released along the
 inflow boundaries, spaced so that each carries an equal share of the inflow, as the
 channels of a flow net do; the rest are dropped at random over the wetted area.
+A particle's path ends where its water leaves the model: an exit face, a head
+boundary, or a drain or well inside the mesh. If nothing flows (the total head is
+the same everywhere), the play bar says so and nothing is animated.
 
 The animation starts as soon as the box is ticked. It is drawn over whatever the
 view shows (contours, flow lines, the phreatic surface) and loops every 8 seconds

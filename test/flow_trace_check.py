@@ -44,6 +44,31 @@ above and below the row at mid-height can carry different k.
      250 ms a frame), drawn with the display panel's current options: with Filled
      contours turned on, a written frame matches a direct render with them on and
      not one with them off. Skipped without PySide6.
+  I. SINKS INSIDE THE MESH. The right face made no-flow and a drain of fixed head
+     0 put on the interior nodes at x = 7, 0.5 < y < 1.5 (40 columns): every
+     inflow particle ends on the drain line (x = 7 to 1e-9, y within the drain)
+     and no trip runs past two loops. Before the fix none of them left: they
+     hopped across the drain until the trace's cap (1600 display seconds). The
+     same with the drain one node of the no-flow right face (x = 10, y = 1): every
+     inflow particle ends at that node (to 1e-9); before, none did.
+  J. JOINT-SPLIT MESH. The rectangle split along x = 5 (the nodes there copied
+     onto the right-hand elements, the map from joint_node_merge as
+     build_seep_data records it): the trace is built on the merged nodes and
+     every inflow particle crosses the joint and ends on the outflow face. Before
+     the fix matplotlib refused the split triangulation ("Triangulation is
+     invalid").
+  K. NO FLOW. Head 10 on both faces: build_flow_trace raises NoFlowError saying
+     nothing flows, instead of animating round-off (max velocity 1e-13).
+  L. SPECIFIED FLUX INFLOW. A flux of 0.5 into the top edge over 2 <= x <= 4
+     (assemble_flux_nodal, positive into the domain) with the head faces: the
+     release points on that stretch of the top edge carry its share of the
+     inflow (q * L over the total, to 2 points of 300), the inflow found is the
+     flowrate (to 1e-9), and every one of those particles travels into the
+     domain and ends on the outflow face.
+  M. GIF MEMORY AND CANCEL. Mid-export, the GIF writer holds no full RGB frame:
+     what it holds is under a quarter of the frames' raw RGB size (it held all
+     of it before). A Cancel raised from the progress callback writes no file
+     (before, the partial GIF was written).
 """
 import contextlib
 import io
@@ -260,7 +285,187 @@ def run():
         print(f"  F. MP4 (ffmpeg {'found' if has else 'not found'}): {msg}")
         if not ok:
             failures.append(f"F. MP4 with ffmpeg {'found' if has else 'missing'}: {msg}")
+    failures += _sink_checks()
+    failures += _joint_check()
+    failures += _no_flow_check()
+    failures += _flux_check()
+    failures += _gif_memory_checks(seep, sol)
     failures += _transient_checks()
+    return failures
+
+
+def _inflow_ends(tr):
+    pids = np.unique(tr.path_id[tr.kind == "inflow"])
+    return np.array([tr._XY[tr._last[p]] for p in pids]), tr.path_end[pids]
+
+
+def _sink_checks():
+    from xslope.flow_trace import build_flow_trace
+    failures = []
+    # I(a). an interior drain line
+    s = _rect(nx=40)
+    n = s["nodes"]
+    right = np.isclose(n[:, 0], 10.0)
+    s["bc_type"][right] = 0
+    s["bc_values"][right] = 0.0
+    drain = np.isclose(n[:, 0], 7.0) & (n[:, 1] > 0.5) & (n[:, 1] < 1.5)
+    s["bc_type"][drain] = 1
+    s["bc_values"][drain] = 0.0
+    sol = _solve(s)
+    tr = build_flow_trace(s, sol, n_particles=300, inflow_share=1.0, loop_seconds=8.0)
+    ends, trips = _inflow_ends(tr)
+    ylo, yhi = n[drain, 1].min(), n[drain, 1].max()
+    on = (np.abs(ends[:, 0] - 7.0) < 1e-9) & (ends[:, 1] >= ylo - 1e-9) & (ends[:, 1] <= yhi + 1e-9)
+    print(f"  I. interior drain: {tr.info['inflow_exited']} of {tr.info['n_release']} inflow "
+          f"particles left, {on.mean():.1%} of the paths end on the drain line; "
+          f"longest trip {trips.max():.1f} display s (loop {tr.P:g})")
+    if not (on.all() and tr.info["inflow_exited"] == tr.info["n_release"]):
+        failures.append(f"I. interior drain: {on.mean():.1%} of the inflow paths end on it, "
+                        f"{tr.info['inflow_exited']} of {tr.info['n_release']} left")
+    if not trips.max() < 2 * tr.P:
+        failures.append(f"I. interior drain: a trip runs {trips.max():.1f} display s")
+    # I(b). a drain of one node on a no-flow face
+    s = _rect(nx=40)
+    n = s["nodes"]
+    right = np.isclose(n[:, 0], 10.0)
+    s["bc_type"][right] = 0
+    s["bc_values"][right] = 0.0
+    k = np.nonzero(right & np.isclose(n[:, 1], 1.0))[0]
+    s["bc_type"][k] = 1
+    sol = _solve(s)
+    tr = build_flow_trace(s, sol, n_particles=300, inflow_share=1.0, loop_seconds=8.0)
+    ends, trips = _inflow_ends(tr)
+    d = np.hypot(ends[:, 0] - 10.0, ends[:, 1] - 1.0)
+    print(f"  I. one-node drain: {tr.info['inflow_exited']} of {tr.info['n_release']} left; "
+          f"paths end within {d.max():.1e} of the node")
+    if not (d.max() < 1e-9 and tr.info["inflow_exited"] == tr.info["n_release"]):
+        failures.append(f"I. one-node drain: paths end up to {d.max():.3g} from it, "
+                        f"{tr.info['inflow_exited']} of {tr.info['n_release']} left")
+    return failures
+
+
+def _joint_check():
+    from xslope.flow_trace import build_flow_trace
+    from xslope.seep import joint_node_merge
+    seep = _rect()
+    nodes, els = seep["nodes"], seep["elements"].copy()
+    col = np.nonzero(np.isclose(nodes[:, 0], 5.0))[0]
+    copy_of = {int(c): len(nodes) + i for i, c in enumerate(col)}
+    right = nodes[els].mean(1)[:, 0] > 5.0
+    els[right] = [[copy_of.get(int(v), v) for v in e] for e in els[right]]
+    n2 = np.vstack([nodes, nodes[col]])
+    merge = joint_node_merge({"nodes": n2, "elements_joint": [[0, 0, 0, 0]]})
+    s2 = dict(seep, nodes=n2, elements=els, node_merge=merge,
+              bc_type=np.concatenate([seep["bc_type"], np.zeros(len(col), int)]),
+              bc_values=np.concatenate([seep["bc_values"], np.zeros(len(col))]),
+              flux_nodal=np.zeros(len(n2)))
+    sol = _solve(s2)
+    try:
+        tr = build_flow_trace(s2, sol, n_particles=200, inflow_share=1.0, speed_scale="true")
+    except Exception as e:
+        print(f"  J. joint-split mesh: {type(e).__name__}: {e}")
+        return [f"J. joint-split mesh: {type(e).__name__}: {e}"]
+    ends, _ = _inflow_ends(tr)
+    starts = np.array([tr._XY[tr._first[p]] for p in np.unique(tr.path_id)])
+    crossed = (starts[:, 0] < 1e-3).all() and np.allclose(ends[:, 0], 10.0, atol=1e-9)
+    print(f"  J. joint-split mesh: traced on {len(tr.field.nodes)} merged nodes "
+          f"({len(n2)} split); every inflow path from x = 0 crosses x = 5 and ends on "
+          f"x = 10: {crossed}")
+    if len(tr.field.nodes) != len(nodes) or not crossed:
+        return [f"J. joint-split mesh: {len(tr.field.nodes)} nodes, crossed {crossed}"]
+    return []
+
+
+def _no_flow_check():
+    from xslope.flow_trace import NoFlowError, build_flow_trace
+    seep = _rect()
+    seep["bc_values"][:] = np.where(seep["bc_type"] == 1, 10.0, 0.0)
+    sol = _solve(seep)
+    vmax = np.abs(sol["velocity"]).max()
+    try:
+        build_flow_trace(seep, sol, n_particles=200)
+        msg = "built a trace"
+        ok = False
+    except NoFlowError as e:
+        msg = f"NoFlowError: {e}"
+        ok = "Nothing flows" in str(e)
+    print(f"  K. equal heads (max velocity {vmax:.1e}): {msg}")
+    return [] if ok else [f"K. no-flow model: {msg}"]
+
+
+def _flux_check():
+    from xslope.flow_trace import TraceField, build_flow_trace, inflow_release_points
+    from xslope.seep import assemble_flux_nodal
+    s = _rect()
+    qf, x0, x1 = 0.5, 2.0, 4.0
+    s["flux_nodal"] = assemble_flux_nodal(
+        s["nodes"], s["elements"], s["element_types"],
+        [{"coords": [(x0, 2.0), (x1, 2.0)], "flux": qf}], 1e-6)
+    sol = _solve(s)
+    field = TraceField(s, sol)
+    n = 300
+    pts, _, q_tot = inflow_release_points(field, n)
+    on = (pts[:, 1] > 2.0 - 1e-3) & (pts[:, 0] >= x0 - 1e-9) & (pts[:, 0] <= x1 + 1e-9)
+    want = qf * (x1 - x0) / q_tot * n
+    tr = build_flow_trace(s, sol, n_particles=n, inflow_share=1.0, seed=5, field=field)
+    starts = np.array([tr._XY[tr._first[p]] for p in range(len(tr.path_end))])
+    ends = np.array([tr._XY[tr._last[p]] for p in range(len(tr.path_end))])
+    top = starts[:, 1] > 2.0 - 1e-3
+    deep = ends[top]
+    print(f"  L. flux edge: {on.sum()} of {n} release points on it (want {want:.1f}: "
+          f"q L = {qf * (x1 - x0):g} of {q_tot:.6g}); inflow found vs flowrate "
+          f"{q_tot:.12g} / {sol['flowrate']:.12g}; its particles end on x = 10: "
+          f"{np.allclose(deep[:, 0], 10.0, atol=1e-9)} ({len(deep)} paths)")
+    failures = []
+    if not abs(on.sum() - want) <= 2:
+        failures.append(f"L. {on.sum()} release points on the flux edge, want {want:.1f}")
+    if not abs(q_tot - sol["flowrate"]) < 1e-9 * sol["flowrate"]:
+        failures.append(f"L. inflow found {q_tot} != flowrate {sol['flowrate']}")
+    if not (top.sum() == on.sum() and np.allclose(deep[:, 0], 10.0, atol=1e-9)):
+        failures.append("L. the flux edge's particles do not all end on the outflow face")
+    return failures
+
+
+def _gif_memory_checks(seep, sol):
+    import matplotlib.pyplot as plt
+    from xslope.anim_export import _compact_gif_writer
+    from xslope.plot_seep import animate_flow_trace
+    failures = []
+    with tempfile.TemporaryDirectory() as tmp:
+        anim = animate_flow_trace(seep, sol, n_particles=100, loop_seconds=1.0, fps=20,
+                                  dpi=40, figsize=(4, 2))
+        w = _compact_gif_writer(20, 64)
+        seen = {}
+
+        def held(i, total):
+            if i == total - 1:
+                frames = list(getattr(w, "_frames", []))
+                rgb = sum(im.size[0] * im.size[1] * len(im.getbands()) for im in frames)
+                rgb += sum(len(d) for _, d in getattr(w, "_packed", []))
+                seen["held"], seen["raw"] = rgb, total * 3 * w.frame_size[0] * w.frame_size[1]
+        gif = os.path.join(tmp, "m.gif")
+        anim.save(gif, writer=w, progress_callback=held)
+        frac = seen["held"] / seen["raw"]
+        print(f"  M. mid-export the GIF writer holds {frac:.1%} of the frames' raw RGB size")
+        if not frac < 0.25:
+            failures.append(f"M. the GIF writer holds {frac:.1%} of the frames' RGB size")
+
+        class _Cancel(Exception):
+            pass
+
+        def cancel(i, total):
+            if i == 5:
+                raise _Cancel()
+        gif2 = os.path.join(tmp, "c.gif")
+        try:
+            anim.save(gif2, writer=_compact_gif_writer(20, 64), progress_callback=cancel)
+        except _Cancel:
+            pass
+        plt.close("all")
+        wrote = os.path.exists(gif2)
+        print(f"  M. cancelled at frame 5: file written {wrote}")
+        if wrote:
+            failures.append("M. a cancelled export wrote the partial GIF")
     return failures
 
 

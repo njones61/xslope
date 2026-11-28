@@ -12933,6 +12933,11 @@ AUDIT_CHECK_MODULES = {
     # The Taylor series (LEM and FEM) reports the normal index and P_f beside the
     # lognormal ones, as Monte Carlo does, in its result, Log table and Studio summary.
     'taylor_normal': ('taylor_normal_check.py', 'lem'),
+    # The flow trace: paths, equal-flux seeding, no particle off the mesh, the loop
+    # seam and the GIF exporter; and Studio's Flow trace box, play bar and Save
+    # animation (pauses when hidden, absent on transient results).
+    'flow_trace': ('flow_trace_check.py', 'roundtrip'),
+    'flow_trace_studio': ('flow_trace_studio_check.py', 'roundtrip'),
     # Every tutorial page walked as written, Studio offscreen and the engine, in one
     # process per page (591a): about two hours for the 31 pages, so the gate runs it.
     'tutorial_walk': ('tutorial_walk_check.py', 'tutorials'),

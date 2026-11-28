@@ -35,7 +35,7 @@ from xslope.plot import (
     plot_circular_search_results, plot_inputs, plot_mesh,
     plot_noncircular_search_results, plot_reliability_results, plot_solution,
 )
-from xslope.plot_seep import plot_seep_data, plot_seep_solution
+from xslope.plot_seep import plot_seep_data, plot_seep_solution, seep_solution_plot_kwargs
 from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ZOOM_STEP = 1.25
@@ -91,6 +91,10 @@ class MplCanvas(QWidget):
     # (data_x, data_y, tol) payload, with tol from ~8 screen px — so zooming in
     # shrinks the pick tolerance in data units and fine picks become precise.
     clicked = Signal(float, float, float)
+    # Emitted after every raster of the figure (a new render, a resize, a zoom
+    # refine, a clear), so an item drawn over the pixmap in scene coordinates
+    # (the seepage view's flow trace) can follow the plot's axes.
+    rasterized = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -285,22 +289,11 @@ class MplCanvas(QWidget):
 
     def render_seep_solution(self, seep_data, solution, opts, style=None):
         opts = opts or {}
+        # One option-to-keyword mapping, shared with the animation export, so a
+        # saved animation draws each frame as this view does.
+        kw = seep_solution_plot_kwargs(opts)
         self._draw(lambda fig: plot_seep_solution(
-            seep_data, solution, variable=opts.get("variable", "head"),
-            levels=opts.get("levels", 20), base_mat=opts.get("base_mat", 1),
-            alpha=opts.get("alpha", 0.4),
-            vector_scale=opts.get("vector_scale", 0.05),
-            pad_frac=opts.get("pad_frac", 0.05),
-            flowlines=opts.get("flowlines", True),
-            vectors=opts.get("vectors", False),
-            fill_contours=opts.get("fill_contours", False),
-            contour_lines=opts.get("contour_lines", True),
-            phreatic=opts.get("phreatic", True),
-            cmap=opts.get("cmap", "Spectral_r"),
-            cbar_shrink=opts.get("cbar_shrink", 0.8),
-            show_bc_levels=opts.get("show_bc_levels", False),
-            legend_ncol=opts.get("legend_ncol", "auto"),
-            legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), mesh=False, fig=fig, style=style))
+            seep_data, solution, fig=fig, style=style, **kw))
 
     def render_fem_data(self, fem_data, opts=None, style=None):
         opts = opts or {}
@@ -395,6 +388,33 @@ class MplCanvas(QWidget):
         btn.clicked.connect(slot)
         self._toolbar.insertWidget(self._toolbar.count() - 1, btn)
         return btn
+
+    def add_bottom_bar(self, widget):
+        """Add a view-specific bar below the plot (the steady seepage view's flow
+        trace play bar), as the transient view's play bar sits below its plot."""
+        self.layout().addWidget(widget)
+        return widget
+
+    def scene_transform(self, ax=None):
+        """The map from ``ax``'s data coordinates (default the main axes) to scene
+        coordinates, and the axes' plot area in the scene, as of the last raster.
+
+        Returns ``(A, b, rect)`` with scene = ``xy @ A.T + b`` for (n, 2) data
+        points and ``rect`` a QRectF, or None when there is no axes. Valid for
+        linear axes (every geometry plot); the scene is the figure in inches x
+        BASE_DPI with y down, so it does not change with the render DPI."""
+        ax = ax or self._main_axes()
+        if ax is None or self._pixitem is None:
+            return None
+        import numpy as np
+        s = BASE_DPI / self.figure.dpi
+        h = self.figure.get_size_inches()[1] * BASE_DPI
+        d = ax.transData.transform([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+        sc = np.column_stack([d[:, 0] * s, h - d[:, 1] * s])
+        A = np.column_stack([sc[1] - sc[0], sc[2] - sc[0]])
+        bb = ax.bbox
+        rect = QRectF(bb.x0 * s, h - bb.y1 * s, bb.width * s, bb.height * s)
+        return A, sc[0], rect
 
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):
@@ -575,6 +595,7 @@ class MplCanvas(QWidget):
         self.scene.setSceneRect(QRectF(0, 0, w_in * BASE_DPI, h_in * BASE_DPI))
         self._render_dpi = dpi
         self._content_rect = self._tight_content_rect(w_in, h_in)
+        self.rasterized.emit()
 
     def _tight_content_rect(self, w_in, h_in):
         """The inked content's bounding box in scene coords (inches × BASE_DPI),

@@ -1829,3 +1829,391 @@ def get_ordered_mesh_boundary(nodes, elements, element_types=None):
         return nodes[all_boundary_nodes]
     else:
         raise ValueError("No boundary nodes found.")
+
+# ---------------------------------------------------------------------------
+# Flow trace animation
+# ---------------------------------------------------------------------------
+
+#: The meteor color: the blue the flow lines are drawn in, darkened so a faint
+#: streak still reads over the material fills.
+_FLOW_TRACE_COLOR = "#0a3d91"
+
+#: How much a streak thins toward its tail: the last of its ``n_tail`` pieces
+#: is drawn at ``1 - FLOW_TRACE_TAPER`` of the head's width.
+FLOW_TRACE_TAPER = 0.55
+
+#: The flow trace's settings shared by the Python animation and Studio's view:
+#: particles lit at once, the share released from the inflow boundaries, the
+#: speed scale, the loop length (display seconds), the frame rate of a saved
+#: animation, and the streak's head width (points).
+FLOW_TRACE_DEFAULTS = {"n_particles": 1500, "inflow_share": 0.35,
+                       "speed_scale": "sqrt", "loop_seconds": 8.0, "fps": 20,
+                       "linewidth": 0.9}
+
+
+def flow_trace_widths(rank, n_tail, linewidth):
+    """Each streak piece's line width: ``linewidth`` at the head (rank 0),
+    tapering toward the tail."""
+    return linewidth * (1.0 - FLOW_TRACE_TAPER * np.asarray(rank) / n_tail)
+
+
+def _fmt_duration(value, unit):
+    """'291 yr', '3.2e+04 s', ... for the title's time-scale note."""
+    txt = f"{value:.3g}"
+    return f"{txt} {unit}" if unit else f"{txt} (model time units)"
+
+
+def animate_flow_trace(seep_data, solution, n_particles=1500, inflow_share=0.35,
+                       speed_scale="sqrt", loop_seconds=8.0, fps=20,
+                       lit_seconds=2.0, tail_seconds=0.5, n_tail=8,
+                       streak_length=0.04, porosity=None, seed=0,
+                       color=None, linewidth=0.9, materials=True, phreatic=True,
+                       material_alpha=0.25, figsize=None, dpi=100,
+                       show_title=True, style=None, save_gif=None, save_mp4=None,
+                       save_png=None, png_time=None, trace=None):
+    """Animate a steady seepage solution as a looping field of flow-tracing meteors.
+
+    Particles follow the solved velocity field. Each is lit for ``lit_seconds``
+    of its path: it brightens, then dims and goes out, trailing a streak of its
+    last ``tail_seconds`` of travel that fades toward the tail. Streaks are long
+    where the flow is fast and short where it is slow. The animation loops
+    seamlessly: every particle's state is computed from ``(t - phase) mod P``.
+
+    Two kinds of particle are drawn together (``inflow_share`` sets the split of
+    the ``n_particles`` lit at any moment; either share may be zero):
+
+    - inflow particles, released from points spaced along the inflow boundaries
+      so each carries an equal share of the total inflow (as the channels of a
+      flow net do), each lit over a span that starts at a random point of its
+      trip;
+    - area particles, dropped at random over the wetted domain (uniform by
+      area), each lit for one span from its drop, then dropped again.
+
+    Parameters
+    ----------
+    seep_data, solution : a steady seepage model and its solution
+        (``run_seepage_analysis``); the solution's nodal ``velocity`` is traced.
+    speed_scale : "true" | "sqrt" | "log"
+        "true" makes display time proportional to real travel time (slow zones
+        may look frozen); "sqrt" and "log" compress the speeds so slow zones
+        still move. The paths are the same in every case; only the pace differs.
+    loop_seconds, fps : the loop period P in seconds and the frame rate.
+    streak_length : the streak of a particle moving at the reference speed (the
+        90th percentile of the wetted nodes' speed) as a fraction of the model
+        width; sets the time scale.
+    porosity : None, a scalar, or one value per material. Given, particles move
+        at the seepage velocity (Darcy velocity / porosity); otherwise at the
+        Darcy velocity. The title says which.
+    color, linewidth : meteor color (default a dark flow-line blue) and head width.
+    figsize : default 12 in wide, as tall as the model's aspect needs.
+    materials, phreatic : draw the material zones faintly / the phreatic surface.
+    save_gif, save_mp4, save_png : paths to write. The MP4 needs ffmpeg
+        (:func:`xslope.anim_export.ffmpeg_available`); the PNG is one still at
+        ``png_time`` (default P/2).
+    trace : a precomputed :class:`xslope.flow_trace.FlowTrace` to draw instead
+        of building one (the particle options are then ignored).
+
+    Returns
+    -------
+    matplotlib.animation.FuncAnimation, with the trace on ``anim.flow_trace``.
+    """
+    import time as _time
+    from matplotlib import animation
+    from matplotlib.colors import to_rgba
+    from .flow_trace import build_flow_trace
+    from .anim_export import save_animation
+
+    t0 = _time.perf_counter()
+    if trace is None:
+        trace = build_flow_trace(
+            seep_data, solution, n_particles=n_particles, inflow_share=inflow_share,
+            speed_scale=speed_scale, loop_seconds=loop_seconds,
+            lit_seconds=lit_seconds, tail_seconds=tail_seconds, n_tail=n_tail,
+            streak_length=streak_length, porosity=porosity, seed=seed)
+    t_build = _time.perf_counter() - t0
+    field = trace.field
+    info = trace.info
+    P = trace.P
+
+    x0, x1, y0, y1 = field.bbox
+    if figsize is None:
+        aspect = (y1 - y0) / max(x1 - x0, 1e-12)
+        figsize = (12.0, min(max(12.0 * aspect + (1.3 if show_title else 0.7), 3.0), 9.0))
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    # Background: materials faintly, the outline, the phreatic surface.
+    if materials and seep_data.get("element_materials") is not None:
+        from .style import resolve_style, material_style
+        from .plot import fill_merged
+        _st = resolve_style(style)
+        for mat in np.unique(field.tri_material):
+            polys = [field.nodes[t] for t in field.tris[field.tri_material == mat]]
+            fill_merged(ax, polys, facecolor=material_style(_st, int(mat) - 1)["color"],
+                        alpha=material_alpha, gid="ZONE_FILL")
+    outline = np.stack([field.bnd_pa, field.bnd_pb], axis=1)
+    # Above the meteors, so a sheet pile's slit (an inner boundary) stays visible.
+    # Round caps: the outline is many short sub-edges, and butt ends leave
+    # anti-aliased gaps between them that read as a dashed line.
+    ax.add_collection(LineCollection(outline, colors="black", linewidths=1.0,
+                                     capstyle="round", zorder=4))
+    if phreatic and field.unconfined:
+        p_head = field.head - field.nodes[:, 1]
+        cs = ax.tricontour(field.triang, p_head, levels=[0], colors="black",
+                           linewidths=1.2, alpha=0.7, zorder=2)
+        cs.set_gid("PHREATIC")
+
+    pad = 0.02 * max(x1 - x0, y1 - y0)
+    ax.set_xlim(x0 - pad, x1 + pad)
+    ax.set_ylim(y0 - pad, y1 + pad)
+    ax.set_aspect("equal")
+
+    rgb = to_rgba(color or _FLOW_TRACE_COLOR)[:3]
+    lc = LineCollection([], linewidths=linewidth, capstyle="round", zorder=3)
+    ax.add_collection(lc)
+
+    if show_title:
+        from .plot import declared_unit_labels
+        units = declared_unit_labels(seep_data) or {}
+        t_unit = units.get("time") or ""
+        if info["velocity_kind"] == "seepage":
+            vel_txt = "seepage velocity (Darcy velocity / porosity)"
+        else:
+            vel_txt = "Darcy velocity (no porosity given)"
+        if speed_scale == "true" or info["speed_scale"] == "true":
+            pace = ("true speed: 1 s of animation = "
+                    + _fmt_duration(info["time_per_display_second"], t_unit))
+        else:
+            pace = f"{info['speed_scale']}-compressed speed (slow zones sped up)"
+        title = "Flow Trace"
+        sub = f"Particles follow the {vel_txt}; {pace}"
+        ax.set_title(title)
+        base_fs = ax.title.get_fontsize()
+        ax.set_title(title, pad=base_fs * 1.7 + 6.0)
+        ax.annotate(sub, xy=(0.5, 1.0), xycoords="axes fraction", xytext=(0.0, 4.0),
+                    textcoords="offset points", ha="center", va="bottom",
+                    fontsize=base_fs * 0.82, annotation_clip=False)
+    try:
+        fig.tight_layout()
+    except Exception:
+        pass
+
+    n_frames = max(int(round(loop_seconds * fps)), 1)
+    times = np.arange(n_frames) * (P / n_frames)
+
+    def draw(t):
+        seg, alpha, rank = trace.frame(t)
+        col = np.empty((len(seg), 4))
+        col[:, :3] = rgb
+        col[:, 3] = alpha
+        lc.set_segments(seg)
+        lc.set_color(col)
+        lc.set_linewidth(flow_trace_widths(rank, trace.n_tail, linewidth))
+        return (lc,)
+
+    def update(f):
+        return draw(times[f])
+
+    draw(times[0])
+    anim = animation.FuncAnimation(fig, update, frames=n_frames,
+                                   interval=1000.0 / fps, blit=False)
+    anim.flow_trace = trace
+    anim.frame_times = times
+    anim.draw_at = draw
+
+    t1 = _time.perf_counter()
+    if save_png:
+        draw(P / 2 if png_time is None else png_time)
+        fig.savefig(save_png, dpi=dpi)
+        draw(times[0])
+    if save_gif:
+        save_animation(anim, save_gif, fps=fps, dpi=dpi)
+    if save_mp4:
+        save_animation(anim, save_mp4, fps=fps, dpi=dpi)
+    t_save = _time.perf_counter() - t1
+    anim.timings = {"build": t_build, "save": t_save}
+    logger.info("Flow trace: %s; %s speed; build %.2f s, save %.2f s",
+                info["velocity_kind"], info["speed_scale"], t_build, t_save)
+    return anim
+
+
+# ---------------------------------------------------------------------------
+# Display options shared with Studio, and the transient animation export
+# ---------------------------------------------------------------------------
+
+#: What Studio's transient display panel shows before anything is changed
+#: (``SeepDisplayPanel(transient=True).options()``, base material aside): head
+#: with its contours, no flow lines (a transient frame has no flow net), the
+#: phreatic surface and the boundary water levels on.
+TRANSIENT_VIEW_OPTIONS = {
+    "variable": "head", "base_mat": 1, "levels": 20, "alpha": 0.85,
+    "vector_scale": 0.05, "pad_frac": 0.05, "flowlines": False, "vectors": False,
+    "fill_contours": False, "phreatic": True, "show_bc_levels": True,
+    "cmap": "Spectral_r", "cbar_shrink": 1.0, "legend_ncol": "auto",
+    "legend_frame": False, "show_title": True, "show_legend": True,
+}
+
+
+def seep_solution_plot_kwargs(opts):
+    """The :func:`plot_seep_solution` keywords for a display-options dict.
+
+    One mapping for Studio's seepage views (the canvas) and for the animation
+    export, so a saved animation draws its frames exactly as the view does. A
+    missing option takes the value the canvas has always used for it.
+    """
+    opts = opts or {}
+    return dict(
+        variable=opts.get("variable", "head"),
+        levels=opts.get("levels", 20), base_mat=opts.get("base_mat", 1),
+        alpha=opts.get("alpha", 0.4),
+        vector_scale=opts.get("vector_scale", 0.05),
+        pad_frac=opts.get("pad_frac", 0.05),
+        flowlines=opts.get("flowlines", True),
+        vectors=opts.get("vectors", False),
+        fill_contours=opts.get("fill_contours", False),
+        contour_lines=opts.get("contour_lines", True),
+        phreatic=opts.get("phreatic", True),
+        cmap=opts.get("cmap", "Spectral_r"),
+        cbar_shrink=opts.get("cbar_shrink", 0.8),
+        show_bc_levels=opts.get("show_bc_levels", False),
+        legend_ncol=opts.get("legend_ncol", "auto"),
+        legend_frame=opts.get("legend_frame", False),
+        show_title=opts.get("show_title", True),
+        show_legend=opts.get("show_legend", True),
+        mesh=False)
+
+
+def save_transient_animation(seep_data, frames, path, seconds_per_frame=0.5,
+                             fps=None, options=None, style=None, figsize=(12, 7),
+                             dpi=100, progress=None):
+    """Write a transient seepage run's saved frames as an animation (GIF or MP4).
+
+    Each frame is drawn by :func:`plot_seep_solution` with the keywords Studio's
+    transient view uses (:func:`seep_solution_plot_kwargs`), in the order the
+    view plays them, so the file shows what the play bar shows.
+
+    Parameters
+    ----------
+    seep_data : the model the frames belong to
+    frames : the plottable frame solutions (a transient solution's ``frames``,
+        as :func:`xslope.seep.import_transient_solution` returns them), or that
+        transient solution dict itself
+    path : a .gif or .mp4 path (MP4 needs ffmpeg:
+        :func:`xslope.anim_export.ffmpeg_available`)
+    seconds_per_frame : how long each frame shows (0.5 s is the play bar at
+        1x); ``fps`` given instead sets the frame rate directly. A GIF holds
+        delays in hundredths of a second, so the delay rounds to 10 ms.
+    options : a display-options dict as Studio's panel gives it; missing keys
+        take :data:`TRANSIENT_VIEW_OPTIONS`
+    style, figsize, dpi : the display style, figure size (inches) and resolution
+    progress : optional callable(frame_index, total_frames)
+
+    Returns
+    -------
+    dict with ``path``, ``frames`` (count), ``fps``, ``times`` (each frame's time,
+    in file order) and ``titles`` (each written frame's title).
+    """
+    from matplotlib import animation
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+    from .anim_export import save_animation
+
+    if isinstance(frames, dict):
+        frames = frames["frames"]
+    frames = list(frames)
+    if not frames:
+        raise ValueError("there are no frames to write")
+    if fps is None:
+        if not seconds_per_frame > 0:
+            raise ValueError("seconds_per_frame must be positive")
+        fps = 1.0 / float(seconds_per_frame)
+    opts = dict(TRANSIENT_VIEW_OPTIONS)
+    opts.update(options or {})
+    kw = seep_solution_plot_kwargs(opts)
+
+    fig = Figure(figsize=figsize, dpi=dpi)
+    FigureCanvasAgg(fig)
+    titles = []
+
+    def update(k):
+        plot_seep_solution(seep_data, frames[k], fig=fig, style=style, **kw)
+        ax = fig.axes[0] if fig.axes else None
+        titles.append(ax.get_title() if ax is not None else "")
+        return []
+
+    anim = animation.FuncAnimation(fig, update, frames=len(frames),
+                                   init_func=lambda: [], interval=1000.0 / fps,
+                                   blit=False, repeat=False)
+    save_animation(anim, path, fps=fps, dpi=dpi, progress=progress)
+    times = [fr.get("time") for fr in frames]
+    return {"path": str(path), "frames": len(frames), "fps": fps,
+            "times": times, "titles": titles}
+
+
+def save_flow_trace_animation(seep_data, solution, trace, path, options=None,
+                              style=None, figsize=(12, 7), dpi=100, fps=None,
+                              linewidth=None, color=None, progress=None):
+    """Write a flow trace over a steady seepage plot as an animation (GIF or MP4).
+
+    The background is :func:`plot_seep_solution` drawn with the keywords Studio's
+    steady view uses (:func:`seep_solution_plot_kwargs` of ``options``), so the
+    file shows the view's layers at the view's extent; the streaks are drawn on
+    top of them, clipped to the plot area, for one loop of ``trace``.
+
+    Parameters
+    ----------
+    seep_data, solution : the steady model and solution the trace was built from
+    trace : a :class:`xslope.flow_trace.FlowTrace` (``build_flow_trace``)
+    path : a .gif or .mp4 path (MP4 needs ffmpeg)
+    options : a display-options dict as Studio's panel gives it
+    style, figsize, dpi : the display style, figure size (inches) and resolution
+    fps : frames per second (default :data:`FLOW_TRACE_DEFAULTS`); the file
+        holds ``round(P * fps)`` frames, one loop, and loops seamlessly
+    linewidth, color : the streak head width (points) and color
+    progress : optional callable(frame_index, total_frames)
+
+    Returns
+    -------
+    dict with ``path``, ``frames`` (count), ``fps`` and ``loop_seconds``.
+    """
+    from matplotlib import animation
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.colors import to_rgba
+    from matplotlib.figure import Figure
+    from .anim_export import save_animation
+
+    fps = FLOW_TRACE_DEFAULTS["fps"] if fps is None else fps
+    linewidth = FLOW_TRACE_DEFAULTS["linewidth"] if linewidth is None else linewidth
+    if not fps > 0:
+        raise ValueError("fps must be positive")
+    fig = Figure(figsize=figsize, dpi=dpi)
+    FigureCanvasAgg(fig)
+    plot_seep_solution(seep_data, solution, fig=fig, style=style,
+                       **seep_solution_plot_kwargs(options))
+    if not fig.axes:
+        raise ValueError("the seepage plot drew no axes")
+    # The plot itself is the largest axes (a colorbar and a legend are smaller).
+    ax = max(fig.axes, key=lambda a: a.get_position().width * a.get_position().height)
+    rgb = to_rgba(color or _FLOW_TRACE_COLOR)[:3]
+    # Over every layer of the plot, as Studio's view draws them.
+    lc = LineCollection([], capstyle="round", zorder=10)
+    ax.add_collection(lc, autolim=False)
+
+    n_frames = max(int(round(trace.P * fps)), 1)
+    times = np.arange(n_frames) * (trace.P / n_frames)
+
+    def update(k):
+        seg, alpha, rank = trace.frame(times[k])
+        col = np.empty((len(seg), 4))
+        col[:, :3] = rgb
+        col[:, 3] = alpha
+        lc.set_segments(seg)
+        lc.set_color(col)
+        lc.set_linewidth(flow_trace_widths(rank, trace.n_tail, linewidth))
+        return (lc,)
+
+    anim = animation.FuncAnimation(fig, update, frames=n_frames,
+                                   init_func=lambda: (lc,), interval=1000.0 / fps,
+                                   blit=False, repeat=False)
+    save_animation(anim, path, fps=fps, dpi=dpi, progress=progress)
+    return {"path": str(path), "frames": n_frames, "fps": fps,
+            "loop_seconds": trace.P}

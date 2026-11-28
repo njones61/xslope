@@ -555,6 +555,43 @@ so rapid-drawdown problems show BC 1 and BC 2 together.
 
 ![Seep Solution view](images/analysis_seep_solution.png)
 
+### Flow trace {#flow-trace}
+
+Tick **Flow trace** on the Seep · Solution view's Display panel to animate the
+flow. Particles follow the solved velocity field across the plot, each lit for a
+moment with a short streak behind it. Streaks are long where the water moves fast
+and short where it moves slowly, so the paths through a filter or under a cutoff
+stand out at a glance. Slow zones are sped up so they still visibly move (the pace
+follows the square root of the speed); the paths themselves are not changed. The
+particles move at the Darcy velocity. About a third of them are released along the
+inflow boundaries, spaced so that each carries an equal share of the inflow, as the
+channels of a flow net do; the rest are dropped at random over the wetted area.
+A particle's path ends where its water leaves the model: an exit face, a head
+boundary, or a drain or well inside the mesh. If nothing flows (the total head is
+the same everywhere), the play bar says so and nothing is animated.
+
+The animation starts as soon as the box is ticked. It is drawn over whatever the
+view shows (contours, flow lines, the phreatic surface) and loops every 8 seconds
+without a visible seam. Zoom and pan work while it plays. It pauses while another
+tab is shown or the window is minimized, and resumes where it left off. **Trace
+particles** sets the streak density: about how many particles are lit at once
+(1,500 by default). Unticking the box removes the streaks. The streaks stand out
+best over pale zones: lower **Fill opacity** (0.3 in the figure below), and untick
+**Contour lines** and **Flow lines** to show the streaks on their own.
+
+While the trace is on, a play bar sits below the plot:
+
+- **Pause** / **Play** stops and restarts the animation.
+- **Save animation…** writes one loop to an animated GIF at 20 frames per second,
+  drawn over the plot as shown, with the same layers at the same size. MP4 is
+  offered too when ffmpeg is installed. A progress dialog tracks the export, and
+  **Cancel** stops it.
+
+Flow trace is offered only for a steady solution: each frame of a transient run
+has its own velocity field.
+
+![Seep · Solution view with the flow trace and its play bar](images/analysis_seep_flow_trace.png){width=683}
+
 ---
 
 ## Transient seepage
@@ -599,6 +636,8 @@ sits a **play bar**:
   **jump-to-time** entry — type a time, press Enter, and the view snaps to the
   nearest saved frame.
 - A **Speed** selector (0.5× – 4×) for playback, which advances the frames in order.
+- **Save animation…**, which writes every frame to an animated GIF (MP4 too when
+  ffmpeg is installed), drawn with the current display options at the selected speed.
 
 ![Seep · Transient view with the play bar](images/analysis_seep_transient_playbar.png)
 
@@ -608,7 +647,8 @@ next Open, so a saved transient run reloads without re-solving. Its
 [Display panel](#display-options-per-view) is the seep-solution panel tailored for a
 frame series: **Water levels** default on (the pool visibly drops as it plays), and
 the flow-net-only **Flow lines** and **Base material** controls are omitted — a
-transient state has no flow net (see the note below). Changing an option re-renders
+transient state has no flow net (see the note below) — and so is
+[Flow trace](#flow-trace). Changing an option re-renders
 the shown frame.
 
 An **LEM** or **FEM** run uses one frame: with `u = seep`, the instant named in
@@ -776,11 +816,12 @@ on every view. Changing an option re-renders the
 **cached** result instantly — there's no re-solve. See
 [The Display dock](interface.md#the-display-dock).
 
-One option is steady-only: **Flow lines**. A flow net requires divergence-free
-through-flow, so it exists only for a **steady** seepage solution; a **transient**
-frame is a storage-release state with no stream function, so its Display panel omits
-the **Flow lines** and **Base material** controls and turns **Water levels** on by
-default. Read a transient frame's flow direction with **velocity vectors** instead.
+Two options are steady-only: **Flow lines** and **Flow trace**. A flow net requires
+divergence-free through-flow, so it exists only for a **steady** seepage solution; a
+**transient** frame is a storage-release state with no stream function, so its
+Display panel omits the **Flow lines** and **Base material** controls and turns
+**Water levels** on by default. It omits **Flow trace** too, since each frame has its
+own velocity field. Read a transient frame's flow direction with **velocity vectors** instead.
 See [Transient outputs](../seep/transient.md#outputs).
 
 ![A Display panel](images/analysis_display_panel.png)

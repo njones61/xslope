@@ -283,6 +283,62 @@ def _self_test(path=None):
         return 5
     emit(f"[ok] bishop FS = {res['FS']:.4f} over {len(slice_df)} slices")
 
+    # --- seepage flow trace written as a GIF ---------------------------------
+    # Studio's Save animation writes through Pillow's GIF writer and matplotlib's
+    # animation module; a bundle missing either would fail only when a user saves.
+    # A tiny confined rectangle (head 10 on the left, 0 on the right), solved,
+    # traced and written as a ten-frame GIF.
+    try:
+        import contextlib
+        import io
+        import tempfile
+        import numpy as np
+        from PIL import Image
+        from xslope.seep import run_seepage_analysis
+        from xslope.flow_trace import build_flow_trace
+        from xslope.plot_seep import save_flow_trace_animation
+
+        xs, ys = np.linspace(0.0, 10.0, 11), np.linspace(0.0, 2.0, 5)
+        X, Y = np.meshgrid(xs, ys)
+        nodes = np.column_stack([X.ravel(), Y.ravel()])
+        els = []
+        for j in range(len(ys) - 1):
+            for i in range(len(xs) - 1):
+                a = j * len(xs) + i
+                b, c, d = a + 1, a + 1 + len(xs), a + len(xs)
+                els += [[a, b, c], [a, c, d]]
+        n = len(nodes)
+        bc_type = np.zeros(n, int)
+        bc_values = np.zeros(n)
+        left, right = np.isclose(nodes[:, 0], 0.0), np.isclose(nodes[:, 0], 10.0)
+        bc_type[left | right] = 1
+        bc_values[left] = 10.0
+        seep = {"nodes": nodes, "elements": np.array(els),
+                "element_types": np.full(len(els), 3),
+                "element_materials": np.ones(len(els), int),
+                "bc_type": bc_type, "bc_values": bc_values, "flux_nodal": np.zeros(n),
+                "k1_by_mat": np.array([1.0]), "k2_by_mat": np.array([1.0]),
+                "angle_by_mat": np.zeros(1), "kr0_by_mat": np.full(1, 0.001),
+                "h0_by_mat": np.full(1, -1.0), "unsat_by_mat": None,
+                "vg_a_by_mat": None, "vg_n_by_mat": None, "vg_l_by_mat": None,
+                "unit_weight": 9.81}
+        with contextlib.redirect_stdout(io.StringIO()):
+            solution = run_seepage_analysis(seep)
+        trace = build_flow_trace(seep, solution, n_particles=100, loop_seconds=1.0)
+        with tempfile.TemporaryDirectory(prefix="xslope_selftest_") as tmp:
+            out = os.path.join(tmp, "trace.gif")
+            save_flow_trace_animation(seep, solution, trace, out, figsize=(4, 2),
+                                      dpi=50, fps=10)
+            with Image.open(out) as im:
+                frames = getattr(im, "n_frames", 1)
+        if frames < 2:
+            emit(f"[fail] flow trace gif: {frames} frame(s)")
+            return 11
+        emit(f"[ok] flow trace gif ({frames} frames)")
+    except Exception as e:  # noqa: BLE001
+        emit(f"[fail] flow trace gif: {type(e).__name__}: {e}")
+        return 11
+
     # --- the compiled fast kernel (installers ship it, PyPI does not) --------
     try:
         from xslope import _fem_kernel

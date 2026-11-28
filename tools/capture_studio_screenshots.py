@@ -1517,6 +1517,68 @@ def capture_seep_solution_view():
     return _seep_view("solution", "analysis_seep_solution.png")
 
 
+EARTH_DAM2 = os.path.join(REPO_ROOT, "docs/seep/files/xslope_earth_dam2.xlsx")
+#: The loop time the flow trace still is taken at (display seconds): any time
+#: gives the same picture on every run (the trace's particles are seeded).
+FLOW_TRACE_STILL_T = 4.0
+
+
+def capture_seep_flow_trace():
+    """The Seep · Solution view with Flow trace ticked and its play bar, on a copy
+    of the earth dam sample (its saved mesh and steady solution restore with it,
+    so nothing is solved). Paused at a fixed loop time, so the still repeats."""
+    import shutil
+    import tempfile
+    tmp = tempfile.mkdtemp(prefix="flow_trace_shot_")
+    stem = os.path.splitext(os.path.basename(EARTH_DAM2))[0]
+    src = os.path.dirname(EARTH_DAM2)
+    for f in os.listdir(src):
+        if f.startswith(stem + ".") or f.startswith(stem + "_"):
+            shutil.copy(os.path.join(src, f), tmp)
+    mw = _main_window(os.path.join(tmp, stem + ".xlsx"))
+    mw.set_mode_index(1)
+    _settle()
+    canvas = mw.seep_solution_canvas[1]
+    mw.view_tabs.setCurrentWidget(canvas)
+    _settle()
+    canvas.render_now()
+    _settle()
+    panel = mw._display_panels[canvas]
+    # Flow lines and contour lines off and the zones paler, so the streaks read on
+    # their own in a page-sized still (the page tells the reader to do the same).
+    panel.flowlines.setChecked(False)
+    panel.contour_lines.setChecked(False)
+    panel.alpha.setValue(0.3)
+    _settle()
+    canvas.render_now()
+    _settle()
+    panel.flow_trace.setChecked(True)
+    player = canvas.flow_trace
+    from PySide6.QtWidgets import QApplication
+    import time
+    t0 = time.time()
+    while player.trace is None and time.time() - t0 < 30:
+        QApplication.processEvents()
+        time.sleep(0.01)
+    if player.trace is None:
+        raise RuntimeError("the flow trace was not built")
+    _settle()
+    # Hold the clock at a fixed loop time and grab at once (no events between):
+    # the bar still reads Pause, as it does while the trace plays.
+    player._halt()
+    player._t = FLOW_TRACE_STILL_T
+    player._draw(player.display_time())
+    out = os.path.join(OUT_DIR, "analysis_seep_flow_trace.png")
+    mw.view_tabs.grab().save(out)
+    panel.flow_trace.setChecked(False)
+    panel.flowlines.setChecked(True)
+    panel.contour_lines.setChecked(True)
+    panel.alpha.setValue(0.85)
+    _settle()
+    shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Seismic: the Run LEM seismic options and the Newmark dialog
 # --------------------------------------------------------------------------- #
@@ -1636,7 +1698,7 @@ def _main():
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,
                capture_display_dock_fem, capture_seep_data_view,
-               capture_seep_solution_view) + PARAMETRIC_SHOTS + CROSSING_SHOTS + SEISMIC_SHOTS:
+               capture_seep_solution_view, capture_seep_flow_trace) + PARAMETRIC_SHOTS + CROSSING_SHOTS + SEISMIC_SHOTS:
         path = fn()                 # None: a shot that needs a vendor file skipped
         if path:
             print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")

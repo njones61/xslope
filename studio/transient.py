@@ -7,7 +7,9 @@ at one instant. This view shows one frame at a time through the SAME
 velocity vectors, the phreatic surface and the colorbar all render exactly as they
 do for a steady solve), and adds a play bar along the bottom of the plot window:
 transport buttons, a frame slider with a time readout that doubles as a
-jump-to-time entry, and a playback-speed selector.
+jump-to-time entry, a playback-speed selector, and a Save animation… button that
+writes every frame to a GIF (or an MP4 when ffmpeg is installed) drawn with the
+view's current display options, at the selected playback speed.
 
 Rapid-drawdown ``stage_1`` / ``stage_2`` times are model INPUTS, edited under
 Inputs → Transient (the :class:`~studio.editors.TransientEditor`) — the play bar no
@@ -21,13 +23,14 @@ frame's ``time``/``inflow``/``outflow`` keys — this view supplies no title tex
 
 from __future__ import annotations
 
+import os
 import traceback
 
 import numpy as np
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLabel, QLineEdit, QSlider,
-    QToolButton, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+    QMessageBox, QProgressDialog, QSlider, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .canvas import MplCanvas
@@ -79,6 +82,10 @@ class TransientSeepView(QWidget):
         self._speed.setCurrentIndex(1)   # 1x
         self._speed.setToolTip("Playback speed.")
 
+        self._btn_save = save_animation_button(
+            "Write every frame to an animated GIF, drawn with the current display "
+            "options at the selected playback speed.")
+
         bar = QHBoxLayout()
         for w in (self._btn_first, self._btn_prev, self._btn_play,
                   self._btn_next, self._btn_last):
@@ -88,6 +95,7 @@ class TransientSeepView(QWidget):
         bar.addWidget(self._readout)
         bar.addWidget(QLabel("Speed"))
         bar.addWidget(self._speed)
+        bar.addWidget(self._btn_save)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -107,6 +115,7 @@ class TransientSeepView(QWidget):
         self._slider.valueChanged.connect(self.set_index)
         self._readout.editingFinished.connect(self._on_readout)
         self._speed.currentIndexChanged.connect(self._on_speed)
+        self._btn_save.clicked.connect(self.save_animation)
 
     # --- data -----------------------------------------------------------
     def set_frames(self, seep_data, frames, opts_getter=None, style_getter=None,
@@ -186,6 +195,7 @@ class TransientSeepView(QWidget):
         self._btn_prev.setEnabled(not at_start)
         self._btn_next.setEnabled(not at_end)
         self._btn_last.setEnabled(not at_end)
+        self._btn_save.setEnabled(n > 0)
 
     def _on_readout(self):
         txt = self._readout.text().strip()
@@ -227,6 +237,37 @@ class TransientSeepView(QWidget):
             return
         self.set_index(self._idx + 1)
 
+    # --- export ---------------------------------------------------------
+    def _suggested_animation_name(self):
+        doc = getattr(self.window(), "doc", None)
+        path = getattr(doc, "path", None)
+        if path:
+            return os.path.splitext(path)[0] + "_transient.gif"
+        return "transient_seepage.gif"
+
+    def save_animation(self, _checked=False, path=None):
+        """Write every frame to a GIF (MP4 when ffmpeg is installed), drawn with
+        the view's current display options and style, one frame per play-bar step
+        at the selected speed, at the canvas's figure size. ``path`` skips the
+        file dialog (scripted use). Returns the export summary, or None."""
+        if not self._frames or self._seep_data is None:
+            return None
+        from xslope.plot_seep import save_transient_animation
+        path = animation_save_path(self, self._suggested_animation_name(), path)
+        if path is None:
+            return None
+        if self._btn_play.isChecked():
+            self._btn_play.setChecked(False)
+        w, h = self.canvas.figure.get_size_inches()
+        return write_animation(
+            self, path, len(self._frames),
+            lambda progress: save_transient_animation(
+                self._seep_data, self._frames, path,
+                seconds_per_frame=self._interval_ms() / 1000.0,
+                options=self._opts_getter() or {},
+                style=self._style_getter() or None,
+                figsize=(float(w), float(h)), dpi=100, progress=progress))
+
     # --- tab plumbing ---------------------------------------------------
     def ensure_fitted(self):
         """Forwarded so the tab-shown fit path (main window) works on this wrapper."""
@@ -240,3 +281,85 @@ def _tool(text, tip, checkable=False):
     if checkable:
         b.setCheckable(True)
     return b
+
+
+# --- the Save animation… button, shared by every animated view ----------------
+# (this play bar, and the steady seepage view's flow trace bar)
+
+def save_animation_button(what):
+    """A "Save animation…" button whose tooltip says ``what`` it writes and which
+    formats this system can write (MP4 only when ffmpeg is installed)."""
+    from xslope.anim_export import ffmpeg_available
+    return _tool(
+        "Save animation…",
+        what + (" MP4 is offered too (ffmpeg found)." if ffmpeg_available() else
+                " MP4 needs ffmpeg, which was not found on this system, so only "
+                "GIF is offered."))
+
+
+def animation_save_path(parent, suggested, path=None):
+    """Ask where to write an animation (GIF, plus MP4 when ffmpeg is installed)
+    and return the path, or None when cancelled. A given ``path`` skips the
+    dialog (scripted use); an MP4 without ffmpeg is refused with a message."""
+    from xslope.anim_export import ffmpeg_available
+    has_mp4 = ffmpeg_available()
+    if path is None:
+        filters = ["GIF animation (*.gif)"]
+        if has_mp4:
+            filters.append("MP4 video (*.mp4)")
+        path, sel = QFileDialog.getSaveFileName(
+            parent, "Save animation", suggested, ";;".join(filters))
+        if not path:
+            return None
+        ext = os.path.splitext(path)[1].lower()
+        if ext not in (".gif", ".mp4"):
+            path += ".mp4" if sel.startswith("MP4") else ".gif"
+    if path.lower().endswith(".mp4") and not has_mp4:
+        QMessageBox.warning(parent, "Save animation",
+                            "MP4 needs ffmpeg, which was not found on this "
+                            "system. Save as .gif instead.")
+        return None
+    return path
+
+
+def write_animation(parent, path, n_frames, write):
+    """Run ``write(progress)`` under a cancellable progress dialog and return its
+    result, or None when cancelled (the partial file is removed) or failed (a
+    message points at the Log pane). ``progress(i, total)`` is what the writer
+    calls per frame; it keeps the window responsive and raises on Cancel. A
+    finished write is reported in the window's status bar."""
+    dlg = QProgressDialog("Writing the animation…", "Cancel", 0, n_frames, parent)
+    dlg.setWindowModality(Qt.WindowModal)
+    dlg.setMinimumDuration(300)
+
+    class _Cancelled(Exception):
+        pass
+
+    def progress(i, total):
+        dlg.setValue(i)
+        QApplication.processEvents()
+        if dlg.wasCanceled():
+            raise _Cancelled()
+
+    try:
+        info = write(progress)
+    except _Cancelled:
+        dlg.close()
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return None
+    except Exception:
+        dlg.close()
+        traceback.print_exc()
+        QMessageBox.warning(parent, "Save animation failed",
+                            "Could not write the animation — see the Log pane.")
+        return None
+    dlg.setValue(n_frames)
+    dlg.close()
+    win = parent.window()
+    if hasattr(win, "statusBar"):
+        win.statusBar().showMessage(
+            f"Saved {os.path.basename(path)} ({n_frames} frames)")
+    return info

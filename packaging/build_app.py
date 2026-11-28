@@ -309,6 +309,9 @@ EXPECTED_MARKERS = [
     "[ok] assistant request with tools",
     "[ok] gmsh",
     "[ok] bishop FS",
+    # Save animation writes through Pillow's GIF writer and matplotlib's animation
+    # module: a ten-frame flow-trace GIF of a small solved rectangle.
+    "[ok] flow trace gif",
     # Downloads over https, through the app's own code and the certificates it
     # carries. Without them every Open in Studio link and update check failed on
     # a user's Mac (1.0.1) while the build stayed green.

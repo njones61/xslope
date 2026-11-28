@@ -91,6 +91,10 @@ class MplCanvas(QWidget):
     # (data_x, data_y, tol) payload, with tol from ~8 screen px — so zooming in
     # shrinks the pick tolerance in data units and fine picks become precise.
     clicked = Signal(float, float, float)
+    # Emitted after every raster of the figure (a new render, a resize, a zoom
+    # refine, a clear), so an item drawn over the pixmap in scene coordinates
+    # (the seepage view's flow trace) can follow the plot's axes.
+    rasterized = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -385,6 +389,33 @@ class MplCanvas(QWidget):
         self._toolbar.insertWidget(self._toolbar.count() - 1, btn)
         return btn
 
+    def add_bottom_bar(self, widget):
+        """Add a view-specific bar below the plot (the steady seepage view's flow
+        trace play bar), as the transient view's play bar sits below its plot."""
+        self.layout().addWidget(widget)
+        return widget
+
+    def scene_transform(self, ax=None):
+        """The map from ``ax``'s data coordinates (default the main axes) to scene
+        coordinates, and the axes' plot area in the scene, as of the last raster.
+
+        Returns ``(A, b, rect)`` with scene = ``xy @ A.T + b`` for (n, 2) data
+        points and ``rect`` a QRectF, or None when there is no axes. Valid for
+        linear axes (every geometry plot); the scene is the figure in inches x
+        BASE_DPI with y down, so it does not change with the render DPI."""
+        ax = ax or self._main_axes()
+        if ax is None or self._pixitem is None:
+            return None
+        import numpy as np
+        s = BASE_DPI / self.figure.dpi
+        h = self.figure.get_size_inches()[1] * BASE_DPI
+        d = ax.transData.transform([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+        sc = np.column_stack([d[:, 0] * s, h - d[:, 1] * s])
+        A = np.column_stack([sc[1] - sc[0], sc[2] - sc[0]])
+        bb = ax.bbox
+        rect = QRectF(bb.x0 * s, h - bb.y1 * s, bb.width * s, bb.height * s)
+        return A, sc[0], rect
+
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):
         """Export the current figure to a file. PNG prompts for a DPI; PDF/SVG/DXF
@@ -564,6 +595,7 @@ class MplCanvas(QWidget):
         self.scene.setSceneRect(QRectF(0, 0, w_in * BASE_DPI, h_in * BASE_DPI))
         self._render_dpi = dpi
         self._content_rect = self._tight_content_rect(w_in, h_in)
+        self.rasterized.emit()
 
     def _tight_content_rect(self, w_in, h_in):
         """The inked content's bounding box in scene coords (inches × BASE_DPI),

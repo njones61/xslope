@@ -1834,6 +1834,24 @@ def get_ordered_mesh_boundary(nodes, elements, element_types=None):
 #: streak still reads over the material fills.
 _FLOW_TRACE_COLOR = "#0a3d91"
 
+#: How much a streak thins toward its tail: the last of its ``n_tail`` pieces
+#: is drawn at ``1 - FLOW_TRACE_TAPER`` of the head's width.
+FLOW_TRACE_TAPER = 0.55
+
+#: The flow trace's settings shared by the Python animation and Studio's view:
+#: particles lit at once, the share released from the inflow boundaries, the
+#: speed scale, the loop length (display seconds), the frame rate of a saved
+#: animation, and the streak's head width (points).
+FLOW_TRACE_DEFAULTS = {"n_particles": 1500, "inflow_share": 0.35,
+                       "speed_scale": "sqrt", "loop_seconds": 8.0, "fps": 20,
+                       "linewidth": 0.9}
+
+
+def flow_trace_widths(rank, n_tail, linewidth):
+    """Each streak piece's line width: ``linewidth`` at the head (rank 0),
+    tapering toward the tail."""
+    return linewidth * (1.0 - FLOW_TRACE_TAPER * np.asarray(rank) / n_tail)
+
 
 def _fmt_duration(value, unit):
     """'291 yr', '3.2e+04 s', ... for the title's time-scale note."""
@@ -1985,7 +2003,7 @@ def animate_flow_trace(seep_data, solution, n_particles=1500, inflow_share=0.35,
         col[:, 3] = alpha
         lc.set_segments(seg)
         lc.set_color(col)
-        lc.set_linewidth(linewidth * (1.0 - 0.55 * rank / trace.n_tail))
+        lc.set_linewidth(flow_trace_widths(rank, trace.n_tail, linewidth))
         return (lc,)
 
     def update(f):
@@ -2124,3 +2142,73 @@ def save_transient_animation(seep_data, frames, path, seconds_per_frame=0.5,
     times = [fr.get("time") for fr in frames]
     return {"path": str(path), "frames": len(frames), "fps": fps,
             "times": times, "titles": titles}
+
+
+def save_flow_trace_animation(seep_data, solution, trace, path, options=None,
+                              style=None, figsize=(12, 7), dpi=100, fps=None,
+                              linewidth=None, color=None, progress=None):
+    """Write a flow trace over a steady seepage plot as an animation (GIF or MP4).
+
+    The background is :func:`plot_seep_solution` drawn with the keywords Studio's
+    steady view uses (:func:`seep_solution_plot_kwargs` of ``options``), so the
+    file shows the view's layers at the view's extent; the streaks are drawn on
+    top of them, clipped to the plot area, for one loop of ``trace``.
+
+    Parameters
+    ----------
+    seep_data, solution : the steady model and solution the trace was built from
+    trace : a :class:`xslope.flow_trace.FlowTrace` (``build_flow_trace``)
+    path : a .gif or .mp4 path (MP4 needs ffmpeg)
+    options : a display-options dict as Studio's panel gives it
+    style, figsize, dpi : the display style, figure size (inches) and resolution
+    fps : frames per second (default :data:`FLOW_TRACE_DEFAULTS`); the file
+        holds ``round(P * fps)`` frames, one loop, and loops seamlessly
+    linewidth, color : the streak head width (points) and color
+    progress : optional callable(frame_index, total_frames)
+
+    Returns
+    -------
+    dict with ``path``, ``frames`` (count), ``fps`` and ``loop_seconds``.
+    """
+    from matplotlib import animation
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.colors import to_rgba
+    from matplotlib.figure import Figure
+    from .anim_export import save_animation
+
+    fps = FLOW_TRACE_DEFAULTS["fps"] if fps is None else fps
+    linewidth = FLOW_TRACE_DEFAULTS["linewidth"] if linewidth is None else linewidth
+    if not fps > 0:
+        raise ValueError("fps must be positive")
+    fig = Figure(figsize=figsize, dpi=dpi)
+    FigureCanvasAgg(fig)
+    plot_seep_solution(seep_data, solution, fig=fig, style=style,
+                       **seep_solution_plot_kwargs(options))
+    if not fig.axes:
+        raise ValueError("the seepage plot drew no axes")
+    # The plot itself is the largest axes (a colorbar and a legend are smaller).
+    ax = max(fig.axes, key=lambda a: a.get_position().width * a.get_position().height)
+    rgb = to_rgba(color or _FLOW_TRACE_COLOR)[:3]
+    # Over every layer of the plot, as Studio's view draws them.
+    lc = LineCollection([], capstyle="round", zorder=10)
+    ax.add_collection(lc, autolim=False)
+
+    n_frames = max(int(round(trace.P * fps)), 1)
+    times = np.arange(n_frames) * (trace.P / n_frames)
+
+    def update(k):
+        seg, alpha, rank = trace.frame(times[k])
+        col = np.empty((len(seg), 4))
+        col[:, :3] = rgb
+        col[:, 3] = alpha
+        lc.set_segments(seg)
+        lc.set_color(col)
+        lc.set_linewidth(flow_trace_widths(rank, trace.n_tail, linewidth))
+        return (lc,)
+
+    anim = animation.FuncAnimation(fig, update, frames=n_frames,
+                                   init_func=lambda: (lc,), interval=1000.0 / fps,
+                                   blit=False, repeat=False)
+    save_animation(anim, path, fps=fps, dpi=dpi, progress=progress)
+    return {"path": str(path), "frames": n_frames, "fps": fps,
+            "loop_seconds": trace.P}

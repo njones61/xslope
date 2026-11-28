@@ -82,14 +82,9 @@ class TransientSeepView(QWidget):
         self._speed.setCurrentIndex(1)   # 1x
         self._speed.setToolTip("Playback speed.")
 
-        from xslope.anim_export import ffmpeg_available
-        self._btn_save = _tool(
-            "Save animation…",
+        self._btn_save = save_animation_button(
             "Write every frame to an animated GIF, drawn with the current display "
-            "options at the selected playback speed."
-            + (" MP4 is offered too (ffmpeg found)." if ffmpeg_available() else
-               " MP4 needs ffmpeg, which was not found on this system, so only "
-               "GIF is offered."))
+            "options at the selected playback speed.")
 
         bar = QHBoxLayout()
         for w in (self._btn_first, self._btn_prev, self._btn_play,
@@ -257,71 +252,21 @@ class TransientSeepView(QWidget):
         file dialog (scripted use). Returns the export summary, or None."""
         if not self._frames or self._seep_data is None:
             return None
-        from xslope.anim_export import ffmpeg_available
         from xslope.plot_seep import save_transient_animation
-        has_mp4 = ffmpeg_available()
+        path = animation_save_path(self, self._suggested_animation_name(), path)
         if path is None:
-            filters = ["GIF animation (*.gif)"]
-            if has_mp4:
-                filters.append("MP4 video (*.mp4)")
-            path, sel = QFileDialog.getSaveFileName(
-                self, "Save animation", self._suggested_animation_name(),
-                ";;".join(filters))
-            if not path:
-                return None
-            ext = os.path.splitext(path)[1].lower()
-            if ext not in (".gif", ".mp4"):
-                path += ".mp4" if sel.startswith("MP4") else ".gif"
-        if path.lower().endswith(".mp4") and not has_mp4:
-            QMessageBox.warning(self, "Save animation",
-                                "MP4 needs ffmpeg, which was not found on this "
-                                "system. Save as .gif instead.")
             return None
-
         if self._btn_play.isChecked():
             self._btn_play.setChecked(False)
-        n = len(self._frames)
-        dlg = QProgressDialog("Writing the animation…", "Cancel", 0, n, self)
-        dlg.setWindowModality(Qt.WindowModal)
-        dlg.setMinimumDuration(300)
-
-        class _Cancelled(Exception):
-            pass
-
-        def progress(i, total):
-            dlg.setValue(i)
-            QApplication.processEvents()
-            if dlg.wasCanceled():
-                raise _Cancelled()
-
         w, h = self.canvas.figure.get_size_inches()
-        try:
-            info = save_transient_animation(
+        return write_animation(
+            self, path, len(self._frames),
+            lambda progress: save_transient_animation(
                 self._seep_data, self._frames, path,
                 seconds_per_frame=self._interval_ms() / 1000.0,
                 options=self._opts_getter() or {},
                 style=self._style_getter() or None,
-                figsize=(float(w), float(h)), dpi=100, progress=progress)
-        except _Cancelled:
-            dlg.close()
-            try:
-                os.remove(path)
-            except OSError:
-                pass
-            return None
-        except Exception:
-            dlg.close()
-            traceback.print_exc()
-            QMessageBox.warning(self, "Save animation failed",
-                                "Could not write the animation — see the Log pane.")
-            return None
-        dlg.setValue(n)
-        dlg.close()
-        win = self.window()
-        if hasattr(win, "statusBar"):
-            win.statusBar().showMessage(
-                f"Saved {os.path.basename(path)} ({n} frames)")
-        return info
+                figsize=(float(w), float(h)), dpi=100, progress=progress))
 
     # --- tab plumbing ---------------------------------------------------
     def ensure_fitted(self):
@@ -336,3 +281,85 @@ def _tool(text, tip, checkable=False):
     if checkable:
         b.setCheckable(True)
     return b
+
+
+# --- the Save animation… button, shared by every animated view ----------------
+# (this play bar, and the steady seepage view's flow trace bar)
+
+def save_animation_button(what):
+    """A "Save animation…" button whose tooltip says ``what`` it writes and which
+    formats this system can write (MP4 only when ffmpeg is installed)."""
+    from xslope.anim_export import ffmpeg_available
+    return _tool(
+        "Save animation…",
+        what + (" MP4 is offered too (ffmpeg found)." if ffmpeg_available() else
+                " MP4 needs ffmpeg, which was not found on this system, so only "
+                "GIF is offered."))
+
+
+def animation_save_path(parent, suggested, path=None):
+    """Ask where to write an animation (GIF, plus MP4 when ffmpeg is installed)
+    and return the path, or None when cancelled. A given ``path`` skips the
+    dialog (scripted use); an MP4 without ffmpeg is refused with a message."""
+    from xslope.anim_export import ffmpeg_available
+    has_mp4 = ffmpeg_available()
+    if path is None:
+        filters = ["GIF animation (*.gif)"]
+        if has_mp4:
+            filters.append("MP4 video (*.mp4)")
+        path, sel = QFileDialog.getSaveFileName(
+            parent, "Save animation", suggested, ";;".join(filters))
+        if not path:
+            return None
+        ext = os.path.splitext(path)[1].lower()
+        if ext not in (".gif", ".mp4"):
+            path += ".mp4" if sel.startswith("MP4") else ".gif"
+    if path.lower().endswith(".mp4") and not has_mp4:
+        QMessageBox.warning(parent, "Save animation",
+                            "MP4 needs ffmpeg, which was not found on this "
+                            "system. Save as .gif instead.")
+        return None
+    return path
+
+
+def write_animation(parent, path, n_frames, write):
+    """Run ``write(progress)`` under a cancellable progress dialog and return its
+    result, or None when cancelled (the partial file is removed) or failed (a
+    message points at the Log pane). ``progress(i, total)`` is what the writer
+    calls per frame; it keeps the window responsive and raises on Cancel. A
+    finished write is reported in the window's status bar."""
+    dlg = QProgressDialog("Writing the animation…", "Cancel", 0, n_frames, parent)
+    dlg.setWindowModality(Qt.WindowModal)
+    dlg.setMinimumDuration(300)
+
+    class _Cancelled(Exception):
+        pass
+
+    def progress(i, total):
+        dlg.setValue(i)
+        QApplication.processEvents()
+        if dlg.wasCanceled():
+            raise _Cancelled()
+
+    try:
+        info = write(progress)
+    except _Cancelled:
+        dlg.close()
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return None
+    except Exception:
+        dlg.close()
+        traceback.print_exc()
+        QMessageBox.warning(parent, "Save animation failed",
+                            "Could not write the animation — see the Log pane.")
+        return None
+    dlg.setValue(n_frames)
+    dlg.close()
+    win = parent.window()
+    if hasattr(win, "statusBar"):
+        win.statusBar().showMessage(
+            f"Saved {os.path.basename(path)} ({n_frames} frames)")
+    return info

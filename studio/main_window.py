@@ -2513,6 +2513,7 @@ class MainWindow(QMainWindow):
         removed = False
         for canvas in canvases:
             if canvas is not None:
+                self._stop_flow_trace(canvas)
                 idx = self.view_tabs.indexOf(canvas)
                 if idx >= 0:
                     self.view_tabs.removeTab(idx)
@@ -3043,6 +3044,7 @@ class MainWindow(QMainWindow):
             self.view_tabs.addTab(canvas, self._seep_tab_label("Seep · Solution", bc))
             panel = SeepDisplayPanel(self.doc.slope_data.get("materials"))
             panel.changed.connect(lambda *_dummy, b=bc: self._rerender_seep_solution(b))
+            panel.traceChanged.connect(lambda *_dummy, b=bc: self._sync_flow_trace(b))
             self.display_stack.addWidget(panel)
             self._display_panels[canvas] = panel
         self._rerender_seep_solution(bc)
@@ -3064,6 +3066,38 @@ class MainWindow(QMainWindow):
                     style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
+            # A new solution under a ticked Flow trace box rebuilds the trace.
+            self._sync_flow_trace(bc)
+
+    def _sync_flow_trace(self, bc=1):
+        """Start, rebuild or stop the flow trace on a steady seep solution view to
+        match its Display panel's Flow trace box and particle count."""
+        bundle = self.doc.results.get("seep_solutions", {}).get(bc)
+        canvas = self.seep_solution_canvas.get(bc)
+        panel = self._display_panels.get(canvas)
+        if canvas is None or panel is None:
+            return
+        want = panel.trace_options()
+        player = getattr(canvas, "flow_trace", None)
+        if not want["on"] or not bundle:
+            if player is not None:
+                player.stop()
+            return
+        if player is None:
+            from .flow_trace_view import FlowTracePlayer, suggested_name
+            player = FlowTracePlayer(
+                canvas, suggested_name=lambda b=bc: suggested_name(self.doc, b))
+            canvas.flow_trace = player
+        player.start(bundle["seep_data"], bundle["solution"], want["n_particles"],
+                     opts_getter=panel.options,
+                     style_getter=lambda: self.doc.style or None)
+
+    @staticmethod
+    def _stop_flow_trace(widget):
+        """Stop a view's flow trace before the view is removed."""
+        player = getattr(widget, "flow_trace", None)
+        if player is not None:
+            player.stop()
 
     # --- transient seepage (frames + play bar) ---------------------------
     def _on_transient_seep_succeeded(self, bundle):
@@ -4412,6 +4446,7 @@ class MainWindow(QMainWindow):
             canvases.append(self.transient_seep_view)
         for canvas in canvases:
             if canvas is not None:
+                self._stop_flow_trace(canvas)
                 idx = self.view_tabs.indexOf(canvas)
                 if idx >= 0:
                     self.view_tabs.removeTab(idx)

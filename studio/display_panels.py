@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 from matplotlib import colormaps as _mpl_colormaps
-from PySide6.QtCore import QSize, Signal
+from PySide6.QtCore import QSize, QTimer, Signal
 from PySide6.QtGui import QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QSpinBox, QWidget,
@@ -389,6 +389,9 @@ class SeepDisplayPanel(QWidget):
     A steady view keeps every control and defaults Water levels OFF (byte-stable)."""
 
     changed = Signal()
+    # The flow trace's controls: they start, stop or rebuild the animation drawn
+    # over the plot, and leave the plot itself alone (no re-render).
+    traceChanged = Signal()
 
     def __init__(self, materials, transient=False, parent=None):
         super().__init__(parent)
@@ -429,6 +432,19 @@ class SeepDisplayPanel(QWidget):
 
         self.flowlines = QCheckBox("Flow lines")
         self.flowlines.setChecked(True)
+        # Steady only, like Flow lines: a transient run's frames each have their
+        # own velocity field, so there is no one field for particles to follow.
+        self.flow_trace = QCheckBox("Flow trace")
+        self.flow_trace.setToolTip(
+            "Animate particles that follow the seepage velocity over the plot. "
+            "Streaks are long where the flow is fast and short where it is slow; "
+            "slow zones are sped up (square-root pace) so they still move. "
+            "A play bar below the plot pauses it and saves it as an animation.")
+        from xslope.plot_seep import FLOW_TRACE_DEFAULTS
+        self.trace_particles = _ispin(200, 5000, FLOW_TRACE_DEFAULTS["n_particles"],
+                                      step=100)
+        self.trace_particles.setToolTip(
+            "Streak density: about how many particles are lit at any moment.")
         self.vectors = QCheckBox("Velocity vectors")
         self.fill = QCheckBox("Filled contours")
         self.phreatic = QCheckBox("Phreatic surface")
@@ -450,6 +466,7 @@ class SeepDisplayPanel(QWidget):
         # transient frame's instantaneous flow direction.
         if not self._transient:
             form.addRow("", self.flowlines)
+            form.addRow("", self.flow_trace)
         form.addRow("", self.vectors)
         form.addRow("", self.fill)
         form.addRow("", self.phreatic)
@@ -461,6 +478,8 @@ class SeepDisplayPanel(QWidget):
         form.addRow("Colorbar size", self.cbar_size)
         form.addRow("Fill opacity", self.alpha)
         form.addRow("Vector scale", self.vector_scale)
+        if not self._transient:
+            form.addRow("Trace particles", self.trace_particles)
         form.addRow("Padding", self.pad_frac)
         _add_legend_controls(self, form)
 
@@ -475,6 +494,15 @@ class SeepDisplayPanel(QWidget):
             c.toggled.connect(self._emit)
         self.vectors.toggled.connect(self._sync_enabled)
         self.fill.toggled.connect(self._sync_enabled)
+        self.flow_trace.toggled.connect(self._sync_enabled)
+        self.flow_trace.toggled.connect(self._emit_trace)
+        # Debounced: typing 2500, or a run of arrow clicks, builds one trace, not
+        # one for every value on the way.
+        self._trace_debounce = QTimer(self)
+        self._trace_debounce.setSingleShot(True)
+        self._trace_debounce.setInterval(400)
+        self._trace_debounce.timeout.connect(self._emit_trace)
+        self.trace_particles.valueChanged.connect(self._trace_debounce.start)
         self._sync_enabled()
 
     def _base_mat_touched(self, *_):
@@ -500,6 +528,15 @@ class SeepDisplayPanel(QWidget):
     def _emit(self, *_):
         self.changed.emit()
 
+    def _emit_trace(self, *_):
+        self.traceChanged.emit()
+
+    def trace_options(self):
+        """The flow trace's state: on (never on a transient view) and its
+        particle count. Kept out of :meth:`options`, which is the plot's."""
+        return {"on": (not self._transient) and self.flow_trace.isChecked(),
+                "n_particles": int(self.trace_particles.value())}
+
     def _sync_enabled(self):
         # Flow lines / base material only apply to the head flow-net; vector scale
         # only matters when vectors are drawn. (A transient panel omits the flow-net
@@ -509,6 +546,7 @@ class SeepDisplayPanel(QWidget):
             self.flowlines.setEnabled(head)
             self.base_mat.setEnabled(head)
         self.vector_scale.setEnabled(self.vectors.isChecked())
+        self.trace_particles.setEnabled(self.flow_trace.isChecked())
         # The ramp and its colorbar only apply to the filled contours.
         self.cmap.setEnabled(self.fill.isChecked())
         self.cbar_size.setEnabled(self.fill.isChecked())

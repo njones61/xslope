@@ -679,6 +679,10 @@ frame = solution["frames"][i]
 plot_seep_solution(seep_data, frame, variable="u", levels=15,
                    flowlines=False, vectors=True, phreatic=True)
 
+# Write the whole run as an animated GIF, each frame shown for half a second
+from xslope.plot_seep import save_transient_animation
+save_transient_animation(seep_data, solution, "earth_dam_tseep.gif", seconds_per_frame=0.5)
+
 # Write the run to {base}_tseep.csv (+ _tseep_meta.json), and read it back
 export_transient_solution(seep_data, solution, "earth_dam", input_file=input_file)
 reloaded = import_transient_solution(seep_data, "earth_dam")

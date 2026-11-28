@@ -593,6 +593,20 @@ stream function, and is shown with velocity vectors instead.
 pressure goes negative somewhere. It is the boundary between the saturated and unsaturated
 zones and acts as the water table in a stability analysis.
 
+**Flow trace.** `animate_flow_trace` animates a steady solution as streaks that move along
+the velocity field. Particles are traced through the solved nodal velocities, each lit for
+a moment with a short streak behind it, so the paths through a filter or under a cutoff
+stand out at a glance. About a third of the particles start on the inflow boundaries,
+spaced so that each carries an equal share of the inflow; the rest are dropped at random
+over the wetted area. By default the particles move at the Darcy velocity; pass `porosity`
+(one value, or one per material) to move them at the seepage velocity instead. Slow zones
+are sped up so they still visibly move (`speed_scale="sqrt"`, the default; `"true"` keeps
+real travel times), and the animation loops every 8 seconds without a visible seam. It can
+be written to an animated GIF, or to MP4 when ffmpeg is installed. A transient solution has
+a different velocity field at every frame, so the flow trace is for steady solutions only.
+Studio draws the same trace on its seepage view; see
+[Flow trace](../studio/analysis.md#flow-trace).
+
 ## Usage
 
 A complete steady analysis — mesh, solve, plot, export:
@@ -627,6 +641,10 @@ plot_seep_solution(seep_data, solution, levels=15, base_mat=2,
 export_mesh_to_json(mesh, input_file.parent / f"{input_file.stem}_mesh.json")
 export_seep_solution(seep_data, solution,
                      input_file.parent / f"{input_file.stem}_seep.csv")
+
+# Animate the flow: one 8-second loop, written to an animated GIF
+from xslope.plot_seep import animate_flow_trace
+animate_flow_trace(seep_data, solution, save_gif="earth_dam1_flow.gif")
 ```
 
 A SEEP2D input file builds the same `seep_data` directly, mesh and boundary conditions

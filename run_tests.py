@@ -12927,6 +12927,9 @@ AUDIT_CHECK_MODULES = {
     # hinge; a polygon model's base is labeled "Bottom boundary", not "Max Depth".
     'pile_hinge_end': ('pile_hinge_end_check.py', 'fem'),
     'polygon_base_label': ('polygon_base_label_check.py', 'preflight'),
+    # The seepage plot's contour lines can be turned off, in Python and on Studio's
+    # seepage Display panel (Contour lines box, ticked by default).
+    'seep_contour_lines': ('seep_contour_lines_check.py', 'preflight'),
     # The Taylor series (LEM and FEM) reports the normal index and P_f beside the
     # lognormal ones, as Monte Carlo does, in its result, Log table and Studio summary.
     'taylor_normal': ('taylor_normal_check.py', 'lem'),

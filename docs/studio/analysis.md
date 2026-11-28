@@ -538,7 +538,7 @@ above the
 set the file defines: set 1 alone for most files, and both sets for a
 rapid-drawdown pair (a caption in the dialog says so when a second set is
 present). Display choices — the
-plotted variable, contour levels, flow lines, vectors, fill, the phreatic
+plotted variable, contour levels and lines, flow lines, vectors, fill, the phreatic
 surface — are not run options; they live on the
 [Display panel](#display-options-per-view) of the solution view and re-render
 the cached solution without re-solving.
@@ -769,7 +769,7 @@ Reinforcement rows and the plot label show *within capacity*, *near capacity*, *
 Each result view has its own **Display** panel (in the left dock) exposing the
 options the underlying plot accepts — slice numbers and seep contours on the LEM
 solution; nodes / labels / padding on the mesh; variable, levels, vector scale,
-flow-line toggles, and a **Water levels** overlay (each head/reservoir boundary's
+contour-line and flow-line toggles, and a **Water levels** overlay (each head/reservoir boundary's
 level for the shown frame) on the seep solution; plot type, deformation controls, and
 the converged/at-failure **Field state** switch on FEM results; legend column layout
 on every view. Changing an option re-renders the

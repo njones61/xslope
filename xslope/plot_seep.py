@@ -545,7 +545,7 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
     return fig
 
 
-def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, vector_max=None, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, vmin=None, vmax=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, show_bc_levels=False, fig=None, style=None):
+def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, vector_max=None, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, vmin=None, vmax=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, show_bc_levels=False, contour_lines=True, fig=None, style=None):
     """
     Plot seep analysis results including head contours, flow lines, and phreatic surface.
     
@@ -576,6 +576,10 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     fill_contours : bool, optional
         If True, shows filled contours with color map. If False, only black solid
         contour lines are shown. Default is True.
+    contour_lines : bool, optional
+        If True (default), draws the variable's contour lines (for head, the
+        equipotentials) as thin black lines. False leaves them out, and their legend
+        entry with them.
     phreatic : bool, optional
         If True, plots the phreatic surface (where pressure head = 0) as a thick red line.
         Default is True. Only plotted if pore pressure is negative somewhere in the domain.
@@ -849,7 +853,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # read as a crisp flow net regardless of sign (matplotlib would otherwise dash
     # any negative level via rcParam contour.negative_linestyle — e.g. for signed
     # variables like pore pressure).
-    if not head_flat:
+    if contour_lines and not head_flat:
         _cs = ax.tricontour(triang, contour_data, levels=contour_levels, colors="k",
                             linewidths=0.5, linestyles="solid")
         _cs.set_gid('HEAD_CONTOURS')
@@ -1166,7 +1170,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if has_phreatic:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=2.0, label="Phreatic surface"))
     # Sentence case (capitalize() → "Total head contour") to match "Flow line".
-    if not head_flat:
+    if contour_lines and not head_flat:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=0.5,
                                       label=f"{variable_label.capitalize()} contour"))
     if plot_flowlines and has_flowlines:

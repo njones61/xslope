@@ -294,6 +294,7 @@ class MplCanvas(QWidget):
             flowlines=opts.get("flowlines", True),
             vectors=opts.get("vectors", False),
             fill_contours=opts.get("fill_contours", False),
+            contour_lines=opts.get("contour_lines", True),
             phreatic=opts.get("phreatic", True),
             cmap=opts.get("cmap", "Spectral_r"),
             cbar_shrink=opts.get("cbar_shrink", 0.8),

@@ -431,6 +431,11 @@ class SeepDisplayPanel(QWidget):
         self.flowlines.setChecked(True)
         self.vectors = QCheckBox("Velocity vectors")
         self.fill = QCheckBox("Filled contours")
+        self.contour_lines = QCheckBox("Contour lines")
+        self.contour_lines.setChecked(True)
+        self.contour_lines.setToolTip(
+            "Draw the contour lines of the variable shown (for total head, the "
+            "equipotential lines of the flow net).")
         self.phreatic = QCheckBox("Phreatic surface")
         self.phreatic.setChecked(True)
         # Water-level overlay: each head/reservoir boundary's instantaneous level
@@ -451,6 +456,7 @@ class SeepDisplayPanel(QWidget):
         if not self._transient:
             form.addRow("", self.flowlines)
         form.addRow("", self.vectors)
+        form.addRow("", self.contour_lines)
         form.addRow("", self.fill)
         form.addRow("", self.phreatic)
         form.addRow("", self.bc_levels)
@@ -470,8 +476,8 @@ class SeepDisplayPanel(QWidget):
         for s in (self.levels, self.alpha, self.vector_scale, self.pad_frac,
                   self.cbar_size):
             s.valueChanged.connect(self._emit)
-        for c in (self.flowlines, self.vectors, self.fill, self.phreatic,
-                  self.bc_levels):
+        for c in (self.flowlines, self.vectors, self.contour_lines, self.fill,
+                  self.phreatic, self.bc_levels):
             c.toggled.connect(self._emit)
         self.vectors.toggled.connect(self._sync_enabled)
         self.fill.toggled.connect(self._sync_enabled)
@@ -526,6 +532,7 @@ class SeepDisplayPanel(QWidget):
             "flowlines": (not self._transient) and self.flowlines.isChecked(),
             "vectors": self.vectors.isChecked(),
             "fill_contours": self.fill.isChecked(),
+            "contour_lines": self.contour_lines.isChecked(),
             "phreatic": self.phreatic.isChecked(),
             "show_bc_levels": self.bc_levels.isChecked(),
             "cmap": self.cmap.currentData(),

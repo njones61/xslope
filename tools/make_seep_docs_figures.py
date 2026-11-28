@@ -20,6 +20,8 @@ docs/seep/overview.md
   seep_ov_flownet.png    The flow net of that same earth-dam section: total-head
                          contours, stream-function flow lines, and the phreatic
                          surface, with the flow-net elements labelled.
+  seep_ov_flownet_core.png  The flow net alone (head contours and flow lines,
+                         base_mat = the core), beside the Results text on flow nets.
   seep_ov_variables.png  The four contourable nodal fields of one solution
                          (total head, pore pressure, velocity magnitude,
                          hydraulic gradient magnitude).
@@ -270,6 +272,19 @@ def fig_flownet_and_variables():
         _save(fig, name, pad=0.3)
         names.append(name)
     _stack(names, "seep_ov_variables.png")
+
+
+def fig_flownet_plain():
+    """The dam's flow net on its own, beside the Results text that explains it:
+    total-head contours and flow lines with the core as the base material, so the
+    cells are curvilinear squares in the core."""
+    _, _, seep = _dam_model()
+    sol = _quiet(run_seepage_analysis, seep, tol=1e-4)
+    fig = plt.figure(figsize=(9.5, 3.4))
+    _quiet(plot_seep_solution, seep, sol, levels=15, base_mat=2,
+           fill_contours=False, phreatic=True, mesh=False, flowlines=True,
+           show_title=False, fig=fig)
+    _save(fig, "seep_ov_flownet_core.png")
 
 
 # =========================================================================== #
@@ -703,6 +718,7 @@ def main(which):
         fig_bcs()
         fig_kr_models()
         fig_flownet_and_variables()
+        fig_flownet_plain()
     if which in ("all", "transient"):
         print("transient.md figures (one transient march)")
         fig_transient(_transient_run())

@@ -585,6 +585,13 @@ renderer draws the $N_f$ that makes the count consistent. The flow net therefore
 curvilinear squares in the base material, and choosing a different `base_mat` re-scales the
 channel count to that material.
 
+![seep_ov_flownet_core.png](images/seep_ov_flownet_core.png){width=1000px}
+
+*The earth dam's flow net with the core as the base material (`levels=15`, `base_mat=2`):
+15 total-head contours and the flow lines the rule calls for, forming curvilinear squares in
+the core. In the shell, about ten times as permeable, the same channels form cells about ten
+times as long as they are wide.*
+
 A stream function exists only for divergence-free flow, so flow lines are available for steady
 solutions only. A [transient frame](transient.md#outputs) exchanges water with storage, has no
 stream function, and is shown with velocity vectors instead.

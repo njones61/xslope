@@ -309,6 +309,8 @@ Arai & Tagyo (1985) example 3: a homogeneous slope with a water table, verifying
 |---|---|---|---|---|---|
 | Bishop | 1.113 | 1.190 (−6.5%) | 1.118 (−0.4%) | 1.138 (−2.2%) | Arai & Tagyo's own Bishop is the originating reference; SLOPE/W is the outlier of the four sources |
 
+SLOPE/W's own file starts the piezometric line at x = 30, so its 1.190 has no water left of there, while the manual's Figure 34 and the other sources draw the line along the toe.
+
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.12; Arai & Tagyo (1985).
 
 ### 🟢 2.13 — Greco Layered Slope {#gs-2-13}

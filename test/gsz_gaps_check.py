@@ -508,48 +508,123 @@ def check_skill():
 # 7. A piezometric line that stops short of the model
 # --------------------------------------------------------------------------------
 
-def check_piezo_past_ends():
-    """SLOPE/W applies no pore pressure beyond a piezometric line's ends (its Arai and
-    Tagyo example saves zero at every column base left of the line's start). The
-    import carries that rule as a line continued down to the model's base and along
-    it, and says so."""
+def check_piezo_short_ends():
+    """SLOPE/W applies no pore pressure outside a piezometric line's x-range; XSLOPE
+    refuses a slice there. The import brings the line across exactly as drawn, never
+    continued, and its note names SLOPE/W's rule and says what to do at each short
+    end by where the end sits: on the ground surface, above it (a pool), or below
+    it. The preflight warns and the slicer refuses a slice past the end. Arai and
+    Tagyo's file (its line starts at x = 30, where the manual's Figure 34 draws it
+    along the toe) is scored on SLOPE/W's terms by the corpus harness's rule, not by
+    the importer."""
     from xslope.slice import generate_slices
+    from xslope.preflight import preflight
+    common = ("SLOPE/W applies no pore pressure outside a line's x-range; XSLOPE "
+              "refuses a slice there instead")
     fails = []
+    # The built model's ground runs (0, 8), (15, 8), (35, 20), (60, 20).
+    cases = {
+        "ground": ([(25.0, 14.0), (60.0, 15.0)],
+                   ["no water left of x = 25", "left end the line is on the ground "
+                    "surface", "the water table comes out on the ground there",
+                    "extend the line along the ground surface to x = 0"]),
+        "pool": ([(5.0, 10.0), (20.0, 10.0), (60.0, 15.0)],
+                 ["no water left of x = 5", "left end the line is 2 above the ground: "
+                  "a pool", "Extend the line level to x = 0"]),
+        "below": ([(20.0, 10.0), (50.0, 15.0)],
+                  ["no water left of x = 20 and right of x = 50",
+                   "left end the line is 1 below the ground",
+                   "Extend it to x = 0 as the water continues",
+                   "right end the line is 5 below the ground",
+                   "Extend it to x = 60 as the water continues"]),
+    }
     with tempfile.TemporaryDirectory() as td:
+        for name, (line, want) in cases.items():
+            sd0 = _built_model()
+            sd0["piezo_line"] = line
+            path, _ = _export(sd0, td, name)
+            _g, (sd, cav) = _import(path, 1, critical_surface=False)
+            got = sorted(sd.get("piezo_line") or [])
+            if len(got) != len(line) or not all(
+                    _close(a[0], b[0]) and _close(a[1], b[1]) for a, b in zip(got, line)):
+                fails.append(f"7 ({name}): the line {line} imported as {got}, not as "
+                             f"drawn")
+            note = next((c for c in cav if "stops short of the model" in c), "")
+            missing = [w for w in [common] + want if w not in note]
+            if missing:
+                fails.append(f"7 ({name}): the import note lacks {missing}: {note!r}")
+            # An unsolved file has no SLOPE/W results to speak of.
+            if "This file's SLOPE/W results" in note or \
+                    "SLOPE/W would compute this file" not in note:
+                fails.append(f"7 ({name}): the note on an unsolved file claims "
+                             f"results: {note!r}")
+            # XSLOPE's own behavior is unchanged: a warning, and a refused slice.
+            rep = preflight(sd, "lem", ids=["piezo.extent_short"])
+            if not any(f.rule_id == "piezo.extent_short" for f in rep.warnings):
+                fails.append(f"7 ({name}): no piezo.extent_short warning")
+            if name == "below":
+                try:
+                    _quiet(generate_slices, sd, circle=dict(CIRCLE), num_slices=40,
+                           debug=False, check_inputs=False)
+                    fails.append("7: a circle reaching past the line's end sliced")
+                except ValueError as exc:
+                    if "outside the piezometric line's x-extent" not in str(exc):
+                        raise
+            # Back out: the line goes to SLOPE/W as it came in.
+            back, _ = _export(sd, td, f"{name}_back")
+            _g2, (sd2, _c2) = _import(back, 1, critical_surface=False)
+            if sorted(sd2.get("piezo_line") or []) != got:
+                fails.append(f"7 ({name}): the line exported as "
+                             f"{sorted(sd2.get('piezo_line') or [])}, not {got}")
         sd0 = _built_model()
-        sd0["piezo_line"] = [(20.0, 10.0), (60.0, 15.0)]
-        base, _ = _export(sd0, td, "short")
-        _g, (sd, cav) = _import(base, 1, critical_surface=False)
-        pl = sorted(sd.get("piezo_line") or [])
-        if not pl or pl[0][0] > 1e-9 or abs(pl[0][1]) > 1e-9:
-            fails.append(f"7: a line starting at x = 20 imported as {pl}, not continued "
-                         f"along the model's base (y = 0) to x = 0")
-        if not any("does not span the model" in c and "left of x = 20" in c
-                   for c in cav):
-            fails.append("7: the continued line was not stated in the import notes")
-        ok, res = _quiet(generate_slices, sd, circle=dict(CIRCLE), num_slices=40,
-                         debug=False, check_inputs=False)
-        if not ok:
-            fails.append(f"7: the circle did not slice: {res}")
-        else:
-            df = res[0]
-            left = df[df["x_c"] < 19.9]
-            right = df[(df["x_c"] > 21.0) & (df["y_cb"] < 9.0)]
-            if left.empty or (left["u"] != 0.0).any():
-                fails.append("7: a slice left of the line's start has pore pressure")
-            if right.empty or not (right["u"] > 0.0).all():
-                fails.append("7: the slices under the line lost their pore pressure")
+        path, _ = _export(sd0, td, "spans")
+        _g, (_sd, cav) = _import(path, 1, critical_surface=False)
+        if any("stops short of the model" in c for c in cav):
+            fails.append("7: a line spanning the model drew a short-line note")
 
     path = _vendor("Arai and Tagyo - Pore water pressure slope.gsz")
     if path is not None:
         from xslope.solve import mprice
-        g, (sd, _cav) = _import(path, critical_surface=False)
-        got = _critical_fs(g, g["analyses"][0], sd,
-                           lambda d: mprice(d, f_type="half_sine"))
-        if got is None or abs(got[0] / got[1] - 1.0) > 0.005:
-            fails.append(f"7: Arai and Tagyo's pore-water slope solves to {got} on "
-                         f"SLOPE/W's critical circle (XSLOPE, SLOPE/W); expected within "
-                         f"0.5%")
+        sys.path.insert(0, os.path.join(_REPO, "tools"))
+        import gsz_corpus
+        g, (sd, cav) = _import(path, critical_surface=False)
+        if sorted(sd["piezo_line"]) != [(30.0, 23.0), (48.0, 29.0), (66.0, 32.0)]:
+            fails.append(f"7: Arai and Tagyo's line imported as {sd['piezo_line']}, not "
+                         f"as SLOPE/W's file draws it")
+        note = next((c for c in cav if "stops short of the model" in c), "")
+        for w in (common, "This file's SLOPE/W results were computed with no water "
+                  "left of x = 30", "on the ground surface",
+                  "along the ground surface to x = 0"):
+            if w not in note:
+                fails.append(f"7: Arai and Tagyo's note lacks {w!r}: {note!r}")
+        # Imported as drawn, SLOPE/W's critical circle reaches past x = 30: refused.
+        try:
+            _critical_fs(g, g["analyses"][0], sd,
+                         lambda d: mprice(d, f_type="half_sine"))
+            fails.append("7: Arai and Tagyo's critical circle sliced past the line's "
+                         "start")
+        except ValueError as exc:
+            if "outside the piezometric line's x-extent" not in str(exc):
+                raise
+        _g, (_sd, cav) = _import(path)
+        if not any("reaches past the end of the piezometric line" in c for c in cav):
+            fails.append("7: the rejected critical circle's note does not say it "
+                         "reaches past the line")
+        # The harness's rule: the same circle, scored on SLOPE/W's terms.
+        if "Arai and Tagyo - Pore water pressure slope" not in \
+                gsz_corpus.ZERO_PAST_LINE_ENDS:
+            fails.append("7: the corpus harness does not score Arai and Tagyo by "
+                         "SLOPE/W's rule")
+        else:
+            sdz, ext = gsz_corpus._zero_past_line_ends(sd)
+            got = _critical_fs(
+                g, g["analyses"][0], sdz,
+                lambda d: mprice(gsz_corpus._apply_zero_past_line_ends(d, ext),
+                                 f_type="half_sine"))
+            if got is None or abs(got[0] / got[1] - 1.0) > 0.005:
+                fails.append(f"7: under the harness's rule Arai and Tagyo solves to "
+                             f"{got} on SLOPE/W's critical circle (XSLOPE, SLOPE/W); "
+                             f"expected within 0.5%")
     return fails
 
 
@@ -785,7 +860,7 @@ CHECKS = [
     ("4. the phreatic switch written on export", check_phreatic_export),
     ("5. partial factors named", check_partial_factors),
     ("6. the skill on imported surfaces", check_skill),
-    ("7. a piezometric line short of the model", check_piezo_past_ends),
+    ("7. a piezometric line short of the model", check_piezo_short_ends),
     ("8. spatial Mohr-Coulomb strengths", check_spatial_strength),
     ("9. anchors: default type, bond, F of S", check_anchor_import),
     ("10. saved circles of an axis search", check_axis_rows),

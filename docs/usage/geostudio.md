@@ -60,7 +60,7 @@ choice changes the model, so XSLOPE asks for it rather than guessing.
 | **Spatial Mohr-Coulomb** with a cohesion that is a straight line in elevation, on φ = 0 | `option='cp'`, see below |
 | **Bedrock** (impenetrable) | `option='elastic'` — an impenetrable material, see below |
 | Material color | The zone color in Studio |
-| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it; Type `phreatic` only where the analysis applies SLOPE/W's phreatic correction. A line that stops short of the model's edges is continued with no water beyond its ends, see below |
+| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it; Type `phreatic` only where the analysis applies SLOPE/W's phreatic correction. A line that stops short of the model's edges imports as drawn, with a note, see below |
 | **Ru**, per material | `u = ru`, with the same value |
 | **Water above the ground surface** | **A distributed load** — see below |
 | **A parent SEEP/W analysis's pore-pressure field** | The `seep` option, on SEEP/W's own mesh — see below |
@@ -189,17 +189,23 @@ the head uncorrected where the line runs along the ground surface, and XSLOPE co
 there too. The caveats name that stretch when a model has one. Export writes a `phreatic`
 line back as SLOPE/W's switch.
 
-**A line that stops short of the model.** SLOPE/W applies no pore pressure beyond the
-ends of a piezometric surface. Its Arai and Tagyo example shows this: the water table
-starts partway up the slope, and SLOPE/W's saved pore pressure is zero at every slice
-base to the left of that point. XSLOPE needs a line that spans every slice it reads, so
-the import continues the line straight down to the model's base and along the base to
-the model's edge. That gives the same zero pore pressure, and the notes state where the
-line was continued. Continuing the line level instead would put water under the toe
-that SLOPE/W does not have: on that example it puts XSLOPE's factor of safety 11% above
-SLOPE/W's (the median over SLOPE/W's 251 saved circles), against 0.2% below with the
-import's rule. If the water does continue past the line's end in
-your model, edit the line.
+**A line that stops short of the model.** SLOPE/W applies no pore pressure outside a
+piezometric line's x-range: a slice base past either end of the line has none. XSLOPE
+refuses a slice there instead, and the input checks warn when a line does not cover the
+whole section. Only you know where the water goes past the end of the line, so the
+import brings the line across exactly as drawn. The notes give the line's x-range and
+the model's, say that a file solved in SLOPE/W was solved with no water past the line's
+ends, and say what to do at each short end, by where that end sits:
+
+- **On the ground surface.** The water table comes out on the ground there. If the
+  water continues, extend the line along the ground surface to the model's edge.
+- **Above the ground surface.** The line ends over a pool. Extend the line level to the
+  model's edge.
+- **Below the ground surface.** Extend the line to the model's edge as the water
+  continues.
+
+Once you extend the line, XSLOPE's factor of safety includes water that SLOPE/W's saved
+answer does not, so the two can differ.
 
 **Ru** imports as XSLOPE's `ru` option, with each material's own value. Both programs
 take the pore pressure as ru times the weight of the soil above the slice base. SLOPE/W
@@ -380,7 +386,8 @@ without telling you. Read the caveats it returns.
   center; the import then recovers the critical circle's center from SLOPE/W's saved
   slices, and the other circles of that search are not used. Run a search afterwards to find XSLOPE's own critical surface. If that circle
   will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
-  along a bedrock boundary), XSLOPE takes the most critical of SLOPE/W's circles that
+  along a bedrock boundary, or the circle may reach past the end of a piezometric
+  line), XSLOPE takes the most critical of SLOPE/W's circles that
   does build, or imports no surface if none does, and the caveats report either case. A
   block, fully specified, or automatic-search surface is not a circle, so no surface is
   imported from one, or from an analysis that takes its surface from such a parent.

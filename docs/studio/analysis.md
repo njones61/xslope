@@ -864,7 +864,10 @@ itself — and so the import brings the piezometric surface across, sets
 dloads sheet to the model's real loads. The only exception is an analysis whose water is
 a solved **SEEP/W field**: that states no water surface anywhere, so the reservoir is
 recovered from the head field and written as a load, with the mode set to `manual`. Both
-cases are named in the post-import notes.
+cases are named in the post-import notes. A piezometric line that stops short of the
+model's edges imports as drawn. SLOPE/W applies no pore pressure past the end of a line,
+where XSLOPE refuses a slice, so the notes say where the line stops and how to extend it
+([GeoStudio import](../usage/geostudio.md#water-and-pore-pressure)).
 
 ![GeoStudio import — choosing an analysis](images/analysis_gsz_import_dialog.png)
 

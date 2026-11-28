@@ -1471,63 +1471,74 @@ def _import_seep(gsz, analysis, step, caveats, polygons):
     return mesh, u, chosen
 
 
-def _piezo_past_ends(line, domain_polygon, which="piezometric surface"):
-    """Carry SLOPE/W's no-water rule past a piezometric line's ends. Returns
-    ``(line, note)``; ``note`` is None when the line already spans the model.
+def _piezo_short_ends(line, ground_surface, domain_polygon, which="piezometric surface",
+                      solved=True):
+    """The import note for a piezometric line that stops short of the model's edges,
+    or None when it spans them. The line itself is imported as drawn.
 
-    SLOPE/W applies no pore pressure beyond the ends of a piezometric surface. Its
-    own Arai and Tagyo pore-water example shows it: the line starts on the slope at
-    x = 30, and SLOPE/W's saved pressure is zero at every column base left of that,
-    9 to 10 m below the line's level. XSLOPE refuses a slice past a line's end
-    rather than read zero there, so the import continues the line down to the
-    model's base and along it to the model's edge, which gives the same zero. Run
-    level instead, the line would stand above the toe and load it with ponded water
-    SLOPE/W does not have: 11% high on that example's 251 circles, against -0.2%
-    this way.
+    SLOPE/W applies no pore pressure outside a line's x-range (not documented; its
+    saved slice results read exactly zero there). XSLOPE has no such rule: its slicer
+    refuses a slice past a line's end, and the preflight warns (piezo.extent_short).
+    The import does not invent the missing water. The note says what SLOPE/W did and,
+    for each short end, what the end's position suggests the user do: an end on the
+    ground surface is a water table coming out on the ground; one above the ground at
+    the model's edge is a pool, which continues level; one below the ground goes on
+    as the water does, which only the user knows.
     """
     if len(line) < 2 or domain_polygon is None or domain_polygon.is_empty:
-        return line, None
-    x0m, y_base, x1m, _ = domain_polygon.bounds
+        return None
+    x0m, y0m, x1m, y1m = domain_polygon.bounds
     pts = sorted(line)
-    tol = 1e-6 * max(1.0, x1m - x0m)
-    out, ends = list(pts), []
-    if pts[0][0] > x0m + tol:
-        x0 = pts[0][0]
-        out = [(x0m, y_base), (x0 - tol, y_base)] + out
-        ends.append(f"left of x = {x0:g}")
-    if pts[-1][0] < x1m - tol:
-        x1 = pts[-1][0]
-        out = out + [(x1 + tol, y_base), (x1m, y_base)]
-        ends.append(f"right of x = {x1:g}")
+    tol_x = 1e-6 * max(1.0, x1m - x0m)
+    # "On the ground": within 0.1% of the model's size. Walter Bouldin's line ends
+    # 0.08 ft above the ground on a model 216 ft wide; the other short ends in
+    # SLOPE/W's files are tens of feet off it.
+    tol_y = 1e-3 * max(1.0, x1m - x0m, y1m - y0m)
+    ends = []
+    for side, (x, y), edge in (("left", pts[0], x0m), ("right", pts[-1], x1m)):
+        if (side == "left" and x <= edge + tol_x) or (side == "right" and x >= edge - tol_x):
+            continue
+        past = f"{side} of x = {x:g}"
+        yg = _y_on(ground_surface, x)
+        if yg is not None and abs(y - yg) <= tol_y:
+            advice = (f"At its {side} end the line is on the ground surface: the water "
+                      f"table comes out on the ground there. If the water continues, "
+                      f"extend the line along the ground surface to x = {edge:g}")
+        elif yg is not None and y > yg:
+            advice = (f"At its {side} end the line is {y - yg:.3g} above the ground: a "
+                      f"pool. Extend the line level to x = {edge:g}")
+        else:
+            below = "" if yg is None else f"{yg - y:.3g} "
+            advice = (f"At its {side} end the line is {below}below the ground. Extend "
+                      f"it to x = {edge:g} as the water continues")
+        ends.append((past, advice))
     if not ends:
-        return line, None
-    return out, (
-        f"the {which} does not span the model (it runs from x = {pts[0][0]:g} to "
-        f"{pts[-1][0]:g}; the model from x = {x0m:g} to {x1m:g}). SLOPE/W applies no "
-        f"pore pressure beyond a line's ends, so the import continues the line down to "
-        f"the model's base (y = {y_base:g}) and along it, giving zero pore pressure "
-        f"{' and '.join(ends)}, as in SLOPE/W. Edit the line if the water continues "
-        f"there")
+        return None
+    pasts = " and ".join(p for p, _ in ends)
+    return (
+        f"the {which} stops short of the model: it runs from x = {pts[0][0]:g} to "
+        f"{pts[-1][0]:g}, and the model from x = {x0m:g} to {x1m:g}. SLOPE/W applies "
+        f"no pore pressure outside a line's x-range; XSLOPE refuses a slice there "
+        f"instead. "
+        + (f"This file's SLOPE/W results were computed with no water {pasts}. "
+           if solved else f"SLOPE/W would compute this file with no water {pasts}. ")
+        + ". ".join(a for _, a in ends))
 
 
-def _piezo_without_continuation(line, y_base):
-    """The inverse of :func:`_piezo_past_ends`: ``line`` without the stretch along
-    the model's base (y = ``y_base``) the import added beyond either end. That stretch
-    is two points on the base, the inner one a hair (at most 1e-6 x the width) short
-    of the line's own end."""
-    pts = sorted(line)
-    if len(pts) < 4:
-        return line
-    width = max(1.0, pts[-1][0] - pts[0][0])
-    tol = 1e-6 * width
-    on_base = lambda q: abs(q[1] - y_base) <= 1e-9 * max(1.0, abs(y_base))  # noqa: E731
-    if (on_base(pts[0]) and on_base(pts[1]) and not on_base(pts[2])
-            and 0.0 < pts[2][0] - pts[1][0] <= 1.01 * tol):
-        pts = pts[2:]
-    if (len(pts) >= 4 and on_base(pts[-1]) and on_base(pts[-2]) and not on_base(pts[-3])
-            and 0.0 < pts[-2][0] - pts[-3][0] <= 1.01 * tol):
-        pts = pts[:-2]
-    return pts if len(pts) != len(line) else line
+def _circle_past_line(trial, lines, domain_polygon):
+    """Does the sliding mass of SLOPE/W's trial circle ``trial`` (xo, yo, r) reach
+    past either end of any of ``lines``, where XSLOPE's slicer refuses a slice?"""
+    if not lines or domain_polygon is None or domain_polygon.is_empty:
+        return False
+    from shapely.geometry import Point
+    mass = Point(trial["xo"], trial["yo"]).buffer(trial["r"], 256).intersection(
+        domain_polygon)
+    if mass.is_empty:
+        return False
+    x0, _, x1, _ = mass.bounds
+    tol = 1e-6 * max(1.0, x1 - x0)
+    return any(x0 < min(p[0] for p in ln) - tol or x1 > max(p[0] for p in ln) + tol
+               for ln in lines if len(ln) >= 2)
 
 
 def _line_on_ground(line, ground_surface, n=20):
@@ -2246,18 +2257,20 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
 
-    # A line that stops short of the model's edges: SLOPE/W has no water past its
-    # ends (see _piezo_past_ends).
-    piezo_line, note = _piezo_past_ends(
-        piezo_line, domain_polygon,
-        "piezometric surface" if not piezo_line2 else
-        "piezometric surface before drawdown (line 1)")
-    if note:
-        caveats.append(note)
-    piezo_line2, note = _piezo_past_ends(
-        piezo_line2, domain_polygon, "piezometric surface after drawdown (line 2)")
-    if note:
-        caveats.append(note)
+    # A line that stops short of the model's edges is imported as drawn, with a note
+    # (see _piezo_short_ends): SLOPE/W has no water past its ends, XSLOPE refuses a
+    # slice there.
+    solved = bool(read_gsz_results(gsz, analysis["name"], step))
+    short_lines = []
+    for line, which in (
+            (piezo_line, "piezometric surface" if not piezo_line2 else
+             "piezometric surface before drawdown (line 1)"),
+            (piezo_line2, "piezometric surface after drawdown (line 2)")):
+        note = _piezo_short_ends(line or [], ground_surface, domain_polygon, which,
+                                 solved)
+        if note:
+            caveats.append(note)
+            short_lines.append(line)
 
     phreatic = bool(stab.get("phreatic"))
     if piezo_line and phreatic:
@@ -2408,15 +2421,22 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 f"{' before the optimization' if optimized else ''} (its FS = "
                 f"{rejected['fs']:.3f}) is one xslope can't build on this model"
                 + (" — most likely a COMPOSITE surface, truncated along the "
-                   "impenetrable bedrock" if bedrock_note else "")
+                   "impenetrable bedrock" if bedrock_note else
+                   " — it reaches past the end of the piezometric line"
+                   if _circle_past_line(rejected, short_lines, domain_polygon)
+                   else "")
                 + ". The circle imported above is the most critical one that does "
                   "build, so its FS is higher than SLOPE/W's")
     elif circular:
         caveats.append(
             f"none of SLOPE/W's {len(circular)} trial circles can be built on this "
             f"model (its critical FS = {rejected['fs']:.3f}), so NO failure surface was "
-            f"imported — define one, or run a search. Usually this means SLOPE/W scored "
-            f"COMPOSITE surfaces, truncated along an impenetrable boundary")
+            f"imported — define one, or run a search. "
+            + ("They reach past the end of the piezometric line"
+               if all(_circle_past_line(t, short_lines, domain_polygon)
+                      for t in circular) else
+               "Usually this means SLOPE/W scored COMPOSITE surfaces, truncated along "
+               "an impenetrable boundary"))
     else:
         caveats.append(
             "no failure surface was imported — SLOPE/W's search definition has no "
@@ -3462,13 +3482,6 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             "the zones first.)")
     if not materials:
         raise ValueError("This model has no materials to export.")
-    # A line the import continued past its ends (_piezo_past_ends) goes back as the
-    # line SLOPE/W had: GeoStudio applies no water past a line's ends on its own.
-    y_base = min(p["polygon"].bounds[1] for p in polygons)
-    slope_data = dict(slope_data)
-    for key in ("piezo_line", "piezo_line2"):
-        if slope_data.get(key):
-            slope_data[key] = _piezo_without_continuation(slope_data[key], y_base)
 
     gamma_water = require_gamma_water(slope_data, "GeoStudio export")
     try:

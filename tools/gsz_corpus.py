@@ -77,6 +77,64 @@ except (TypeError, ValueError):
     _RAPID_SLICES = False
 
 
+# Analyses scored with SLOPE/W's rule for a piezometric line that stops short of the
+# model: SLOPE/W applies no pore pressure outside the line's x-range (not documented;
+# its saved slice results read exactly zero there), where XSLOPE's slicer refuses the
+# slice. The importer brings the line across as drawn and says so; this rule lives
+# here only, to compare with SLOPE/W's saved answers on their own terms.
+ZERO_PAST_LINE_ENDS = {
+    # A defect in SLOPE/W's own file (verification manual 2.12): its line is only
+    # (30, 23), (48, 29), (66, 32). The manual's Figure 34, and Slide2's version of the
+    # problem, also draw (0, 15) and (18, 15) along the toe and up the face. SLOPE/W's
+    # saved answers, its published 1.190 among them, are the truncated line's, with no
+    # water left of x = 30.
+    "Arai and Tagyo - Pore water pressure slope",
+}
+
+
+def _zero_past_line_ends(slope_data):
+    """For an analysis in ZERO_PAST_LINE_ENDS: ``(model to slice, extents)``.
+
+    The slicer will not cut a slice past a line's end, so the model it slices carries
+    each short line on along the model's base past its ends. That stretch is below
+    every slice base, so it adds no pore pressure, no ponded water and no weight
+    change; it only lets the slicer through. ``_apply_zero_past_line_ends`` then sets
+    the pore pressure on the slice table itself, by SLOPE/W's rule, from the line as
+    drawn (``extents``, one (x0, x1) per line key)."""
+    sd = dict(slope_data)
+    y_base = min(p["polygon"].bounds[1] for p in sd["polygons"])
+    x_lo = min(p["polygon"].bounds[0] for p in sd["polygons"])
+    x_hi = max(p["polygon"].bounds[2] for p in sd["polygons"])
+    tol = 1e-6 * max(1.0, x_hi - x_lo)
+    extents = {}
+    for key in ("piezo_line", "piezo_line2"):
+        pts = sorted(sd.get(key) or [])
+        if len(pts) < 2:
+            continue
+        extents[key] = (pts[0][0], pts[-1][0])
+        if pts[0][0] > x_lo + tol:
+            pts = [(x_lo, y_base), (pts[0][0] - tol, y_base)] + pts
+        if pts[-1][0] < x_hi - tol:
+            pts = pts + [(pts[-1][0] + tol, y_base), (x_hi, y_base)]
+        sd[key] = pts
+    return sd, extents
+
+
+def _apply_zero_past_line_ends(df, extents):
+    """SLOPE/W's rule on the slice table: no pore pressure at a slice base whose
+    pore-pressure point lies outside the drawn line's x-range."""
+    for key, (u, hw) in (("piezo_line", ("u", "hw")), ("piezo_line2", ("u2", "hw2"))):
+        if key not in extents or u not in df:
+            continue
+        x0, x1 = extents[key]
+        tol = 1e-9 * max(1.0, x1 - x0)
+        out = (df["x_u"] < x0 - tol) | (df["x_u"] > x1 + tol)
+        df.loc[out, u] = 0.0
+        if hw in df:
+            df.loc[out, hw] = 0.0
+    return df
+
+
 def score_analysis(gsz, analysis, slices):
     """xslope vs SLOPE/W on every circle SLOPE/W scored. Returns a result dict.
 
@@ -115,6 +173,10 @@ def score_analysis(gsz, analysis, slices):
             out["note"] = f"import failed: {e}"
             return out
         out["caveats"] = caveats
+        extents = None
+        if name in ZERO_PAST_LINE_ENDS:
+            slope_data, extents = _zero_past_line_ends(slope_data)
+            out["note"] = "scored with SLOPE/W's no-water rule past the line's ends"
 
         rows = read_gsz_results(gsz, name, step)
         if not rows:
@@ -136,6 +198,8 @@ def score_analysis(gsz, analysis, slices):
                     out["skipped"] += 1
                     continue
                 df = res[0]
+                if extents:
+                    df = _apply_zero_past_line_ends(df, extents)
                 # Does the mass we built weigh what SLOPE/W says it weighs? This checks
                 # the imported polygons and unit weights with the solver taken out of the
                 # way -- and it tells a genuine circle from one *fitted* to a block.
@@ -153,6 +217,8 @@ def score_analysis(gsz, analysis, slices):
     if not errs:
         if out["noncirc"]:
             out["note"] = f"{out['noncirc']} non-circular surfaces (not rebuildable)"
+        elif out["skipped"]:
+            out["note"] = f"none of {out['skipped']} circles would slice or solve"
         else:
             out["note"] = "not solved (no trial surfaces saved)"
         return out

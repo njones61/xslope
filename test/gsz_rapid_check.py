@@ -12,8 +12,9 @@ and <DrawdownPhi> (c_R, phi_R). XSLOPE takes the two surfaces as piezo lines 1 a
      its own parser: the higher surface is line 1 and the lower is line 2, point for
      point; each undrained soil's d and psi are its c_R and phi_R converted by
      SLOPE/W's equations, written out here again rather than borrowed from the
-     importer; a free-draining soil has neither; and the caveat that used to say the
-     drawdown was not imported is gone.
+     importer; a free-draining soil has neither; the caveat that used to say the
+     drawdown was not imported is gone; and a surface that stops short of the model
+     comes across as drawn, with a note on SLOPE/W's no-water rule past its end.
   B. THE ANSWER. Each example is solved as a rapid drawdown on SLOPE/W's own
      critical circle, imported from the same file, with SLOPE/W's own method, and
      the factor of safety must be the one docs/verification/geostudio.md prints.
@@ -63,6 +64,23 @@ EXAMPLES = [
 #: from the printed value (half the last printed digit, plus a little).
 NUM_SLICES = 60
 FS_TOL = 0.0006
+
+#: What the import note says of a surface that stops short of the model: SLOPE/W
+#: applies no pore pressure past its end, and what to do there, by where the end sits.
+#: The other two examples' surfaces span their models and draw no such note.
+SHORT_NOTES = {
+    "2.40": ["piezometric surface before drawdown (line 1) stops short of the model",
+             "SLOPE/W applies no pore pressure outside a line's x-range; XSLOPE "
+             "refuses a slice there instead",
+             "results were computed with no water right of x = 211",
+             "right end the line is on the ground surface",
+             "extend the line along the ground surface to x = 216"],
+    "2.43": ["piezometric surface before drawdown (line 1) stops short of the model",
+             "SLOPE/W applies no pore pressure outside a line's x-range; XSLOPE "
+             "refuses a slice there instead",
+             "results were computed with no water left of x = 1",
+             "above the ground: a pool", "Extend the line level to x = 0"],
+}
 
 #: The caveat the import gave before it carried a staged rapid drawdown.
 OLD_CAVEAT = "THE FACTOR OF SAFETY IS NOT SLOPE/W'S RAPID DRAWDOWN ANSWER"
@@ -142,18 +160,13 @@ def _import(path):
 
 def _drawdown_problems(label, sd, want):
     """How ``sd`` departs from the drawdown the XML states (an empty list if not)."""
-    # A surface that stops short of the model is continued along the model's base
-    # (SLOPE/W puts no water past a line's ends); the vendor's own surface is the line
-    # without that continuation.
-    from xslope.geostudio import _piezo_without_continuation
-    y_base = min(p["polygon"].bounds[1] for p in sd["polygons"])
+    # Both surfaces come across exactly as drawn, including one that stops short of
+    # the model (Walter Bouldin's and Pilarcitos's surfaces before drawdown).
     out = []
-    line1 = _piezo_without_continuation(sd.get("piezo_line") or [], y_base)
-    line2 = _piezo_without_continuation(sd.get("piezo_line2") or [], y_base)
-    if not _same_line(line1, want["before"]):
+    if not _same_line(sd.get("piezo_line") or [], want["before"]):
         out.append(f"{label}: piezo line 1 is {sd.get('piezo_line')}, expected the "
                    f"surface before drawdown {want['before']}")
-    if not _same_line(line2, want["after"]):
+    if not _same_line(sd.get("piezo_line2") or [], want["after"]):
         out.append(f"{label}: piezo line 2 is {sd.get('piezo_line2')}, expected the "
                    f"surface after drawdown {want['after']}")
     mats = {m["name"]: m for m in sd["materials"]}
@@ -198,6 +211,15 @@ def check_import():
         if not any("rapid drawdown FS" in c for c in cav):
             fails.append(f"{label}: the circle caveat does not say SLOPE/W's FS on it "
                          f"is its rapid drawdown answer")
+        notes = [c for c in cav if "stops short of the model" in c]
+        want_note = SHORT_NOTES.get(sec)
+        if want_note is None and notes:
+            fails.append(f"{label}: a short-line note on surfaces that span the model: "
+                         f"{notes}")
+        elif want_note is not None:
+            missing = [w for w in want_note if not notes or w not in notes[0]]
+            if len(notes) != 1 or missing:
+                fails.append(f"{label}: the short-line note lacks {missing}: {notes}")
     return fails
 
 

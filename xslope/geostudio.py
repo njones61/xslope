@@ -2087,7 +2087,19 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     # it is imported; the B-bar part is reported below.
     if option in ("PiezoSurface", "PiezoSurfaceBbar"):
         if surfaces:
-            piezo_line = list(next(iter(surfaces.values())))
+            first_id = next(iter(surfaces))
+            piezo_line = list(surfaces[first_id])
+            # SLOPE/W can give each material its own piezometric surface; XSLOPE has
+            # one line per stage, so every connected material reads the first one.
+            # Say which, and which materials SLOPE/W gave another surface.
+            other = [gsz["materials"][m]["name"] for m in used
+                     if uses.get(m) not in (None, first_id) and uses.get(m) in surfaces]
+            if other and not rapid:
+                caveats.append(
+                    f"GeoStudio gives material(s) {', '.join(repr(o) for o in other)} "
+                    f"a different piezometric surface from the rest; XSLOPE has one "
+                    f"piezometric line, so every material was imported reading "
+                    f"piezometric surface {first_id}. Check the water in those materials")
             for mid, mat in zip(used, materials):
                 # No MaterialUsesPiezs at all -> the surface applies to everything.
                 if not uses or mid in uses:
@@ -2098,9 +2110,10 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                     f"material(s) {', '.join(repr(d) for d in dry)} are not connected "
                     f"to the piezometric surface in GeoStudio — imported with no pore "
                     f"pressure")
-            if len(surfaces) > 1 and not rapid:
+            if len(surfaces) > 1 and not rapid and not other:
                 # (A staged rapid drawdown has two by design, the water before and
-                # after drawdown; _rapid_drawdown imports both.)
+                # after drawdown; _rapid_drawdown imports both. When materials use
+                # different surfaces, the note above already says which was taken.)
                 caveats.append(
                     f"the file defines {len(surfaces)} piezometric surfaces; "
                     f"xslope takes one, so the first was imported")

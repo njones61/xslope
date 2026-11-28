@@ -2073,17 +2073,17 @@ def _piezo_extent_short(ctx):
     tol = max(1e-9, 1e-6 * (gs[1] - gs[0]))
     gaps = []
     if pz[0] > gs[0] + tol:
-        gaps.append(f"x < {pz[0]:.6g}")
+        gaps.append(f"left of x = {pz[0]:.6g}")
     if pz[1] < gs[1] - tol:
-        gaps.append(f"x > {pz[1]:.6g}")
+        gaps.append(f"right of x = {pz[1]:.6g}")
     if not gaps:
         return None
-    return (f"Piezometric Line 1 spans x = [{pz[0]:.6g}, {pz[1]:.6g}], which does "
-            f"not cover the whole section ([{gs[0]:.6g}, {gs[1]:.6g}]): it stops "
-            f"short at {', '.join(gaps)}. A failure surface reaching into that reach "
-            f"is refused, because a material with u = piezo would have no "
-            f"piezometric surface to read there. This is fine when every trial "
-            f"surface stays inside the line {_AT_PIEZO}.")
+    return (f"Piezometric Line 1 runs from x = {pz[0]:.6g} to {pz[1]:.6g}, which does "
+            f"not cover the whole section (x = {gs[0]:.6g} to {gs[1]:.6g}): there is "
+            f"no line {' or '.join(gaps)}. A failure surface that reaches there is "
+            f"refused, because a material with u = piezo has no piezometric surface "
+            f"to read. This is fine when every trial surface stays inside the line; "
+            f"otherwise extend the line {_AT_PIEZO}.")
 
 
 @rule("piezo.no_consumer", WARNING, ("lem",),

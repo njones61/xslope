@@ -57,9 +57,10 @@ choice changes the model, so XSLOPE asks for it rather than guessing.
 | **Undrained materials** (φ = 0, strength entered as cohesion) | `option='mc'` with c = Su, φ = 0 |
 | **SHANSEP** with a constant ratio (its older name is S=f(overburden)) | `option='ratio'` with c/p = the ratio and c = 0, see below |
 | **S=f(depth)** (undrained strength rising with depth below the top of its layer) | `option='cp'` measured from that top, see below |
+| **Spatial Mohr-Coulomb** with a cohesion that is a straight line in elevation, on φ = 0 | `option='cp'`, see below |
 | **Bedrock** (impenetrable) | `option='elastic'` — an impenetrable material, see below |
 | Material color | The zone color in Studio |
-| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it; Type `phreatic` only where the analysis applies SLOPE/W's phreatic correction |
+| Piezometric surface, and the materials assigned to use it | Piezo line, on the materials that use it; Type `phreatic` only where the analysis applies SLOPE/W's phreatic correction. A line that stops short of the model's edges imports as drawn, with a note, see below |
 | **Ru**, per material | `u = ru`, with the same value |
 | **Water above the ground surface** | **A distributed load** — see below |
 | **A parent SEEP/W analysis's pore-pressure field** | The `seep` option, on SEEP/W's own mesh — see below |
@@ -113,9 +114,26 @@ SLOPE/W's, and the notes give the largest difference. S=f(depth) can also cap th
 strength at a maximum, which XSLOPE does not have. The import names any field on these
 materials that it does not read.
 
-SLOPE/W's S=f(datum), its Spatial Mohr-Coulomb, and every other strength model XSLOPE
-does not have are imported with whatever cohesion and friction angle they carry, and
-the notes say that this is not the same strength.
+**Strength that varies in space.** SLOPE/W's Spatial Mohr-Coulomb model lets the
+cohesion, friction angle and unit weight each follow a function of x, a function of y,
+or a function over x and y. One case is exactly XSLOPE's `cp` option: a cohesion that is
+a straight line in elevation, rising with depth, on a friction angle of zero. It imports
+as `cp`, with c the cohesion at the line's upper point, r_elev that point's elevation and
+c/p the rate of increase. SLOPE/W holds the strength at its end values beyond the line's
+two ends, and so does `cp` above r_elev. Below the line's lower end `cp` keeps rising
+while SLOPE/W's strength stays constant, and the notes say so when the material reaches
+that deep. On SLOPE/W's own example (a foundation whose cohesion rises from 5.4 kPa at
+y = 9 m to 27.52 kPa at y = 0), the imported model matches SLOPE/W's factor of safety to
+within 0.2% on its critical circle.
+
+XSLOPE has one value per material for every other case. A cohesion or friction angle
+function imports as its lowest value, so XSLOPE's strength is at or below SLOPE/W's, and
+a unit weight function imports as the average of its points. The notes name the
+material, the function, its range and the value used.
+
+SLOPE/W's S=f(datum), and every other strength model XSLOPE does not have, are imported
+with whatever cohesion and friction angle they carry, and the notes say that this is not
+the same strength.
 
 SLOPE/W can also scale any strength by a function of the slice base's inclination (an
 anisotropy function). XSLOPE has no such scaling, so the import uses the unscaled
@@ -170,6 +188,24 @@ plain head under the line, and so does the import. One difference remains: SLOPE
 the head uncorrected where the line runs along the ground surface, and XSLOPE corrects it
 there too. The caveats name that stretch when a model has one. Export writes a `phreatic`
 line back as SLOPE/W's switch.
+
+**A line that stops short of the model.** SLOPE/W applies no pore pressure outside a
+piezometric line's x-range: a slice base past either end of the line has none. XSLOPE
+refuses a slice there instead, and the input checks warn when a line does not cover the
+whole section. Only you know where the water goes past the end of the line, so the
+import brings the line across exactly as drawn. The notes give the line's x-range and
+the model's, say that a file solved in SLOPE/W was solved with no water past the line's
+ends, and say what to do at each short end, by where that end sits:
+
+- **On the ground surface.** The water table comes out on the ground there. If the
+  water continues, extend the line along the ground surface to the model's edge.
+- **Above the ground surface.** The line ends over a pool. Extend the line level to the
+  model's edge.
+- **Below the ground surface.** Extend the line to the model's edge as the water
+  continues.
+
+Once you extend the line, XSLOPE's factor of safety includes water that SLOPE/W's saved
+answer does not, so the two can differ.
 
 **Ru** imports as XSLOPE's `ru` option, with each material's own value. Both programs
 take the pore pressure as ru times the weight of the soil above the slice base. SLOPE/W
@@ -292,12 +328,38 @@ a φ = 0 undrained analysis, but worth a few percent in a c′ = 0 one.
 ### Reinforcement
 
 A GeoStudio reinforcement carries a capacity, a plate capacity, a pullout resistance and
-an out-of-plane spacing — but **no direction and no dependence on the factor of safety**.
-Both are implied by the reinforcement type. XSLOPE stores them explicitly, so the import
-has to supply them, and the mapping was chosen by comparison with *SLOPE/W's own factors
-of safety*: reinforcement acts **along the bar** (`dir='axial'`), as a
-known load (`appl='active'`). On the SLOPE/W verification manual's geosynthetic-reinforced
-embankment ([§2.24](../verification/geostudio.md#gs-2-24)) this reproduces SLOPE/W to within 0.3% for the clay fill and 0.6% for the sand fill.
+an out-of-plane spacing, but **no direction**: the direction is implied by the
+reinforcement type. XSLOPE stores it explicitly, so the import has to supply it, and the
+mapping was chosen by comparison with *SLOPE/W's own factors of safety*: reinforcement
+acts **along the bar** (`dir='axial'`). On the SLOPE/W verification manual's
+geosynthetic-reinforced embankment ([§2.24](../verification/geostudio.md#gs-2-24)) this
+reproduces SLOPE/W to within 0.3% for the clay fill and 0.6% for the sand fill.
+
+GeoStudio writes a setting only when it differs from the default, so a missing setting
+takes GeoStudio's default:
+
+| GeoStudio | XSLOPE |
+|---|---|
+| No type | An anchor, GeoStudio's default type |
+| F of S Dependent: No (the default) | `appl='active'`, a known load |
+| F of S Dependent: Yes | `appl='passive'`, the force divided by the factor of safety |
+| Force distribution: Distributed (the default) | Applied where the bar crosses the slip surface, and the notes say so |
+
+**Anchors.** An anchor develops its pullout resistance only over its **bond length**, the
+grouted length at its buried end; the free length in front of it carries no bond. So an
+anchor's capacity imports as the smaller of its tensile capacity and its pullout
+resistance times its bond length, developed over the bond length from the buried end.
+Where a slip surface crosses the free length, that is SLOPE/W's anchor force exactly. On
+SLOPE/W's Reinforcement with Anchors example, a pullout resistance of 200 kN/m over a
+3 m bond, with the anchors 2 m apart, gives 300 kN per meter of wall, the force in
+SLOPE/W's own slice results, and the imported model matches SLOPE/W's factor of safety
+to within 0.3% on its critical circles. A nail is
+bonded over its whole length, so its bond length plays no part.
+
+An anchor or nail can also carry a **shear force**, and GeoStudio has pile and
+user-defined reinforcement types. XSLOPE's reinforcement lines carry tension only, so
+these are not imported, and the notes name each one. Leaving out an anchor's shear force
+lowers the factor of safety: by 5.5% on SLOPE/W's example with shear.
 
 Everything is converted to XSLOPE's **per unit width** convention by dividing through by
 the spacing, and GeoStudio's pullout resistance per unit length becomes the bond length
@@ -320,9 +382,12 @@ without telling you. Read the caveats it returns.
   grid-and-radius; neither is an XSLOPE search, and a wrong surface is worse than none.
   If the file was saved *solved*, XSLOPE imports **SLOPE/W's critical circle** instead —
   which makes the model complete, and lets you compare the two programs on identical
-  geometry. Run a search afterwards to find XSLOPE's own critical surface. If that circle
+  geometry. A search with a moment axis saves the axis in place of each circle's
+  center; the import then recovers the critical circle's center from SLOPE/W's saved
+  slices, and the other circles of that search are not used. Run a search afterwards to find XSLOPE's own critical surface. If that circle
   will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
-  along a bedrock boundary), XSLOPE takes the most critical of SLOPE/W's circles that
+  along a bedrock boundary, or the circle may reach past the end of a piezometric
+  line), XSLOPE takes the most critical of SLOPE/W's circles that
   does build, or imports no surface if none does, and the caveats report either case. A
   block, fully specified, or automatic-search surface is not a circle, so no surface is
   imported from one, or from an analysis that takes its surface from such a parent.
@@ -527,7 +592,9 @@ it straight back out, and diffs XSLOPE's XML against the vendor's.
   pore-pressure field** where a stability analysis depends on it — but it does not import
   a seepage *problem* to re-solve, and writes no analysis but SLOPE/W.
 - Only one piezometric surface is imported, except from a staged rapid drawdown, which
-  takes two; any other analysis that defines several uses the first.
+  takes two; any other analysis that defines several uses the first, for every material
+  that uses one. SLOPE/W can assign a different surface to each material, and the notes
+  say when a file defines more than one.
 - Import replaces the current project. In Studio you are prompted to discard unsaved
   changes first, exactly as when opening a file; the imported model is then left unsaved
   so you can review it and **Save As**.

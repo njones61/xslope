@@ -1389,7 +1389,7 @@ def test_lem06_polygon_rings():
 #: is 'name', so a block starting one column earlier lands every value one field to
 #: the right (the same reason the circles tables start at Xo rather than at #).
 _MAT_HEADERS = ["name", "γ", "γsat", "option", "c", "φ", "c/p", "r-elev", "d",
-                "psi", "t_cut", "E", "nu", "u"]
+                "psi", "t_cut", "E", "ν", "u"]
 #: The editor field each of those columns is, in the same order.
 _MAT_KEYS = ["name", "gamma", "gamma_sat", "option", "c", "phi", "cp", "r_elev",
              "d", "psi", "t_cut", "E", "nu", "u"]

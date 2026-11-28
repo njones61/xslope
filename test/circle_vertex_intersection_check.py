@@ -38,6 +38,7 @@ import contextlib
 import copy
 import io
 import math
+import os
 import warnings
 
 from xslope import slice as sl
@@ -45,6 +46,10 @@ from xslope.fileio import load_slope_data
 from xslope.slice import (circle_polyline_intersections, generate_slices,
                           get_sorted_intersections)
 from xslope.solve import spencer
+
+#: The repository root: the model paths below are relative to it, not to the
+#: folder the suite runs from.
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DAM = "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx"
 
@@ -78,7 +83,7 @@ def _quiet_load(path):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         with contextlib.redirect_stdout(io.StringIO()):
-            return load_slope_data(path)
+            return load_slope_data(os.path.join(_REPO, path))
 
 
 def _dry(path):

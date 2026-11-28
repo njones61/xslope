@@ -67,17 +67,45 @@ def _vendor(name):
 
 def _unit_weight_example(td):
     """SLOPE/W's Unit Weight Definition example, written to ``td``, or None."""
+    return _slopew_example(td, UNIT_WEIGHT_EXAMPLE)
+
+
+def _slopew_example(td, member):
+    """One file of SLOPE/W's 2025.2 examples zip, written to ``td``, or None."""
     z = os.path.join(GSZ_DOWNLOADS, SLOPEW_EXAMPLES_ZIP)
     if not os.path.isfile(z):
         return None
     try:
-        data = zipfile.ZipFile(z).read(UNIT_WEIGHT_EXAMPLE)
+        data = zipfile.ZipFile(z).read(member)
     except KeyError:
         return None
-    p = os.path.join(td, "unit_weight_definition.gsz")
+    p = os.path.join(td, os.path.basename(member).replace(" ", "_"))
     with open(p, "wb") as fh:
         fh.write(data)
     return p
+
+
+def _critical_fs(g, analysis, sd, solver, n=30):
+    """``(XSLOPE, SLOPE/W)`` factors of safety on SLOPE/W's critical circle of one
+    analysis, or None when it has no circle or XSLOPE cannot solve it. A circle
+    drawn through a vertex of the ground surface (an Entry and Exit search whose exit
+    is a point) is moved off it by a micrometre."""
+    from xslope.geostudio import read_gsz_results
+    from xslope.slice import generate_slices
+    rows = [r for r in read_gsz_results(g, analysis["name"]) if r["circular"]]
+    if not rows:
+        return None
+    best = min(rows, key=lambda t: t["fs"])
+    for eps in (0.0, -1e-6, 1e-6):
+        circle = {"Xo": best["xo"], "Yo": best["yo"], "R": best["r"] * (1.0 + eps),
+                  "Depth": None, "Y": None, "Option": "Depth",
+                  "Movement": "Left to Right"}
+        ok, res = _quiet(generate_slices, sd, circle=circle, num_slices=n,
+                         debug=False, check_inputs=False)
+        if ok:
+            ok2, r = _quiet(solver, res[0])
+            return (r["FS"], best["fs"]) if ok2 else None
+    return None
 
 
 def _built_model(gamma_sat=None, phreatic=False):
@@ -354,7 +382,10 @@ def check_tieback_capacity():
         from xslope.slice import generate_slices
         from xslope.solve import spencer
         g, (sd, _cav) = _import(path)
-        cap = 247343.87 / 4.0           # <TensileCapacity> over <Spacing>
+        # <TensileCapacity> 247343.87 over <Spacing> 4 is 61836; the anchor's bond,
+        # <PulloutResistance> 4000 / 4 over <BondLength> 40, is 40000 and governs (the
+        # 40,000 lb/ft of wall verification manual 2.35 quotes).
+        cap = min(247343.87, 4000.0 * 40.0) / 4.0
         for rl in sd.get("reinforcement_lines") or [{}]:
             if not _close(rl.get("t_max") or 0.0, cap, 1e-6):
                 fails.append(f"3: the Tie-Back Wall's anchors imported at t_max "
@@ -473,6 +504,355 @@ def check_skill():
     return fails
 
 
+# --------------------------------------------------------------------------------
+# 7. A piezometric line that stops short of the model
+# --------------------------------------------------------------------------------
+
+def check_piezo_short_ends():
+    """SLOPE/W applies no pore pressure outside a piezometric line's x-range; XSLOPE
+    refuses a slice there. The import brings the line across exactly as drawn, never
+    continued, and its note names SLOPE/W's rule and says what to do at each short
+    end by where the end sits: on the ground surface, above it (a pool), or below
+    it. The preflight warns and the slicer refuses a slice past the end. Arai and
+    Tagyo's file (its line starts at x = 30, where the manual's Figure 34 draws it
+    along the toe) is scored on SLOPE/W's terms by the corpus harness's rule, not by
+    the importer."""
+    from xslope.slice import generate_slices
+    from xslope.preflight import preflight
+    common = ("SLOPE/W applies no pore pressure outside a line's x-range; XSLOPE "
+              "refuses a slice there instead")
+    fails = []
+    # The built model's ground runs (0, 8), (15, 8), (35, 20), (60, 20).
+    cases = {
+        "ground": ([(25.0, 14.0), (60.0, 15.0)],
+                   ["no water left of x = 25", "left end the line is on the ground "
+                    "surface", "the water table comes out on the ground there",
+                    "extend the line along the ground surface to x = 0"]),
+        "pool": ([(5.0, 10.0), (20.0, 10.0), (60.0, 15.0)],
+                 ["no water left of x = 5", "left end the line is 2 above the ground: "
+                  "a pool", "Extend the line level to x = 0"]),
+        "below": ([(20.0, 10.0), (50.0, 15.0)],
+                  ["no water left of x = 20 and right of x = 50",
+                   "left end the line is 1 below the ground",
+                   "Extend it to x = 0 as the water continues",
+                   "right end the line is 5 below the ground",
+                   "Extend it to x = 60 as the water continues"]),
+    }
+    with tempfile.TemporaryDirectory() as td:
+        for name, (line, want) in cases.items():
+            sd0 = _built_model()
+            sd0["piezo_line"] = line
+            path, _ = _export(sd0, td, name)
+            _g, (sd, cav) = _import(path, 1, critical_surface=False)
+            got = sorted(sd.get("piezo_line") or [])
+            if len(got) != len(line) or not all(
+                    _close(a[0], b[0]) and _close(a[1], b[1]) for a, b in zip(got, line)):
+                fails.append(f"7 ({name}): the line {line} imported as {got}, not as "
+                             f"drawn")
+            note = next((c for c in cav if "stops short of the model" in c), "")
+            missing = [w for w in [common] + want if w not in note]
+            if missing:
+                fails.append(f"7 ({name}): the import note lacks {missing}: {note!r}")
+            # An unsolved file has no SLOPE/W results to speak of.
+            if "This file's SLOPE/W results" in note or \
+                    "SLOPE/W would compute this file" not in note:
+                fails.append(f"7 ({name}): the note on an unsolved file claims "
+                             f"results: {note!r}")
+            # XSLOPE's own behavior is unchanged: a warning, and a refused slice.
+            rep = preflight(sd, "lem", ids=["piezo.extent_short"])
+            if not any(f.rule_id == "piezo.extent_short" for f in rep.warnings):
+                fails.append(f"7 ({name}): no piezo.extent_short warning")
+            if name == "below":
+                try:
+                    _quiet(generate_slices, sd, circle=dict(CIRCLE), num_slices=40,
+                           debug=False, check_inputs=False)
+                    fails.append("7: a circle reaching past the line's end sliced")
+                except ValueError as exc:
+                    if "outside the piezometric line's x-extent" not in str(exc):
+                        raise
+            # Back out: the line goes to SLOPE/W as it came in.
+            back, _ = _export(sd, td, f"{name}_back")
+            _g2, (sd2, _c2) = _import(back, 1, critical_surface=False)
+            if sorted(sd2.get("piezo_line") or []) != got:
+                fails.append(f"7 ({name}): the line exported as "
+                             f"{sorted(sd2.get('piezo_line') or [])}, not {got}")
+        sd0 = _built_model()
+        path, _ = _export(sd0, td, "spans")
+        _g, (_sd, cav) = _import(path, 1, critical_surface=False)
+        if any("stops short of the model" in c for c in cav):
+            fails.append("7: a line spanning the model drew a short-line note")
+
+    path = _vendor("Arai and Tagyo - Pore water pressure slope.gsz")
+    if path is not None:
+        from xslope.solve import mprice
+        sys.path.insert(0, os.path.join(_REPO, "tools"))
+        import gsz_corpus
+        g, (sd, cav) = _import(path, critical_surface=False)
+        if sorted(sd["piezo_line"]) != [(30.0, 23.0), (48.0, 29.0), (66.0, 32.0)]:
+            fails.append(f"7: Arai and Tagyo's line imported as {sd['piezo_line']}, not "
+                         f"as SLOPE/W's file draws it")
+        note = next((c for c in cav if "stops short of the model" in c), "")
+        for w in (common, "This file's SLOPE/W results were computed with no water "
+                  "left of x = 30", "on the ground surface",
+                  "along the ground surface to x = 0"):
+            if w not in note:
+                fails.append(f"7: Arai and Tagyo's note lacks {w!r}: {note!r}")
+        # Imported as drawn, SLOPE/W's critical circle reaches past x = 30: refused.
+        try:
+            _critical_fs(g, g["analyses"][0], sd,
+                         lambda d: mprice(d, f_type="half_sine"))
+            fails.append("7: Arai and Tagyo's critical circle sliced past the line's "
+                         "start")
+        except ValueError as exc:
+            if "outside the piezometric line's x-extent" not in str(exc):
+                raise
+        _g, (_sd, cav) = _import(path)
+        if not any("reaches past the end of the piezometric line" in c for c in cav):
+            fails.append("7: the rejected critical circle's note does not say it "
+                         "reaches past the line")
+        # The harness's rule: the same circle, scored on SLOPE/W's terms.
+        if "Arai and Tagyo - Pore water pressure slope" not in \
+                gsz_corpus.ZERO_PAST_LINE_ENDS:
+            fails.append("7: the corpus harness does not score Arai and Tagyo by "
+                         "SLOPE/W's rule")
+        else:
+            sdz, ext = gsz_corpus._zero_past_line_ends(sd)
+            got = _critical_fs(
+                g, g["analyses"][0], sdz,
+                lambda d: mprice(gsz_corpus._apply_zero_past_line_ends(d, ext),
+                                 f_type="half_sine"))
+            if got is None or abs(got[0] / got[1] - 1.0) > 0.005:
+                fails.append(f"7: under the harness's rule Arai and Tagyo solves to "
+                             f"{got} on SLOPE/W's critical circle (XSLOPE, SLOPE/W); "
+                             f"expected within 0.5%")
+    return fails
+
+
+# --------------------------------------------------------------------------------
+# 8. Spatial Mohr-Coulomb strengths
+# --------------------------------------------------------------------------------
+
+def _set_spatial(root, points, input_param="Y", phi=None):
+    """Make the foundation a Spatial Mohr-Coulomb material whose cohesion is the
+    curve ``points`` [(coordinate, c), ...] against ``input_param``."""
+    for m in root.findall(ST):
+        if m.findtext("Name") != "foundation":
+            continue
+        m.find("SlopeModel").text = "MohrCoulombSpatial"
+        ss = m.find("StressStrain")
+        for tag in ("CohesionPrime", "PhiPrime"):
+            e = ss.find(tag)
+            if e is not None:
+                ss.remove(e)
+        ET.SubElement(ss, "SlopeCohesionModel").text = "Function"
+        ET.SubElement(ss, "CohesionFnNum").text = "1"
+        if phi is not None:
+            ET.SubElement(ss, "PhiPrime").text = str(phi)
+    fns = root.find("Functions")
+    if fns is None:
+        fns = ET.SubElement(root, "Functions")
+    mat = ET.SubElement(fns, "Material")
+    ss = ET.SubElement(mat, "StressStrain")
+    cfs = ET.SubElement(ss, "CohesionFns", Len="1")
+    fn = ET.SubElement(cfs, "CohesionFn")
+    ET.SubElement(fn, "ID").text = "1"
+    ET.SubElement(fn, "Name").text = "strength line"
+    ET.SubElement(fn, "Function").text = (
+        f"Spline(OutputParam=CohesionPrime,InputParam={input_param},Smooth=100,"
+        f"Tension=100,SlopeBefore=0,SlopeAfter=0,LogInput=false,LogOutput=false)")
+    pts = ET.SubElement(fn, "Points", Len=str(len(points)))
+    for x, y in points:
+        ET.SubElement(pts, "Point", X=str(x), Y=str(y))
+
+
+def check_spatial_strength():
+    """A Spatial Mohr-Coulomb cohesion that is a straight line rising with depth, on
+    phi = 0, is XSLOPE's cp (SLOPE/W's own SHANSEP example has one). Any other
+    function is replaced by its lowest value, and the notes name the material, the
+    function and the value used."""
+    fails = []
+    with tempfile.TemporaryDirectory() as td:
+        base, _ = _export(_built_model(), td, "base")
+        cases = {"line": ([(0.0, 40.0), (8.0, 20.0)], "Y", None),
+                 "friction": ([(0.0, 40.0), (8.0, 20.0)], "Y", 20.0),
+                 "x": ([(0.0, 30.0), (30.0, 18.0), (60.0, 25.0)], "X", None)}
+        got = {}
+        for name, (pts, inp, phi) in cases.items():
+            p = _mutate(base, os.path.join(td, f"{name}.gsz"),
+                        lambda r, a=pts, b=inp, c=phi: _set_spatial(r, a, b, c))
+            _g, got[name] = _import(p, 1, critical_surface=False)
+        m = _mat(got["line"][0], "foundation")
+        if (m["option"], m["c"], m["cp"], m["r_elev"], m["phi"]) != \
+                ("cp", 20.0, 2.5, 8.0, 0.0):
+            fails.append(f"8: a cohesion line 40 at y = 0 to 20 at y = 8 imported as "
+                         f"{m['option']} c={m['c']} cp={m['cp']} r_elev={m['r_elev']}, "
+                         f"not cp 20 / 2.5 below y = 8")
+        if not any("cp option" in c for c in got["line"][1]):
+            fails.append("8: the cp mapping was not stated in the import notes")
+        m = _mat(got["friction"][0], "foundation")
+        if (m["option"], m["c"], m["phi"]) != ("mc", 20.0, 20.0) or not any(
+                "'foundation'" in c and "lowest" in c for c in got["friction"][1]):
+            fails.append(f"8: a cohesion line on phi = 20 imported as {m['option']} "
+                         f"c={m['c']} phi={m['phi']}, not mc with the lowest c, 20, "
+                         f"and a note (XSLOPE's cp takes no friction angle)")
+        m = _mat(got["x"][0], "foundation")
+        if (m["option"], m["c"]) != ("mc", 18.0) or not any(
+                "'foundation'" in c and "'strength line'" in c and "c = 18" in c
+                for c in got["x"][1]):
+            fails.append(f"8: a cohesion function of x imported as {m['option']} "
+                         f"c={m['c']}, or without a note naming the material, the "
+                         f"function and the value used")
+
+        path = _slopew_example(
+            td, "SLOPE2D/SHANSEP - Stress History and Normalized Soil Engineering "
+                "Property.gsz")
+        if path is not None:
+            from xslope.solve import spencer
+            from xslope.geostudio import read_gsz
+            g = read_gsz(path)
+            a = next(a for a in g["analyses"] if a["name"].startswith("4 "))
+            _g, (sd, _cav) = _import(path, a["id"], critical_surface=False)
+            got = _critical_fs(g, a, sd, spencer)
+            if got is None or abs(got[0] / got[1] - 1.0) > 0.005:
+                fails.append(f"8: SLOPE/W's Spatial Mohr-Coulomb example solves to "
+                             f"{got} on its critical circle (XSLOPE, SLOPE/W); expected "
+                             f"within 0.5%")
+    return fails
+
+
+# --------------------------------------------------------------------------------
+# 9. Reinforcement: the untyped default, the bond length, F of S dependence
+# --------------------------------------------------------------------------------
+
+def check_anchor_import():
+    """A product with no <Type> is GeoStudio's default, an anchor (axial). An anchor
+    develops pullout over its <BondLength> only, so its capacity is the smaller of
+    the tensile capacity and pullout x bond length. <FofSDependent>true is passive.
+    A shear force, and a type XSLOPE does not map, are named in the notes."""
+    fails = []
+    with tempfile.TemporaryDirectory() as td:
+        base, _ = _export(_built_model(), td, "base")
+        products = {
+            "untyped": {"Name": "bar", "ID": "1", "Spacing": "2", "BondLength": "5",
+                        "Tensile": "1000", "PlateCapacity": "1000",
+                        "PulloutResistance": "100"},
+            "fofs": {"Name": "bar", "ID": "1", "Spacing": "2", "BondLength": "5",
+                     "Tensile": "1000", "PlateCapacity": "1000",
+                     "PulloutResistance": "100", "FofSDependent": "true", "Shear": "50"},
+            "nail": {"Name": "bar", "ID": "1", "Type": "Nail", "Spacing": "2",
+                     "BondLength": "5", "Tensile": "1000", "PlateCapacity": "1000",
+                     "PulloutResistance": "100"},
+            "pile": {"Name": "pile", "ID": "1", "Type": "Pile", "Shear": "50"},
+        }
+        got = {}
+        for name, prod in products.items():
+            p = _mutate(base, os.path.join(td, f"{name}.gsz"),
+                        lambda r, q=prod: _add_reinforcement(r, q))
+            _g, got[name] = _import(p, 1, critical_surface=False)
+        rl = got["untyped"][0]["reinforcement_lines"][0]
+        # rate 100 / 2 = 50 per unit length over 5 -> 250, below 1000 / 2 = 500
+        if (rl["type"], rl["dir"], rl["appl"]) != ("anchor", "axial", "active") or \
+                not _close(rl["t_max"], 250.0) or not _close(max(rl["lp1"], rl["lp2"]),
+                                                             5.0):
+            fails.append(f"9: an untyped product with a 5 m bond imported as "
+                         f"{rl['type']}/{rl['dir']}/{rl['appl']} t_max={rl['t_max']} "
+                         f"lp={rl['lp1']}, not an axial anchor at 250 over 5")
+        cav = got["untyped"][1]
+        if not any("no type" in c and "anchor" in c for c in cav) or \
+                not any("bond length" in c for c in cav):
+            fails.append("9: the anchor default and the bond length were not stated")
+        rl = got["fofs"][0]["reinforcement_lines"][0]
+        if rl["appl"] != "passive":
+            fails.append("9: an F of S dependent product did not import as passive")
+        if not any("shear force" in c for c in got["fofs"][1]):
+            fails.append("9: a dropped shear force was not stated")
+        rl = got["nail"][0]["reinforcement_lines"][0]
+        if not _close(rl["t_max"], 500.0):
+            fails.append(f"9: a nail's BondLength capped it at {rl['t_max']}; nails are "
+                         f"bonded over their whole length")
+        if not any("'pile' (Pile)" in c for c in got["pile"][1]):
+            fails.append("9: a Pile product was not named as unmapped")
+
+        from xslope.solve import janbu, spencer
+        path = _vendor("Pockoski and Duncan - Reinforcement.gsz")
+        if path is not None:
+            from xslope.geostudio import read_gsz
+            g = read_gsz(path)
+            for a in g["analyses"]:
+                solver = {"Janbu": janbu, "Spencer": spencer}.get(a["method"])
+                if solver is None or "single" in a["name"]:
+                    continue
+                _g, (sd, _cav) = _import(path, a["id"], critical_surface=False)
+                got_fs = _critical_fs(g, a, sd, solver)
+                if got_fs is None or abs(got_fs[0] / got_fs[1] - 1.0) > 0.03:
+                    fails.append(f"9: Pockoski and Duncan's tieback, {a['name']}: "
+                                 f"{got_fs} on SLOPE/W's critical circle (XSLOPE, "
+                                 f"SLOPE/W); expected within 3%")
+        path = _slopew_example(td, "SLOPE2D/Reinforcement with Anchors.gsz")
+        if path is not None:
+            from xslope.geostudio import read_gsz
+            g = read_gsz(path)
+            for a in g["analyses"]:
+                if a["name"].startswith("4 "):
+                    continue                # its shear force is not imported
+                _g, (sd, _cav) = _import(path, a["id"], critical_surface=False)
+                got_fs = _critical_fs(g, a, sd, spencer)
+                if got_fs is None or abs(got_fs[0] / got_fs[1] - 1.0) > 0.005:
+                    fails.append(f"9: Reinforcement with Anchors, {a['name']}: "
+                                 f"{got_fs} on SLOPE/W's critical circle (XSLOPE, "
+                                 f"SLOPE/W); expected within 0.5%")
+    return fails
+
+
+# --------------------------------------------------------------------------------
+# 10. Saved slip circles of a search with a moment axis
+# --------------------------------------------------------------------------------
+
+def check_axis_rows():
+    """A search with a moment axis writes the axis as every saved row's center. The
+    circle whose columns are saved gets its center back from them; the other rows
+    are 'axis' rows and are not rebuilt as circles."""
+    import math
+    from xslope.geostudio import _axis_circle_from_columns
+    fails = []
+    xc, yc, r = 40.0, 25.0, 20.0
+    angles = [math.radians(a) for a in range(230, 311, 10)]
+    pts = [(xc + r * math.cos(t), yc + r * math.sin(t)) for t in angles]
+    lines = ["XLeft,XRight,YBackBotLeft,YBackBotRight"]
+    lines += [f"{a[0]},{b[0]},{a[1]},{b[1]}" for a, b in zip(pts, pts[1:])]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("a/001/column_7.csv", "\n".join(lines))
+        zf.writestr("a/001/column_8.csv", "\n".join(lines[:3] + ["1,2,3,9", "2,3,9,3"]))
+    fit = _axis_circle_from_columns(zipfile.ZipFile(buf), "a/001/",
+                                    [{"SlipNum": "7"}, {"SlipNum": "8"}])
+    if "7" not in fit or max(abs(fit["7"][0] - xc), abs(fit["7"][1] - yc),
+                             abs(fit["7"][2] - r)) > 1e-9:
+        fails.append(f"10: a saved circle's columns gave center {fit.get('7')}, not "
+                     f"({xc}, {yc}, {r})")
+    if "8" in fit:
+        fails.append("10: columns that are not one circle were fitted as one")
+
+    with tempfile.TemporaryDirectory() as td:
+        path = _slopew_example(td, "SLOPE2D/Reinforcement with Anchors.gsz")
+        if path is not None:
+            from xslope.geostudio import read_gsz, read_gsz_results
+            g = read_gsz(path)
+            a = next(a for a in g["analyses"] if a["name"].startswith("2 "))
+            rows = read_gsz_results(g, a["name"])
+            circles = [t for t in rows if t["circular"]]
+            if len(circles) != 1 or {t["kind"] for t in rows} != {"axis", "circle"}:
+                fails.append(f"10: the anchors example's axis search gave "
+                             f"{len(circles)} circles and kinds "
+                             f"{sorted({t['kind'] for t in rows})}")
+            elif abs(circles[0]["xo"] - 187.644) > 0.01 or \
+                    abs(circles[0]["yo"] - 119.339) > 0.01:
+                fails.append(f"10: its critical circle's center came back as "
+                             f"({circles[0]['xo']:.3f}, {circles[0]['yo']:.3f}), not "
+                             f"(187.644, 119.339)")
+    return fails
+
+
 CHECKS = [
     ("1. gamma_sat written on export", check_gamma_sat_export),
     ("2. unit weight above the water table", check_unit_weight_import),
@@ -480,6 +860,10 @@ CHECKS = [
     ("4. the phreatic switch written on export", check_phreatic_export),
     ("5. partial factors named", check_partial_factors),
     ("6. the skill on imported surfaces", check_skill),
+    ("7. a piezometric line short of the model", check_piezo_short_ends),
+    ("8. spatial Mohr-Coulomb strengths", check_spatial_strength),
+    ("9. anchors: default type, bond, F of S", check_anchor_import),
+    ("10. saved circles of an axis search", check_axis_rows),
 ]
 
 
